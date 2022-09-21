@@ -186,11 +186,22 @@ talkingPoints: {{ ("data.billTrackers", ["talkingPoints"]) }}\
         for eg in random.choices(training_data, k=n_prompts):
             text_prompt += eg["prompt"] + prompt_sep + eg["completion"] + completion_sep
 
+example_prompt = """\
+billNumber: 5188
+billTitle: Concerning the creation of the Washington state public bank.
+billURL: https://app.leg.wa.gov/billsummary?BillNumber=5188&Year;=2021&Initiative;=false
+talkingPoints: Senate Summary
+
+  * Activates a public financial cooperative as a cooperative membership organization to lend to local and tribal governmental entities.
+  * Local and tribal governments, along with the state, are permitted to be members of the public financial cooperative.
+  * Enables the public financial cooperative to issue debt in the name of the cooperative rather than the state of Washington.\
+"""
+
 with col2:
     "### Prompt"
 
     eg = random.choice(training_data)
-    example_prompt = st.text_area("Example prompt", value=eg["prompt"])
+    example_prompt = st.text_area("Example prompt", value=example_prompt)
     text_prompt += example_prompt + prompt_sep
 
     with st.expander("Final Prompt"):
