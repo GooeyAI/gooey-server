@@ -179,8 +179,8 @@ talkingPoints: {{ ("data.billTrackers", ["talkingPoints"]) }}\
         )
         prompt_sep = st.text_input("Prompt end separator", value="\n$$$$\n")
         completion_sep = st.text_input("Completion end separator", value="\n####\n")
-        n_prompts = st.number_input("Number of examples", value=4)
-        max_tokens = st.number_input("Max output tokens", value=128)
+        n_prompts = int(st.number_input("Number of examples", value=4))
+        max_tokens = int(st.number_input("Max output tokens", value=128))
 
         text_prompt = prompt_header.strip() + "\n\n"
         for eg in random.choices(training_data, k=n_prompts):
