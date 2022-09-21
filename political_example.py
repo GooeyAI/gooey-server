@@ -12,7 +12,7 @@ from html2text import html2text
 
 st.set_page_config(layout="wide")
 
-"# Drag & Drop AI - Polictical letters example"
+"# Drag & Drop AI - Political letters example"
 
 col1, col2 = st.columns(2)
 
