@@ -159,18 +159,41 @@ talkingPoints: {{ ("data.billTrackers", ["talkingPoints"]) }}\
         match selected_text_api:
             case "openai":
                 openai.api_key = config("OPENAI_API_KEY")
+                engine_choices = [
+                    "text-davinci-002",
+                    "text-curie-001",
+                    "text-babbage-001",
+                    "text-ada-001",
+                ]
             case "goose.ai":
+                openai.api_key = config("GOOSEAI_API_KEY")
                 openai.api_base = "https://api.goose.ai/v1"
+                engine_choices = [
+                    "gpt-neo-20b",
+                    "cassandra-lit-2-7b",
+                    "cassandra-lit-e2-2-7b",
+                    "cassandra-lit-e3-2-7b",
+                    "cassandra-lit-6-7b",
+                    "cassandra-lit-e2-6-7b",
+                    "cassandra-lit-e3-6-7b",
+                    "convo-6b",
+                    "fairseq-125m",
+                    "fairseq-355m",
+                    "fairseq-1-3b",
+                    "fairseq-2-7b",
+                    "fairseq-6-7b",
+                    "fairseq-13b",
+                    "gpt-j-6b",
+                    "gpt-neo-125m",
+                    "gpt-neo-1-3b",
+                    "gpt-neo-2-7b",
+                ]
 
-        # list engines
-        with st.spinner():
-            engines = openai.Engine.list()
-
-        # select engine
-        engine_choices = [engine["id"] for engine in engines["data"]]
-        selected_engine = st.selectbox(
-            "Engine", engine_choices, index=engine_choices.index("text-davinci-002")
-        )
+        # # list engines
+        # with st.spinner():
+        #     engines = openai.Engine.list()
+        # engine_choices = [engine["id"] for engine in engines["data"]]
+        selected_engine = st.selectbox("Engine", engine_choices, index=0)
 
     with st.expander("Prompt generation"):
         prompt_header = st.text_area(
