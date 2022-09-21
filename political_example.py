@@ -179,7 +179,7 @@ talkingPoints: {{ ("data.billTrackers", ["talkingPoints"]) }}\
         )
         prompt_sep = st.text_input("Prompt end separator", value="\n$$$$\n")
         completion_sep = st.text_input("Completion end separator", value="\n####\n")
-        n_prompts = st.number_input("Number of examples", value=5)
+        n_prompts = st.number_input("Number of examples", value=4)
         max_tokens = st.number_input("Max output tokens", value=128)
 
         text_prompt = prompt_header.strip() + "\n\n"
@@ -206,6 +206,8 @@ with col2:
 
     with st.expander("Final Prompt"):
         st.text(text_prompt)
+
+    st.button("Run")
 
     "### Completion"
 
