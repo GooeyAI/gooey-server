@@ -159,6 +159,7 @@ talkingPoints: {{ ("data.billTrackers", ["talkingPoints"]) }}\
         match selected_text_api:
             case "openai":
                 openai.api_key = config("OPENAI_API_KEY")
+                openai.api_base = "https://api.openai.com/v1"
                 engine_choices = [
                     "text-davinci-002",
                     "text-curie-001",
