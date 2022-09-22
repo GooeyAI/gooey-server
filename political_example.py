@@ -202,13 +202,12 @@ talkingPoints: {{ ("data.billTrackers", ["talkingPoints"]) }}\
             value="A polite and passionate writer that argues to politicians from a voter’s perspective as to why they should support or vote against upcoming Bills. It often deviates from the talking points to make a grounded, personal argument regarding why the elected representative should work for or against an upcoming Bill",
         )
         prompt_sep = st.text_input("Prompt end separator", value="\n$$$$\n")
+        completion_prefix = st.text_input("Completion prefix", value="Response:")
+        completion_prefix = completion_prefix.strip() + " "
         completion_sep = st.text_input("Completion end separator", value="\n####\n")
-        n_prompts = int(st.number_input("Number of examples", value=4))
+        num_prompts = int(st.number_input("Number of examples", value=4))
+        best_of = int(st.number_input("Best of", value=3))
         max_tokens = int(st.number_input("Max output tokens", value=128))
-
-        text_prompt = prompt_header.strip() + "\n\n"
-        for eg in random.choices(training_data, k=n_prompts):
-            text_prompt += eg["prompt"] + prompt_sep + eg["completion"] + completion_sep
 
 example_prompt = """\
 billNumber: 5188
@@ -224,12 +223,22 @@ talkingPoints: Senate Summary
 with col2:
     "### Prompt"
 
-    eg = random.choice(training_data)
     example_prompt = st.text_area("Example prompt", value=example_prompt)
-    text_prompt += example_prompt + prompt_sep
+
+    final_prompt = prompt_header.strip() + "\n\n"
+    for eg in random.choices(training_data, k=num_prompts):
+        final_prompt += (
+            eg["prompt"]
+            + prompt_sep
+            + completion_prefix
+            + eg["completion"]
+            + completion_sep
+        )
+
+    final_prompt += example_prompt + prompt_sep + completion_prefix
 
     with st.expander("Final Prompt"):
-        st.text(text_prompt)
+        st.text(final_prompt)
 
     st.button("Run")
 
@@ -239,16 +248,21 @@ with col2:
         r = openai.Completion.create(
             engine=selected_engine,
             max_tokens=max_tokens,
-            prompt=text_prompt,
+            prompt=final_prompt,
             stop=[completion_sep],
+            # n=num_samples,
+            best_of=best_of,
         )
 
     # choose the first completion that isn't empty
     response = ""
+    finish_reason = ""
     for choice in r["choices"]:
         text = choice["text"].strip()
         if text:
             response = text
+            finish_reason = choice["finish_reason"]
             break
 
-    st.text(response)
+    st.text_area("", value=response)
+    f"(finish reason: {finish_reason})"
