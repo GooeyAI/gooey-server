@@ -13,9 +13,7 @@ from daras_ai.components import language_model_prompt_gen
 from daras_ai.components import text_input
 from daras_ai.components import train_data_formatter
 from daras_ai.components.header import header
-
-import settings
-
+from daras_ai import settings
 from daras_ai.components.text_input import raw_text_input
 from daras_ai.components.text_output import raw_text_output
 
