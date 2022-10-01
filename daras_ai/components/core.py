@@ -11,7 +11,7 @@ def daras_ai_step(verbose_name=None):
         def wrapper(idx, delete, **kwargs):
             if verbose_name:
                 with st.expander(verbose_name):
-                    if st.button(f"🗑 {idx + 1}"):
+                    if st.button("🗑", help=f"Delete Step {idx + 1}"):
                         delete()
                         return
                     fn(**kwargs)

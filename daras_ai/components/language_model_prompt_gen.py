@@ -22,22 +22,24 @@ def language_model_prompt_gen(variables, state, set_state):
     )
     set_state({"prompt_header": prompt_header})
 
-    prompt_sep = st.text_area("Prompt end separator", value=state.get("prompt_sep", ""))
+    prompt_sep = st.text_area(
+        "Prompt end separator", value=state.get("prompt_sep", "\n$$$$\n")
+    )
     set_state({"prompt_sep": prompt_sep})
 
     completion_prefix = st.text_area(
-        "Completion prefix", value=state.get("completion_prefix", "")
+        "Completion prefix", value=state.get("completion_prefix", "Response: ")
     )
     set_state({"completion_prefix": completion_prefix})
 
     completion_prefix = completion_prefix.strip() + " "
     completion_sep = st.text_area(
-        "Completion end separator", value=state.get("completion_sep", "")
+        "Completion end separator", value=state.get("completion_sep", "\n####\n")
     )
     set_state({"completion_sep": completion_sep})
 
     num_prompts = int(
-        st.number_input("Number of examples", value=state.get("num_prompts", 0))
+        st.number_input("Number of examples", value=state.get("num_prompts", 1))
     )
     set_state({"num_prompts": num_prompts})
 

@@ -12,6 +12,7 @@ from daras_ai.components import http_data_source
 from daras_ai.components import language_model_prompt_gen
 from daras_ai.components import text_input
 from daras_ai.components import train_data_formatter
+from daras_ai.components import text_train_data
 from daras_ai.components.header import header
 from daras_ai import settings
 from daras_ai.components.text_input import raw_text_input
@@ -78,39 +79,38 @@ def call_step(idx: int, state: dict):
 st.session_state.setdefault("header", {"name": header.__name__})
 call_step(0, st.session_state["header"])
 
+
 col1, col2 = st.columns(2)
 
 with col1:
-    st.write("## Input")
+    st.write("# Input")
 
     st.session_state.setdefault("input_step", {"name": raw_text_input.__name__})
     call_step(0, st.session_state["input_step"])
 
-    st.write("## Steps")
+    st.write("# Steps")
+
+    col1_1, col2_1 = st.columns(2)
+    with col1_1:
+        fn = st.selectbox(
+            "Add a step",
+            [value for value in REPO.values() if value.verbose_name],
+            format_func=lambda fn: fn.verbose_name,
+        )
+    with col2_1:
+        add_btn = st.button("Add")
+    if add_btn:
+        st.session_state["steps"].append({"name": fn.__name__})
+        doc_ref.update(st.session_state.to_dict())
 
     st.session_state.setdefault("steps", [])
     for idx, step in enumerate(st.session_state["steps"]):
         call_step(idx, step)
 
 with col2:
-    st.write("## Output")
+    st.write("# Output")
 
     st.button("Run")
 
     st.session_state.setdefault("output_step", {"name": raw_text_output.__name__})
     call_step(0, st.session_state["output_step"])
-
-col1, col2, *_ = st.columns(5)
-with col1:
-    fn = st.selectbox(
-        "Add a step",
-        [value for value in REPO.values() if value.verbose_name],
-        format_func=lambda fn: fn.verbose_name,
-    )
-with col2:
-    btn = st.button("Add")
-
-if btn:
-    st.session_state["steps"].append({"name": fn.__name__})
-    doc_ref.update(st.session_state.to_dict())
-    st.experimental_rerun()

@@ -75,8 +75,8 @@ def language_model(variables, state, set_state):
     )
     set_state({"max_tokens": max_tokens})
 
-    stop = st.text_input("Stop sequences (JSON)", value=state.get("stop", "[]"))
-    set_state({"stop": stop})
+    stop = json.loads(st.text_input("Stop sequences (JSON)", value=state.get("stop")))
+    set_state({"stop": json.dumps(stop)})
 
     final_prompt_var = st.text_input(
         "Final prompt input var", value=state.get("final_prompt_var", "")
@@ -88,7 +88,7 @@ def language_model(variables, state, set_state):
             engine=selected_engine,
             max_tokens=max_tokens,
             prompt=variables[final_prompt_var],
-            stop=json.loads(stop),
+            stop=stop,
             best_of=best_of,
         )
 
