@@ -13,42 +13,42 @@ from daras_ai.components.core import daras_ai_step
 
 
 @daras_ai_step("Language Model Prompt Generator")
-def language_model_prompt_gen(variables, state, set_state):
+def language_model_prompt_gen(idx, variables, state):
     st.write("### Config")
 
     prompt_header = st.text_area(
         label="Prompt header",
         value=state.get("prompt_header", ""),
     )
-    set_state({"prompt_header": prompt_header})
+    state.update({"prompt_header": prompt_header})
 
     prompt_sep = st.text_area(
         "Prompt end separator", value=state.get("prompt_sep", "\n$$$$\n")
     )
-    set_state({"prompt_sep": prompt_sep})
+    state.update({"prompt_sep": prompt_sep})
 
     completion_prefix = st.text_area(
         "Completion prefix", value=state.get("completion_prefix", "Response: ")
     )
-    set_state({"completion_prefix": completion_prefix})
+    state.update({"completion_prefix": completion_prefix})
 
     completion_prefix = completion_prefix.strip() + " "
     completion_sep = st.text_area(
         "Completion end separator", value=state.get("completion_sep", "\n####\n")
     )
-    set_state({"completion_sep": completion_sep})
+    state.update({"completion_sep": completion_sep})
 
     num_prompts = int(
         st.number_input("Number of examples", value=state.get("num_prompts", 1))
     )
-    set_state({"num_prompts": num_prompts})
+    state.update({"num_prompts": num_prompts})
 
     st.write("### Generation")
 
     training_data_var = st.text_input(
         "Training data var", value=state.get("training_data_var", "")
     )
-    set_state({"training_data_var": training_data_var})
+    state.update({"training_data_var": training_data_var})
 
     final_prompt = prompt_header.strip() + "\n\n"
     for eg in random.choices(variables[training_data_var], k=num_prompts):
@@ -67,5 +67,5 @@ def language_model_prompt_gen(variables, state, set_state):
     final_prompt_var = st.text_input(
         "Final prompt out var", value=state.get("final_prompt_var", "")
     )
-    set_state({"final_prompt_var": final_prompt_var})
+    state.update({"final_prompt_var": final_prompt_var})
     variables[final_prompt_var] = final_prompt

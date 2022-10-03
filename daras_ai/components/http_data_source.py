@@ -7,30 +7,30 @@ from daras_ai.components.core import daras_ai_step
 
 
 @daras_ai_step("Training data via HTTP")
-def http_data_source(variables, state, set_state):
+def http_data_source(idx, variables, state):
     method = st.text_input(
         label="HTTP method",
         value=state.get("method", ""),
     )
-    set_state({"method": method})
+    state.update({"method": method})
 
     url = st.text_input(
         label="URL",
         value=state.get("url", ""),
     )
-    set_state({"url": url})
+    state.update({"url": url})
 
     headers = st.text_area(
         label="Headers",
         value=state.get("headers", "{}"),
     )
-    set_state({"headers": headers})
+    state.update({"headers": headers})
 
     json_body = st.text_area(
         label="JSON body",
         value=state.get("json_body", ""),
     )
-    set_state({"json_body": json_body})
+    state.update({"json_body": json_body})
 
     "**Response**"
 
@@ -52,5 +52,5 @@ def http_data_source(variables, state, set_state):
         value=state.get("out_var"),
     )
     if out_var is not None:
-        set_state({"out_var": out_var})
+        state.update({"out_var": out_var})
         variables[out_var] = response_json

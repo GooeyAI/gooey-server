@@ -13,7 +13,9 @@ from daras_ai.components.core import daras_ai_step
 
 
 @daras_ai_step("Language Model")
-def language_model(variables, state, set_state):
+def language_model(idx, variables, state):
+    st.write("#### Config")
+
     # select text api
     api_provider_options = ["openai", "goose.ai"]
     api_provider = st.selectbox(
@@ -21,7 +23,7 @@ def language_model(variables, state, set_state):
         options=api_provider_options,
         index=api_provider_options.index(state.get("api_provider#1", "openai")),
     )
-    set_state({"api_provider#1": api_provider})
+    state.update({"api_provider#1": api_provider})
 
     # set api key
     match api_provider:
@@ -65,23 +67,40 @@ def language_model(variables, state, set_state):
         options=engine_choices,
         index=engine_choices.index(state.get("selected_engine#1", engine_choices[0])),
     )
-    set_state({"selected_engine#1": selected_engine})
+    state.update({"selected_engine#1": selected_engine})
 
-    best_of = int(st.number_input("Best of", value=state.get("best_of", 0)))
-    set_state({"best_of": best_of})
+    best_of = int(st.number_input("Best of", value=state.get("best_of", 1)))
+    state.update({"best_of": best_of})
 
     max_tokens = int(
-        st.number_input("Max output tokens", value=state.get("max_tokens", 0))
+        st.number_input("Max output tokens", value=state.get("max_tokens", 128))
     )
-    set_state({"max_tokens": max_tokens})
+    state.update({"max_tokens": max_tokens})
 
-    stop = json.loads(st.text_input("Stop sequences (JSON)", value=state.get("stop")))
-    set_state({"stop": json.dumps(stop)})
-
-    final_prompt_var = st.text_input(
-        "Final prompt input var", value=state.get("final_prompt_var", "")
+    stop = json.loads(
+        st.text_input("Stop sequences (JSON)", value=state.get("stop", "null"))
     )
-    set_state({"final_prompt_var": final_prompt_var})
+    state.update({"stop": json.dumps(stop)})
+
+    st.write("#### I/O")
+
+    all_vars = ["", *variables.keys()]
+    final_prompt_var = st.selectbox(
+        "Final prompt input var",
+        all_vars,
+        index=all_vars.index(state.get("final_prompt_var", "")),
+    )
+    state.update({"final_prompt_var": final_prompt_var})
+
+    output_var = st.selectbox(
+        "Model output var",
+        all_vars,
+        index=all_vars.index(state.get("output_var", "")),
+    )
+    state.update({"output_var": output_var})
+
+    if not (final_prompt_var and output_var):
+        return
 
     with st.spinner():
         r = openai.Completion.create(
@@ -103,4 +122,4 @@ def language_model(variables, state, set_state):
             break
 
     st.write(f"Finish reason: {finish_reason}")
-    variables["text_output"] = text_output
+    variables[output_var] = text_output

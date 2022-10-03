@@ -1,55 +1,66 @@
 import secrets
+import typing
 from copy import deepcopy
 
 import streamlit as st
 import streamlit.components.v1 as components
 from google.cloud import firestore
 
-from daras_ai.components.core import REPO
+from daras_ai.components.core import STEPS_REPO
 
-from daras_ai.components import text_api_selection
+from daras_ai.components import language_model
 from daras_ai.components import http_data_source
 from daras_ai.components import language_model_prompt_gen
 from daras_ai.components import text_input
 from daras_ai.components import train_data_formatter
 from daras_ai.components import text_train_data
-from daras_ai.components.header import header
 from daras_ai import settings
 from daras_ai.components.text_input import raw_text_input
 from daras_ai.components.text_output import raw_text_output
 
-st.set_page_config(layout="wide")
 
-query_params = st.experimental_get_query_params()
-doc_id = query_params.get("id", [secrets.token_urlsafe(8)])[0]
-st.experimental_set_query_params(id=doc_id)
+def get_or_create_doc_id():
+    query_params = st.experimental_get_query_params()
+    doc_id = query_params.get("id", [new_doc_id()])[0]
+    st.experimental_set_query_params(id=doc_id)
+    return doc_id
 
-db = firestore.Client()
-db_collection = db.collection("daras-ai--political_example")
-doc_ref = db_collection.document(doc_id)
-st.session_state["doc_ref"] = doc_ref
 
-doc = doc_ref.get()
-if not doc.exists:
-    doc_ref.create({"http_request_method": "GET"})
+def new_doc_id():
+    return secrets.token_urlsafe(8)
+
+
+@st.cache(allow_output_mutation=True)
+def get_firestore_doc(doc_id: str):
+    db_collection = get_db_collection()
+    doc_ref = db_collection.document(doc_id)
+
     doc = doc_ref.get()
+    if not doc.exists:
+        doc_ref.create({"http_request_method": "GET"})
+        doc = doc_ref.get()
 
-st.session_state.update(doc.to_dict())
+    return doc.to_dict()
 
-VARS = {}
 
-fork_me = st.button("Fork Me 🍴")
-if fork_me:
-    fork_doc_id = secrets.token_urlsafe(8)
+def get_db_collection():
+    db = firestore.Client()
+    db_collection = db.collection("daras-ai--political_example")
+    return db_collection
 
+
+def fork_me():
+    db_collection = get_db_collection()
+
+    fork_doc_id = new_doc_id()
     fork_doc_ref = db_collection.document(fork_doc_id)
-    fork_doc_ref.set(st.session_state.to_dict())
+    fork_doc_ref.set(deepcopy(st.session_state.to_dict()))
 
     components.html(
         f"""
         <script>
-        let new_url = window.top.location.href.split("?")[0] + "?id={fork_doc_id}";
-        window.open(new_url, "_blank");
+            let new_url = window.top.location.href.split("?")[0] + "?id={fork_doc_id}";
+            window.open(new_url, "_blank");
         </script>
         """,
         width=0,
@@ -57,60 +68,87 @@ if fork_me:
     )
 
 
-def call_step(idx: int, state: dict):
-    step_name: str = state["name"]
+def save_me():
+    db_collection = get_db_collection()
 
-    def set_state(update: dict):
-        old = deepcopy(state)
-        state.update(update)
-        if state == old:
-            return
-        doc_ref.update(st.session_state.to_dict())
+    doc_ref = db_collection.document(doc_id)
+    doc_ref.set(deepcopy(st.session_state.to_dict()))
 
-    def delete():
-        st.session_state["steps"].pop(idx)
-        doc_ref.update(st.session_state.to_dict())
+    cached_state.clear()
+    cached_state.update(deepcopy(st.session_state.to_dict()))
+
+
+def action_buttons():
+    top_col1, top_col2 = st.columns(2)
+    with top_col1:
+        st.button("Fork Me 🍴", on_click=fork_me)
+    with top_col2:
+        st.button("Save Me 💾", on_click=save_me)
+
+
+def render_steps(*, key: str, title: str):
+    st.session_state.setdefault(key, [])
+    state_steps = st.session_state[key]
+
+    def call_step(idx: int, state: dict, fn: typing.Callable):
+        def delete():
+            state_steps.pop(idx)
+            st.experimental_rerun()
+
+        st.session_state.setdefault("variables", {})
+        fn(
+            variables=st.session_state["variables"],
+            state=state,
+            delete=delete,
+            idx=idx,
+        )
+
+    selectbox_col, add_btn_col = st.columns(2)
+    with selectbox_col:
+        selected_fn = st.selectbox(
+            title,
+            [value for value in STEPS_REPO[key].values() if value.verbose_name],
+            format_func=lambda fn: fn.verbose_name,
+        )
+    with add_btn_col:
+        add_step = st.button(f"Add", help=f"Add {key}")
+
+    if add_step:
+        state_steps.append({"name": selected_fn.__name__})
         st.experimental_rerun()
 
-    fn = REPO[step_name]
-    fn(variables=VARS, state=state, set_state=set_state, delete=delete, idx=idx)
+    for idx, step in enumerate(state_steps):
+        call_step(idx, step, STEPS_REPO[key][step["name"]])
 
 
-st.session_state.setdefault("header", {"name": header.__name__})
-call_step(0, st.session_state["header"])
+#
+# main
+#
 
+st.set_page_config(layout="wide")
+
+doc_id = get_or_create_doc_id()
+cached_state = get_firestore_doc(doc_id)
+
+if not st.session_state:
+    st.session_state.update(deepcopy(cached_state))
+
+action_buttons()
+
+
+title = st.text_input("Title", key="header_title")
+description = st.text_area("Description", key="header_desc")
 
 col1, col2 = st.columns(2)
 
 with col1:
     st.write("# Input")
-
-    st.session_state.setdefault("input_step", {"name": raw_text_input.__name__})
-    call_step(0, st.session_state["input_step"])
+    render_steps(key="input_steps", title="Add an input")
 
     st.write("# Steps")
-
-    col1_1, col2_1 = st.columns(2)
-    with col1_1:
-        fn = st.selectbox(
-            "Add a step",
-            [value for value in REPO.values() if value.verbose_name],
-            format_func=lambda fn: fn.verbose_name,
-        )
-    with col2_1:
-        add_btn = st.button("Add")
-    if add_btn:
-        st.session_state["steps"].append({"name": fn.__name__})
-        doc_ref.update(st.session_state.to_dict())
-
-    st.session_state.setdefault("steps", [])
-    for idx, step in enumerate(st.session_state["steps"]):
-        call_step(idx, step)
+    render_steps(key="compute_steps", title="Add a step")
 
 with col2:
     st.write("# Output")
-
     st.button("Run")
-
-    st.session_state.setdefault("output_step", {"name": raw_text_output.__name__})
-    call_step(0, st.session_state["output_step"])
+    render_steps(key="output_steps", title="Add an output")

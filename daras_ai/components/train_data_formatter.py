@@ -11,33 +11,33 @@ input_spec_parse_pattern = "{" * 5 + "}" * 5
 
 
 @daras_ai_step("Training data extractor")
-def train_data_formatter(variables, state, set_state):
+def train_data_formatter(idx, variables, state):
     input_var = st.text_input(
         label="Input data var",
         value=state.get("input_var", None),
     )
     if input_var is None:
         return
-    set_state({"input_var": input_var})
+    state.update({"input_var": input_var})
     input_json = variables[input_var]
 
     input_format = st.text_area(
         label="Prompt template",
         value=state.get("input_format", ""),
     )
-    set_state({"input_format": input_format})
+    state.update({"input_format": input_format})
 
     output_format = st.text_area(
         label="Completion template",
         value=state.get("output_format", ""),
     )
-    set_state({"output_format": output_format})
+    state.update({"output_format": output_format})
 
     do_html2text = st.checkbox(
         "HTML -> Text",
         value=state.get("do_html2text", False),
     )
-    set_state({"do_html2text": do_html2text})
+    state.update({"do_html2text": do_html2text})
 
     input_prompts = []
     input_spec_results: list[parse.Result] = list(
@@ -106,7 +106,7 @@ def train_data_formatter(variables, state, set_state):
         value=state.get("out_var"),
     )
     if out_var is not None:
-        set_state({"out_var": out_var})
+        state.update({"out_var": out_var})
         variables[out_var] = training_data
 
     # openai.FineTune
