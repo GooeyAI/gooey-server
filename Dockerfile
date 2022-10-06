@@ -1,4 +1,4 @@
-FROM 3.10-slim
+FROM library/python:3.10-slim
 
 EXPOSE 8000
 
