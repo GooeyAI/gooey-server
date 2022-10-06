@@ -144,7 +144,7 @@ with col1:
     st.write("# Input")
     render_steps(key="input_steps", title="Add an input")
 
-    st.write("# Steps")
+    st.write("# Recipie")
     render_steps(key="compute_steps", title="Add a step")
 
 with col2:

@@ -15,7 +15,7 @@ from daras_ai.train_data_formatter import input_spec_parse_pattern
 app = FastAPI()
 
 
-@app.post("/api/v1/run-recipie/")
+@app.post("/v1/run-recipie/")
 def run(
     params: dict = Body(
         examples={
