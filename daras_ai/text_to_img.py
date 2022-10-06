@@ -7,10 +7,19 @@ import streamlit as st
 
 @daras_ai_step("Text to Img")
 def text_to_img(idx, variables, state):
+    st.write("### Config")
+
     selected_model = st.selectbox(
         "Model",
         options=["Stable Diffusion"],
     )
+
+    num_outputs = int(
+        st.number_input("# of outputs", value=int(state.get("num_outputs", 4)), step=1)
+    )
+    state.update({"num_outputs": num_outputs})
+
+    st.write("### Input")
 
     model_input_var = var_selector(
         "Input var",
@@ -18,6 +27,9 @@ def text_to_img(idx, variables, state):
         state=state,
         variables=variables,
     )
+
+    st.write("### Output")
+
     model_output_var = var_selector(
         "Output var",
         help=f"Text to Img Output {idx}",
@@ -30,14 +42,17 @@ def text_to_img(idx, variables, state):
 
     match selected_model:
         case "Stable Diffusion":
-            variables[model_output_var] = stable_diffusion(variables[model_input_var])
+            variables[model_output_var] = stable_diffusion(
+                variables[model_input_var],
+                num_outputs,
+            )
 
 
 @st.cache
-def stable_diffusion(prompt):
+def stable_diffusion(prompt, num_outputs):
     model = replicate.models.get("stability-ai/stable-diffusion")
-    photo = model.predict(prompt=prompt)[0]
-    return photo
+    photos = model.predict(prompt=prompt, num_outputs=num_outputs)
+    return photos
 
 
 # def dall_e(prompt):
