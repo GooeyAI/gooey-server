@@ -3,7 +3,7 @@ import json
 import requests
 import streamlit as st
 
-from daras_ai.components.core import daras_ai_step
+from daras_ai.core import daras_ai_step
 
 
 @daras_ai_step("Training data via HTTP")

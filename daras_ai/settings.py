@@ -14,3 +14,5 @@ except UndefinedValueError:
 else:
     with open(GOOGLE_APPLICATION_CREDENTIALS, "w") as f:
         f.write(_json)
+
+os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", None)

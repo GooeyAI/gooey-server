@@ -1,15 +1,11 @@
-import ast
 import json
 
 import openai
-import parse
 import streamlit as st
 from decouple import config
-from glom import glom
-from html2text import html2text
 
-from daras_ai.components.core import daras_ai_step
-from daras_ai.components.core import daras_ai_step
+from daras_ai.core import var_selector
+from daras_ai.core import daras_ai_step
 
 
 @daras_ai_step("Language Model")
@@ -69,8 +65,17 @@ def language_model(idx, variables, state):
     )
     state.update({"selected_engine#1": selected_engine})
 
-    best_of = int(st.number_input("Best of", value=state.get("best_of", 1)))
-    state.update({"best_of": best_of})
+    num_candidates = int(
+        st.number_input(
+            "# of Candidate completions", value=state.get("num_candidates", 6)
+        )
+    )
+    state.update({"num_candidates": num_candidates})
+
+    num_outputs = int(
+        st.number_input("# Of outputs to generate", value=state.get("num_outputs", 3))
+    )
+    state.update({"num_outputs": num_outputs})
 
     max_tokens = int(
         st.number_input("Max output tokens", value=state.get("max_tokens", 128))
@@ -84,20 +89,16 @@ def language_model(idx, variables, state):
 
     st.write("#### I/O")
 
-    all_vars = ["", *variables.keys()]
-    final_prompt_var = st.selectbox(
+    final_prompt_var = var_selector(
         "Final prompt input var",
-        all_vars,
-        index=all_vars.index(state.get("final_prompt_var", "")),
+        state=state,
+        variables=variables,
     )
-    state.update({"final_prompt_var": final_prompt_var})
-
-    output_var = st.selectbox(
+    output_var = var_selector(
         "Model output var",
-        all_vars,
-        index=all_vars.index(state.get("output_var", "")),
+        state=state,
+        variables=variables,
     )
-    state.update({"output_var": output_var})
 
     if not (final_prompt_var and output_var):
         return
@@ -108,18 +109,18 @@ def language_model(idx, variables, state):
             max_tokens=max_tokens,
             prompt=variables[final_prompt_var],
             stop=stop,
-            best_of=best_of,
+            best_of=num_outputs * num_candidates,
+            n=num_outputs,
         )
 
     # choose the first completion that isn't empty
-    text_output = ""
-    finish_reason = ""
+    text_output = []
+    # finish_reason = ""
     for choice in r["choices"]:
         text = choice["text"].strip()
         if text:
-            text_output = text
-            finish_reason = choice["finish_reason"]
-            break
+            text_output.append(text)
+            # finish_reason = choice["finish_reason"]
 
-    st.write(f"Finish reason: {finish_reason}")
+    # st.write(f"Finish reason: {finish_reason}")
     variables[output_var] = text_output

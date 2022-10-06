@@ -5,7 +5,7 @@ import streamlit as st
 from glom import glom
 from html2text import html2text
 
-from daras_ai.components.core import daras_ai_step
+from daras_ai.core import daras_ai_step
 
 input_spec_parse_pattern = "{" * 5 + "}" * 5
 

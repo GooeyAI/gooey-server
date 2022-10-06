@@ -1,15 +1,17 @@
-import ast
 import random
 
-import openai
+import streamlit as st
+
+from daras_ai.core import daras_ai_step, var_selector
+import ast
+
 import parse
 import streamlit as st
-from decouple import config
 from glom import glom
 from html2text import html2text
 
-from daras_ai.components.core import daras_ai_step
-from daras_ai.components.core import daras_ai_step
+from daras_ai.core import daras_ai_step
+from daras_ai.train_data_formatter import input_spec_parse_pattern
 
 
 @daras_ai_step("Language Model Prompt Generator")
@@ -32,7 +34,6 @@ def language_model_prompt_gen(idx, variables, state):
     )
     state.update({"completion_prefix": completion_prefix})
 
-    completion_prefix = completion_prefix.strip() + " "
     completion_sep = st.text_area(
         "Completion end separator", value=state.get("completion_sep", "\n####\n")
     )
@@ -43,13 +44,37 @@ def language_model_prompt_gen(idx, variables, state):
     )
     state.update({"num_prompts": num_prompts})
 
-    st.write("### Generation")
+    st.write("### I/O")
 
-    training_data_var = st.text_input(
-        "Training data var", value=state.get("training_data_var", "")
+    training_data_var = var_selector(
+        "Training data input var",
+        state=state,
+        variables=variables,
     )
-    state.update({"training_data_var": training_data_var})
+    prompt_input_var = st.text_area(
+        "Prompt input",
+        value=state.get("prompt_input_var", ""),
+    )
+    state.update({"prompt_input_var": prompt_input_var})
+    final_prompt_var = var_selector(
+        "Final prompt out var",
+        state=state,
+        variables=variables,
+    )
 
+    if not (training_data_var and final_prompt_var and prompt_input_var):
+        return
+
+    prompt_input = prompt_input_var
+    input_spec_results: list[parse.Result] = list(
+        parse.findall(input_spec_parse_pattern, prompt_input)
+    )
+    for spec_result in input_spec_results:
+        spec = spec_result.fixed[0]
+        variable_value = glom(variables, ast.literal_eval(spec))
+        prompt_input = prompt_input.replace("{{" + spec + "}}", variable_value)
+
+    completion_prefix = completion_prefix.strip() + " "
     final_prompt = prompt_header.strip() + "\n\n"
     for eg in random.choices(variables[training_data_var], k=num_prompts):
         final_prompt += (
@@ -59,13 +84,8 @@ def language_model_prompt_gen(idx, variables, state):
             + eg["completion"]
             + completion_sep
         )
+    final_prompt += prompt_input + prompt_sep + completion_prefix
 
-    final_prompt += variables["text_input"] + prompt_sep + completion_prefix
-
-    st.text_area("", value=final_prompt)
-
-    final_prompt_var = st.text_input(
-        "Final prompt out var", value=state.get("final_prompt_var", "")
-    )
-    state.update({"final_prompt_var": final_prompt_var})
     variables[final_prompt_var] = final_prompt
+
+    st.text_area("Final prompt (generated)", value=final_prompt)

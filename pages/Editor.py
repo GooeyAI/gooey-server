@@ -6,17 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from google.cloud import firestore
 
-from daras_ai.components.core import STEPS_REPO
-
-from daras_ai.components import language_model
-from daras_ai.components import http_data_source
-from daras_ai.components import language_model_prompt_gen
-from daras_ai.components import text_input
-from daras_ai.components import train_data_formatter
-from daras_ai.components import text_train_data
-from daras_ai import settings
-from daras_ai.components.text_input import raw_text_input
-from daras_ai.components.text_output import raw_text_output
+from daras_ai.core import STEPS_REPO
 
 
 def get_or_create_doc_id():
@@ -96,29 +86,38 @@ def render_steps(*, key: str, title: str):
             st.experimental_rerun()
 
         st.session_state.setdefault("variables", {})
+        variables = st.session_state["variables"]
+        for k in list(variables.keys()):
+            if not k:
+                variables.pop(k)
         fn(
-            variables=st.session_state["variables"],
+            variables=variables,
             state=state,
             delete=delete,
             idx=idx,
         )
 
     selectbox_col, add_btn_col = st.columns(2)
+    repo_to_use = STEPS_REPO[key]
     with selectbox_col:
         selected_fn = st.selectbox(
             title,
-            [value for value in STEPS_REPO[key].values() if value.verbose_name],
-            format_func=lambda fn: fn.verbose_name,
+            [""] + [value for value in repo_to_use.values() if value.verbose_name],
+            format_func=lambda fn: fn and fn.verbose_name,
         )
     with add_btn_col:
         add_step = st.button(f"Add", help=f"Add {key}")
 
-    if add_step:
+    if selected_fn and add_step:
         state_steps.append({"name": selected_fn.__name__})
         st.experimental_rerun()
 
     for idx, step in enumerate(state_steps):
-        call_step(idx, step, STEPS_REPO[key][step["name"]])
+        try:
+            step_fn = repo_to_use[step["name"]]
+        except KeyError:
+            continue
+        call_step(idx, step, step_fn)
 
 
 #

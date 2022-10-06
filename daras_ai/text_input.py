@@ -1,10 +1,10 @@
 import streamlit as st
 
-from daras_ai.components.core import daras_ai_step
+from daras_ai.core import daras_ai_step
 
 
 @daras_ai_step("Text Input", is_input=True, is_expanded=True)
-def raw_text_input(idx, variables, state):
+def text_input(idx, variables, state):
     var_name = st.text_input(
         "", value=state.get("var_name", "text_input"), help=f"Input name {idx}"
     )
