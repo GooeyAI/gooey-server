@@ -38,8 +38,12 @@ def text_train_data(idx, variables, state):
             )
         state.update({"training_data": json.dumps(training_data)})
 
+    st.write("### Input")
+
     st.write("**Training data**")
     st.dataframe(training_data)
+
+    st.write("### Output")
 
     out_var = st.text_input(
         label="Training Output var",

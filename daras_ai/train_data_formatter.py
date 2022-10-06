@@ -129,3 +129,14 @@ def train_data_formatter(idx, variables, state):
     #             ]
     #         )
     #     )
+
+
+def format_input_var(input_var, variables):
+    input_spec_results: list[parse.Result] = list(
+        parse.findall(input_spec_parse_pattern, input_var)
+    )
+    for spec_result in input_spec_results:
+        spec = spec_result.fixed[0]
+        variable_value = glom(variables, ast.literal_eval(spec))
+        input_var = input_var.replace("{{" + spec + "}}", variable_value)
+    return input_var

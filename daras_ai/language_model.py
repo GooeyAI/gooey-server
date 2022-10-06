@@ -6,6 +6,7 @@ from decouple import config
 
 from daras_ai.core import var_selector
 from daras_ai.core import daras_ai_step
+from daras_ai.train_data_formatter import format_input_var
 
 
 @daras_ai_step("Language Model")
@@ -87,13 +88,16 @@ def language_model(idx, variables, state):
     )
     state.update({"stop": json.dumps(stop)})
 
-    st.write("#### I/O")
+    st.write("### Input")
 
-    final_prompt_var = var_selector(
-        "Final prompt input var",
-        state=state,
-        variables=variables,
+    final_prompt_var = st.text_area(
+        "Final prompt input",
+        value=state.get("final_prompt_var", ""),
     )
+    state.update({"final_prompt_var": final_prompt_var})
+
+    st.write("### Output")
+
     output_var = var_selector(
         "Model output var",
         state=state,
@@ -103,11 +107,13 @@ def language_model(idx, variables, state):
     if not (final_prompt_var and output_var):
         return
 
+    final_prompt = format_input_var(final_prompt_var, variables)
+
     with st.spinner():
         r = openai.Completion.create(
             engine=selected_engine,
             max_tokens=max_tokens,
-            prompt=variables[final_prompt_var],
+            prompt=final_prompt,
             stop=stop,
             best_of=num_candidates,
             n=num_outputs,

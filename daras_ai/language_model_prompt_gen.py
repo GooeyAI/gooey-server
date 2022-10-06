@@ -2,16 +2,9 @@ import random
 
 import streamlit as st
 
-from daras_ai.core import daras_ai_step, var_selector
-import ast
-
-import parse
-import streamlit as st
-from glom import glom
-from html2text import html2text
-
 from daras_ai.core import daras_ai_step
-from daras_ai.train_data_formatter import input_spec_parse_pattern
+from daras_ai.core import var_selector
+from daras_ai.train_data_formatter import format_input_var
 
 
 @daras_ai_step("Language Model Prompt Generator")
@@ -44,18 +37,20 @@ def language_model_prompt_gen(idx, variables, state):
     )
     state.update({"num_prompts": num_prompts})
 
-    st.write("### I/O")
+    st.write("### Input")
 
     training_data_var = var_selector(
         "Training data input var",
         state=state,
         variables=variables,
     )
+
     prompt_input_var = st.text_area(
         "Prompt input",
         value=state.get("prompt_input_var", ""),
     )
     state.update({"prompt_input_var": prompt_input_var})
+
     final_prompt_var = var_selector(
         "Final prompt out var",
         state=state,
@@ -65,14 +60,7 @@ def language_model_prompt_gen(idx, variables, state):
     if not (training_data_var and final_prompt_var and prompt_input_var):
         return
 
-    prompt_input = prompt_input_var
-    input_spec_results: list[parse.Result] = list(
-        parse.findall(input_spec_parse_pattern, prompt_input)
-    )
-    for spec_result in input_spec_results:
-        spec = spec_result.fixed[0]
-        variable_value = glom(variables, ast.literal_eval(spec))
-        prompt_input = prompt_input.replace("{{" + spec + "}}", variable_value)
+    prompt_input = format_input_var(prompt_input_var, variables)
 
     completion_prefix = completion_prefix.strip() + " "
     final_prompt = prompt_header.strip() + "\n\n"
@@ -87,5 +75,7 @@ def language_model_prompt_gen(idx, variables, state):
     final_prompt += prompt_input + prompt_sep + completion_prefix
 
     variables[final_prompt_var] = final_prompt
+
+    st.write("### Output")
 
     st.text_area("Final prompt (generated)", value=final_prompt)
