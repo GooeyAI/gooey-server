@@ -126,7 +126,7 @@ def run(
                     max_tokens=max_tokens,
                     prompt=variables[final_prompt_var],
                     stop=stop,
-                    best_of=num_outputs * num_candidates,
+                    best_of=num_candidates,
                     n=num_outputs,
                 )
 
