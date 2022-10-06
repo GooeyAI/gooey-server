@@ -47,8 +47,9 @@ def text_train_data(idx, variables, state):
 
     out_var = st.text_input(
         label="Training Output var",
-        value=state.get("out_var"),
+        value=state.get("out_var", ""),
     )
-    if out_var is not None:
-        state.update({"out_var": out_var})
-        variables[out_var] = training_data
+    if not out_var:
+        return
+    state.update({"out_var": out_var})
+    variables[out_var] = training_data

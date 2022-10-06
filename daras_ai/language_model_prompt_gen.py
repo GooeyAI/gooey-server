@@ -51,11 +51,13 @@ def language_model_prompt_gen(idx, variables, state):
     )
     state.update({"prompt_input_var": prompt_input_var})
 
-    final_prompt_var = var_selector(
+    st.write("### Output")
+
+    final_prompt_var = st.text_input(
         "Final prompt out var",
-        state=state,
-        variables=variables,
+        value=state.get("Final prompt out var", ""),
     )
+    state.update({"Final prompt out var": final_prompt_var})
 
     if not (training_data_var and final_prompt_var and prompt_input_var):
         return
@@ -75,7 +77,5 @@ def language_model_prompt_gen(idx, variables, state):
     final_prompt += prompt_input + prompt_sep + completion_prefix
 
     variables[final_prompt_var] = final_prompt
-
-    st.write("### Output")
 
     st.text_area("Final prompt (generated)", value=final_prompt)
