@@ -38,7 +38,7 @@ def text_to_img(idx, variables, state):
         help=f"Text to Img Output {idx}",
         value=state.get("output_var", ""),
     )
-    state.update({"input_var": output_var})
+    state.update({"output_var": output_var})
 
 
 # def dall_e(prompt):

@@ -20,11 +20,12 @@ def run_compute_steps(compute_steps, variables):
         match compute_step["name"]:
             case "text_train_data":
                 training_data_json = compute_step["training_data"]
+                output_var = compute_step["out_var"]
 
-                if not training_data_json:
+                if not (training_data_json and output_var):
                     raise ValueError
 
-                variables[compute_step["out_var"]] = json.loads(training_data_json)
+                variables[output_var] = json.loads(training_data_json)
 
             case "language_model_prompt_gen":
                 prompt_header = compute_step["prompt_header"]
@@ -38,7 +39,7 @@ def run_compute_steps(compute_steps, variables):
 
                 prompt_input = variables.get(prompt_input_var)
 
-                if not (training_data_var and final_prompt_out_var and prompt_input):
+                if not (training_data_var and prompt_input and final_prompt_out_var):
                     raise ValueError
 
                 completion_prefix = completion_prefix.strip() + " "
@@ -100,6 +101,9 @@ def run_compute_steps(compute_steps, variables):
                 format_str = compute_step["format_str"]
                 output_var = compute_step["output_var"]
 
+                if not output_var:
+                    raise ValueError
+
                 input_spec_results: list[parse.Result] = list(
                     parse.findall(input_spec_parse_pattern, format_str)
                 )
@@ -116,10 +120,11 @@ def run_compute_steps(compute_steps, variables):
                 selected_model = compute_step["selected_model"]
                 num_outputs = compute_step["num_outputs"]
 
-                if not (input_var and output_var):
+                prompt = variables[input_var]
+
+                if not (prompt and output_var):
                     return
 
-                prompt = variables[input_var]
                 if isinstance(prompt, list):
                     prompt = random.choice(prompt)
 
