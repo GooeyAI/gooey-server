@@ -1,10 +1,9 @@
 import random
 
 import replicate
-import requests
-
-from daras_ai.core import daras_ai_step_config, var_selector, daras_ai_step_computer
 import streamlit as st
+
+from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
 
 
 @daras_ai_step_config("Text to Img")

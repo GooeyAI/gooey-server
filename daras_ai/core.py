@@ -88,22 +88,6 @@ def daras_ai_step_config(
     return decorator
 
 
-def var_selector(label, *, state, variables, **kwargs):
-    options = ["", *variables.keys()]
-    try:
-        index = options.index(state.get(label, ""))
-    except IndexError:
-        index = 0
-    selected_var = st.selectbox(
-        label,
-        options=options,
-        index=index,
-        **kwargs,
-    )
-    state.update({label: selected_var})
-    return selected_var
-
-
 def import_all() -> typing.Dict[str, types.ModuleType]:
     """ "imports all modules in the package of the caller"""
 
