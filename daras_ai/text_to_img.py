@@ -1,3 +1,5 @@
+import random
+
 import replicate
 import requests
 
@@ -30,22 +32,23 @@ def text_to_img(idx, variables, state):
 
     st.write("### Output")
 
-    model_output_var = var_selector(
+    model_output_var = st.text_input(
         "Output var",
         help=f"Text to Img Output {idx}",
-        state=state,
-        variables=variables,
+        value=state.get("Output var", ""),
     )
+    state.update({"Output var": model_output_var})
 
     if not (model_input_var and model_output_var):
         return
 
+    prompt = variables[model_input_var]
+    if isinstance(prompt, list):
+        prompt = random.choice(prompt)
+
     match selected_model:
         case "Stable Diffusion":
-            variables[model_output_var] = stable_diffusion(
-                variables[model_input_var],
-                num_outputs,
-            )
+            variables[model_output_var] = stable_diffusion(prompt, num_outputs)
 
 
 @st.cache

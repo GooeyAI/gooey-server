@@ -98,11 +98,11 @@ def language_model(idx, variables, state):
 
     st.write("### Output")
 
-    output_var = var_selector(
+    output_var = st.text_input(
         "Model output var",
-        state=state,
-        variables=variables,
+        value=state.get("Model output var", ""),
     )
+    state.update({"Model output var": output_var})
 
     if not (final_prompt_var and output_var):
         return

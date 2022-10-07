@@ -68,12 +68,25 @@ def save_me():
     cached_state.update(deepcopy(st.session_state.to_dict()))
 
 
+def run_as_api():
+    variables = st.session_state["variables"]
+    params = {
+        "recipie_id": doc_id,
+        "inputs": {
+            input_step["var_name"]: variables[input_step["var_name"]]
+            for input_step in st.session_state["input_steps"]
+        },
+    }
+
+
 def action_buttons():
-    top_col1, top_col2 = st.columns(2)
+    top_col1, top_col2, top_col3 = st.columns(3)
     with top_col1:
-        st.button("Fork Me 🍴", on_click=fork_me)
+        st.button("Save a Copy 📕", on_click=fork_me)
     with top_col2:
         st.button("Save Me 💾", on_click=save_me)
+    with top_col3:
+        st.button("Run as API 🚀", on_click=run_as_api)
 
 
 def render_steps(*, key: str, title: str):
