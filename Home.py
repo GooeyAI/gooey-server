@@ -20,9 +20,13 @@ for snapshot in st.session_state["docs"]:
     if not name:
         continue
 
+    tagline = doc.get("header_tagline", "")
     st.markdown(
         f"""
-        <a href="/Editor/?id={recipie_id}" target = "_self">{name}</a>
+        <h5>
+            <a href="/Editor/?id={recipie_id}" target = "_self">{name}</a>
+        </h5>
+        {tagline}
         """,
         unsafe_allow_html=True,
     )
