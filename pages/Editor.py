@@ -153,8 +153,6 @@ action_buttons()
 tab1, tab2 = st.tabs(["Run Recipie 🏃‍♂️", "Edit Recipie ✍️"])
 
 with tab2:
-    st.write("# Recipie")
-
     st.text_input("Title", key="header_title")
     st.text_input("Tagline", key="header_tagline")
     st.text_area("Description", key="header_desc")

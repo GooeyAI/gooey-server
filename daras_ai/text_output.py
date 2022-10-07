@@ -30,4 +30,6 @@ def raw_text_output(idx, variables, state):
             f"{var_name} ({j + 1})",
             help=f"Output value {idx + 1}, {j + 1}",
             value=text,
+            disabled=True,
+            height=200,
         )

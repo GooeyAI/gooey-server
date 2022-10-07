@@ -23,10 +23,9 @@ for snapshot in st.session_state["docs"]:
     tagline = doc.get("header_tagline", "")
     st.markdown(
         f"""
-        <h5>
-            <a href="/Editor/?id={recipie_id}" target = "_self">{name}</a>
-        </h5>
-        {tagline}
+        <a style="font-size: 24px" href="/Editor/?id={recipie_id}" target = "_self">{name}</a>
+        <br>
+        <i>{tagline}</i>
         """,
         unsafe_allow_html=True,
     )

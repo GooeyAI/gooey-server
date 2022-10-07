@@ -46,6 +46,7 @@ def language_model_prompt_gen(idx, variables, state):
 
     prompt_input_var = st.text_input(
         "Prompt Input Variable",
+        help=f"Prompt Input Variable for prompt gen {idx + 1}",
         value=state.get("prompt_input_var", ""),
     )
     state.update({"prompt_input_var": prompt_input_var})
@@ -62,4 +63,5 @@ def language_model_prompt_gen(idx, variables, state):
         "Final prompt (generated value)",
         value=variables.get(final_prompt_out_var, ""),
         disabled=True,
+        height=200,
     )

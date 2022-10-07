@@ -91,6 +91,7 @@ def language_model(idx, variables, state):
 
     prompt_input_var = st.text_input(
         "Prompt Input Variable",
+        help=f"Prompt Input Variable for language model {idx + 1}",
         value=state.get("prompt_input_var", ""),
     )
     state.update({"prompt_input_var": prompt_input_var})
