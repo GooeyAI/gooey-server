@@ -2,7 +2,7 @@ import json
 
 import streamlit as st
 
-from daras_ai.core import daras_ai_step_config
+from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
 
 
 @daras_ai_step_config("Text Training Data")
@@ -53,3 +53,14 @@ def text_train_data(idx, variables, state):
 
     st.write("Training Data Value")
     st.dataframe(training_data)
+
+
+@daras_ai_step_computer
+def text_train_data(idx, variables, state):
+    training_data_json = state["training_data"]
+    output_var = state["out_var"]
+
+    if not (training_data_json and output_var):
+        raise ValueError
+
+    variables[output_var] = json.loads(training_data_json)

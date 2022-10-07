@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 from google.cloud import firestore
 
 from daras_ai.computer import run_compute_steps
-from daras_ai.core import STEPS_REPO, IO_STEPS
+from daras_ai.core import STEPS_REPO, IO_REPO
 
 
 def get_or_create_doc_id():
@@ -170,7 +170,7 @@ with tab2:
 def render_io_steps(key):
     for idx, step in enumerate(st.session_state[key]):
         try:
-            step_fn = IO_STEPS[step["name"]]
+            step_fn = IO_REPO[step["name"]]
         except KeyError:
             continue
         step_fn(idx=idx, state=step, variables=variables)

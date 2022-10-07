@@ -3,7 +3,7 @@ import random
 import replicate
 import requests
 
-from daras_ai.core import daras_ai_step_config, var_selector
+from daras_ai.core import daras_ai_step_config, var_selector, daras_ai_step_computer
 import streamlit as st
 
 
@@ -39,6 +39,28 @@ def text_to_img(idx, variables, state):
         value=state.get("output_var", ""),
     )
     state.update({"output_var": output_var})
+
+
+@daras_ai_step_computer
+def text_to_img(idx, variables, state):
+    input_var = state["input_var"]
+    output_var = state["output_var"]
+    selected_model = state["selected_model"]
+    num_outputs = state["num_outputs"]
+
+    prompt = variables[input_var]
+
+    if not (prompt and output_var):
+        return
+
+    if isinstance(prompt, list):
+        prompt = random.choice(prompt)
+
+    match selected_model:
+        case "Stable Diffusion":
+            model = replicate.models.get("stability-ai/stable-diffusion")
+            photos = model.predict(prompt=prompt, num_outputs=num_outputs)
+            variables[output_var] = photos
 
 
 # def dall_e(prompt):

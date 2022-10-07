@@ -1,10 +1,12 @@
 import json
 
+import json
+
 import openai
 import streamlit as st
 from decouple import config
 
-from daras_ai.core import var_selector
+from daras_ai.core import daras_ai_step_computer
 from daras_ai.core import daras_ai_step_config
 
 
@@ -106,3 +108,45 @@ def language_model(idx, variables, state):
 
     st.write("Model Output (generated value)")
     st.write(variables.get(output_var, ""))
+
+
+@daras_ai_step_computer
+def language_model(idx, variables, state):
+    api_provider = state["api_provider#1"]
+    selected_engine = state["selected_engine#1"]
+    max_tokens = state["max_tokens"]
+    prompt_input_var = state["prompt_input_var"]
+    stop = json.loads(state["stop"])
+    num_outputs = state["num_outputs"]
+    num_candidates = state["num_candidates"]
+    output_var = state["output_var"]
+
+    prompt = variables.get(prompt_input_var)
+
+    if not (api_provider and prompt and output_var):
+        raise ValueError
+
+    match api_provider:
+        case "openai":
+            openai.api_key = config("OPENAI_API_KEY")
+            openai.api_base = "https://api.openai.com/v1"
+        case "goose.ai":
+            openai.api_key = config("GOOSEAI_API_KEY")
+            openai.api_base = "https://api.goose.ai/v1"
+
+    r = openai.Completion.create(
+        engine=selected_engine,
+        max_tokens=max_tokens,
+        prompt=prompt,
+        stop=stop,
+        best_of=num_candidates,
+        n=num_outputs,
+    )
+
+    # choose the first completion that isn't empty
+    text_output = []
+    for choice in r["choices"]:
+        text = choice["text"].strip()
+        if text:
+            text_output.append(text)
+    variables[output_var] = text_output

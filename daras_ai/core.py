@@ -9,9 +9,7 @@ import streamlit as st
 import typing
 
 OUTPUT_STEPS = "output_steps"
-
 COMPUTE_STEPS = "compute_steps"
-
 INPUT_STEPS = "input_steps"
 
 STEPS_REPO = {
@@ -20,11 +18,22 @@ STEPS_REPO = {
     OUTPUT_STEPS: {},
 }
 
-IO_STEPS = {}
+IO_REPO = {}
+COMPUTER_REPO = {}
+
+
+def daras_ai_step_computer(fn):
+    COMPUTER_REPO[fn.__name__] = fn
+
+    @wraps(fn)
+    def wrapper(idx, steps, variables, state):
+        fn(idx=idx, variables=variables, state=state)
+
+    return wrapper
 
 
 def daras_ai_step_io(fn):
-    IO_STEPS[fn.__name__] = fn
+    IO_REPO[fn.__name__] = fn
 
     @wraps(fn)
     def wrapper(idx, steps, variables, state):
