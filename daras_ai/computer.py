@@ -1,5 +1,6 @@
 import ast
 import parse
+import replicate
 import streamlit as st
 from glom import glom
 from html2text import html2text
@@ -108,3 +109,22 @@ def run_compute_steps(compute_steps, variables):
                     format_str = format_str.replace("{{" + spec + "}}", variable_value)
 
                 variables[output_var] = format_str
+
+            case "text_to_img":
+                input_var = compute_step["input_var"]
+                output_var = compute_step["output_var"]
+                selected_model = compute_step["selected_model"]
+                num_outputs = compute_step["num_outputs"]
+
+                if not (input_var and output_var):
+                    return
+
+                prompt = variables[input_var]
+                if isinstance(prompt, list):
+                    prompt = random.choice(prompt)
+
+                match selected_model:
+                    case "Stable Diffusion":
+                        model = replicate.models.get("stability-ai/stable-diffusion")
+                        photos = model.predict(prompt=prompt, num_outputs=num_outputs)
+                        variables[output_var] = photos

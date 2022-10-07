@@ -15,6 +15,7 @@ def text_to_img(idx, variables, state):
         "Model",
         options=["Stable Diffusion"],
     )
+    state.update({"selected_model": selected_model})
 
     num_outputs = int(
         st.number_input("# of outputs", value=int(state.get("num_outputs", 4)), step=1)
@@ -23,39 +24,21 @@ def text_to_img(idx, variables, state):
 
     st.write("### Input")
 
-    model_input_var = var_selector(
+    input_var = st.text_input(
         "Input var",
         help=f"Text to Img Input {idx}",
-        state=state,
-        variables=variables,
+        value=state.get("input_var", ""),
     )
+    state.update({"input_var": input_var})
 
     st.write("### Output")
 
-    model_output_var = st.text_input(
+    output_var = st.text_input(
         "Output var",
         help=f"Text to Img Output {idx}",
-        value=state.get("Output var", ""),
+        value=state.get("output_var", ""),
     )
-    state.update({"Output var": model_output_var})
-
-    if not (model_input_var and model_output_var):
-        return
-
-    prompt = variables[model_input_var]
-    if isinstance(prompt, list):
-        prompt = random.choice(prompt)
-
-    match selected_model:
-        case "Stable Diffusion":
-            variables[model_output_var] = stable_diffusion(prompt, num_outputs)
-
-
-@st.cache
-def stable_diffusion(prompt, num_outputs):
-    model = replicate.models.get("stability-ai/stable-diffusion")
-    photos = model.predict(prompt=prompt, num_outputs=num_outputs)
-    return photos
+    state.update({"input_var": output_var})
 
 
 # def dall_e(prompt):
