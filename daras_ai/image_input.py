@@ -1,8 +1,8 @@
-from daras_ai.core import daras_ai_step
+from daras_ai.core import daras_ai_step_config
 import streamlit as st
 
 
-@daras_ai_step("Image input")
+@daras_ai_step_config("Image input", is_input=True)
 def image_input(idx, variables, state):
     var_name = st.text_input(
         "", value=state.get("var_name", "image_input"), help=f"Image name {idx}"

@@ -2,12 +2,11 @@ import random
 
 import streamlit as st
 
-from daras_ai.core import daras_ai_step
+from daras_ai.core import daras_ai_step_config
 from daras_ai.core import var_selector
-from daras_ai.train_data_formatter import format_input_var
 
 
-@daras_ai_step("Language Model Prompt Generator")
+@daras_ai_step_config("Training Data -> Prompt")
 def language_model_prompt_gen(idx, variables, state):
     st.write("### Config")
 
@@ -39,43 +38,28 @@ def language_model_prompt_gen(idx, variables, state):
 
     st.write("### Input")
 
-    training_data_var = var_selector(
-        "Training data input var",
-        state=state,
-        variables=variables,
+    training_data_var = st.text_input(
+        "Training Data Input Variable",
+        value=state.get("training_data_var", ""),
     )
+    state.update({"training_data_var": training_data_var})
 
-    prompt_input_var = st.text_area(
-        "Prompt input",
+    prompt_input_var = st.text_input(
+        "Prompt Input Variable",
         value=state.get("prompt_input_var", ""),
     )
     state.update({"prompt_input_var": prompt_input_var})
 
     st.write("### Output")
 
-    final_prompt_var = st.text_input(
-        "Final prompt out var",
-        value=state.get("Final prompt out var", ""),
+    final_prompt_out_var = st.text_input(
+        "Final Prompt Output Variable",
+        value=state.get("final_prompt_out_var", ""),
     )
-    state.update({"Final prompt out var": final_prompt_var})
+    state.update({"final_prompt_out_var": final_prompt_out_var})
 
-    if not (training_data_var and final_prompt_var and prompt_input_var):
-        return
-
-    prompt_input = format_input_var(prompt_input_var, variables)
-
-    completion_prefix = completion_prefix.strip() + " "
-    final_prompt = prompt_header.strip() + "\n\n"
-    for eg in random.choices(variables[training_data_var], k=num_prompts):
-        final_prompt += (
-            eg["prompt"]
-            + prompt_sep
-            + completion_prefix
-            + eg["completion"]
-            + completion_sep
-        )
-    final_prompt += prompt_input + prompt_sep + completion_prefix
-
-    variables[final_prompt_var] = final_prompt
-
-    st.text_area("Final prompt (generated)", value=final_prompt)
+    st.text_area(
+        "Final prompt (generated value)",
+        value=variables.get(final_prompt_out_var, ""),
+        disabled=True,
+    )

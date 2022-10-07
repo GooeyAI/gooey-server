@@ -2,10 +2,10 @@ from math import ceil
 
 import streamlit as st
 
-from daras_ai.core import daras_ai_step
+from daras_ai.core import daras_ai_step_config
 
 
-@daras_ai_step("Image Output", is_output=True, is_expanded=True)
+@daras_ai_step_config("Image Output", is_output=True, is_expanded=True)
 def image_output(idx, variables, state):
     var_name = st.text_input(
         "", value=state.get("var_name", "image_output"), help=f"Image Output name {idx}"

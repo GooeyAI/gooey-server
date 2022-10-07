@@ -1,16 +1,15 @@
 import ast
-
 import parse
 import streamlit as st
 from glom import glom
 from html2text import html2text
 
-from daras_ai.core import daras_ai_step
+from daras_ai.core import daras_ai_step_config
 
 input_spec_parse_pattern = "{" * 5 + "}" * 5
 
 
-@daras_ai_step("Training data extractor")
+@daras_ai_step_config("Training data extractor")
 def train_data_formatter(idx, variables, state):
     input_var = st.text_input(
         label="Input data var",
@@ -129,14 +128,3 @@ def train_data_formatter(idx, variables, state):
     #             ]
     #         )
     #     )
-
-
-def format_input_var(input_var, variables):
-    input_spec_results: list[parse.Result] = list(
-        parse.findall(input_spec_parse_pattern, input_var)
-    )
-    for spec_result in input_spec_results:
-        spec = spec_result.fixed[0]
-        variable_value = glom(variables, ast.literal_eval(spec))
-        input_var = input_var.replace("{{" + spec + "}}", variable_value)
-    return input_var

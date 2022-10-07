@@ -6,7 +6,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 from google.cloud import firestore
 
-from daras_ai.core import STEPS_REPO
+from daras_ai.computer import run_compute_steps
+from daras_ai.core import STEPS_REPO, IO_STEPS
 
 
 def get_or_create_doc_id():
@@ -44,7 +45,9 @@ def fork_me():
 
     fork_doc_id = new_doc_id()
     fork_doc_ref = db_collection.document(fork_doc_id)
-    fork_doc_ref.set(deepcopy(st.session_state.to_dict()))
+    fork_state = deepcopy(st.session_state.to_dict())
+    fork_state["header_title"] = f"Copy of {fork_state.get('header_title', '')}"
+    fork_doc_ref.set(fork_state)
 
     components.html(
         f"""
@@ -69,7 +72,6 @@ def save_me():
 
 
 def run_as_api():
-    variables = st.session_state["variables"]
     params = {
         "recipie_id": doc_id,
         "inputs": {
@@ -81,32 +83,25 @@ def run_as_api():
 
 def action_buttons():
     top_col1, top_col2, top_col3 = st.columns(3)
-    with top_col1:
-        st.button("Save a Copy 📕", on_click=fork_me)
     with top_col2:
+        st.button("Save a Copy 📕", on_click=fork_me)
+    with top_col1:
         st.button("Save Me 💾", on_click=save_me)
     with top_col3:
         st.button("Run as API 🚀", on_click=run_as_api)
 
 
 def render_steps(*, key: str, title: str):
-    st.session_state.setdefault(key, [])
     state_steps = st.session_state[key]
 
     def call_step(idx: int, state: dict, fn: typing.Callable):
-        def delete():
-            state_steps.pop(idx)
-            st.experimental_rerun()
-
-        st.session_state.setdefault("variables", {})
-        variables = st.session_state["variables"]
         for k in list(variables.keys()):
             if not k:
                 variables.pop(k)
         fn(
+            steps=state_steps,
             variables=variables,
             state=state,
-            delete=delete,
             idx=idx,
         )
 
@@ -145,22 +140,61 @@ cached_state = get_firestore_doc(doc_id)
 if not st.session_state:
     st.session_state.update(deepcopy(cached_state))
 
+st.session_state.setdefault("input_steps", [])
+st.session_state.setdefault("compute_steps", [])
+st.session_state.setdefault("output_steps", [])
+
+st.session_state.setdefault("variables", {})
+variables = st.session_state["variables"]
+
 action_buttons()
 
 
-title = st.text_input("Title", key="header_title")
-description = st.text_area("Description", key="header_desc")
+tab1, tab2 = st.tabs(["Run Recipie 🏃‍♂️", "Edit Recipie ✍️"])
 
-col1, col2 = st.columns(2)
+with tab2:
+    st.write("# Recipie")
 
-with col1:
-    st.write("# Input")
+    st.text_input("Title", key="header_title")
+    st.text_input("Tagline", key="header_tagline")
+    st.text_area("Description", key="header_desc")
+
+    st.write("### Input steps")
     render_steps(key="input_steps", title="Add an input")
 
-    st.write("# Recipie")
+    st.write("### Output steps")
+    render_steps(key="output_steps", title="Add an output")
+
+    st.write("### Compute steps")
     render_steps(key="compute_steps", title="Add a step")
 
-with col2:
-    st.write("# Output")
-    st.button("Run")
-    render_steps(key="output_steps", title="Add an output")
+
+def render_io_steps(key):
+    for idx, step in enumerate(st.session_state[key]):
+        try:
+            step_fn = IO_STEPS[step["name"]]
+        except KeyError:
+            continue
+        step_fn(idx=idx, state=step, variables=variables)
+
+
+with tab1:
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("## " + st.session_state.get("header_title", ""))
+        tagline = st.session_state.get("header_tagline", "")
+        if tagline:
+            st.write("*" + tagline + "*")
+        st.write(st.session_state.get("header_desc", ""))
+
+        st.write("### Input")
+        render_io_steps("input_steps")
+
+    with col2:
+        if st.button("Run 🏃‍♂️"):
+            with st.spinner("Running Recipie..."):
+                run_compute_steps(st.session_state["compute_steps"], variables)
+
+        st.write("### Output")
+        render_io_steps("output_steps")

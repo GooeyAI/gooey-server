@@ -3,11 +3,11 @@ import random
 import replicate
 import requests
 
-from daras_ai.core import daras_ai_step, var_selector
+from daras_ai.core import daras_ai_step_config, var_selector
 import streamlit as st
 
 
-@daras_ai_step("Text to Img")
+@daras_ai_step_config("Text to Img")
 def text_to_img(idx, variables, state):
     st.write("### Config")
 

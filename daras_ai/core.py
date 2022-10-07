@@ -20,15 +20,49 @@ STEPS_REPO = {
     OUTPUT_STEPS: {},
 }
 
+IO_STEPS = {}
 
-def daras_ai_step(verbose_name, *, is_input=False, is_output=False, is_expanded=False):
+
+def daras_ai_step_io(fn):
+    IO_STEPS[fn.__name__] = fn
+
+    @wraps(fn)
+    def wrapper(idx, steps, variables, state):
+        fn(idx=idx, variables=variables, state=state)
+
+    return wrapper
+
+
+def daras_ai_step_config(
+    verbose_name, *, is_input=False, is_output=False, is_expanded=False
+):
     def decorator(fn):
         @wraps(fn)
-        def wrapper(idx, delete, variables, state):
+        def wrapper(idx, steps, variables, state):
             with st.expander(verbose_name, expanded=is_expanded):
-                if st.button("🗑", help=f"Delete {verbose_name} {idx + 1}"):
-                    delete()
-                    return
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.button(
+                        "Move Up ⬆️",
+                        help=f"Move up {verbose_name} {idx + 1}",
+                        disabled=idx == 0,
+                    ):
+                        steps[idx], steps[idx - 1] = steps[idx - 1], steps[idx]
+                        st.experimental_rerun()
+                with col2:
+                    if st.button(
+                        "Move Down ⬇️",
+                        help=f"Move down {verbose_name} {idx + 1}",
+                        disabled=idx == len(steps) - 1,
+                    ):
+                        steps[idx], steps[idx + 1] = steps[idx + 1], steps[idx]
+                        st.experimental_rerun()
+                with col3:
+                    if st.button(
+                        "Delete step 🗑", help=f"Delete {verbose_name} {idx + 1}"
+                    ):
+                        steps.pop(idx)
+                        st.experimental_rerun()
                 fn(idx=idx, variables=variables, state=state)
 
         if is_input:

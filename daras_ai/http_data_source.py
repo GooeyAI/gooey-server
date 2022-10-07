@@ -3,10 +3,10 @@ import json
 import requests
 import streamlit as st
 
-from daras_ai.core import daras_ai_step
+from daras_ai.core import daras_ai_step_config
 
 
-@daras_ai_step("Training data via HTTP")
+@daras_ai_step_config("Training data via HTTP")
 def http_data_source(idx, variables, state):
     method = st.text_input(
         label="HTTP method",

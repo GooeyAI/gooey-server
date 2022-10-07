@@ -5,11 +5,10 @@ import streamlit as st
 from decouple import config
 
 from daras_ai.core import var_selector
-from daras_ai.core import daras_ai_step
-from daras_ai.train_data_formatter import format_input_var
+from daras_ai.core import daras_ai_step_config
 
 
-@daras_ai_step("Language Model")
+@daras_ai_step_config("Language Model")
 def language_model(idx, variables, state):
     st.write("#### Config")
 
@@ -25,8 +24,8 @@ def language_model(idx, variables, state):
     # set api key
     match api_provider:
         case "openai":
-            openai.api_key = config("OPENAI_API_KEY")
-            openai.api_base = "https://api.openai.com/v1"
+            # openai.api_key = config("OPENAI_API_KEY")
+            # openai.api_base = "https://api.openai.com/v1"
             engine_choices = [
                 "text-davinci-002",
                 "text-curie-001",
@@ -34,8 +33,8 @@ def language_model(idx, variables, state):
                 "text-ada-001",
             ]
         case "goose.ai":
-            openai.api_key = config("GOOSEAI_API_KEY")
-            openai.api_base = "https://api.goose.ai/v1"
+            # openai.api_key = config("GOOSEAI_API_KEY")
+            # openai.api_base = "https://api.goose.ai/v1"
             engine_choices = [
                 "gpt-neo-20b",
                 "cassandra-lit-2-7b",
@@ -79,7 +78,7 @@ def language_model(idx, variables, state):
     state.update({"num_outputs": num_outputs})
 
     max_tokens = int(
-        st.number_input("Max output tokens", value=state.get("max_tokens", 128))
+        st.number_input("Max output tokens", value=state.get("max_tokens", 256))
     )
     state.update({"max_tokens": max_tokens})
 
@@ -90,43 +89,19 @@ def language_model(idx, variables, state):
 
     st.write("### Input")
 
-    final_prompt_var = st.text_area(
-        "Final prompt input",
-        value=state.get("final_prompt_var", ""),
+    prompt_input_var = st.text_input(
+        "Prompt Input Variable",
+        value=state.get("prompt_input_var", ""),
     )
-    state.update({"final_prompt_var": final_prompt_var})
+    state.update({"prompt_input_var": prompt_input_var})
 
     st.write("### Output")
 
     output_var = st.text_input(
-        "Model output var",
-        value=state.get("Model output var", ""),
+        "Model Output Variable",
+        value=state.get("output_var", ""),
     )
-    state.update({"Model output var": output_var})
+    state.update({"output_var": output_var})
 
-    if not (final_prompt_var and output_var):
-        return
-
-    final_prompt = format_input_var(final_prompt_var, variables)
-
-    with st.spinner():
-        r = openai.Completion.create(
-            engine=selected_engine,
-            max_tokens=max_tokens,
-            prompt=final_prompt,
-            stop=stop,
-            best_of=num_candidates,
-            n=num_outputs,
-        )
-
-    # choose the first completion that isn't empty
-    text_output = []
-    # finish_reason = ""
-    for choice in r["choices"]:
-        text = choice["text"].strip()
-        if text:
-            text_output.append(text)
-            # finish_reason = choice["finish_reason"]
-
-    # st.write(f"Finish reason: {finish_reason}")
-    variables[output_var] = text_output
+    st.write("Model Output (generated value)")
+    st.write(variables.get(output_var, ""))
