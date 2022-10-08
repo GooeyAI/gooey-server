@@ -7,13 +7,14 @@ app = FastAPI()
 
 
 @app.post("/v1/run-recipie/")
+@app.post("/v1/run-recipe/")
 def run(
     params: dict = Body(
         examples={
             "political-ai": {
                 "summary": "Political AI example",
                 "value": {
-                    "recipie_id": "xYlKZM4b5T0",
+                    "recipe_id": "xYlKZM4b5T0",
                     "inputs": {
                         "text_input": {
                             "action_id": "17716",
@@ -24,19 +25,19 @@ def run(
         },
     ),
 ):
-    db = firestore.Client()
-    db_collection = db.collection("daras-ai--political_example")
-    try:
-        recipie_id = params["recipie_id"]
-    except KeyError:
+    recipe_id = params.get("recipie_id", params.get("recipe_id", None))
+    if not recipe_id:
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "missing field in request body",
-                "path": ["recipie_id"],
+                "path": ["recipe_id"],
             },
         )
-    doc_ref = db_collection.document(recipie_id)
+
+    db = firestore.Client()
+    db_collection = db.collection("daras-ai--political_example")
+    doc_ref = db_collection.document(recipe_id)
     doc = doc_ref.get().to_dict()
 
     variables = {}

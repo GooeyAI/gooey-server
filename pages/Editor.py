@@ -67,7 +67,7 @@ def fork_me():
 def save_me():
     db_collection = get_db_collection()
 
-    doc_ref = db_collection.document(recipie_id)
+    doc_ref = db_collection.document(recipe_id)
     doc_ref.set(deepcopy(st.session_state.to_dict()))
 
     cached_state.clear()
@@ -134,8 +134,8 @@ def render_io_steps(key):
 
 st.set_page_config(layout="wide")
 
-recipie_id = get_or_create_doc_id()
-cached_state = get_firestore_doc(recipie_id)
+recipe_id = get_or_create_doc_id()
+cached_state = get_firestore_doc(recipe_id)
 
 if not st.session_state:
     st.session_state.update(deepcopy(cached_state))
@@ -148,7 +148,7 @@ st.session_state.setdefault("variables", {})
 variables = st.session_state["variables"]
 
 
-tab1, tab2, tab3 = st.tabs(["Run Recipie 🏃‍♂️", "Edit Recipie ✍️", "Run as API 🚀"])
+tab1, tab2, tab3 = st.tabs(["Run Recipe 🏃‍♂️", "Edit Recipe ✍️", "Run as API 🚀"])
 
 with tab2:
     action_buttons()
@@ -168,9 +168,9 @@ with tab2:
 
 
 with tab3:
-    api_url = "https://api.daras.ai/v1/run-recipie/"
+    api_url = "https://api.daras.ai/v1/run-recipe/"
     params = {
-        "recipie_id": recipie_id,
+        "recipe_id": recipe_id,
         "inputs": {
             input_step["name"]: {
                 input_step["var_name"]: variables[input_step["var_name"]],
@@ -181,7 +181,7 @@ with tab3:
 
     st.write(
         rf"""
-Call this recipie as an API 
+Call this recipe as an API 
 
 ```
 curl -X 'POST' \
@@ -215,7 +215,7 @@ with tab1:
 
     with col2:
         if st.button("Run 🏃‍♂️"):
-            with st.spinner("Running Recipie..."):
+            with st.spinner("Running Recipe..."):
                 run_compute_steps(st.session_state["compute_steps"], variables)
 
         st.write("### Output")

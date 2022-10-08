@@ -13,7 +13,7 @@ if "docs" not in st.session_state:
 for snapshot in st.session_state["docs"]:
     snapshot: DocumentSnapshot
 
-    recipie_id = snapshot.id
+    recipe_id = snapshot.id
     doc = snapshot.to_dict()
 
     name = doc.get("header_title")
@@ -23,7 +23,7 @@ for snapshot in st.session_state["docs"]:
     tagline = doc.get("header_tagline", "")
     st.markdown(
         f"""
-        <a style="font-size: 24px" href="/Editor/?id={recipie_id}" target = "_self">{name}</a>
+        <a style="font-size: 24px" href="/Editor/?id={recipe_id}" target = "_self">{name}</a>
         <br>
         <i>{tagline}</i>
         """,
