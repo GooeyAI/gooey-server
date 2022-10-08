@@ -4,6 +4,7 @@ import shlex
 import typing
 from copy import deepcopy
 
+import firebase_admin
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
@@ -11,6 +12,10 @@ from google.cloud import firestore
 
 from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
+
+
+if not firebase_admin._apps:
+    firebase_admin.initialize_app()
 
 
 def get_or_create_doc_id():

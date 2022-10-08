@@ -1,9 +1,11 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import requests
 import streamlit as st
 
 from daras_ai.core import daras_ai_step_computer, daras_ai_step_config
+from daras_ai.image_input import img_to_png, upload_file_from_bytes, bytes_to_cv2_img
 
 mp_face_mesh = mp.solutions.face_mesh
 mp_drawing = mp.solutions.drawing_utils
@@ -30,7 +32,7 @@ def extract_face(idx, state, variables):
     state.update({"face_mask_var": face_mask_var})
 
     face_cutout_var = st.text_input(
-        "Face Cutout Output Variable",
+        "Face Cutout Output Variable (optional)",
         value=state.get("face_cutout_var", ""),
         help=f"face cutout output var {idx}",
     )
@@ -43,22 +45,28 @@ def extract_face(idx, state, variables):
     selected_model = state["selected_model"]
     face_mask_var = state["face_mask_var"]
     face_cutout_var = state["face_cutout_var"]
+    r = requests.get(input_img)
+    r.raise_for_status()
+    input_img_bytes = r.content
 
-    if not (selected_model and input_img and face_mask_var and face_cutout_var):
+    if not (selected_model and input_img and face_mask_var and input_img_bytes):
         raise ValueError
 
     match selected_model:
         case "MediaPipe":
-            image_cv2 = cv2.imdecode(np.frombuffer(input_img, dtype=np.uint8), flags=1)
+            image_cv2 = bytes_to_cv2_img(input_img_bytes)
 
             face_mask = _extract_face(image_cv2)
 
-            variables[face_mask_var] = _img_to_png(face_mask)
-            variables[face_cutout_var] = _img_to_png(image_cv2 & face_mask)
+            variables[face_mask_var] = upload_file_from_bytes(
+                "face_mask.png",
+                img_to_png(face_mask),
+            )
 
-
-def _img_to_png(img):
-    return cv2.imencode(".png", img)[1].tobytes()
+            if face_cutout_var:
+                variables[face_cutout_var] = upload_file_from_bytes(
+                    "face_cutout.png", img_to_png(image_cv2 & face_mask)
+                )
 
 
 def _extract_face(image):
