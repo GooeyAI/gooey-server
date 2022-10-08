@@ -52,16 +52,15 @@ def image_input(idx, variables, state):
         return
     if var_name not in variables:
         variables[var_name] = None
+
     uploaded_file = st.file_uploader(var_name, help=f"Image input {var_name} {idx + 1}")
-    if not uploaded_file:
-        try:
-            del variables[var_name]
-        except KeyError:
-            pass
-        return
-    image_url = upload_file(uploaded_file)
-    variables[var_name] = image_url
-    st.image(image_url, width=300)
+    if uploaded_file:
+        image_url = upload_file(uploaded_file)
+        variables[var_name] = image_url
+
+    image_url = variables.get(var_name)
+    if image_url:
+        st.image(variables[var_name], width=300)
 
 
 @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})

@@ -27,6 +27,8 @@ def image_output(idx, variables, state):
     if not isinstance(images, list):
         images = [images]
 
+    st.write(f"{var_name}")
+
     col1, col2 = st.columns(2)
 
     images = [img for img in images if img]
@@ -35,7 +37,7 @@ def image_output(idx, variables, state):
     if col1_images:
         with col1:
             st.image(col1_images)
-    col_2_images = images[mid:]
-    if col_2_images:
+    col2_images = images[mid:]
+    if col2_images:
         with col2:
-            st.image(col_2_images)
+            st.image(col2_images)
