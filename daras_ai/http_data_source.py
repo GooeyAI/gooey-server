@@ -1,12 +1,14 @@
 import json
+from locale import format
 
 import requests
 import streamlit as st
 
-from daras_ai.core import daras_ai_step_config
+from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
+from daras_ai.text_format import daras_ai_format_str
 
 
-@daras_ai_step_config("Training data via HTTP")
+@daras_ai_step_config("Call External API")
 def http_data_source(idx, variables, state):
     method = st.text_input(
         label="HTTP method",
@@ -32,25 +34,43 @@ def http_data_source(idx, variables, state):
     )
     state.update({"json_body": json_body})
 
-    "**Response**"
+    output_var = st.text_input(
+        label="Output Variable",
+        value=state.get("output_var", ""),
+    )
+    state.update({"output_var": output_var})
 
-    if "data_source_response" not in st.session_state:
-        with st.spinner():
-            r = requests.request(
-                method,
-                url,
-                headers=json.loads(headers),
-                json=json.loads(json_body),
-            )
+    st.write("Output Data (fetched)")
+    st.write(variables.get(output_var, ""))
+
+
+@daras_ai_step_computer
+def http_data_source(idx, variables, state):
+    json_body = state["json_body"]
+    method = state["method"]
+    url = state["url"]
+    headers = state["headers"]
+    output_var = state["output_var"]
+
+    url = daras_ai_format_str(url, variables)
+
+    if not (url and method and output_var):
+        raise ValueError
+
+    if json_body:
+        body = json.loads(json_body)
+    else:
+        body = None
+
+    with st.spinner():
+        r = requests.request(
+            method,
+            url,
+            headers=json.loads(headers),
+            json=body,
+        )
+
     r.raise_for_status()
     response_json = r.json()
 
-    st.write(response_json)
-
-    out_var = st.text_input(
-        label="Output var",
-        value=state.get("out_var"),
-    )
-    if out_var is not None:
-        state.update({"out_var": out_var})
-        variables[out_var] = response_json
+    variables[output_var] = response_json

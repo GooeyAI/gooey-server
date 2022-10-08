@@ -35,6 +35,10 @@ def text_format(idx, variables, state):
     if not output_var:
         raise ValueError
 
+    variables[output_var] = daras_ai_format_str(format_str, variables)
+
+
+def daras_ai_format_str(format_str, variables):
     input_spec_results: list[parse.Result] = list(
         parse.findall(input_spec_parse_pattern, format_str)
     )
@@ -42,5 +46,4 @@ def text_format(idx, variables, state):
         spec = spec_result.fixed[0]
         variable_value = glom(variables, ast.literal_eval(spec))
         format_str = format_str.replace("{{" + spec + "}}", variable_value)
-
-    variables[output_var] = format_str
+    return format_str
