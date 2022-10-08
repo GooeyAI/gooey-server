@@ -1,4 +1,6 @@
 import os
+
+import firebase_admin
 from decouple import config, UndefinedValueError
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,4 +19,8 @@ else:
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", None)
 
+if not firebase_admin._apps:
+    firebase_admin.initialize_app()
+
 GS_BUCKET_NAME = config("GS_BUCKET_NAME")
+DARS_API_ROOT = config("DARS_API_ROOT", "https://api.daras.ai")

@@ -41,31 +41,29 @@ def run(
     doc = doc_ref.get().to_dict()
 
     variables = {}
-    for input_step in doc["input_steps"]:
-        step_name = input_step["name"]
-        match step_name:
-            case "text_input":
-                var_name = input_step["var_name"]
-                try:
-                    variables[var_name] = params["inputs"][step_name][var_name]
-                except (KeyError, TypeError):
-                    raise HTTPException(
-                        status_code=400,
-                        detail={
-                            "error": "missing field in request body",
-                            "path": ["inputs", step_name, var_name],
-                        },
-                    )
 
+    # put input steps parameters into variables
+    for input_step in doc["input_steps"]:
+        var_name = input_step["var_name"]
+        try:
+            variables[var_name] = params["inputs"][var_name]
+        except (KeyError, TypeError):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "missing field in request body",
+                    "path": ["inputs", var_name],
+                },
+            )
+
+    # run compute steps
     compute_steps = doc["compute_steps"]
     run_compute_steps(compute_steps, variables)
 
+    # put output steps parameters into variables
     outputs = {}
-
     for output_step in doc["output_steps"]:
-        match output_step["name"]:
-            case "raw_text_output":
-                var_name = output_step["var_name"]
-                outputs[var_name] = variables[var_name]
+        var_name = output_step["var_name"]
+        outputs[var_name] = variables[var_name]
 
     return {"outputs": outputs}

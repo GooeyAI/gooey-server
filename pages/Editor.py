@@ -10,12 +10,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 from google.cloud import firestore
 
+from daras_ai import settings
 from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
-
-
-if not firebase_admin._apps:
-    firebase_admin.initialize_app()
 
 
 def get_or_create_doc_id():
@@ -173,13 +170,11 @@ with tab2:
 
 
 with tab3:
-    api_url = "https://api.daras.ai/v1/run-recipe/"
+    api_url = f"{settings.DARS_API_ROOT}/v1/run-recipe/"
     params = {
         "recipe_id": recipe_id,
         "inputs": {
-            input_step["name"]: {
-                input_step["var_name"]: variables.get(input_step["var_name"], ""),
-            }
+            input_step["var_name"]: variables.get(input_step["var_name"], "")
             for input_step in st.session_state["input_steps"]
         },
     }
@@ -202,6 +197,7 @@ curl -X 'POST' \
         with st.spinner("Waiting for API..."):
             r = requests.post(api_url, json=params)
             "Response"
+            r.raise_for_status()
             st.write(r.json())
 
 
