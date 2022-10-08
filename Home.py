@@ -1,6 +1,9 @@
 import streamlit as st
 from google.cloud import firestore
 from google.cloud.firestore_v1 import DocumentSnapshot
+from daras_ai import settings
+
+assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
 db = firestore.Client()
 db_collection = db.collection("daras-ai--political_example")
