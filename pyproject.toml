@@ -21,7 +21,11 @@ streamlit-nested-layout = "^0.1.1"
 replicate = "^0.4.0"
 fastapi = "^0.85.0"
 uvicorn = {extras = ["standard"], version = "^0.18.3"}
-
+firebase-admin = "^6.0.0"
+# mediapipe for M1 macs
+mediapipe-silicon = {version = "^0.8.11", markers = "platform_machine == 'arm64'", platform = "darwin"}
+# mediapipe for others
+mediapipe = {version = "^0.8.11", markers = "platform_machine != 'arm64'"}
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"

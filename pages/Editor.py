@@ -172,10 +172,10 @@ with tab3:
     params = {
         "recipe_id": recipe_id,
         "inputs": {
-            input_step["name"]: {
-                input_step["var_name"]: variables[input_step["var_name"]],
-            }
-            for input_step in st.session_state["input_steps"]
+            # input_step["name"]: {
+            #     input_step["var_name"]: variables.get(input_step["var_name"], ""),
+            # }
+            # for input_step in st.session_state["input_steps"]
         },
     }
 

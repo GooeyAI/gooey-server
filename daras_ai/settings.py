@@ -16,3 +16,5 @@ else:
         f.write(_json)
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", None)
+
+GS_BUCKET_NAME = config("GS_BUCKET_NAME")
