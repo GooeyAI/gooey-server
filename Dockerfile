@@ -6,6 +6,8 @@ ENV WORKDIR /usr/src/app
 RUN mkdir -p $WORKDIR
 WORKDIR $WORKDIR
 
+RUN apt-get update && apt-get install libgl1
+
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
