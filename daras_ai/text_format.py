@@ -22,6 +22,12 @@ def text_format(idx, variables, state):
     )
     state.update({"output_var": output_var})
 
+    do_html2text = st.checkbox(
+        "HTML -> Text",
+        value=state.get("do_html2text", False),
+    )
+    state.update({"do_html2text": do_html2text})
+
     st.text_area(
         "Output value (generated)", value=variables.get(output_var, ""), disabled=True
     )
@@ -31,19 +37,24 @@ def text_format(idx, variables, state):
 def text_format(idx, variables, state):
     format_str = state["format_str"]
     output_var = state["output_var"]
+    do_html2text = state["do_html2text"]
 
     if not output_var:
         raise ValueError
 
-    variables[output_var] = daras_ai_format_str(format_str, variables)
+    variables[output_var] = daras_ai_format_str(format_str, variables, do_html2text)
 
 
-def daras_ai_format_str(format_str, variables):
+def daras_ai_format_str(format_str, variables, do_html2text=False):
     input_spec_results: list[parse.Result] = list(
         parse.findall(input_spec_parse_pattern, format_str)
     )
     for spec_result in input_spec_results:
         spec = spec_result.fixed[0]
         variable_value = glom(variables, ast.literal_eval(spec))
-        format_str = format_str.replace("{{" + spec + "}}", variable_value)
+        variable_value = str(variable_value)
+        if do_html2text:
+            variable_value = html2text(variable_value)
+        variable_value = variable_value.strip()
+        format_str = format_str.replace("{{" + spec + "}}", str(variable_value))
     return format_str

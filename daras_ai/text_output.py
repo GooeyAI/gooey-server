@@ -25,6 +25,8 @@ def raw_text_output(idx, variables, state):
     if not isinstance(text_list, list):
         text_list = [text_list]
 
+    st.write(var_name)
+
     for j, text in enumerate(text_list):
         st.text_area(
             f"{var_name} ({j + 1})",
