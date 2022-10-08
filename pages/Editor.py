@@ -1,7 +1,10 @@
+import json
 import secrets
+import shlex
 import typing
 from copy import deepcopy
 
+import requests
 import streamlit as st
 import streamlit.components.v1 as components
 from google.cloud import firestore
@@ -64,31 +67,19 @@ def fork_me():
 def save_me():
     db_collection = get_db_collection()
 
-    doc_ref = db_collection.document(doc_id)
+    doc_ref = db_collection.document(recipie_id)
     doc_ref.set(deepcopy(st.session_state.to_dict()))
 
     cached_state.clear()
     cached_state.update(deepcopy(st.session_state.to_dict()))
 
 
-def run_as_api():
-    params = {
-        "recipie_id": doc_id,
-        "inputs": {
-            input_step["var_name"]: variables[input_step["var_name"]]
-            for input_step in st.session_state["input_steps"]
-        },
-    }
-
-
 def action_buttons():
-    top_col1, top_col2, top_col3 = st.columns(3)
-    with top_col2:
-        st.button("Save a Copy 📕", on_click=fork_me)
+    top_col1, top_col2 = st.columns(2)
     with top_col1:
         st.button("Save Me 💾", on_click=save_me)
-    with top_col3:
-        st.button("Run as API 🚀", on_click=run_as_api)
+    with top_col2:
+        st.button("Save a Copy 📕", on_click=fork_me)
 
 
 def render_steps(*, key: str, title: str):
@@ -128,14 +119,23 @@ def render_steps(*, key: str, title: str):
         call_step(idx, step, step_fn)
 
 
+def render_io_steps(key):
+    for idx, step in enumerate(st.session_state[key]):
+        try:
+            step_fn = IO_REPO[step["name"]]
+        except KeyError:
+            continue
+        step_fn(idx=idx, state=step, variables=variables)
+
+
 #
 # main
 #
 
 st.set_page_config(layout="wide")
 
-doc_id = get_or_create_doc_id()
-cached_state = get_firestore_doc(doc_id)
+recipie_id = get_or_create_doc_id()
+cached_state = get_firestore_doc(recipie_id)
 
 if not st.session_state:
     st.session_state.update(deepcopy(cached_state))
@@ -147,12 +147,12 @@ st.session_state.setdefault("output_steps", [])
 st.session_state.setdefault("variables", {})
 variables = st.session_state["variables"]
 
-action_buttons()
 
-
-tab1, tab2 = st.tabs(["Run Recipie 🏃‍♂️", "Edit Recipie ✍️"])
+tab1, tab2, tab3 = st.tabs(["Run Recipie 🏃‍♂️", "Edit Recipie ✍️", "Run as API 🚀"])
 
 with tab2:
+    action_buttons()
+
     st.text_input("Title", key="header_title")
     st.text_input("Tagline", key="header_tagline")
     st.text_area("Description", key="header_desc")
@@ -167,13 +167,37 @@ with tab2:
     render_steps(key="compute_steps", title="Add a step")
 
 
-def render_io_steps(key):
-    for idx, step in enumerate(st.session_state[key]):
-        try:
-            step_fn = IO_REPO[step["name"]]
-        except KeyError:
-            continue
-        step_fn(idx=idx, state=step, variables=variables)
+with tab3:
+    api_url = "https://api.daras.ai/v1/run-recipie/"
+    params = {
+        "recipie_id": recipie_id,
+        "inputs": {
+            input_step["name"]: {
+                input_step["var_name"]: variables[input_step["var_name"]],
+            }
+            for input_step in st.session_state["input_steps"]
+        },
+    }
+
+    st.write(
+        rf"""
+Call this recipie as an API 
+
+```
+curl -X 'POST' \
+  {shlex.quote(api_url)} \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d {shlex.quote(json.dumps(params, indent=2))}
+```
+    """
+    )
+
+    if st.button("Call API 🚀"):
+        with st.spinner("Waiting for API..."):
+            r = requests.post(api_url, json=params)
+            "Response"
+            st.write(r.json())
 
 
 with tab1:
