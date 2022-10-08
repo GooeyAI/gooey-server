@@ -14,11 +14,15 @@ def run(
                 "summary": "Political AI example",
                 "value": {
                     "recipie_id": "xYlKZM4b5T0",
-                    "inputs": {"text_input": {"action_id": "17477"}},
+                    "inputs": {
+                        "text_input": {
+                            "action_id": "17716",
+                        },
+                    },
                 },
-            }
-        }
-    )
+            },
+        },
+    ),
 ):
     db = firestore.Client()
     db_collection = db.collection("daras-ai--political_example")
