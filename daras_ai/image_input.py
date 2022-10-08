@@ -20,6 +20,7 @@ def image_input(idx, variables, state):
         variables[var_name] = None
     uploaded_file = st.file_uploader(var_name, help=f"Image input {var_name} {idx + 1}")
     if not uploaded_file:
+        del variables[var_name]
         return
     variables[var_name] = uploaded_file.getvalue()
 
