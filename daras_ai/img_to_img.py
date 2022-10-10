@@ -87,17 +87,26 @@ def img_to_img(idx, variables, state):
 
     match selected_model:
         case "Stable Diffusion":
-            model = replicate.models.get("devxpy/glid-3-xl-stable").versions.get(
-                "cef7ec313a60334cd1d52aef39118ae9df4f44987899107b43d15472e5b3d504"
-            )
-            params = dict(
-                prompt=prompt,
-                num_outputs=num_outputs,
-                edit_image=init_img,
-                mask=mask_img,
-                num_inference_steps=num_inference_steps,
-            )
-            variables[output_var] = model.predict(**params)
+            if mask_img:
+                model = replicate.models.get("devxpy/glid-3-xl-stable").versions.get(
+                    "760f4043f4f53f4bb5e9b3d1f9268030ae514638e77732916344f1dd4b305607"
+                )
+                photos = model.predict(
+                    prompt=prompt,
+                    num_outputs=num_outputs,
+                    edit_image=init_img,
+                    mask=mask_img,
+                    num_inference_steps=num_inference_steps,
+                )
+            else:
+                model = replicate.models.get("stability-ai/stable-diffusion")
+                photos = model.predict(
+                    prompt=prompt,
+                    num_outputs=num_outputs,
+                    init_image=init_img,
+                    num_inference_steps=num_inference_steps,
+                )
+            variables[output_var] = photos
 
 
 # def dall_e(prompt):
