@@ -87,7 +87,9 @@ def img_to_img(idx, variables, state):
 
     match selected_model:
         case "Stable Diffusion":
-            model = replicate.models.get("devxpy/glid-3-xl-stable")
+            model = replicate.models.get("devxpy/glid-3-xl-stable").versions.get(
+                "cef7ec313a60334cd1d52aef39118ae9df4f44987899107b43d15472e5b3d504"
+            )
             params = dict(
                 prompt=prompt,
                 num_outputs=num_outputs,
