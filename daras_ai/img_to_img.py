@@ -84,6 +84,10 @@ def img_to_img(idx, variables, state):
 
     if isinstance(prompt, list):
         prompt = random.choice(prompt)
+    if isinstance(init_img, list):
+        init_img = random.choice(init_img)
+    if isinstance(init_img, list):
+        mask_img = random.choice(mask_img)
 
     match selected_model:
         case "Stable Diffusion":

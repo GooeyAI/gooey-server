@@ -29,12 +29,18 @@ def face_restoration(idx, variables, state):
     img_input_var = state["img_input_var"]
     img_output_var = state["img_output_var"]
     selected_model = state["selected_model"]
-    img_input = variables.get(img_input_var)
+    input_images = variables.get(img_input_var)
 
-    if not (img_input and img_output_var and selected_model):
+    if not (input_images and img_output_var and selected_model):
         return
+
+    if not isinstance(input_images, list):
+        input_images = [input_images]
 
     match selected_model:
         case "gfpgan":
-            model = replicate.models.get("tencentarc/gfpgan")
-            variables[img_output_var] = model.predict(img=img_input)
+            output_images = []
+            for img in input_images:
+                model = replicate.models.get("tencentarc/gfpgan")
+                output_images.append(model.predict(img=img))
+            variables[img_output_var] = output_images
