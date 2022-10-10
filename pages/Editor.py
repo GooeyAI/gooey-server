@@ -13,6 +13,7 @@ from google.cloud import firestore
 from daras_ai import settings
 from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
+from daras_ai.logo import logo
 
 
 def get_or_create_doc_id():
@@ -149,6 +150,7 @@ st.session_state.setdefault("output_steps", [])
 st.session_state.setdefault("variables", {})
 variables = st.session_state["variables"]
 
+logo()
 
 tab1, tab2, tab3 = st.tabs(["Run Recipe 🏃‍♂️", "Edit Recipe ✍️", "Run as API 🚀"])
 
