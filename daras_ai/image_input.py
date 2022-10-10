@@ -1,6 +1,9 @@
+import base64
+import io
 import uuid
 
 import cv2
+from PIL import Image, ImageOps
 import numpy as np
 import streamlit as st
 from firebase_admin import storage
@@ -65,7 +68,15 @@ def image_input(idx, variables, state):
 
 @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 def upload_file(uploaded_file):
-    return upload_file_from_bytes(uploaded_file.name, uploaded_file.getvalue())
+    img_bytes = uploaded_file.getvalue()
+
+    im_pil = Image.open(io.BytesIO(img_bytes))
+    im_pil = ImageOps.fit(im_pil, (512, 512), centering=(0.5, 0))
+    img_bytes_io = io.BytesIO()
+    im_pil.save(img_bytes_io, format="png")
+    img_bytes = img_bytes_io.getvalue()
+
+    return upload_file_from_bytes(uploaded_file.name, img_bytes)
 
 
 def upload_file_from_bytes(filename: str, img_bytes: bytes) -> str:
@@ -75,7 +86,7 @@ def upload_file_from_bytes(filename: str, img_bytes: bytes) -> str:
     return blob.public_url
 
 
-def img_to_png(img):
+def cv2_img_to_png(img):
     return cv2.imencode(".png", img)[1].tobytes()
 
 

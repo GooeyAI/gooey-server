@@ -5,7 +5,11 @@ import requests
 import streamlit as st
 
 from daras_ai.core import daras_ai_step_computer, daras_ai_step_config
-from daras_ai.image_input import img_to_png, upload_file_from_bytes, bytes_to_cv2_img
+from daras_ai.image_input import (
+    cv2_img_to_png,
+    upload_file_from_bytes,
+    bytes_to_cv2_img,
+)
 
 mp_face_mesh = mp.solutions.face_mesh
 mp_drawing = mp.solutions.drawing_utils
@@ -60,20 +64,26 @@ def extract_face(idx, state, variables):
 
             variables[face_mask_var] = upload_file_from_bytes(
                 "face_mask.png",
-                img_to_png(face_mask),
+                cv2_img_to_png(face_mask),
             )
 
             if face_cutout_var:
+                # gaussian = np.random.normal(0, 1, image_cv2.shape).astype(np.uint8)
+                # gaussian = (np.ones(image_cv2.shape) * 255).astype(np.uint8)
                 variables[face_cutout_var] = upload_file_from_bytes(
-                    "face_cutout.png", img_to_png(image_cv2 & face_mask)
+                    "face_cutout.png",
+                    # img_to_png((gaussian & ~face_mask) + (image_cv2 & face_mask)),
+                    cv2_img_to_png((image_cv2 & face_mask)),
                 )
 
 
 def _extract_face(image):
+    face_mask = np.zeros(image.shape, dtype=np.uint8)
+
     with mp_face_mesh.FaceMesh(
         static_image_mode=True,
         refine_landmarks=True,
-        max_num_faces=1,
+        max_num_faces=10,
         min_detection_confidence=0.5,
     ) as face_mesh:
         # Convert the BGR image to RGB and process it with MediaPipe Face Mesh.
@@ -83,7 +93,6 @@ def _extract_face(image):
             raise ValueError("Face not found")
 
         image_rows, image_cols, _ = image.shape
-        face_mask = np.zeros(image.shape, dtype=np.uint8)
 
         for landmark_list in results.multi_face_landmarks:
             idx_to_coordinates = build_idx_to_coordinates_dict(
@@ -100,9 +109,7 @@ def _extract_face(image):
 
             cv2.fillConvexPoly(face_mask, face_oval_hull, (255, 255, 255))
 
-        return face_mask
-
-    raise ValueError("Face not found")
+    return face_mask
 
 
 def build_idx_to_coordinates_dict(image_cols, image_rows, landmark_list):
