@@ -1,6 +1,7 @@
 import streamlit as st
 from google.cloud import firestore
 from google.cloud.firestore_v1 import DocumentSnapshot
+
 from daras_ai import settings
 from daras_ai.logo import logo
 
@@ -21,7 +22,9 @@ for snapshot in st.session_state["docs"]:
     recipe_id = snapshot.id
     doc = snapshot.to_dict()
 
-    name = doc.get("header_title")
+    if doc.get("header_is_hidden"):
+        continue
+    name = doc.get("header_title", doc.get(""))
     if not name:
         continue
 

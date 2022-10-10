@@ -14,6 +14,7 @@ from daras_ai import settings
 from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
 from daras_ai.logo import logo
+from daras_ai.secret_key_checker import check_secret_key
 
 
 def get_or_create_doc_id():
@@ -53,6 +54,7 @@ def fork_me():
     fork_doc_ref = db_collection.document(fork_doc_id)
     fork_state = deepcopy(st.session_state.to_dict())
     fork_state["header_title"] = f"Copy of {fork_state.get('header_title', '')}"
+    fork_state["header_is_hidden"] = True
     fork_doc_ref.set(fork_state)
 
     components.html(
@@ -78,18 +80,12 @@ def save_me():
 
 
 def action_buttons():
-    if settings.SECRET_KEY:
-        secret_key = st.text_input(
-            "Enter secret key to save recipe. Contact dev@dara.network to obtain a secret key."
-        )
-        if secret_key != settings.SECRET_KEY:
-            return
-
-    top_col1, top_col2 = st.columns(2)
+    top_col1, top_col2, top_col3 = st.columns(3)
     with top_col1:
         st.button("Save Me 💾", on_click=save_me)
     with top_col2:
         st.button("Save a Copy 📕", on_click=fork_me)
+    st.checkbox("Is Hidden?", key="header_is_hidden")
 
 
 def render_steps(*, key: str, title: str):
@@ -162,7 +158,8 @@ logo()
 tab1, tab2, tab3 = st.tabs(["Run Recipe 🏃‍♂️", "Edit Recipe ✍️", "Run as API 🚀"])
 
 with tab2:
-    action_buttons()
+    if check_secret_key("save this recipie"):
+        action_buttons()
 
     st.text_input("Title", key="header_title")
     st.text_input("Tagline", key="header_tagline")
@@ -179,15 +176,7 @@ with tab2:
 
 
 with tab3:
-
-    def run_as_api():
-        if settings.SECRET_KEY:
-            secret_key = st.text_input(
-                "Enter secret key to run as API. Contact dev@dara.network to obtain a secret key."
-            )
-            if secret_key != settings.SECRET_KEY:
-                return
-
+    if check_secret_key("run as API"):
         api_url = f"{settings.DARS_API_ROOT}/v1/run-recipe/"
         params = {
             "recipe_id": recipe_id,
@@ -199,8 +188,8 @@ with tab3:
 
         st.write(
             rf"""
-        Call this recipe as an API 
-
+            Call this recipe as an API 
+    
 ```
 curl -X 'POST' \
   {shlex.quote(api_url)} \
@@ -208,7 +197,7 @@ curl -X 'POST' \
   -H 'Content-Type: application/json' \
   -d {shlex.quote(json.dumps(params, indent=2))}
 ```
-            """
+                """
         )
 
         if st.button("Call API 🚀"):
@@ -218,7 +207,6 @@ curl -X 'POST' \
                 r.raise_for_status()
                 st.write(r.json())
 
-    run_as_api()
 
 with tab1:
     col1, col2 = st.columns(2)
