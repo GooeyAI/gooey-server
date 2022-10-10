@@ -78,6 +78,13 @@ def save_me():
 
 
 def action_buttons():
+    if settings.SECRET_KEY:
+        secret_key = st.text_input(
+            "Enter secret key to save recipe. Contact dev@dara.network to obtain a secret key."
+        )
+        if secret_key != settings.SECRET_KEY:
+            return
+
     top_col1, top_col2 = st.columns(2)
     with top_col1:
         st.button("Save Me 💾", on_click=save_me)
@@ -172,18 +179,27 @@ with tab2:
 
 
 with tab3:
-    api_url = f"{settings.DARS_API_ROOT}/v1/run-recipe/"
-    params = {
-        "recipe_id": recipe_id,
-        "inputs": {
-            input_step["var_name"]: variables.get(input_step["var_name"], "")
-            for input_step in st.session_state["input_steps"]
-        },
-    }
 
-    st.write(
-        rf"""
-Call this recipe as an API 
+    def run_as_api():
+        if settings.SECRET_KEY:
+            secret_key = st.text_input(
+                "Enter secret key to run as API. Contact dev@dara.network to obtain a secret key."
+            )
+            if secret_key != settings.SECRET_KEY:
+                return
+
+        api_url = f"{settings.DARS_API_ROOT}/v1/run-recipe/"
+        params = {
+            "recipe_id": recipe_id,
+            "inputs": {
+                input_step["var_name"]: variables.get(input_step["var_name"], "")
+                for input_step in st.session_state["input_steps"]
+            },
+        }
+
+        st.write(
+            rf"""
+        Call this recipe as an API 
 
 ```
 curl -X 'POST' \
@@ -192,16 +208,17 @@ curl -X 'POST' \
   -H 'Content-Type: application/json' \
   -d {shlex.quote(json.dumps(params, indent=2))}
 ```
-    """
-    )
+            """
+        )
 
-    if st.button("Call API 🚀"):
-        with st.spinner("Waiting for API..."):
-            r = requests.post(api_url, json=params)
-            "Response"
-            r.raise_for_status()
-            st.write(r.json())
+        if st.button("Call API 🚀"):
+            with st.spinner("Waiting for API..."):
+                r = requests.post(api_url, json=params)
+                "Response"
+                r.raise_for_status()
+                st.write(r.json())
 
+    run_as_api()
 
 with tab1:
     col1, col2 = st.columns(2)
