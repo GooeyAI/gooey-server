@@ -1,10 +1,12 @@
 import random
 
 import replicate
+import requests
 import streamlit as st
 
 
 from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
+from daras_ai.image_input import resize_img, upload_file_from_bytes
 
 
 @daras_ai_step_config("Img to Img")
@@ -89,12 +91,21 @@ def img_to_img(idx, variables, state):
     if isinstance(init_img, list):
         mask_img = random.choice(mask_img)
 
+    if init_img:
+        init_img = upload_file_from_bytes(
+            "init_img.png", resize_img(requests.get(init_img).content, (512, 512))
+        )
+    if mask_img:
+        mask_img = upload_file_from_bytes(
+            "mask_img.png", resize_img(requests.get(mask_img).content, (512, 512))
+        )
+
     match selected_model:
         case "Stable Diffusion":
+            model = replicate.models.get("devxpy/glid-3-xl-stable").versions.get(
+                "773fe7b990c57d29570b2d6fc71a0f460b129c8c950b5e1b1b9c881581387c98"
+            )
             if mask_img:
-                model = replicate.models.get("devxpy/glid-3-xl-stable").versions.get(
-                    "b9bebfc343d791256f20408b731c0fc8b41149d59fe8922ede490c2a05dc30bf"
-                )
                 photos = model.predict(
                     prompt=prompt,
                     num_outputs=num_outputs,
@@ -103,11 +114,10 @@ def img_to_img(idx, variables, state):
                     num_inference_steps=num_inference_steps,
                 )
             else:
-                model = replicate.models.get("stability-ai/stable-diffusion")
                 photos = model.predict(
                     prompt=prompt,
                     num_outputs=num_outputs,
-                    init_image=init_img,
+                    init_img=init_img,
                     num_inference_steps=num_inference_steps,
                 )
             variables[output_var] = photos

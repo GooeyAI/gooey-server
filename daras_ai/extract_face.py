@@ -49,6 +49,10 @@ def extract_face(idx, state, variables):
     selected_model = state["selected_model"]
     face_mask_var = state["face_mask_var"]
     face_cutout_var = state["face_cutout_var"]
+
+    if not input_img:
+        raise ValueError
+
     r = requests.get(input_img)
     r.raise_for_status()
     input_img_bytes = r.content
