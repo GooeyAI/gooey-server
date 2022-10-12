@@ -57,7 +57,14 @@ def http_data_source(idx, variables, state):
     if not (url and method and output_var):
         raise ValueError
 
+    if headers:
+        headers = daras_ai_format_str(headers, variables)
+        headers = json.loads(headers)
+    else:
+        headers = None
+
     if json_body:
+        json_body = daras_ai_format_str(json_body, variables)
         body = json.loads(json_body)
     else:
         body = None
@@ -66,7 +73,7 @@ def http_data_source(idx, variables, state):
         r = requests.request(
             method,
             url,
-            headers=json.loads(headers),
+            headers=headers,
             json=body,
         )
 
