@@ -228,7 +228,7 @@ with tab1:
                 run_compute_steps(st.session_state["compute_steps"], variables)
                 time_taken = time() - start
             st.markdown(
-                f"**Run Time** `{time_taken:.2f}` seconds. "
+                f"**Run Time** `{time_taken:.1f}` seconds. "
                 f"This GPU time is free while we're building daras.ai, Enjoy!"
             )
 
