@@ -6,7 +6,6 @@ from daras_ai.computer import run_compute_steps
 app = FastAPI()
 
 
-@app.post("/v1/run-recipie/")
 @app.post("/v1/run-recipe/")
 def run(
     params: dict = Body(
@@ -16,9 +15,7 @@ def run(
                 "value": {
                     "recipe_id": "xYlKZM4b5T0",
                     "inputs": {
-                        "text_input": {
-                            "action_id": "17716",
-                        },
+                        "action_id": "17716",
                     },
                 },
             },

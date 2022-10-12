@@ -3,8 +3,8 @@ import secrets
 import shlex
 import typing
 from copy import deepcopy
+from time import time
 
-import firebase_admin
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
@@ -224,7 +224,13 @@ with tab1:
     with col2:
         if st.button("Run 🏃‍♂️"):
             with st.spinner("Running Recipe..."):
+                start = time()
                 run_compute_steps(st.session_state["compute_steps"], variables)
+                time_taken = time() - start
+            st.markdown(
+                f"**Run Time** `{234.4241:.2f}` seconds. "
+                f"This GPU time is free while we're building daras.ai, Enjoy!"
+            )
 
         st.write("### Output")
         render_io_steps("output_steps")
