@@ -103,7 +103,7 @@ def img_to_img(idx, variables, state):
     match selected_model:
         case "Stable Diffusion":
             model = replicate.models.get("devxpy/glid-3-xl-stable").versions.get(
-                "773fe7b990c57d29570b2d6fc71a0f460b129c8c950b5e1b1b9c881581387c98"
+                "d53d0cf59b46f622265ad5924be1e536d6a371e8b1eaceeebc870b6001a0659b"
             )
             if mask_img:
                 photos = model.predict(
