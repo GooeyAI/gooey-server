@@ -1,22 +1,16 @@
 import streamlit as st
-from google.cloud import firestore
 from google.cloud.firestore_v1 import DocumentSnapshot
 
 from daras_ai import settings
+from daras_ai.db import list_all_docs
 from daras_ai.logo import logo
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
 logo()
 
-db = firestore.Client()
-db_collection = db.collection("daras-ai--political_example")
 
-if "docs" not in st.session_state:
-    with st.spinner("Loading..."):
-        st.session_state["docs"] = db_collection.where("header_title", "!=", "").get()
-
-for snapshot in st.session_state["docs"]:
+for snapshot in list_all_docs():
     snapshot: DocumentSnapshot
 
     recipe_id = snapshot.id

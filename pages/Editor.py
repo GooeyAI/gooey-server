@@ -13,6 +13,7 @@ from google.cloud import firestore
 from daras_ai import settings
 from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
+from daras_ai.db import list_all_docs
 from daras_ai.logo import logo
 from daras_ai.secret_key_checker import check_secret_key
 
@@ -56,6 +57,7 @@ def fork_me():
     fork_state["header_title"] = f"Copy of {fork_state.get('header_title', '')}"
     fork_state["header_is_hidden"] = True
     fork_doc_ref.set(fork_state)
+    list_all_docs()  # refresh list of docs
 
     components.html(
         f"""
@@ -74,6 +76,7 @@ def save_me():
 
     doc_ref = db_collection.document(recipe_id)
     doc_ref.set(deepcopy(st.session_state.to_dict()))
+    list_all_docs()  # refresh list of docs
 
     cached_state.clear()
     cached_state.update(deepcopy(st.session_state.to_dict()))
