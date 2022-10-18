@@ -25,11 +25,15 @@ def text_format(idx, variables, state):
     do_html2text = st.checkbox(
         "HTML -> Text",
         value=state.get("do_html2text", False),
+        help=f"Text format HTML -> Text {idx}",
     )
     state.update({"do_html2text": do_html2text})
 
     st.text_area(
-        "Output value (generated)", value=variables.get(output_var, ""), disabled=True
+        "Output value (generated)",
+        value=variables.get(output_var, ""),
+        help=f"Text format Output value (generated) {idx}",
+        disabled=True,
     )
 
 
@@ -52,9 +56,13 @@ def daras_ai_format_str(format_str, variables, do_html2text=False):
     for spec_result in input_spec_results:
         spec = spec_result.fixed[0]
         variable_value = glom(variables, ast.literal_eval(spec))
-        variable_value = str(variable_value)
+        if variable_value is None:
+            variable_value = ""
+        else:
+            variable_value = str(variable_value)
         if do_html2text:
             variable_value = html2text(variable_value)
-        variable_value = variable_value.strip()
+        if isinstance(variable_value, str):
+            variable_value = variable_value.strip()
         format_str = format_str.replace("{{" + spec + "}}", str(variable_value))
     return format_str

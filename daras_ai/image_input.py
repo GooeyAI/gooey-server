@@ -69,14 +69,17 @@ def image_input(idx, variables, state):
 @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 def upload_file(uploaded_file):
     img_bytes = uploaded_file.getvalue()
+    img_bytes = resize_img(img_bytes, (512, 512))
+    return upload_file_from_bytes(uploaded_file.name, img_bytes)
 
+
+def resize_img(img_bytes, size):
     im_pil = Image.open(io.BytesIO(img_bytes))
-    im_pil = ImageOps.fit(im_pil, (512, 512), centering=(0.5, 0))
+    im_pil = ImageOps.fit(im_pil, size, centering=(0.5, 0))
     img_bytes_io = io.BytesIO()
     im_pil.save(img_bytes_io, format="png")
     img_bytes = img_bytes_io.getvalue()
-
-    return upload_file_from_bytes(uploaded_file.name, img_bytes)
+    return img_bytes
 
 
 def upload_file_from_bytes(filename: str, img_bytes: bytes) -> str:

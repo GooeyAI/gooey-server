@@ -13,6 +13,7 @@ from google.cloud import firestore
 from daras_ai import settings
 from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
+from daras_ai.db import list_all_docs
 from daras_ai.logo import logo
 from daras_ai.secret_key_checker import check_secret_key
 
@@ -56,6 +57,7 @@ def fork_me():
     fork_state["header_title"] = f"Copy of {fork_state.get('header_title', '')}"
     fork_state["header_is_hidden"] = True
     fork_doc_ref.set(fork_state)
+    list_all_docs()  # refresh list of docs
 
     components.html(
         f"""
@@ -74,6 +76,7 @@ def save_me():
 
     doc_ref = db_collection.document(recipe_id)
     doc_ref.set(deepcopy(st.session_state.to_dict()))
+    list_all_docs()  # refresh list of docs
 
     cached_state.clear()
     cached_state.update(deepcopy(st.session_state.to_dict()))
@@ -165,15 +168,17 @@ with tab2:
     st.text_input("Tagline", key="header_tagline")
     st.text_area("Description", key="header_desc")
 
-    st.write("### Input steps")
-    render_steps(key="input_steps", title="Add an input")
+    col1, col2 = st.columns(2)
 
-    st.write("### Output steps")
-    render_steps(key="output_steps", title="Add an output")
+    with col1:
+        st.write("### Inputs")
+        render_steps(key="input_steps", title="Add an input")
+    with col2:
+        st.write("### Outputs")
+        render_steps(key="output_steps", title="Add an output")
 
-    st.write("### Compute steps")
+    st.write("### Steps")
     render_steps(key="compute_steps", title="Add a step")
-
 
 with tab3:
     if check_secret_key("run as API"):
@@ -207,7 +212,6 @@ curl -X 'POST' \
                 r.raise_for_status()
                 st.write(r.json())
 
-
 with tab1:
     col1, col2 = st.columns(2)
 
@@ -222,12 +226,12 @@ with tab1:
         render_io_steps("input_steps")
 
     with col2:
-        if st.button("Run 🏃‍♂️"):
+        if st.button("Run Recipe 🏃‍♂️"):
             with st.spinner("Running Recipe..."):
                 start = time()
                 run_compute_steps(st.session_state["compute_steps"], variables)
                 time_taken = time() - start
-            st.markdown(
+            st.caption(
                 f"**Run Time** `{time_taken:.1f}` seconds. "
                 f"This GPU time is free while we're building daras.ai, Enjoy!"
             )

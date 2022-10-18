@@ -24,6 +24,8 @@ def image_output(idx, variables, state):
         variables[var_name] = []
 
     images = variables[var_name]
+    if not images:
+        return
     if not isinstance(images, list):
         images = [images]
 
