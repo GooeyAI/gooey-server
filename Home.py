@@ -10,6 +10,30 @@ assert settings.GOOGLE_APPLICATION_CREDENTIALS
 logo()
 
 
+# st.markdown(
+#     f"""
+#         <a style="font-size: 24px" href="/FaceInpainting" target = "_self">
+#         You as Superhero
+#         </a>
+#         <br>
+#         <i>Face Inpainting: Profile pic > Face Masking > Stable Diffusion > GFPGAN</i>
+#         """,
+#     unsafe_allow_html=True,
+# )
+
+
+# st.markdown(
+#     f"""
+#         <a style="font-size: 24px" href="/FaceInpainting" target = "_self">
+#         You as Superhero
+#         </a>
+#         <br>
+#         <i>Face Inpainting: Profile pic > Face Masking > Stable Diffusion > GFPGAN</i>
+#         """,
+#     unsafe_allow_html=True,
+# )
+
+
 for snapshot in list_all_docs():
     snapshot: DocumentSnapshot
 

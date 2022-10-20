@@ -2,8 +2,11 @@ from fastapi import FastAPI, HTTPException, Body
 from google.cloud import firestore
 
 from daras_ai.computer import run_compute_steps
+from pages import ChyronPlant
 
-app = FastAPI()
+app = FastAPI(
+    title="DarasAI",
+)
 
 
 @app.post("/v1/run-recipe/")
@@ -64,3 +67,27 @@ def run(
         outputs[var_name] = variables[var_name]
 
     return {"outputs": outputs}
+
+
+# @app.post("/v2/run-recipe/")
+# def run(
+#     params: dict = Body(
+#         examples={
+#             "political-ai": {
+#                 "summary": "Political AI example",
+#                 "value": {
+#                     "recipe_id": "xYlKZM4b5T0",
+#                     "inputs": {
+#                         "action_id": "17716",
+#                     },
+#                 },
+#             },
+#         },
+#     ),
+# ):
+
+
+@app.post(ChyronPlant.API_URL, response_model=ChyronPlant.ResponseModel)
+def run_api(params: ChyronPlant.RequestModel):
+    settings = ChyronPlant.get_doc()
+    return ChyronPlant.run(settings, params.dict())

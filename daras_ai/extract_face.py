@@ -64,7 +64,7 @@ def extract_face(idx, state, variables):
         case "MediaPipe":
             image_cv2 = bytes_to_cv2_img(input_img_bytes)
 
-            face_mask = _extract_face(image_cv2)
+            face_mask = extract_face_cv2(image_cv2)
 
             variables[face_mask_var] = upload_file_from_bytes(
                 "face_mask.png",
@@ -81,7 +81,7 @@ def extract_face(idx, state, variables):
                 )
 
 
-def _extract_face(image):
+def extract_face_cv2(image):
     face_mask = np.zeros(image.shape, dtype=np.uint8)
 
     with mp_face_mesh.FaceMesh(
