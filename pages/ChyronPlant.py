@@ -21,7 +21,7 @@ def main():
     logo()
 
     if not st.session_state:
-        st.session_state.update(deepcopy(get_doc()))
+        st.session_state.update(deepcopy(get_saved_state()))
 
     st.button(" 💾 Save", on_click=save_me)
 
@@ -127,13 +127,18 @@ def run_tab():
 
     submit = st.button("Submit")
     if submit:
-        st.session_state.update(run(st.session_state, st.session_state))
+        gen = run(st.session_state)
+    else:
+        gen = None
 
     st.write(
         """
         **MIDI translation**
         """
     )
+    if gen:
+        with st.spinner():
+            next(gen)
     st.text_area(
         "",
         label_visibility="collapsed",
@@ -146,6 +151,9 @@ def run_tab():
         ### Chyron Output
         """
     )
+    if gen:
+        with st.spinner():
+            next(gen)
     st.text_area(
         "",
         label_visibility="collapsed",
@@ -155,19 +163,19 @@ def run_tab():
     )
 
 
-def run(settings: dict, params: dict) -> dict:
+def run(state: dict):
     openai.api_key = config("OPENAI_API_KEY")
-    midi_translation = run_midi_notes(settings, params.get("midi_notes", ""))
-    chyron_output = run_chyron(settings, midi_translation)
-    return {
-        "midi_translation": midi_translation,
-        "chyron_output": chyron_output,
-    }
+
+    state["midi_translation"] = run_midi_notes(state)
+    yield state
+
+    state["chyron_output"] = run_chyron(state)
+    yield state
 
 
-def run_midi_notes(settings, midi_notes):
-    prompt = settings.get("midi_notes_prompt", "")
-    prompt += "\nMIDI: " + midi_notes + "\nEnglish:"
+def run_midi_notes(state: dict):
+    prompt = state.get("midi_notes_prompt", "")
+    prompt += "\nMIDI: " + state.get("midi_notes", "") + "\nEnglish:"
 
     r = openai.Completion.create(
         engine="text-davinci-002",
@@ -182,11 +190,12 @@ def run_midi_notes(settings, midi_notes):
         text = choice["text"].strip()
         if text:
             return text
+    return ""
 
 
-def run_chyron(settings, midi_translation):
-    prompt = settings.get("chyron_prompt", "")
-    prompt += "\nUser: " + midi_translation.strip() + "\nChyron:"
+def run_chyron(state: dict):
+    prompt = state.get("chyron_prompt", "")
+    prompt += "\nUser: " + state.get("midi_translation", "").strip() + "\nChyron:"
 
     r = openai.Completion.create(
         engine="text-davinci-002",
@@ -201,26 +210,28 @@ def run_chyron(settings, midi_translation):
         text = choice["text"].strip()
         if text:
             return text
+    return ""
 
 
 def save_me():
-    Thread(target=_save_me, args=[deepcopy(st.session_state.to_dict())]).start()
+    updated_state = deepcopy(st.session_state.to_dict())
+    Thread(target=_save_me, args=[updated_state]).start()
 
 
-def _save_me(updated_settings):
+def _save_me(updated_state):
     db = firestore.Client()
     db_collection = db.collection("daras-ai-v2")
     doc_ref = db_collection.document("ChyronPlant")
 
-    doc_ref.set(updated_settings)
+    doc_ref.set(updated_state)
 
-    cached_settings = get_doc()
-    cached_settings.clear()
-    cached_settings.update(updated_settings)
+    saved_state = get_saved_state()
+    saved_state.clear()
+    saved_state.update(updated_state)
 
 
 @st.cache(allow_output_mutation=True)
-def get_doc():
+def get_saved_state():
     db = firestore.Client()
     db_collection = db.collection("daras-ai-v2")
     doc_ref = db_collection.document("ChyronPlant")
@@ -229,19 +240,6 @@ def get_doc():
         doc_ref.create({})
         doc = doc_ref.get()
     return doc.to_dict()
-
-
-NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-OCTAVES = list(range(11))
-NOTES_IN_OCTAVE = len(NOTES)
-
-
-def number_to_note(number: int) -> str:
-    octave = number // NOTES_IN_OCTAVE
-    assert octave in OCTAVES, "Incorrect octave"
-    assert 0 <= number <= 127, "Incorrect note"
-    note = NOTES[number % NOTES_IN_OCTAVE]
-    return f"{note}{octave}"
 
 
 if __name__ == "__main__":

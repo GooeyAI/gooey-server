@@ -89,5 +89,7 @@ def run(
 
 @app.post(ChyronPlant.API_URL, response_model=ChyronPlant.ResponseModel)
 def run_api(params: ChyronPlant.RequestModel):
-    settings = ChyronPlant.get_doc()
-    return ChyronPlant.run(settings, params.dict())
+    state = ChyronPlant.get_saved_state()
+    state.update(params.dict())
+    all(ChyronPlant.run(state))
+    return state
