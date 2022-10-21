@@ -184,14 +184,14 @@ def run(state: dict):
         "resized_img.png", resized_img_bytes
     )
 
-    yield state
+    yield
 
     image_cv2 = bytes_to_cv2_img(resized_img_bytes)
     face_mask_cv2 = extract_face_cv2(image_cv2)
     face_mask_bytes = cv2_img_to_png(face_mask_cv2)
     state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)
 
-    yield state
+    yield
 
     model = replicate.models.get("devxpy/glid-3-xl-stable").versions.get(
         "d53d0cf59b46f622265ad5924be1e536d6a371e8b1eaceeebc870b6001a0659b"
@@ -210,7 +210,7 @@ def run(state: dict):
         upload_file_from_bytes("out.png", requests.get(url).content)
         for url in output_images
     ]
-    yield state
+    yield
 
 
 main()

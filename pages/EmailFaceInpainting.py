@@ -1,11 +1,12 @@
+import smtplib
 from copy import deepcopy
-from time import time, sleep
+from time import time
 
 import replicate
 import requests
 import streamlit as st
+from decouple import config
 from pydantic import BaseModel
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.extract_face import extract_face_cv2
 from daras_ai.face_restoration import map_parallel, gfpgan
@@ -14,10 +15,10 @@ from daras_ai.image_input import (
     bytes_to_cv2_img,
     cv2_img_to_png,
     upload_file_from_bytes,
-    upload_file,
 )
 from daras_ai.logo import logo
 from daras_ai_v2.base import get_saved_state, run_as_api_tab, save_button
+from daras_ai_v2.send_email import send_smtp_message
 
 DOC_NAME = "EmailFaceInpainting"
 API_URL = "/v1/EmailFaceInpainting/run"
@@ -180,6 +181,11 @@ How It Works:
                 icon="✅",
             )
 
+    if gen:
+        with st.spinner("Sending email..."):
+            next(gen)
+        st.write(f"✅ Email sent to {st.session_state.get('email_address')}")
+
 
 def edit_tab():
     pass
@@ -207,14 +213,14 @@ def run(state: dict):
         "resized_img.png", resized_img_bytes
     )
 
-    yield state
+    yield
 
     image_cv2 = bytes_to_cv2_img(resized_img_bytes)
     face_mask_cv2 = extract_face_cv2(image_cv2)
     face_mask_bytes = cv2_img_to_png(face_mask_cv2)
     state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)
 
-    yield state
+    yield
 
     model = replicate.models.get("devxpy/glid-3-xl-stable").versions.get(
         "d53d0cf59b46f622265ad5924be1e536d6a371e8b1eaceeebc870b6001a0659b"
@@ -233,7 +239,19 @@ def run(state: dict):
         upload_file_from_bytes("out.png", requests.get(url).content)
         for url in output_images
     ]
-    yield state
+
+    yield
+
+    send_smtp_message(
+        sender="devs@dara.network",
+        to_address=email_address,
+        subject="Email of you in Paris",
+        html_message="<br>".join(
+            f'<img width=300 src="{url}"></img>' for url in state["output_images"]
+        ),
+    )
+
+    yield
 
 
 main()

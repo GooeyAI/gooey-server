@@ -142,10 +142,10 @@ def run(state: dict):
     openai.api_key = config("OPENAI_API_KEY")
 
     state["midi_translation"] = run_midi_notes(state)
-    yield state
+    yield
 
     state["chyron_output"] = run_chyron(state)
-    yield state
+    yield
 
 
 def run_midi_notes(state: dict):
