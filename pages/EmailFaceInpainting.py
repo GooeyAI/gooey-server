@@ -254,7 +254,8 @@ def run(state: dict):
     send_smtp_message(
         sender="devs@dara.network",
         to_address=email_address,
-        subject="Email of you in Paris",
+        subject="Thanks for joining the Daras.AI waitlist",
+        text_message="Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact sean@dara.network",
         files=[url for url in state["output_images"]]
     )
 
