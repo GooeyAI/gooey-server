@@ -246,9 +246,7 @@ def run(state: dict):
         sender="devs@dara.network",
         to_address=email_address,
         subject="Email of you in Paris",
-        html_message="<br>".join(
-            f'<img width=300 src="{url}"></img>' for url in state["output_images"]
-        ),
+        files=[url for url in state["output_images"]]
     )
 
     yield
