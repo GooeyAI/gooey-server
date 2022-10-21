@@ -7,6 +7,8 @@ from os.path import basename
 import streamlit as st
 from decouple import config
 
+from daras_ai.image_input import upload_file_from_bytes
+
 
 def send_smtp_message(
         smtp_server, smtp_username,
@@ -33,16 +35,22 @@ def send_smtp_message(
     msg['To'] = to_address
     msg['Cc'] = cc_address
     msg['Subject'] = subject_text
-    msg.attach(MIMEText(html_message, 'html'))
     msg.attach(MIMEText(text_message, 'plain'))
+    # html_message += "<h1>hiiiiii<img width='300px' src='https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a4691908-511d-11ed-8fcf-921309c00215/out.png'</h1>"
     for f in files or []:
-        part = MIMEApplication(
-            f.getvalue(),
-            Name=basename(f.name)
-        )
-        part['Content-Disposition'] = 'attachment; filename="%s"' % basename(f.name)
-        msg.attach(part)
-
+        if f.name.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')):
+            url = upload_file_from_bytes(filename=f.name, img_bytes=f.getvalue())
+            html_message += f"<img width='300px', src='{url}'/><br>"
+            # st.write(url)
+        else:
+            # TO SEND AS ATTACHMENT
+            part = MIMEApplication(
+                f.getvalue(),
+                Name=basename(f.name)
+            )
+            part['Content-Disposition'] = 'attachment; filename="%s"' % basename(f.name)
+            msg.attach(part)
+    msg.attach(MIMEText(html_message, 'html'))
     smtp_server.ehlo()
     smtp_server.starttls()
     # smtplib docs recommend calling ehlo() before and after starttls()
