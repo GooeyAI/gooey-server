@@ -188,7 +188,16 @@ How It Works:
 
 
 def edit_tab():
-    pass
+    st.write(
+        """
+        ### From Email
+        """
+    )
+    st.text_input(
+        "",
+        label_visibility="collapsed",
+        key="from_email_prompt",
+    )
 
 
 def run(state: dict):
