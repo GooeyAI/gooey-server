@@ -147,7 +147,12 @@ How It Works:
     with col1:
         if gen:
             with st.spinner():
-                next(gen)
+                try:
+                    next(gen)
+                except ValueError as e:
+                    with msg_container:
+                        st.error(str(e), icon="⚠️")
+                        return
         if "resized_image" in st.session_state:
             st.image(st.session_state["resized_image"], caption="Cropped Image")
 
