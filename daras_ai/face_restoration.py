@@ -41,12 +41,12 @@ def face_restoration(idx, variables, state):
 
     match selected_model:
         case "gfpgan":
+            variables[img_output_var] = map_parallel(gfpgan, input_images)
 
-            def _gfpgan(img):
-                model = replicate.models.get("tencentarc/gfpgan")
-                return model.predict(img=img)
 
-            variables[img_output_var] = map_parallel(_gfpgan, input_images)
+def gfpgan(img):
+    model = replicate.models.get("tencentarc/gfpgan")
+    return model.predict(img=img)
 
 
 def map_parallel(fn, it):
