@@ -1,44 +1,26 @@
-import json
-import os
-import shlex
 from copy import deepcopy
-from threading import Thread
 
 import openai
-import requests
 import streamlit as st
 from decouple import config
-from furl import furl
-from google.cloud import firestore
 from pydantic import BaseModel
 
-from daras_ai import settings
+from daras_ai_v2.base import (
+    logo,
+    get_saved_state,
+    run_as_api_tab,
+    save_button,
+)
 
-
-def main():
-    from daras_ai.logo import logo
-
-    logo()
-
-    if not st.session_state:
-        st.session_state.update(deepcopy(get_doc()))
-
-    st.button(" 💾 Save", on_click=save_me)
-
-    tab1, tab2, tab3 = st.tabs(["🏃‍♀️ Run", "⚙️ Settings", "🚀 Run as API"])
-
-    with tab1:
-        run_tab()
-
-    with tab2:
-        edit_tab()
-
-    with tab3:
-        run_as_api_tab()
+DOC_NAME = "ChyronPlant"
+API_URL = "/v1/ChyronPlant/run"
 
 
 class RequestModel(BaseModel):
     midi_notes: str
+
+    midi_notes_prompt: str | None
+    chyron_prompt: str | None
 
     class Config:
         schema_extra = {
@@ -53,32 +35,81 @@ class ResponseModel(BaseModel):
     chyron_output: str
 
 
-API_URL = "/v1/ChyronPlant/run"
+def main():
+    logo()
+
+    if not st.session_state:
+        st.session_state.update(deepcopy(get_saved_state(DOC_NAME)))
+
+    save_button(DOC_NAME)
+
+    tab1, tab2, tab3 = st.tabs(["🏃‍♀️ Run", "⚙️ Settings", "🚀 Run as API"])
+
+    with tab1:
+        run_tab()
+
+    with tab2:
+        edit_tab()
+
+    with tab3:
+        run_as_api_tab(API_URL, RequestModel)
 
 
-def run_as_api_tab():
-    api_url = str(furl(settings.DARS_API_ROOT) / API_URL)
-
-    params = RequestModel.parse_obj(st.session_state).dict()
-
-    st.write("### CURL request")
-
+def run_tab():
     st.write(
-        rf"""```
-curl -X 'POST' \
-  {shlex.quote(api_url)} \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d {shlex.quote(json.dumps(params, indent=2))}
-```"""
+        """
+        # Chyron Plant Bot
+        """
     )
 
-    if st.button("Call API 🚀"):
-        with st.spinner("Waiting for API..."):
-            r = requests.post(api_url, json=params)
-            "### Response"
-            r.raise_for_status()
-            st.write(r.json())
+    with st.form("my_form"):
+        st.write(
+            """
+            ### Input Midi notes
+            """
+        )
+        st.text_input(
+            "",
+            label_visibility="collapsed",
+            key="midi_notes",
+        )
+
+        submitted = st.form_submit_button("🚀 Submit")
+
+    gen = None
+    if submitted:
+        gen = run(st.session_state)
+
+    st.write(
+        """
+        **MIDI translation**
+        """
+    )
+    if gen:
+        with st.spinner():
+            next(gen)
+    st.text_area(
+        "",
+        label_visibility="collapsed",
+        key="midi_translation",
+        disabled=True,
+    )
+
+    st.write(
+        """
+        ### Chyron Output
+        """
+    )
+    if gen:
+        with st.spinner():
+            next(gen)
+    st.text_area(
+        "",
+        label_visibility="collapsed",
+        key="chyron_output",
+        disabled=True,
+        height=300,
+    )
 
 
 def edit_tab():
@@ -107,67 +138,19 @@ def edit_tab():
     )
 
 
-def run_tab():
-    st.write(
-        """
-        # Chyron Plant Bot
-        """
-    )
-
-    st.write(
-        """
-        ### Input Midi notes
-        """
-    )
-    st.text_input(
-        "",
-        label_visibility="collapsed",
-        key="midi_notes",
-    )
-
-    submit = st.button("Submit")
-    if submit:
-        st.session_state.update(run(st.session_state, st.session_state))
-
-    st.write(
-        """
-        **MIDI translation**
-        """
-    )
-    st.text_area(
-        "",
-        label_visibility="collapsed",
-        key="midi_translation",
-        disabled=True,
-    )
-
-    st.write(
-        """
-        ### Chyron Output
-        """
-    )
-    st.text_area(
-        "",
-        label_visibility="collapsed",
-        key="chyron_output",
-        disabled=True,
-        height=300,
-    )
-
-
-def run(settings: dict, params: dict) -> dict:
+def run(state: dict):
     openai.api_key = config("OPENAI_API_KEY")
-    midi_translation = run_midi_notes(settings, params.get("midi_notes", ""))
-    chyron_output = run_chyron(settings, midi_translation)
-    return {
-        "midi_translation": midi_translation,
-        "chyron_output": chyron_output,
-    }
+
+    state["midi_translation"] = run_midi_notes(state)
+    yield
+
+    state["chyron_output"] = run_chyron(state)
+    yield
 
 
-def run_midi_notes(settings, midi_notes):
-    prompt = settings.get("midi_notes_prompt", "")
-    prompt += "\nMIDI: " + midi_notes + "\nEnglish:"
+def run_midi_notes(state: dict):
+    prompt = state.get("midi_notes_prompt", "").strip()
+    prompt += "\nMIDI: " + state.get("midi_notes", "") + "\nEnglish:"
 
     r = openai.Completion.create(
         engine="text-davinci-002",
@@ -182,11 +165,12 @@ def run_midi_notes(settings, midi_notes):
         text = choice["text"].strip()
         if text:
             return text
+    return ""
 
 
-def run_chyron(settings, midi_translation):
-    prompt = settings.get("chyron_prompt", "")
-    prompt += "\nUser: " + midi_translation.strip() + "\nChyron:"
+def run_chyron(state: dict):
+    prompt = state.get("chyron_prompt", "").strip()
+    prompt += "\nUser: " + state.get("midi_translation", "").strip() + "\nChyron:"
 
     r = openai.Completion.create(
         engine="text-davinci-002",
@@ -201,47 +185,7 @@ def run_chyron(settings, midi_translation):
         text = choice["text"].strip()
         if text:
             return text
-
-
-def save_me():
-    Thread(target=_save_me, args=[deepcopy(st.session_state.to_dict())]).start()
-
-
-def _save_me(updated_settings):
-    db = firestore.Client()
-    db_collection = db.collection("daras-ai-v2")
-    doc_ref = db_collection.document("ChyronPlant")
-
-    doc_ref.set(updated_settings)
-
-    cached_settings = get_doc()
-    cached_settings.clear()
-    cached_settings.update(updated_settings)
-
-
-@st.cache(allow_output_mutation=True)
-def get_doc():
-    db = firestore.Client()
-    db_collection = db.collection("daras-ai-v2")
-    doc_ref = db_collection.document("ChyronPlant")
-    doc = doc_ref.get()
-    if not doc.exists:
-        doc_ref.create({})
-        doc = doc_ref.get()
-    return doc.to_dict()
-
-
-NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-OCTAVES = list(range(11))
-NOTES_IN_OCTAVE = len(NOTES)
-
-
-def number_to_note(number: int) -> str:
-    octave = number // NOTES_IN_OCTAVE
-    assert octave in OCTAVES, "Incorrect octave"
-    assert 0 <= number <= 127, "Incorrect note"
-    note = NOTES[number % NOTES_IN_OCTAVE]
-    return f"{note}{octave}"
+    return ""
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Body
 from google.cloud import firestore
 
 from daras_ai.computer import run_compute_steps
-from pages import ChyronPlant
+from pages import ChyronPlant, FaceInpainting, EmailFaceInpainting
 
 app = FastAPI(
     title="DarasAI",
@@ -69,25 +69,35 @@ def run(
     return {"outputs": outputs}
 
 
-# @app.post("/v2/run-recipe/")
-# def run(
-#     params: dict = Body(
-#         examples={
-#             "political-ai": {
-#                 "summary": "Political AI example",
-#                 "value": {
-#                     "recipe_id": "xYlKZM4b5T0",
-#                     "inputs": {
-#                         "action_id": "17716",
-#                     },
-#                 },
-#             },
-#         },
-#     ),
-# ):
-
-
 @app.post(ChyronPlant.API_URL, response_model=ChyronPlant.ResponseModel)
 def run_api(params: ChyronPlant.RequestModel):
-    settings = ChyronPlant.get_doc()
-    return ChyronPlant.run(settings, params.dict())
+    state = ChyronPlant.get_saved_state(ChyronPlant.DOC_NAME)
+
+    # remove None values
+    params_dict = {k: v for k, v in params.dict().items() if v is not None}
+    state.update(params_dict)
+
+    # run the script
+    all(ChyronPlant.run(state))
+
+    return state
+
+
+def script_to_api(module):
+    @app.post(module.API_URL, response_model=module.ResponseModel)
+    def run_api(params: module.RequestModel):
+        state = module.get_saved_state(module.DOC_NAME)
+
+        # remove None values
+        params_dict = {k: v for k, v in params.dict().items() if v is not None}
+        state.update(params_dict)
+
+        # run the script
+        all(module.run(state))
+
+        return state
+
+
+script_to_api(ChyronPlant)
+script_to_api(FaceInpainting)
+script_to_api(EmailFaceInpainting)
