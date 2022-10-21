@@ -19,12 +19,12 @@ from daras_ai.image_input import (
 from daras_ai.logo import logo
 from daras_ai_v2.base import get_saved_state, run_as_api_tab, save_button
 
-DOC_NAME = "FaceInpainting"
-API_URL = "/v1/FaceInpainting/run"
+DOC_NAME = "EmailFaceInpainting"
+API_URL = "/v1/EmailFaceInpainting/run"
 
 
 class RequestModel(BaseModel):
-    input_photo: str
+    email_address: str
     text_prompt: str
 
     num_outputs: int = 1
@@ -33,8 +33,8 @@ class RequestModel(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                "text_prompt": "tony stark from the iron man",
-                "input_photo": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2bcf31e8-48ef-11ed-8fe1-02420a00005c/_DSC0030_1.jpg",
+                "text_prompt": "winter's day in paris",
+                "email_address": "sean@dara.network",
             }
         }
 
@@ -69,17 +69,18 @@ def main():
 def run_tab():
     st.write(
         """
-### You as Superhero
+### Email of You in Paris
 
-*Face Inpainting: Profile pic > Face Masking > Stable Diffusion > GFPGAN*
+*EmailID > Profile pic > Face Masking > Stable Diffusion > GFPGAN*  
 
-Render yourself as superman, iron man, as a pizza, whatever!
+This recipe takes only an email address and returns a photo of the person with that email, rendered on winter's day in Paris.
 
 How It Works:
 
-1. Extracts faces from any image using MediaPipe
-2. Generates images from the given prompt and inpaints with Stable diffusion
-3. Improves faces using gfpgan    
+1. Calls social media APIs to get a user's twitter, facebook, linkedin or insta profile photo 
+2. Extracts faces from any image using MediaPipe
+3. Generates images from the given prompt and inpaints with Stable diffusion
+4. Improves faces using gfpgan    
 """
     )
 
@@ -94,21 +95,23 @@ How It Works:
             "",
             label_visibility="collapsed",
             key="text_prompt",
-            placeholder="Iron man",
+            placeholder="winter's day in paris",
         )
 
         st.write(
             """
-            ### Face Photo
-            Give us a photo of yourself, or anyone else
+            ### Email Address
+            Give us your email address, and we'll try to get your photo 
             """
         )
-        input_file = st.file_uploader(
+        st.text_input(
             "",
             label_visibility="collapsed",
+            key="email_address",
+            placeholder="john@appleseed.com",
         )
         st.caption(
-            "By uploading an image, you agree to Dara's [Privacy Policy](https://dara.network/privacy)"
+            "By providing your email address, you agree to Dara's [Privacy Policy](https://dara.network/privacy)"
         )
 
         col1, col2 = st.columns(2)
@@ -132,9 +135,10 @@ How It Works:
     start = time()
     if submitted:
         text_prompt = st.session_state.get("text_prompt")
-        if not (text_prompt and input_file):
+        email_address = st.session_state.get("email_address")
+        if not (text_prompt and email_address):
             with msg_container:
-                st.error("Please provide a Prompt and a Face Photo", icon="⚠️")
+                st.error("Please provide a Prompt and your Email Address", icon="⚠️")
         else:
             gen = run(st.session_state)
 
@@ -143,7 +147,6 @@ How It Works:
     with col1:
         if gen:
             with st.spinner():
-                st.session_state["input_image"] = upload_file(input_file)
                 next(gen)
         if "resized_image" in st.session_state:
             st.image(st.session_state["resized_image"], caption="Cropped Image")
@@ -178,7 +181,22 @@ def edit_tab():
 
 
 def run(state: dict):
-    img_bytes = requests.get(state["input_photo"]).content
+    email_address = state["email_address"]
+
+    r = requests.post(
+        "https://api.apollo.io/v1/people/match",
+        json={
+            "api_key": "BOlC1SGQWNuP3D70WA_-yw",
+            "email": email_address,
+        },
+    )
+    r.raise_for_status()
+
+    photo_url = r.json()["person"]["photo_url"]
+    if not photo_url:
+        raise ValueError("Photo not found")
+
+    img_bytes = requests.get(photo_url).content
     resized_img_bytes = resize_img(img_bytes, (512, 512))
     state["resized_image"] = upload_file_from_bytes(
         "resized_img.png", resized_img_bytes

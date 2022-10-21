@@ -14,6 +14,16 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 from daras_ai_v2 import settings
 
 
+def save_button(doc_name: str):
+    pressed_save = st.button(" 💾 Save")
+    if pressed_save:
+        updated_state = deepcopy(st.session_state.to_dict())
+        updated_state = {
+            k: v for k, v in updated_state.items() if not k.startswith("FormSubmitter:")
+        }
+        Thread(target=_save_me, args=[doc_name, updated_state]).start()
+
+
 def logo():
     st.markdown(
         """
@@ -34,18 +44,6 @@ def logo():
         unsafe_allow_html=True,
     )
     st.write("")
-
-
-def save_button(
-    doc_name: str,
-):
-    pressed_save = st.button(" 💾 Save")
-    if pressed_save:
-        updated_state = deepcopy(st.session_state.to_dict())
-        updated_state = {
-            k: v for k, v in updated_state.items() if not k.startswith("FormSubmitter:")
-        }
-        Thread(target=_save_me, args=[doc_name, updated_state]).start()
 
 
 def _save_me(doc_name: str, updated_state: dict):

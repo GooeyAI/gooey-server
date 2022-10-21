@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Body
 from google.cloud import firestore
 
 from daras_ai.computer import run_compute_steps
-from pages import ChyronPlant, FaceInpainting
+from pages import ChyronPlant, FaceInpainting, EmailFaceInpainting
 
 app = FastAPI(
     title="DarasAI",
@@ -83,15 +83,21 @@ def run_api(params: ChyronPlant.RequestModel):
     return state
 
 
-@app.post(FaceInpainting.API_URL, response_model=FaceInpainting.ResponseModel)
-def run_api(params: FaceInpainting.RequestModel):
-    state = FaceInpainting.get_saved_state(FaceInpainting.DOC_NAME)
+def script_to_api(module):
+    @app.post(module.API_URL, response_model=module.ResponseModel)
+    def run_api(params: module.RequestModel):
+        state = module.get_saved_state(module.DOC_NAME)
 
-    # remove None values
-    params_dict = {k: v for k, v in params.dict().items() if v is not None}
-    state.update(params_dict)
+        # remove None values
+        params_dict = {k: v for k, v in params.dict().items() if v is not None}
+        state.update(params_dict)
 
-    # run the script
-    all(FaceInpainting.run(state))
+        # run the script
+        all(module.run(state))
 
-    return state
+        return state
+
+
+script_to_api(ChyronPlant)
+script_to_api(FaceInpainting)
+script_to_api(EmailFaceInpainting)
