@@ -29,7 +29,7 @@ def send_smtp_message(
     """
     # Create message container. The correct MIME type is multipart/alternative.
     msg = MIMEMultipart('alternative')
-    msg['From'] = "events@dara.network"  # sender
+    msg['From'] = sender
     msg['To'] = to_address
     msg['Cc'] = cc_address
     msg['Subject'] = subject_text
