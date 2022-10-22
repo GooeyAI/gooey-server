@@ -17,7 +17,9 @@ from daras_ai.image_input import (
     upload_file,
 )
 from daras_ai.logo import logo
+from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import get_saved_state, run_as_api_tab, save_button
+from daras_ai_v2.extract_face import extract_face_img_bytes
 
 DOC_NAME = "FaceInpainting"
 API_URL = "/v1/FaceInpainting/run"
@@ -187,31 +189,27 @@ def run(state: dict):
 
     yield
 
-    image_cv2 = bytes_to_cv2_img(resized_img_bytes)
-    face_mask_cv2 = extract_face_cv2(image_cv2)
-    face_mask_bytes = cv2_img_to_png(face_mask_cv2)
+    face_mask_bytes = extract_face_img_bytes(resized_img_bytes)
     state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)
 
     yield
 
-    model = replicate.models.get("devxpy/glid-3-xl-stable").versions.get(
-        "d53d0cf59b46f622265ad5924be1e536d6a371e8b1eaceeebc870b6001a0659b"
-    )
-    output_images = model.predict(
+    output_images = stable_diffusion.inpainting(
         prompt=state.get("text_prompt", ""),
         num_outputs=state.get("num_outputs", 1),
         edit_image=state["resized_image"],
         mask=state["face_mask"],
         num_inference_steps=state.get("num_steps", 50),
     )
-
     output_images = map_parallel(gfpgan, output_images)
 
     state["output_images"] = [
         upload_file_from_bytes("out.png", requests.get(url).content)
         for url in output_images
     ]
+
     yield
 
 
-main()
+if __name__ == "__main__":
+    main()

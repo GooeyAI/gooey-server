@@ -19,6 +19,7 @@ from daras_ai.image_input import (
 from daras_ai.logo import logo
 from daras_ai_v2.base import get_saved_state, run_as_api_tab, save_button
 from daras_ai_v2.send_email import send_smtp_message
+from pages import FaceInpainting
 
 DOC_NAME = "EmailFaceInpainting"
 API_URL = "/v1/EmailFaceInpainting/run"
@@ -216,40 +217,9 @@ def run(state: dict):
     if not photo_url:
         raise ValueError("Photo not found")
 
-    img_bytes = requests.get(photo_url).content
-    resized_img_bytes = resize_img(img_bytes, (512, 512))
-    state["resized_image"] = upload_file_from_bytes(
-        "resized_img.png", resized_img_bytes
-    )
+    state["input_image"] = photo_url
 
-    yield
-
-    image_cv2 = bytes_to_cv2_img(resized_img_bytes)
-    face_mask_cv2 = extract_face_cv2(image_cv2)
-    face_mask_bytes = cv2_img_to_png(face_mask_cv2)
-    state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)
-
-    yield
-
-    model = replicate.models.get("devxpy/glid-3-xl-stable").versions.get(
-        "d53d0cf59b46f622265ad5924be1e536d6a371e8b1eaceeebc870b6001a0659b"
-    )
-    output_images = model.predict(
-        prompt=state.get("text_prompt", ""),
-        num_outputs=state.get("num_outputs", 1),
-        edit_image=state["resized_image"],
-        mask=state["face_mask"],
-        num_inference_steps=state.get("num_steps", 50),
-    )
-
-    output_images = map_parallel(gfpgan, output_images)
-
-    state["output_images"] = [
-        upload_file_from_bytes("out.png", requests.get(url).content)
-        for url in output_images
-    ]
-
-    yield
+    yield from FaceInpainting.run(state)
 
     send_smtp_message(
         sender="devs@dara.network",
@@ -262,4 +232,5 @@ def run(state: dict):
     yield
 
 
-main()
+if __name__ == "__main__":
+    main()
