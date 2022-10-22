@@ -255,7 +255,7 @@ def run(state: dict):
         sender="devs@dara.network",
         to_address=email_address,
         subject="Thanks for joining the Daras.AI waitlist",
-        text_message="Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact sean@dara.network",
+        html_message="Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact sean@dara.network",
         image_urls=state["output_images"],
     )
 

@@ -132,7 +132,7 @@ How It Works:
     start = time()
     if submitted:
         text_prompt = st.session_state.get("text_prompt")
-        if not (text_prompt and input_file):
+        if not (text_prompt and (input_file or st.session_state.get("input_image"))):
             with msg_container:
                 st.error("Please provide a Prompt and a Face Photo", icon="⚠️")
         else:
@@ -143,7 +143,8 @@ How It Works:
     with col1:
         if gen:
             with st.spinner():
-                st.session_state["input_image"] = upload_file(input_file)
+                if input_file:
+                    st.session_state["input_image"] = upload_file(input_file)
                 next(gen)
         if "resized_image" in st.session_state:
             st.image(st.session_state["resized_image"], caption="Cropped Image")
@@ -178,7 +179,7 @@ def edit_tab():
 
 
 def run(state: dict):
-    img_bytes = requests.get(state["input_photo"]).content
+    img_bytes = requests.get(state["input_image"]).content
     resized_img_bytes = resize_img(img_bytes, (512, 512))
     state["resized_image"] = upload_file_from_bytes(
         "resized_img.png", resized_img_bytes
