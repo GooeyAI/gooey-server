@@ -141,9 +141,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         state["input_image"] = photo_url
 
         yield from super().run(state)
-        state["email_sent"] = True
-
-        return
 
         send_smtp_message(
             sender="devs@dara.network",

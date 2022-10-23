@@ -4,7 +4,7 @@ import shlex
 import typing
 from copy import deepcopy
 from threading import Thread
-from time import time
+from time import time, sleep
 
 import requests
 import streamlit as st
@@ -30,7 +30,8 @@ class DarsAiPage:
         tab1, tab2, tab3 = st.tabs(["🏃‍♀️ Run", "⚙️ Settings", "🚀 Run as API"])
 
         if not st.session_state.get("__loaded__"):
-            st.session_state.update(deepcopy(get_saved_state(self.doc_name)))
+            with st.spinner("Loading Settings..."):
+                st.session_state.update(deepcopy(get_saved_state(self.doc_name)))
             st.session_state["__loaded__"] = True
 
         with tab2:
@@ -171,10 +172,10 @@ def set_saved_state(
     saved_state.update(updated_state)
 
 
-@st.cache(allow_output_mutation=True)
-def get_saved_state(doc_name: str) -> dict:
+@st.cache(allow_output_mutation=True, show_spinner=False)
+def get_saved_state(doc_name: str, *, collection_name="daras-ai-v2") -> dict:
     db = firestore.Client()
-    db_collection = db.collection("daras-ai-v2")
+    db_collection = db.collection(collection_name)
     doc_ref = db_collection.document(doc_name)
     doc = doc_ref.get()
     if not doc.exists:
