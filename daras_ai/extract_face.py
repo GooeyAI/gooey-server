@@ -81,8 +81,77 @@ def extract_face(idx, state, variables):
                 )
 
 
-def extract_face_cv2(image):
-    face_mask = np.zeros(image.shape, dtype=np.uint8)
+def extract_and_reposition_face_cv2(image_cv2):
+    img_cols, img_rows, _ = image_cv2.shape
+    face_mask = np.zeros(image_cv2.shape, dtype=np.uint8)
+
+    for face_oval_hull in face_oval_hull_generator(image_cv2):
+        cv2.fillConvexPoly(face_mask, face_oval_hull, (255, 255, 255))
+
+        orig_rows = face_oval_hull[:, :, 1]
+        orig_columns = face_oval_hull[:, :, 0]
+
+        face_height = abs(orig_columns.max() - orig_columns.min())
+        resize_ratio = (img_cols / 3) / face_height
+
+        re_img = cv2.resize(image_cv2, (0, 0), fx=resize_ratio, fy=resize_ratio)
+        # re_img = cv2.cvtColor(re_img, cv2.COLOR_BGR2RGB)
+
+        re_mask = cv2.resize(face_mask, (0, 0), fx=resize_ratio, fy=resize_ratio)
+        # re_mask = cv2.cvtColor(re_mask, cv2.COLOR_BGR2RGB)
+
+        re_img_cols, re_img_rows, _ = re_img.shape
+
+        face_col = (orig_columns.max() + orig_columns.min()) // 2
+        face_row = (orig_rows.max() + orig_rows.min()) // 2
+
+        re_face_col = int(face_col * resize_ratio)
+        re_face_row = int(face_row * resize_ratio)
+
+        re_rect = (
+            int(max(re_face_col - img_cols / 3, 0)),
+            int(min(re_face_col + 2 * (img_cols / 3), re_img_cols)),
+            int(max(re_face_row - img_rows / 3, 0)),
+            int(min(re_face_row + 2 * (img_rows / 3), re_img_rows)),
+        )
+
+        new_rect = (
+            int(img_cols / 3 - (re_face_col - re_rect[0])),
+            int(img_cols / 3 - (re_face_col - re_rect[0])) + (re_rect[1] - re_rect[0]),
+            int(img_rows / 3 - (re_face_row - re_rect[2])),
+            int(img_rows / 3 - (re_face_row - re_rect[2])) + (re_rect[3] - re_rect[2]),
+        )
+
+        new_img = np.zeros(image_cv2.shape, dtype=np.uint8)
+        new_mask = np.zeros(image_cv2.shape, dtype=np.uint8)
+
+        new_rect_slice = (
+            slice(new_rect[2], new_rect[3]),
+            slice(new_rect[0], new_rect[1]),
+            slice(0, 3),
+        )
+
+        re_rect_slice = (
+            slice(re_rect[2], re_rect[3]),
+            slice(re_rect[0], re_rect[1]),
+            slice(0, 3),
+        )
+
+        new_img[new_rect_slice] = re_img[re_rect_slice]
+        new_mask[new_rect_slice] = re_mask[re_rect_slice]
+
+        return new_img, new_mask
+
+
+def extract_face_cv2(image_cv2):
+    face_mask = np.zeros(image_cv2.shape, dtype=np.uint8)
+    for face_oval_hull in face_oval_hull_generator(image_cv2):
+        cv2.fillConvexPoly(face_mask, face_oval_hull, (255, 255, 255))
+    return face_mask
+
+
+def face_oval_hull_generator(image_cv2):
+    image_rows, image_cols, _ = image_cv2.shape
 
     with mp_face_mesh.FaceMesh(
         static_image_mode=True,
@@ -91,12 +160,10 @@ def extract_face_cv2(image):
         min_detection_confidence=0.5,
     ) as face_mesh:
         # Convert the BGR image to RGB and process it with MediaPipe Face Mesh.
-        results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        results = face_mesh.process(cv2.cvtColor(image_cv2, cv2.COLOR_BGR2RGB))
 
         if not results.multi_face_landmarks:
             raise ValueError("Face not found")
-
-        image_rows, image_cols, _ = image.shape
 
         for landmark_list in results.multi_face_landmarks:
             idx_to_coordinates = build_idx_to_coordinates_dict(
@@ -110,10 +177,7 @@ def extract_face_cv2(image):
                         face_oval_points.append(idx_to_coordinates[idx])
 
             face_oval_hull = cv2.convexHull(np.array(face_oval_points))
-
-            cv2.fillConvexPoly(face_mask, face_oval_hull, (255, 255, 255))
-
-    return face_mask
+            yield face_oval_hull
 
 
 def build_idx_to_coordinates_dict(image_cols, image_rows, landmark_list):

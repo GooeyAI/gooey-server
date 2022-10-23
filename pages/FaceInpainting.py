@@ -1,18 +1,13 @@
 from copy import deepcopy
-from time import time, sleep
+from time import time
 
-import replicate
 import requests
 import streamlit as st
 from pydantic import BaseModel
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from daras_ai.extract_face import extract_face_cv2
 from daras_ai.face_restoration import map_parallel, gfpgan
 from daras_ai.image_input import (
     resize_img,
-    bytes_to_cv2_img,
-    cv2_img_to_png,
     upload_file_from_bytes,
     upload_file,
 )
@@ -130,50 +125,70 @@ How It Works:
 
     msg_container = st.container()
 
+    text_prompt = st.session_state.get("text_prompt", "")
+    input_image_or_file = input_file or st.session_state.get("input_image")
+
     gen = None
     start = time()
     if submitted:
-        text_prompt = st.session_state.get("text_prompt")
-        if not (text_prompt and (input_file or st.session_state.get("input_image"))):
+        if not (text_prompt and input_image_or_file):
             with msg_container:
                 st.error("Please provide a Prompt and a Face Photo", icon="⚠️")
         else:
             gen = run(st.session_state)
 
-    col1, col2, col3 = st.columns(3)
+    final_col1, final_col2 = st.columns(2)
+    with final_col1:
+        if input_image_or_file:
+            st.image(input_image_or_file, caption="Face Photo")
 
-    with col1:
-        if gen:
-            with st.spinner():
-                if input_file:
-                    st.session_state["input_image"] = upload_file(input_file)
-                next(gen)
-        if "resized_image" in st.session_state:
-            st.image(st.session_state["resized_image"], caption="Cropped Image")
+    with st.expander("Steps", expanded=True):
+        col1, col2, col3, col4 = st.columns(4)
 
-    with col2:
-        if gen:
-            with st.spinner():
-                next(gen)
-        if "face_mask" in st.session_state:
-            st.image(st.session_state["face_mask"], caption="Detected Face")
+        with col1:
+            if input_image_or_file:
+                st.image(input_image_or_file, caption="Input Image")
 
-    with col3:
+        with col2:
+            if gen:
+                with st.spinner():
+                    if input_file:
+                        st.session_state["input_image"] = upload_file(input_file)
+                    next(gen)
+            if "resized_image" in st.session_state:
+                st.image(st.session_state["resized_image"], caption="Cropped Image")
+            if "face_mask" in st.session_state:
+                st.image(st.session_state["face_mask"], caption="Face Mask")
+
+        with col3:
+            if gen:
+                with st.spinner():
+                    next(gen)
+            if "diffusion_images" in st.session_state:
+                for url in st.session_state["diffusion_images"]:
+                    st.image(url, caption=f"Stable Diffusion - “{text_prompt}”")
+
+        with col4:
+            if gen:
+                with st.spinner():
+                    next(gen)
+            if "output_images" in st.session_state:
+                for url in st.session_state["output_images"]:
+                    st.image(url, caption="gfpgan (Face Restoration)")
+
         if gen:
-            with st.spinner():
-                next(gen)
+            time_taken = time() - start
+            with msg_container:
+                st.success(
+                    f"Success! Run Time: `{time_taken:.1f}` seconds. "
+                    f"This GPU time is free while we're building daras.ai, Enjoy!",
+                    icon="✅",
+                )
+
+    with final_col2:
         if "output_images" in st.session_state:
             for url in st.session_state["output_images"]:
-                st.image(url, caption=st.session_state.get("text_prompt", ""))
-
-    if gen:
-        time_taken = time() - start
-        with msg_container:
-            st.success(
-                f"Success! Run Time: `{time_taken:.1f}` seconds. "
-                f"This GPU time is free while we're building daras.ai, Enjoy!",
-                icon="✅",
-            )
+                st.image(url, caption=f"“{text_prompt}”")
 
 
 def edit_tab():
@@ -182,14 +197,11 @@ def edit_tab():
 
 def run(state: dict):
     img_bytes = requests.get(state["input_image"]).content
-    resized_img_bytes = resize_img(img_bytes, (512, 512))
-    state["resized_image"] = upload_file_from_bytes(
-        "resized_img.png", resized_img_bytes
-    )
 
-    yield
+    re_img_bytes = resize_img(img_bytes, (512, 512))
+    re_img_bytes, face_mask_bytes = extract_face_img_bytes(re_img_bytes)
 
-    face_mask_bytes = extract_face_img_bytes(resized_img_bytes)
+    state["resized_image"] = upload_file_from_bytes("re_img.png", re_img_bytes)
     state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)
 
     yield
@@ -201,6 +213,14 @@ def run(state: dict):
         mask=state["face_mask"],
         num_inference_steps=state.get("num_steps", 50),
     )
+
+    state["diffusion_images"] = [
+        upload_file_from_bytes("diffusion.png", requests.get(url).content)
+        for url in output_images
+    ]
+
+    yield
+
     output_images = map_parallel(gfpgan, output_images)
 
     state["output_images"] = [
