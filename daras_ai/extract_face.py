@@ -87,7 +87,6 @@ def extract_and_reposition_face_cv2(
     pos_x=4 / 9,
     pos_y=3 / 9,
 ):
-
     img_cols, img_rows, _ = image_cv2.shape
     face_mask = np.zeros(image_cv2.shape, dtype=np.uint8)
 

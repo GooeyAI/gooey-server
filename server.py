@@ -1,12 +1,15 @@
+import typing
+
 from fastapi import FastAPI, HTTPException, Body
 from google.cloud import firestore
 
 from daras_ai.computer import run_compute_steps
-from pages import ChyronPlant, FaceInpainting, EmailFaceInpainting
+from daras_ai_v2.base import DarsAiPage, get_saved_state
+from pages.ChyronPlant import ChyronPlantPage
+from pages.EmailFaceInpainting import EmailFaceInpaintingPage
+from pages.FaceInpainting import FaceInpaintingPage
 
-app = FastAPI(
-    title="DarasAI",
-)
+app = FastAPI(title="DarasAI")
 
 
 @app.post("/v1/run-recipe/")
@@ -69,35 +72,23 @@ def run(
     return {"outputs": outputs}
 
 
-@app.post(ChyronPlant.API_URL, response_model=ChyronPlant.ResponseModel)
-def run_api(params: ChyronPlant.RequestModel):
-    state = ChyronPlant.get_saved_state(ChyronPlant.DOC_NAME)
+def script_to_api(page: typing.Type[DarsAiPage]):
+    @app.post(page.endpoint, response_model=page.ResponseModel)
+    def run_api(request: page.RequestModel):
+        # get saved state from db
+        state = get_saved_state(page.doc_name)
 
-    # remove None values
-    params_dict = {k: v for k, v in params.dict().items() if v is not None}
-    state.update(params_dict)
-
-    # run the script
-    all(ChyronPlant.run(state))
-
-    return state
-
-
-def script_to_api(module):
-    @app.post(module.API_URL, response_model=module.ResponseModel)
-    def run_api(params: module.RequestModel):
-        state = module.get_saved_state(module.DOC_NAME)
-
-        # remove None values
-        params_dict = {k: v for k, v in params.dict().items() if v is not None}
-        state.update(params_dict)
+        # remove None values & update state
+        request_dict = {k: v for k, v in request.dict().items() if v is not None}
+        state.update(request_dict)
 
         # run the script
-        all(module.run(state))
+        all(page().run(state))
 
+        # return updated state
         return state
 
 
-script_to_api(ChyronPlant)
-script_to_api(FaceInpainting)
-script_to_api(EmailFaceInpainting)
+script_to_api(ChyronPlantPage)
+script_to_api(FaceInpaintingPage)
+script_to_api(EmailFaceInpaintingPage)
