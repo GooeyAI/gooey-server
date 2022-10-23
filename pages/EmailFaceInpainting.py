@@ -144,7 +144,7 @@ How It Works:
         else:
             gen = run(st.session_state)
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     with col1:
         if gen:
@@ -155,20 +155,14 @@ How It Works:
                     with msg_container:
                         st.error(str(e), icon="⚠️")
                         return
-        if "resized_image" in st.session_state:
-            st.image(st.session_state["resized_image"], caption="Cropped Image")
+        if "input_image" in st.session_state:
+            st.image(st.session_state["input_image"], caption="Input Image")
 
     with col2:
         if gen:
             with st.spinner():
-                next(gen)
-        if "face_mask" in st.session_state:
-            st.image(st.session_state["face_mask"], caption="Detected Face")
-
-    with col3:
-        if gen:
-            with st.spinner():
-                next(gen)
+                for _ in range(3):
+                    next(gen)
         if "output_images" in st.session_state:
             for url in st.session_state["output_images"]:
                 st.image(url, caption=st.session_state.get("text_prompt", ""))
@@ -186,10 +180,6 @@ How It Works:
         with st.spinner("Sending email..."):
             next(gen)
         st.write(f"✅ Email sent to {st.session_state.get('email_address')}")
-
-    if gen:
-        for _ in gen:
-            pass
 
 
 def edit_tab():
@@ -222,6 +212,8 @@ def run(state: dict):
         raise ValueError("Photo not found")
 
     state["input_image"] = photo_url
+
+    yield
 
     yield from FaceInpainting.run(state)
 
