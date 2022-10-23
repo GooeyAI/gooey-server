@@ -34,6 +34,10 @@ class DarsAiPage:
                 st.session_state.update(deepcopy(get_saved_state(self.doc_name)))
             st.session_state["__loaded__"] = True
 
+        with tab1:
+            self.render_title()
+            submitted = self.render_form()
+
         with tab2:
             self.render_settings()
 
@@ -41,9 +45,10 @@ class DarsAiPage:
             run_as_api_tab(self.endpoint, self.RequestModel)
 
         with tab1:
-            self.render_title()
-            submitted = self.render_form()
             self._runner(submitted)
+        #
+        # NOTE: Don't put any code after runner since it will call experimental_rerun
+        #
 
     def render_title(self):
         pass
