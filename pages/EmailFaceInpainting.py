@@ -187,6 +187,10 @@ How It Works:
             next(gen)
         st.write(f"✅ Email sent to {st.session_state.get('email_address')}")
 
+    if gen:
+        for _ in gen:
+            pass
+
 
 def edit_tab():
     st.write(

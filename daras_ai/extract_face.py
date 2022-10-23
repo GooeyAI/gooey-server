@@ -81,7 +81,13 @@ def extract_face(idx, state, variables):
                 )
 
 
-def extract_and_reposition_face_cv2(image_cv2):
+def extract_and_reposition_face_cv2(
+    image_cv2,
+    face_scale=0.2,
+    pos_x=4 / 9,
+    pos_y=3 / 9,
+):
+
     img_cols, img_rows, _ = image_cv2.shape
     face_mask = np.zeros(image_cv2.shape, dtype=np.uint8)
 
@@ -92,13 +98,10 @@ def extract_and_reposition_face_cv2(image_cv2):
         orig_columns = face_oval_hull[:, :, 0]
 
         face_height = abs(orig_columns.max() - orig_columns.min())
-        resize_ratio = (img_cols / 3) / face_height
+        resize_ratio = img_cols / face_height * face_scale
 
         re_img = cv2.resize(image_cv2, (0, 0), fx=resize_ratio, fy=resize_ratio)
-        # re_img = cv2.cvtColor(re_img, cv2.COLOR_BGR2RGB)
-
         re_mask = cv2.resize(face_mask, (0, 0), fx=resize_ratio, fy=resize_ratio)
-        # re_mask = cv2.cvtColor(re_mask, cv2.COLOR_BGR2RGB)
 
         re_img_cols, re_img_rows, _ = re_img.shape
 
@@ -109,17 +112,22 @@ def extract_and_reposition_face_cv2(image_cv2):
         re_face_row = int(face_row * resize_ratio)
 
         re_rect = (
-            int(max(re_face_col - img_cols / 3, 0)),
-            int(min(re_face_col + 2 * (img_cols / 3), re_img_cols)),
-            int(max(re_face_row - img_rows / 3, 0)),
-            int(min(re_face_row + 2 * (img_rows / 3), re_img_rows)),
+            int(max(re_face_col - img_cols * pos_x, 0)),
+            int(min(re_face_col + (img_cols * (1 - pos_x)), re_img_cols)),
+            int(max(re_face_row - img_rows * pos_y, 0)),
+            int(min(re_face_row + (img_rows * (1 - pos_y)), re_img_rows)),
         )
 
+        rect_col_start = img_cols * pos_x - (re_face_col - re_rect[0])
+        rect_row_start = img_rows * pos_y - (re_face_row - re_rect[2])
+        rect_height = re_rect[1] - re_rect[0]
+        rect_width = re_rect[3] - re_rect[2]
+
         new_rect = (
-            int(img_cols / 3 - (re_face_col - re_rect[0])),
-            int(img_cols / 3 - (re_face_col - re_rect[0])) + (re_rect[1] - re_rect[0]),
-            int(img_rows / 3 - (re_face_row - re_rect[2])),
-            int(img_rows / 3 - (re_face_row - re_rect[2])) + (re_rect[3] - re_rect[2]),
+            int(rect_col_start),
+            int(rect_col_start) + rect_height,
+            int(rect_row_start),
+            int(rect_row_start) + rect_width,
         )
 
         new_img = np.zeros(image_cv2.shape, dtype=np.uint8)
