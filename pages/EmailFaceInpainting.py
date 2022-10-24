@@ -128,6 +128,8 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         if st.session_state.get("email_sent"):
             st.write(f"✅ Email sent to {st.session_state.get('email_address')}")
+        else:
+            st.empty()
 
     def run(self, state: dict):
         yield "Fetching profile..."
