@@ -153,6 +153,13 @@ class ChyronPlantPage(DarsAiPage):
                 return text
         return ""
 
+    def render_example(self, state):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(state.get("midi_translation", ""))
+        with col2:
+            st.write(state.get("chyron_output", ""))
+
 
 if __name__ == "__main__":
     ChyronPlantPage().render()

@@ -224,6 +224,18 @@ class FaceInpaintingPage(DarsAiPage):
             for url in output_images
         ]
 
+    def render_example(self, state: dict):
+        col1, col2 = st.columns(2)
+        with col1:
+            input_image = state.get("input_image")
+            if input_image:
+                st.image(input_image)
+        with col2:
+            output_images = state.get("output_images")
+            if output_images:
+                for img in output_images:
+                    st.image(img)
+
 
 if __name__ == "__main__":
     FaceInpaintingPage().render()

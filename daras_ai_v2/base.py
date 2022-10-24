@@ -12,6 +12,7 @@ from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
 
+from daras_ai.cache_tools import cache_and_refresh
 from daras_ai_v2 import settings
 
 DEFAULT_STATUS = "Running Recipe..."
@@ -43,7 +44,7 @@ class DarsAiPage:
             self.render_settings()
 
         with examples_tab:
-            self.render_examples()
+            self._examples_tab()
 
         with api_tab:
             run_as_api_tab(self.endpoint, self.RequestModel)
@@ -172,30 +173,28 @@ class DarsAiPage:
             for field_name in model.__fields__
         ]
 
-    def render_examples(self):
-        db = firestore.Client()
-        db_collection = db.collection("daras-ai-v2")
-        doc_ref = db_collection.document(self.doc_name)
-        sub_collection = doc_ref.collection("examples")
-
-        for snapshot in sub_collection.get():
+    def _examples_tab(self):
+        for snapshot in list_all_docs(
+            document_id=self.doc_name,
+            sub_collection_id="examples",
+        ):
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
-            col1, col2, *_ = st.columns(6)
+            col1, col2, col3, *_ = st.columns(6)
             with col1:
-                pressed_tweak = st.button("✍️ Tweak it", help=f"tweak {example_id}")
+                pressed_tweak = st.button("✏️ Tweak it", help=f"tweak {example_id}")
             with col2:
                 pressed_delete = st.button("🗑️ Delete", help=f"delete {example_id}")
+            with col3:
+                pressed_share = st.button("✉️️ Share", help=f"delete {example_id}")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.image(doc.get("input_image"))
-            with col2:
-                for img in doc.get("output_images"):
-                    st.image(img)
+            self.render_example(doc)
 
             st.write("---")
+
+    def render_example(self, state: dict):
+        pass
 
 
 def logo():
@@ -228,14 +227,9 @@ def set_saved_state(
     sub_collection_id: str = None,
     sub_document_id: str = None,
 ):
-    db = firestore.Client()
-
-    db_collection = db.collection(collection_id)
-    doc_ref = db_collection.document(document_id)
-
-    if sub_collection_id:
-        sub_collection = doc_ref.collection(sub_collection_id)
-        doc_ref = sub_collection.document(sub_document_id)
+    doc_ref = get_doc_ref(
+        collection_id, document_id, sub_collection_id, sub_document_id
+    )
 
     doc_ref.set(updated_state)
 
@@ -257,13 +251,9 @@ def get_saved_state(
     sub_collection_id: str = None,
     sub_document_id: str = None,
 ) -> dict:
-    db = firestore.Client()
-    db_collection = db.collection(collection_id)
-    doc_ref = db_collection.document(document_id)
-
-    if sub_collection_id:
-        sub_collection_id = doc_ref.collection(sub_collection_id)
-        doc_ref = sub_collection_id.document(sub_document_id)
+    doc_ref = get_doc_ref(
+        collection_id, document_id, sub_collection_id, sub_document_id
+    )
 
     doc = doc_ref.get()
     if not doc.exists:
@@ -271,6 +261,31 @@ def get_saved_state(
         doc = doc_ref.get()
 
     return doc.to_dict()
+
+
+@cache_and_refresh
+def list_all_docs(
+    collection_id="daras-ai-v2",
+    *,
+    document_id: str = None,
+    sub_collection_id: str = None,
+):
+    db = firestore.Client()
+    db_collection = db.collection(collection_id)
+    if sub_collection_id:
+        doc_ref = db_collection.document(document_id)
+        db_collection = doc_ref.collection(sub_collection_id)
+    return db_collection.get()
+
+
+def get_doc_ref(collection_id, document_id, sub_collection_id, sub_document_id):
+    db = firestore.Client()
+    db_collection = db.collection(collection_id)
+    doc_ref = db_collection.document(document_id)
+    if sub_collection_id:
+        sub_collection = doc_ref.collection(sub_collection_id)
+        doc_ref = sub_collection.document(sub_document_id)
+    return doc_ref
 
 
 def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
