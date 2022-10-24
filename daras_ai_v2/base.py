@@ -1,5 +1,6 @@
 import inspect
 import json
+import secrets
 import shlex
 import typing
 from copy import deepcopy
@@ -25,7 +26,6 @@ class DarsAiPage:
 
     def render(self):
         logo()
-        save_button(self.doc_name, self.RequestModel, self.ResponseModel)
 
         tab1, tab2, tab3 = st.tabs(["🏃‍♀️ Run", "⚙️ Settings", "🚀 Run as API"])
 
@@ -47,8 +47,10 @@ class DarsAiPage:
         with tab1:
             self._runner(submitted)
         #
-        # NOTE: Don't put any code after runner since it will call experimental_rerun
+        # NOTE: Beware of putting code after runner since it will call experimental_rerun
         #
+
+        self.save_button()
 
     def render_title(self):
         pass
@@ -103,6 +105,13 @@ class DarsAiPage:
             except StopIteration:
                 if start_time:
                     st.session_state["__time_taken"] += time() - start_time
+
+                st.session_state["__state_to_save"] = {
+                    field_name: deepcopy(st.session_state[field_name])
+                    for field_name in self.fields_to_save()
+                    if field_name in st.session_state
+                }
+
                 del st.session_state["__status"]
                 del st.session_state["__gen"]
 
@@ -125,21 +134,39 @@ class DarsAiPage:
             except KeyError:
                 pass
 
+    def save_button(self):
+        state_to_save = st.session_state.get("__state_to_save")
+        if not state_to_save:
+            return
 
-def save_button(doc_name: str, request_model, response_model):
-    pressed_save = st.button(" 💾 Save")
-    if pressed_save:
-        updated_state = deepcopy(st.session_state.to_dict())
-        updated_state = {
-            field_name: updated_state[field_name]
-            for field_name in request_model.__fields__
-            if field_name in updated_state
-        } | {
-            field_name: updated_state[field_name]
-            for field_name in response_model.__fields__
-            if field_name in updated_state
-        }
-        Thread(target=set_saved_state, args=[doc_name, updated_state]).start()
+        pressed_save = st.button("🔖 Save as Example")
+        pressed_star = st.button("⭐️ Save & Highlight")
+
+        if pressed_save or pressed_star:
+            if pressed_save:
+                sub_collection = "examples"
+                sub_doc = secrets.token_urlsafe(8)
+            else:
+                sub_collection = None
+                sub_doc = None
+
+            with st.spinner("Saving..."):
+                set_saved_state(
+                    self.doc_name,
+                    state_to_save,
+                    sub_collection_id=sub_collection,
+                    sub_document_id=sub_doc,
+                )
+
+            st.success("Saved", icon="✅")
+
+    def fields_to_save(self) -> [str]:
+        # only save the fields in request/response
+        return [
+            field_name
+            for model in (self.RequestModel, self.ResponseModel)
+            for field_name in model.__fields__
+        ]
 
 
 def logo():
@@ -165,27 +192,55 @@ def logo():
 
 
 def set_saved_state(
-    doc_name: str, updated_state: dict, *, collection_name="daras-ai-v2"
+    document_id: str,
+    updated_state: dict,
+    *,
+    collection_id: str = "daras-ai-v2",
+    sub_collection_id: str = None,
+    sub_document_id: str = None,
 ):
     db = firestore.Client()
-    db_collection = db.collection(collection_name)
-    doc_ref = db_collection.document(doc_name)
+
+    db_collection = db.collection(collection_id)
+    doc_ref = db_collection.document(document_id)
+
+    if sub_collection_id:
+        sub_collection = doc_ref.collection(sub_collection_id)
+        doc_ref = sub_collection.document(sub_document_id)
+
     doc_ref.set(updated_state)
 
-    saved_state = get_saved_state(doc_name)
+    saved_state = get_saved_state(
+        document_id,
+        collection_id=collection_id,
+        sub_collection_id=sub_collection_id,
+        sub_document_id=sub_document_id,
+    )
     saved_state.clear()
     saved_state.update(updated_state)
 
 
 @st.cache(allow_output_mutation=True, show_spinner=False)
-def get_saved_state(doc_name: str, *, collection_name="daras-ai-v2") -> dict:
+def get_saved_state(
+    document_id: str,
+    *,
+    collection_id="daras-ai-v2",
+    sub_collection_id: str = None,
+    sub_document_id: str = None,
+) -> dict:
     db = firestore.Client()
-    db_collection = db.collection(collection_name)
-    doc_ref = db_collection.document(doc_name)
+    db_collection = db.collection(collection_id)
+    doc_ref = db_collection.document(document_id)
+
+    if sub_collection_id:
+        sub_collection_id = doc_ref.collection(sub_collection_id)
+        doc_ref = sub_collection_id.document(sub_document_id)
+
     doc = doc_ref.get()
     if not doc.exists:
         doc_ref.create({})
         doc = doc_ref.get()
+
     return doc.to_dict()
 
 

@@ -154,7 +154,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
 @st.cache()
 def get_photo_for_email(email_address):
-    state = get_saved_state(email_address, collection_name="apollo_io_photo_cache")
+    state = get_saved_state(email_address, collection_id="apollo_io_photo_cache")
     photo_url = state.get("photo_url")
     if photo_url:
         return photo_url
@@ -176,7 +176,7 @@ def get_photo_for_email(email_address):
         "face_photo.png", requests.get(photo_url).content
     )
     set_saved_state(
-        email_address, {"photo_url": photo_url}, collection_name="apollo_io_photo_cache"
+        email_address, {"photo_url": photo_url}, collection_id="apollo_io_photo_cache"
     )
 
     return photo_url
