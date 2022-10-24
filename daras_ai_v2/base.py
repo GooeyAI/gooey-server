@@ -4,8 +4,7 @@ import secrets
 import shlex
 import typing
 from copy import deepcopy
-from threading import Thread
-from time import time, sleep
+from time import time
 
 import requests
 import streamlit as st
@@ -27,30 +26,34 @@ class DarsAiPage:
     def render(self):
         logo()
 
-        tab1, tab2, tab3 = st.tabs(["🏃‍♀️ Run", "⚙️ Settings", "🚀 Run as API"])
+        run_tab, settings_tab, examples_tab, api_tab = st.tabs(
+            ["🏃‍♀️ Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
+        )
 
         if not st.session_state.get("__loaded__"):
             with st.spinner("Loading Settings..."):
                 st.session_state.update(deepcopy(get_saved_state(self.doc_name)))
             st.session_state["__loaded__"] = True
 
-        with tab1:
+        with run_tab:
             self.render_title()
             submitted = self.render_form()
 
-        with tab2:
+        with settings_tab:
             self.render_settings()
 
-        with tab3:
+        with examples_tab:
+            self.render_examples()
+
+        with api_tab:
             run_as_api_tab(self.endpoint, self.RequestModel)
 
-        with tab1:
+        with run_tab:
             self._runner(submitted)
+            self.save_buttons()
         #
         # NOTE: Beware of putting code after runner since it will call experimental_rerun
         #
-
-        self.save_button()
 
     def render_title(self):
         pass
@@ -134,13 +137,14 @@ class DarsAiPage:
             except KeyError:
                 pass
 
-    def save_button(self):
+    def save_buttons(self):
         state_to_save = st.session_state.get("__state_to_save")
         if not state_to_save:
             return
 
-        pressed_save = st.button("🔖 Save as Example")
-        pressed_star = st.button("⭐️ Save & Highlight")
+        col1, col2, *_ = st.columns(4)
+        pressed_save = col1.button("🔖 Save as Example")
+        pressed_star = col2.button("⭐️ Save & Highlight")
 
         if pressed_save or pressed_star:
             if pressed_save:
@@ -167,6 +171,31 @@ class DarsAiPage:
             for model in (self.RequestModel, self.ResponseModel)
             for field_name in model.__fields__
         ]
+
+    def render_examples(self):
+        db = firestore.Client()
+        db_collection = db.collection("daras-ai-v2")
+        doc_ref = db_collection.document(self.doc_name)
+        sub_collection = doc_ref.collection("examples")
+
+        for snapshot in sub_collection.get():
+            example_id = snapshot.id
+            doc = snapshot.to_dict()
+
+            col1, col2, *_ = st.columns(6)
+            with col1:
+                pressed_tweak = st.button("✍️ Tweak it", help=f"tweak {example_id}")
+            with col2:
+                pressed_delete = st.button("🗑️ Delete", help=f"delete {example_id}")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.image(doc.get("input_image"))
+            with col2:
+                for img in doc.get("output_images"):
+                    st.image(img)
+
+            st.write("---")
 
 
 def logo():
