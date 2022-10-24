@@ -143,9 +143,9 @@ class DarsAiPage:
         if not state_to_save:
             return
 
-        col1, col2, *_ = st.columns(4)
+        col1, col2, *_ = st.columns(3)
         pressed_save = col1.button("🔖 Save as Example")
-        pressed_star = col2.button("⭐️ Save & Highlight")
+        pressed_star = col2.button("⭐️ Showcase on page")
 
         if pressed_save or pressed_star:
             if pressed_save:
