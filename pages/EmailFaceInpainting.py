@@ -3,7 +3,7 @@ import streamlit as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.base import get_saved_state, set_saved_state
+from daras_ai_v2.base import get_saved_doc, set_saved_doc, get_doc_ref
 from daras_ai_v2.send_email import send_smtp_message
 from pages.FaceInpainting import FaceInpaintingPage
 
@@ -154,7 +154,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
 @st.cache()
 def get_photo_for_email(email_address):
-    state = get_saved_state(email_address, collection_id="apollo_io_photo_cache")
+    state = get_saved_doc(
+        get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
+    )
     photo_url = state.get("photo_url")
     if photo_url:
         return photo_url
@@ -175,8 +177,9 @@ def get_photo_for_email(email_address):
     photo_url = upload_file_from_bytes(
         "face_photo.png", requests.get(photo_url).content
     )
-    set_saved_state(
-        email_address, {"photo_url": photo_url}, collection_id="apollo_io_photo_cache"
+    set_saved_doc(
+        get_doc_ref(email_address, collection_id="apollo_io_photo_cache"),
+        {"photo_url": photo_url},
     )
 
     return photo_url

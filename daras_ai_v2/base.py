@@ -36,7 +36,9 @@ class DarsAiPage:
 
         if not st.session_state.get("__loaded__"):
             with st.spinner("Loading Settings..."):
-                st.session_state.update(deepcopy(get_saved_state(self.doc_name)))
+                st.session_state.update(
+                    deepcopy(get_saved_doc(get_doc_ref(self.doc_name)))
+                )
             st.session_state["__loaded__"] = True
 
         with run_tab:
@@ -151,23 +153,26 @@ class DarsAiPage:
         pressed_save = col1.button("🔖 Save as Example")
         pressed_star = col2.button("⭐️ Showcase on page")
 
-        if pressed_save or pressed_star:
-            if pressed_save:
-                sub_collection = "examples"
-                sub_doc = secrets.token_urlsafe(8)
-            else:
-                sub_collection = None
-                sub_doc = None
+        if pressed_save:
+            sub_collection = "examples"
+            sub_doc = secrets.token_urlsafe(8)
+        elif pressed_star:
+            sub_collection = None
+            sub_doc = None
+        else:
+            return
 
-            with st.spinner("Saving..."):
-                set_saved_state(
+        with st.spinner("Saving..."):
+            set_saved_doc(
+                get_doc_ref(
                     self.doc_name,
-                    state_to_save,
                     sub_collection_id=sub_collection,
                     sub_document_id=sub_doc,
-                )
+                ),
+                state_to_save,
+            )
 
-            st.success("Saved", icon="✅")
+        st.success("Done", icon="✅")
 
     def fields_to_save(self) -> [str]:
         # only save the fields in request/response
@@ -223,47 +228,28 @@ def logo():
     st.write("")
 
 
-def set_saved_state(
-    document_id: str,
+def set_saved_doc(
+    doc_ref: firestore.DocumentReference,
     updated_state: dict,
-    *,
-    collection_id: str = "daras-ai-v2",
-    sub_collection_id: str = None,
-    sub_document_id: str = None,
 ):
-    doc_ref = get_doc_ref(
-        collection_id, document_id, sub_collection_id, sub_document_id
-    )
-
     doc_ref.set(updated_state)
-
-    saved_state = get_saved_state(
-        document_id,
-        collection_id=collection_id,
-        sub_collection_id=sub_collection_id,
-        sub_document_id=sub_document_id,
-    )
+    saved_state = get_saved_doc(doc_ref)
     saved_state.clear()
     saved_state.update(updated_state)
 
 
-@st.cache(allow_output_mutation=True, show_spinner=False)
-def get_saved_state(
-    document_id: str,
-    *,
-    collection_id="daras-ai-v2",
-    sub_collection_id: str = None,
-    sub_document_id: str = None,
-) -> dict:
-    doc_ref = get_doc_ref(
-        collection_id, document_id, sub_collection_id, sub_document_id
-    )
-
+@st.cache(
+    allow_output_mutation=True,
+    show_spinner=False,
+    hash_funcs={
+        firestore.DocumentReference: lambda doc_ref: doc_ref.path,
+    },
+)
+def get_saved_doc(doc_ref: firestore.DocumentReference) -> dict:
     doc = doc_ref.get()
     if not doc.exists:
         doc_ref.create({})
         doc = doc_ref.get()
-
     return doc.to_dict()
 
 
@@ -282,7 +268,13 @@ def list_all_docs(
     return db_collection.get()
 
 
-def get_doc_ref(collection_id, document_id, sub_collection_id, sub_document_id):
+def get_doc_ref(
+    document_id: str,
+    *,
+    collection_id="daras-ai-v2",
+    sub_collection_id: str = None,
+    sub_document_id: str = None,
+):
     db = firestore.Client()
     db_collection = db.collection(collection_id)
     doc_ref = db_collection.document(document_id)

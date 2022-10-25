@@ -4,10 +4,11 @@ from fastapi import FastAPI, HTTPException, Body
 from google.cloud import firestore
 
 from daras_ai.computer import run_compute_steps
-from daras_ai_v2.base import DarsAiPage, get_saved_state
+from daras_ai_v2.base import DarsAiPage, get_saved_doc, get_doc_ref
 from pages.ChyronPlant import ChyronPlantPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.LetterWriter import LetterWriterPage
 
 app = FastAPI(title="DarasAI")
 
@@ -76,7 +77,7 @@ def script_to_api(page: typing.Type[DarsAiPage]):
     @app.post(page.endpoint, response_model=page.ResponseModel)
     def run_api(request: page.RequestModel):
         # get saved state from db
-        state = get_saved_state(page.doc_name)
+        state = get_saved_doc(get_doc_ref(page.doc_name))
 
         # remove None values & update state
         request_dict = {k: v for k, v in request.dict().items() if v is not None}
@@ -92,3 +93,4 @@ def script_to_api(page: typing.Type[DarsAiPage]):
 script_to_api(ChyronPlantPage)
 script_to_api(FaceInpaintingPage)
 script_to_api(EmailFaceInpaintingPage)
+script_to_api(LetterWriterPage)
