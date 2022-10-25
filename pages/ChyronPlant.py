@@ -9,6 +9,7 @@ from daras_ai_v2.base import (
 
 
 class ChyronPlantPage(DarsAiPage):
+    title = "Chyron Plant Bot"
     doc_name = "ChyronPlant"
     endpoint = "/v1/ChyronPlant/run"
 
@@ -28,13 +29,6 @@ class ChyronPlantPage(DarsAiPage):
     class ResponseModel(BaseModel):
         midi_translation: str
         chyron_output: str
-
-    def render_title(self):
-        st.write(
-            """
-            # Chyron Plant Bot
-            """
-        )
 
     def render_form(self):
         with st.form("my_form"):

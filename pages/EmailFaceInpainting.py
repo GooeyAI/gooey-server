@@ -1,15 +1,15 @@
 import requests
 import streamlit as st
-from google.cloud import firestore
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.base import DarsAiPage, get_saved_state, set_saved_state
+from daras_ai_v2.base import get_saved_state, set_saved_state
 from daras_ai_v2.send_email import send_smtp_message
 from pages.FaceInpainting import FaceInpaintingPage
 
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
+    title = "Email of You in Paris"
     doc_name = "EmailFaceInpainting#2"
     endpoint = "/v1/EmailFaceInpainting/run"
 
@@ -36,11 +36,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         output_images: list[str]
         email_sent: bool
 
-    def render_title(self):
+    def render_description(self):
         st.write(
             """
-    ### Email of You in Paris
-    
     *EmailID > Profile pic > Face Masking > Stable Diffusion > GFPGAN*  
     
     This recipe takes only an email address and returns a photo of the person with that email, rendered on winter's day in Paris.

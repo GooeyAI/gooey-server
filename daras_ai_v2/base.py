@@ -19,12 +19,15 @@ DEFAULT_STATUS = "Running Recipe..."
 
 
 class DarsAiPage:
+    title: str
     doc_name: str
     endpoint: str
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
 
     def render(self):
+        st.set_page_config(page_title=self.title + " - Daras.AI")
+
         logo()
 
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
@@ -37,7 +40,8 @@ class DarsAiPage:
             st.session_state["__loaded__"] = True
 
         with run_tab:
-            self.render_title()
+            st.write("### " + self.title)
+            self.render_description()
             submitted = self.render_form()
 
         with settings_tab:
@@ -56,7 +60,7 @@ class DarsAiPage:
         # NOTE: Beware of putting code after runner since it will call experimental_rerun
         #
 
-    def render_title(self):
+    def render_description(self):
         pass
 
     def render_settings(self):

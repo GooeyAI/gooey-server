@@ -14,6 +14,7 @@ from daras_ai_v2.extract_face import extract_face_img_bytes
 
 
 class FaceInpaintingPage(DarsAiPage):
+    title = "You as Superhero"
     doc_name = "FaceInpainting#2"
     endpoint = "/v1/FaceInpainting/run"
 
@@ -41,11 +42,9 @@ class FaceInpaintingPage(DarsAiPage):
     def __init__(self):
         st.session_state.setdefault("num_steps", 50)
 
-    def render_title(self):
+    def render_description(self):
         st.write(
             """
-    ### You as Superhero
-    
     *Face Inpainting: Profile pic > Face Masking > Stable Diffusion > GFPGAN*
     
     Render yourself as superman, iron man, as a pizza, whatever!
