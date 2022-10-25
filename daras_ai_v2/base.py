@@ -11,6 +11,7 @@ import streamlit as st
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
+from requests import HTTPError
 
 from daras_ai.cache_tools import cache_and_refresh
 from daras_ai_v2 import settings
@@ -106,7 +107,7 @@ class DarsAiPage:
                             # increment total time taken after every iteration
                             st.session_state["__time_taken"] += time() - start_time
                     # render ValueError nicely
-                    except ValueError as e:
+                    except (ValueError, HTTPError) as e:
                         st.error(str(e), icon="⚠️")
                         # cleanup is important!
                         del st.session_state["__status"]

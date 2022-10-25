@@ -1,9 +1,13 @@
+import json
 import typing
 
+import requests
 import streamlit as st
 from pydantic.main import BaseModel
 
+from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import DarsAiPage
+from daras_ai_v2.language_model import run_language_model
 from daras_ai_v2.text_training_data_widget import text_training_data, TrainingDataModel
 
 
@@ -18,15 +22,19 @@ class LetterWriterPage(DarsAiPage):
         prompt_header: str = None
         example_letters: list[TrainingDataModel] = None
 
-        num_outputs: int = None
-        quality: float = None
-        sampling_temperature: float = None
+        lm_selected_api: str
+        lm_selected_engine: str
+        lm_num_outputs: int = None
+        lm_quality: float = None
+        lm_sampling_temperature: float = None
 
         api_http_method: str = None
         api_url: str = None
         api_headers: str = None
         api_json_body: str = None
-        api_output_formatter: str = None
+
+        input_prompt: str = None
+        strip_html_2_text: bool = False
 
         class Config:
             schema_extra = {
@@ -123,19 +131,20 @@ class LetterWriterPage(DarsAiPage):
 
             st.write(
                 """
-            ##### Output Formatter
+            ##### Input Talking Points (Prompt)
             
-            Parse the JSON output here
+            Specify the input prompt for the model.
             
-            *You can use the powerful [glom](https://glom.readthedocs.io/en/latest/tutorial.html/) syntax - 
-            `This is my {{ "field.value" }}`*
+            *You can use the powerful [glom](https://glom.readthedocs.io/en/latest/tutorial.html/) syntax to parse the API JSON response.*  
+            *E.g. `This is my {{ "field.value" }}`*
             """
             )
             st.text_area(
-                "api_output_formatter",
+                "input_prompt",
                 label_visibility="collapsed",
-                key="api_output_formatter",
+                key="input_prompt",
             )
+            st.checkbox("Strip all HTML -> Text?", key="strip_html_2_text")
 
         st.write("### Model Settings")
 
@@ -193,7 +202,7 @@ class LetterWriterPage(DarsAiPage):
         with col1:
             st.slider(
                 label="# of Outputs",
-                key="num_outputs",
+                key="lm_num_outputs",
                 min_value=1,
                 max_value=4,
                 value=1,
@@ -201,7 +210,7 @@ class LetterWriterPage(DarsAiPage):
         with col2:
             st.slider(
                 label="Quality",
-                key="quality",
+                key="lm_quality",
                 min_value=1.0,
                 max_value=5.0,
                 step=0.1,
@@ -222,7 +231,7 @@ class LetterWriterPage(DarsAiPage):
         st.slider(
             label="model risk",
             label_visibility="collapsed",
-            key="sampling_temperature",
+            key="lm_sampling_temperature",
             min_value=0.0,
             max_value=1.0,
             value=1.0,
@@ -231,7 +240,87 @@ class LetterWriterPage(DarsAiPage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         yield "Calling API.."
 
+        request = self.RequestModel.parse_obj(state)
+
+        url = request.api_url.replace("{{ action_id }}", request.action_id)
+        method = request.api_http_method.replace("{{ action_id }}", request.action_id)
+        headers = request.api_headers.replace("{{ action_id }}", request.action_id)
+        json_body = request.api_json_body.replace("{{ action_id }}", request.action_id)
+
+        if not (url and method):
+            raise ValueError("HTTP method / URL is empty. Please check your settings.")
+
+        if headers:
+            headers = json.loads(headers)
+        else:
+            headers = None
+
+        if json_body:
+            body = json.loads(json_body)
+        else:
+            body = None
+
+        r = requests.request(method=method, url=url, headers=headers, json=body)
+        r.raise_for_status()
+
         yield "Running GPT3..."
+
+        input_prompt = daras_ai_format_str(
+            format_str=request.input_prompt,
+            variables=r.json(),
+            do_html2text=request.strip_html_2_text,
+        )
+
+        if not request.prompt_header:
+            raise ValueError(
+                "Task description not provided. Please check your settings."
+            )
+        if not input_prompt:
+            raise ValueError("Input prompt is Empty. Please check your settings.")
+        if not request.example_letters:
+            raise ValueError(
+                "Example letters not provided. Please check your settings."
+            )
+
+        prompt_prefix = "TalkingPoints:"
+        completion_prefix = "Letter:"
+
+        prompt_sep = "\n####\n"
+        completion_sep = "\n$$$$\n"
+
+        prompt_prefix = prompt_prefix.strip() + " "
+        completion_prefix = completion_prefix.strip() + " "
+
+        final_prompt = request.prompt_header.strip() + "\n\n"
+
+        for value in request.example_letters:
+            prompt_part = prompt_prefix + value.prompt + prompt_sep
+            completion_part = completion_prefix + value.completion + completion_sep
+            final_prompt += prompt_part + completion_part
+
+        final_prompt += prompt_prefix + input_prompt + prompt_sep + completion_prefix
+
+        state["output_letters"] = run_language_model(
+            request.lm_selected_api,
+            engine=request.lm_selected_engine,
+            quality=request.lm_quality,
+            num_outputs=request.lm_num_outputs,
+            temperature=request.lm_sampling_temperature,
+            prompt=final_prompt,
+            max_tokens=256,
+            stop=[prompt_sep, completion_sep],
+        )
+
+    def render_output(self):
+        st.write("### Generated Letters")
+        for i, out in enumerate(st.session_state.get("output_letters", [])):
+            st.text_area(
+                "output_letter",
+                label_visibility="collapsed",
+                help=f"output_letters {i}",
+                value=out,
+                height=300,
+            )
 
 
 if __name__ == "__main__":
