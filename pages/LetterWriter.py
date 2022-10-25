@@ -4,6 +4,7 @@ import streamlit as st
 from pydantic.main import BaseModel
 
 from daras_ai_v2.base import DarsAiPage, get_saved_doc, get_doc_ref, set_saved_doc
+from daras_ai_v2.text_training_data_widget import text_training_data, TrainingDataSchema
 
 
 class LetterWriterPage(DarsAiPage):
@@ -15,9 +16,12 @@ class LetterWriterPage(DarsAiPage):
         action_id: str
 
         prompt_header: str = None
+        example_letters: TrainingDataSchema = None
+
         num_outputs: int = None
-        quality: int = None
+        quality: float = None
         sampling_temperature: float = None
+
         api_http_method: str = None
         api_url: str = None
         api_headers: str = None
@@ -71,8 +75,19 @@ class LetterWriterPage(DarsAiPage):
             "prompt_header",
             label_visibility="collapsed",
             key="prompt_header",
-            height=300,
+            height=200,
         )
+
+        st.write("---")
+
+        st.write(
+            """
+            #### Example letters
+            A set of example letters so that the model can learn your writing style
+            """
+        )
+
+        text_training_data("Talking points", "Letter", key="example_letters")
 
         st.write("---")
 
@@ -135,6 +150,7 @@ class LetterWriterPage(DarsAiPage):
                 key="num_outputs",
                 min_value=1,
                 max_value=4,
+                value=1,
             )
         with col2:
             st.slider(
@@ -143,6 +159,7 @@ class LetterWriterPage(DarsAiPage):
                 min_value=1.0,
                 max_value=5.0,
                 step=0.1,
+                value=1.0,
             )
 
         st.write(
@@ -167,7 +184,7 @@ class LetterWriterPage(DarsAiPage):
 
         st.write("---")
 
-        st.write("### API settings")
+        st.write("### Custom API settings")
 
         col1, col2 = st.columns([1, 3])
         with col1:
