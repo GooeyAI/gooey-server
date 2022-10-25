@@ -3,8 +3,8 @@ import typing
 import streamlit as st
 from pydantic.main import BaseModel
 
-from daras_ai_v2.base import DarsAiPage, get_saved_doc, get_doc_ref, set_saved_doc
-from daras_ai_v2.text_training_data_widget import text_training_data, TrainingDataSchema
+from daras_ai_v2.base import DarsAiPage
+from daras_ai_v2.text_training_data_widget import text_training_data, TrainingDataModel
 
 
 class LetterWriterPage(DarsAiPage):
@@ -16,7 +16,7 @@ class LetterWriterPage(DarsAiPage):
         action_id: str
 
         prompt_header: str = None
-        example_letters: TrainingDataSchema = None
+        example_letters: list[TrainingDataModel] = None
 
         num_outputs: int = None
         quality: float = None
