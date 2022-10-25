@@ -4,7 +4,7 @@ import secrets
 import shlex
 import typing
 from copy import deepcopy
-from time import time
+from time import time, sleep
 
 import requests
 import streamlit as st
@@ -80,11 +80,10 @@ class DarsAiPage:
     def _runner(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
 
+        # The area for displaying status messages streamed from run()
         status_area = st.empty()
-        render_area = st.empty()
 
-        with render_area.container():
-            self.render_output()
+        self.render_output()
 
         if submitted:
             st.session_state["__status"] = DEFAULT_STATUS
@@ -102,30 +101,38 @@ class DarsAiPage:
                     try:
                         with st.spinner(st.session_state["__status"]):
                             start_time = time()
+                            # advance the generator (to further progress of run())
                             st.session_state["__status"] = next(gen) or DEFAULT_STATUS
+                            # increment total time taken after every iteration
                             st.session_state["__time_taken"] += time() - start_time
-
+                    # render ValueError nicely
                     except ValueError as e:
                         st.error(str(e), icon="⚠️")
+                        # cleanup is important!
                         del st.session_state["__status"]
                         del st.session_state["__gen"]
                         del st.session_state["__time_taken"]
                         return
 
             except StopIteration:
+                # Weird but important! This measures the runtime of code after the last `yield` in `run()`
                 if start_time:
                     st.session_state["__time_taken"] += time() - start_time
 
+                # save a snapshot of the params used to create this output
                 st.session_state["__state_to_save"] = {
                     field_name: deepcopy(st.session_state[field_name])
                     for field_name in self.fields_to_save()
                     if field_name in st.session_state
                 }
 
+                # cleanup is important!
                 del st.session_state["__status"]
                 del st.session_state["__gen"]
 
+            # this bit of hack streams the outputs from run() in realtime
             st.experimental_rerun()
+
         else:
             time_taken = st.session_state.get("__time_taken", 0)
             if time_taken:

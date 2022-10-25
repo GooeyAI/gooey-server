@@ -65,33 +65,79 @@ class LetterWriterPage(DarsAiPage):
             return submitted
 
     def render_settings(self):
-        st.write(
+        with st.expander("Task description"):
+            st.write(
+                """
+                Briefly describe the task for the language model
+                """
+            )
+            st.text_area(
+                "prompt_header",
+                label_visibility="collapsed",
+                key="prompt_header",
+                height=200,
+            )
+
+        with st.expander("Example letters"):
+
+            st.write(
+                """
+                A set of example letters for the model to learn your writing style
+                """
+            )
+
+            text_training_data("Talking points", "Letter", key="example_letters")
+
+        with st.expander("Custom API settings"):
+            st.write(
+                """
+            Call any external API to get the talking points from an input Action ID
+             
+            *You can substitute the user input Action ID like so - `{{ action_id }}`*
             """
-            #### Task description
-            Breiefly describe the task for the language model
+            )
+
+            st.write("---")
+
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.text_input(
+                    "HTTP Method",
+                    key="api_http_method",
+                )
+            with col2:
+                st.text_input(
+                    "URL",
+                    key="api_url",
+                )
+            st.text_area(
+                "Headers as JSON (optional)",
+                key="api_headers",
+            )
+            st.text_area(
+                "JSON Body (optional)",
+                key="api_json_body",
+            )
+
+            st.write("---")
+
+            st.write(
+                """
+            ##### Output Formatter
+            
+            Parse the JSON output here
+            
+            *You can use the powerful [glom](https://glom.readthedocs.io/en/latest/tutorial.html/) syntax - 
+            `This is my {{ "field.value" }}`*
             """
-        )
-        st.text_area(
-            "prompt_header",
-            label_visibility="collapsed",
-            key="prompt_header",
-            height=200,
-        )
+            )
+            st.text_area(
+                "api_output_formatter",
+                label_visibility="collapsed",
+                key="api_output_formatter",
+            )
 
-        st.write("---")
-
-        st.write(
-            """
-            #### Example letters
-            A set of example letters so that the model can learn your writing style
-            """
-        )
-
-        text_training_data("Talking points", "Letter", key="example_letters")
-
-        st.write("---")
-
-        st.write("### Model Params")
+        st.write("### Model Settings")
 
         col1, col2 = st.columns(2)
 
@@ -180,34 +226,6 @@ class LetterWriterPage(DarsAiPage):
             min_value=0.0,
             max_value=1.0,
             value=1.0,
-        )
-
-        st.write("---")
-
-        st.write("### Custom API settings")
-
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            st.text_input(
-                "HTTP Method",
-                key="api_http_method",
-            )
-        with col2:
-            st.text_input(
-                "URL",
-                key="api_url",
-            )
-        st.text_area(
-            "Headers",
-            key="api_headers",
-        )
-        st.text_area(
-            "JSON Body",
-            key="api_json_body",
-        )
-        st.text_area(
-            "Output Formatter",
-            key="api_output_formatter",
         )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
