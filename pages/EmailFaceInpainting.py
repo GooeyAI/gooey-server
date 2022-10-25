@@ -83,11 +83,13 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 "By providing your email address, you agree to Dara's [Privacy Policy](https://dara.network/privacy)"
             )
 
-            col1, col2 = st.columns(2)
-
+            col1, col2 = st.columns(2, gap="medium")
             with col1:
                 st.slider(
-                    label="# of Outputs", key="num_outputs", min_value=1, max_value=4
+                    label="# of Outputs",
+                    key="num_outputs",
+                    min_value=1,
+                    max_value=4,
                 )
             with col2:
                 st.slider(

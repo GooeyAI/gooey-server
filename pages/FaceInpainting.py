@@ -87,8 +87,7 @@ class FaceInpaintingPage(DarsAiPage):
                 "By uploading an image, you agree to Dara's [Privacy Policy](https://dara.network/privacy)"
             )
 
-            col1, col2 = st.columns(2)
-
+            col1, col2 = st.columns(2, gap="medium")
             with col1:
                 st.slider(
                     label="# of Outputs",

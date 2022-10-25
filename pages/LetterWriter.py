@@ -22,10 +22,10 @@ class LetterWriterPage(DarsAiPage):
         prompt_header: str = None
         example_letters: list[TrainingDataModel] = None
 
-        lm_selected_api: str
-        lm_selected_engine: str
-        lm_num_outputs: int = None
-        lm_quality: float = None
+        lm_selected_api: str = None
+        lm_selected_engine: str = None
+        num_outputs: int = None
+        quality: float = None
         lm_sampling_temperature: float = None
 
         api_http_method: str = None
@@ -45,6 +45,10 @@ class LetterWriterPage(DarsAiPage):
 
     class ResponseModel(BaseModel):
         output_letters: list[str]
+
+        response_json: str
+        generated_input_prompt: str
+        final_prompt: str
 
     def render_description(self):
         st.write(
@@ -68,6 +72,25 @@ class LetterWriterPage(DarsAiPage):
                 key="action_id",
                 label_visibility="collapsed",
             )
+
+            col1, col2 = st.columns(2, gap="medium")
+            with col1:
+                st.slider(
+                    label="# of Outputs",
+                    key="num_outputs",
+                    min_value=1,
+                    max_value=4,
+                    value=1,
+                )
+            with col2:
+                st.slider(
+                    label="Quality",
+                    key="quality",
+                    min_value=1.0,
+                    max_value=5.0,
+                    step=0.1,
+                    value=1.0,
+                )
 
             submitted = st.form_submit_button("🚀 Submit")
             return submitted
@@ -199,24 +222,6 @@ class LetterWriterPage(DarsAiPage):
                 key="lm_selected_engine",
             )
 
-        with col1:
-            st.slider(
-                label="# of Outputs",
-                key="lm_num_outputs",
-                min_value=1,
-                max_value=4,
-                value=1,
-            )
-        with col2:
-            st.slider(
-                label="Quality",
-                key="lm_quality",
-                min_value=1.0,
-                max_value=5.0,
-                step=0.1,
-                value=1.0,
-            )
-
         st.write(
             """
             ##### Model Risk Factor 
@@ -262,14 +267,19 @@ class LetterWriterPage(DarsAiPage):
 
         r = requests.request(method=method, url=url, headers=headers, json=body)
         r.raise_for_status()
+        response_json = r.json()
 
-        yield "Running GPT3..."
+        state["response_json"] = response_json
+        yield "Generating Prompt..."
 
         input_prompt = daras_ai_format_str(
             format_str=request.input_prompt,
-            variables=r.json(),
+            variables=response_json,
             do_html2text=request.strip_html_2_text,
         )
+
+        state["generated_input_prompt"] = input_prompt
+        yield "Generating Prompt..."
 
         if not request.prompt_header:
             raise ValueError(
@@ -300,11 +310,14 @@ class LetterWriterPage(DarsAiPage):
 
         final_prompt += prompt_prefix + input_prompt + prompt_sep + completion_prefix
 
+        state["final_prompt"] = final_prompt
+        yield "Running Language Model..."
+
         state["output_letters"] = run_language_model(
             request.lm_selected_api,
             engine=request.lm_selected_engine,
-            quality=request.lm_quality,
-            num_outputs=request.lm_num_outputs,
+            quality=request.quality,
+            num_outputs=request.num_outputs,
             temperature=request.lm_sampling_temperature,
             prompt=final_prompt,
             max_tokens=256,
@@ -313,12 +326,45 @@ class LetterWriterPage(DarsAiPage):
 
     def render_output(self):
         st.write("### Generated Letters")
-        for i, out in enumerate(st.session_state.get("output_letters", [])):
+        output_letters = st.session_state.get(
+            "output_letters",
+            # this default value makes a nicer output while running :)
+            [""] * st.session_state["num_outputs"],
+        )
+        for i, out in enumerate(output_letters):
             st.text_area(
                 "output_letter",
                 label_visibility="collapsed",
                 help=f"output_letters {i}",
                 value=out,
+                height=300,
+                disabled=True,
+            )
+
+        with st.expander("Steps"):
+            response_json = st.session_state.get("response_json", {})
+            st.write("**API Response**")
+            st.json(
+                response_json,
+                expanded=False,
+            )
+
+            st.write("**Input Talking Points (Prompt)**")
+            input_prompt = st.session_state.get("generated_input_prompt", "")
+            st.text_area(
+                "input_prompt",
+                label_visibility="collapsed",
+                value=input_prompt,
+                disabled=True,
+            )
+
+            st.write("**Final Language Model Prompt**")
+            final_prompt = st.session_state.get("final_prompt", "")
+            st.text_area(
+                "final_prompt",
+                label_visibility="collapsed",
+                value=final_prompt,
+                disabled=True,
                 height=300,
             )
 
