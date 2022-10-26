@@ -111,79 +111,6 @@ class LetterWriterPage(DarsAiPage):
             return submitted
 
     def render_settings(self):
-        with st.expander("Task description"):
-            st.write(
-                """
-                Briefly describe the task for the language model
-                """
-            )
-            st.text_area(
-                "prompt_header",
-                label_visibility="collapsed",
-                key="prompt_header",
-                height=200,
-            )
-
-        with st.expander("Example letters"):
-
-            st.write(
-                """
-                A set of example letters for the model to learn your writing style
-                """
-            )
-
-            text_training_data("Talking points", "Letter", key="example_letters")
-
-        with st.expander("Custom API settings"):
-            st.write(
-                """
-            Call any external API to get the talking points from an input Action ID
-             
-            *You can substitute the user input Action ID like so - `{{ action_id }}`*
-            """
-            )
-
-            st.write("---")
-
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.text_input(
-                    "HTTP Method",
-                    key="api_http_method",
-                )
-            with col2:
-                st.text_input(
-                    "URL",
-                    key="api_url",
-                )
-            st.text_area(
-                "Headers as JSON (optional)",
-                key="api_headers",
-            )
-            st.text_area(
-                "JSON Body (optional)",
-                key="api_json_body",
-            )
-
-            st.write("---")
-
-            st.write(
-                """
-            ##### Input Talking Points (Prompt)
-            
-            Specify the input prompt for the model.
-            
-            *You can use the powerful [glom](https://glom.readthedocs.io/en/latest/tutorial.html/) syntax to parse the API JSON response.*  
-            *E.g. `This is my {{ "field.value" }}`*
-            """
-            )
-            st.text_area(
-                "input_prompt",
-                label_visibility="collapsed",
-                key="input_prompt",
-            )
-            st.checkbox("Strip all HTML -> Text?", key="strip_html_2_text")
-
         st.write("### Model Settings")
 
         col1, col2 = st.columns(2)
@@ -240,9 +167,9 @@ class LetterWriterPage(DarsAiPage):
         st.write(
             """
             ##### Model Risk Factor 
-            
+
             *(Sampling Temperature)*
-            
+
             Higher values allow the model to take more risks.
             Try 0.9 for more creative applications, 
             and 0 for ones with a well-defined answer. 
@@ -256,6 +183,84 @@ class LetterWriterPage(DarsAiPage):
             max_value=1.0,
             value=1.0,
         )
+
+        st.write("---")
+
+        st.write("### Task description")
+        st.write(
+            """
+            Briefly describe the task for the language model
+            """
+        )
+        st.text_area(
+            "prompt_header",
+            label_visibility="collapsed",
+            key="prompt_header",
+            height=200,
+        )
+
+        st.write("---")
+
+        st.write("### Example letters")
+
+        st.write(
+            """
+            A set of example letters for the model to learn your writing style
+            """
+        )
+
+        text_training_data("Talking points", "Letter", key="example_letters")
+
+        st.write("---")
+
+        st.write("### Custom API settings")
+
+        st.write(
+            """
+        Call any external API to get the talking points from an input Action ID
+         
+        *You can substitute the user input Action ID like so - `{{ action_id }}`*
+        """
+        )
+
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.text_input(
+                "HTTP Method",
+                key="api_http_method",
+            )
+        with col2:
+            st.text_input(
+                "URL",
+                key="api_url",
+            )
+        st.text_area(
+            "Headers as JSON (optional)",
+            key="api_headers",
+        )
+        st.text_area(
+            "JSON Body (optional)",
+            key="api_json_body",
+        )
+
+        st.write("---")
+
+        st.write(
+            """
+        ##### Input Talking Points (Prompt)
+        
+        Specify the input prompt for the model.
+        
+        *You can use the powerful [glom](https://glom.readthedocs.io/en/latest/tutorial.html/) syntax to parse the API JSON response.*  
+        *E.g. `This is my {{ "field.value" }}`*
+        """
+        )
+        st.text_area(
+            "input_prompt",
+            label_visibility="collapsed",
+            key="input_prompt",
+        )
+        st.checkbox("Strip all HTML -> Text?", key="strip_html_2_text")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         yield "Calling API.."
