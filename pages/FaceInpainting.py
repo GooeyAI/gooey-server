@@ -1,7 +1,9 @@
+import cv2
 import requests
 import streamlit as st
 from pydantic import BaseModel
 
+from daras_ai.extract_face import extract_and_reposition_face_cv2
 from daras_ai.face_restoration import map_parallel, gfpgan
 from daras_ai.image_input import (
     resize_img,
@@ -22,8 +24,12 @@ class FaceInpaintingPage(DarsAiPage):
         input_image: str
         text_prompt: str
 
-        num_outputs: int = 1
-        quality: int = 50
+        num_outputs: int = None
+        quality: int = None
+
+        face_scale: float = None
+        face_pos_x: float = None
+        face_pos_y: float = None
 
         class Config:
             schema_extra = {
@@ -125,7 +131,49 @@ class FaceInpaintingPage(DarsAiPage):
         return submitted
 
     def render_settings(self):
-        pass
+        st.write(
+            """
+            ### Face Repositioning Settings
+            """
+        )
+        col1, col2, col3 = st.columns(3)
+        face_scale = col1.slider(
+            "Scale",
+            min_value=0.1,
+            max_value=1.0,
+            value=0.2,
+            key="face_scale",
+        )
+        pos_x = col2.slider(
+            "Position X",
+            min_value=0.0,
+            max_value=1.0,
+            value=4 / 9,
+            key="face_pos_x",
+        )
+        pos_y = col3.slider(
+            "Position Y",
+            min_value=0.0,
+            max_value=1.0,
+            value=3 / 9,
+            key="face_pos_y",
+        )
+
+        # show an example image
+        img_cv2 = cv2.imread("static/face.png")
+        img, mask = extract_and_reposition_face_cv2(
+            img_cv2, face_scale=face_scale, pos_x=pos_x, pos_y=pos_y
+        )
+
+        # draw rule of 3rds
+        edge = img.shape[0]
+        color = (200, 200, 200)
+        for i in range(2):
+            pos = (edge // 3) * (i + 1)
+            cv2.line(img, (0, pos), (edge, pos), color, 2)
+            cv2.line(img, (pos, 0), (pos, 512), color, 2)
+
+        st.image(img, width=300)
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
@@ -193,7 +241,12 @@ class FaceInpaintingPage(DarsAiPage):
         img_bytes = requests.get(input_image_url).content
 
         re_img_bytes = resize_img(img_bytes, (512, 512))
-        re_img_bytes, face_mask_bytes = extract_face_img_bytes(re_img_bytes)
+        re_img_bytes, face_mask_bytes = extract_face_img_bytes(
+            re_img_bytes,
+            face_scale=state["face_scale"],
+            pos_x=state["face_pos_x"],
+            pos_y=state["face_pos_y"],
+        )
 
         state["resized_image"] = upload_file_from_bytes("re_img.png", re_img_bytes)
         state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)

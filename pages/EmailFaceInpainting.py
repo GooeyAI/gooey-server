@@ -119,6 +119,8 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         return submitted
 
     def render_settings(self):
+        super().render_settings()
+
         self.should_send_email_checkbox()
         self.from_email_text_input()
         self.cc_email_text_input()
@@ -137,7 +139,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                     get_doc_ref(
                         self.doc_name,
                     ),
-                    state_to_save
+                    state_to_save,
                 )
 
     def cc_email_text_input(self):
@@ -224,8 +226,12 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 sender=from_email if from_email else "devs@dara.network",
                 to_address=email_address,
                 cc_address=cc_email if cc_email else None,
-                subject=email_subject if email_subject else "Thanks for joining the Daras.AI waitlist",
-                html_message=email_body if email_body else "Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact sean@dara.network",
+                subject=email_subject
+                if email_subject
+                else "Thanks for joining the Daras.AI waitlist",
+                html_message=email_body
+                if email_body
+                else "Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact sean@dara.network",
                 image_urls=state["output_images"],
             )
             state["email_sent"] = True
