@@ -1,11 +1,9 @@
-import base64
-import io
 import uuid
 
 import cv2
-from PIL import Image, ImageOps
 import numpy as np
 import streamlit as st
+from PIL import Image, ImageOps
 from firebase_admin import storage
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
@@ -75,12 +73,10 @@ def upload_file(uploaded_file):
 
 def resize_img(img_bytes, size):
     img_cv2 = bytes_to_cv2_img(img_bytes)
-    im_pil = Image.fromarray(img_cv2)
-    im_pil = ImageOps.pad(im_pil, size)
-    img_bytes_io = io.BytesIO()
-    im_pil.save(img_bytes_io, format="png")
-    img_bytes = img_bytes_io.getvalue()
-    return img_bytes
+    img_pil = Image.fromarray(img_cv2)
+    img_pil = ImageOps.fit(img_pil, size)
+    img_cv2 = np.array(img_pil)
+    return cv2_img_to_bytes(img_cv2)
 
 
 def upload_file_from_bytes(filename: str, img_bytes: bytes) -> str:
@@ -90,9 +86,9 @@ def upload_file_from_bytes(filename: str, img_bytes: bytes) -> str:
     return blob.public_url
 
 
-def cv2_img_to_png(img):
+def cv2_img_to_bytes(img):
     return cv2.imencode(".png", img)[1].tobytes()
 
 
 def bytes_to_cv2_img(img_bytes: bytes):
-    return cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), flags=1)
+    return cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)

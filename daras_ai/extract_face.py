@@ -6,7 +6,7 @@ import streamlit as st
 
 from daras_ai.core import daras_ai_step_computer, daras_ai_step_config
 from daras_ai.image_input import (
-    cv2_img_to_png,
+    cv2_img_to_bytes,
     upload_file_from_bytes,
     bytes_to_cv2_img,
 )
@@ -68,7 +68,7 @@ def extract_face(idx, state, variables):
 
             variables[face_mask_var] = upload_file_from_bytes(
                 "face_mask.png",
-                cv2_img_to_png(face_mask),
+                cv2_img_to_bytes(face_mask),
             )
 
             if face_cutout_var:
@@ -77,7 +77,7 @@ def extract_face(idx, state, variables):
                 variables[face_cutout_var] = upload_file_from_bytes(
                     "face_cutout.png",
                     # img_to_png((gaussian & ~face_mask) + (image_cv2 & face_mask)),
-                    cv2_img_to_png((image_cv2 & face_mask)),
+                    cv2_img_to_bytes((image_cv2 & face_mask)),
                 )
 
 

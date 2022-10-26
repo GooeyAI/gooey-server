@@ -97,22 +97,12 @@ class DarsAiPage:
 
         if gen:
             try:
-                with status_area:
-                    try:
-                        with st.spinner(st.session_state["__status"]):
-                            start_time = time()
-                            # advance the generator (to further progress of run())
-                            st.session_state["__status"] = next(gen) or DEFAULT_STATUS
-                            # increment total time taken after every iteration
-                            st.session_state["__time_taken"] += time() - start_time
-                    # render ValueError nicely
-                    except Exception as e:
-                        st.error(f"{type(e)} - {e}", icon="⚠️")
-                        # cleanup is important!
-                        del st.session_state["__status"]
-                        del st.session_state["__gen"]
-                        del st.session_state["__time_taken"]
-                        return
+                with status_area, st.spinner(st.session_state["__status"]):
+                    start_time = time()
+                    # advance the generator (to further progress of run())
+                    st.session_state["__status"] = next(gen) or DEFAULT_STATUS
+                    # increment total time taken after every iteration
+                    st.session_state["__time_taken"] += time() - start_time
 
             except StopIteration:
                 # Weird but important! This measures the runtime of code after the last `yield` in `run()`
@@ -129,6 +119,16 @@ class DarsAiPage:
                 # cleanup is important!
                 del st.session_state["__status"]
                 del st.session_state["__gen"]
+
+            # render ValueError nicely
+            except Exception as e:
+                with status_area:
+                    st.error(f"{type(e)} - {e}", icon="⚠️")
+                # cleanup is important!
+                del st.session_state["__status"]
+                del st.session_state["__gen"]
+                del st.session_state["__time_taken"]
+                return
 
             # this bit of hack streams the outputs from run() in realtime
             st.experimental_rerun()
