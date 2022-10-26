@@ -4,11 +4,12 @@ import secrets
 import shlex
 import typing
 from copy import deepcopy
-from time import time, sleep
+from time import time
 
 import requests
 import streamlit as st
 from furl import furl
+from glom import GlomError
 from google.cloud import firestore
 from pydantic import BaseModel
 from requests import HTTPError
@@ -105,7 +106,7 @@ class DarsAiPage:
                             # increment total time taken after every iteration
                             st.session_state["__time_taken"] += time() - start_time
                     # render ValueError nicely
-                    except (ValueError, HTTPError) as e:
+                    except (ValueError, HTTPError, GlomError) as e:
                         st.error(str(e), icon="⚠️")
                         # cleanup is important!
                         del st.session_state["__status"]
