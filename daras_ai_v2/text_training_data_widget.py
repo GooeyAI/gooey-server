@@ -7,14 +7,6 @@ class TrainingDataModel(BaseModel):
     prompt: str
     completion: str
 
-    class Config:
-        schema_extra = {
-            "example": {
-                "prompt": "Extreme weather events, both extreme cold and extreme heat will probably increase in frequency due to climate change.",
-                "completion": "Dear Senate Rules Committee Members, Please pull HB 1620 out of the Rules Committee and send it for a floor vote",
-            }
-        }
-
 
 def text_training_data(label1: str, label2: str, *, key: str):
     training_data = st.session_state.get(key, [])

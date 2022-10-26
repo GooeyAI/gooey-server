@@ -74,8 +74,10 @@ def run(
 
 
 def script_to_api(page: typing.Type[DarsAiPage]):
+    body_spec = Body(examples=page.RequestModel.Config.schema_extra.get("examples"))
+
     @app.post(page.endpoint, response_model=page.ResponseModel)
-    def run_api(request: page.RequestModel):
+    def run_api(request: page.RequestModel = body_spec):
         # get saved state from db
         state = get_saved_doc(get_doc_ref(page.doc_name))
 

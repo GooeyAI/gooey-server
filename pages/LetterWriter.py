@@ -38,15 +38,30 @@ class LetterWriterPage(DarsAiPage):
 
         class Config:
             schema_extra = {
-                "example": {
-                    "action_id": "14904",
+                "examples": {
+                    "Basic": {
+                        "value": {
+                            "action_id": "14904",
+                        }
+                    },
+                    "Custom example letters": {
+                        "value": {
+                            "action_id": "14904",
+                            "example_letters": [
+                                {
+                                    "prompt": "Extreme weather events, both extreme cold and extreme heat will probably increase in frequency due to climate change.",
+                                    "completion": "Dear Senate Rules Committee Members, Please pull HB 1620 out of the Rules Committee and send it for a floor vote",
+                                }
+                            ],
+                        }
+                    },
                 }
             }
 
     class ResponseModel(BaseModel):
         output_letters: list[str]
 
-        response_json: str
+        response_json: typing.Any
         generated_input_prompt: str
         final_prompt: str
 
@@ -272,6 +287,9 @@ class LetterWriterPage(DarsAiPage):
         state["response_json"] = response_json
         yield "Generating Prompt..."
 
+        if not request.input_prompt:
+            raise ValueError("Input prompt is Empty. Please check your settings.")
+
         input_prompt = daras_ai_format_str(
             format_str=request.input_prompt,
             variables=response_json,
@@ -285,8 +303,6 @@ class LetterWriterPage(DarsAiPage):
             raise ValueError(
                 "Task description not provided. Please check your settings."
             )
-        if not input_prompt:
-            raise ValueError("Input prompt is Empty. Please check your settings.")
         if not request.example_letters:
             raise ValueError(
                 "Example letters not provided. Please check your settings."
