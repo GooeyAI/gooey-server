@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import requests
 import streamlit as st
 from pydantic import BaseModel
@@ -19,6 +21,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         num_outputs: int = 1
         quality: int = 50
+        from_email_prompt: str
+        cc_email_prompt: str
+        email_subject_prompt: str
+        email_body_prompt: str
+        should_send_email: bool
 
         class Config:
             schema_extra = {
@@ -112,6 +119,64 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         return submitted
 
     def render_settings(self):
+        self.should_send_email_checkbox()
+        self.from_email_text_input()
+        self.cc_email_text_input()
+        self.email_subject_text_input()
+        self.email_body_text_area()
+
+        save_btn = st.button(label="💾 Save Settings")
+        if save_btn:
+            state_to_save = {
+                field_name: deepcopy(st.session_state[field_name])
+                for field_name in self.fields_to_save()
+                if field_name in st.session_state
+            }
+            with st.spinner("Saving..."):
+                set_saved_doc(
+                    get_doc_ref(
+                        self.doc_name,
+                    ),
+                    state_to_save
+                )
+
+    def cc_email_text_input(self):
+        st.write(
+            """
+            ### CC Email
+            """
+        )
+        st.text_input(
+            "cc_email_prompt",
+            label_visibility="collapsed",
+            key="cc_email_prompt",
+        )
+
+    def email_body_text_area(self):
+        st.write(
+            """
+            ### Email Body
+            """
+        )
+        st.text_area(
+            "email_body_prompt",
+            label_visibility="collapsed",
+            key="email_body_prompt",
+        )
+
+    def email_subject_text_input(self):
+        st.write(
+            """
+            ### Email Subject
+            """
+        )
+        st.text_input(
+            "email_subject_prompt",
+            label_visibility="collapsed",
+            key="email_subject_prompt",
+        )
+
+    def from_email_text_input(self):
         st.write(
             """
             ### From Email
@@ -121,6 +186,12 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             "from_email_prompt",
             label_visibility="collapsed",
             key="from_email_prompt",
+        )
+
+    def should_send_email_checkbox(self):
+        st.checkbox(
+            "Send Email",
+            key="should_send_email",
         )
 
     def render_output(self):
@@ -143,15 +214,21 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         state["input_image"] = photo_url
 
         yield from super().run(state)
-
-        send_smtp_message(
-            sender="devs@dara.network",
-            to_address=email_address,
-            subject="Thanks for joining the Daras.AI waitlist",
-            html_message="Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact sean@dara.network",
-            image_urls=state["output_images"],
-        )
-        state["email_sent"] = True
+        should_send_email = st.session_state.get("should_send_email")
+        if should_send_email:
+            from_email = st.session_state.get("from_email_prompt")
+            cc_email = st.session_state.get("cc_email_prompt")
+            email_subject = st.session_state.get("email_subject_prompt")
+            email_body = st.session_state.get("email_body_prompt")
+            send_smtp_message(
+                sender=from_email if from_email else "devs@dara.network",
+                to_address=email_address,
+                cc_address=cc_email if cc_email else None,
+                subject=email_subject if email_subject else "Thanks for joining the Daras.AI waitlist",
+                html_message=email_body if email_body else "Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact sean@dara.network",
+                image_urls=state["output_images"],
+            )
+            state["email_sent"] = True
 
 
 @st.cache()
