@@ -42,9 +42,10 @@ def send_smtp_message(
     msg["Cc"] = cc_address
     msg["Subject"] = subject
     msg.attach(MIMEText(text_message, "plain"))
+    to = [to_address] + cc_address.split(",")
 
     for img_url in image_urls:
-        html_message += f"<img width='300px', src='{img_url}'/><br>"
+        html_message += f"<br><br><img width='300px', src='{img_url}'/><br>"
 
     for f in files or []:
         # TO SEND AS ATTACHMENT
@@ -52,6 +53,7 @@ def send_smtp_message(
         part["Content-Disposition"] = 'attachment; filename="%s"' % basename(f.name)
         msg.attach(part)
 
+    html_message+="<br><br>Regards<br>daras.ai"
     msg.attach(MIMEText(html_message, "html"))
 
     with smtplib.SMTP(
@@ -65,4 +67,4 @@ def send_smtp_message(
         smtp_server.login(config("AWS_SMTP_USERNAME"), config("AWS_SMTP_PASSWORD"))
         # Uncomment the next line to send SMTP server responses to stdout.
         # smtp_server.set_debuglevel(1)
-        smtp_server.sendmail(sender, to_address, msg.as_string())
+        smtp_server.sendmail(sender, to, msg.as_string())
