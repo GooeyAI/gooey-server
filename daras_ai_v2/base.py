@@ -106,8 +106,8 @@ class DarsAiPage:
                             # increment total time taken after every iteration
                             st.session_state["__time_taken"] += time() - start_time
                     # render ValueError nicely
-                    except (ValueError, HTTPError, GlomError) as e:
-                        st.error(str(e), icon="⚠️")
+                    except Exception as e:
+                        st.error(f"{type(e)} - {e}", icon="⚠️")
                         # cleanup is important!
                         del st.session_state["__status"]
                         del st.session_state["__gen"]
