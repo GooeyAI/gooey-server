@@ -74,7 +74,8 @@ def upload_file(uploaded_file):
 
 
 def resize_img(img_bytes, size):
-    im_pil = Image.open(io.BytesIO(img_bytes))
+    img_cv2 = bytes_to_cv2_img(img_bytes)
+    im_pil = Image.fromarray(img_cv2)
     im_pil = ImageOps.pad(im_pil, size)
     img_bytes_io = io.BytesIO()
     im_pil.save(img_bytes_io, format="png")
