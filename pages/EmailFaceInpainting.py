@@ -1,3 +1,4 @@
+import re
 from copy import deepcopy
 
 import requests
@@ -9,6 +10,8 @@ from daras_ai_v2.base import get_saved_doc, set_saved_doc, get_doc_ref
 from daras_ai_v2.send_email import send_smtp_message
 from pages.FaceInpainting import FaceInpaintingPage
 
+
+email_regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
     title = "Email of You in Paris"
@@ -114,6 +117,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             email_address = st.session_state.get("email_address")
             if not (text_prompt and email_address):
                 st.error("Please provide a Prompt and your Email Address", icon="⚠️")
+                return False
+            if not re.fullmatch(email_regex, email_address):
+                st.error("Please provide a valid Email Address", icon="⚠️")
                 return False
 
         return submitted
