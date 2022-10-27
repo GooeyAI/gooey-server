@@ -21,10 +21,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         num_outputs: int = 1
         quality: int = 50
-        from_email_prompt: str
-        cc_email_prompt: str
-        email_subject_prompt: str
-        email_body_prompt: str
+        email_from: str
+        email_cc: str
+        email_subject: str
+        email_body: str
         should_send_email: bool
 
         class Config:
@@ -121,11 +121,27 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     def render_settings(self):
         super().render_settings()
 
-        self.should_send_email_checkbox()
-        self.from_email_text_input()
-        self.cc_email_text_input()
-        self.email_subject_text_input()
-        self.email_body_text_area()
+        st.checkbox(
+            "Send Email",
+            key="should_send_email",
+        )
+        st.text_input(
+            label="From email",
+            key="email_from",
+        )
+        st.text_input(
+            label="CC emails (You can enter multiple emails separated by comma)",
+            key="email_cc",
+            placeholder="john@gmail.com, cathy@gmail.com "
+        )
+        st.text_input(
+            label="Email subject",
+            key="email_subject",
+        )
+        st.text_area(
+            label="Email body",
+            key="email_body",
+        )
 
         save_btn = st.button(label="💾 Save Settings")
         if save_btn:
@@ -141,60 +157,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                     ),
                     state_to_save,
                 )
-
-    def cc_email_text_input(self):
-        st.write(
-            """
-            ### CC Email
-            """
-        )
-        st.text_input(
-            "cc_email_prompt",
-            label_visibility="collapsed",
-            key="cc_email_prompt",
-        )
-
-    def email_body_text_area(self):
-        st.write(
-            """
-            ### Email Body
-            """
-        )
-        st.text_area(
-            "email_body_prompt",
-            label_visibility="collapsed",
-            key="email_body_prompt",
-        )
-
-    def email_subject_text_input(self):
-        st.write(
-            """
-            ### Email Subject
-            """
-        )
-        st.text_input(
-            "email_subject_prompt",
-            label_visibility="collapsed",
-            key="email_subject_prompt",
-        )
-
-    def from_email_text_input(self):
-        st.write(
-            """
-            ### From Email
-            """
-        )
-        st.text_input(
-            "from_email_prompt",
-            label_visibility="collapsed",
-            key="from_email_prompt",
-        )
-
-    def should_send_email_checkbox(self):
-        st.checkbox(
-            "Send Email",
-            key="should_send_email",
-        )
 
     def render_output(self):
         super().render_output()
@@ -218,10 +180,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         yield from super().run(state)
         should_send_email = st.session_state.get("should_send_email")
         if should_send_email:
-            from_email = st.session_state.get("from_email_prompt")
-            cc_email = st.session_state.get("cc_email_prompt")
-            email_subject = st.session_state.get("email_subject_prompt")
-            email_body = st.session_state.get("email_body_prompt")
+            from_email = st.session_state.get("email_from")
+            cc_email = st.session_state.get("email_cc")
+            email_subject = st.session_state.get("email_subject")
+            email_body = st.session_state.get("email_body")
             send_smtp_message(
                 sender=from_email if from_email else "devs@dara.network",
                 to_address=email_address,
