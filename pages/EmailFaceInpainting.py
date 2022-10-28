@@ -154,21 +154,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             key="email_body",
         )
 
-        save_btn = st.button(label="💾 Save Settings")
-        if save_btn:
-            state_to_save = {
-                field_name: deepcopy(st.session_state[field_name])
-                for field_name in self.fields_to_save()
-                if field_name in st.session_state
-            }
-            with st.spinner("Saving..."):
-                set_saved_doc(
-                    get_doc_ref(
-                        self.doc_name,
-                    ),
-                    state_to_save,
-                )
-
     def render_output(self):
         super().render_output()
 
