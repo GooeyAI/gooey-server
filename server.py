@@ -9,6 +9,7 @@ from pages.ChyronPlant import ChyronPlantPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.LetterWriter import LetterWriterPage
+from pages.Lipsync import LipsyncPage
 
 app = FastAPI(title="DarasAI")
 
@@ -96,3 +97,4 @@ script_to_api(ChyronPlantPage)
 script_to_api(FaceInpaintingPage)
 script_to_api(EmailFaceInpaintingPage)
 script_to_api(LetterWriterPage)
+script_to_api(LipsyncPage)

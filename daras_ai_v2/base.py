@@ -23,12 +23,9 @@ DEFAULT_STATUS = "Running Recipe..."
 class DarsAiPage:
     title: str
     doc_name: str
-    endpoint: str = ""
+    endpoint: str
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
-
-    def __init__(self):
-        self.endpoint = self.endpoint or f"/v1/{self.doc_name}/run"
 
     def render(self):
         st.set_page_config(page_title=self.title + " - Daras.AI")
@@ -86,7 +83,9 @@ class DarsAiPage:
         # The area for displaying status messages streamed from run()
         status_area = st.empty()
 
-        self.render_output()
+        output_area = st.empty()
+        with output_area.container():
+            self.render_output()
 
         if submitted:
             st.session_state["__status"] = DEFAULT_STATUS
