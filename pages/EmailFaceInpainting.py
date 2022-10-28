@@ -1,3 +1,4 @@
+import re
 from copy import deepcopy
 
 import requests
@@ -10,6 +11,8 @@ from daras_ai_v2.send_email import send_smtp_message
 from pages.FaceInpainting import FaceInpaintingPage
 
 
+email_regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+
 class EmailFaceInpaintingPage(FaceInpaintingPage):
     title = "Email of You in Paris"
     doc_name = "EmailFaceInpainting#2"
@@ -21,10 +24,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         num_outputs: int = 1
         quality: int = 50
-        from_email_prompt: str
-        cc_email_prompt: str
-        email_subject_prompt: str
-        email_body_prompt: str
+        email_from: str
+        email_cc: str
+        email_subject: str
+        email_body: str
         should_send_email: bool
 
         class Config:
@@ -115,85 +118,40 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             if not (text_prompt and email_address):
                 st.error("Please provide a Prompt and your Email Address", icon="⚠️")
                 return False
+            if not re.fullmatch(email_regex, email_address):
+                st.error("Please provide a valid Email Address", icon="⚠️")
+                return False
 
         return submitted
 
     def render_settings(self):
         super().render_settings()
-
-        self.should_send_email_checkbox()
-        self.from_email_text_input()
-        self.cc_email_text_input()
-        self.email_subject_text_input()
-        self.email_body_text_area()
-
-        save_btn = st.button(label="💾 Save Settings")
-        if save_btn:
-            state_to_save = {
-                field_name: deepcopy(st.session_state[field_name])
-                for field_name in self.fields_to_save()
-                if field_name in st.session_state
-            }
-            with st.spinner("Saving..."):
-                set_saved_doc(
-                    get_doc_ref(
-                        self.doc_name,
-                    ),
-                    state_to_save,
-                )
-
-    def cc_email_text_input(self):
         st.write(
             """
-            ### CC Email
+            ### Email settings
             """
+        )
+
+        st.checkbox(
+            "Send email",
+            key="should_send_email",
         )
         st.text_input(
-            "cc_email_prompt",
-            label_visibility="collapsed",
-            key="cc_email_prompt",
+            label="From email",
+            key="email_from",
         )
-
-    def email_body_text_area(self):
-        st.write(
-            """
-            ### Email Body
-            """
+        st.text_input(
+            label="CC emails (You can enter multiple emails separated by comma)",
+            key="email_cc",
+            placeholder="john@gmail.com, cathy@gmail.com "
+        )
+        st.text_input(
+            label="Email subject",
+            key="email_subject",
         )
         st.text_area(
-            "email_body_prompt",
-            label_visibility="collapsed",
-            key="email_body_prompt",
-        )
-
-    def email_subject_text_input(self):
-        st.write(
-            """
-            ### Email Subject
-            """
-        )
-        st.text_input(
-            "email_subject_prompt",
-            label_visibility="collapsed",
-            key="email_subject_prompt",
-        )
-
-    def from_email_text_input(self):
-        st.write(
-            """
-            ### From Email
-            """
-        )
-        st.text_input(
-            "from_email_prompt",
-            label_visibility="collapsed",
-            key="from_email_prompt",
-        )
-
-    def should_send_email_checkbox(self):
-        st.checkbox(
-            "Send Email",
-            key="should_send_email",
+            label="Email body",
+            key="email_body",
         )
 
     def render_output(self):
@@ -218,10 +176,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         yield from super().run(state)
         should_send_email = st.session_state.get("should_send_email")
         if should_send_email:
-            from_email = st.session_state.get("from_email_prompt")
-            cc_email = st.session_state.get("cc_email_prompt")
-            email_subject = st.session_state.get("email_subject_prompt")
-            email_body = st.session_state.get("email_body_prompt")
+            from_email = st.session_state.get("email_from")
+            cc_email = st.session_state.get("email_cc")
+            email_subject = st.session_state.get("email_subject")
+            email_body = st.session_state.get("email_body")
             send_smtp_message(
                 sender=from_email if from_email else "devs@dara.network",
                 to_address=email_address,

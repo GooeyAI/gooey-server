@@ -25,30 +25,16 @@ def get_audio(uuid):
 
 def main():
     st.write("# Text To Audio")
-    change_voice = st.button("Change voice")
-    voices = ('zwf',)
-    if change_voice:
-        voices_resp = requests.get("https://api.uberduck.ai/voices?mode=tts-basic&language=english",
-                                   auth=(config("UBERDUCK_KEY"), config("UBERDUCK_SECRET")),
-                                   )
-        if voices_resp.status_code == 200:
-            data = json.loads(voices_resp.text)
-            st.write(data)
-
-        option = st.selectbox(
-            'Change voice',
-            ('zwf', 'Home phone', 'Mobile phone'))
-        st.write('You selected:', option)
-        st.write(voices)
 
     with st.form(key="send_email", clear_on_submit=False):
+        voice = st.text_input(label="Voice", value="zwf")
         text = st.text_area(label="Text input", value="This is a test.")
-        submitted = st.form_submit_button("Send")
+        submitted = st.form_submit_button("Generate")
         if submitted:
             response = requests.post(
                 "https://api.uberduck.ai/speak",
                 auth=(config("UBERDUCK_KEY"), config("UBERDUCK_SECRET")),
-                json={"speech": text, "voice": "zwf"}
+                json={"speech": text, "voice": voice}
             )
             uuid = json.loads(response.text)["uuid"]
             get_audio(uuid)
