@@ -23,9 +23,12 @@ DEFAULT_STATUS = "Running Recipe..."
 class DarsAiPage:
     title: str
     doc_name: str
-    endpoint: str
+    endpoint: str = ""
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
+
+    def __init__(self):
+        self.endpoint = self.endpoint or f"/v1/{self.doc_name}/run"
 
     def render(self):
         st.set_page_config(page_title=self.title + " - Daras.AI")
@@ -123,7 +126,7 @@ class DarsAiPage:
             # render ValueError nicely
             except Exception as e:
                 with status_area:
-                    st.error(f"{type(e)} - {e}", icon="⚠️")
+                    st.error(f"{type(e).__name__} - {e}", icon="⚠️")
                 # cleanup is important!
                 del st.session_state["__status"]
                 del st.session_state["__gen"]
