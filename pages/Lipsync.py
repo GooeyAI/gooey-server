@@ -32,7 +32,7 @@ class LipsyncPage(DarsAiPage):
                 """
                 #### Input Face
                 Upload a video/image that contains faces to use  
-                *Recommended - .mp4 / .png / .jpg* 
+                *Recommended - mp4 / mov / png / jpg* 
                 """
             )
             face_file = st.file_uploader("input face", label_visibility="collapsed")
@@ -41,7 +41,7 @@ class LipsyncPage(DarsAiPage):
                 """
                 #### Input Audio
                 Upload the video/audio file to use as audio source for lipsyncing  
-                *Recommended - .wav / .mp3*
+                *Recommended - wav / mp3*
                 """
             )
             audio_file = st.file_uploader("input audio", label_visibility="collapsed")
@@ -115,25 +115,27 @@ class LipsyncPage(DarsAiPage):
             pads=f"{request.face_padding_top} {request.face_padding_bottom} {request.face_padding_left} {request.face_padding_right}",
         )
 
+        yield "Downloading results..."
+
         state["output_video"] = upload_file_from_bytes(
             "output.mp4", requests.get(output).content
         )
 
-    def render_output(self):
+    def render_example(self, state: dict):
         col1, col2 = st.columns(2)
 
         with col1:
-            input_face = st.session_state.get("input_face")
+            input_face = state.get("input_face")
             if not input_face:
                 st.empty()
-            elif input_face.endswith(".mp4"):
+            elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
                 st.write("Input Face (Video)")
                 st.video(input_face)
             else:
                 st.write("Input Face (Image)")
                 st.image(input_face)
 
-            input_audio = st.session_state.get("input_audio")
+            input_audio = state.get("input_audio")
             if input_audio:
                 st.write("Input Audio")
                 st.audio(input_audio)
@@ -141,12 +143,15 @@ class LipsyncPage(DarsAiPage):
                 st.empty()
 
         with col2:
-            output_video = st.session_state.get("output_video")
+            output_video = state.get("output_video")
             if output_video:
                 st.write("Output Video")
                 st.video(output_video)
             else:
                 st.empty()
+
+    def render_output(self):
+        self.render_example(st.session_state)
 
 
 if __name__ == "__main__":
