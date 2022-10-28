@@ -76,28 +76,28 @@ class LipsyncPage(DarsAiPage):
             st.slider(
                 "Head",
                 min_value=0,
-                max_value=100,
+                max_value=50,
                 key="face_padding_top",
             )
         with col2:
             st.slider(
                 "Chin",
                 min_value=0,
-                max_value=100,
+                max_value=50,
                 key="face_padding_bottom",
             )
         with col3:
             st.slider(
                 "Left Cheek",
                 min_value=0,
-                max_value=100,
+                max_value=50,
                 key="face_padding_left",
             )
         with col4:
             st.slider(
                 "Right Cheek",
                 min_value=0,
-                max_value=100,
+                max_value=50,
                 key="face_padding_right",
             )
 
