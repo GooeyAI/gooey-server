@@ -132,29 +132,27 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             """
         )
 
-        should_send_email  =st.checkbox(
+        st.checkbox(
             "Send email",
             key="should_send_email",
         )
-        with st.expander(label="Email setting fields",expanded=should_send_email):
-            st.text_input(
-                label="From email",
-                key="email_from",
-                value=st.session_state.get("email_from")
-            )
-            st.text_input(
-                label="CC emails (You can enter multiple emails separated by comma)",
-                key="email_cc",
-                placeholder="john@gmail.com, cathy@gmail.com "
-            )
-            st.text_input(
-                label="Email subject",
-                key="email_subject",
-            )
-            st.text_area(
-                label="Email body",
-                key="email_body",
-            )
+        st.text_input(
+            label="From email",
+            key="email_from",
+        )
+        st.text_input(
+            label="CC emails (You can enter multiple emails separated by comma)",
+            key="email_cc",
+            placeholder="john@gmail.com, cathy@gmail.com "
+        )
+        st.text_input(
+            label="Email subject",
+            key="email_subject",
+        )
+        st.text_area(
+            label="Email body",
+            key="email_body",
+        )
 
         save_btn = st.button(label="💾 Save Settings")
         if save_btn:
