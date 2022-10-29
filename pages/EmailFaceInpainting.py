@@ -14,7 +14,7 @@ from pages.FaceInpainting import FaceInpaintingPage
 email_regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
-    title = "Email of You in Paris"
+    title = "Email of You In Any Scene"
     doc_name = "EmailFaceInpainting#2"
     endpoint = "/v1/EmailFaceInpainting/run"
 
@@ -49,16 +49,18 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     def render_description(self):
         st.write(
             """
-    *EmailID > Profile pic > Face Masking > Stable Diffusion > GFPGAN*  
+    *EmailID > Profile pic > Face Masking + Zoom > Stable Diffusion > GFPGAN > Email*  
     
-    This recipe takes only an email address and returns a photo of the person with that email, rendered on winter's day in Paris.
+    This recipe takes only an email address and returns a photo of the person with that email, rendered using the text prompt.
     
     How It Works:
     
     1. Calls social media APIs to get a user's twitter, facebook, linkedin or insta profile photo 
-    2. Extracts faces from any image using MediaPipe
-    3. Generates images from the given prompt and inpaints with Stable diffusion
-    4. Improves faces using gfpgan    
+    2. Extracts faces from any image
+    3. Adjusts the zoom and X & Y placement of the face
+    4. Generates images from the given prompt and inpaints with Stable diffusion
+    5. Improves faces using gfpgan   
+    6. Sends an email with the rendered image
     """
         )
 
@@ -67,7 +69,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             st.write(
                 """
                 ### Prompt
-                Describe the character that you'd like to generate. 
+                Describe the scene that you'd like to generate around the face. 
                 """
             )
             st.text_input(
@@ -80,7 +82,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             st.write(
                 """
                 ### Email Address
-                Give us your email address, and we'll try to get your photo 
+                Give us your email address and we'll try to get your photo 
                 """
             )
             st.text_input(
@@ -106,11 +108,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                     label="Quality",
                     key="num_steps",
                     min_value=10,
-                    max_value=200,
+                    max_value=100,
                     step=10,
                 )
 
-            submitted = st.form_submit_button("🚀 Submit")
+            submitted = st.form_submit_button("🏃‍ Submit")
 
         if submitted:
             text_prompt = st.session_state.get("text_prompt")
@@ -146,11 +148,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             placeholder="john@gmail.com, cathy@gmail.com "
         )
         st.text_input(
-            label="Email subject",
+            label="Subject",
             key="email_subject",
         )
         st.text_area(
-            label="Email body",
+            label="Body",
             key="email_body",
         )
 
