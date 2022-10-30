@@ -53,7 +53,6 @@ class DarsAiPage:
             run_as_api_tab(self.endpoint, self.RequestModel)
 
         with run_tab:
-            st.write("### " + self.title)
             self.render_description()
             submitted = self.render_form()
             self._runner(submitted)
