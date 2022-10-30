@@ -31,9 +31,9 @@ class DarsAiPage:
         st.set_page_config(page_title=self.title + " - Daras.AI")
 
         logo()
-
+        st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
-            ["🏃‍♀️ Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
+            ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
         )
 
         if not st.session_state.get("__loaded__"):
