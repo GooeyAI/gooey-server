@@ -10,8 +10,17 @@ from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="DarasAI")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.post("/v1/run-recipe/")
