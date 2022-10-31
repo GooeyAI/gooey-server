@@ -21,7 +21,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
     class RequestModel(BaseModel):
         email_address: str
-        text_prompt: str
+        text_prompt: str = None
 
         num_outputs: int = None
         quality: int = None
