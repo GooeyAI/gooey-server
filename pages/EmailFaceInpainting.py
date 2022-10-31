@@ -31,6 +31,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         email_body: str = None
         should_send_email: bool = None
 
+        face_scale: float = None
+        face_pos_x: float = None
+        face_pos_y: float = None
+
         class Config:
             schema_extra = {
                 "example": {
