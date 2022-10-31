@@ -72,7 +72,7 @@ class LetterWriterPage(DarsAiPage):
             
             This recipe is intended to help users see what would be an appropriate political letter they could 
             write to their elected officials, given a Bill number, talking points and desired outcomes for that bill. 
-            It shows off how you can use Daras.AI to -
+            It shows off how you can use Gooey.AI to -
             1. Get a parameter (e.g. the Action ID)
             2. Call any API (e.g the takeaction.network's API that return talking points associated with a bill) 
             3. Then merge this data with a GPT3 prompt to create a sample political letter. 

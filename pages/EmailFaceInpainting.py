@@ -188,7 +188,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 cc_address=cc_email if cc_email else None,
                 subject=email_subject
                 if email_subject
-                else "Thanks for joining the Daras.AI waitlist",
+                else "Thanks for joining the Gooey.AI waitlist",
                 html_message=email_body
                 if email_body
                 else "Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact sean@dara.network",
