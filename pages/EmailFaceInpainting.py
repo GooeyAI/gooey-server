@@ -181,12 +181,13 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         state["input_image"] = photo_url
 
         yield from super().run(state)
-        should_send_email = st.session_state.get("should_send_email")
+
+        should_send_email = state.get("should_send_email")
         if should_send_email:
-            from_email = st.session_state.get("email_from")
-            cc_email = st.session_state.get("email_cc")
-            email_subject = st.session_state.get("email_subject")
-            email_body = st.session_state.get("email_body")
+            from_email = state.get("email_from")
+            cc_email = state.get("email_cc")
+            email_subject = state.get("email_subject")
+            email_body = state.get("email_body")
             send_smtp_message(
                 sender=from_email if from_email else "devs@dara.network",
                 to_address=email_address,
