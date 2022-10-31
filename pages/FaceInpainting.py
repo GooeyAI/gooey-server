@@ -90,7 +90,7 @@ class FaceInpaintingPage(DarsAiPage):
                 key="input_file",
             )
             st.caption(
-                "By uploading an image, you agree to Dara's [Privacy Policy](https://dara.network/privacy)"
+                "By uploading an image, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
             col1, col2 = st.columns(2, gap="medium")

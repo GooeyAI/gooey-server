@@ -92,7 +92,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 placeholder="john@appleseed.com",
             )
             st.caption(
-                "By providing your email address, you agree to Dara's [Privacy Policy](https://dara.network/privacy)"
+                "By providing your email address, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
             col1, col2 = st.columns(2, gap="medium")
@@ -191,7 +191,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 else "Thanks for joining the Gooey.AI waitlist",
                 html_message=email_body
                 if email_body
-                else "Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact sean@dara.network",
+                else "Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact support@gooey.ai",
                 image_urls=state["output_images"],
             )
             state["email_sent"] = True
