@@ -107,7 +107,7 @@ class LipsyncPage(DarsAiPage):
         yield "Running wav2lip..."
 
         model = replicate.models.get("devxpy/cog-wav2lip").versions.get(
-            "f3bd0cb5538aa0c47a58f3408b233d6cea61bc939f1b256a0e065b4bd11fdd20"
+            "8d65e3f4f4298520e079198b493c25adfc43c058ffec924f2aefc8010ed25eef"
         )
         output = model.predict(
             face=request.input_face,
