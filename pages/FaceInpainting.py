@@ -11,11 +11,11 @@ from daras_ai.image_input import (
     upload_file,
 )
 from daras_ai_v2 import stable_diffusion
-from daras_ai_v2.base import DarsAiPage
+from daras_ai_v2.base import DarasAiPage
 from daras_ai_v2.extract_face import extract_face_img_bytes
 
 
-class FaceInpaintingPage(DarsAiPage):
+class FaceInpaintingPage(DarasAiPage):
     title = "You as Superhero"
     doc_name = "FaceInpainting#2"
     endpoint = "/v1/FaceInpainting/run"

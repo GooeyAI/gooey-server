@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, Body
 from google.cloud import firestore
 
 from daras_ai.computer import run_compute_steps
-from daras_ai_v2.base import DarsAiPage, get_saved_doc, get_doc_ref
+from daras_ai_v2.base import DarasAiPage, get_saved_doc, get_doc_ref
 from pages.ChyronPlant import ChyronPlantPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
@@ -83,7 +83,7 @@ def run(
     return {"outputs": outputs}
 
 
-def script_to_api(page: typing.Type[DarsAiPage]):
+def script_to_api(page: typing.Type[DarasAiPage]):
     body_spec = Body(examples=page.RequestModel.Config.schema_extra.get("examples"))
 
     @app.post(page.endpoint, response_model=page.ResponseModel)

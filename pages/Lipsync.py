@@ -6,10 +6,10 @@ import streamlit as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.base import DarsAiPage
+from daras_ai_v2.base import DarasAiPage
 
 
-class LipsyncPage(DarsAiPage):
+class LipsyncPage(DarasAiPage):
     title = "Lipsync"
     doc_name = "Lipsync"
     endpoint = "/v1/Lipsync/run"

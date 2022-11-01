@@ -6,12 +6,12 @@ import streamlit as st
 from pydantic.main import BaseModel
 
 from daras_ai.text_format import daras_ai_format_str
-from daras_ai_v2.base import DarsAiPage
+from daras_ai_v2.base import DarasAiPage
 from daras_ai_v2.language_model import run_language_model
 from daras_ai_v2.text_training_data_widget import text_training_data, TrainingDataModel
 
 
-class LetterWriterPage(DarsAiPage):
+class LetterWriterPage(DarasAiPage):
     title = "Letter Writer"
     doc_name = "LetterWriter"
     endpoint = "/v1/LetterWriter/run"
