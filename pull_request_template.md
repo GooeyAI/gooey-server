@@ -1,6 +1,7 @@
 ### Q/A checklist
 
 - [ ] Do a code review of the changes
+- [ ] Add any new dependencies to poetry & export to requirementst.txt (`poetry export -o requirements.txt`) 
 - [ ] Carefully think about the stuff that might break because of this change
 - [ ] The relevant pages still run when you press submit
 - [ ] If you added new settings / knobs, the values get saved if you save it on the UI
