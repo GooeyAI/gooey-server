@@ -11,7 +11,8 @@ from daras_ai_v2.send_email import send_smtp_message
 from pages.FaceInpainting import FaceInpaintingPage
 
 
-email_regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
     title = "Email of You In Any Scene"
@@ -20,15 +21,19 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
     class RequestModel(BaseModel):
         email_address: str
-        text_prompt: str
+        text_prompt: str = None
 
-        num_outputs: int = 1
-        quality: int = 50
-        email_from: str
-        email_cc: str
-        email_subject: str
-        email_body: str
-        should_send_email: bool
+        num_outputs: int = None
+        quality: int = None
+        email_from: str = None
+        email_cc: str = None
+        email_subject: str = None
+        email_body: str = None
+        should_send_email: bool = None
+
+        face_scale: float = None
+        face_pos_x: float = None
+        face_pos_y: float = None
 
         class Config:
             schema_extra = {
@@ -145,7 +150,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         st.text_input(
             label="CC emails (You can enter multiple emails separated by comma)",
             key="email_cc",
-            placeholder="john@gmail.com, cathy@gmail.com "
+            placeholder="john@gmail.com, cathy@gmail.com",
         )
         st.text_input(
             label="Subject",
@@ -176,12 +181,13 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         state["input_image"] = photo_url
 
         yield from super().run(state)
-        should_send_email = st.session_state.get("should_send_email")
+
+        should_send_email = state.get("should_send_email")
         if should_send_email:
-            from_email = st.session_state.get("email_from")
-            cc_email = st.session_state.get("email_cc")
-            email_subject = st.session_state.get("email_subject")
-            email_body = st.session_state.get("email_body")
+            from_email = state.get("email_from")
+            cc_email = state.get("email_cc")
+            email_subject = state.get("email_subject")
+            email_body = state.get("email_body")
             send_smtp_message(
                 sender=from_email if from_email else "devs@dara.network",
                 to_address=email_address,

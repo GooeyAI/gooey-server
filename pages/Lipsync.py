@@ -18,10 +18,10 @@ class LipsyncPage(DarsAiPage):
         input_face: str
         input_audio: str
 
-        face_padding_top: int
-        face_padding_bottom: int
-        face_padding_left: int
-        face_padding_right: int
+        face_padding_top: int = None
+        face_padding_bottom: int = None
+        face_padding_left: int = None
+        face_padding_right: int = None
 
     class ResponseModel(BaseModel):
         output_video: str

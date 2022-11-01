@@ -10,3 +10,7 @@
 ### Run
 
 `streamlit run Home.py`
+
+### Our Colors
+pink: #ff66c6
+azure: #aae3ef
