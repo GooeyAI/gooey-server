@@ -4,10 +4,10 @@ from google.cloud.firestore_v1 import DocumentSnapshot
 from daras_ai import settings
 from daras_ai.db import list_all_docs
 from daras_ai.logo import logo
+from daras_ai_v2.base import get_saved_doc, get_doc_ref
 from pages.ChyronPlant import ChyronPlantPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
-from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
@@ -20,7 +20,6 @@ st.write("---")
 for page in [
     FaceInpaintingPage,
     EmailFaceInpaintingPage,
-    LetterWriterPage,
     LipsyncPage,
     ChyronPlantPage,
 ]:
@@ -28,14 +27,14 @@ for page in [
     st.markdown(
         f"""
         <a style="font-size: 24px" href="/{url}" target = "_self">
-        {page.title}
+        <h2>{page.title}</h2>
         </a>
-        <br>
-        <br>
         """,
         unsafe_allow_html=True,
     )
-
+    st.write("")
+    page().render_example(get_saved_doc(get_doc_ref(page.doc_name)))
+    st.write("---")
 
 st.write("")
 

@@ -1,3 +1,4 @@
+import re
 import uuid
 
 import cv2
@@ -68,7 +69,7 @@ def image_input(idx, variables, state):
 def upload_file(uploaded_file):
     img_bytes = uploaded_file.getvalue()
     img_bytes = resize_img(img_bytes, (512, 512))
-    return upload_file_from_bytes(uploaded_file.name, img_bytes)
+    return upload_file_from_bytes(safe_filename(uploaded_file.name), img_bytes)
 
 
 def resize_img(img_bytes, size):
@@ -92,3 +93,11 @@ def cv2_img_to_bytes(img):
 
 def bytes_to_cv2_img(img_bytes: bytes):
     return cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+
+FILENAME_WHITELIST = re.compile(r"[ \w\-_.]")
+
+
+def safe_filename(filename: str):
+    print(list(FILENAME_WHITELIST.finditer(filename)))
+    return "".join(match.group(0) for match in FILENAME_WHITELIST.finditer(filename))

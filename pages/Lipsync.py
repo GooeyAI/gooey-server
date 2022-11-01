@@ -10,7 +10,7 @@ from daras_ai_v2.base import DarsAiPage
 
 
 class LipsyncPage(DarsAiPage):
-    title = "Lipsync"
+    title = "Lip Syncing"
     doc_name = "Lipsync"
     endpoint = "/v1/Lipsync/run"
 

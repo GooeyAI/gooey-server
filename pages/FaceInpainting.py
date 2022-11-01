@@ -9,6 +9,7 @@ from daras_ai.image_input import (
     resize_img,
     upload_file_from_bytes,
     upload_file,
+    safe_filename,
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import DarsAiPage
@@ -253,8 +254,9 @@ class FaceInpaintingPage(DarsAiPage):
 
         yield "Running Stable Diffusion..."
 
+        prompt = state.get("text_prompt", "")
         output_images = stable_diffusion.inpainting(
-            prompt=state.get("text_prompt", ""),
+            prompt=prompt,
             num_outputs=state.get("num_outputs", 1),
             edit_image=state["resized_image"],
             mask=state["face_mask"],
@@ -271,7 +273,10 @@ class FaceInpaintingPage(DarsAiPage):
         output_images = map_parallel(gfpgan, output_images)
 
         state["output_images"] = [
-            upload_file_from_bytes("out.png", requests.get(url).content)
+            upload_file_from_bytes(
+                safe_filename(f"gooey.ai - {prompt.strip()}.png"),
+                requests.get(url).content,
+            )
             for url in output_images
         ]
 
@@ -280,12 +285,12 @@ class FaceInpaintingPage(DarsAiPage):
         with col1:
             input_image = state.get("input_image")
             if input_image:
-                st.image(input_image)
+                st.image(input_image, caption="Input Image")
         with col2:
             output_images = state.get("output_images")
             if output_images:
                 for img in output_images:
-                    st.image(img)
+                    st.image(img, caption=state.get("text_prompt", ""))
 
 
 if __name__ == "__main__":
