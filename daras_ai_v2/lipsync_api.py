@@ -5,7 +5,7 @@ import requests
 
 def wav2lip(*, face: str, audio: str, pads: (int, int, int, int)) -> bytes:
     r = requests.post(
-        "http://gooey-ai-1:5001/predictions",
+        "http://35.225.120.135:5001/predictions",
         json={
             "input": {
                 "face": face,
