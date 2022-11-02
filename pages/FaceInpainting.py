@@ -274,7 +274,7 @@ class FaceInpaintingPage(DarsAiPage):
 
         state["output_images"] = [
             upload_file_from_bytes(
-                safe_filename(f"gooey.ai - {prompt.strip()}.png"),
+                safe_filename(f"gooey.ai inpainting - {prompt.strip()}.png"),
                 requests.get(url).content,
             )
             for url in output_images

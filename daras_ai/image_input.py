@@ -99,5 +99,6 @@ FILENAME_WHITELIST = re.compile(r"[ \w\-_.]")
 
 
 def safe_filename(filename: str):
-    print(list(FILENAME_WHITELIST.finditer(filename)))
-    return "".join(match.group(0) for match in FILENAME_WHITELIST.finditer(filename))
+    matches = FILENAME_WHITELIST.finditer(filename)
+    filename = "".join(match.group(0) for match in matches)
+    return filename[:255]
