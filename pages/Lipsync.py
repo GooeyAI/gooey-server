@@ -1,16 +1,16 @@
 import typing
+from pathlib import Path
 
-import replicate
-import requests
 import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2.base import DarsAiPage
+from daras_ai_v2.lipsync_api import wav2lip
 
 
 class LipsyncPage(DarsAiPage):
-    title = "Lipsync"
+    title = "Lip Syncing"
     doc_name = "Lipsync"
     endpoint = "/v1/Lipsync/run"
 
@@ -106,20 +106,21 @@ class LipsyncPage(DarsAiPage):
 
         yield "Running wav2lip..."
 
-        model = replicate.models.get("devxpy/cog-wav2lip").versions.get(
-            "8d65e3f4f4298520e079198b493c25adfc43c058ffec924f2aefc8010ed25eef"
-        )
-        output = model.predict(
+        img_bytes = wav2lip(
             face=request.input_face,
             audio=request.input_audio,
-            pads=f"{request.face_padding_top} {request.face_padding_bottom} {request.face_padding_left} {request.face_padding_right}",
+            pads=(
+                request.face_padding_top,
+                request.face_padding_bottom,
+                request.face_padding_left,
+                request.face_padding_right,
+            ),
         )
 
-        yield "Downloading results..."
-
-        state["output_video"] = upload_file_from_bytes(
-            "output.mp4", requests.get(output).content
+        out_filename = safe_filename(
+            f"gooey.ai lipsync - {Path(request.input_face).stem}.mp4"
         )
+        state["output_video"] = upload_file_from_bytes(out_filename, img_bytes)
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)

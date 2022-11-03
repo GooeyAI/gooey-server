@@ -202,6 +202,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             )
             state["email_sent"] = True
 
+    def render_example(self, state: dict):
+        st.write("Input Email -", state.get("email_address"))
+        super().render_example(state)
+
 
 @st.cache()
 def get_photo_for_email(email_address):
