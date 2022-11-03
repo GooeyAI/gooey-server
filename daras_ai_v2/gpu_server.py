@@ -3,7 +3,8 @@ import typing
 
 import requests
 
-GPU_API_ROOT = "http://gpu-1.gooey.ai"
+# GPU_API_ROOT = "http://gpu-1.gooey.ai"
+GPU_API_ROOT = "http://gooey-a-1"
 
 
 def call_gpu_server_b64(port: int, input_data: dict) -> list[bytes]:

@@ -60,8 +60,6 @@ class FaceInpaintingPage(DarsAiPage):
             """
     *Face Inpainting: Profile pic > Face Masking > Stable Diffusion > GFPGAN*
     
-    Render yourself as superman, iron man, as a pizza, whatever!
-    
     How It Works:
     
     1. Extracts faces from any image using MediaPipe
