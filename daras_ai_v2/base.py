@@ -9,12 +9,11 @@ from time import time
 import requests
 import streamlit as st
 from furl import furl
-from glom import GlomError
 from google.cloud import firestore
 from pydantic import BaseModel
-from requests import HTTPError
 
 from daras_ai.cache_tools import cache_and_refresh
+from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
 
 DEFAULT_STATUS = "Running Recipe..."
@@ -157,9 +156,12 @@ class DarasAiPage:
         if not state_to_save:
             return
 
+        if not check_secret_key("Save"):
+            return
+
         col1, col2, *_ = st.columns(3)
         pressed_save = col1.button("🔖 Save as Example")
-        pressed_star = col2.button("⭐️ Showcase on page")
+        pressed_star = col2.button("💾 Save as Default")
 
         if pressed_save:
             sub_collection = "examples"
@@ -296,6 +298,9 @@ def get_doc_ref(
 
 
 def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
+    if not check_secret_key("run as API"):
+        return
+
     api_docs_url = str(furl(settings.DARS_API_ROOT) / "docs")
     api_url = str(furl(settings.DARS_API_ROOT) / endpoint)
 

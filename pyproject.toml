@@ -27,6 +27,7 @@ mediapipe-silicon = {version = "^0.8.11", markers = "platform_machine == 'arm64'
 # mediapipe for others
 mediapipe = {version = "^0.8.11", markers = "platform_machine != 'arm64'"}
 furl = "^2.1.3"
+itsdangerous = "2.1.2"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"
