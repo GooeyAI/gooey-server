@@ -1,3 +1,4 @@
+import os
 import typing
 
 from fastapi import FastAPI, HTTPException, Body
@@ -11,6 +12,15 @@ from pages.FaceInpainting import FaceInpaintingPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from fastapi.middleware.cors import CORSMiddleware
+import os
+from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
+from starlette.requests import Request
+from starlette.middleware.sessions import SessionMiddleware
+
+from google.oauth2 import id_token
+from google.auth.transport import requests
+from fastapi.templating import Jinja2Templates
 
 app = FastAPI(title="DarasAI")
 
@@ -21,6 +31,65 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+templates = Jinja2Templates(directory="templates")
+
+app.add_middleware(SessionMiddleware, secret_key="loveudara")
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+
+
+@app.post("/auth", status_code=302)
+async def authentication(request: Request):
+    body = await request.body()
+    body_str = body.decode("utf-8")
+    creds = body_str.split("&")
+    token = creds[0].split("=")[1]
+
+    csrf_token_cookie = request.cookies.get("g_csrf_token")
+    if not csrf_token_cookie:
+        print(400, "No CSRF token in Cookie.")
+        RedirectResponse(url="/error", status_code=302)
+    csrf_token_body = creds[1].split("=")[1]
+    if not csrf_token_body:
+        print(400, "No CSRF token in post body.")
+        RedirectResponse(url="/error", status_code=302)
+    if csrf_token_cookie != csrf_token_body:
+        print(400, "Failed to verify double submit cookie.")
+        RedirectResponse(url="/error", status_code=302)
+
+    try:
+        user = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
+        print(user)
+
+        request.session["user"] = dict({"email": user["email"], "name": user["name"]})
+
+        return RedirectResponse(url="/", status_code=302)
+
+    except ValueError:
+        return RedirectResponse(url="/error", status_code=302)
+
+
+@app.get("/")
+def check(request: Request):
+    user = request.session.get("user")
+    user_logged_in = False
+    if user:
+        user_logged_in = True
+    return templates.TemplateResponse(
+        "index.html", context={"request": request, "user_logged_in": user_logged_in}
+    )
+
+
+@app.route("/logout")
+async def logout(request: Request):
+    request.session.pop("user", None)
+    return RedirectResponse(url="/")
+
+
+@app.route("/error")
+def error(request: Request):
+    return templates.TemplateResponse("error_page.html", context={"request": request})
 
 
 @app.post("/v1/run-recipe/")
