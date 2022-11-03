@@ -82,72 +82,83 @@ def extract_face(idx, state, variables):
 
 
 def extract_and_reposition_face_cv2(
-    image_cv2,
-    face_scale=0.2,
-    pos_x=4 / 9,
-    pos_y=3 / 9,
+    orig_img,
+    out_face_scale: float = 0.2,
+    out_pos_x: float = 4 / 9,
+    out_pos_y: float = 3 / 9,
 ):
-    img_cols, img_rows, _ = image_cv2.shape
-    face_mask = np.zeros(image_cv2.shape, dtype=np.uint8)
+    img_y, img_x, _ = orig_img.shape
 
-    for face_oval_hull in face_oval_hull_generator(image_cv2):
-        cv2.fillConvexPoly(face_mask, face_oval_hull, (255, 255, 255))
+    # blank mask for the original img
+    orig_mask = np.zeros(orig_img.shape, dtype=np.uint8)
 
-        orig_rows = face_oval_hull[:, :, 1]
-        orig_columns = face_oval_hull[:, :, 0]
+    for face_vertices in face_oval_hull_generator(orig_img):
+        # draw face mask for the original img
+        cv2.fillConvexPoly(orig_mask, face_vertices, (255, 255, 255))
 
-        face_height = abs(orig_columns.max() - orig_columns.min())
-        resize_ratio = img_cols / face_height * face_scale
+        # face polygon vertices x & y coords
+        face_hull_x = face_vertices[:, :, 0]
+        face_hull_y = face_vertices[:, :, 1]
 
-        re_img = cv2.resize(image_cv2, (0, 0), fx=resize_ratio, fy=resize_ratio)
-        re_mask = cv2.resize(face_mask, (0, 0), fx=resize_ratio, fy=resize_ratio)
+        # original face height
+        face_height = abs(face_hull_y.max() - face_hull_y.min())
 
-        re_img_cols, re_img_rows, _ = re_img.shape
+        # image resize ratio
+        re_ratio = (img_y / face_height) * out_face_scale
 
-        face_col = (orig_columns.max() + orig_columns.min()) // 2
-        face_row = (orig_rows.max() + orig_rows.min()) // 2
+        # resized image size
+        re_img_x = int(img_x * re_ratio)
+        re_img_y = int(img_y * re_ratio)
 
-        re_face_col = int(face_col * resize_ratio)
-        re_face_row = int(face_row * resize_ratio)
+        # resized image and mask
+        re_img = cv2.resize(orig_img, (re_img_x, re_img_y))
+        re_mask = cv2.resize(orig_mask, (re_img_x, re_img_y))
 
-        re_rect = (
-            int(max(re_face_col - img_cols * pos_x, 0)),
-            int(min(re_face_col + (img_cols * (1 - pos_x)), re_img_cols)),
-            int(max(re_face_row - img_rows * pos_y, 0)),
-            int(min(re_face_row + (img_rows * (1 - pos_y)), re_img_rows)),
+        # face center coords in original image
+        face_center_x = (face_hull_x.max() + face_hull_x.min()) // 2
+        face_center_y = (face_hull_y.max() + face_hull_y.min()) // 2
+
+        # face center coords in resized image
+        re_face_center_x = int(face_center_x * re_ratio)
+        re_face_center_y = int(face_center_y * re_ratio)
+
+        # crop of resized image
+        re_crop_x1 = int(max(re_face_center_x - (img_x * out_pos_x), 0))
+        re_crop_y1 = int(max(re_face_center_y - (img_y * out_pos_y), 0))
+
+        re_crop_x2 = int(min(re_face_center_x + (img_x * (1 - out_pos_x)), re_img_x))
+        re_crop_y2 = int(min(re_face_center_y + (img_y * (1 - out_pos_y)), re_img_y))
+
+        # crop of output image
+        out_crop_x1 = int((img_x * out_pos_x) - (re_face_center_x - re_crop_x1))
+        out_crop_y1 = int((img_y * out_pos_y) - (re_face_center_y - re_crop_y1))
+
+        re_crop_width = re_crop_x2 - re_crop_x1
+        re_crop_height = re_crop_y2 - re_crop_y1
+
+        out_crop_x2 = out_crop_x1 + re_crop_width
+        out_crop_y2 = out_crop_y1 + re_crop_height
+
+        # efficient croppers / slicers
+        re_rect_cropper = (
+            slice(re_crop_y1, re_crop_y2),
+            slice(re_crop_x1, re_crop_x2),
+            slice(0, 3),
         )
-
-        rect_col_start = img_cols * pos_x - (re_face_col - re_rect[0])
-        rect_row_start = img_rows * pos_y - (re_face_row - re_rect[2])
-        rect_height = re_rect[1] - re_rect[0]
-        rect_width = re_rect[3] - re_rect[2]
-
-        new_rect = (
-            int(rect_col_start),
-            int(rect_col_start) + rect_height,
-            int(rect_row_start),
-            int(rect_row_start) + rect_width,
-        )
-
-        new_img = np.zeros(image_cv2.shape, dtype=np.uint8)
-        new_mask = np.zeros(image_cv2.shape, dtype=np.uint8)
-
-        new_rect_slice = (
-            slice(new_rect[2], new_rect[3]),
-            slice(new_rect[0], new_rect[1]),
+        out_rect_cropper = (
+            slice(out_crop_y1, out_crop_y2),
+            slice(out_crop_x1, out_crop_x2),
             slice(0, 3),
         )
 
-        re_rect_slice = (
-            slice(re_rect[2], re_rect[3]),
-            slice(re_rect[0], re_rect[1]),
-            slice(0, 3),
-        )
+        out_img = np.zeros(orig_img.shape, dtype=np.uint8)
+        out_mask = np.zeros(orig_img.shape, dtype=np.uint8)
 
-        new_img[new_rect_slice] = re_img[re_rect_slice]
-        new_mask[new_rect_slice] = re_mask[re_rect_slice]
+        # paste crop of resized image onto the crop of output image
+        out_img[out_rect_cropper] = re_img[re_rect_cropper]
+        out_mask[out_rect_cropper] = re_mask[re_rect_cropper]
 
-        return new_img, new_mask
+        return out_img, out_mask
 
 
 def extract_face_cv2(image_cv2):

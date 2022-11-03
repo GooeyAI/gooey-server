@@ -1,9 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
 
-from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
-
-import replicate
 import streamlit as st
+
+from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
+from daras_ai_v2.gpu_server import call_gpu_server_b64
 
 
 @daras_ai_step_config("Face Restoration")
@@ -44,9 +44,17 @@ def face_restoration(idx, variables, state):
             variables[img_output_var] = map_parallel(gfpgan, input_images)
 
 
-def gfpgan(img):
-    model = replicate.models.get("tencentarc/gfpgan")
-    return model.predict(img=img)
+def gfpgan(img: str) -> bytes:
+    return call_gpu_server_b64(
+        port=5003,
+        input_data={
+            "img": img,
+            "version": "v1.4",
+            "scale": 2,
+        },
+    )[0]
+    # model = replicate.models.get("tencentarc/gfpgan")
+    # return model.predict(img=img)
 
 
 def map_parallel(fn, it):

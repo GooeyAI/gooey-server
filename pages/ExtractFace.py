@@ -26,7 +26,7 @@ def main():
     image_cv2 = bytes_to_cv2_img(resized_img_bytes)
     if reposition:
         image_cv2, face_mask_cv2 = extract_and_reposition_face_cv2(
-            image_cv2, face_scale=face_scale, pos_x=pos_x, pos_y=pos_y
+            image_cv2, out_face_scale=face_scale, out_pos_x=pos_x, out_pos_y=pos_y
         )
     else:
         face_mask_cv2 = extract_face_cv2(image_cv2)
