@@ -12,6 +12,7 @@ from google.oauth2 import service_account
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import DarsAiPage
+
 credentials = service_account.Credentials.from_service_account_file('serviceAccountKey.json')
 
 
@@ -60,19 +61,6 @@ class TextToSpeechPage(DarsAiPage):
                 placeholder="This is a test",
                 value="This is a test",
             )
-            st.radio(
-                "Provider",
-                horizontal=True,
-                options=[provider.name for provider in TextToSpeechProviders],
-                key="tts_provider"
-            )
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.text_input(label="Voice name(Google TTS)", value="en-US-Neural2-F", key="google_tts_voice_name")
-
-            with col2:
-                st.text_input(label="Voice name (Uberduck)", value="zwf", key="uberduck_voice_name")
 
             submitted = st.form_submit_button("🚀 Submit")
 
@@ -90,6 +78,24 @@ class TextToSpeechPage(DarsAiPage):
             ### Voice Settings
             """
         )
+        tts_provider = st.radio(
+            "Provider",
+            horizontal=True,
+            options=[provider.name for provider in TextToSpeechProviders],
+            key="tts_provider"
+        )
+        if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
+            st.text_input(label="Voice name(Google TTS)", value="en-US-Neural2-F", key="google_tts_voice_name")
+            st.write("Get more voice names [here](https://cloud.google.com/text-to-speech/docs/voices)")
+            st.slider("Pitch", min_value=-20.0, max_value=20.0, value=0.0, key="google_pitch")
+            st.slider("Speaking rate (1.0 is the normal native speed)", min_value=0.25, max_value=4.0,step=0.1,
+                      value=1.0, key="google_speaking_rate")
+
+        if tts_provider == TextToSpeechProviders.UBERDUCK.name:
+            st.text_input(label="Voice name (Uberduck)", value="kanye-west-rap", key="uberduck_voice_name")
+            st.write("Get more voice names [here](https://app.uberduck.ai/leaderboard/voice)")
+            st.slider("Speaking rate (1.0 is the normal native speed)", min_value=0.5, max_value=3.0, step=0.1,
+                      value=1.0, key="uberduck_speaking_rate")
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
@@ -103,11 +109,15 @@ class TextToSpeechPage(DarsAiPage):
         tts_provider = state["tts_provider"]
         if tts_provider == TextToSpeechProviders.UBERDUCK.name:
             voice_name = state["uberduck_voice_name"]
+            pace = state["uberduck_speaking_rate"]
             response = requests.post(
                 "https://api.uberduck.ai/speak",
                 auth=(config("UBERDUCK_KEY"), config("UBERDUCK_SECRET")),
-                json={"speech": text, "voice": voice_name}
+                json={"speech": text, "voice": voice_name,
+                      "pace": pace,
+                      }
             )
+            response.raise_for_status()
             file_uuid = json.loads(response.text)["uuid"]
             while True:
                 data = requests.get(f"https://api.uberduck.ai/speak-status?uuid={file_uuid}")
@@ -120,6 +130,8 @@ class TextToSpeechPage(DarsAiPage):
 
         if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
             voice_name = state["google_tts_voice_name"]
+            pitch = state["google_pitch"]
+            speaking_rate = state["google_speaking_rate"]
             client = texttospeech.TextToSpeechClient(credentials=credentials)
 
             synthesis_input = texttospeech.SynthesisInput(text=text)
@@ -130,8 +142,8 @@ class TextToSpeechPage(DarsAiPage):
             # Select the type of audio file you want returned
             audio_config = texttospeech.AudioConfig()
             audio_config.audio_encoding = texttospeech.AudioEncoding.MP3
-            audio_config.pitch = 0.0  # optional
-            audio_config.speaking_rate = 1.0  # optional
+            audio_config.pitch = pitch  # optional
+            audio_config.speaking_rate = speaking_rate  # optional
 
             # Perform the text-to-speech request on the text input with the selected
             # voice parameters and audio file type
@@ -141,7 +153,6 @@ class TextToSpeechPage(DarsAiPage):
             state["audio_url"] = upload_file_from_bytes(
                 f"google_tts_{uuid.uuid4()}.mp3", response.audio_content
             )
-
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
