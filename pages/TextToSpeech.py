@@ -137,8 +137,8 @@ class TextToSpeechPage(DarsAiPage):
 
         if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
             voice_name = state["google_tts_voice_name"] if "google_tts_voice_name" in state else "en-US-Neural2-F"
-            pitch = state["google_pitch"] if "google_pitch" in state  else 0.0
-            speaking_rate = state["google_speaking_rate"] if "google_spaeking_rate" in state else 1.0
+            pitch = state["google_pitch"] if "google_pitch" in state else 0.0
+            speaking_rate = state["google_speaking_rate"] if "google_speaking_rate" in state else 1.0
 
             client = texttospeech.TextToSpeechClient(credentials=credentials)
 
