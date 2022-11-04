@@ -19,7 +19,7 @@ from daras_ai_v2 import settings
 DEFAULT_STATUS = "Running Recipe..."
 
 
-class DarsAiPage:
+class BasePage:
     title: str
     doc_name: str
     endpoint: str

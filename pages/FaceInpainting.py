@@ -14,12 +14,12 @@ from daras_ai.image_input import (
     safe_filename,
 )
 from daras_ai_v2 import stable_diffusion
-from daras_ai_v2.base import DarsAiPage
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.extract_face import extract_face_img_bytes
 import numpy as np
 
 
-class FaceInpaintingPage(DarsAiPage):
+class FaceInpaintingPage(BasePage):
     title = "You in a Christmas Greeting"
     doc_name = "FaceInpainting#2"
     endpoint = "/v1/FaceInpainting/run"
