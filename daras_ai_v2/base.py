@@ -259,6 +259,10 @@ def set_saved_doc(
     },
 )
 def get_saved_doc(doc_ref: firestore.DocumentReference) -> dict:
+    return get_saved_doc_nocahe(doc_ref)
+
+
+def get_saved_doc_nocahe(doc_ref):
     doc = doc_ref.get()
     if not doc.exists:
         doc_ref.create({})
