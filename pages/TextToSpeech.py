@@ -28,12 +28,12 @@ class TextToSpeechPage(DarsAiPage):
 
     class RequestModel(BaseModel):
         text_prompt: str
-        tts_provider: str =None
+        tts_provider: str = None
         uberduck_voice_name: str = None
         google_tts_voice_name: str = None
         google_speaking_rate: float = None
         google_pitch: float = None
-        uberduck_speaking_rate: float =None
+        uberduck_speaking_rate: float = None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -50,7 +50,6 @@ class TextToSpeechPage(DarsAiPage):
                 3. Play in the browser
             """
         )
-
 
     def render_form(self):
         with st.form("my_form"):
@@ -94,7 +93,7 @@ class TextToSpeechPage(DarsAiPage):
             st.text_input(label="Voice name(Google TTS)", value="en-US-Neural2-F", key="google_tts_voice_name")
             st.write("Get more voice names [here](https://cloud.google.com/text-to-speech/docs/voices)")
             st.slider("Pitch", min_value=-20.0, max_value=20.0, value=0.0, key="google_pitch")
-            st.slider("Speaking rate (1.0 is the normal native speed)", min_value=0.25, max_value=4.0,step=0.1,
+            st.slider("Speaking rate (1.0 is the normal native speed)", min_value=0.25, max_value=4.0, step=0.1,
                       value=1.0, key="google_speaking_rate")
 
         if tts_provider == TextToSpeechProviders.UBERDUCK.name:
