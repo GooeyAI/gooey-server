@@ -115,7 +115,7 @@ class FaceInpaintingPage(BasePage):
                     step=10,
                 )
 
-            submitted = st.form_submit_button("🚀 Submit")
+            submitted = st.form_submit_button("🏃‍ Submit")
 
         text_prompt = st.session_state.get("text_prompt")
         input_file = st.session_state.get("input_file")
