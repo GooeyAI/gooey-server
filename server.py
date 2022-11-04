@@ -22,6 +22,8 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from fastapi.templating import Jinja2Templates
 
+from pages.TextToSpeech import TextToSpeechPage
+
 app = FastAPI(title="DarasAI")
 
 app.add_middleware(
@@ -176,3 +178,4 @@ script_to_api(FaceInpaintingPage)
 script_to_api(EmailFaceInpaintingPage)
 script_to_api(LetterWriterPage)
 script_to_api(LipsyncPage)
+script_to_api(TextToSpeechPage)
