@@ -28,6 +28,12 @@ class TextToSpeechPage(DarsAiPage):
 
     class RequestModel(BaseModel):
         text_prompt: str
+        tts_provider: str =None
+        uberduck_voice_name: str = None
+        google_tts_voice_name: str = None
+        google_speaking_rate: float = None
+        google_pitch: float = None
+        uberduck_speaking_rate: float =None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -35,16 +41,16 @@ class TextToSpeechPage(DarsAiPage):
     def render_description(self):
         st.write(
             """
-    *Convert text into audio*
+                *Convert text into audio*
 
+                How It Works:
 
-    How It Works:
-
-    1. Takes text input
-    2. Generates audio file in voice of your choice
-    3. Play in the browser
-    """
+                1. Takes text input
+                2. Generates audio file in voice of your choice
+                3. Play in the browser
+            """
         )
+
 
     def render_form(self):
         with st.form("my_form"):
@@ -106,10 +112,11 @@ class TextToSpeechPage(DarsAiPage):
     def run(self, state: dict):
         yield "Generating Audio..."
         text = state["text_prompt"]
-        tts_provider = state["tts_provider"]
+        tts_provider = state["tts_provider"] if "tts_provider" in state else TextToSpeechProviders.UBERDUCK.name
         if tts_provider == TextToSpeechProviders.UBERDUCK.name:
-            voice_name = state["uberduck_voice_name"]
-            pace = state["uberduck_speaking_rate"]
+            voice_name = state["uberduck_voice_name"] if "uberduck_voice_name" in state else "kanye-west-rap"
+            pace = state["uberduck_speaking_rate"] if "uberduck_speaking_rate" in state else 1.0
+
             response = requests.post(
                 "https://api.uberduck.ai/speak",
                 auth=(config("UBERDUCK_KEY"), config("UBERDUCK_SECRET")),
@@ -129,9 +136,10 @@ class TextToSpeechPage(DarsAiPage):
                     time.sleep(2)
 
         if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
-            voice_name = state["google_tts_voice_name"]
-            pitch = state["google_pitch"]
-            speaking_rate = state["google_speaking_rate"]
+            voice_name = state["google_tts_voice_name"] if "google_tts_voice_name" in state else "en-US-Neural2-F"
+            pitch = state["google_pitch"] if "google_pitch" in state  else 0.0
+            speaking_rate = state["google_speaking_rate"] if "google_spaeking_rate" in state else 1.0
+
             client = texttospeech.TextToSpeechClient(credentials=credentials)
 
             synthesis_input = texttospeech.SynthesisInput(text=text)
