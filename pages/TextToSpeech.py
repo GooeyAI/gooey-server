@@ -165,14 +165,13 @@ class TextToSpeechPage(DarsAiPage):
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
         with col1:
-            input_image = state.get("input_image")
-            if input_image:
-                st.image(input_image)
+            text = state.get("text_prompt")
+            if text:
+                st.write(text)
         with col2:
-            output_images = state.get("output_images")
-            if output_images:
-                for img in output_images:
-                    st.image(img)
+            audio_url = state.get("audio_url")
+            if audio_url:
+                st.audio(audio_url)
 
 
 if __name__ == "__main__":
