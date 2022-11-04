@@ -75,7 +75,7 @@ def upload_file(uploaded_file):
 def resize_img(img_bytes, size):
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
-    img_pil = ImageOps.fit(img_pil, size)
+    img_pil = ImageOps.pad(img_pil, size)
     img_cv2 = np.array(img_pil)
     return cv2_img_to_bytes(img_cv2)
 

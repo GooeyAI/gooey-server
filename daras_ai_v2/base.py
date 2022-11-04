@@ -19,7 +19,7 @@ from daras_ai_v2 import settings
 DEFAULT_STATUS = "Running Recipe..."
 
 
-class DarsAiPage:
+class BasePage:
     title: str
     doc_name: str
     endpoint: str
@@ -259,6 +259,10 @@ def set_saved_doc(
     },
 )
 def get_saved_doc(doc_ref: firestore.DocumentReference) -> dict:
+    return get_saved_doc_nocahe(doc_ref)
+
+
+def get_saved_doc_nocahe(doc_ref):
     doc = doc_ref.get()
     if not doc.exists:
         doc_ref.create({})

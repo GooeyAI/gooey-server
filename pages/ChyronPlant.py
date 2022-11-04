@@ -4,11 +4,11 @@ from decouple import config
 from pydantic import BaseModel
 
 from daras_ai_v2.base import (
-    DarsAiPage,
+    BasePage,
 )
 
 
-class ChyronPlantPage(DarsAiPage):
+class ChyronPlantPage(BasePage):
     title = "Chyron Plant Bot"
     doc_name = "ChyronPlant"
     endpoint = "/v1/ChyronPlant/run"

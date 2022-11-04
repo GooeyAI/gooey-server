@@ -1,24 +1,17 @@
-import base64
+from daras_ai_v2.gpu_server import call_gpu_server_b64
 
-import requests
+WAV2LIP_PORT = 5001
 
 
 def wav2lip(*, face: str, audio: str, pads: (int, int, int, int)) -> bytes:
-    r = requests.post(
-        "http://35.225.120.135:5001/predictions",
-        json={
-            "input": {
-                "face": face,
-                "audio": audio,
-                "pads": " ".join(map(str, pads)),
-                # "out_height": 480,
-                # "smooth": True,
-                # "fps": 25,
-            },
+    return call_gpu_server_b64(
+        port=WAV2LIP_PORT,
+        input_data={
+            "face": face,
+            "audio": audio,
+            "pads": " ".join(map(str, pads)),
+            # "out_height": 480,
+            # "smooth": True,
+            # "fps": 25,
         },
-    )
-    r.raise_for_status()
-
-    b64_data = r.json()["output"]
-    b64_data = b64_data[b64_data.find(",") + 1 :]
-    return base64.b64decode(b64_data)
+    )[0]

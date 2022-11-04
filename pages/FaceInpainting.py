@@ -1,6 +1,8 @@
+import PIL
 import cv2
 import requests
 import streamlit as st
+from PIL import ImageOps
 from pydantic import BaseModel
 
 from daras_ai.extract_face import extract_and_reposition_face_cv2
@@ -12,12 +14,13 @@ from daras_ai.image_input import (
     safe_filename,
 )
 from daras_ai_v2 import stable_diffusion
-from daras_ai_v2.base import DarsAiPage
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.extract_face import extract_face_img_bytes
+import numpy as np
 
 
-class FaceInpaintingPage(DarsAiPage):
-    title = "You as Superhero"
+class FaceInpaintingPage(BasePage):
+    title = "You in a Christmas Greeting"
     doc_name = "FaceInpainting#2"
     endpoint = "/v1/FaceInpainting/run"
 
@@ -31,6 +34,9 @@ class FaceInpaintingPage(DarsAiPage):
         face_scale: float = None
         face_pos_x: float = None
         face_pos_y: float = None
+
+        output_width: int = None
+        output_height: int = None
 
         class Config:
             schema_extra = {
@@ -53,8 +59,6 @@ class FaceInpaintingPage(DarsAiPage):
         st.write(
             """
     *Face Inpainting: Profile pic > Face Masking > Stable Diffusion > GFPGAN*
-    
-    Render yourself as superman, iron man, as a pizza, whatever!
     
     How It Works:
     
@@ -134,6 +138,31 @@ class FaceInpaintingPage(DarsAiPage):
     def render_settings(self):
         st.write(
             """
+            ### Output Resolution
+            """
+        )
+        col1, col2, col3 = st.columns([10, 1, 10])
+        with col1:
+            output_width = st.slider(
+                "Width",
+                key="output_width",
+                min_value=512,
+                max_value=1024,
+                step=128,
+            )
+        with col2:
+            st.write("X")
+        with col3:
+            output_height = st.slider(
+                "Height",
+                key="output_height",
+                min_value=512,
+                max_value=1024,
+                step=128,
+            )
+
+        st.write(
+            """
             ### Face Repositioning Settings
             """
         )
@@ -142,37 +171,44 @@ class FaceInpaintingPage(DarsAiPage):
             "Scale",
             min_value=0.1,
             max_value=1.0,
-            value=0.2,
             key="face_scale",
         )
         pos_x = col2.slider(
             "Position X",
             min_value=0.0,
             max_value=1.0,
-            value=4 / 9,
             key="face_pos_x",
         )
         pos_y = col3.slider(
             "Position Y",
             min_value=0.0,
             max_value=1.0,
-            value=3 / 9,
             key="face_pos_y",
         )
 
         # show an example image
         img_cv2 = cv2.imread("static/face.png")
+
+        # resize image as requested
+        img_pil = PIL.Image.fromarray(img_cv2)
+        img_pil = ImageOps.pad(img_pil, (output_width, output_height))
+        img_cv2 = np.asarray(img_pil)
+
+        # extract face
         img, mask = extract_and_reposition_face_cv2(
-            img_cv2, face_scale=face_scale, pos_x=pos_x, pos_y=pos_y
+            img_cv2, out_face_scale=face_scale, out_pos_x=pos_x, out_pos_y=pos_y
         )
 
         # draw rule of 3rds
-        edge = img.shape[0]
         color = (200, 200, 200)
+        stroke = 2
+        img_y, img_x, _ = img.shape
         for i in range(2):
-            pos = (edge // 3) * (i + 1)
-            cv2.line(img, (0, pos), (edge, pos), color, 2)
-            cv2.line(img, (pos, 0), (pos, 512), color, 2)
+            pos = (img_y // 3) * (i + 1)
+            cv2.line(img, (0, pos), (img_x, pos), color, stroke)
+
+            pos = (img_x // 3) * (i + 1)
+            cv2.line(img, (pos, 0), (pos, img_y), color, stroke)
 
         st.image(img, width=300)
 
@@ -180,7 +216,7 @@ class FaceInpaintingPage(DarsAiPage):
         text_prompt = st.session_state.get("text_prompt", "")
         input_file = st.session_state.get("input_file")
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_file or input_image
+        input_image_or_file = input_image or input_file
         output_images = st.session_state.get("output_images")
 
         col1, col2 = st.columns(2)
@@ -241,7 +277,9 @@ class FaceInpaintingPage(DarsAiPage):
         input_image_url = state["input_image"]
         img_bytes = requests.get(input_image_url).content
 
-        re_img_bytes = resize_img(img_bytes, (512, 512))
+        re_img_bytes = resize_img(
+            img_bytes, (state["output_width"], state["output_height"])
+        )
         re_img_bytes, face_mask_bytes = extract_face_img_bytes(
             re_img_bytes,
             face_scale=state["face_scale"],
@@ -255,29 +293,29 @@ class FaceInpaintingPage(DarsAiPage):
         yield "Running Stable Diffusion..."
 
         prompt = state.get("text_prompt", "")
-        output_images = stable_diffusion.inpainting(
+
+        diffusion_images = stable_diffusion.inpainting(
             prompt=prompt,
             num_outputs=state.get("num_outputs", 1),
             edit_image=state["resized_image"],
             mask=state["face_mask"],
             num_inference_steps=state.get("num_steps", 50),
+            width=state["output_width"],
+            height=state["output_height"],
         )
-
-        state["diffusion_images"] = [
-            upload_file_from_bytes("diffusion.png", requests.get(url).content)
-            for url in output_images
-        ]
+        state["diffusion_images"] = diffusion_images
 
         yield "Running gfpgan..."
 
-        output_images = map_parallel(gfpgan, output_images)
+        output_images = map_parallel(gfpgan, diffusion_images)
 
         state["output_images"] = [
             upload_file_from_bytes(
                 safe_filename(f"gooey.ai inpainting - {prompt.strip()}.png"),
-                requests.get(url).content,
+                img_bytes,
+                # requests.get(url).content,
             )
-            for url in output_images
+            for img_bytes in output_images
         ]
 
     def render_example(self, state: dict):
