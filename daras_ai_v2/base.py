@@ -160,8 +160,8 @@ class BasePage:
             return
 
         col1, col2, *_ = st.columns(3)
-        pressed_save = col1.button("🔖 Save as Example")
-        pressed_star = col2.button("💾 Save as Default")
+        pressed_save = col1.button("🔖 Add as Example")
+        pressed_star = col2.button("💾 Save to Recipe & Settings")
 
         if pressed_save:
             sub_collection = "examples"
@@ -202,7 +202,7 @@ class BasePage:
 
             col1, col2, col3, *_ = st.columns(6)
             with col1:
-                pressed_tweak = st.button("✏️ Tweak it", help=f"tweak {example_id}")
+                pressed_tweak = st.button("✏️ Tweak", help=f"tweak {example_id}")
             with col2:
                 pressed_delete = st.button("🗑️ Delete", help=f"delete {example_id}")
             with col3:
