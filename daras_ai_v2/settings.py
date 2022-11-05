@@ -25,3 +25,4 @@ if not firebase_admin._apps:
 GS_BUCKET_NAME = config("GS_BUCKET_NAME")
 DARS_API_ROOT = config("DARS_API_ROOT", "https://api.daras.ai")
 SECRET_KEY = config("SECRET_KEY", None)
+GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")

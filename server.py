@@ -1,4 +1,3 @@
-import os
 import typing
 
 from fastapi import FastAPI
@@ -13,6 +12,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
 
 from daras_ai.computer import run_compute_steps
+from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
 from pages.ChyronPlant import ChyronPlantPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
@@ -33,8 +33,6 @@ app.add_middleware(
 templates = Jinja2Templates(directory="templates")
 
 app.add_middleware(SessionMiddleware, secret_key="loveudara")
-
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 
 @app.post("/auth", status_code=302)
@@ -57,7 +55,11 @@ async def authentication(request: Request):
         RedirectResponse(url="/error", status_code=302)
 
     try:
-        user = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
+        user = id_token.verify_oauth2_token(
+            token,
+            requests.Request(),
+            settings.GOOGLE_CLIENT_ID,
+        )
         print(user)
 
         request.session["user"] = dict({"email": user["email"], "name": user["name"]})
@@ -169,8 +171,13 @@ def script_to_api(page: typing.Type[BasePage]):
         return state
 
 
-script_to_api(ChyronPlantPage)
-script_to_api(FaceInpaintingPage)
-script_to_api(EmailFaceInpaintingPage)
-script_to_api(LetterWriterPage)
-script_to_api(LipsyncPage)
+all_pages = [
+    ChyronPlantPage,
+    FaceInpaintingPage,
+    EmailFaceInpaintingPage,
+    LetterWriterPage,
+    LipsyncPage,
+]
+
+for page in all_pages:
+    script_to_api(page)

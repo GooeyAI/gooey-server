@@ -308,11 +308,7 @@ def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
     api_docs_url = str(furl(settings.DARS_API_ROOT) / "docs")
     api_url = str(furl(settings.DARS_API_ROOT) / endpoint)
 
-    request_body = {
-        field_name: st.session_state.get(field_name)
-        for field_name, field in request_model.__fields__.items()
-        if field.required
-    }
+    request_body = get_example_request_body(request_model, st.session_state)
 
     st.markdown(
         f"""<a href="{api_docs_url}">API Docs</a>""",
@@ -337,3 +333,13 @@ curl -X 'POST' \
             "### Response"
             r.raise_for_status()
             st.write(r.json())
+
+
+def get_example_request_body(
+    request_model: typing.Type[BaseModel], state: dict
+) -> dict:
+    return {
+        field_name: state.get(field_name)
+        for field_name, field in request_model.__fields__.items()
+        if field.required
+    }
