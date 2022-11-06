@@ -6,7 +6,7 @@ import streamlit as st
 
 
 from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
-from daras_ai.image_input import resize_img, upload_file_from_bytes
+from daras_ai.image_input import resize_img_pad, upload_file_from_bytes
 
 
 @daras_ai_step_config("Img to Img")
@@ -93,11 +93,11 @@ def img_to_img(idx, variables, state):
 
     if init_img:
         init_img = upload_file_from_bytes(
-            "init_img.png", resize_img(requests.get(init_img).content, (512, 512))
+            "init_img.png", resize_img_pad(requests.get(init_img).content, (512, 512))
         )
     if mask_img:
         mask_img = upload_file_from_bytes(
-            "mask_img.png", resize_img(requests.get(mask_img).content, (512, 512))
+            "mask_img.png", resize_img_pad(requests.get(mask_img).content, (512, 512))
         )
 
     match selected_model:

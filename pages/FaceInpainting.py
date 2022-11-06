@@ -1,22 +1,18 @@
-import PIL
 import cv2
 import requests
 import streamlit as st
-from PIL import ImageOps
 from pydantic import BaseModel
 
 from daras_ai.extract_face import extract_and_reposition_face_cv2
 from daras_ai.face_restoration import map_parallel, gfpgan
 from daras_ai.image_input import (
-    resize_img,
     upload_file_from_bytes,
-    upload_file,
     safe_filename,
+    upload_file_hq,
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.extract_face import extract_face_img_bytes
-import numpy as np
 
 
 class FaceInpaintingPage(BasePage):
@@ -131,7 +127,7 @@ class FaceInpaintingPage(BasePage):
         if submitted:
             input_file = st.session_state.get("input_file")
             if input_file:
-                st.session_state["input_image"] = upload_file(input_file)
+                st.session_state["input_image"] = upload_file_hq(input_file)
 
         return submitted
 
@@ -189,14 +185,13 @@ class FaceInpaintingPage(BasePage):
         # show an example image
         img_cv2 = cv2.imread("static/face.png")
 
-        # resize image as requested
-        img_pil = PIL.Image.fromarray(img_cv2)
-        img_pil = ImageOps.pad(img_pil, (output_width, output_height))
-        img_cv2 = np.asarray(img_pil)
-
         # extract face
         img, mask = extract_and_reposition_face_cv2(
-            img_cv2, out_face_scale=face_scale, out_pos_x=pos_x, out_pos_y=pos_y
+            img_cv2,
+            out_size=(output_width, output_height),
+            out_face_scale=face_scale,
+            out_pos_x=pos_x,
+            out_pos_y=pos_y,
         )
 
         # draw rule of 3rds
@@ -277,11 +272,9 @@ class FaceInpaintingPage(BasePage):
         input_image_url = state["input_image"]
         img_bytes = requests.get(input_image_url).content
 
-        re_img_bytes = resize_img(
-            img_bytes, (state["output_width"], state["output_height"])
-        )
         re_img_bytes, face_mask_bytes = extract_face_img_bytes(
-            re_img_bytes,
+            img_bytes,
+            out_size=(state["output_width"], state["output_height"]),
             face_scale=state["face_scale"],
             pos_x=state["face_pos_x"],
             pos_y=state["face_pos_y"],
