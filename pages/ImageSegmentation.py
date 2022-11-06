@@ -65,7 +65,7 @@ class ImageSegmentationPage(BasePage):
         yield "Uploading..."
 
         state["output_image"] = upload_file_from_bytes(
-            f"gooey.ai Image Segmentation - {Path(request.input_image).stem}",
+            f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}",
             img_bytes,
         )
 
@@ -88,7 +88,7 @@ class ImageSegmentationPage(BasePage):
 
         with col2:
             if output_image:
-                st.image(output_image, caption=f"Segmentation Output")
+                st.image(output_image, caption=f"Segmentation Mask")
             else:
                 st.empty()
 
