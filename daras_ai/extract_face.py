@@ -83,11 +83,15 @@ def extract_face(idx, state, variables):
 
 def extract_and_reposition_face_cv2(
     orig_img,
+    *,
+    out_size: (int, int) = (512, 512),
     out_face_scale: float = 0.2,
     out_pos_x: float = 4 / 9,
     out_pos_y: float = 3 / 9,
 ):
     img_y, img_x, _ = orig_img.shape
+    out_img_x, out_img_y = out_size
+    out_img_shape = (out_img_y, out_img_x, orig_img.shape[-1])
 
     # blank mask for the original img
     orig_mask = np.zeros(orig_img.shape, dtype=np.uint8)
@@ -104,7 +108,7 @@ def extract_and_reposition_face_cv2(
         face_height = abs(face_hull_y.max() - face_hull_y.min())
 
         # image resize ratio
-        re_ratio = (img_y / face_height) * out_face_scale
+        re_ratio = (out_img_y / face_height) * out_face_scale
 
         # resized image size
         re_img_x = int(img_x * re_ratio)
@@ -123,15 +127,19 @@ def extract_and_reposition_face_cv2(
         re_face_center_y = int(face_center_y * re_ratio)
 
         # crop of resized image
-        re_crop_x1 = int(max(re_face_center_x - (img_x * out_pos_x), 0))
-        re_crop_y1 = int(max(re_face_center_y - (img_y * out_pos_y), 0))
+        re_crop_x1 = int(max(re_face_center_x - (out_img_x * out_pos_x), 0))
+        re_crop_y1 = int(max(re_face_center_y - (out_img_y * out_pos_y), 0))
 
-        re_crop_x2 = int(min(re_face_center_x + (img_x * (1 - out_pos_x)), re_img_x))
-        re_crop_y2 = int(min(re_face_center_y + (img_y * (1 - out_pos_y)), re_img_y))
+        re_crop_x2 = int(
+            min(re_face_center_x + (out_img_x * (1 - out_pos_x)), re_img_x)
+        )
+        re_crop_y2 = int(
+            min(re_face_center_y + (out_img_y * (1 - out_pos_y)), re_img_y)
+        )
 
         # crop of output image
-        out_crop_x1 = int((img_x * out_pos_x) - (re_face_center_x - re_crop_x1))
-        out_crop_y1 = int((img_y * out_pos_y) - (re_face_center_y - re_crop_y1))
+        out_crop_x1 = int((out_img_x * out_pos_x) - (re_face_center_x - re_crop_x1))
+        out_crop_y1 = int((out_img_y * out_pos_y) - (re_face_center_y - re_crop_y1))
 
         re_crop_width = re_crop_x2 - re_crop_x1
         re_crop_height = re_crop_y2 - re_crop_y1
@@ -151,8 +159,8 @@ def extract_and_reposition_face_cv2(
             slice(0, 3),
         )
 
-        out_img = np.zeros(orig_img.shape, dtype=np.uint8)
-        out_mask = np.zeros(orig_img.shape, dtype=np.uint8)
+        out_img = np.zeros(out_img_shape, dtype=np.uint8)
+        out_mask = np.zeros(out_img_shape, dtype=np.uint8)
 
         # paste crop of resized image onto the crop of output image
         out_img[out_rect_cropper] = re_img[re_rect_cropper]
