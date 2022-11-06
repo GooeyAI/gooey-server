@@ -117,9 +117,7 @@ class LipsyncPage(BasePage):
             ),
         )
 
-        out_filename = safe_filename(
-            f"gooey.ai lipsync - {Path(request.input_face).stem}.mp4"
-        )
+        out_filename = f"gooey.ai lipsync - {Path(request.input_face).stem}.mp4"
         state["output_video"] = upload_file_from_bytes(out_filename, img_bytes)
 
     def render_example(self, state: dict):

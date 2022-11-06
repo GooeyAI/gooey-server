@@ -17,6 +17,7 @@ from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
 from pages.ChyronPlant import ChyronPlantPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.ImageSegmentation import ImageSegmentationPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 
@@ -177,6 +178,7 @@ all_pages = [
     EmailFaceInpaintingPage,
     LetterWriterPage,
     LipsyncPage,
+    ImageSegmentationPage,
 ]
 
 for page in all_pages:
