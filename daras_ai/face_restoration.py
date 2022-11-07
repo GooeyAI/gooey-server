@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import streamlit as st
 
 from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
-from daras_ai_v2.gpu_server import call_gpu_server_b64
+from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
 
 
 @daras_ai_step_config("Face Restoration")
@@ -46,7 +46,7 @@ def face_restoration(idx, variables, state):
 
 def gfpgan(img: str) -> bytes:
     return call_gpu_server_b64(
-        port=5003,
+        endpoint=GpuEndpoints.gfpgan,
         input_data={
             "img": img,
             "version": "v1.4",

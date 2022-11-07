@@ -15,6 +15,7 @@ from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
 from pages.ChyronPlant import ChyronPlantPage
+from pages.CompareLM import CompareLMPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.LetterWriter import LetterWriterPage
@@ -177,6 +178,7 @@ all_pages = [
     EmailFaceInpaintingPage,
     LetterWriterPage,
     LipsyncPage,
+    CompareLMPage,
 ]
 
 for page in all_pages:
