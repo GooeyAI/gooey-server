@@ -8,6 +8,7 @@ class GpuEndpoints:
     wav2lip = "http://gpu-1.gooey.ai:5001"
     glid_3_xl_stable = "http://gpu-1.gooey.ai:5002"
     gfpgan = "http://gpu-1.gooey.ai:5003"
+    dichotomous_image_segmentation = "http://gpu-1.gooey.ai:5004"
 
     flan_t5 = "http://gpu-2.gooey.ai:5005"
 

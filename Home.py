@@ -9,6 +9,7 @@ from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Lipsync import LipsyncPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
@@ -23,6 +24,7 @@ for page in [
     EmailFaceInpaintingPage,
     LipsyncPage,
     ChyronPlantPage,
+    ImageSegmentationPage,
     CompareLMPage,
 ]:
     url = page.__module__.split(".")[-1]
