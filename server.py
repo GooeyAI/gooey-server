@@ -18,6 +18,7 @@ from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.ImageSegmentation import ImageSegmentationPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 
@@ -179,6 +180,7 @@ all_pages = [
     LetterWriterPage,
     LipsyncPage,
     CompareLMPage,
+    ImageSegmentationPage,
 ]
 
 for page in all_pages:

@@ -16,7 +16,7 @@ from daras_ai.cache_tools import cache_and_refresh
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
 
-DEFAULT_STATUS = "Running Recipe..."
+DEFAULT_STATUS = "Running..."
 
 
 class BasePage:
