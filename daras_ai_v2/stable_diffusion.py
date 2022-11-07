@@ -1,7 +1,5 @@
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.gpu_server import call_gpu_server_b64
-
-GLID_3_XL_PORT = 5002
+from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
 
 
 def inpainting(
@@ -15,7 +13,7 @@ def inpainting(
     height: int,
 ) -> list[str]:
     out_imgs = call_gpu_server_b64(
-        port=GLID_3_XL_PORT,
+        endpoint=GpuEndpoints.glid_3_xl_stable,
         input_data={
             "prompt": prompt,
             "num_inference_steps": num_inference_steps,

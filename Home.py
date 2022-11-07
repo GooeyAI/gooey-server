@@ -6,6 +6,7 @@ from daras_ai.db import list_all_docs
 from daras_ai.logo import logo
 from daras_ai_v2.base import get_saved_doc, get_doc_ref
 from pages.ChyronPlant import ChyronPlantPage
+from pages.CompareLM import CompareLMPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.ImageSegmentation import ImageSegmentationPage
@@ -24,6 +25,7 @@ for page in [
     LipsyncPage,
     ChyronPlantPage,
     ImageSegmentationPage,
+    CompareLMPage,
 ]:
     url = page.__module__.split(".")[-1]
     st.markdown(
