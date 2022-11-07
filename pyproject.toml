@@ -29,6 +29,7 @@ mediapipe = {version = "^0.8.11", markers = "platform_machine != 'arm64'"}
 furl = "^2.1.3"
 itsdangerous = "2.1.2"
 pytest = "^7.2.0"
+google-cloud-texttospeech = "2.12.1"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"

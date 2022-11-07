@@ -24,6 +24,8 @@ from pages.ImageSegmentation import ImageSegmentationPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 
+from pages.TextToSpeech import TextToSpeechPage
+
 app = FastAPI(title="DarasAI")
 
 app.add_middleware(
@@ -199,6 +201,7 @@ all_pages = [
     LipsyncPage,
     CompareLMPage,
     ImageSegmentationPage,
+    TextToSpeechPage,
 ]
 
 for page in all_pages:
