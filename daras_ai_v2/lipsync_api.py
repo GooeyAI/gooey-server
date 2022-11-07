@@ -1,11 +1,9 @@
-from daras_ai_v2.gpu_server import call_gpu_server_b64
-
-WAV2LIP_PORT = 5001
+from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
 
 
 def wav2lip(*, face: str, audio: str, pads: (int, int, int, int)) -> bytes:
     return call_gpu_server_b64(
-        port=WAV2LIP_PORT,
+        endpoint=GpuEndpoints.wav2lip,
         input_data={
             "face": face,
             "audio": audio,
