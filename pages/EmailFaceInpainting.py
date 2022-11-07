@@ -202,21 +202,14 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         yield "Fetching profile..."
 
-        try:
-            photo_url = get_photo_for_email(request.email_address)
-            if not photo_url:
-                raise ValueError("Photo not found")
-
+        photo_url = get_photo_for_email(request.email_address)
+        if photo_url:
             state["input_image"] = photo_url
-
             yield from super().run(state)
 
-        finally:
-            if not request.should_send_email:
-                return
+        output_images = state.get("output_images")
 
-            output_images = state.get("output_images")
-
+        if request.should_send_email and (output_images or request.fallback_email_body):
             yield "Sending Email..."
 
             send_email_via_postmark(
@@ -227,8 +220,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 subject=request.email_subject,
                 html_body=self._get_email_body(request, output_images),
             )
-
             state["email_sent"] = True
+
+        if not photo_url:
+            raise ValueError("Photo not found")
 
     def _get_email_body(
         self,
