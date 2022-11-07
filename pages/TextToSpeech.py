@@ -126,7 +126,9 @@ class TextToSpeechPage(BasePage):
                 data = requests.get(f"https://api.uberduck.ai/speak-status?uuid={file_uuid}")
                 path = json.loads(data.text)["path"]
                 if path:
-                    state["audio_url"] = path
+                    yield "Uploading Audio file..."
+                    audio_url = upload_file_from_bytes("uberduck_gen.wav", requests.get(path).content)
+                    state["audio_url"] = audio_url
                     break
                 else:
                     time.sleep(2)
