@@ -31,7 +31,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         email_subject: str = None
         email_body: str = None
         email_body_enable_html: bool = None
-        fallback_email_body: str = False
+        fallback_email_body: str = None
 
         face_scale: float = None
         face_pos_x: float = None
