@@ -160,8 +160,8 @@ class BasePage:
             return
 
         col1, col2, *_ = st.columns(3)
-        pressed_save = col1.button("🔖 Save as Example")
-        pressed_star = col2.button("💾 Save as Default")
+        pressed_save = col1.button("🔖 Add as Example")
+        pressed_star = col2.button("💾 Save to Recipe & Settings")
 
         if pressed_save:
             sub_collection = "examples"
@@ -202,7 +202,7 @@ class BasePage:
 
             col1, col2, col3, *_ = st.columns(6)
             with col1:
-                pressed_tweak = st.button("✏️ Tweak it", help=f"tweak {example_id}")
+                pressed_tweak = st.button("✏️ Tweak", help=f"tweak {example_id}")
             with col2:
                 pressed_delete = st.button("🗑️ Delete", help=f"delete {example_id}")
             with col3:
@@ -308,11 +308,7 @@ def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
     api_docs_url = str(furl(settings.DARS_API_ROOT) / "docs")
     api_url = str(furl(settings.DARS_API_ROOT) / endpoint)
 
-    request_body = {
-        field_name: st.session_state.get(field_name)
-        for field_name, field in request_model.__fields__.items()
-        if field.required
-    }
+    request_body = get_example_request_body(request_model, st.session_state)
 
     st.markdown(
         f"""<a href="{api_docs_url}">API Docs</a>""",
@@ -337,3 +333,13 @@ curl -X 'POST' \
             "### Response"
             r.raise_for_status()
             st.write(r.json())
+
+
+def get_example_request_body(
+    request_model: typing.Type[BaseModel], state: dict
+) -> dict:
+    return {
+        field_name: state.get(field_name)
+        for field_name, field in request_model.__fields__.items()
+        if field.required
+    }

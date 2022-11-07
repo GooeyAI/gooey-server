@@ -46,7 +46,7 @@ class LipsyncPage(BasePage):
             )
             audio_file = st.file_uploader("input audio", label_visibility="collapsed")
 
-            submitted = st.form_submit_button("☑️ Submit")
+            submitted = st.form_submit_button("🏃‍ Submit")
 
         # upload input files if submitted
         if submitted:
@@ -67,7 +67,7 @@ class LipsyncPage(BasePage):
             """
         ### Face Padding
         Adjust the detected face bounding box. Often leads to improved results.  
-        Recommended to give atleast 10 padding for the chin region. 
+        Recommended to give at least 10 padding for the chin region. 
         """
         )
 
@@ -104,7 +104,7 @@ class LipsyncPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
 
-        yield "Running wav2lip..."
+        yield "Running LipSync..."
 
         img_bytes = wav2lip(
             face=request.input_face,

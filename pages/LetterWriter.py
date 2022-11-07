@@ -107,7 +107,7 @@ class LetterWriterPage(BasePage):
                     value=1.0,
                 )
 
-            submitted = st.form_submit_button("🚀 Submit")
+            submitted = st.form_submit_button("🏃‍ Submit")
             return submitted
 
     def render_settings(self):

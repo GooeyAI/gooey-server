@@ -35,6 +35,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         face_pos_x: float = None
         face_pos_y: float = None
 
+        output_width: int = None
+        output_height: int = None
+
         class Config:
             schema_extra = {
                 "example": {
@@ -49,7 +52,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         face_mask: str
         diffusion_images: list[str]
         output_images: list[str]
-        email_sent: bool
+        email_sent: bool = False
 
     def render_description(self):
         st.write(
