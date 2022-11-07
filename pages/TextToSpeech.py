@@ -129,6 +129,8 @@ class TextToSpeechPage(BasePage):
         audio_url = st.session_state.get("audio_url")
         if audio_url:
             st.audio(audio_url)
+        else:
+            st.empty()
 
     def run(self, state: dict):
         yield "Generating Audio..."
