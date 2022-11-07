@@ -29,6 +29,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         email_cc: str = None
         email_subject: str = None
         email_body: str = None
+        fallback_email_body: str = None
         should_send_email: bool = None
 
         face_scale: float = None
@@ -128,8 +129,16 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             if not (text_prompt and email_address):
                 st.error("Please provide a Prompt and your Email Address", icon="⚠️")
                 return False
+
             if not re.fullmatch(email_regex, email_address):
                 st.error("Please provide a valid Email Address", icon="⚠️")
+                return False
+
+            from_email = st.session_state.get("email_from")
+            email_subject = st.session_state.get("email_subject")
+            email_body = st.session_state.get("email_body")
+            if not (from_email and email_subject and email_body):
+                st.error("Please provide a From Email, Subject & Body")
                 return False
 
         return submitted
@@ -160,8 +169,12 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             key="email_subject",
         )
         st.text_area(
-            label="Body",
+            label="Body (HTML)",
             key="email_body",
+        )
+        st.text_area(
+            label="Fallback Body (in case of failure)",
+            key="fallback_email_body",
         )
 
     def render_output(self):
@@ -177,32 +190,41 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         email_address = state["email_address"]
 
-        photo_url = get_photo_for_email(email_address)
-        if not photo_url:
-            raise ValueError("Photo not found")
+        try:
+            photo_url = get_photo_for_email(email_address)
+            if not photo_url:
+                raise ValueError("Photo not found")
 
-        state["input_image"] = photo_url
+            state["input_image"] = photo_url
 
-        yield from super().run(state)
+            yield from super().run(state)
 
-        should_send_email = state.get("should_send_email")
-        if should_send_email:
+        finally:
+            should_send_email = state.get("should_send_email")
+            if not should_send_email:
+                return
+
             from_email = state.get("email_from")
             cc_email = state.get("email_cc")
             email_subject = state.get("email_subject")
             email_body = state.get("email_body")
+            fallback_email_body = state.get("fallback_email_body", "")
+            output_images = state.get("output_images")
+
+            if not output_images:
+                email_body = fallback_email_body
+
+            yield "Sending Email..."
+
             send_smtp_message(
-                sender=from_email if from_email else "devs@dara.network",
+                sender=from_email,
                 to_address=email_address,
-                cc_address=cc_email if cc_email else None,
-                subject=email_subject
-                if email_subject
-                else "Thanks for joining the Gooey.AI waitlist",
-                html_message=email_body
-                if email_body
-                else "Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact support@gooey.ai",
-                image_urls=state["output_images"],
+                cc_address=cc_email or None,
+                subject=email_subject,
+                html_message=email_body,
+                image_urls=output_images,
             )
+
             state["email_sent"] = True
 
     def render_example(self, state: dict):

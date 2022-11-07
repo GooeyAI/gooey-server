@@ -44,7 +44,7 @@ def send_smtp_message(
     msg.attach(MIMEText(text_message, "plain"))
     to = [to_address] + cc_address.split(",")
 
-    for img_url in image_urls:
+    for img_url in image_urls or []:
         html_message += f"<br><br><img width='300px', src='{img_url}'/><br>"
 
     for f in files or []:
@@ -53,7 +53,7 @@ def send_smtp_message(
         part["Content-Disposition"] = 'attachment; filename="%s"' % basename(f.name)
         msg.attach(part)
 
-    html_message+="<br><br>Regards<br>daras.ai"
+    html_message += "<br><br>Regards<br>daras.ai"
     msg.attach(MIMEText(html_message, "html"))
 
     with smtplib.SMTP(
