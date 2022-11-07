@@ -30,7 +30,7 @@ class TextToSpeechPage(BasePage):
         uberduck_voice_name: str = None
         uberduck_speaking_rate: float = None
 
-        google_tts_voice_name: str = None
+        google_voice_name: str = None
         google_speaking_rate: float = None
         google_pitch: float = None
 
@@ -92,7 +92,7 @@ class TextToSpeechPage(BasePage):
             st.text_input(
                 label="Voice name(Google TTS)",
                 value="en-US-Neural2-F",
-                key="google_tts_voice_name",
+                key="google_voice_name",
             )
             st.write(
                 "Get more voice names [here](https://cloud.google.com/text-to-speech/docs/voices)"
@@ -183,8 +183,8 @@ class TextToSpeechPage(BasePage):
 
         if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
             voice_name = (
-                state["google_tts_voice_name"]
-                if "google_tts_voice_name" in state
+                state["google_voice_name"]
+                if "google_voice_name" in state
                 else "en-US-Neural2-F"
             )
             pitch = state["google_pitch"] if "google_pitch" in state else 0.0
