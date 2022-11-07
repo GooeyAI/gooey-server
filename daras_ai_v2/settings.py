@@ -29,4 +29,6 @@ SECRET_KEY = config("SECRET_KEY", None)
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
 UBERDUCK_KEY = config("UBERDUCK_KEY")
 UBERDUCK_SECRET = config("UBERDUCK_SECRET")
-google_service_account_credentials = service_account.Credentials.from_service_account_file('serviceAccountKey.json')
+google_service_account_credentials = (
+    service_account.Credentials.from_service_account_file("serviceAccountKey.json")
+)

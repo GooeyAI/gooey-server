@@ -6,7 +6,9 @@ from enum import Enum
 from daras_ai.image_input import upload_file_from_bytes
 from google.oauth2 import service_account
 
-credentials = service_account.Credentials.from_service_account_file('serviceAccountKey.json')
+credentials = service_account.Credentials.from_service_account_file(
+    "serviceAccountKey.json"
+)
 
 
 class VoiceGender(Enum):
@@ -21,15 +23,23 @@ gender_dict = {
     VoiceGender.NEUTRAL.name: texttospeech.SsmlVoiceGender.NEUTRAL,
 }
 
+
 def main():
     st.write("# GOOGLE Text To Speach")
 
     with st.form(key="send_email", clear_on_submit=False):
         voice_name = st.text_input(label="Voice name", value="en-US-Neural2-F")
-        st.write("Get more voice names [here](https://cloud.google.com/text-to-speech/docs/voices)")
+        st.write(
+            "Get more voice names [here](https://cloud.google.com/text-to-speech/docs/voices)"
+        )
         text = st.text_area(label="Text input", value="This is a test.")
         pitch = st.slider("Pitch", min_value=-20.0, max_value=20.0, value=0.0)
-        speaking_rate = st.slider("Speaking rate (1.0 is the normal native speed)", min_value=0.25, max_value=4.0, value=1.0)
+        speaking_rate = st.slider(
+            "Speaking rate (1.0 is the normal native speed)",
+            min_value=0.25,
+            max_value=4.0,
+            value=1.0,
+        )
         # voice_gender = st.selectbox("Voice", (voice.name for voice in VoiceGender))
         submitted = st.form_submit_button("Generate")
         if submitted:

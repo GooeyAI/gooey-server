@@ -12,7 +12,6 @@ from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 
 
-
 class TextToSpeechProviders(Enum):
     GOOGLE_TTS = 1
     UBERDUCK = 2
@@ -84,20 +83,46 @@ class TextToSpeechPage(BasePage):
             "Provider",
             horizontal=True,
             options=[provider.name for provider in TextToSpeechProviders],
-            key="tts_provider"
+            key="tts_provider",
         )
         if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
-            st.text_input(label="Voice name(Google TTS)", value="en-US-Neural2-F", key="google_tts_voice_name")
-            st.write("Get more voice names [here](https://cloud.google.com/text-to-speech/docs/voices)")
-            st.slider("Pitch", min_value=-20.0, max_value=20.0, value=0.0, key="google_pitch")
-            st.slider("Speaking rate (1.0 is the normal native speed)", min_value=0.25, max_value=4.0, step=0.1,
-                      value=1.0, key="google_speaking_rate")
+            st.text_input(
+                label="Voice name(Google TTS)",
+                value="en-US-Neural2-F",
+                key="google_tts_voice_name",
+            )
+            st.write(
+                "Get more voice names [here](https://cloud.google.com/text-to-speech/docs/voices)"
+            )
+            st.slider(
+                "Pitch", min_value=-20.0, max_value=20.0, value=0.0, key="google_pitch"
+            )
+            st.slider(
+                "Speaking rate (1.0 is the normal native speed)",
+                min_value=0.25,
+                max_value=4.0,
+                step=0.1,
+                value=1.0,
+                key="google_speaking_rate",
+            )
 
         if tts_provider == TextToSpeechProviders.UBERDUCK.name:
-            st.text_input(label="Voice name (Uberduck)", value="kanye-west-rap", key="uberduck_voice_name")
-            st.write("Get more voice names [here](https://app.uberduck.ai/leaderboard/voice)")
-            st.slider("Speaking rate (1.0 is the normal native speed)", min_value=0.5, max_value=3.0, step=0.1,
-                      value=1.0, key="uberduck_speaking_rate")
+            st.text_input(
+                label="Voice name (Uberduck)",
+                value="kanye-west-rap",
+                key="uberduck_voice_name",
+            )
+            st.write(
+                "Get more voice names [here](https://app.uberduck.ai/leaderboard/voice)"
+            )
+            st.slider(
+                "Speaking rate (1.0 is the normal native speed)",
+                min_value=0.5,
+                max_value=3.0,
+                step=0.1,
+                value=1.0,
+                key="uberduck_speaking_rate",
+            )
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
@@ -108,37 +133,65 @@ class TextToSpeechPage(BasePage):
     def run(self, state: dict):
         yield "Generating Audio..."
         text = state["text_prompt"]
-        tts_provider = state["tts_provider"] if "tts_provider" in state else TextToSpeechProviders.UBERDUCK.name
+        tts_provider = (
+            state["tts_provider"]
+            if "tts_provider" in state
+            else TextToSpeechProviders.UBERDUCK.name
+        )
         if tts_provider == TextToSpeechProviders.UBERDUCK.name:
-            voice_name = state["uberduck_voice_name"] if "uberduck_voice_name" in state else "kanye-west-rap"
-            pace = state["uberduck_speaking_rate"] if "uberduck_speaking_rate" in state else 1.0
+            voice_name = (
+                state["uberduck_voice_name"]
+                if "uberduck_voice_name" in state
+                else "kanye-west-rap"
+            )
+            pace = (
+                state["uberduck_speaking_rate"]
+                if "uberduck_speaking_rate" in state
+                else 1.0
+            )
 
             response = requests.post(
                 "https://api.uberduck.ai/speak",
                 auth=(settings.UBERDUCK_KEY, settings.UBERDUCK_SECRET),
-                json={"speech": text, "voice": voice_name,
-                      "pace": pace,
-                      }
+                json={
+                    "speech": text,
+                    "voice": voice_name,
+                    "pace": pace,
+                },
             )
             response.raise_for_status()
             file_uuid = json.loads(response.text)["uuid"]
             while True:
-                data = requests.get(f"https://api.uberduck.ai/speak-status?uuid={file_uuid}")
+                data = requests.get(
+                    f"https://api.uberduck.ai/speak-status?uuid={file_uuid}"
+                )
                 path = json.loads(data.text)["path"]
                 if path:
                     yield "Uploading Audio file..."
-                    audio_url = upload_file_from_bytes("uberduck_gen.wav", requests.get(path).content)
+                    audio_url = upload_file_from_bytes(
+                        "uberduck_gen.wav", requests.get(path).content
+                    )
                     state["audio_url"] = audio_url
                     break
                 else:
                     time.sleep(2)
 
         if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
-            voice_name = state["google_tts_voice_name"] if "google_tts_voice_name" in state else "en-US-Neural2-F"
+            voice_name = (
+                state["google_tts_voice_name"]
+                if "google_tts_voice_name" in state
+                else "en-US-Neural2-F"
+            )
             pitch = state["google_pitch"] if "google_pitch" in state else 0.0
-            speaking_rate = state["google_speaking_rate"] if "google_speaking_rate" in state else 1.0
+            speaking_rate = (
+                state["google_speaking_rate"]
+                if "google_speaking_rate" in state
+                else 1.0
+            )
 
-            client = texttospeech.TextToSpeechClient(credentials=settings.google_service_account_credentials)
+            client = texttospeech.TextToSpeechClient(
+                credentials=settings.google_service_account_credentials
+            )
 
             synthesis_input = texttospeech.SynthesisInput(text=text)
             voice = texttospeech.VoiceSelectionParams()
@@ -154,7 +207,8 @@ class TextToSpeechPage(BasePage):
             # Perform the text-to-speech request on the text input with the selected
             # voice parameters and audio file type
             response = client.synthesize_speech(
-                input=synthesis_input, voice=voice, audio_config=audio_config)
+                input=synthesis_input, voice=voice, audio_config=audio_config
+            )
             yield "Uploading Audio file..."
             state["audio_url"] = upload_file_from_bytes(
                 "google_tts_gen.mp3", response.audio_content
