@@ -5,9 +5,11 @@ import shlex
 import typing
 from copy import deepcopy
 from time import time
+import jinja2
 
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
@@ -193,6 +195,10 @@ class DarsAiPage:
         ]
 
     def _examples_tab(self):
+        if "share_pressed" not in st.session_state:
+            st.session_state["share_pressed"] = False
+        template_loader = jinja2.FileSystemLoader(searchpath="./")
+        template_enviornment = jinja2.Environment(loader=template_loader)
         for snapshot in list_all_docs(
             document_id=self.doc_name,
             sub_collection_id="examples",
@@ -200,17 +206,41 @@ class DarsAiPage:
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
-            col1, col2, col3, *_ = st.columns(6)
+            col1, col2, col3, col4, *_ = st.columns(6)
             with col1:
                 pressed_tweak = st.button("✏️ Tweak it", help=f"tweak {example_id}")
             with col2:
                 pressed_delete = st.button("🗑️ Delete", help=f"delete {example_id}")
             with col3:
-                pressed_share = st.button("✉️️ Share", help=f"delete {example_id}")
+                pressed_share = st.button(
+                    "✉️️ Share",
+                    help=f"Share {example_id}",
+                    on_click=self.share_button_press,
+                )
+            with col1:
+                if st.session_state["share_pressed"]:
+                    share_buttons_template = template_enviornment.get_template(
+                        name="templates/share_buttons.html",
+                    )
+                    context = {
+                        "example_url": "https://app.daras.ai/",
+                        "email_subject": "Daras ai",
+                    }
+                    share_buttons_html = jinja2.Template.render(
+                        share_buttons_template, context
+                    )
+                    components.html(
+                        share_buttons_html,
+                        width=200,
+                        height=53,
+                    )
 
             self.render_example(doc)
 
             st.write("---")
+
+    def share_button_press(self):
+        st.session_state["share_pressed"] = not st.session_state["share_pressed"]
 
     def render_example(self, state: dict):
         pass
