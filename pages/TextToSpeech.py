@@ -176,7 +176,7 @@ class TextToSpeechPage(BasePage):
                     state["audio_url"] = audio_url
                     break
                 else:
-                    time.sleep(2)
+                    time.sleep(0.1)
 
         if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
             voice_name = (
