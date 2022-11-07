@@ -1,14 +1,11 @@
 import json
 import time
-import uuid
 from enum import Enum
 
 import requests
 import streamlit as st
-from decouple import config
 from google.cloud import texttospeech
 from pydantic import BaseModel
-from google.oauth2 import service_account
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
@@ -158,7 +155,7 @@ class TextToSpeechPage(BasePage):
                 input=synthesis_input, voice=voice, audio_config=audio_config)
             yield "Uploading Audio file..."
             state["audio_url"] = upload_file_from_bytes(
-                f"google_tts_{uuid.uuid4()}.mp3", response.audio_content
+                "google_tts_gen.mp3", response.audio_content
             )
 
     def render_example(self, state: dict):
