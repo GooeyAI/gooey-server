@@ -134,7 +134,9 @@ class CompareLMPage(BasePage):
         with col1:
             st.write(state.get("input_prompt", ""))
         with col2:
+            st.write("**Flan-T5**")
             st.write(state.get("flan_t5_output", ""))
+            st.write("**GPT-3**")
             st.write(state.get("gpt3_output", ""))
 
 
