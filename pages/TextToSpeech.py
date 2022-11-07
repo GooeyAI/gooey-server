@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from google.oauth2 import service_account
 
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.base import DarsAiPage
+from daras_ai_v2.base import BasePage
 
 credentials = service_account.Credentials.from_service_account_file('serviceAccountKey.json')
 
@@ -21,7 +21,7 @@ class TextToSpeechProviders(Enum):
     UBERDUCK = 2
 
 
-class TextToSpeechPage(DarsAiPage):
+class TextToSpeechPage(BasePage):
     doc_name = "TextToSpeech"
     title = "Text to Speech"
     endpoint = "/v1/TextToSpeech/run"
