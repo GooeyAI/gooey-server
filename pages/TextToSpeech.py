@@ -11,9 +11,9 @@ from pydantic import BaseModel
 from google.oauth2 import service_account
 
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 
-credentials = service_account.Credentials.from_service_account_file('serviceAccountKey.json')
 
 
 class TextToSpeechProviders(Enum):
@@ -118,7 +118,7 @@ class TextToSpeechPage(BasePage):
 
             response = requests.post(
                 "https://api.uberduck.ai/speak",
-                auth=(config("UBERDUCK_KEY"), config("UBERDUCK_SECRET")),
+                auth=(settings.UBERDUCK_KEY, settings.UBERDUCK_SECRET),
                 json={"speech": text, "voice": voice_name,
                       "pace": pace,
                       }
@@ -139,7 +139,7 @@ class TextToSpeechPage(BasePage):
             pitch = state["google_pitch"] if "google_pitch" in state else 0.0
             speaking_rate = state["google_speaking_rate"] if "google_speaking_rate" in state else 1.0
 
-            client = texttospeech.TextToSpeechClient(credentials=credentials)
+            client = texttospeech.TextToSpeechClient(credentials=settings.google_service_account_credentials)
 
             synthesis_input = texttospeech.SynthesisInput(text=text)
             voice = texttospeech.VoiceSelectionParams()

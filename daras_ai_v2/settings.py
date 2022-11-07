@@ -2,6 +2,7 @@ import os
 
 import firebase_admin
 from decouple import config, UndefinedValueError
+from google.oauth2 import service_account
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -26,3 +27,6 @@ GS_BUCKET_NAME = config("GS_BUCKET_NAME")
 DARS_API_ROOT = config("DARS_API_ROOT", "https://api.daras.ai")
 SECRET_KEY = config("SECRET_KEY", None)
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
+UBERDUCK_KEY = config("UBERDUCK_KEY")
+UBERDUCK_SECRET = config("UBERDUCK_SECRET")
+google_service_account_credentials = service_account.Credentials.from_service_account_file('serviceAccountKey.json')
