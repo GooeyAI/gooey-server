@@ -4,12 +4,61 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from os.path import basename
 
+import requests
 from decouple import config
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 
-def isImage(data: str) -> bool:
-    return data.lower().endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif"))
+def send_email_via_postmark(
+    *,
+    from_address: str,
+    to_address: str,
+    cc: str = None,
+    bcc: str = None,
+    subject: str = "",
+    html_body: str = "",
+    text_body: str = "",
+):
+    requests.post(
+        "https://api.postmarkapp.com/email",
+        headers={
+            "X-Postmark-Server-Token": "1471a277-2b9d-4831-9975-5a8be6ef64bf",
+        },
+        json={
+            "From": from_address,
+            "To": to_address,
+            "Cc": cc,
+            "Bcc": bcc,
+            "Subject": subject,
+            # "Tag": "Invitation",
+            "HtmlBody": html_body,
+            "TextBody": text_body,
+            # "ReplyTo": "reply@example.com",
+            # "Headers": [{"Name": "CUSTOM-HEADER", "Value": "value"}],
+            # "TrackOpens": true,
+            # "TrackLinks": "None",
+            # "Attachments": [
+            #     {
+            #         "Name": "readme.txt",
+            #         "Content": "dGVzdCBjb250ZW50",
+            #         "ContentType": "text/plain",
+            #     },
+            #     {
+            #         "Name": "report.pdf",
+            #         "Content": "dGVzdCBjb250ZW50",
+            #         "ContentType": "application/octet-stream",
+            #     },
+            #     {
+            #         "Name": "image.jpg",
+            #         "ContentID": "cid:image.jpg",
+            #         "Content": "dGVzdCBjb250ZW50",
+            #         "ContentType": "image/jpeg",
+            #     },
+            # ],
+            # "Metadata": {"color": "blue", "client-id": "12345"},
+            # "MessageStream": "outbound",
+        },
+    )
 
 
 def send_smtp_message(
@@ -44,7 +93,7 @@ def send_smtp_message(
     msg.attach(MIMEText(text_message, "plain"))
     to = [to_address] + cc_address.split(",")
 
-    for img_url in image_urls:
+    for img_url in image_urls or []:
         html_message += f"<br><br><img width='300px', src='{img_url}'/><br>"
 
     for f in files or []:

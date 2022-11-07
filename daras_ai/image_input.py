@@ -96,6 +96,7 @@ def resize_img_contain(img_bytes, size):
 
 
 def upload_file_from_bytes(filename: str, img_bytes: bytes) -> str:
+    filename = safe_filename(filename)
     bucket = storage.bucket(settings.GS_BUCKET_NAME)
     blob = bucket.blob(f"daras_ai/media/{uuid.uuid1()}/{filename}")
     blob.upload_from_string(img_bytes)

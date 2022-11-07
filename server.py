@@ -3,11 +3,13 @@ import typing
 from fastapi import FastAPI
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from google.auth.transport import requests
 from google.cloud import firestore
 from google.oauth2 import id_token
+from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
 
@@ -15,8 +17,10 @@ from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
 from pages.ChyronPlant import ChyronPlantPage
+from pages.CompareLM import CompareLMPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.ImageSegmentation import ImageSegmentationPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 
@@ -154,20 +158,36 @@ def run(
     return {"outputs": outputs}
 
 
+class RunFailedModel(BaseModel):
+    error: str
+
+
 def script_to_api(page: typing.Type[BasePage]):
     body_spec = Body(examples=page.RequestModel.Config.schema_extra.get("examples"))
 
-    @app.post(page.endpoint, response_model=page.ResponseModel)
+    @app.post(
+        page.endpoint,
+        response_model=page.ResponseModel,
+        responses={500: {"model": RunFailedModel}},
+    )
     def run_api(request: page.RequestModel = body_spec):
         # get saved state from db
         state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
+
+        # only use the request values, discard outputs
+        state = page.RequestModel.parse_obj(state).dict()
 
         # remove None values & update state
         request_dict = {k: v for k, v in request.dict().items() if v is not None}
         state.update(request_dict)
 
         # run the script
-        all(page().run(state))
+        try:
+            all(page().run(state))
+        except Exception as e:
+            return JSONResponse(
+                status_code=500, content={"error": f"{type(e).__name__} - {e}"}
+            )
 
         # return updated state
         return state
@@ -179,6 +199,8 @@ all_pages = [
     EmailFaceInpaintingPage,
     LetterWriterPage,
     LipsyncPage,
+    CompareLMPage,
+    ImageSegmentationPage,
     TextToSpeechPage,
 ]
 

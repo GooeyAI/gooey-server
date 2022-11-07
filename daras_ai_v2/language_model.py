@@ -1,6 +1,8 @@
 import openai
 from decouple import config
 
+from daras_ai_v2.gpu_server import call_gpu_server, GpuEndpoints
+
 
 def run_language_model(
     api_provider: str,
@@ -11,7 +13,7 @@ def run_language_model(
     quality: float,
     num_outputs: int,
     temperature: float,
-):
+) -> list[str]:
     match api_provider:
         case "openai":
             openai.api_key = config("OPENAI_API_KEY")
@@ -19,6 +21,16 @@ def run_language_model(
         case "goose.ai":
             openai.api_key = config("GOOSEAI_API_KEY")
             openai.api_base = "https://api.goose.ai/v1"
+        case "flan-t5":
+            return call_gpu_server(
+                endpoint=GpuEndpoints.flan_t5,
+                input_data={
+                    "prompt": prompt,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "n": num_outputs,
+                },
+            )
 
     r = openai.Completion.create(
         engine=engine,

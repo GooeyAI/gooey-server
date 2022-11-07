@@ -1,5 +1,4 @@
 import re
-from copy import deepcopy
 
 import requests
 import streamlit as st
@@ -7,9 +6,8 @@ from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import get_saved_doc, set_saved_doc, get_doc_ref
-from daras_ai_v2.send_email import send_smtp_message
+from daras_ai_v2.send_email import send_email_via_postmark
 from pages.FaceInpainting import FaceInpaintingPage
-
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
@@ -25,11 +23,15 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         num_outputs: int = None
         quality: int = None
+
+        should_send_email: bool = None
         email_from: str = None
         email_cc: str = None
+        email_bcc: str = None
         email_subject: str = None
         email_body: str = None
-        should_send_email: bool = None
+        email_body_enable_html: bool = None
+        fallback_email_body: str = None
 
         face_scale: float = None
         face_pos_x: float = None
@@ -128,8 +130,16 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             if not (text_prompt and email_address):
                 st.error("Please provide a Prompt and your Email Address", icon="⚠️")
                 return False
+
             if not re.fullmatch(email_regex, email_address):
                 st.error("Please provide a valid Email Address", icon="⚠️")
+                return False
+
+            from_email = st.session_state.get("email_from")
+            email_subject = st.session_state.get("email_subject")
+            email_body = st.session_state.get("email_body")
+            if not (from_email and email_subject and email_body):
+                st.error("Please provide a From Email, Subject & Body")
                 return False
 
         return submitted
@@ -143,25 +153,38 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         )
 
         st.checkbox(
-            "Send email",
+            "Should Send email",
             key="should_send_email",
         )
         st.text_input(
-            label="From email",
+            label="From",
             key="email_from",
         )
         st.text_input(
-            label="CC emails (You can enter multiple emails separated by comma)",
+            label="Cc (You can enter multiple emails separated by comma)",
             key="email_cc",
+            placeholder="john@gmail.com, cathy@gmail.com",
+        )
+        st.text_input(
+            label="Bcc (You can enter multiple emails separated by comma)",
+            key="email_bcc",
             placeholder="john@gmail.com, cathy@gmail.com",
         )
         st.text_input(
             label="Subject",
             key="email_subject",
         )
+        st.checkbox(
+            label="Enable HTML Body",
+            key="email_body_enable_html",
+        )
         st.text_area(
-            label="Body",
+            label="Body (use {{output_images}} to insert the images into the email)",
             key="email_body",
+        )
+        st.text_area(
+            label="Fallback Body (in case of failure)",
+            key="fallback_email_body",
         )
 
     def render_output(self):
@@ -173,37 +196,68 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             st.empty()
 
     def run(self, state: dict):
+        request: EmailFaceInpaintingPage.RequestModel = self.RequestModel.parse_obj(
+            state
+        )
+
         yield "Fetching profile..."
 
-        email_address = state["email_address"]
+        photo_url = get_photo_for_email(request.email_address)
+        if photo_url:
+            state["input_image"] = photo_url
+            yield from super().run(state)
 
-        photo_url = get_photo_for_email(email_address)
+        output_images = state.get("output_images")
+
+        if request.should_send_email and (output_images or request.fallback_email_body):
+            yield "Sending Email..."
+
+            send_email_via_postmark(
+                from_address=request.email_from,
+                to_address=request.email_address,
+                cc=request.email_cc,
+                bcc=request.email_bcc,
+                subject=request.email_subject,
+                html_body=self._get_email_body(request, output_images),
+            )
+            state["email_sent"] = True
+
         if not photo_url:
             raise ValueError("Photo not found")
 
-        state["input_image"] = photo_url
+    def _get_email_body(
+        self,
+        request: "EmailFaceInpaintingPage.RequestModel",
+        output_images: [str],
+    ) -> str:
+        if output_images:
+            # convert images to html
+            output_images_html = ""
+            for img_url in output_images:
+                output_images_html += f'<img width="300px" src="{img_url}"/>'
 
-        yield from super().run(state)
+            # remove `{{output_images}}` placeholder
+            parts = request.email_body.split("{{output_images}}")
 
-        should_send_email = state.get("should_send_email")
-        if should_send_email:
-            from_email = state.get("email_from")
-            cc_email = state.get("email_cc")
-            email_subject = state.get("email_subject")
-            email_body = state.get("email_body")
-            send_smtp_message(
-                sender=from_email if from_email else "devs@dara.network",
-                to_address=email_address,
-                cc_address=cc_email if cc_email else None,
-                subject=email_subject
-                if email_subject
-                else "Thanks for joining the Gooey.AI waitlist",
-                html_message=email_body
-                if email_body
-                else "Here's a picture of you that we found from your email address on the internet and then enhanced with AI. Want more? Contact support@gooey.ai",
-                image_urls=state["output_images"],
-            )
-            state["email_sent"] = True
+            # if not html, wrap in a div to render as text
+            if not request.email_body_enable_html:
+                parts = [
+                    f'<div style="white-space: pre-wrap;">{part}</div>'
+                    for part in parts
+                ]
+
+            # add output images as html
+            email_body = output_images_html.join(parts)
+
+        else:
+            # no output images, use fallback
+            email_body = request.fallback_email_body
+
+            # if not html, wrap in a div to render as text
+            if not request.email_body_enable_html:
+                email_body = f'<div style="white-space: pre-wrap;">{email_body}</div>'
+
+        return email_body
 
     def render_example(self, state: dict):
         st.write("Input Email -", state.get("email_address"))
