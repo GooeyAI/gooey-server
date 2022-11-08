@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import get_saved_doc, set_saved_doc, get_doc_ref
 from daras_ai_v2.send_email import send_email_via_postmark
+from daras_ai_v2.stable_diffusion import InpaintingModels
 from pages.FaceInpainting import FaceInpaintingPage
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
@@ -24,6 +25,15 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         num_outputs: int = None
         quality: int = None
 
+        face_scale: float = None
+        face_pos_x: float = None
+        face_pos_y: float = None
+
+        output_width: int = None
+        output_height: int = None
+
+        selected_model: str = InpaintingModels.jack_qiao.name
+
         should_send_email: bool = None
         email_from: str = None
         email_cc: str = None
@@ -32,13 +42,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         email_body: str = None
         email_body_enable_html: bool = None
         fallback_email_body: str = None
-
-        face_scale: float = None
-        face_pos_x: float = None
-        face_pos_y: float = None
-
-        output_width: int = None
-        output_height: int = None
 
         class Config:
             schema_extra = {
