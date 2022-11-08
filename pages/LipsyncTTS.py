@@ -11,7 +11,7 @@ from pages.TextToSpeech import TextToSpeechPage
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lip Syncing with Text to speech"
     doc_name = "LipsyncTTS"
-    endpoint = "/v1/Lipsync/run"
+    endpoint = "/v1/LipsyncTTS/run"
 
     class RequestModel(BaseModel):
         input_face: str
