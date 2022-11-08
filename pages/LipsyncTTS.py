@@ -8,7 +8,7 @@ from pages.Lipsync import LipsyncPage
 from pages.TextToSpeech import TextToSpeechPage
 
 
-class LipsyncPageTTS(LipsyncPage, TextToSpeechPage):
+class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lip Syncing with Text to speech"
     doc_name = "LipsyncTTS"
     endpoint = "/v1/Lipsync/run"
@@ -96,4 +96,4 @@ class LipsyncPageTTS(LipsyncPage, TextToSpeechPage):
 
 
 if __name__ == "__main__":
-    LipsyncPageTTS().render()
+    LipsyncTTSPage().render()
