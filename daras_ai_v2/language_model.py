@@ -1,6 +1,7 @@
 import openai
 from decouple import config
 
+from daras_ai_v2 import settings
 from daras_ai_v2.gpu_server import call_gpu_server, GpuEndpoints
 
 
@@ -16,7 +17,7 @@ def run_language_model(
 ) -> list[str]:
     match api_provider:
         case "openai":
-            openai.api_key = config("OPENAI_API_KEY")
+            openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
         case "goose.ai":
             openai.api_key = config("GOOSEAI_API_KEY")

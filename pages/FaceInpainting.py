@@ -12,7 +12,9 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.extract_face import extract_face_img_bytes
+from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
 class FaceInpaintingPage(BasePage):
@@ -34,6 +36,8 @@ class FaceInpaintingPage(BasePage):
         output_width: int = None
         output_height: int = None
 
+        selected_model: str = InpaintingModels.jack_qiao.name
+
         class Config:
             schema_extra = {
                 "example": {
@@ -52,6 +56,7 @@ class FaceInpaintingPage(BasePage):
         st.session_state.setdefault("num_steps", 50)
 
     def render_description(self):
+        return
         st.write(
             """
     *Face Inpainting: Profile pic > Face Masking > Stable Diffusion > GFPGAN*
@@ -94,23 +99,6 @@ class FaceInpaintingPage(BasePage):
                 "By uploading an image, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
-            col1, col2 = st.columns(2, gap="medium")
-            with col1:
-                st.slider(
-                    label="# of Outputs",
-                    key="num_outputs",
-                    min_value=1,
-                    max_value=4,
-                )
-            with col2:
-                st.slider(
-                    label="Quality",
-                    key="num_steps",
-                    min_value=10,
-                    max_value=200,
-                    step=10,
-                )
-
             submitted = st.form_submit_button("🏃‍ Submit")
 
         text_prompt = st.session_state.get("text_prompt")
@@ -132,6 +120,32 @@ class FaceInpaintingPage(BasePage):
         return submitted
 
     def render_settings(self):
+        selected_model = enum_selector(
+            InpaintingModels,
+            label="Image Model",
+            key="selected_model",
+        )
+
+        col1, col2 = st.columns(2, gap="medium")
+        with col1:
+            st.slider(
+                label="# of Outputs",
+                key="num_outputs",
+                min_value=1,
+                max_value=4,
+            )
+        with col2:
+            if selected_model != InpaintingModels.dall_e.name:
+                st.slider(
+                    label="Quality",
+                    key="num_steps",
+                    min_value=10,
+                    max_value=200,
+                    step=10,
+                )
+            else:
+                st.empty()
+
         st.write(
             """
             ### Output Resolution
@@ -283,15 +297,18 @@ class FaceInpaintingPage(BasePage):
         state["resized_image"] = upload_file_from_bytes("re_img.png", re_img_bytes)
         state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)
 
-        yield "Running Stable Diffusion..."
+        yield f"Generating Image..."
 
         prompt = state.get("text_prompt", "")
 
         diffusion_images = stable_diffusion.inpainting(
+            selected_model=state["selected_model"],
             prompt=prompt,
             num_outputs=state.get("num_outputs", 1),
             edit_image=state["resized_image"],
+            edit_image_bytes=re_img_bytes,
             mask=state["face_mask"],
+            mask_bytes=face_mask_bytes,
             num_inference_steps=state.get("num_steps", 50),
             width=state["output_width"],
             height=state["output_height"],
