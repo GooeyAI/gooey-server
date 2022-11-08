@@ -56,7 +56,6 @@ class FaceInpaintingPage(BasePage):
         st.session_state.setdefault("num_steps", 50)
 
     def render_description(self):
-        return
         st.write(
             """
     *Face Inpainting: Profile pic > Face Masking > Stable Diffusion > GFPGAN*

@@ -105,23 +105,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 "By providing your email address, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
-            col1, col2 = st.columns(2, gap="medium")
-            with col1:
-                st.slider(
-                    label="# of Outputs",
-                    key="num_outputs",
-                    min_value=1,
-                    max_value=4,
-                )
-            with col2:
-                st.slider(
-                    label="Quality",
-                    key="num_steps",
-                    min_value=10,
-                    max_value=100,
-                    step=10,
-                )
-
             submitted = st.form_submit_button("🏃‍ Submit")
 
         if submitted:
