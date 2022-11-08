@@ -1,3 +1,4 @@
+import cv2
 import streamlit as st
 
 from daras_ai.extract_face import extract_face_cv2, extract_and_reposition_face_cv2
@@ -6,9 +7,12 @@ from daras_ai.image_input import (
     bytes_to_cv2_img,
     resize_img_contain,
 )
+from daras_ai_v2.extract_face import rgb_mask_to_rgba
 
 
 def main():
+    st.write("### A simple app to extract faces from images")
+
     file = st.file_uploader("Photo")
     reposition = st.checkbox("Reposition", value=True)
 
@@ -30,11 +34,14 @@ def main():
         )
     else:
         face_mask_cv2 = extract_face_cv2(image_cv2)
+    face_mask_cv2 = cv2.GaussianBlur(face_mask_cv2, (0, 0), 5)
     face_mask_bytes = cv2_img_to_bytes(face_mask_cv2)
 
     st.image(img_bytes, width=200)
     st.image(cv2_img_to_bytes(image_cv2), width=200)
     st.image(face_mask_bytes, width=200)
+
+    st.image(rgb_mask_to_rgba(face_mask_bytes), width=200)
 
 
 if __name__ == "__main__":

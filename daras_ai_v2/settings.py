@@ -32,3 +32,5 @@ UBERDUCK_SECRET = config("UBERDUCK_SECRET")
 google_service_account_credentials = (
     service_account.Credentials.from_service_account_file("serviceAccountKey.json")
 )
+
+OPENAI_API_KEY = config("OPENAI_API_KEY")

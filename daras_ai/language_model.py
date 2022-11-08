@@ -8,6 +8,7 @@ from decouple import config
 
 from daras_ai.core import daras_ai_step_computer
 from daras_ai.core import daras_ai_step_config
+from daras_ai_v2 import settings
 
 
 @daras_ai_step_config("Language Model")
@@ -128,7 +129,7 @@ def language_model(idx, variables, state):
 
     match api_provider:
         case "openai":
-            openai.api_key = config("OPENAI_API_KEY")
+            openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
         case "goose.ai":
             openai.api_key = config("GOOSEAI_API_KEY")
