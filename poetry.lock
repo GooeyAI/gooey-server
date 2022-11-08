@@ -840,7 +840,7 @@ python-versions = ">=3.8"
 
 [[package]]
 name = "openai"
-version = "0.23.1"
+version = "0.25.0"
 description = "Python client library for the OpenAI API"
 category = "main"
 optional = false
@@ -1634,7 +1634,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "69f5435798193e4ebc6473263cb4f4cdd95e5cd758a62b05154e5573c489c3f6"
+content-hash = "9fba19c0b11cd060b973692bb13f6c11784762fbba65252d57db5c8073955bbf"
 
 [metadata.files]
 absl-py = [
@@ -2368,7 +2368,7 @@ numpy = [
     {file = "numpy-1.23.3.tar.gz", hash = "sha256:51bf49c0cd1d52be0a240aa66f3458afc4b95d8993d2d04f0d91fa60c10af6cd"},
 ]
 openai = [
-    {file = "openai-0.23.1.tar.gz", hash = "sha256:16703a2433c1fc71b913057062d00b86dd2ad714dfd7b2b1ab803ac9b31fba5f"},
+    {file = "openai-0.25.0.tar.gz", hash = "sha256:59ac6531e4f7bf8e9a53186e853d9ffb1d5f07973ecb4f7d273163a314814510"},
 ]
 opencv-contrib-python = [
     {file = "opencv-contrib-python-4.6.0.66.tar.gz", hash = "sha256:256efeb263999f3fb2427095392c1cb442d655508cd0a42864a383d55f3e6d43"},
