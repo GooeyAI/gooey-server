@@ -104,7 +104,7 @@ class CompareLMPage(BasePage):
         st.write(
             """
             ### Flan-T5 
-            [`flan-t5-xl`](https://huggingface.co/google/flan-t5-xl)
+            [`flan-t5-xxl`](https://huggingface.co/google/flan-t5-xxl)
             """
         )
         st.text_area(
