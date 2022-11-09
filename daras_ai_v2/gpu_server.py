@@ -12,6 +12,7 @@ class GpuEndpoints:
 
     flan_t5 = "http://gpu-2.gooey.ai:5005"
     runway_ml_inpainting = "http://gpu-2.gooey.ai:5006"
+    u2net = "http://gpu-1.gooey.ai:5007"
 
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:

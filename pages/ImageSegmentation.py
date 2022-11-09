@@ -1,13 +1,12 @@
 import typing
 from pathlib import Path
 
+import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_hq, upload_file_from_bytes, safe_filename
+from daras_ai.image_input import upload_file_hq, upload_file_from_bytes
 from daras_ai_v2.base import BasePage
-import streamlit as st
-
-from daras_ai_v2.image_segmentation import dichotomous_image_segmentation
+from daras_ai_v2.image_segmentation import u2net
 
 
 class ImageSegmentationPage(BasePage):
@@ -60,7 +59,7 @@ class ImageSegmentationPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
 
-        img_bytes = dichotomous_image_segmentation(request.input_image)
+        img_bytes = u2net(request.input_image)
 
         yield "Uploading..."
 
