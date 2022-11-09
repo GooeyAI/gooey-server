@@ -78,6 +78,19 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
         return submitted
 
+
+    def render_description(self):
+        st.write(
+            """
+                *Converts text to audio and Lipsyncs with video*
+
+                How It Works:
+
+                1. Takes Text input + Face input
+                2. Generates audio file in voice of your choice 
+                3. Merges the audio and video.
+            """
+        )
     def render_settings(self):
         LipsyncPage.render_settings(self)
         TextToSpeechPage.render_settings(self)
