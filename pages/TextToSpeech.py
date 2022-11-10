@@ -136,22 +136,23 @@ class TextToSpeechPage(BasePage):
             st.empty()
 
     def run(self, state: dict):
+        request = self.RequestModel.parse_obj(state)
         yield "Generating Audio..."
-        text = state["text_prompt"]
+        text = request.text_prompt
         tts_provider = (
-            state["tts_provider"]
-            if "tts_provider" in state
+            request.tts_provider
+            if request.tts_provider
             else TextToSpeechProviders.UBERDUCK.name
         )
         if tts_provider == TextToSpeechProviders.UBERDUCK.name:
             voice_name = (
-                state["uberduck_voice_name"]
-                if "uberduck_voice_name" in state
+                request.uberduck_voice_name
+                if request.uberduck_voice_name
                 else "kanye-west-rap"
             )
             pace = (
-                state["uberduck_speaking_rate"]
-                if "uberduck_speaking_rate" in state
+                request.uberduck_speaking_rate
+                if request.uberduck_speaking_rate
                 else 1.0
             )
 
@@ -183,14 +184,14 @@ class TextToSpeechPage(BasePage):
 
         if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
             voice_name = (
-                state["google_voice_name"]
-                if "google_voice_name" in state
+                request.google_voice_name
+                if request.google_voice_name
                 else "en-US-Neural2-F"
             )
-            pitch = state["google_pitch"] if "google_pitch" in state else 0.0
+            pitch = request.google_pitch if request.google_pitch in state else 0.0
             speaking_rate = (
-                state["google_speaking_rate"]
-                if "google_speaking_rate" in state
+                request.google_speaking_rate
+                if request.google_speaking_rate
                 else 1.0
             )
 
