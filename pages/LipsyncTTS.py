@@ -78,7 +78,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
         return submitted
 
-
     def render_description(self):
         st.write(
             """
@@ -91,6 +90,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
                 3. Merges the audio and video.
             """
         )
+
     def render_settings(self):
         LipsyncPage.render_settings(self)
         TextToSpeechPage.render_settings(self)
