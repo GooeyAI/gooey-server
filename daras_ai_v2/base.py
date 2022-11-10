@@ -202,11 +202,17 @@ class BasePage:
 
             col1, col2, col3, *_ = st.columns(6)
             with col1:
-                pressed_tweak = st.button("✏️ Tweak", help=f"tweak {example_id}")
+                pressed_tweak = st.button("✏️ Tweak", help=f"tweak {example_id}",key=f"tweak-{example_id}")
             with col2:
-                pressed_delete = st.button("🗑️ Delete", help=f"delete {example_id}")
+                pressed_delete = st.button("🗑️ Delete", help=f"delete {example_id}", key=f"delete-{example_id}")
+                if pressed_delete:
+                    example = get_doc_ref(self.doc_name, sub_collection_id="examples", sub_document_id=example_id)
+                    with st.spinner("deleting..."):
+                        deleted = example.delete()
+                        if deleted:
+                            st.success("Deleted")
             with col3:
-                pressed_share = st.button("✉️️ Share", help=f"delete {example_id}")
+                pressed_share = st.button("✉️️ Share", help=f"share {example_id}", key=f"share-{example_id}")
 
             self.render_example(doc)
 
