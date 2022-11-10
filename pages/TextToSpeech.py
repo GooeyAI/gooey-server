@@ -190,9 +190,7 @@ class TextToSpeechPage(BasePage):
             )
             pitch = request.google_pitch if request.google_pitch in state else 0.0
             speaking_rate = (
-                request.google_speaking_rate
-                if request.google_speaking_rate
-                else 1.0
+                request.google_speaking_rate if request.google_speaking_rate else 1.0
             )
 
             client = texttospeech.TextToSpeechClient(
