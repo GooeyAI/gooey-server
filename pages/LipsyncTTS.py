@@ -68,8 +68,10 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
                 st.error("Text input cannot be empty", icon="⚠️")
                 return False
             if not face_file:
-                st.error("Input face cannot be empty", icon="⚠️")
-                return False
+                if "input_face" not in st.session_state:
+                    st.error("Input face cannot be empty", icon="⚠️")
+                    return False
+
             with st.spinner("Uploading..."):
                 if face_file:
                     st.session_state["input_face"] = upload_file_from_bytes(
