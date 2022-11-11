@@ -37,9 +37,21 @@ class BasePage:
 
         if not st.session_state.get("__loaded__"):
             with st.spinner("Loading Settings..."):
-                st.session_state.update(
-                    deepcopy(get_saved_doc(get_doc_ref(self.doc_name)))
-                )
+                query_params = st.experimental_get_query_params()
+                if query_params:
+                    st.session_state.update(
+                        get_saved_doc(
+                            get_doc_ref(
+                                self.doc_name,
+                                sub_collection_id="examples",
+                                sub_document_id=query_params["example_id"][0],
+                            )
+                        )
+                    )
+                else:
+                    st.session_state.update(
+                        deepcopy(get_saved_doc(get_doc_ref(self.doc_name)))
+                    )
             st.session_state["__loaded__"] = True
 
         with settings_tab:
@@ -202,17 +214,29 @@ class BasePage:
 
             col1, col2, col3, *_ = st.columns(6)
             with col1:
-                pressed_tweak = st.button("✏️ Tweak", help=f"tweak {example_id}",key=f"tweak-{example_id}")
+                doc_name_for_url = self.doc_name.split("#")[0]
+                st.markdown(
+                    f"<a href='{doc_name_for_url}?example_id={example_id}'>✏️ Tweak</a>",
+                    unsafe_allow_html=True,
+                )
             with col2:
-                pressed_delete = st.button("🗑️ Delete", help=f"delete {example_id}", key=f"delete-{example_id}")
+                pressed_delete = st.button(
+                    "🗑️ Delete", help=f"delete {example_id}", key=f"delete-{example_id}"
+                )
                 if pressed_delete:
-                    example = get_doc_ref(self.doc_name, sub_collection_id="examples", sub_document_id=example_id)
+                    example = get_doc_ref(
+                        self.doc_name,
+                        sub_collection_id="examples",
+                        sub_document_id=example_id,
+                    )
                     with st.spinner("deleting..."):
                         deleted = example.delete()
                         if deleted:
                             st.success("Deleted")
             with col3:
-                pressed_share = st.button("✉️️ Share", help=f"share {example_id}", key=f"share-{example_id}")
+                pressed_share = st.button(
+                    "✉️️ Share", help=f"share {example_id}", key=f"share-{example_id}"
+                )
 
             self.render_example(doc)
 
