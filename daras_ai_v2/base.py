@@ -207,8 +207,8 @@ class BasePage:
 
     def _examples_tab(self):
         for snapshot in list_all_docs(
-            document_id=self.doc_name,
-            sub_collection_id="examples",
+                document_id=self.doc_name,
+                sub_collection_id="examples",
         ):
             example_id = snapshot.id
             doc = snapshot.to_dict()
@@ -233,15 +233,14 @@ class BasePage:
                     with st.spinner("deleting..."):
                         deleted = example.delete()
                         if deleted:
-                            st.success("Deleted",  icon="✅")
+                            st.success("Deleted", icon="✅")
             with col3:
                 pressed_share = st.button(
                     "✉️️ Share", help=f"share {example_id}", key=f"share-{example_id}"
                 )
                 if pressed_share:
-                    pyperclip.copy(settings.BASE_URL+f"/{doc_name_for_url}?example_id={example_id}")
+                    pyperclip.copy(settings.BASE_URL + f"/{doc_name_for_url}?example_id={example_id}")
                     st.success('Share URL Copied', icon="✅")
-
 
             self.render_example(doc)
 
@@ -277,8 +276,8 @@ def logo():
 
 
 def set_saved_doc(
-    doc_ref: firestore.DocumentReference,
-    updated_state: dict,
+        doc_ref: firestore.DocumentReference,
+        updated_state: dict,
 ):
     doc_ref.set(updated_state)
     saved_state = get_saved_doc(doc_ref)
@@ -307,10 +306,10 @@ def get_saved_doc_nocahe(doc_ref):
 
 @cache_and_refresh
 def list_all_docs(
-    collection_id="daras-ai-v2",
-    *,
-    document_id: str = None,
-    sub_collection_id: str = None,
+        collection_id="daras-ai-v2",
+        *,
+        document_id: str = None,
+        sub_collection_id: str = None,
 ):
     db = firestore.Client()
     db_collection = db.collection(collection_id)
@@ -321,11 +320,11 @@ def list_all_docs(
 
 
 def get_doc_ref(
-    document_id: str,
-    *,
-    collection_id="daras-ai-v2",
-    sub_collection_id: str = None,
-    sub_document_id: str = None,
+        document_id: str,
+        *,
+        collection_id="daras-ai-v2",
+        sub_collection_id: str = None,
+        sub_document_id: str = None,
 ):
     db = firestore.Client()
     db_collection = db.collection(collection_id)
@@ -371,7 +370,7 @@ curl -X 'POST' \
 
 
 def get_example_request_body(
-    request_model: typing.Type[BaseModel], state: dict
+        request_model: typing.Type[BaseModel], state: dict
 ) -> dict:
     return {
         field_name: state.get(field_name)
