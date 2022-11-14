@@ -6,6 +6,7 @@ import typing
 from copy import deepcopy
 from time import time
 
+import pyperclip
 import requests
 import streamlit as st
 from furl import furl
@@ -232,11 +233,15 @@ class BasePage:
                     with st.spinner("deleting..."):
                         deleted = example.delete()
                         if deleted:
-                            st.success("Deleted")
+                            st.success("Deleted",  icon="✅")
             with col3:
                 pressed_share = st.button(
                     "✉️️ Share", help=f"share {example_id}", key=f"share-{example_id}"
                 )
+                if pressed_share:
+                    pyperclip.copy(settings.BASE_URL+f"/{doc_name_for_url}?example_id={example_id}")
+                    st.success('Share URL Copied', icon="✅")
+
 
             self.render_example(doc)
 
