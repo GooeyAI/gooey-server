@@ -212,7 +212,7 @@ class BasePage:
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
-            col1, col2, col3, *_ = st.columns(6)
+            col1, col2, col3, *_ = st.columns(3)
             with col1:
                 doc_name_for_url = self.doc_name.split("#")[0]
                 st.markdown(
