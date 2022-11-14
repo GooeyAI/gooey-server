@@ -233,7 +233,6 @@ with tab1:
                 time_taken = time() - start
             st.caption(
                 f"**Run Time** `{time_taken:.1f}` seconds. "
-                f"This GPU time is free while we're building daras.ai, Enjoy!"
             )
 
         st.write("### Output")

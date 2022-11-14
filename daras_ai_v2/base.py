@@ -138,8 +138,7 @@ class BasePage:
             if time_taken:
                 with status_area:
                     st.success(
-                        f"Success! Run Time: `{time_taken:.2f}` seconds. "
-                        f"This GPU time is free while we're building daras.ai, Enjoy!",
+                        f"Success! Run Time: `{time_taken:.2f}` seconds. ",
                         icon="✅",
                     )
                     del st.session_state["__time_taken"]
