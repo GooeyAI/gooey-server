@@ -34,8 +34,8 @@ google_service_account_credentials = (
 )
 
 OPENAI_API_KEY = config("OPENAI_API_KEY")
-DEBUG=True
+DEBUG = True
 if DEBUG:
-    BASE_URL="http://localhost:8501"
+    BASE_URL = "http://localhost:8501"
 else:
-    BASE_URL="http://app.gooey.ai"
+    BASE_URL = "http://app.gooey.ai"
