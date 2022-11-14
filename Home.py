@@ -11,6 +11,7 @@ from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Lipsync import LipsyncPage
+from pages.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
@@ -26,6 +27,7 @@ for page in [
     ChyronPlantPage,
     ImageSegmentationPage,
     CompareLMPage,
+    TextToSpeechPage,
 ]:
     url = page.__module__.split(".")[-1]
     st.markdown(

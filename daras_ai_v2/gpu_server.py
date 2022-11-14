@@ -11,16 +11,18 @@ class GpuEndpoints:
     dichotomous_image_segmentation = "http://gpu-1.gooey.ai:5004"
 
     flan_t5 = "http://gpu-2.gooey.ai:5005"
+    runway_ml_inpainting = "http://gpu-2.gooey.ai:5006"
+    u2net = "http://gpu-1.gooey.ai:5007"
 
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
     b64_data = call_gpu_server(endpoint=endpoint, input_data=input_data)
     if not isinstance(b64_data, list):
         b64_data = [b64_data]
-    return [_b64_decode(item) for item in b64_data]
+    return [b64_img_decode(item) for item in b64_data]
 
 
-def _b64_decode(b64_data):
+def b64_img_decode(b64_data):
     return base64.b64decode(b64_data[b64_data.find(",") + 1 :])
 
 

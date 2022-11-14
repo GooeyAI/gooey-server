@@ -67,9 +67,7 @@ def daras_ai_step_config(
                         steps[idx], steps[idx + 1] = steps[idx + 1], steps[idx]
                         st.experimental_rerun()
                 with col3:
-                    if st.button(
-                        "🗑 Delete", help=f"Delete {verbose_name} {idx + 1}"
-                    ):
+                    if st.button("🗑 Delete", help=f"Delete {verbose_name} {idx + 1}"):
                         steps.pop(idx)
                         st.experimental_rerun()
                 fn(idx=idx, variables=variables, state=state)

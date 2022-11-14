@@ -3,6 +3,7 @@ import streamlit as st
 from decouple import config
 from pydantic import BaseModel
 
+from daras_ai_v2 import settings
 from daras_ai_v2.base import (
     BasePage,
 )
@@ -99,7 +100,7 @@ class ChyronPlantPage(BasePage):
         )
 
     def run(self, state: dict):
-        openai.api_key = config("OPENAI_API_KEY")
+        openai.api_key = settings.OPENAI_API_KEY
 
         yield "Translating MIDI..."
 

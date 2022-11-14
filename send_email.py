@@ -11,9 +11,17 @@ from daras_ai.image_input import upload_file_from_bytes
 
 
 def send_smtp_message(
-        smtp_server, smtp_username,
-        smtp_password, sender, to_address, cc_address,
-        subject_text, html_message, text_message, files=None):
+    smtp_server,
+    smtp_username,
+    smtp_password,
+    sender,
+    to_address,
+    cc_address,
+    subject_text,
+    html_message,
+    text_message,
+    files=None,
+):
     """
     Sends an email by using an Amazon Pinpoint SMTP server.
 
@@ -30,27 +38,24 @@ def send_smtp_message(
     :param text_message: The email body for recipients with non-HTML email clients.
     """
     # Create message container. The correct MIME type is multipart/alternative.
-    msg = MIMEMultipart('alternative')
-    msg['From'] = sender
-    msg['To'] = to_address
-    msg['Cc'] = cc_address
-    msg['Subject'] = subject_text
-    msg.attach(MIMEText(text_message, 'plain'))
+    msg = MIMEMultipart("alternative")
+    msg["From"] = sender
+    msg["To"] = to_address
+    msg["Cc"] = cc_address
+    msg["Subject"] = subject_text
+    msg.attach(MIMEText(text_message, "plain"))
     # html_message += "<h1>hiiiiii<img width='300px' src='https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a4691908-511d-11ed-8fcf-921309c00215/out.png'</h1>"
     for f in files or []:
-        if f.name.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')):
+        if f.name.lower().endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
             url = upload_file_from_bytes(filename=f.name, img_bytes=f.getvalue())
             html_message += f"<img width='300px', src='{url}'/><br>"
             # st.write(url)
         else:
             # TO SEND AS ATTACHMENT
-            part = MIMEApplication(
-                f.getvalue(),
-                Name=basename(f.name)
-            )
-            part['Content-Disposition'] = 'attachment; filename="%s"' % basename(f.name)
+            part = MIMEApplication(f.getvalue(), Name=basename(f.name))
+            part["Content-Disposition"] = 'attachment; filename="%s"' % basename(f.name)
             msg.attach(part)
-    msg.attach(MIMEText(html_message, 'html'))
+    msg.attach(MIMEText(html_message, "html"))
     smtp_server.ehlo()
     smtp_server.starttls()
     # smtplib docs recommend calling ehlo() before and after starttls()
@@ -64,10 +69,21 @@ def send_smtp_message(
 def send_email():
     print([to_email, from_email, files])
     try:
-        with smtplib.SMTP(config("AWS_SMTP_SERVER"), config("AWS_SMTP_PORT")) as smtp_server:
+        with smtplib.SMTP(
+            config("AWS_SMTP_SERVER"), config("AWS_SMTP_PORT")
+        ) as smtp_server:
             send_smtp_message(
-                smtp_server, config("AWS_SMTP_USERNAME"), config("AWS_SMTP_PASSWORD"), from_email, to_email,
-                "", subject, "", body, files=files)
+                smtp_server,
+                config("AWS_SMTP_USERNAME"),
+                config("AWS_SMTP_PASSWORD"),
+                from_email,
+                to_email,
+                "",
+                subject,
+                "",
+                body,
+                files=files,
+            )
     except Exception:
         st.error(body="Couldn't send message.", icon="⚠️")
         raise
@@ -81,9 +97,7 @@ with st.form(key="send_email", clear_on_submit=False):
     from_email = st.text_input(label="From")
     subject = st.text_input(label="Subject")
     body = st.text_area(label="Body")
-    files = st.file_uploader(label="Attachments",
-                             accept_multiple_files=True
-                             )
+    files = st.file_uploader(label="Attachments", accept_multiple_files=True)
     submitted = st.form_submit_button("Send")
     if submitted:
         send_email()

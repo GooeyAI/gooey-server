@@ -12,7 +12,7 @@ from decouple import config
 
 
 def get_audio(uuid):
-    with st.spinner(f'Generating your audio file ...'):
+    with st.spinner(f"Generating your audio file ..."):
         while True:
             data = requests.get(f"https://api.uberduck.ai/speak-status?uuid={uuid}")
             path = json.loads(data.text)["path"]
@@ -34,7 +34,7 @@ def main():
             response = requests.post(
                 "https://api.uberduck.ai/speak",
                 auth=(config("UBERDUCK_KEY"), config("UBERDUCK_SECRET")),
-                json={"speech": text, "voice": voice}
+                json={"speech": text, "voice": voice},
             )
             uuid = json.loads(response.text)["uuid"]
             get_audio(uuid)

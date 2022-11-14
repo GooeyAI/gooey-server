@@ -480,6 +480,19 @@ requests = ">=2.18.0,<3.0.0dev"
 protobuf = ["protobuf (<5.0.0dev)"]
 
 [[package]]
+name = "google-cloud-texttospeech"
+version = "2.12.1"
+description = "Google Cloud Text-to-Speech API client library"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+google-api-core = {version = ">=1.32.0,<2.0.0 || >=2.8.0,<3.0.0dev", extras = ["grpc"]}
+proto-plus = ">=1.22.0,<2.0.0dev"
+protobuf = ">=3.19.0,<5.0.0dev"
+
+[[package]]
 name = "google-crc32c"
 version = "1.5.0"
 description = "A python wrapper of the C library 'Google CRC32C'"
@@ -827,7 +840,7 @@ python-versions = ">=3.8"
 
 [[package]]
 name = "openai"
-version = "0.23.1"
+version = "0.25.0"
 description = "Python client library for the OpenAI API"
 category = "main"
 optional = false
@@ -1621,7 +1634,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "69f5435798193e4ebc6473263cb4f4cdd95e5cd758a62b05154e5573c489c3f6"
+content-hash = "9fba19c0b11cd060b973692bb13f6c11784762fbba65252d57db5c8073955bbf"
 
 [metadata.files]
 absl-py = [
@@ -1842,6 +1855,10 @@ google-cloud-firestore = [
 google-cloud-storage = [
     {file = "google-cloud-storage-2.5.0.tar.gz", hash = "sha256:382f34b91de2212e3c2e7b40ec079d27ee2e3dbbae99b75b1bcd8c63063ce235"},
     {file = "google_cloud_storage-2.5.0-py2.py3-none-any.whl", hash = "sha256:19a26c66c317ce542cea0830b7e787e8dac2588b6bfa4d3fd3b871ba16305ab0"},
+]
+google-cloud-texttospeech = [
+    {file = "google-cloud-texttospeech-2.12.1.tar.gz", hash = "sha256:256c189f3d76139e86ad4483a1ab41f296d2f92f42dd948fb310d6db919f0e10"},
+    {file = "google_cloud_texttospeech-2.12.1-py2.py3-none-any.whl", hash = "sha256:5255f3d64a7d7173893dd3323d53e6d2198f3e35350b266038840af9507cdf95"},
 ]
 google-crc32c = [
     {file = "google-crc32c-1.5.0.tar.gz", hash = "sha256:89284716bc6a5a415d4eaa11b1726d2d60a0cd12aadf5439828353662ede9dd7"},
@@ -2351,7 +2368,7 @@ numpy = [
     {file = "numpy-1.23.3.tar.gz", hash = "sha256:51bf49c0cd1d52be0a240aa66f3458afc4b95d8993d2d04f0d91fa60c10af6cd"},
 ]
 openai = [
-    {file = "openai-0.23.1.tar.gz", hash = "sha256:16703a2433c1fc71b913057062d00b86dd2ad714dfd7b2b1ab803ac9b31fba5f"},
+    {file = "openai-0.25.0.tar.gz", hash = "sha256:59ac6531e4f7bf8e9a53186e853d9ffb1d5f07973ecb4f7d273163a314814510"},
 ]
 opencv-contrib-python = [
     {file = "opencv-contrib-python-4.6.0.66.tar.gz", hash = "sha256:256efeb263999f3fb2427095392c1cb442d655508cd0a42864a383d55f3e6d43"},

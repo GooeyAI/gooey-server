@@ -170,6 +170,9 @@ google-cloud-firestore==2.7.0 ; python_version >= "3.10" and python_version < "4
 google-cloud-storage==2.5.0 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:19a26c66c317ce542cea0830b7e787e8dac2588b6bfa4d3fd3b871ba16305ab0 \
     --hash=sha256:382f34b91de2212e3c2e7b40ec079d27ee2e3dbbae99b75b1bcd8c63063ce235
+google-cloud-texttospeech==2.12.1 ; python_version >= "3.10" and python_version < "4.0" \
+    --hash=sha256:256c189f3d76139e86ad4483a1ab41f296d2f92f42dd948fb310d6db919f0e10 \
+    --hash=sha256:5255f3d64a7d7173893dd3323d53e6d2198f3e35350b266038840af9507cdf95
 google-crc32c==1.5.0 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:024894d9d3cfbc5943f8f230e23950cd4906b2fe004c72e29b209420a1e6b05a \
     --hash=sha256:02c65b9817512edc6a4ae7c7e987fea799d2e0ee40c53ec573a692bee24de876 \
@@ -614,8 +617,8 @@ numpy==1.23.3 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:efd9d3abe5774404becdb0748178b48a218f1d8c44e0375475732211ea47c67e \
     --hash=sha256:f8c02ec3c4c4fcb718fdf89a6c6f709b14949408e8cf2a2be5bfa9c49548fd85 \
     --hash=sha256:ffcf105ecdd9396e05a8e58e81faaaf34d3f9875f137c7372450baa5d77c9a54
-openai==0.23.1 ; python_version >= "3.10" and python_version < "4.0" \
-    --hash=sha256:16703a2433c1fc71b913057062d00b86dd2ad714dfd7b2b1ab803ac9b31fba5f
+openai==0.25.0 ; python_version >= "3.10" and python_version < "4.0" \
+    --hash=sha256:59ac6531e4f7bf8e9a53186e853d9ffb1d5f07973ecb4f7d273163a314814510
 opencv-contrib-python==4.6.0.66 ; platform_machine == "arm64" and sys_platform == "darwin" and python_version >= "3.10" and python_version < "4.0" or python_version >= "3.10" and python_version < "4.0" and platform_machine != "arm64" \
     --hash=sha256:1dcdd0c68ae8495668f8a3360f7da5a24bc490320f21fc819bf60e197bf5bd7e \
     --hash=sha256:243411366820ba73f185867d0d9f9b8d42296070068222d5e3e40ecdcbbb3b39 \

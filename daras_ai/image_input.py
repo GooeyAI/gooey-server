@@ -66,13 +66,13 @@ def image_input(idx, variables, state):
 
 
 @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
-def upload_file(uploaded_file):
+def upload_file(uploaded_file: UploadedFile):
     img_bytes = uploaded_file.getvalue()
     img_bytes = resize_img_pad(img_bytes, (512, 512))
     return upload_file_from_bytes(safe_filename(uploaded_file.name), img_bytes)
 
 
-def resize_img_pad(img_bytes, size):
+def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
     img_pil = ImageOps.pad(img_pil, size)
@@ -81,13 +81,13 @@ def resize_img_pad(img_bytes, size):
 
 
 @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
-def upload_file_hq(uploaded_file, *, resize=(1024, 1024)):
+def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
     img_bytes = uploaded_file.getvalue()
     img_bytes = resize_img_contain(img_bytes, resize)
     return upload_file_from_bytes(safe_filename(uploaded_file.name), img_bytes)
 
 
-def resize_img_contain(img_bytes, size):
+def resize_img_contain(img_bytes: bytes, size: (int, int)) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
     img_pil = ImageOps.contain(img_pil, size)
