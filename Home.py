@@ -11,12 +11,12 @@ from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Lipsync import LipsyncPage
+from pages.LipsyncTTS import LipsyncTTSPage
 from pages.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
 logo()
-
 
 st.write("---")
 
@@ -28,6 +28,7 @@ for page in [
     ImageSegmentationPage,
     CompareLMPage,
     TextToSpeechPage,
+    LipsyncTTSPage,
 ]:
     url = page.__module__.split(".")[-1]
     st.markdown(
@@ -45,7 +46,6 @@ for page in [
 st.write("")
 
 with st.expander("Old Recipes"):
-
     for snapshot in list_all_docs():
         snapshot: DocumentSnapshot
 
