@@ -23,6 +23,7 @@ from pages.FaceInpainting import FaceInpaintingPage
 from pages.ImageSegmentation import ImageSegmentationPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
+from pages.LipsyncTTS import LipsyncTTSPage
 
 from pages.TextToSpeech import TextToSpeechPage
 
@@ -202,6 +203,7 @@ all_pages = [
     CompareLMPage,
     ImageSegmentationPage,
     TextToSpeechPage,
+    LipsyncTTSPage,
 ]
 
 for page in all_pages:
