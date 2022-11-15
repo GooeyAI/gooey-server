@@ -222,7 +222,7 @@ class BasePage:
                 )
             with col2:
                 pressed_delete = st.button(
-                    "🗑️ Delete", help=f"delete {example_id}", key=f"delete-{example_id}"
+                    "🗑️ Delete", help=f"Delete example", key=f"delete-{example_id}",
                 )
                 if pressed_delete:
                     example = get_doc_ref(
@@ -236,7 +236,7 @@ class BasePage:
                             st.success("Deleted", icon="✅")
             with col3:
                 pressed_share = st.button(
-                    "✉️️ Share", help=f"share {example_id}", key=f"share-{example_id}"
+                    "✉️️ Share", help=f"Share example", key=f"share-{example_id}"
                 )
                 if pressed_share:
                     pyperclip.copy(
