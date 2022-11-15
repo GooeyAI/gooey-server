@@ -206,6 +206,7 @@ class BasePage:
         ]
 
     def _examples_tab(self):
+        allow_delete = check_secret_key("delete example")
         for snapshot in list_all_docs(
             document_id=self.doc_name,
             sub_collection_id="examples",
@@ -221,20 +222,6 @@ class BasePage:
                     unsafe_allow_html=True,
                 )
             with col2:
-                pressed_delete = st.button(
-                    "🗑️ Delete", help=f"Delete example", key=f"delete-{example_id}",
-                )
-                if pressed_delete:
-                    example = get_doc_ref(
-                        self.doc_name,
-                        sub_collection_id="examples",
-                        sub_document_id=example_id,
-                    )
-                    with st.spinner("deleting..."):
-                        deleted = example.delete()
-                        if deleted:
-                            st.success("Deleted", icon="✅")
-            with col3:
                 pressed_share = st.button(
                     "✉️️ Share", help=f"Share example", key=f"share-{example_id}"
                 )
@@ -244,6 +231,23 @@ class BasePage:
                         + f"/{doc_name_for_url}?example_id={example_id}"
                     )
                     st.success("Share URL Copied", icon="✅")
+            with col3:
+                if allow_delete:
+                    pressed_delete = st.button(
+                        "🗑️ Delete",
+                        help=f"Delete example",
+                        key=f"delete-{example_id}",
+                    )
+                    if pressed_delete:
+                        example = get_doc_ref(
+                            self.doc_name,
+                            sub_collection_id="examples",
+                            sub_document_id=example_id,
+                        )
+                        with st.spinner("deleting..."):
+                            deleted = example.delete()
+                            if deleted:
+                                st.success("Deleted", icon="✅")
 
             self.render_example(doc)
 
