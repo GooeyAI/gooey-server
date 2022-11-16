@@ -8,6 +8,8 @@ import requests
 from decouple import config
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
+from daras_ai_v2 import settings
+
 
 def send_email_via_postmark(
     *,
@@ -22,7 +24,7 @@ def send_email_via_postmark(
     requests.post(
         "https://api.postmarkapp.com/email",
         headers={
-            "X-Postmark-Server-Token": "1471a277-2b9d-4831-9975-5a8be6ef64bf",
+            "X-Postmark-Server-Token": settings.POSTMARK_API_TOKEN,
         },
         json={
             "From": from_address,
@@ -102,7 +104,6 @@ def send_smtp_message(
         part["Content-Disposition"] = 'attachment; filename="%s"' % basename(f.name)
         msg.attach(part)
 
-    html_message += "<br><br>Regards<br>daras.ai"
     msg.attach(MIMEText(html_message, "html"))
 
     with smtplib.SMTP(

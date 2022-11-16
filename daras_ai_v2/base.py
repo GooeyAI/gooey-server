@@ -28,7 +28,11 @@ class BasePage:
     ResponseModel: typing.Type[BaseModel]
 
     def render(self):
-        st.set_page_config(page_title=self.title + " - Gooey.AI")
+        st.set_page_config(
+            page_title=self.title + " - Gooey.AI",
+            # page_icon = "🧊",
+            layout="wide",
+        )
 
         logo()
         st.write("## " + self.title)
@@ -151,8 +155,7 @@ class BasePage:
             if time_taken:
                 with status_area:
                     st.success(
-                        f"Success! Run Time: `{time_taken:.2f}` seconds. "
-                        f"This GPU time is free while we're building daras.ai, Enjoy!",
+                        f"Success! Run Time: `{time_taken:.2f}` seconds. ",
                         icon="✅",
                     )
                     del st.session_state["__time_taken"]
@@ -277,7 +280,7 @@ def logo():
     st.markdown(
         f"""
         <a href="/" target="_self">
-            <img width=150 src="https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey-logo-rect.png"></img>
+            <img style="width:150px; height:71px" src="https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"></img>
         </a>
         <span style="position: absolute; right: 0px">
             <a href="https://dara.network/privacy/">Privacy</a> & 

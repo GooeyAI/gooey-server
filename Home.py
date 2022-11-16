@@ -15,7 +15,11 @@ from pages.LipsyncTTS import LipsyncTTSPage
 from pages.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
-
+st.set_page_config(
+    page_title="Home - Gooey.AI",
+    # page_icon="🧊",
+    layout="wide",
+)
 logo()
 
 st.write("---")
