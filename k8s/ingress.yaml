@@ -44,7 +44,7 @@ metadata:
     networking.gke.io/v1beta1.FrontendConfig: "https-redirect"
     kubernetes.io/ingress.allow-http: "true"
   labels:
-    app: gooey-api
+    app: gooey-streamlit
 spec:
   defaultBackend:
     service:
