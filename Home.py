@@ -27,12 +27,12 @@ st.write("---")
 for page in [
     FaceInpaintingPage,
     EmailFaceInpaintingPage,
-    LipsyncPage,
-    ChyronPlantPage,
-    ImageSegmentationPage,
-    CompareLMPage,
     TextToSpeechPage,
     LipsyncTTSPage,
+    CompareLMPage,
+    LipsyncPage,
+    #ChyronPlantPage,
+    #ImageSegmentationPage,
 ]:
     url = page.__module__.split(".")[-1]
     st.markdown(
