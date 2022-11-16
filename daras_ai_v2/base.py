@@ -29,8 +29,8 @@ class BasePage:
     def render(self):
         st.set_page_config(
             page_title=self.title + " - Gooey.AI",
-            #page_icon = "🧊",
-            layout = "wide",
+            # page_icon = "🧊",
+            layout="wide",
         )
 
         logo()
