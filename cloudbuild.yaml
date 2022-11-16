@@ -3,7 +3,6 @@ steps:
     args:
       - --destination=$_IMAGE_NAME:$COMMIT_SHA
       - --cache=true
-      - --cache-ttl=XXh
     id: Build
   - name: gcr.io/cloud-builders/docker
     args:
