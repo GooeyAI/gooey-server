@@ -49,7 +49,7 @@ for page in [
 
 st.write("")
 
-with st.expander("Old Recipes"):
+with st.expander("Early Recipes"):
     for snapshot in list_all_docs():
         snapshot: DocumentSnapshot
 
