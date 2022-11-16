@@ -104,7 +104,6 @@ def send_smtp_message(
         part["Content-Disposition"] = 'attachment; filename="%s"' % basename(f.name)
         msg.attach(part)
 
-    html_message += "<br><br>Regards<br>daras.ai"
     msg.attach(MIMEText(html_message, "html"))
 
     with smtplib.SMTP(
