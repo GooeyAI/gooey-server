@@ -275,7 +275,81 @@ spec:
                   name: service-account-key
           image: gcr.io/dara-c1b52/github.com/dara-network/ddgai
           imagePullPolicy: IfNotPresent
-          name: ddgai-1
+          name: gooey-streamlit
+          resources:
+            limits:
+              cpu: '4'
+              ephemeral-storage: 2Gi
+              memory: 4Gi
+            requests:
+              cpu: '4'
+              ephemeral-storage: 2Gi
+              memory: 4Gi
+          securityContext:
+            capabilities:
+              drop:
+                - NET_RAW
+        - env:
+            - name: API_SERVER
+              value: '1'
+            - name: DARS_API_ROOT
+              valueFrom:
+                configMapKeyRef:
+                  key: DARS_API_ROOT
+                  name: gooey-env-1
+            - name: OPENAI_API_KEY
+              valueFrom:
+                configMapKeyRef:
+                  key: OPENAI_API_KEY
+                  name: gooey-env-1
+            - name: GOOSEAI_API_KEY
+              valueFrom:
+                configMapKeyRef:
+                  key: GOOSEAI_API_KEY
+                  name: gooey-env-1
+            - name: REPLICATE_API_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  key: REPLICATE_API_TOKEN
+                  name: gooey-env-1
+            - name: GS_BUCKET_NAME
+              valueFrom:
+                configMapKeyRef:
+                  key: GS_BUCKET_NAME
+                  name: gooey-env-1
+            - name: SECRET_KEY
+              valueFrom:
+                configMapKeyRef:
+                  key: SECRET_KEY
+                  name: gooey-env-1
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                configMapKeyRef:
+                  key: GOOGLE_CLIENT_ID
+                  name: gooey-env-1
+            - name: UBERDUCK_KEY
+              valueFrom:
+                configMapKeyRef:
+                  key: UBERDUCK_KEY
+                  name: gooey-env-1
+            - name: UBERDUCK_SECRET
+              valueFrom:
+                configMapKeyRef:
+                  key: UBERDUCK_SECRET
+                  name: gooey-env-1
+            - name: POSTMARK_API_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  key: POSTMARK_API_TOKEN
+                  name: gooey-env-1
+            - name: GOOGLE_APPLICATION_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+                  name: service-account-key
+          image: gcr.io/dara-c1b52/github.com/dara-network/ddgai
+          imagePullPolicy: IfNotPresent
+          name: gooey-api
           resources:
             limits:
               cpu: '4'
