@@ -1,14 +1,14 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
-    args: ['-c', 'docker pull gcr.io/$PROJECT_ID/[IMAGE_NAME]:latest || exit 0']
+    args: ['-c', 'docker pull $_IMAGE_NAME:latest || exit 0']
   - name: gcr.io/cloud-builders/docker
     args:
       - build
       - '-t'
       - '$_IMAGE_NAME:$COMMIT_SHA'
       - '--cache-from'
-      - 'gcr.io/$PROJECT_ID/[IMAGE_NAME]:latest'
+      - '$_IMAGE_NAME:latest'
       - .
       - '-f'
       - $_DOCKERFILE_NAME
