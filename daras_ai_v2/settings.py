@@ -34,3 +34,5 @@ google_service_account_credentials = (
 )
 
 OPENAI_API_KEY = config("OPENAI_API_KEY")
+
+POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN")
