@@ -217,25 +217,34 @@ class BasePage:
             example_id = snapshot.id
             doc = snapshot.to_dict()
             doc_name_for_url = self.doc_name.split("#")[0]
+            url = f"{settings.BASE_URL}/{doc_name_for_url}?example_id={example_id}"
             col1, col2, col3, *_ = st.columns(3)
             with col1:
-                st.markdown(
-                    f"<a href='{doc_name_for_url}?example_id={example_id}'>✏️ Tweak</a>",
-                    unsafe_allow_html=True,
+                pressed_tweak = st.button(
+                    "✏️ Tweak", help=f"Tweak example", key=f"tweak-{example_id}"
                 )
+                if pressed_tweak:
+                    html(
+                        f"""
+                        <script>
+                            window.open("{url}", "_blank");
+                        </script>
+                        """,
+                        width=0,
+                        height=0,
+                    )
             with col2:
                 pressed_share = st.button(
                     "✉️️ Share", help=f"Share example", key=f"share-{example_id}"
                 )
                 if pressed_share:
-                    url = f"{settings.BASE_URL}/{doc_name_for_url}?example_id={example_id}"
                     html(
                         f"""
                     <script>
                            parent.navigator.clipboard.writeText("{url}").then(
                               (e) => console.log("success"),
                               (e) => console.log(e)
-                            );
+                           );
                     </script>
                     """,
                         height=0,
