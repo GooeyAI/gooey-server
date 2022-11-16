@@ -262,7 +262,7 @@ spec:
                   name: service-account-key
           image: gcr.io/dara-c1b52/github.com/dara-network/ddgai
           imagePullPolicy: IfNotPresent
-          name: ddgai-1
+          name: gooey-streamlit
           resources:
             limits:
               cpu: '4'
@@ -336,7 +336,7 @@ spec:
                   name: service-account-key
           image: gcr.io/dara-c1b52/github.com/dara-network/ddgai
           imagePullPolicy: IfNotPresent
-          name: ddgai-1
+          name: gooey-api
           resources:
             limits:
               cpu: '4'

@@ -1,14 +1,9 @@
 steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    entrypoint: 'bash'
-    args: ['-c', 'docker pull $_IMAGE_NAME:latest || exit 0']
-  - name: gcr.io/cloud-builders/docker
+  - name: 'gcr.io/kaniko-project/executor:latest'
     args:
       - build
       - '-t'
       - '$_IMAGE_NAME:$COMMIT_SHA'
-      - '--cache-from'
-      - '$_IMAGE_NAME:latest'
       - .
       - '-f'
       - $_DOCKERFILE_NAME
