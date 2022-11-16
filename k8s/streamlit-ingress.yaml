@@ -1,0 +1,40 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: gooey-us-1-app-cert
+spec:
+  domains:
+    - us-1.app.gooey.ai
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gooey-streamlit-service
+  labels:
+    app: gooey-streamlit
+spec:
+  type: NodePort
+  selector:
+    app: gooey-streamlit
+  ports:
+  - port: 8001
+    targetPort: 8001
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gooey-streamlit-1-ingress
+  annotations:
+    networking.gke.io/managed-certificates: gooey-us-1-app-cert
+    kubernetes.io/ingress.global-static-ip-name: gooey-streamlit
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/v1beta1.FrontendConfig: "https-redirect"
+    kubernetes.io/ingress.allow-http: "true"
+  labels:
+    app: gooey-streamlit
+spec:
+  defaultBackend:
+    service:
+      name: gooey-streamlit-service
+      port:
+        number: 8001
