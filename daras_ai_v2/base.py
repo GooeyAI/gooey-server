@@ -5,8 +5,8 @@ import shlex
 import typing
 from copy import deepcopy
 from time import time
+from streamlit.components.v1 import html
 
-import pyperclip
 import requests
 import streamlit as st
 from furl import furl
@@ -213,10 +213,9 @@ class BasePage:
         ):
             example_id = snapshot.id
             doc = snapshot.to_dict()
-
+            doc_name_for_url = self.doc_name.split("#")[0]
             col1, col2, col3, *_ = st.columns(3)
             with col1:
-                doc_name_for_url = self.doc_name.split("#")[0]
                 st.markdown(
                     f"<a href='{doc_name_for_url}?example_id={example_id}'>✏️ Tweak</a>",
                     unsafe_allow_html=True,
@@ -226,9 +225,17 @@ class BasePage:
                     "✉️️ Share", help=f"Share example", key=f"share-{example_id}"
                 )
                 if pressed_share:
-                    pyperclip.copy(
-                        settings.BASE_URL
-                        + f"/{doc_name_for_url}?example_id={example_id}"
+                    url = f"{settings.BASE_URL}/{doc_name_for_url}?example_id={example_id}"
+                    html(
+                        f"""
+                    <script>
+                           parent.navigator.clipboard.writeText("{url}").then(
+                              (e) => console.log("success"),
+                              (e) => console.log(e)
+                            );
+                    </script>
+                    """,
+                        height=0,
                     )
                     st.success("Share URL Copied", icon="✅")
             with col3:

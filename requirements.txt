@@ -841,8 +841,6 @@ pympler==1.0.1 ; python_version >= "3.10" and python_version < "4.0" \
 pyparsing==3.0.9 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:2b020ecf7d21b687f219b71ecad3631f644a47f01403fa1d1036b0c6416d70fb \
     --hash=sha256:5026bae9a10eeaefb61dab2f09052b9f4307d44aee4eda64b309723d8d206bbc
-pyperclip==1.8.2 ; python_version >= "3.10" and python_version < "4.0" \
-    --hash=sha256:105254a8b04934f0bc84e9c24eb360a591aaf6535c9def5f29d92af107a9bf57
 pyrsistent==0.18.1 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:0e3e1fcc45199df76053026a51cc59ab2ea3fc7c094c6627e93b7b44cdae2c8c \
     --hash=sha256:1b34eedd6812bf4d33814fca1b66005805d3640ce53140ab8bbb1e2651b0d9bc \
