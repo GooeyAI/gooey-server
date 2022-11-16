@@ -479,7 +479,7 @@ metadata:
       operation: Update
       subresource: status
       time: '2022-11-15T16:40:58Z'
-  name: gooey-streamlit-p4x9f
+  name: gooey-streamlit-service
   namespace: default
 spec:
   clusterIP: 10.18.129.33
@@ -492,7 +492,7 @@ spec:
   ports:
     - port: 80
       protocol: TCP
-      targetPort: 8000
+      targetPort: 8001
   selector:
     app: gooey-streamlit
   sessionAffinity: None
