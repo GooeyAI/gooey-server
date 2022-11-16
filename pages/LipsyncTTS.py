@@ -105,7 +105,40 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         yield from LipsyncPage.run(self, state)
 
     def render_example(self, state: dict):
-        LipsyncPage.render_example(self, state)
+        col1, col2 = st.columns(2)
+
+        with col1:
+            input_text = state.get("text_prompt")
+            if input_text:
+                st.write("Input Text")
+                st.write(input_text)
+            else:
+                st.empty()
+
+            #input_audio = state.get("input_audio")
+            #if input_audio:
+            #    st.write("Synthesized Voice")
+            #    st.audio(input_audio)
+            #else:
+            #    st.empty()
+
+            input_face = state.get("input_face")
+            if not input_face:
+                st.empty()
+            elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
+                st.write("Input Face (Video)")
+                st.video(input_face)
+            else:
+                st.write("Input Face (Image)")
+                st.image(input_face)
+
+        with col2:
+            output_video = state.get("output_video")
+            if output_video:
+                st.write("Output Video")
+                st.video(output_video)
+            else:
+                st.empty()
 
     def render_output(self):
         self.render_example(st.session_state)
