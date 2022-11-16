@@ -231,10 +231,7 @@ with tab1:
                 start = time()
                 run_compute_steps(st.session_state["compute_steps"], variables)
                 time_taken = time() - start
-            st.caption(
-                f"**Run Time** `{time_taken:.1f}` seconds. "
-                f"This GPU time is free while we're building daras.ai, Enjoy!"
-            )
+            st.caption(f"**Run Time** `{time_taken:.1f}` seconds. ")
 
         st.write("### Output")
         render_io_steps("output_steps")
