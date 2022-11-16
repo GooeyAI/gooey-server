@@ -79,7 +79,7 @@ class FaceInpaintingPage(BasePage):
                 Describe the character that you'd like to generate. 
                 """
             )
-            st.text_input(
+            st.text_area(
                 "text_prompt",
                 label_visibility="collapsed",
                 key="text_prompt",

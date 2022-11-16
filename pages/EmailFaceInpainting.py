@@ -85,7 +85,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 Describe the scene that you'd like to generate around the face. 
                 """
             )
-            st.text_input(
+            st.text_area(
                 "text_prompt",
                 label_visibility="collapsed",
                 key="text_prompt",
