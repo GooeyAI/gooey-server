@@ -1,13 +1,9 @@
 steps:
   - name: 'gcr.io/kaniko-project/executor:latest'
     args:
-      - build
-      - '-t'
-      - '$_IMAGE_NAME:$COMMIT_SHA'
-      - .
-      - '-f'
-      - $_DOCKERFILE_NAME
-    dir: $_DOCKERFILE_DIR
+      - --destination=$_IMAGE_NAME:$COMMIT_SHA
+      - --cache=true
+      - --cache-ttl=XXh
     id: Build
   - name: gcr.io/cloud-builders/docker
     args:
