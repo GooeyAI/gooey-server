@@ -18,7 +18,7 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
 class FaceInpaintingPage(BasePage):
-    title = "You in a Christmas Greeting"
+    title = "A Face in Any Scene"
     doc_name = "FaceInpainting#2"
     endpoint = "/v1/FaceInpainting/run"
 
@@ -57,14 +57,17 @@ class FaceInpaintingPage(BasePage):
 
     def render_description(self):
         st.write(
-            """
-    *Face Inpainting: Profile pic > Face Masking > Stable Diffusion > GFPGAN*
+            """    
+    This recipe takes a photo with a face and then uses the text prompt to paint a background.
     
     How It Works:
     
     1. Extracts faces from any image using MediaPipe
-    2. Generates images from the given prompt and inpaints with Stable diffusion
-    3. Improves faces using gfpgan    
+    2. Generates images from the given prompt and paints a background scene with Stable diffusion
+    3. Improves faces using GFPGAN    
+    
+    *Face Inpainting: Photo > Face Masking > Stable Diffusion > GFPGAN*
+
     """
         )
 

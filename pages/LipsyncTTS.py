@@ -9,7 +9,7 @@ from pages.TextToSpeech import TextToSpeechPage
 
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
-    title = "Lip Syncing with Text to speech"
+    title = "Lipsync from Any Video + Text"
     doc_name = "LipsyncTTS"
     endpoint = "/v1/LipsyncTTS/run"
 
@@ -83,13 +83,14 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     def render_description(self):
         st.write(
             """
-                *Converts text to audio and Lipsyncs with video*
+                This recipe takes any text and a video of a person (plus the voice defined in Settings) to create a lipsync'd video of that person speaking your text.
 
                 How It Works:
 
-                1. Takes Text input + Face input
-                2. Generates audio file in voice of your choice 
-                3. Merges the audio and video.
+                1. Takes any text + a video (with a face in it)
+                2. Generates audio file in voice of your choice
+                3. Merges the audio and video
+                4. Renders a lipsynced video with your text
             """
         )
 
