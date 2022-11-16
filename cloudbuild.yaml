@@ -40,8 +40,6 @@ steps:
       - '--location=$_GKE_LOCATION'
       - '--namespace=$_K8S_NAMESPACE'
     id: Apply deploy
-images:
-  - '$_IMAGE_NAME:$COMMIT_SHA'
 options:
   substitutionOption: ALLOW_LOOSE
 substitutions:
