@@ -305,7 +305,7 @@ def get_doc_ref(
 
 
 def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
-    if not check_secret_key("run as API"):
+    if not check_secret_key("run as API", settings.API_SECRET_KEY):
         return
 
     api_docs_url = str(furl(settings.DARS_API_ROOT) / "docs")
