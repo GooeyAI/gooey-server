@@ -29,7 +29,7 @@ metadata:
 spec:
   defaultBackend:
     service:
-      name: gooey-streamlit-service
+      name: gooey-service
       port:
         number: 8001
 ---
@@ -48,6 +48,6 @@ metadata:
 spec:
   defaultBackend:
     service:
-      name: gooey-api-service
+      name: gooey-service
       port:
         number: 8002
