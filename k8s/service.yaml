@@ -10,6 +10,8 @@ spec:
     app: gooey-streamlit
   ports:
   - port: 8001
+    name: app-port
     targetPort: 8001
   - port: 8002
+    name: api-port
     targetPort: 8002
