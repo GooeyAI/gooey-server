@@ -50,7 +50,7 @@ def gfpgan(img: str) -> bytes:
         input_data={
             "img": img,
             "version": "v1.4",
-            "scale": 2,
+            "scale": 1,
         },
     )[0]
     # model = replicate.models.get("tencentarc/gfpgan")
