@@ -36,3 +36,6 @@ google_service_account_credentials = (
 OPENAI_API_KEY = config("OPENAI_API_KEY")
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN")
+
+GPU_SERVER_1 = config("GPU_SERVER_1", "http://gpu-1.gooey.ai")
+GPU_SERVER_2 = config("GPU_SERVER_2", "http://gpu-2.gooey.ai")
