@@ -18,14 +18,61 @@ metadata:
     - apiVersion: apps/v1
       fieldsType: FieldsV1
       fieldsV1:
+        'f:metadata':
+          'f:labels':
+            .: {}
+            'f:app': {}
+        'f:spec':
+          'f:progressDeadlineSeconds': {}
+          'f:revisionHistoryLimit': {}
+          'f:selector': {}
+          'f:strategy':
+            'f:rollingUpdate':
+              .: {}
+              'f:maxSurge': {}
+              'f:maxUnavailable': {}
+            'f:type': {}
+          'f:template':
+            'f:metadata':
+              'f:labels':
+                .: {}
+                'f:app': {}
+            'f:spec':
+              'f:dnsPolicy': {}
+              'f:restartPolicy': {}
+              'f:schedulerName': {}
+              'f:securityContext': {}
+              'f:terminationGracePeriodSeconds': {}
+      manager: GoogleCloudConsole
+      operation: Update
+      time: '2022-11-16T05:35:19Z'
+    - apiVersion: apps/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        'f:metadata':
+          'f:annotations':
+            'f:gcb-build-id': {}
+            'f:kubectl.kubernetes.io/last-applied-configuration': {}
+          'f:labels':
+            'f:app.kubernetes.io/version': {}
         'f:spec':
           'f:template':
+            'f:metadata':
+              'f:annotations':
+                'f:gcb-build-id': {}
+              'f:labels':
+                'f:app.kubernetes.io/version': {}
             'f:spec':
               'f:containers':
                 'k:{"name":"ddgai-1"}':
+                  .: {}
                   'f:env':
+                    .: {}
                     'k:{"name":"DARS_API_ROOT"}':
+                      .: {}
+                      'f:name': {}
                       'f:valueFrom':
+                        .: {}
                         'f:configMapKeyRef': {}
                     'k:{"name":"GOOGLE_APPLICATION_CREDENTIALS_JSON"}':
                       .: {}
@@ -75,6 +122,10 @@ metadata:
                       'f:valueFrom':
                         .: {}
                         'f:configMapKeyRef': {}
+                    'k:{"name":"STREAMLIT_SERVER"}':
+                      .: {}
+                      'f:name': {}
+                      'f:value': {}
                     'k:{"name":"UBERDUCK_KEY"}':
                       .: {}
                       'f:name': {}
@@ -87,68 +138,31 @@ metadata:
                       'f:valueFrom':
                         .: {}
                         'f:configMapKeyRef': {}
+                  'f:image': {}
+                  'f:imagePullPolicy': {}
+                  'f:name': {}
                   'f:resources':
+                    .: {}
                     'f:limits':
+                      .: {}
                       'f:cpu': {}
                       'f:ephemeral-storage': {}
                       'f:memory': {}
                     'f:requests':
+                      .: {}
                       'f:cpu': {}
                       'f:ephemeral-storage': {}
                       'f:memory': {}
-      manager: kubectl-edit
-      operation: Update
-      time: '2022-11-13T20:54:58Z'
-    - apiVersion: apps/v1
-      fieldsType: FieldsV1
-      fieldsV1:
-        'f:metadata':
-          'f:labels':
-            .: {}
-            'f:app': {}
-        'f:spec':
-          'f:progressDeadlineSeconds': {}
-          'f:revisionHistoryLimit': {}
-          'f:selector': {}
-          'f:strategy':
-            'f:rollingUpdate':
-              .: {}
-              'f:maxSurge': {}
-              'f:maxUnavailable': {}
-            'f:type': {}
-          'f:template':
-            'f:metadata':
-              'f:labels':
-                .: {}
-                'f:app': {}
-            'f:spec':
-              'f:containers':
-                'k:{"name":"ddgai-1"}':
-                  .: {}
-                  'f:env':
+                  'f:securityContext':
                     .: {}
-                    'k:{"name":"DARS_API_ROOT"}':
+                    'f:capabilities':
                       .: {}
-                      'f:name': {}
-                      'f:valueFrom': {}
-                    'k:{"name":"STREAMLIT_SERVER"}':
-                      .: {}
-                      'f:name': {}
-                      'f:value': {}
-                  'f:image': {}
-                  'f:imagePullPolicy': {}
-                  'f:name': {}
-                  'f:resources': {}
+                      'f:drop': {}
                   'f:terminationMessagePath': {}
                   'f:terminationMessagePolicy': {}
-              'f:dnsPolicy': {}
-              'f:restartPolicy': {}
-              'f:schedulerName': {}
-              'f:securityContext': {}
-              'f:terminationGracePeriodSeconds': {}
-      manager: GoogleCloudConsole
+      manager: kubectl-client-side-apply
       operation: Update
-      time: '2022-11-16T05:35:19Z'
+      time: '2022-11-16T07:03:18Z'
     - apiVersion: apps/v1
       fieldsType: FieldsV1
       fieldsV1:
@@ -178,12 +192,11 @@ metadata:
           'f:observedGeneration': {}
           'f:readyReplicas': {}
           'f:replicas': {}
-          'f:unavailableReplicas': {}
           'f:updatedReplicas': {}
       manager: kube-controller-manager
       operation: Update
       subresource: status
-      time: '2022-11-16T05:36:26Z'
+      time: '2022-11-16T07:06:25Z'
   name: gooey-streamlit
   namespace: default
 spec:
@@ -262,81 +275,7 @@ spec:
                   name: service-account-key
           image: gcr.io/dara-c1b52/github.com/dara-network/ddgai
           imagePullPolicy: IfNotPresent
-          name: gooey-streamlit
-          resources:
-            limits:
-              cpu: '4'
-              ephemeral-storage: 2Gi
-              memory: 4Gi
-            requests:
-              cpu: '4'
-              ephemeral-storage: 2Gi
-              memory: 4Gi
-          securityContext:
-            capabilities:
-              drop:
-                - NET_RAW
-        - env:
-            - name: API_SERVER
-              value: '1'
-            - name: DARS_API_ROOT
-              valueFrom:
-                configMapKeyRef:
-                  key: DARS_API_ROOT
-                  name: gooey-env-1
-            - name: OPENAI_API_KEY
-              valueFrom:
-                configMapKeyRef:
-                  key: OPENAI_API_KEY
-                  name: gooey-env-1
-            - name: GOOSEAI_API_KEY
-              valueFrom:
-                configMapKeyRef:
-                  key: GOOSEAI_API_KEY
-                  name: gooey-env-1
-            - name: REPLICATE_API_TOKEN
-              valueFrom:
-                configMapKeyRef:
-                  key: REPLICATE_API_TOKEN
-                  name: gooey-env-1
-            - name: GS_BUCKET_NAME
-              valueFrom:
-                configMapKeyRef:
-                  key: GS_BUCKET_NAME
-                  name: gooey-env-1
-            - name: SECRET_KEY
-              valueFrom:
-                configMapKeyRef:
-                  key: SECRET_KEY
-                  name: gooey-env-1
-            - name: GOOGLE_CLIENT_ID
-              valueFrom:
-                configMapKeyRef:
-                  key: GOOGLE_CLIENT_ID
-                  name: gooey-env-1
-            - name: UBERDUCK_KEY
-              valueFrom:
-                configMapKeyRef:
-                  key: UBERDUCK_KEY
-                  name: gooey-env-1
-            - name: UBERDUCK_SECRET
-              valueFrom:
-                configMapKeyRef:
-                  key: UBERDUCK_SECRET
-                  name: gooey-env-1
-            - name: POSTMARK_API_TOKEN
-              valueFrom:
-                configMapKeyRef:
-                  key: POSTMARK_API_TOKEN
-                  name: gooey-env-1
-            - name: GOOGLE_APPLICATION_CREDENTIALS_JSON
-              valueFrom:
-                secretKeyRef:
-                  key: GOOGLE_APPLICATION_CREDENTIALS_JSON
-                  name: service-account-key
-          image: gcr.io/dara-c1b52/github.com/dara-network/ddgai
-          imagePullPolicy: IfNotPresent
-          name: gooey-api
+          name: ddgai-1
           resources:
             limits:
               cpu: '4'
@@ -418,6 +357,18 @@ metadata:
       operation: Update
       subresource: status
       time: '2022-11-12T17:46:24Z'
+    - apiVersion: autoscaling/v2
+      fieldsType: FieldsV1
+      fieldsV1:
+        'f:metadata':
+          'f:annotations':
+            'f:gcb-build-id': {}
+            'f:kubectl.kubernetes.io/last-applied-configuration': {}
+          'f:labels':
+            'f:app.kubernetes.io/version': {}
+      manager: kubectl-client-side-apply
+      operation: Update
+      time: '2022-11-16T07:03:19Z'
   name: gooey-streamlit-hpa-u5pa
   namespace: default
 spec:
@@ -441,7 +392,7 @@ metadata:
   annotations:
     cloud.google.com/neg: '{"ingress":true}'
     cloud.google.com/neg-status: >-
-      {"network_endpoint_groups":{"80":"k8s1-61b64d54-default-gooey-streamlit-p4x9f-80-9ead6c05"},"zones":["us-central1-a","us-central1-c","us-central1-f"]}
+      {"network_endpoint_groups":{"8001":"k8s1-61b64d54-default-gooey-streamlit-8s7x9-8001-c86daa0d"},"zones":["us-central1-b","us-central1-c","us-central1-f"]}
   generateName: gooey-streamlit-
   labels:
     app: gooey-streamlit
@@ -454,12 +405,22 @@ metadata:
           'f:labels':
             .: {}
             'f:app': {}
+            'f:app.kubernetes.io/managed-by': {}
+            'f:app.kubernetes.io/name': {}
+            'f:app.kubernetes.io/version': {}
         'f:spec':
           'f:internalTrafficPolicy': {}
           'f:ports':
             .: {}
-            'k:{"port":80,"protocol":"TCP"}':
+            'k:{"port":8001,"protocol":"TCP"}':
               .: {}
+              'f:name': {}
+              'f:port': {}
+              'f:protocol': {}
+              'f:targetPort': {}
+            'k:{"port":8002,"protocol":"TCP"}':
+              .: {}
+              'f:name': {}
               'f:port': {}
               'f:protocol': {}
               'f:targetPort': {}
@@ -468,7 +429,7 @@ metadata:
           'f:type': {}
       manager: GoogleCloudConsole
       operation: Update
-      time: '2022-11-15T16:33:04Z'
+      time: '2022-11-16T07:04:49Z'
     - apiVersion: v1
       fieldsType: FieldsV1
       fieldsV1:
@@ -478,19 +439,24 @@ metadata:
       manager: glbc
       operation: Update
       subresource: status
-      time: '2022-11-15T16:40:58Z'
-  name: gooey-streamlit-service
+      time: '2022-11-16T07:06:34Z'
+  name: gooey-streamlit-8s7x9
   namespace: default
 spec:
-  clusterIP: 10.18.129.33
+  clusterIP: 10.18.129.202
   clusterIPs:
-    - 10.18.129.33
+    - 10.18.129.202
   internalTrafficPolicy: Cluster
   ipFamilies:
     - IPv4
   ipFamilyPolicy: SingleStack
   ports:
-    - port: 80
+    - name: 8002-to-8002-tcp
+      port: 8002
+      protocol: TCP
+      targetPort: 8002
+    - name: 8001-to-8001-tcp
+      port: 8001
       protocol: TCP
       targetPort: 8001
   selector:
