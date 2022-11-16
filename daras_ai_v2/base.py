@@ -254,13 +254,13 @@ def set_saved_doc(
     saved_state.update(updated_state)
 
 
-@st.cache(
-    allow_output_mutation=True,
-    show_spinner=False,
-    hash_funcs={
-        firestore.DocumentReference: lambda doc_ref: doc_ref.path,
-    },
-)
+# @st.cache(
+#     allow_output_mutation=True,
+#     show_spinner=False,
+#     hash_funcs={
+#         firestore.DocumentReference: lambda doc_ref: doc_ref.path,
+#     },
+# )
 def get_saved_doc(doc_ref: firestore.DocumentReference) -> dict:
     return get_saved_doc_nocahe(doc_ref)
 
@@ -273,7 +273,7 @@ def get_saved_doc_nocahe(doc_ref):
     return doc.to_dict()
 
 
-@cache_and_refresh
+# @cache_and_refresh
 def list_all_docs(
     collection_id="daras-ai-v2",
     *,
