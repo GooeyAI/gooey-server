@@ -27,7 +27,11 @@ class BasePage:
     ResponseModel: typing.Type[BaseModel]
 
     def render(self):
-        st.set_page_config(page_title=self.title + " - Gooey.AI")
+        st.set_page_config(
+            page_title=self.title + " - Gooey.AI",
+            #page_icon = "🧊",
+            layout = "wide",
+        )
 
         logo()
         st.write("## " + self.title)
