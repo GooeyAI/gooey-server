@@ -29,8 +29,8 @@ class BasePage:
     def render(self):
         st.set_page_config(
             page_title=self.title + " - Gooey.AI",
-            #page_icon = "🧊",
-            layout = "wide",
+            page_icon="static/favicon.png",
+            layout="wide",
         )
 
         logo()
@@ -254,13 +254,13 @@ def set_saved_doc(
     saved_state.update(updated_state)
 
 
-@st.cache(
-    allow_output_mutation=True,
-    show_spinner=False,
-    hash_funcs={
-        firestore.DocumentReference: lambda doc_ref: doc_ref.path,
-    },
-)
+# @st.cache(
+#     allow_output_mutation=True,
+#     show_spinner=False,
+#     hash_funcs={
+#         firestore.DocumentReference: lambda doc_ref: doc_ref.path,
+#     },
+# )
 def get_saved_doc(doc_ref: firestore.DocumentReference) -> dict:
     return get_saved_doc_nocahe(doc_ref)
 
@@ -273,7 +273,7 @@ def get_saved_doc_nocahe(doc_ref):
     return doc.to_dict()
 
 
-@cache_and_refresh
+# @cache_and_refresh
 def list_all_docs(
     collection_id="daras-ai-v2",
     *,
@@ -305,7 +305,7 @@ def get_doc_ref(
 
 
 def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
-    if not check_secret_key("run as API"):
+    if not check_secret_key("run as API", settings.API_SECRET_KEY):
         return
 
     api_docs_url = str(furl(settings.DARS_API_ROOT) / "docs")
