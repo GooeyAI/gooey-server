@@ -42,20 +42,23 @@ def face_restoration(idx, variables, state):
 
     match selected_model:
         case "gfpgan":
-            variables[img_output_var] = map_parallel(gfpgan, input_images)
+            variables[img_output_var] = map_parallel(gfpgan_replicate, input_images)
+
+
+def gfpgan_replicate(img: str):
+    model = replicate.models.get("tencentarc/gfpgan")
+    return model.predict(img=img)
 
 
 def gfpgan(img: str) -> bytes:
-    # return call_gpu_server_b64(
-    #     endpoint=GpuEndpoints.gfpgan,
-    #     input_data={
-    #         "img": img,
-    #         "version": "v1.4",
-    #         "scale": 1,
-    #     },
-    # )[0]
-    model = replicate.models.get("tencentarc/gfpgan")
-    return model.predict(img=img)
+    return call_gpu_server_b64(
+        endpoint=GpuEndpoints.gfpgan,
+        input_data={
+            "img": img,
+            "version": "v1.4",
+            "scale": 1,
+        },
+    )[0]
 
 
 def map_parallel(fn, it):
