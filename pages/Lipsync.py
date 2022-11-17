@@ -11,8 +11,7 @@ from daras_ai_v2.lipsync_api import wav2lip
 
 class LipsyncPage(BasePage):
     title = "Lip Syncing"
-    doc_name = "Lipsync"
-    endpoint = "/v1/Lipsync/run"
+    slug = "Lipsync"
 
     class RequestModel(BaseModel):
         input_face: str

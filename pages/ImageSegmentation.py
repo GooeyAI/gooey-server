@@ -11,8 +11,8 @@ from daras_ai_v2.image_segmentation import u2net
 
 class ImageSegmentationPage(BasePage):
     title = "Image Segmentation"
-    doc_name = "ImageSegmentation#2"
-    endpoint = "/v1/ImageSegmentation/run"
+    slug = "ImageSegmentation"
+    version = 2
 
     class RequestModel(BaseModel):
         input_image: str
