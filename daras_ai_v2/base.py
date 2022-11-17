@@ -68,6 +68,13 @@ class BasePage:
                     st.session_state.update(
                         deepcopy(get_saved_doc(get_doc_ref(self.doc_name)))
                     )
+
+            with st.spinner("Loading Examples..."):
+                st.session_state["__example_docs"] = list_all_docs(
+                    document_id=self.doc_name,
+                    sub_collection_id="examples",
+                )
+
             st.session_state["__loaded__"] = True
 
         with settings_tab:
@@ -221,15 +228,21 @@ class BasePage:
 
     def _examples_tab(self):
         allow_delete = check_secret_key("delete example")
-        for snapshot in list_all_docs(
-            document_id=self.doc_name,
-            sub_collection_id="examples",
-        ):
+
+        for snapshot in st.session_state.get("__example_docs", []):
             example_id = snapshot.id
             doc = snapshot.to_dict()
-            doc_name_for_url = self.doc_name.split("#")[0]
-            url = f"{settings.BASE_URL}/{doc_name_for_url}?example_id={example_id}"
+
+            url = (
+                furl(
+                    settings.APP_BASE_URL,
+                    query_params={"example_id": example_id},
+                )
+                / self.slug
+            ).url
+
             col1, col2, col3, *_ = st.columns(3)
+
             with col1:
                 pressed_tweak = st.button(
                     "✏️ Tweak", help=f"Tweak example", key=f"tweak-{example_id}"
@@ -244,6 +257,7 @@ class BasePage:
                         width=0,
                         height=0,
                     )
+
             with col2:
                 pressed_share = st.button(
                     "✉️️ Share", help=f"Share example", key=f"share-{example_id}"
@@ -261,6 +275,7 @@ class BasePage:
                         height=0,
                     )
                     st.success("Share URL Copied", icon="✅")
+
             with col3:
                 if allow_delete:
                     pressed_delete = st.button(
@@ -278,6 +293,7 @@ class BasePage:
                             deleted = example.delete()
                             if deleted:
                                 st.success("Deleted", icon="✅")
+                            st.experimental_rerun()
 
             self.render_example(doc)
 
