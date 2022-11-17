@@ -236,7 +236,7 @@ class BasePage:
 
             url = (
                 furl(
-                    settings.DARS_API_ROOT,
+                    settings.APP_BASE_URL,
                     query_params={"example_id": example_id},
                 )
                 / self.slug
@@ -365,8 +365,8 @@ def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
     if not check_secret_key("run as API", settings.API_SECRET_KEY):
         return
 
-    api_docs_url = str(furl(settings.DARS_API_ROOT) / "docs")
-    api_url = str(furl(settings.DARS_API_ROOT) / endpoint)
+    api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
+    api_url = str(furl(settings.API_BASE_URL) / endpoint)
 
     request_body = get_example_request_body(request_model, st.session_state)
 
