@@ -26,8 +26,8 @@ page_classes = [
     LipsyncTTSPage,
     CompareLMPage,
     LipsyncPage,
-    #ChyronPlantPage,
-    #ImageSegmentationPage,
+    # ChyronPlantPage,
+    # ImageSegmentationPage,
 ]
 
 pages = [page_cls() for page_cls in page_classes]

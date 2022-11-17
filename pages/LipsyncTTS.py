@@ -114,11 +114,11 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             else:
                 st.empty()
 
-            #input_audio = state.get("input_audio")
-            #if input_audio:
+            # input_audio = state.get("input_audio")
+            # if input_audio:
             #    st.write("Synthesized Voice")
             #    st.audio(input_audio)
-            #else:
+            # else:
             #    st.empty()
 
             input_face = state.get("input_face")
