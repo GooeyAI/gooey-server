@@ -52,7 +52,7 @@ class DeforumSDPage(BasePage):
         out_video_bytes = call_gpu_server_b64(
             endpoint=GpuEndpoints.deforum_sd,
             input_data={
-                "max_frames": 100,
+                "max_frames": request.max_frames,
                 "animation_prompts": request.input_prompt,
             },
         )[0]
