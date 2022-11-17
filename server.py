@@ -227,12 +227,16 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
 
 
 def _st_page(request: Request, iframe_url: str, *, context: dict):
+    f = furl(iframe_url)
+    f.query.params["embed"] = "true"
+    f.query.params.update(**request.query_params)  # pass down query params
+
     return templates.TemplateResponse(
         "app.html",
         context={
             "user": request.session.get("user"),
             "request": request,
-            "iframe_url": iframe_url,
+            "iframe_url": f.url,
             "settings": settings,
             **context,
         },
