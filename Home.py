@@ -17,14 +17,14 @@ from pages.TextToSpeech import TextToSpeechPage
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
 st.set_page_config(
     page_title="Home - Gooey.AI",
-    # page_icon="🧊",
+    page_icon="static/favicon.png",
     layout="wide",
 )
 logo()
 
 st.write("---")
 
-for page in [
+for page_cls in [
     FaceInpaintingPage,
     EmailFaceInpaintingPage,
     LipsyncPage,
@@ -34,7 +34,9 @@ for page in [
     TextToSpeechPage,
     LipsyncTTSPage,
 ]:
+    page = page_cls()
     url = page.__module__.split(".")[-1]
+
     st.markdown(
         f"""
         <a style="font-size: 24px" href="/{url}" target = "_self">
@@ -44,7 +46,10 @@ for page in [
         unsafe_allow_html=True,
     )
     st.write("")
-    page().render_example(get_saved_doc(get_doc_ref(page.doc_name)))
+
+    example_doc = get_saved_doc(get_doc_ref(page.doc_name))
+    page.render_example(example_doc)
+
     st.write("---")
 
 st.write("")

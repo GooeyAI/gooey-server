@@ -163,15 +163,18 @@ class RunFailedModel(BaseModel):
     error: str
 
 
-def script_to_api(page: typing.Type[BasePage]):
-    body_spec = Body(examples=page.RequestModel.Config.schema_extra.get("examples"))
+def script_to_api(page_cls: typing.Type[BasePage]):
+    body_spec = Body(examples=page_cls.RequestModel.Config.schema_extra.get("examples"))
 
     @app.post(
-        page.endpoint,
-        response_model=page.ResponseModel,
+        page_cls().endpoint,
+        response_model=page_cls.ResponseModel,
         responses={500: {"model": RunFailedModel}},
     )
-    def run_api(request: page.RequestModel = body_spec):
+    def run_api(request: page_cls.RequestModel = body_spec):
+        # init a new page for every request
+        page = page_cls()
+
         # get saved state from db
         state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
 
@@ -184,7 +187,7 @@ def script_to_api(page: typing.Type[BasePage]):
 
         # run the script
         try:
-            all(page().run(state))
+            all(page.run(state))
         except Exception as e:
             return JSONResponse(
                 status_code=500, content={"error": f"{type(e).__name__} - {e}"}
@@ -206,5 +209,10 @@ all_pages = [
     LipsyncTTSPage,
 ]
 
-for page in all_pages:
-    script_to_api(page)
+
+def setup_pages():
+    for page_cls in all_pages:
+        script_to_api(page_cls)
+
+
+setup_pages()

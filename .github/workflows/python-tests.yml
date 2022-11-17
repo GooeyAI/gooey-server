@@ -29,4 +29,4 @@ jobs:
         secrets: ${{ toJSON(secrets) }}
 
     - name: Test with pytest
-      run: pytest -s
+      run: pytest
