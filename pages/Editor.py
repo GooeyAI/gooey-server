@@ -141,7 +141,7 @@ def render_io_steps(key):
 # main
 #
 
-st.set_page_config(layout="wide")
+logo()
 
 recipe_id = get_or_create_doc_id()
 cached_state = get_firestore_doc(recipe_id)
@@ -156,7 +156,6 @@ st.session_state.setdefault("output_steps", [])
 st.session_state.setdefault("variables", {})
 variables = st.session_state["variables"]
 
-logo()
 
 tab1, tab2, tab3 = st.tabs(["Run Recipe 🏃‍♂️", "Edit Recipe ✍️", "Run as API 🚀"])
 

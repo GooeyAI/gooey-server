@@ -5,7 +5,9 @@ from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from furl import furl
 from google.auth.transport import requests
 from google.cloud import firestore
 from google.oauth2 import id_token
@@ -24,7 +26,6 @@ from pages.ImageSegmentation import ImageSegmentationPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
-
 from pages.TextToSpeech import TextToSpeechPage
 
 app = FastAPI(title="DarasAI")
@@ -36,10 +37,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
-
-app.add_middleware(SessionMiddleware, secret_key="loveudara")
 
 
 @app.post("/auth", status_code=302)
@@ -77,15 +78,15 @@ async def authentication(request: Request):
         return RedirectResponse(url="/error", status_code=302)
 
 
-@app.get("/")
-def check(request: Request):
-    user = request.session.get("user")
-    user_logged_in = False
-    if user:
-        user_logged_in = True
-    return templates.TemplateResponse(
-        "index.html", context={"request": request, "user_logged_in": user_logged_in}
-    )
+# @app.get("/")
+# def check(request: Request):
+#     user = request.session.get("user")
+#     user_logged_in = False
+#     if user:
+#         user_logged_in = True
+#     return templates.TemplateResponse(
+#         "index.html", context={"request": request, "user_logged_in": user_logged_in}
+#     )
 
 
 @app.route("/logout")
@@ -197,6 +198,51 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         return state
 
 
+@app.get("/")
+async def st_home(request: Request):
+    iframe_url = furl(settings.APP_BASE_URL)
+    return templates.TemplateResponse(
+        "app.html",
+        context={
+            "title": "Home - Gooey.AI",
+            "request": request,
+            "iframe_url": iframe_url,
+            "settings": settings,
+        },
+    )
+
+
+@app.get("/Editor")
+async def st_home(request: Request):
+    iframe_url = (
+        furl(settings.APP_BASE_URL, query_params=request.query_params) / "Editor"
+    )
+    return templates.TemplateResponse(
+        "app.html",
+        context={
+            "title": "Gooey.AI",
+            "request": request,
+            "iframe_url": iframe_url,
+            "settings": settings,
+        },
+    )
+
+
+def script_to_frontend(page_cls: typing.Type[BasePage]):
+    @app.get(f"/{page_cls.slug}/")
+    async def st_page(request: Request):
+        iframe_url = furl(settings.APP_BASE_URL) / page_cls.slug
+        return templates.TemplateResponse(
+            "app.html",
+            context={
+                "title": f"{page_cls.title} - Gooey.AI",
+                "request": request,
+                "iframe_url": iframe_url,
+                "settings": settings,
+            },
+        )
+
+
 all_pages = [
     ChyronPlantPage,
     FaceInpaintingPage,
@@ -213,6 +259,7 @@ all_pages = [
 def setup_pages():
     for page_cls in all_pages:
         script_to_api(page_cls)
+        script_to_frontend(page_cls)
 
 
 setup_pages()

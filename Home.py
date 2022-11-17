@@ -1,9 +1,9 @@
 import streamlit as st
 from google.cloud.firestore_v1 import DocumentSnapshot
 
-from daras_ai import settings
 from daras_ai.db import list_all_docs
 from daras_ai.logo import logo
+from daras_ai_v2 import settings
 from daras_ai_v2.base import get_saved_doc, get_doc_ref
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
@@ -15,11 +15,7 @@ from pages.LipsyncTTS import LipsyncTTSPage
 from pages.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
-st.set_page_config(
-    page_title="Home - Gooey.AI",
-    page_icon="static/favicon.png",
-    layout="wide",
-)
+
 logo()
 
 st.write("---")
@@ -35,11 +31,10 @@ for page_cls in [
     LipsyncTTSPage,
 ]:
     page = page_cls()
-    url = page.__module__.split(".")[-1]
 
     st.markdown(
         f"""
-        <a style="font-size: 24px" href="/{url}" target = "_self">
+        <a style="font-size: 24px" href="{settings.DARS_API_ROOT}/{page.slug}" target = "_top">
         <h2>{page.title}</h2>
         </a>
         """,
@@ -70,7 +65,9 @@ with st.expander("Old Recipes"):
         tagline = doc.get("header_tagline", "")
         st.markdown(
             f"""
-            <a style="font-size: 24px" href="/Editor/?id={recipe_id}" target = "_self">{name}</a>
+            <a style="font-size: 24px" href="{settings.DARS_API_ROOT}/Editor/?id={recipe_id}" target = "_self">
+                {name}
+            </a>
             <br>
             <i>{tagline}</i>
             """,

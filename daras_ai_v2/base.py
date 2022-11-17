@@ -5,15 +5,15 @@ import shlex
 import typing
 from copy import deepcopy
 from time import time
-from streamlit.components.v1 import html
 
 import requests
 import streamlit as st
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
+from streamlit.components.v1 import html
 
-from daras_ai.cache_tools import cache_and_refresh
+from daras_ai.logo import logo
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
 
@@ -39,13 +39,8 @@ class BasePage:
         return f"/v1/{self.slug}/run"
 
     def render(self):
-        st.set_page_config(
-            page_title=self.title + " - Gooey.AI",
-            page_icon="static/favicon.png",
-            layout="wide",
-        )
-
         logo()
+
         st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
             ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
@@ -235,7 +230,7 @@ class BasePage:
 
             url = (
                 furl(
-                    settings.APP_BASE_URL,
+                    settings.DARS_API_ROOT,
                     query_params={"example_id": example_id},
                 )
                 / self.slug
@@ -300,31 +295,6 @@ class BasePage:
 
     def render_example(self, state: dict):
         pass
-
-
-def logo():
-    st.markdown(
-        """
-        <style>
-        footer {visibility: hidden;}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f"""
-        <a href="/" target="_self">
-            <img style="width:150px; height:71px" src="https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"></img>
-        </a>
-        <span style="position: absolute; right: 0px">
-            <a href="https://dara.network/privacy/">Privacy</a> & 
-            <a href="https://dara.network/terms/">Terms</a>
-        </span>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.write("")
 
 
 def set_saved_doc(
