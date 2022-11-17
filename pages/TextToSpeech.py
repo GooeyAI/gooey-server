@@ -18,9 +18,8 @@ class TextToSpeechProviders(Enum):
 
 
 class TextToSpeechPage(BasePage):
-    doc_name = "TextToSpeech"
     title = "Speak Any Text"
-    endpoint = "/v1/TextToSpeech/run"
+    slug = "TextToSpeech"
 
     class RequestModel(BaseModel):
         text_prompt: str

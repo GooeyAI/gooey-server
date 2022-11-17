@@ -1,26 +1,27 @@
 import streamlit as st
 
+from daras_ai_v2.hidden_html_widget import hidden_html
+
 
 def logo():
-    st.markdown(
+    st.set_page_config(layout="wide")
+
+    hidden_html(
         """
         <style>
-        footer {visibility: hidden;}
+        footer {
+            visibility: hidden;
+        }
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
-    st.markdown(
-        f"""
-        <a href="/" target="_self">
-            <img style="width:150px; height:71px" src="https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"></img>
-        </a>
-        <span style="position: absolute; right: 0px">
-            <a href="https://dara.network/privacy/">Privacy</a> & 
-            <a href="https://dara.network/terms/">Terms</a>
-        </span>
-        """,
-        unsafe_allow_html=True,
+        <script>
+            function fit() {
+                top.postMessage({
+                    "type": "MAIN_IFRAME_RESIZE",
+                    "height": parent.document.getElementsByClassName("main")[0].scrollHeight,
+                }, "*");
+            }
+            setInterval(fit, 50);
+        </script>
+        """
     )
-    st.write("")

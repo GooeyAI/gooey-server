@@ -21,7 +21,7 @@ from daras_ai.secret_key_checker import check_secret_key
 def get_or_create_doc_id():
     query_params = st.experimental_get_query_params()
     doc_id = query_params.get("id", [new_doc_id()])[0]
-    st.experimental_set_query_params(id=doc_id)
+    st.experimental_set_query_params(id=doc_id, **query_params)
     return doc_id
 
 
@@ -141,7 +141,7 @@ def render_io_steps(key):
 # main
 #
 
-st.set_page_config(layout="wide")
+logo()
 
 recipe_id = get_or_create_doc_id()
 cached_state = get_firestore_doc(recipe_id)
@@ -156,7 +156,6 @@ st.session_state.setdefault("output_steps", [])
 st.session_state.setdefault("variables", {})
 variables = st.session_state["variables"]
 
-logo()
 
 tab1, tab2, tab3 = st.tabs(["Run Recipe 🏃‍♂️", "Edit Recipe ✍️", "Run as API 🚀"])
 

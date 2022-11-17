@@ -1,3 +1,5 @@
+import typing
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -12,8 +14,9 @@ from server import app, all_pages
 client = TestClient(app)
 
 
-@pytest.mark.parametrize("page", all_pages)
-def test_apis_basic(page: BasePage):
+@pytest.mark.parametrize("page_cls", all_pages)
+def test_apis_basic(page_cls: typing.Type[BasePage]):
+    page = page_cls()
     state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
 
     r = client.post(

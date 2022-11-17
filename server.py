@@ -5,7 +5,9 @@ from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from furl import furl
 from google.auth.transport import requests
 from google.cloud import firestore
 from google.oauth2 import id_token
@@ -24,7 +26,6 @@ from pages.ImageSegmentation import ImageSegmentationPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
-
 from pages.TextToSpeech import TextToSpeechPage
 
 app = FastAPI(title="DarasAI")
@@ -36,10 +37,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
-
-app.add_middleware(SessionMiddleware, secret_key="loveudara")
 
 
 @app.post("/auth", status_code=302)
@@ -67,25 +68,13 @@ async def authentication(request: Request):
             requests.Request(),
             settings.GOOGLE_CLIENT_ID,
         )
-        print(user)
-
-        request.session["user"] = dict({"email": user["email"], "name": user["name"]})
+        # print(user)
+        request.session["user"] = dict(user)
 
         return RedirectResponse(url="/", status_code=302)
 
     except ValueError:
         return RedirectResponse(url="/error", status_code=302)
-
-
-@app.get("/")
-def check(request: Request):
-    user = request.session.get("user")
-    user_logged_in = False
-    if user:
-        user_logged_in = True
-    return templates.TemplateResponse(
-        "index.html", context={"request": request, "user_logged_in": user_logged_in}
-    )
 
 
 @app.route("/logout")
@@ -163,15 +152,18 @@ class RunFailedModel(BaseModel):
     error: str
 
 
-def script_to_api(page: typing.Type[BasePage]):
-    body_spec = Body(examples=page.RequestModel.Config.schema_extra.get("examples"))
+def script_to_api(page_cls: typing.Type[BasePage]):
+    body_spec = Body(examples=page_cls.RequestModel.Config.schema_extra.get("examples"))
 
     @app.post(
-        page.endpoint,
-        response_model=page.ResponseModel,
+        page_cls().endpoint,
+        response_model=page_cls.ResponseModel,
         responses={500: {"model": RunFailedModel}},
     )
-    def run_api(request: page.RequestModel = body_spec):
+    def run_api(request: page_cls.RequestModel = body_spec):
+        # init a new page for every request
+        page = page_cls()
+
         # get saved state from db
         state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
 
@@ -184,7 +176,7 @@ def script_to_api(page: typing.Type[BasePage]):
 
         # run the script
         try:
-            all(page().run(state))
+            all(page.run(state))
         except Exception as e:
             return JSONResponse(
                 status_code=500, content={"error": f"{type(e).__name__} - {e}"}
@@ -192,6 +184,54 @@ def script_to_api(page: typing.Type[BasePage]):
 
         # return updated state
         return state
+
+
+@app.get("/")
+def st_home(request: Request):
+    iframe_url = furl(settings.APP_BASE_URL).url
+    return _st_page(
+        request,
+        iframe_url,
+        context={"title": "Home - Gooey.AI"},
+    )
+
+
+@app.get("/Editor/")
+def st_home(request: Request):
+    iframe_url = (
+        furl(settings.APP_BASE_URL, query_params=request.query_params) / "Editor"
+    )
+    return _st_page(
+        request,
+        iframe_url,
+        context={"title": f"Gooey.AI"},
+    )
+
+
+def script_to_frontend(page_cls: typing.Type[BasePage]):
+    @app.get(f"/{page_cls.slug}/")
+    def st_page(request: Request):
+        iframe_url = furl(settings.APP_BASE_URL) / page_cls.slug
+        return _st_page(
+            request,
+            iframe_url,
+            context={
+                "title": f"{page_cls.title} - Gooey.AI",
+            },
+        )
+
+
+def _st_page(request: Request, iframe_url: str, **context):
+    return templates.TemplateResponse(
+        "app.html",
+        context={
+            "user": request.session.get("user"),
+            "request": request,
+            "iframe_url": iframe_url,
+            "settings": settings,
+            **context,
+        },
+    )
 
 
 all_pages = [
@@ -206,5 +246,11 @@ all_pages = [
     LipsyncTTSPage,
 ]
 
-for page in all_pages:
-    script_to_api(page)
+
+def setup_pages():
+    for page_cls in all_pages:
+        script_to_api(page_cls)
+        script_to_frontend(page_cls)
+
+
+setup_pages()

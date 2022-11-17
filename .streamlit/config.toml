@@ -2,6 +2,7 @@
 hideSidebarNav = true
 
 [theme]
+base="dark"
 
 # Primary accent for interactive elements
 primaryColor="#03dac5"

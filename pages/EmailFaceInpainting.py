@@ -15,8 +15,8 @@ email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
     title = "Email of You In Any Scene"
-    doc_name = "EmailFaceInpainting#2"
-    endpoint = "/v1/EmailFaceInpainting/run"
+    slug = "EmailFaceInpainting"
+    version = 2
 
     class RequestModel(BaseModel):
         email_address: str
