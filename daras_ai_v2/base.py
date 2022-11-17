@@ -103,7 +103,7 @@ class BasePage:
         pass
 
     def render_output(self):
-        pass
+        self.render_example(st.session_state)
 
     def render_form(self) -> bool:
         return False
