@@ -265,7 +265,7 @@ class BasePage:
                     hidden_html(
                         f"""
                         <script>
-                               parent.navigator.clipboard.writeText("{url}").then(
+                               top.navigator.clipboard.writeText("{url}").then(
                                   (e) => console.log("success"),
                                   (e) => console.log(e)
                                );
