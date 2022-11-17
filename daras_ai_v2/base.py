@@ -272,7 +272,7 @@ class BasePage:
                         </script>
                         """
                     )
-                    st.success("Share URL Copied", icon="✅")
+                    st.success("Recipe example URL Copied", icon="✅")
 
             with col3:
                 if allow_delete:
