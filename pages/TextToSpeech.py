@@ -19,8 +19,7 @@ class TextToSpeechProviders(Enum):
 
 class TextToSpeechPage(BasePage):
     title = "Text to Speech"
-    doc_name = "TextToSpeech"
-    slug = "Text to Speech"
+    slug = "TextToSpeech"
 
     class RequestModel(BaseModel):
         text_prompt: str
