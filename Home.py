@@ -41,7 +41,7 @@ for page, example_doc in zip(pages, all_examples):
     with col1:
         st.markdown(
             f"""
-            <a style="font-size: 24px" href="{furl(settings.DARS_API_ROOT)/ page.slug}" target = "_top">
+            <a style="font-size: 24px" href="{furl(settings.APP_BASE_URL) / page.slug}" target = "_top">
                 <h2>{page.title}</h2>
             </a>
             """,
@@ -70,7 +70,7 @@ with st.expander("Early Recipes"):
 
         tagline = doc.get("header_tagline", "")
         editor_url = (
-            furl(settings.DARS_API_ROOT, query_params={"id": recipe_id}) / "Editor"
+            furl(settings.APP_BASE_URL, query_params={"id": recipe_id}) / "Editor"
         )
 
         st.markdown(

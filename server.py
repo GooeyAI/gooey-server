@@ -188,7 +188,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
 
 @app.get("/")
 def st_home(request: Request):
-    iframe_url = furl(settings.APP_BASE_URL).url
+    iframe_url = furl(settings.IFRAME_BASE_URL).url
     return _st_page(
         request,
         iframe_url,
@@ -199,7 +199,7 @@ def st_home(request: Request):
 @app.get("/Editor/")
 def st_home(request: Request):
     iframe_url = (
-        furl(settings.APP_BASE_URL, query_params=request.query_params) / "Editor"
+        furl(settings.IFRAME_BASE_URL, query_params=request.query_params) / "Editor"
     )
     return _st_page(
         request,
@@ -211,7 +211,7 @@ def st_home(request: Request):
 def script_to_frontend(page_cls: typing.Type[BasePage]):
     @app.get(f"/{page_cls.slug}/")
     def st_page(request: Request):
-        iframe_url = furl(settings.APP_BASE_URL) / page_cls.slug
+        iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug
         return _st_page(
             request,
             iframe_url,

@@ -1,6 +1,6 @@
 import streamlit as st
 
-from daras_ai import settings
+from daras_ai_v2 import settings
 
 
 def check_secret_key(label, secret_key=settings.SECRET_KEY):

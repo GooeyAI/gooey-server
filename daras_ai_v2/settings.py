@@ -26,7 +26,6 @@ if not firebase_admin._apps:
 SECRET_KEY = config("SECRET_KEY")
 
 GS_BUCKET_NAME = config("GS_BUCKET_NAME")
-DARS_API_ROOT = config("DARS_API_ROOT", "https://api.daras.ai")
 API_SECRET_KEY = config("API_SECRET_KEY", None)
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
 UBERDUCK_KEY = config("UBERDUCK_KEY")
@@ -36,6 +35,9 @@ google_service_account_credentials = (
 )
 
 OPENAI_API_KEY = config("OPENAI_API_KEY")
-APP_BASE_URL = config("APP_BASE_URL")
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN")
+
+APP_BASE_URL = config("APP_BASE_URL")
+API_BASE_URL = config("API_BASE_URL")
+IFRAME_BASE_URL = config("IFRAME_BASE_URL")

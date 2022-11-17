@@ -8,7 +8,7 @@ from PIL import Image, ImageOps
 from firebase_admin import storage
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from daras_ai import settings
+from daras_ai_v2 import settings
 from daras_ai.core import daras_ai_step_config, daras_ai_step_io
 
 

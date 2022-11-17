@@ -10,7 +10,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from google.cloud import firestore
 
-from daras_ai import settings
+from daras_ai_v2 import settings
 from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
 from daras_ai.db import list_all_docs
@@ -181,7 +181,7 @@ with tab2:
 
 with tab3:
     if check_secret_key("run as API"):
-        api_url = f"{settings.DARS_API_ROOT}/v1/run-recipe/"
+        api_url = f"{settings.API_BASE_URL}/v1/run-recipe/"
         params = {
             "recipe_id": recipe_id,
             "inputs": {
