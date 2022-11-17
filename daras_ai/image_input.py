@@ -1,3 +1,4 @@
+import os
 import re
 import uuid
 
@@ -117,4 +118,6 @@ FILENAME_WHITELIST = re.compile(r"[ \w\-_.]")
 def safe_filename(filename: str):
     matches = FILENAME_WHITELIST.finditer(filename)
     filename = "".join(match.group(0) for match in matches)
-    return filename[:255]
+    head, tail = os.path.split(filename)
+    out = os.path.join(head[:200], tail)
+    return out
