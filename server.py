@@ -221,7 +221,7 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
         )
 
 
-def _st_page(request: Request, iframe_url: str, **context):
+def _st_page(request: Request, iframe_url: str, *, context: dict):
     return templates.TemplateResponse(
         "app.html",
         context={
