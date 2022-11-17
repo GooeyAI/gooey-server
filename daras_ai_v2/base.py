@@ -299,6 +299,12 @@ class BasePage:
     def render_example(self, state: dict):
         pass
 
+    def preview_description(self) -> str:
+        pass
+
+    def preview_image(self, state: dict) -> str:
+        pass
+
 
 def set_saved_doc(
     doc_ref: firestore.DocumentReference,

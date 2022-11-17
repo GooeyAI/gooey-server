@@ -55,6 +55,9 @@ class FaceInpaintingPage(BasePage):
     def __init__(self):
         st.session_state.setdefault("num_steps", 50)
 
+    def preview_description(self) -> str:
+        return "This recipe takes a photo with a face and then uses the text prompt to paint a background."
+
     def render_description(self):
         st.write(
             """    
@@ -341,6 +344,9 @@ class FaceInpaintingPage(BasePage):
             if output_images:
                 for img in output_images:
                     st.image(img, caption=state.get("text_prompt", ""))
+
+    def preview_image(self, state: dict) -> str:
+        return state.get("output_images", [""])[0]
 
 
 if __name__ == "__main__":

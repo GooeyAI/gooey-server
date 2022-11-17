@@ -211,12 +211,16 @@ def st_home(request: Request):
 def script_to_frontend(page_cls: typing.Type[BasePage]):
     @app.get(f"/{page_cls.slug}/")
     def st_page(request: Request):
+        page = page_cls()
+        state = page.get_doc()
         iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug
         return _st_page(
             request,
             iframe_url,
             context={
                 "title": f"{page_cls.title} - Gooey.AI",
+                "description": page.preview_description(),
+                "image": page.preview_image(state),
             },
         )
 
