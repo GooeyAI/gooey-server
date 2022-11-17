@@ -21,10 +21,21 @@ DEFAULT_STATUS = "Running..."
 
 class BasePage:
     title: str
-    doc_name: str
-    endpoint: str
+    slug: str
+    version: int = 1
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
+
+    @property
+    def doc_name(self):
+        # for backwards compat
+        if self.version == 1:
+            return self.slug
+        return f"{self.slug}#{self.version}"
+
+    @property
+    def endpoint(self):
+        return f"/v1/{self.slug}/run"
 
     def render(self):
         st.set_page_config(

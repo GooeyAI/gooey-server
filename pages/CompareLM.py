@@ -8,8 +8,7 @@ from daras_ai_v2.language_model import run_language_model
 
 class CompareLMPage(BasePage):
     title = "GPT3 vs Flan-T5"
-    doc_name = "CompareLM"
-    endpoint = "/v1/CompareLM/run"
+    slug = "CompareLM"
 
     class RequestModel(BaseModel):
         input_prompt: str

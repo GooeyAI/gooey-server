@@ -19,8 +19,8 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 
 class FaceInpaintingPage(BasePage):
     title = "You in a Christmas Greeting"
-    doc_name = "FaceInpainting#2"
-    endpoint = "/v1/FaceInpainting/run"
+    slug = "FaceInpainting"
+    version = 2
 
     class RequestModel(BaseModel):
         input_image: str
