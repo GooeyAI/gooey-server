@@ -27,14 +27,14 @@ class BasePage:
     ResponseModel: typing.Type[BaseModel]
 
     @property
-    def doc_name(self):
+    def doc_name(self) -> str:
         # for backwards compat
         if self.version == 1:
             return self.slug
         return f"{self.slug}#{self.version}"
 
     @property
-    def endpoint(self):
+    def endpoint(self) -> str:
         return f"/v1/{self.slug}/run"
 
     def render(self):
