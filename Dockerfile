@@ -15,4 +15,5 @@ COPY . .
 
 ENV FORWARDED_ALLOW_IPS '*'
 
+RUN python scripts/fix_st_timeout.py
 CMD ./scripts/run-prod.sh
