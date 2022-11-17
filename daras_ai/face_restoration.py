@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 
+import replicate
 import streamlit as st
 
 from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
@@ -45,16 +46,16 @@ def face_restoration(idx, variables, state):
 
 
 def gfpgan(img: str) -> bytes:
-    return call_gpu_server_b64(
-        endpoint=GpuEndpoints.gfpgan,
-        input_data={
-            "img": img,
-            "version": "v1.4",
-            "scale": 1,
-        },
-    )[0]
-    # model = replicate.models.get("tencentarc/gfpgan")
-    # return model.predict(img=img)
+    # return call_gpu_server_b64(
+    #     endpoint=GpuEndpoints.gfpgan,
+    #     input_data={
+    #         "img": img,
+    #         "version": "v1.4",
+    #         "scale": 1,
+    #     },
+    # )[0]
+    model = replicate.models.get("tencentarc/gfpgan")
+    return model.predict(img=img)
 
 
 def map_parallel(fn, it):
