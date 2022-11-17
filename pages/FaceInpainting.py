@@ -4,7 +4,7 @@ import streamlit as st
 from pydantic import BaseModel
 
 from daras_ai.extract_face import extract_and_reposition_face_cv2
-from daras_ai.face_restoration import map_parallel, gfpgan
+from daras_ai_v2.face_restoration import map_parallel, gfpgan
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,

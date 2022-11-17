@@ -1,10 +1,10 @@
 import streamlit as st
 from google.cloud.firestore_v1 import DocumentSnapshot
 
-from daras_ai import settings
 from daras_ai.db import list_all_docs
 from daras_ai.logo import logo
-from daras_ai_v2.base import get_saved_doc, get_doc_ref
+from daras_ai_v2 import settings
+from daras_ai_v2.face_restoration import map_parallel
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
@@ -15,16 +15,10 @@ from pages.LipsyncTTS import LipsyncTTSPage
 from pages.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
-st.set_page_config(
-    page_title="Home - Gooey.AI",
-    page_icon="static/favicon.png",
-    layout="wide",
-)
+
 logo()
 
-st.write("---")
-
-for page_cls in [
+page_classes = [
     FaceInpaintingPage,
     EmailFaceInpaintingPage,
     LipsyncPage,
@@ -33,22 +27,29 @@ for page_cls in [
     CompareLMPage,
     TextToSpeechPage,
     LipsyncTTSPage,
-]:
-    page = page_cls()
-    url = page.__module__.split(".")[-1]
+]
 
-    st.markdown(
-        f"""
-        <a style="font-size: 24px" href="/{url}" target = "_self">
-        <h2>{page.title}</h2>
-        </a>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.write("")
+pages = [page_cls() for page_cls in page_classes]
 
-    example_doc = get_saved_doc(get_doc_ref(page.doc_name))
-    page.render_example(example_doc)
+with st.spinner():
+    all_examples = map_parallel(lambda page: page.get_doc(), pages)
+
+for page, example_doc in zip(pages, all_examples):
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown(
+            f"""
+            <a style="font-size: 24px" href="{settings.DARS_API_ROOT}/{page.slug}" target = "_top">
+                <h2>{page.title}</h2>
+            </a>
+            """,
+            unsafe_allow_html=True,
+        )
+        page.render_description()
+
+    with col2:
+        page.render_example(example_doc)
 
     st.write("---")
 
@@ -70,7 +71,9 @@ with st.expander("Old Recipes"):
         tagline = doc.get("header_tagline", "")
         st.markdown(
             f"""
-            <a style="font-size: 24px" href="/Editor/?id={recipe_id}" target = "_self">{name}</a>
+            <a style="font-size: 24px" href="{settings.DARS_API_ROOT}/Editor/?id={recipe_id}" target = "_self">
+                {name}
+            </a>
             <br>
             <i>{tagline}</i>
             """,

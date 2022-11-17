@@ -23,6 +23,8 @@ os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", None)
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
+SECRET_KEY = config("SECRET_KEY")
+
 GS_BUCKET_NAME = config("GS_BUCKET_NAME")
 DARS_API_ROOT = config("DARS_API_ROOT", "https://api.daras.ai")
 API_SECRET_KEY = config("API_SECRET_KEY", None)

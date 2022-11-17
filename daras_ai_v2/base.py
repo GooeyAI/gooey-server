@@ -5,7 +5,6 @@ import shlex
 import typing
 from copy import deepcopy
 from time import time
-from streamlit.components.v1 import html
 
 import requests
 import streamlit as st
@@ -13,9 +12,10 @@ from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
 
-from daras_ai.cache_tools import cache_and_refresh
+from daras_ai.logo import logo
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
+from daras_ai_v2.hidden_html_widget import hidden_html
 
 DEFAULT_STATUS = "Running..."
 
@@ -39,13 +39,8 @@ class BasePage:
         return f"/v1/{self.slug}/run"
 
     def render(self):
-        st.set_page_config(
-            page_title=self.title + " - Gooey.AI",
-            page_icon="static/favicon.png",
-            layout="wide",
-        )
-
         logo()
+
         st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
             ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
@@ -54,7 +49,7 @@ class BasePage:
         if not st.session_state.get("__loaded__"):
             with st.spinner("Loading Settings..."):
                 query_params = st.experimental_get_query_params()
-                if query_params:
+                if "example_id" in query_params:
                     st.session_state.update(
                         get_saved_doc(
                             get_doc_ref(
@@ -65,9 +60,7 @@ class BasePage:
                         )
                     )
                 else:
-                    st.session_state.update(
-                        deepcopy(get_saved_doc(get_doc_ref(self.doc_name)))
-                    )
+                    st.session_state.update(self.get_doc())
 
             with st.spinner("Loading Examples..."):
                 st.session_state["__example_docs"] = list_all_docs(
@@ -87,13 +80,21 @@ class BasePage:
             run_as_api_tab(self.endpoint, self.RequestModel)
 
         with run_tab:
-            self.render_description()
-            submitted = self.render_form()
-            self._runner(submitted)
-            self.save_buttons()
+            col1, col2 = st.columns(2)
+
+            with col1:
+                submitted = self.render_form()
+                self.render_description()
+
+            with col2:
+                self._runner(submitted)
+                self.save_buttons()
         #
         # NOTE: Beware of putting code after runner since it will call experimental_rerun
         #
+
+    def get_doc(self):
+        return deepcopy(get_saved_doc(get_doc_ref(self.doc_name)))
 
     def render_description(self):
         pass
@@ -235,7 +236,7 @@ class BasePage:
 
             url = (
                 furl(
-                    settings.APP_BASE_URL,
+                    settings.DARS_API_ROOT,
                     query_params={"example_id": example_id},
                 )
                 / self.slug
@@ -248,14 +249,12 @@ class BasePage:
                     "✏️ Tweak", help=f"Tweak example", key=f"tweak-{example_id}"
                 )
                 if pressed_tweak:
-                    html(
+                    hidden_html(
                         f"""
                         <script>
                             window.open("{url}", "_blank");
                         </script>
-                        """,
-                        width=0,
-                        height=0,
+                        """
                     )
 
             with col2:
@@ -263,16 +262,15 @@ class BasePage:
                     "✉️️ Share", help=f"Share example", key=f"share-{example_id}"
                 )
                 if pressed_share:
-                    html(
+                    hidden_html(
                         f"""
-                    <script>
-                           parent.navigator.clipboard.writeText("{url}").then(
-                              (e) => console.log("success"),
-                              (e) => console.log(e)
-                           );
-                    </script>
-                    """,
-                        height=0,
+                        <script>
+                               parent.navigator.clipboard.writeText("{url}").then(
+                                  (e) => console.log("success"),
+                                  (e) => console.log(e)
+                               );
+                        </script>
+                        """
                     )
                     st.success("Recipe example URL Copied", icon="✅")
 
@@ -302,41 +300,17 @@ class BasePage:
         pass
 
 
-def logo():
-    st.markdown(
-        """
-        <style>
-        footer {visibility: hidden;}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f"""
-        <a href="/" target="_self">
-            <img style="width:150px; height:71px" src="https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"></img>
-        </a>
-        <span style="position: absolute; right: 0px">
-            <a href="https://dara.network/privacy/">Privacy</a> & 
-            <a href="https://dara.network/terms/">Terms</a>
-        </span>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.write("")
-
-
 def set_saved_doc(
     doc_ref: firestore.DocumentReference,
     updated_state: dict,
 ):
     doc_ref.set(updated_state)
-    saved_state = get_saved_doc(doc_ref)
-    saved_state.clear()
-    saved_state.update(updated_state)
+    # saved_state = get_saved_doc(doc_ref)
+    # saved_state.clear()
+    # saved_state.update(updated_state)
 
 
+# @st.progress
 # @st.cache(
 #     allow_output_mutation=True,
 #     show_spinner=False,
