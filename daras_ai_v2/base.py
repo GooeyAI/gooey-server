@@ -293,7 +293,6 @@ class BasePage:
                             deleted = example.delete()
                             if deleted:
                                 st.success("Deleted", icon="✅")
-                            st.experimental_rerun()
 
             self.render_example(doc)
 
