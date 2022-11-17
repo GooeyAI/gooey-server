@@ -9,12 +9,33 @@ from daras_ai_v2.base import (
     get_saved_doc_nocahe,
     get_doc_ref,
 )
-from server import app, all_pages
+from pages.ChyronPlant import ChyronPlantPage
+from pages.EmailFaceInpainting import EmailFaceInpaintingPage
+from pages.FaceInpainting import FaceInpaintingPage
+from pages.ImageSegmentation import ImageSegmentationPage
+from pages.LetterWriter import LetterWriterPage
+from pages.Lipsync import LipsyncPage
+from pages.LipsyncTTS import LipsyncTTSPage
+from pages.TextToSpeech import TextToSpeechPage
+from server import app
 
 client = TestClient(app)
 
+pages_to_test = [
+    ChyronPlantPage,
+    FaceInpaintingPage,
+    EmailFaceInpaintingPage,
+    LetterWriterPage,
+    LipsyncPage,
+    # CompareLMPage,
+    ImageSegmentationPage,
+    TextToSpeechPage,
+    LipsyncTTSPage,
+    # DeforumSDPage,
+]
 
-@pytest.mark.parametrize("page_cls", all_pages)
+
+@pytest.mark.parametrize("page_cls", pages_to_test)
 def test_apis_basic(page_cls: typing.Type[BasePage]):
     page = page_cls()
     state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
