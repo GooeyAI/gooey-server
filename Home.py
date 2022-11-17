@@ -22,12 +22,12 @@ logo()
 page_classes = [
     FaceInpaintingPage,
     EmailFaceInpaintingPage,
-    LipsyncPage,
-    ChyronPlantPage,
-    ImageSegmentationPage,
-    CompareLMPage,
     TextToSpeechPage,
     LipsyncTTSPage,
+    CompareLMPage,
+    LipsyncPage,
+    # ChyronPlantPage,
+    # ImageSegmentationPage,
 ]
 
 pages = [page_cls() for page_cls in page_classes]
@@ -51,12 +51,11 @@ for page, example_doc in zip(pages, all_examples):
 
     with col2:
         page.render_example(example_doc)
-
     st.write("---")
 
 st.write("")
 
-with st.expander("Old Recipes"):
+with st.expander("Early Recipes"):
     for snapshot in list_all_docs():
         snapshot: DocumentSnapshot
 
