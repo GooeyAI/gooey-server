@@ -18,7 +18,7 @@ class TextToSpeechProviders(Enum):
 
 
 class TextToSpeechPage(BasePage):
-    title = "Text to Speech"
+    title = "Speak Any Text"
     slug = "TextToSpeech"
 
     class RequestModel(BaseModel):
@@ -39,13 +39,13 @@ class TextToSpeechPage(BasePage):
     def render_description(self):
         st.write(
             """
-                *Convert text into audio*
+                *Convert text into audio in the voice of your choice*
 
                 How It Works:
 
-                1. Takes text input
-                2. Generates audio file in voice of your choice
-                3. Play in the browser
+                1. Takes any text input
+                2. Generates an audio file in voice of your choice (from Settings)
+                3. Creates an audio file
             """
         )
 

@@ -9,7 +9,7 @@ from pages.TextToSpeech import TextToSpeechPage
 
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
-    title = "Lip Syncing with Text to speech"
+    title = "Lipsync from Any Video + Text"
     slug = "LipsyncTTS"
 
     class RequestModel(BaseModel):
@@ -82,13 +82,14 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     def render_description(self):
         st.write(
             """
-                *Converts text to audio and Lipsyncs with video*
+                This recipe takes any text and a video of a person (plus the voice defined in Settings) to create a lipsync'd video of that person speaking your text.
 
                 How It Works:
 
-                1. Takes Text input + Face input
-                2. Generates audio file in voice of your choice 
-                3. Merges the audio and video.
+                1. Takes any text + a video (with a face in it)
+                2. Generates audio file in voice of your choice
+                3. Merges the audio and video
+                4. Renders a lipsynced video with your text
             """
         )
 
@@ -103,7 +104,40 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         yield from LipsyncPage.run(self, state)
 
     def render_example(self, state: dict):
-        LipsyncPage.render_example(self, state)
+        col1, col2 = st.columns(2)
+
+        with col1:
+            input_text = state.get("text_prompt")
+            if input_text:
+                st.write("Input Text")
+                st.write(input_text)
+            else:
+                st.empty()
+
+            # input_audio = state.get("input_audio")
+            # if input_audio:
+            #    st.write("Synthesized Voice")
+            #    st.audio(input_audio)
+            # else:
+            #    st.empty()
+
+            input_face = state.get("input_face")
+            if not input_face:
+                st.empty()
+            elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
+                st.write("Input Face (Video)")
+                st.video(input_face)
+            else:
+                st.write("Input Face (Image)")
+                st.image(input_face)
+
+        with col2:
+            output_video = state.get("output_video")
+            if output_video:
+                st.write("Output Video")
+                st.video(output_video)
+            else:
+                st.empty()
 
     def render_output(self):
         self.render_example(st.session_state)
