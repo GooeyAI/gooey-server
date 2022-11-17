@@ -9,8 +9,8 @@ from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints, b64_img_de
 
 
 class InpaintingModels(Enum):
-    jack_qiao = "SD v1.4 (Jack Qiao)"
-    runway_ml = "SD v1.5 (RunwayML)"
+    runway_ml = "Stable Diffusion v1.5 (RunwayML)"
+    jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
 
 
