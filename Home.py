@@ -1,4 +1,5 @@
 import streamlit as st
+from furl import furl
 from google.cloud.firestore_v1 import DocumentSnapshot
 
 from daras_ai.db import list_all_docs
@@ -40,7 +41,7 @@ for page, example_doc in zip(pages, all_examples):
     with col1:
         st.markdown(
             f"""
-            <a style="font-size: 24px" href="{settings.DARS_API_ROOT}/{page.slug}" target = "_top">
+            <a style="font-size: 24px" href="{furl(settings.DARS_API_ROOT)/ page.slug}" target = "_top">
                 <h2>{page.title}</h2>
             </a>
             """,
@@ -69,9 +70,13 @@ with st.expander("Old Recipes"):
             continue
 
         tagline = doc.get("header_tagline", "")
+        editor_url = (
+            furl(settings.DARS_API_ROOT, query_params={"id": recipe_id}) / "Editor"
+        )
+
         st.markdown(
             f"""
-            <a style="font-size: 24px" href="{settings.DARS_API_ROOT}/Editor/?id={recipe_id}" target = "_self">
+            <a style="font-size: 24px" href="{editor_url}" target = "_self">
                 {name}
             </a>
             <br>
