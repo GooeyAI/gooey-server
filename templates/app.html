@@ -102,9 +102,8 @@
 
 {% if user %}
     <div class="login_info">
-        <p>
-            {{ user.name }}
-        </p>
+        {{ user.name }}
+        <br>
         <a href="/logout">Signout</a>
     </div>
 {% else %}
@@ -127,7 +126,9 @@
 {% endif %}
 
 
-<iframe onload="resizeIframe(this)" src="{{ iframe_url }}?embed=true" allow="clipboard-read; clipboard-write"></iframe>
+<iframe onload="resizeIframe(this)"
+        src="{{ iframe_url }}?embed=true"
+        allow="clipboard-read; clipboard-write"></iframe>
 
 <script>
     function resizeIframe(obj) {
