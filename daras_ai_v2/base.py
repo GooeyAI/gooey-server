@@ -11,11 +11,11 @@ import streamlit as st
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
-from streamlit.components.v1 import html
 
 from daras_ai.logo import logo
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
+from daras_ai_v2.hidden_html_widget import hidden_html
 
 DEFAULT_STATUS = "Running..."
 
@@ -49,7 +49,7 @@ class BasePage:
         if not st.session_state.get("__loaded__"):
             with st.spinner("Loading Settings..."):
                 query_params = st.experimental_get_query_params()
-                if query_params:
+                if "example_id" in query_params:
                     st.session_state.update(
                         get_saved_doc(
                             get_doc_ref(
@@ -60,9 +60,7 @@ class BasePage:
                         )
                     )
                 else:
-                    st.session_state.update(
-                        deepcopy(get_saved_doc(get_doc_ref(self.doc_name)))
-                    )
+                    st.session_state.update(self.get_doc())
 
             with st.spinner("Loading Examples..."):
                 st.session_state["__example_docs"] = list_all_docs(
@@ -82,13 +80,21 @@ class BasePage:
             run_as_api_tab(self.endpoint, self.RequestModel)
 
         with run_tab:
-            self.render_description()
-            submitted = self.render_form()
-            self._runner(submitted)
-            self.save_buttons()
+            col1, col2 = st.columns(2)
+
+            with col1:
+                submitted = self.render_form()
+                self.render_description()
+
+            with col2:
+                self._runner(submitted)
+                self.save_buttons()
         #
         # NOTE: Beware of putting code after runner since it will call experimental_rerun
         #
+
+    def get_doc(self):
+        return deepcopy(get_saved_doc(get_doc_ref(self.doc_name)))
 
     def render_description(self):
         pass
@@ -243,14 +249,12 @@ class BasePage:
                     "✏️ Tweak", help=f"Tweak example", key=f"tweak-{example_id}"
                 )
                 if pressed_tweak:
-                    html(
+                    hidden_html(
                         f"""
                         <script>
                             window.open("{url}", "_blank");
                         </script>
-                        """,
-                        width=0,
-                        height=0,
+                        """
                     )
 
             with col2:
@@ -258,16 +262,15 @@ class BasePage:
                     "✉️️ Share", help=f"Share example", key=f"share-{example_id}"
                 )
                 if pressed_share:
-                    html(
+                    hidden_html(
                         f"""
-                    <script>
-                           parent.navigator.clipboard.writeText("{url}").then(
-                              (e) => console.log("success"),
-                              (e) => console.log(e)
-                           );
-                    </script>
-                    """,
-                        height=0,
+                        <script>
+                               parent.navigator.clipboard.writeText("{url}").then(
+                                  (e) => console.log("success"),
+                                  (e) => console.log(e)
+                               );
+                        </script>
+                        """
                     )
                     st.success("Share URL Copied", icon="✅")
 
@@ -302,11 +305,12 @@ def set_saved_doc(
     updated_state: dict,
 ):
     doc_ref.set(updated_state)
-    saved_state = get_saved_doc(doc_ref)
-    saved_state.clear()
-    saved_state.update(updated_state)
+    # saved_state = get_saved_doc(doc_ref)
+    # saved_state.clear()
+    # saved_state.update(updated_state)
 
 
+# @st.progress
 # @st.cache(
 #     allow_output_mutation=True,
 #     show_spinner=False,

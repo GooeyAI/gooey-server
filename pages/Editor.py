@@ -21,7 +21,7 @@ from daras_ai.secret_key_checker import check_secret_key
 def get_or_create_doc_id():
     query_params = st.experimental_get_query_params()
     doc_id = query_params.get("id", [new_doc_id()])[0]
-    st.experimental_set_query_params(id=doc_id)
+    st.experimental_set_query_params(id=doc_id, **query_params)
     return doc_id
 
 

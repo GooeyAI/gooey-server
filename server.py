@@ -68,25 +68,13 @@ async def authentication(request: Request):
             requests.Request(),
             settings.GOOGLE_CLIENT_ID,
         )
-        print(user)
-
-        request.session["user"] = dict({"email": user["email"], "name": user["name"]})
+        # print(user)
+        request.session["user"] = dict(user)
 
         return RedirectResponse(url="/", status_code=302)
 
     except ValueError:
         return RedirectResponse(url="/error", status_code=302)
-
-
-# @app.get("/")
-# def check(request: Request):
-#     user = request.session.get("user")
-#     user_logged_in = False
-#     if user:
-#         user_logged_in = True
-#     return templates.TemplateResponse(
-#         "index.html", context={"request": request, "user_logged_in": user_logged_in}
-#     )
 
 
 @app.route("/logout")
@@ -199,48 +187,51 @@ def script_to_api(page_cls: typing.Type[BasePage]):
 
 
 @app.get("/")
-async def st_home(request: Request):
-    iframe_url = furl(settings.APP_BASE_URL)
-    return templates.TemplateResponse(
-        "app.html",
-        context={
-            "title": "Home - Gooey.AI",
-            "request": request,
-            "iframe_url": iframe_url,
-            "settings": settings,
-        },
+def st_home(request: Request):
+    iframe_url = furl(settings.APP_BASE_URL).url
+    return _st_page(
+        request,
+        iframe_url,
+        context={"title": "Home - Gooey.AI"},
     )
 
 
-@app.get("/Editor")
-async def st_home(request: Request):
+@app.get("/Editor/")
+def st_home(request: Request):
     iframe_url = (
         furl(settings.APP_BASE_URL, query_params=request.query_params) / "Editor"
     )
-    return templates.TemplateResponse(
-        "app.html",
-        context={
-            "title": "Gooey.AI",
-            "request": request,
-            "iframe_url": iframe_url,
-            "settings": settings,
-        },
+    return _st_page(
+        request,
+        iframe_url,
+        context={"title": f"Gooey.AI"},
     )
 
 
 def script_to_frontend(page_cls: typing.Type[BasePage]):
     @app.get(f"/{page_cls.slug}/")
-    async def st_page(request: Request):
+    def st_page(request: Request):
         iframe_url = furl(settings.APP_BASE_URL) / page_cls.slug
-        return templates.TemplateResponse(
-            "app.html",
+        return _st_page(
+            request,
+            iframe_url,
             context={
                 "title": f"{page_cls.title} - Gooey.AI",
-                "request": request,
-                "iframe_url": iframe_url,
-                "settings": settings,
             },
         )
+
+
+def _st_page(request: Request, iframe_url: str, **context):
+    return templates.TemplateResponse(
+        "app.html",
+        context={
+            "user": request.session.get("user"),
+            "request": request,
+            "iframe_url": iframe_url,
+            "settings": settings,
+            **context,
+        },
+    )
 
 
 all_pages = [
