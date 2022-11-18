@@ -38,10 +38,18 @@ class DeforumSDPage(BasePage):
     def render_settings(self):
         st.slider("# of Frames", min_value=100, max_value=1000, key="max_frames")
 
+    def render_output(self):
+        output_video = st.session_state.get("output_video")
+        if output_video:
+            st.write("Output Video")
+            st.video(output_video)
+        else:
+            st.empty()
+
     def render_example(self, state: dict):
         output_video = state.get("output_video")
         if output_video:
-            st.write("Output Video")
+            st.write(f"**Output Video** - {state.get('input_prompt')}")
             st.video(output_video)
         else:
             st.empty()

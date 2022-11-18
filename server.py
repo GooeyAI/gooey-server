@@ -24,6 +24,7 @@ from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.ImageSegmentation import ImageSegmentationPage
+from pages.Img2Img import Img2ImgPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
@@ -199,9 +200,7 @@ def st_home(request: Request):
 
 @app.get("/Editor/")
 def st_home(request: Request):
-    iframe_url = (
-        furl(settings.IFRAME_BASE_URL, query_params=request.query_params) / "Editor"
-    )
+    iframe_url = furl(settings.IFRAME_BASE_URL) / "Editor"
     return _st_page(
         request,
         iframe_url,
@@ -254,6 +253,7 @@ all_pages = [
     TextToSpeechPage,
     LipsyncTTSPage,
     DeforumSDPage,
+    Img2ImgPage,
 ]
 
 

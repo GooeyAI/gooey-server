@@ -27,7 +27,7 @@ class FaceInpaintingPage(BasePage):
         text_prompt: str
 
         num_outputs: int = None
-        quality: int = None
+        quality: int = 50
 
         face_scale: float = None
         face_pos_x: float = None
@@ -51,9 +51,6 @@ class FaceInpaintingPage(BasePage):
         face_mask: str
         diffusion_images: list[str]
         output_images: list[str]
-
-    def __init__(self):
-        st.session_state.setdefault("num_steps", 50)
 
     def preview_description(self) -> str:
         return "This recipe takes a photo with a face and then uses the text prompt to paint a background."
@@ -143,7 +140,8 @@ class FaceInpaintingPage(BasePage):
             if selected_model != InpaintingModels.dall_e.name:
                 st.slider(
                     label="Quality",
-                    key="num_steps",
+                    key="quality",
+                    value=50,
                     min_value=10,
                     max_value=200,
                     step=10,
@@ -314,7 +312,7 @@ class FaceInpaintingPage(BasePage):
             edit_image_bytes=re_img_bytes,
             mask=state["face_mask"],
             mask_bytes=face_mask_bytes,
-            num_inference_steps=state.get("num_steps", 50),
+            num_inference_steps=state.get("quality", 50),
             width=state["output_width"],
             height=state["output_height"],
         )

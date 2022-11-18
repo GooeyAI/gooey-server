@@ -17,7 +17,7 @@ def logo():
         <script>
             function fit() {
                 top.postMessage({
-                    "type": "MAIN_IFRAME_RESIZE",
+                    "type": "GOOEY_IFRAME_RESIZE",
                     "height": parent.document.getElementsByClassName("main")[0].scrollHeight,
                 }, "*");
             }

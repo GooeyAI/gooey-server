@@ -10,18 +10,19 @@ import streamlit as st
 import streamlit.components.v1 as components
 from google.cloud import firestore
 
-from daras_ai_v2 import settings
 from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
 from daras_ai.db import list_all_docs
 from daras_ai.logo import logo
 from daras_ai.secret_key_checker import check_secret_key
+from daras_ai_v2 import settings
+from daras_ai_v2.query_params import gooey_set_query_parm
 
 
 def get_or_create_doc_id():
     query_params = st.experimental_get_query_params()
     doc_id = query_params.get("id", [new_doc_id()])[0]
-    st.experimental_set_query_params(id=doc_id, **query_params)
+    gooey_set_query_parm(id=doc_id)
     return doc_id
 
 
