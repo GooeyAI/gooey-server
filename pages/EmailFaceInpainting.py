@@ -23,7 +23,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         text_prompt: str = None
 
         num_outputs: int = None
-        quality: int = None
+        quality: int = 50
 
         face_scale: float = None
         face_pos_x: float = None
