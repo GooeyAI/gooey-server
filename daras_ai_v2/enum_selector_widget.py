@@ -1,9 +1,7 @@
 import enum
-from typing import TypeVar, Type, Optional
+from typing import TypeVar, Type
 
 import streamlit as st
-from streamlit.runtime.state import WidgetCallback, WidgetArgs, WidgetKwargs
-from streamlit.type_util import LabelVisibility, Key
 
 E = TypeVar("E", bound=Type[enum.Enum])
 

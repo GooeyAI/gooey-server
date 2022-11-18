@@ -182,25 +182,33 @@ class FaceInpaintingPage(BasePage):
             ### Face Repositioning Settings
             """
         )
-        col1, col2, col3 = st.columns(3)
-        face_scale = col1.slider(
-            "Scale",
-            min_value=0.1,
-            max_value=1.0,
-            key="face_scale",
-        )
-        pos_x = col2.slider(
-            "Position X",
-            min_value=0.0,
-            max_value=1.0,
-            key="face_pos_x",
-        )
-        pos_y = col3.slider(
-            "Position Y",
-            min_value=0.0,
-            max_value=1.0,
-            key="face_pos_y",
-        )
+
+        st.write("How _big_ should the face look?")
+        col1, _ = st.columns(2)
+        with col1:
+            face_scale = st.slider(
+                "Scale",
+                min_value=0.1,
+                max_value=1.0,
+                key="face_scale",
+            )
+
+        st.write("_Where_ would you like to place the face in the scene?")
+        col1, col2 = st.columns(2)
+        with col1:
+            pos_x = st.slider(
+                "Position X",
+                min_value=0.0,
+                max_value=1.0,
+                key="face_pos_x",
+            )
+        with col2:
+            pos_y = st.slider(
+                "Position Y",
+                min_value=0.0,
+                max_value=1.0,
+                key="face_pos_y",
+            )
 
         # show an example image
         img_cv2 = cv2.imread("static/face.png")

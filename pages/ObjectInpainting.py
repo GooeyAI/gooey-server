@@ -1,11 +1,10 @@
+import cv2
 import requests
 import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.face_restoration import map_parallel, gfpgan
 from daras_ai.image_input import (
     upload_file_from_bytes,
-    safe_filename,
     upload_file_hq,
     resize_img_pad,
 )
@@ -13,6 +12,7 @@ from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.image_segmentation import dis, u2net
+from daras_ai_v2.repositioning import reposition_object, reposition_object_img_bytes
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
@@ -149,50 +149,60 @@ class ObjectInpaintingPage(BasePage):
             ### Object Repositioning Settings
             """
         )
-        col1, col2, col3 = st.columns(3)
-        obj_scale = col1.slider(
-            "Scale",
-            min_value=0.1,
-            max_value=1.0,
-            key="obj_scale",
-        )
-        pos_x = col2.slider(
-            "Position X",
-            min_value=0.0,
-            max_value=1.0,
-            key="obj_pos_x",
-        )
-        pos_y = col3.slider(
-            "Position Y",
-            min_value=0.0,
-            max_value=1.0,
-            key="obj_pos_y",
+
+        st.write("How _big_ should the object look?")
+        col1, _ = st.columns(2)
+        with col1:
+            obj_scale = st.slider(
+                "Scale",
+                min_value=0.1,
+                max_value=1.0,
+                key="obj_scale",
+            )
+
+        st.write("_Where_ would you like to place the object in the scene?")
+        col1, col2 = st.columns(2)
+        with col1:
+            pos_x = st.slider(
+                "Position X",
+                min_value=0.0,
+                max_value=1.0,
+                key="obj_pos_x",
+            )
+        with col2:
+            pos_y = st.slider(
+                "Position Y",
+                min_value=0.0,
+                max_value=1.0,
+                key="obj_pos_y",
+            )
+
+        # show an example image
+        img_cv2 = cv2.imread("static/obj.png")
+        mask_cv2 = cv2.imread("static/obj_mask.png")
+
+        # extract obj
+        img, mask = reposition_object(
+            orig_img=img_cv2,
+            orig_mask=mask_cv2,
+            out_size=(output_width, output_height),
+            out_obj_scale=obj_scale,
+            out_pos_x=pos_x,
+            out_pos_y=pos_y,
         )
 
-        # # show an example image
-        # img_cv2 = cv2.imread("static/obj.png")
-        #
-        # # extract obj
-        # img, mask = extract_and_reposition_face_cv2(
-        #     img_cv2,
-        #     out_size=(output_width, output_height),
-        #     out_face_scale=face_scale,
-        #     out_pos_x=pos_x,
-        #     out_pos_y=pos_y,
-        # )
-        #
-        # # draw rule of 3rds
-        # color = (200, 200, 200)
-        # stroke = 2
-        # img_y, img_x, _ = img.shape
-        # for i in range(2):
-        #     pos = (img_y // 3) * (i + 1)
-        #     cv2.line(img, (0, pos), (img_x, pos), color, stroke)
-        #
-        #     pos = (img_x // 3) * (i + 1)
-        #     cv2.line(img, (pos, 0), (pos, img_y), color, stroke)
-        #
-        # st.image(img, width=300)
+        # draw rule of 3rds
+        color = (200, 200, 200)
+        stroke = 2
+        img_y, img_x, _ = img.shape
+        for i in range(2):
+            pos = (img_y // 3) * (i + 1)
+            cv2.line(img, (0, pos), (img_x, pos), color, stroke)
+
+            pos = (img_x // 3) * (i + 1)
+            cv2.line(img, (pos, 0), (pos, img_y), color, stroke)
+
+        st.image(img, width=300)
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
@@ -247,20 +257,33 @@ class ObjectInpaintingPage(BasePage):
                     st.empty()
 
     def run(self, state: dict):
-        request = self.RequestModel.parse_obj(state)
+        request: ObjectInpaintingPage.RequestModel = self.RequestModel.parse_obj(state)
 
         yield "Running Image Segmentation..."
 
         img_bytes = requests.get(request.input_image).content
 
-        re_img_bytes = resize_img_pad(
-            img_bytes, (request.output_width, request.output_height)
+        padded_img_bytes = resize_img_pad(
+            img_bytes,
+            (request.output_width, request.output_height),
+        )
+        padded_img_url = upload_file_from_bytes("padded_img.png", padded_img_bytes)
+
+        obj_mask_bytes = dis(padded_img_url)
+
+        yield "Repositioning..."
+
+        re_img_bytes, re_mask_bytes = reposition_object_img_bytes(
+            img_bytes=padded_img_bytes,
+            mask_bytes=obj_mask_bytes,
+            out_size=(request.output_width, request.output_height),
+            out_obj_scale=request.obj_scale,
+            out_pos_x=request.obj_pos_x,
+            out_pos_y=request.obj_pos_y,
         )
 
         state["resized_image"] = upload_file_from_bytes("re_img.png", re_img_bytes)
-
-        obj_mask_bytes = u2net(state["resized_image"])
-        state["obj_mask"] = upload_file_from_bytes("obj_mask.png", obj_mask_bytes)
+        state["obj_mask"] = upload_file_from_bytes("obj_mask.png", re_mask_bytes)
 
         yield f"Generating Image..."
 
