@@ -21,12 +21,9 @@ def init_scripts():
     hidden_html_js(
         """
         <script>
-            let lastHeight = 0;
             const observer = new ResizeObserver(entries => {
-                let newHeight = entries[0].contentRect.height;
-                if (newHeight == lastHeight) return;
-                lastHeight = newHeight;
-                top.postMessage({ type: "GOOEY_IFRAME_RESIZE", height: newHeight }, "*");
+                let height = entries[0].contentRect.height;
+                top.postMessage({ type: "GOOEY_IFRAME_RESIZE", height: height }, "*");
             });
             observer.observe(parent.document.querySelector('[data-testid="stVerticalBlock"]'));
         </script>
