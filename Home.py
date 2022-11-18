@@ -13,6 +13,7 @@ from pages.FaceInpainting import FaceInpaintingPage
 from pages.Img2Img import Img2ImgPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
+from pages.ObjectInpainting import ObjectInpaintingPage
 from pages.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
@@ -21,9 +22,10 @@ logo()
 
 page_classes = [
     FaceInpaintingPage,
-    Img2ImgPage,
     TextToSpeechPage,
     LipsyncTTSPage,
+    ObjectInpaintingPage,
+    Img2ImgPage,
     DeforumSDPage,
     CompareLMPage,
     LipsyncPage,
