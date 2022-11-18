@@ -1,6 +1,7 @@
 import cv2
 import requests
 import streamlit as st
+import typing
 from pydantic import BaseModel
 
 from daras_ai.extract_face import extract_and_reposition_face_cv2
@@ -36,7 +37,9 @@ class FaceInpaintingPage(BasePage):
         output_width: int = None
         output_height: int = None
 
-        selected_model: str = InpaintingModels.jack_qiao.name
+        selected_model: typing.Literal[
+            tuple(e.name for e in InpaintingModels)
+        ] = InpaintingModels.jack_qiao.name
 
         class Config:
             schema_extra = {
