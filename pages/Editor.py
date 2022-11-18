@@ -13,7 +13,7 @@ from google.cloud import firestore
 from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
 from daras_ai.db import list_all_docs
-from daras_ai.logo import logo
+from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
 from daras_ai_v2.query_params import gooey_set_query_parm
@@ -142,7 +142,7 @@ def render_io_steps(key):
 # main
 #
 
-logo()
+init_scripts()
 
 recipe_id = get_or_create_doc_id()
 cached_state = get_firestore_doc(recipe_id)
