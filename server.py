@@ -30,7 +30,7 @@ from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
 from pages.TextToSpeech import TextToSpeechPage
 
-app = FastAPI(title="DarasAI", docs_url=None, redoc_url="/docs")
+app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
 app.add_middleware(
     CORSMiddleware,
