@@ -294,7 +294,7 @@ class ObjectInpaintingPage(BasePage):
             edit_image=state["resized_image"],
             edit_image_bytes=re_img_bytes,
             mask=state["obj_mask"],
-            mask_bytes=obj_mask_bytes,
+            mask_bytes=re_mask_bytes,
             num_inference_steps=request.quality,
             width=request.output_width,
             height=request.output_height,
