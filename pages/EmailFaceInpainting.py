@@ -142,7 +142,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         )
 
         st.checkbox(
-            "Should Send email",
+            "Send email",
             key="should_send_email",
         )
         st.text_input(
