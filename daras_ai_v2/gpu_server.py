@@ -3,16 +3,19 @@ import typing
 
 import requests
 
+from daras_ai_v2 import settings
+
 
 class GpuEndpoints:
-    wav2lip = "http://gpu-1.gooey.ai:5001"
-    glid_3_xl_stable = "http://gpu-1.gooey.ai:5002"
-    gfpgan = "http://gpu-1.gooey.ai:5003"
-    dichotomous_image_segmentation = "http://gpu-1.gooey.ai:5004"
-    flan_t5 = "http://gpu-2.gooey.ai:5005"
-    runway_ml_inpainting = "http://gpu-2.gooey.ai:5006"
-    u2net = "http://gpu-1.gooey.ai:5007"
-    deforum_sd = "http://gpu-2.gooey.ai:5008"
+    wav2lip = f"{settings.GPU_SERVER_1}:5001"
+    glid_3_xl_stable = f"{settings.GPU_SERVER_1}:5002"
+    gfpgan = f"{settings.GPU_SERVER_1}:5003"
+    dichotomous_image_segmentation = f"{settings.GPU_SERVER_2}:5004"
+    flan_t5 = f"{settings.GPU_SERVER_2}:5005"
+    runway_ml_inpainting = f"{settings.GPU_SERVER_2}:5006"
+    u2net = f"{settings.GPU_SERVER_1}:5007"
+    deforum_sd = f"{settings.GPU_SERVER_2}:5008"
+    sd_1_5 = f"{settings.GPU_SERVER_2}:5009"
 
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:

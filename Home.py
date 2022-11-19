@@ -3,29 +3,33 @@ from furl import furl
 from google.cloud.firestore_v1 import DocumentSnapshot
 
 from daras_ai.db import list_all_docs
-from daras_ai.logo import logo
+from daras_ai.init import init_scripts
 from daras_ai_v2 import settings
 from daras_ai_v2.face_restoration import map_parallel
-from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
+from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
-from pages.ImageSegmentation import ImageSegmentationPage
+from pages.Img2Img import Img2ImgPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
+from pages.ObjectInpainting import ObjectInpaintingPage
 from pages.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
-logo()
+init_scripts()
 
 page_classes = [
     FaceInpaintingPage,
-    EmailFaceInpaintingPage,
     TextToSpeechPage,
     LipsyncTTSPage,
+    ObjectInpaintingPage,
+    Img2ImgPage,
+    DeforumSDPage,
     CompareLMPage,
     LipsyncPage,
+    EmailFaceInpaintingPage,
     # ChyronPlantPage,
     # ImageSegmentationPage,
 ]
@@ -75,7 +79,7 @@ with st.expander("Early Recipes"):
 
         st.markdown(
             f"""
-            <a style="font-size: 24px" href="{editor_url}" target = "_self">
+            <a style="font-size: 24px" href="{editor_url}" target = "_top">
                 {name}
             </a>
             <br>

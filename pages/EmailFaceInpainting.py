@@ -2,6 +2,7 @@ import re
 
 import requests
 import streamlit as st
+import typing
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
@@ -23,7 +24,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         text_prompt: str = None
 
         num_outputs: int = None
-        quality: int = None
+        quality: int = 50
 
         face_scale: float = None
         face_pos_x: float = None
@@ -32,7 +33,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         output_width: int = None
         output_height: int = None
 
-        selected_model: str = InpaintingModels.jack_qiao.name
+        selected_model: typing.Literal[
+            tuple(e.name for e in InpaintingModels)
+        ] = InpaintingModels.jack_qiao.name
 
         should_send_email: bool = None
         email_from: str = None

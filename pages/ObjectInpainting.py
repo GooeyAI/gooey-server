@@ -1,78 +1,46 @@
 import cv2
 import requests
 import streamlit as st
-import typing
 from pydantic import BaseModel
 
-from daras_ai.extract_face import extract_and_reposition_face_cv2
-from daras_ai_v2.face_restoration import map_parallel, gfpgan
 from daras_ai.image_input import (
     upload_file_from_bytes,
-    safe_filename,
     upload_file_hq,
+    resize_img_pad,
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.extract_face import extract_face_img_bytes
+from daras_ai_v2.image_segmentation import dis, u2net
+from daras_ai_v2.repositioning import reposition_object, reposition_object_img_bytes
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
-class FaceInpaintingPage(BasePage):
-    title = "A Face in Any Scene"
-    slug = "FaceInpainting"
-    version = 2
+class ObjectInpaintingPage(BasePage):
+    title = "An Object in Any Scene"
+    slug = "ObjectInpainting"
 
     class RequestModel(BaseModel):
         input_image: str
         text_prompt: str
 
-        num_outputs: int = None
+        num_outputs: int = 1
         quality: int = 50
 
-        face_scale: float = None
-        face_pos_x: float = None
-        face_pos_y: float = None
+        obj_scale: float = 0.30
+        obj_pos_x: float = 0.4
+        obj_pos_y: float = 0.45
 
-        output_width: int = None
-        output_height: int = None
+        output_width: int = 512
+        output_height: int = 512
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in InpaintingModels)
-        ] = InpaintingModels.jack_qiao.name
-
-        class Config:
-            schema_extra = {
-                "example": {
-                    "text_prompt": "tony stark from the iron man",
-                    "input_photo": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2bcf31e8-48ef-11ed-8fe1-02420a00005c/_DSC0030_1.jpg",
-                }
-            }
+        selected_model: str = InpaintingModels.jack_qiao.name
 
     class ResponseModel(BaseModel):
         resized_image: str
-        face_mask: str
-        diffusion_images: list[str]
+        obj_mask: str
+        # diffusion_images: list[str]
         output_images: list[str]
-
-    def preview_description(self) -> str:
-        return "This recipe takes a photo with a face and then uses the text prompt to paint a background."
-
-    def render_description(self):
-        st.write(
-            """    
-    This recipe takes a photo with a face and then uses the text prompt to paint a background.
-    
-    How It Works:
-    
-    1. Extracts faces from any image using MediaPipe
-    2. Generates images from the given prompt and paints a background scene with Stable diffusion
-    3. Improves faces using GFPGAN    
-    
-    *Face Inpainting: Photo > Face Masking > Stable Diffusion > GFPGAN*
-
-    """
-        )
 
     def render_form(self):
         with st.form("my_form"):
@@ -82,7 +50,7 @@ class FaceInpaintingPage(BasePage):
                 Describe the character that you'd like to generate. 
                 """
             )
-            st.text_area(
+            st.text_input(
                 "text_prompt",
                 label_visibility="collapsed",
                 key="text_prompt",
@@ -91,7 +59,7 @@ class FaceInpaintingPage(BasePage):
 
             st.write(
                 """
-                ### Face Photo
+                ### Object Photo
                 Give us a photo of yourself, or anyone else
                 """
             )
@@ -113,7 +81,7 @@ class FaceInpaintingPage(BasePage):
 
         # form validation
         if submitted and not (text_prompt and input_image_or_file):
-            st.error("Please provide a Prompt and a Face Photo", icon="⚠️")
+            st.error("Please provide a Prompt and a Object Photo", icon="⚠️")
             return False
 
         # upload input file if submitted
@@ -144,7 +112,6 @@ class FaceInpaintingPage(BasePage):
                 st.slider(
                     label="Quality",
                     key="quality",
-                    value=50,
                     min_value=10,
                     max_value=200,
                     step=10,
@@ -179,45 +146,47 @@ class FaceInpaintingPage(BasePage):
 
         st.write(
             """
-            ### Face Repositioning Settings
+            ### Object Repositioning Settings
             """
         )
 
-        st.write("How _big_ should the face look?")
+        st.write("How _big_ should the object look?")
         col1, _ = st.columns(2)
         with col1:
-            face_scale = st.slider(
+            obj_scale = st.slider(
                 "Scale",
                 min_value=0.1,
                 max_value=1.0,
-                key="face_scale",
+                key="obj_scale",
             )
 
-        st.write("_Where_ would you like to place the face in the scene?")
+        st.write("_Where_ would you like to place the object in the scene?")
         col1, col2 = st.columns(2)
         with col1:
             pos_x = st.slider(
                 "Position X",
                 min_value=0.0,
                 max_value=1.0,
-                key="face_pos_x",
+                key="obj_pos_x",
             )
         with col2:
             pos_y = st.slider(
                 "Position Y",
                 min_value=0.0,
                 max_value=1.0,
-                key="face_pos_y",
+                key="obj_pos_y",
             )
 
         # show an example image
-        img_cv2 = cv2.imread("static/face.png")
+        img_cv2 = cv2.imread("static/obj.png")
+        mask_cv2 = cv2.imread("static/obj_mask.png")
 
-        # extract face
-        img, mask = extract_and_reposition_face_cv2(
-            img_cv2,
+        # extract obj
+        img, mask = reposition_object(
+            orig_img=img_cv2,
+            orig_mask=mask_cv2,
             out_size=(output_width, output_height),
-            out_face_scale=face_scale,
+            out_obj_scale=obj_scale,
             out_pos_x=pos_x,
             out_pos_y=pos_y,
         )
@@ -246,7 +215,7 @@ class FaceInpaintingPage(BasePage):
 
         with col1:
             if input_image_or_file:
-                st.image(input_image_or_file, caption="Face Photo")
+                st.image(input_image_or_file, caption="Object Photo")
             else:
                 st.empty()
 
@@ -257,8 +226,8 @@ class FaceInpaintingPage(BasePage):
             else:
                 st.empty()
 
-        with st.expander("Steps", expanded=True):
-            col1, col2, col3, col4 = st.columns(4)
+        with st.expander("Steps"):
+            col1, col2, col3 = st.columns(3)
 
             with col1:
                 if input_image_or_file:
@@ -269,78 +238,68 @@ class FaceInpaintingPage(BasePage):
             with col2:
                 resized_image = st.session_state.get("resized_image")
                 if resized_image:
-                    st.image(resized_image, caption="Repositioned Face")
+                    st.image(resized_image, caption="Repositioned Object")
                 else:
                     st.empty()
 
-                face_mask = st.session_state.get("face_mask")
-                if face_mask:
-                    st.image(face_mask, caption="Face Mask")
+                obj_mask = st.session_state.get("obj_mask")
+                if obj_mask:
+                    st.image(obj_mask, caption="Object Mask")
                 else:
                     st.empty()
 
             with col3:
-                diffusion_images = st.session_state.get("diffusion_images")
+                diffusion_images = st.session_state.get("output_images")
                 if diffusion_images:
                     for url in diffusion_images:
                         st.image(url, caption=f"Stable Diffusion - “{text_prompt}”")
                 else:
                     st.empty()
 
-            with col4:
-                if output_images:
-                    for url in output_images:
-                        st.image(url, caption="gfpgan - Face Restoration")
-                else:
-                    st.empty()
-
     def run(self, state: dict):
-        yield "Extracting Face..."
+        request: ObjectInpaintingPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        input_image_url = state["input_image"]
-        img_bytes = requests.get(input_image_url).content
+        yield "Running Image Segmentation..."
 
-        re_img_bytes, face_mask_bytes = extract_face_img_bytes(
+        img_bytes = requests.get(request.input_image).content
+
+        padded_img_bytes = resize_img_pad(
             img_bytes,
-            out_size=(state["output_width"], state["output_height"]),
-            face_scale=state["face_scale"],
-            pos_x=state["face_pos_x"],
-            pos_y=state["face_pos_y"],
+            (request.output_width, request.output_height),
+        )
+        padded_img_url = upload_file_from_bytes("padded_img.png", padded_img_bytes)
+
+        obj_mask_bytes = dis(padded_img_url)
+
+        yield "Repositioning..."
+
+        re_img_bytes, re_mask_bytes = reposition_object_img_bytes(
+            img_bytes=padded_img_bytes,
+            mask_bytes=obj_mask_bytes,
+            out_size=(request.output_width, request.output_height),
+            out_obj_scale=request.obj_scale,
+            out_pos_x=request.obj_pos_x,
+            out_pos_y=request.obj_pos_y,
         )
 
         state["resized_image"] = upload_file_from_bytes("re_img.png", re_img_bytes)
-        state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)
+        state["obj_mask"] = upload_file_from_bytes("obj_mask.png", re_mask_bytes)
 
         yield f"Generating Image..."
 
-        prompt = state.get("text_prompt", "")
-
         diffusion_images = stable_diffusion.inpainting(
-            selected_model=state["selected_model"],
-            prompt=prompt,
-            num_outputs=state.get("num_outputs", 1),
+            selected_model=request.selected_model,
+            prompt=request.text_prompt,
+            num_outputs=request.num_outputs,
             edit_image=state["resized_image"],
             edit_image_bytes=re_img_bytes,
-            mask=state["face_mask"],
-            mask_bytes=face_mask_bytes,
-            num_inference_steps=state.get("quality", 50),
-            width=state["output_width"],
-            height=state["output_height"],
+            mask=state["obj_mask"],
+            mask_bytes=re_mask_bytes,
+            num_inference_steps=request.quality,
+            width=request.output_width,
+            height=request.output_height,
         )
-        state["diffusion_images"] = diffusion_images
-
-        yield "Running gfpgan..."
-
-        output_images = map_parallel(gfpgan, diffusion_images)
-
-        state["output_images"] = [
-            upload_file_from_bytes(
-                safe_filename(f"gooey.ai inpainting - {prompt.strip()}.png"),
-                img_bytes,
-                # requests.get(url).content,
-            )
-            for img_bytes in output_images
-        ]
+        state["output_images"] = diffusion_images
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
@@ -354,9 +313,6 @@ class FaceInpaintingPage(BasePage):
                 for img in output_images:
                     st.image(img, caption=state.get("text_prompt", ""))
 
-    def preview_image(self, state: dict) -> str:
-        return state.get("output_images", [""])[0]
-
 
 if __name__ == "__main__":
-    FaceInpaintingPage().render()
+    ObjectInpaintingPage().render()

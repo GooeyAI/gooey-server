@@ -12,10 +12,10 @@ from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
 
-from daras_ai.logo import logo
+from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
-from daras_ai_v2.hidden_html_widget import hidden_html
+from daras_ai_v2.hidden_html_widget import hidden_html_js
 
 DEFAULT_STATUS = "Running..."
 
@@ -39,7 +39,7 @@ class BasePage:
         return f"/v1/{self.slug}/run"
 
     def render(self):
-        logo()
+        init_scripts()
 
         st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
@@ -249,7 +249,7 @@ class BasePage:
                     "✏️ Tweak", help=f"Tweak example", key=f"tweak-{example_id}"
                 )
                 if pressed_tweak:
-                    hidden_html(
+                    hidden_html_js(
                         f"""
                         <script>
                             window.open("{url}", "_blank");
@@ -262,7 +262,7 @@ class BasePage:
                     "✉️️ Share", help=f"Share example", key=f"share-{example_id}"
                 )
                 if pressed_share:
-                    hidden_html(
+                    hidden_html_js(
                         f"""
                         <script>
                                parent.navigator.clipboard.writeText("{url}").then(

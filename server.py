@@ -24,12 +24,14 @@ from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.ImageSegmentation import ImageSegmentationPage
+from pages.Img2Img import Img2ImgPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
+from pages.ObjectInpainting import ObjectInpaintingPage
 from pages.TextToSpeech import TextToSpeechPage
 
-app = FastAPI(title="DarasAI")
+app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,7 +46,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
-@app.post("/auth", status_code=302)
+@app.post("/auth", status_code=302, include_in_schema=False)
 async def authentication(request: Request):
     body = await request.body()
     body_str = body.decode("utf-8")
@@ -78,18 +80,18 @@ async def authentication(request: Request):
         return RedirectResponse(url="/error", status_code=302)
 
 
-@app.route("/logout")
+@app.route("/logout", include_in_schema=False)
 async def logout(request: Request):
     request.session.pop("user", None)
     return RedirectResponse(url="/")
 
 
-@app.route("/error")
+@app.route("/error", include_in_schema=False)
 def error(request: Request):
     return templates.TemplateResponse("error_page.html", context={"request": request})
 
 
-@app.post("/v1/run-recipe/")
+@app.post("/v1/run-recipe/", include_in_schema=False)
 def run(
     params: dict = Body(
         examples={
@@ -160,6 +162,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page_cls().endpoint,
         response_model=page_cls.ResponseModel,
         responses={500: {"model": RunFailedModel}},
+        name=page_cls.title,
     )
     def run_api(request: page_cls.RequestModel = body_spec):
         # init a new page for every request
@@ -187,7 +190,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         return state
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def st_home(request: Request):
     iframe_url = furl(settings.IFRAME_BASE_URL).url
     return _st_page(
@@ -197,11 +200,9 @@ def st_home(request: Request):
     )
 
 
-@app.get("/Editor/")
+@app.get("/Editor/", include_in_schema=False)
 def st_home(request: Request):
-    iframe_url = (
-        furl(settings.IFRAME_BASE_URL, query_params=request.query_params) / "Editor"
-    )
+    iframe_url = furl(settings.IFRAME_BASE_URL) / "Editor"
     return _st_page(
         request,
         iframe_url,
@@ -210,7 +211,7 @@ def st_home(request: Request):
 
 
 def script_to_frontend(page_cls: typing.Type[BasePage]):
-    @app.get(f"/{page_cls.slug}/")
+    @app.get(f"/{page_cls.slug}/", include_in_schema=False)
     def st_page(request: Request):
         page = page_cls()
         state = page.get_doc()
@@ -254,6 +255,8 @@ all_pages = [
     TextToSpeechPage,
     LipsyncTTSPage,
     DeforumSDPage,
+    Img2ImgPage,
+    ObjectInpaintingPage,
 ]
 
 
