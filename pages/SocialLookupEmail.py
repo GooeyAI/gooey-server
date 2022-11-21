@@ -4,18 +4,20 @@ import requests
 
 from pydantic import BaseModel
 import streamlit as st
+
+from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import run_language_model
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
 
-class SocialLookupEmail(BasePage):
+class SocialLookupEmailPage(BasePage):
     title = "Get Your Emails Actually Read"
     slug = "SocialLookupEmail"
 
     class RequestModel(BaseModel):
-        input_prompt: str
+        input_email_body: str
         email_address: str
 
         sampling_temperature: float = 1.0
@@ -24,13 +26,15 @@ class SocialLookupEmail(BasePage):
         class Config:
             schema_extra = {
                 "example": {
-                    "input_prompt": "This is a sample email",
+                    "input_email_body": "This is a sample email",
                     "email_address": "sean@dara.network",
                 }
             }
 
     class ResponseModel(BaseModel):
-        gpt3_output: str
+        person_data: dict
+        final_prompt: str
+        output_email_body: str
 
     def render_description(self):
         st.write(
@@ -66,7 +70,6 @@ class SocialLookupEmail(BasePage):
             key="sampling_temperature",
             min_value=0.0,
             max_value=1.0,
-            value=.7,
         )
 
         st.write(
@@ -107,16 +110,16 @@ class SocialLookupEmail(BasePage):
                 """
             )
             st.text_area(
-                "input_prompt",
+                "input_email_body",
                 label_visibility="collapsed",
-                key="input_prompt",
+                key="input_email_body",
                 height=200,
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")
 
         if submitted:
-            text_prompt = st.session_state.get("input_prompt")
+            text_prompt = st.session_state.get("input_email_body")
             email_address = st.session_state.get("email_address")
             if not (text_prompt and email_address):
                 st.error("Please provide a Prompt and an Email Address", icon="⚠️")
@@ -129,24 +132,29 @@ class SocialLookupEmail(BasePage):
         return submitted
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request = self.RequestModel.parse_obj(state)
+        request: SocialLookupEmailPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        #yield "Fetching profile data..."
-        #person = get_profile_for_email(request.email_address)
-        #if person:
-        #    yield "Found profile data..."
-        #    state["person"] = person
+        yield "Fetching profile data..."
 
-            #yield from super().run(state)
+        person = get_profile_for_email(request.email_address)
+        if not person:
+            raise ValueError("Could not find person")
+        state["person_data"] = person
+
+        state["final_prompt"] = daras_ai_format_str(
+            format_str=request.input_email_body,
+            variables={"person": person},
+        )
 
         yield "Running GPT-3..."
-        state["gpt3_output"] = run_language_model(
+
+        state["output_email_body"] = run_language_model(
             api_provider="openai",
             engine="text-davinci-002",
             quality=1,
             num_outputs=1,
             temperature=request.sampling_temperature,
-            prompt=request.input_prompt,
+            prompt=state["final_prompt"],
             max_tokens=request.max_tokens,
             stop=None,
         )[0]
@@ -161,17 +169,41 @@ class SocialLookupEmail(BasePage):
             "Output",
             label_visibility="collapsed",
             disabled=True,
-            value=st.session_state.get("gpt3_output", ""),
+            value=st.session_state.get("output_email_body", ""),
             height=200,
         )
+
+        with st.expander("Steps", expanded=True):
+            person_data = st.session_state.get("person_data")
+            if person_data:
+                st.write("**Person Data**")
+                st.json(
+                    person_data,
+                    expanded=False,
+                )
+            else:
+                st.empty()
+
+            final_prompt = st.session_state.get("final_prompt")
+            if final_prompt:
+                st.text_area(
+                    "Final Prompt",
+                    disabled=True,
+                    value=final_prompt,
+                    height=200,
+                )
+            else:
+                st.empty()
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
         with col1:
-            st.write(state.get("input_prompt", ""))
+            st.write("**Email Address**")
+            st.write(state.get("email_address", ""))
         with col2:
-            st.write("**GPT-3**")
-            st.write(state.get("gpt3_output", ""))
+            st.write("**Email Body Output**")
+            st.write(state.get("output_email_body", ""))
+
 
 @st.cache()
 def get_profile_for_email(email_address):
@@ -184,7 +216,7 @@ def get_profile_for_email(email_address):
     )
     r.raise_for_status()
 
-    person = r.json()["person"]
+    person = r.json().get("person")
     if not person:
         return
 
@@ -192,4 +224,4 @@ def get_profile_for_email(email_address):
 
 
 if __name__ == "__main__":
-    SocialLookupEmail().render()
+    SocialLookupEmailPage().render()

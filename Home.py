@@ -14,6 +14,7 @@ from pages.Img2Img import Img2ImgPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
 from pages.ObjectInpainting import ObjectInpaintingPage
+from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
@@ -29,6 +30,7 @@ page_classes = [
     DeforumSDPage,
     CompareLMPage,
     LipsyncPage,
+    SocialLookupEmailPage,
     EmailFaceInpaintingPage,
     # ChyronPlantPage,
     # ImageSegmentationPage,

@@ -2,6 +2,7 @@ import inspect
 import json
 import secrets
 import shlex
+import traceback
 import typing
 from copy import deepcopy
 from time import time
@@ -158,6 +159,7 @@ class BasePage:
 
             # render ValueError nicely
             except Exception as e:
+                traceback.print_exc()
                 with status_area:
                     st.error(f"{type(e).__name__} - {e}", icon="⚠️")
                 # cleanup is important!
