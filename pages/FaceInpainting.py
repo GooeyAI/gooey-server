@@ -257,7 +257,7 @@ class FaceInpaintingPage(BasePage):
             else:
                 st.empty()
 
-        with st.expander("Steps"):
+        with st.expander("Steps", expanded=True):
             col1, col2, col3, col4 = st.columns(4)
 
             with col1:

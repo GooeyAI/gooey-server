@@ -361,7 +361,7 @@ class LetterWriterPage(BasePage):
                 disabled=True,
             )
 
-        with st.expander("Steps"):
+        with st.expander("Steps", expanded=True):
             response_json = st.session_state.get("response_json", {})
             st.write("**API Response**")
             st.json(
