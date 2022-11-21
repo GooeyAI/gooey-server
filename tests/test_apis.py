@@ -13,9 +13,11 @@ from pages.ChyronPlant import ChyronPlantPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.ImageSegmentation import ImageSegmentationPage
+from pages.Img2Img import Img2ImgPage
 from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
+from pages.ObjectInpainting import ObjectInpaintingPage
 from pages.TextToSpeech import TextToSpeechPage
 from server import app
 
@@ -31,6 +33,8 @@ pages_to_test = [
     ImageSegmentationPage,
     TextToSpeechPage,
     LipsyncTTSPage,
+    Img2ImgPage,
+    ObjectInpaintingPage,
     # DeforumSDPage,
 ]
 

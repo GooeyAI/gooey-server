@@ -29,7 +29,9 @@ class Img2ImgPage(BasePage):
         output_width: int = 512
         output_height: int = 512
 
-        selected_model: str = InpaintingModels.jack_qiao.name
+        selected_model: typing.Literal[
+            tuple(e.name for e in Img2ImgModels)
+        ] = Img2ImgModels.jack_qiao.name
 
     class ResponseModel(BaseModel):
         resized_image: str

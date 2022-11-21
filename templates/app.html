@@ -11,21 +11,31 @@
     <!-- Primary Meta Tags -->
     <title>Meta Tags — Preview, Edit and Generate</title>
     <meta name="title" content="{{ title }}">
-    <meta name="description" content="{{ description }}">
+    {% if description %}
+        <meta name="description" content="{{ description }}">
+    {% endif %}
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.url }}">
     <meta property="og:title" content="{{ title }}">
-    <meta property="og:description" content="{{ description }}">
-    <meta property="og:image" content="{{ image }}">
+    {% if description %}
+        <meta property="og:description" content="{{ description }}">
+    {% endif %}
+    {% if image %}
+        <meta property="og:image" content="{{ image }}">
+    {% endif %}
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="{{ request.url }}">
     <meta property="twitter:title" content="{{ title }}">
-    <meta property="twitter:description" content="{{ description }}">
-    <meta property="twitter:image" content="{{ image }}">
+    {% if description %}
+        <meta property="twitter:description" content="{{ description }}">
+    {% endif %}
+    {% if image %}
+        <meta property="twitter:image" content="{{ image }}">
+    {% endif %}
 
     <style>
         ::-webkit-scrollbar {
@@ -56,20 +66,22 @@
     </style>
 
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600&display=swap');
+
         html, body {
             background-color: black;
             color: #03dac5;
             margin: 0;
             border: 0;
             padding: 0;
-            font-family: avenir;
+            font-family: 'Source Sans Pro', sans-serif;
         }
 
         a {
             text-decoration: none;
             color: #03dac5;
             font-size: 17px;
-            font-weight: 500;
+            font-weight: 600;
         }
 
         a:visited {
@@ -144,10 +156,10 @@
     </div>
 {% endif %}
 
-
 <iframe onload="onIframeLoaded(this)"
         src="{{ iframe_url }}"
-        allow="clipboard-read; clipboard-write"></iframe>
+        allow="clipboard-read; clipboard-write; accelerometer; ambient-light-sensor; autoplay; battery; camera; document-domain; encrypted-media; fullscreen; geolocation; gyroscope; layout-animations; legacy-image-formats; magnetometer; microphone; midi; oversized-images; payment; picture-in-picture; publickey-credentials-get; sync-xhr; usb; vr ; wake-lock; xr-spatial-tracking">
+</iframe>
 
 <script>
     function onIframeLoaded(iframe) {
@@ -162,7 +174,7 @@
                     url.search = searchParams.toString();
                     history.pushState(null, '', url.toString());
                 case "GOOEY_IFRAME_RESIZE":
-                    iframe.style.height = event.data.height + "px";
+                    iframe.style.height = `${event.data.height + 100}px`;
             }
         });
     }

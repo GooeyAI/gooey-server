@@ -10,7 +10,7 @@ class GpuEndpoints:
     wav2lip = f"{settings.GPU_SERVER_1}:5001"
     glid_3_xl_stable = f"{settings.GPU_SERVER_1}:5002"
     gfpgan = f"{settings.GPU_SERVER_1}:5003"
-    dichotomous_image_segmentation = f"{settings.GPU_SERVER_1}:5004"
+    dichotomous_image_segmentation = f"{settings.GPU_SERVER_2}:5004"
     flan_t5 = f"{settings.GPU_SERVER_2}:5005"
     runway_ml_inpainting = f"{settings.GPU_SERVER_2}:5006"
     u2net = f"{settings.GPU_SERVER_1}:5007"
