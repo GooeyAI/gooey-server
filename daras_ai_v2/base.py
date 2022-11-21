@@ -82,7 +82,6 @@ class BasePage:
 
         with run_tab:
             col1, col2 = st.columns(2)
-
             with col1:
                 submitted = self.render_form()
                 self.render_description()
@@ -90,6 +89,9 @@ class BasePage:
             with col2:
                 self._runner(submitted)
                 self.save_buttons()
+
+            self.render_footer()
+
         #
         # NOTE: Beware of putting code after runner since it will call experimental_rerun
         #
@@ -107,6 +109,9 @@ class BasePage:
         self.render_example(st.session_state)
 
     def render_form(self) -> bool:
+        return False
+
+    def render_footer(self) -> bool:
         return False
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
