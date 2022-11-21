@@ -14,23 +14,23 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     class RequestModel(BaseModel):
         input_face: str
-        input_audio: str = None
+        input_audio: str | None
 
-        face_padding_top: int = None
-        face_padding_bottom: int = None
-        face_padding_left: int = None
-        face_padding_right: int = None
+        face_padding_top: int | None
+        face_padding_bottom: int | None
+        face_padding_left: int | None
+        face_padding_right: int | None
 
         text_prompt: str
 
-        tts_provider: str = None
+        tts_provider: str | None
 
-        uberduck_voice_name: str = None
-        uberduck_speaking_rate: float = None
+        uberduck_voice_name: str | None
+        uberduck_speaking_rate: float | None
 
-        google_voice_name: str = None
-        google_speaking_rate: float = None
-        google_pitch: float = None
+        google_voice_name: str | None
+        google_speaking_rate: float | None
+        google_pitch: float | None
 
     class ResponseModel(BaseModel):
         output_video: str

@@ -24,14 +24,14 @@ class TextToSpeechPage(BasePage):
     class RequestModel(BaseModel):
         text_prompt: str
 
-        tts_provider: str = None
+        tts_provider: str | None
 
-        uberduck_voice_name: str = None
-        uberduck_speaking_rate: float = None
+        uberduck_voice_name: str | None
+        uberduck_speaking_rate: float | None
 
-        google_voice_name: str = None
-        google_speaking_rate: float = None
-        google_pitch: float = None
+        google_voice_name: str | None
+        google_speaking_rate: float | None
+        google_pitch: float | None
 
     class ResponseModel(BaseModel):
         audio_url: str

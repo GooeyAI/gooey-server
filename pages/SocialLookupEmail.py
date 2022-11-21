@@ -17,26 +17,19 @@ class SocialLookupEmailPage(BasePage):
     slug = "SocialLookupEmail"
 
     class RequestModel(BaseModel):
-        input_email_body: str = ""
         email_address: str
 
-        url1: str = ""
-        url2: str = ""
-        company: str = ""
-        article_title: str = ""
-        domain: str = ""
-        key_words: str = ""
+        input_email_body: str | None
 
-        sampling_temperature: float = 1.0
-        max_tokens: int = 1024
+        url1: str | None
+        url2: str | None
+        company: str | None
+        article_title: str | None
+        domain: str | None
+        key_words: str | None
 
-        class Config:
-            schema_extra = {
-                "example": {
-                    "input_email_body": "This is a sample email",
-                    "email_address": "sean@dara.network",
-                }
-            }
+        sampling_temperature: float | None
+        max_tokens: int | None
 
     class ResponseModel(BaseModel):
         person_data: dict
@@ -157,7 +150,7 @@ class SocialLookupEmailPage(BasePage):
 
         state["final_prompt"] = daras_ai_format_str(
             format_str=request.input_email_body,
-            variables=self._input_variables(),
+            variables=self._input_variables(state),
         )
 
         yield "Running GPT-3..."
@@ -173,16 +166,16 @@ class SocialLookupEmailPage(BasePage):
             stop=None,
         )[0]
 
-    def _input_variables(self):
+    def _input_variables(self, state: dict):
         return {
-            "person": st.session_state.get("person_data"),
-            "email_address": st.session_state.get("email_address"),
-            "url1": st.session_state.get("url1"),
-            "url2": st.session_state.get("url2"),
-            "company": st.session_state.get("company"),
-            "article_title": st.session_state.get("article_title"),
-            "domain": st.session_state.get("domain"),
-            "key_words": st.session_state.get("key_words"),
+            "person": state.get("person_data"),
+            "email_address": state.get("email_address"),
+            "url1": state.get("url1"),
+            "url2": state.get("url2"),
+            "company": state.get("company"),
+            "article_title": state.get("article_title"),
+            "domain": state.get("domain"),
+            "key_words": state.get("key_words"),
         }
 
     def render_output(self):
@@ -204,7 +197,7 @@ class SocialLookupEmailPage(BasePage):
             if person_data:
                 st.write("**Input Variables**")
                 st.json(
-                    self._input_variables(),
+                    self._input_variables(st.session_state),
                     expanded=False,
                 )
             else:

@@ -1,6 +1,7 @@
 import cv2
 import requests
 import streamlit as st
+import typing
 from pydantic import BaseModel
 
 from daras_ai.image_input import (
@@ -24,17 +25,17 @@ class ObjectInpaintingPage(BasePage):
         input_image: str
         text_prompt: str
 
-        num_outputs: int = 1
-        quality: int = 50
+        num_outputs: int | None
+        quality: int | None
 
-        obj_scale: float = 0.30
-        obj_pos_x: float = 0.4
-        obj_pos_y: float = 0.45
+        obj_scale: float | None
+        obj_pos_x: float | None
+        obj_pos_y: float | None
 
-        output_width: int = 512
-        output_height: int = 512
+        output_width: int | None
+        output_height: int | None
 
-        selected_model: str = InpaintingModels.jack_qiao.name
+        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
 
     class ResponseModel(BaseModel):
         resized_image: str
