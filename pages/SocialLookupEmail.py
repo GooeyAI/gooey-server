@@ -17,8 +17,15 @@ class SocialLookupEmailPage(BasePage):
     slug = "SocialLookupEmail"
 
     class RequestModel(BaseModel):
-        input_email_body: str
+        input_email_body: str = ""
         email_address: str
+
+        url1: str = ""
+        url2: str = ""
+        company: str = ""
+        article_title: str = ""
+        domain: str = ""
+        key_words: str = ""
 
         sampling_temperature: float = 1.0
         max_tokens: int = 1024
@@ -116,6 +123,13 @@ class SocialLookupEmailPage(BasePage):
                 height=200,
             )
 
+            st.text_input("URL 1", key="url1")
+            st.text_input("URL 2", key="url2")
+            st.text_input("Company", key="company")
+            st.text_input("Article Title", key="article_title")
+            st.text_input("Domain", key="domain")
+            st.text_input("Key Words", key="key_words")
+
             submitted = st.form_submit_button("🏃‍ Submit")
 
         if submitted:
@@ -143,7 +157,7 @@ class SocialLookupEmailPage(BasePage):
 
         state["final_prompt"] = daras_ai_format_str(
             format_str=request.input_email_body,
-            variables={"person": person},
+            variables=self._input_variables(),
         )
 
         yield "Running GPT-3..."
@@ -158,6 +172,18 @@ class SocialLookupEmailPage(BasePage):
             max_tokens=request.max_tokens,
             stop=None,
         )[0]
+
+    def _input_variables(self):
+        return {
+            "person": st.session_state.get("person_data"),
+            "email_address": st.session_state.get("email_address"),
+            "url1": st.session_state.get("url1"),
+            "url2": st.session_state.get("url2"),
+            "company": st.session_state.get("company"),
+            "article_title": st.session_state.get("article_title"),
+            "domain": st.session_state.get("domain"),
+            "key_words": st.session_state.get("key_words"),
+        }
 
     def render_output(self):
         st.write(
@@ -176,9 +202,9 @@ class SocialLookupEmailPage(BasePage):
         with st.expander("Steps", expanded=True):
             person_data = st.session_state.get("person_data")
             if person_data:
-                st.write("**Person Data**")
+                st.write("**Input Variables**")
                 st.json(
-                    person_data,
+                    self._input_variables(),
                     expanded=False,
                 )
             else:
