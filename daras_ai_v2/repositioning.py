@@ -36,19 +36,40 @@ def reposition_object(
     *,
     orig_img,
     orig_mask,
-    out_size: (int, int) = (512, 512),
+    out_size: (int, int),
+    out_obj_scale: float = 0.2,
+    out_pos_x: float = 4 / 9,
+    out_pos_y: float = 3 / 9,
+):
+    out_img_shape = (out_size[1], out_size[0], orig_img.shape[-1])
+    return reposition_object_into(
+        orig_img=orig_img,
+        orig_mask=orig_mask,
+        out_img=np.zeros(out_img_shape, dtype=np.uint8),
+        out_mask=np.zeros(out_img_shape, dtype=np.uint8),
+        out_obj_scale=out_obj_scale,
+        out_pos_x=out_pos_x,
+        out_pos_y=out_pos_y,
+    )
+
+
+def reposition_object_into(
+    *,
+    orig_img,
+    orig_mask,
+    out_img,
+    out_mask,
     out_obj_scale: float = 0.2,
     out_pos_x: float = 4 / 9,
     out_pos_y: float = 3 / 9,
 ):
     img_y, img_x, _ = orig_img.shape
-    out_img_x, out_img_y = out_size
-    out_img_shape = (out_img_y, out_img_x, orig_img.shape[-1])
+    out_img_y, out_img_x, _ = out_img.shape
 
     # find the bounds of the object
     obj_xmin, obj_xmax, obj_ymin, obj_ymax = get_mask_bounds(orig_mask)
 
-    # original face height
+    # original obj height
     obj_height = abs(obj_ymax - obj_ymin)
 
     # image resize ratio
@@ -98,9 +119,6 @@ def reposition_object(
         slice(out_crop_x1, out_crop_x2),
         slice(0, 3),
     )
-
-    out_img = np.zeros(out_img_shape, dtype=np.uint8)
-    out_mask = np.zeros(out_img_shape, dtype=np.uint8)
 
     # paste crop of resized image onto the crop of output image
     out_img[out_rect_cropper] = re_img[re_rect_cropper]
