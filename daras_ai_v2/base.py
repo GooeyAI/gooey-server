@@ -246,17 +246,33 @@ class BasePage:
             col1, col2, col3, *_ = st.columns(3)
 
             with col1:
-                pressed_tweak = st.button(
-                    "✏️ Tweak", help=f"Tweak example", key=f"tweak-{example_id}"
+                html(
+                    """
+                    <button style="color:white" class="btn"  onclick="parent.window.open('%s');">
+                      ✏️ Tweak 
+                   </button>
+                   <style>
+                       .btn {
+                            display: inline-flex;
+                            -webkit-box-align: center;
+                            align-items: center;
+                            -webkit-box-pack: center;
+                            justify-content: center;
+                            font-weight: 400;
+                            padding: 0.25rem 0.75rem;
+                            border-radius: 0.25rem;
+                            margin: 0px;
+                            line-height: 1.6;
+                            color: inherit;
+                            width: auto;
+                            user-select: none;
+                            background-color: rgb(8, 8, 8);
+                            border: 1px solid rgba(255, 255, 255, 0.2);
+                        }
+                   </style>
+                    """
+                    % (url,)
                 )
-                if pressed_tweak:
-                    hidden_html_js(
-                        f"""
-                        <script>
-                            window.open("{url}", "_blank");
-                        </script>
-                        """
-                    )
 
             with col2:
                 html(
