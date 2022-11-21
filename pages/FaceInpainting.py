@@ -27,19 +27,17 @@ class FaceInpaintingPage(BasePage):
         input_image: str
         text_prompt: str
 
-        num_outputs: int = None
-        quality: int = 50
+        num_outputs: int | None
+        quality: int | None
 
-        face_scale: float = None
-        face_pos_x: float = None
-        face_pos_y: float = None
+        face_scale: float | None
+        face_pos_x: float | None
+        face_pos_y: float | None
 
-        output_width: int = None
-        output_height: int = None
+        output_width: int | None
+        output_height: int | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in InpaintingModels)
-        ] = InpaintingModels.jack_qiao.name
+        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
 
         class Config:
             schema_extra = {
@@ -257,7 +255,7 @@ class FaceInpaintingPage(BasePage):
             else:
                 st.empty()
 
-        with st.expander("Steps"):
+        with st.expander("Steps", expanded=True):
             col1, col2, col3, col4 = st.columns(4)
 
             with col1:

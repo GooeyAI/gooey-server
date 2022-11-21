@@ -12,7 +12,7 @@ class DeforumSDPage(BasePage):
 
     class RequestModel(BaseModel):
         input_prompt: str
-        max_frames: int = 100
+        max_frames: int | None
 
     class ResponseModel(BaseModel):
         output_video: str

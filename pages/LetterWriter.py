@@ -18,22 +18,22 @@ class LetterWriterPage(BasePage):
     class RequestModel(BaseModel):
         action_id: str
 
-        prompt_header: str = None
-        example_letters: list[TrainingDataModel] = None
+        prompt_header: str | None
+        example_letters: list[TrainingDataModel] | None
 
-        lm_selected_api: str = None
-        lm_selected_engine: str = None
-        num_outputs: int = None
-        quality: float = None
-        lm_sampling_temperature: float = None
+        lm_selected_api: str | None
+        lm_selected_engine: str | None
+        num_outputs: int | None
+        quality: float | None
+        lm_sampling_temperature: float | None
 
-        api_http_method: str = None
-        api_url: str = None
-        api_headers: str = None
-        api_json_body: str = None
+        api_http_method: str | None
+        api_url: str | None
+        api_headers: str | None
+        api_json_body: str | None
 
-        input_prompt: str = None
-        strip_html_2_text: bool = False
+        input_prompt: str | None
+        strip_html_2_text: bool | None
 
         class Config:
             schema_extra = {
@@ -361,7 +361,7 @@ class LetterWriterPage(BasePage):
                 disabled=True,
             )
 
-        with st.expander("Steps"):
+        with st.expander("Steps", expanded=True):
             response_json = st.session_state.get("response_json", {})
             st.write("**API Response**")
             st.json(

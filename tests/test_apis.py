@@ -18,6 +18,7 @@ from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
 from pages.ObjectInpainting import ObjectInpaintingPage
+from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
 from server import app
 
@@ -35,6 +36,7 @@ pages_to_test = [
     LipsyncTTSPage,
     Img2ImgPage,
     ObjectInpaintingPage,
+    SocialLookupEmailPage,
     # DeforumSDPage,
 ]
 

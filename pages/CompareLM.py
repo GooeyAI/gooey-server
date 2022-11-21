@@ -12,8 +12,8 @@ class CompareLMPage(BasePage):
 
     class RequestModel(BaseModel):
         input_prompt: str
-        sampling_temperature: float = 1.0
-        max_tokens: int = 256
+        sampling_temperature: float | None
+        max_tokens: int | None
 
     class ResponseModel(BaseModel):
         gpt3_output: str

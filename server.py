@@ -30,6 +30,7 @@ from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
 from pages.ObjectInpainting import ObjectInpaintingPage
+from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -258,6 +259,7 @@ all_pages = [
     DeforumSDPage,
     Img2ImgPage,
     ObjectInpaintingPage,
+    SocialLookupEmailPage,
     CompareText2ImgPage,
 ]
 
