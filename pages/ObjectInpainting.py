@@ -11,7 +11,7 @@ from daras_ai.image_input import (
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.image_segmentation import dis, u2net
+from daras_ai_v2.image_segmentation import dis
 from daras_ai_v2.repositioning import reposition_object, reposition_object_img_bytes
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
@@ -60,7 +60,7 @@ class ObjectInpaintingPage(BasePage):
             st.write(
                 """
                 ### Object Photo
-                Give us a photo of yourself, or anyone else
+                Give us a photo of anything
                 """
             )
             st.file_uploader(

@@ -20,6 +20,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
+from pages.CompareText2Img import CompareText2ImgPage
 from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
@@ -257,6 +258,7 @@ all_pages = [
     DeforumSDPage,
     Img2ImgPage,
     ObjectInpaintingPage,
+    CompareText2ImgPage,
 ]
 
 
