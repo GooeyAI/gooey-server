@@ -16,6 +16,7 @@ class GpuEndpoints:
     u2net = f"{settings.GPU_SERVER_1}:5007"
     deforum_sd = f"{settings.GPU_SERVER_2}:5008"
     sd_1_5 = f"{settings.GPU_SERVER_2}:5009"
+    # openjourney = f"{settings.GPU_SERVER_2}:5010"
 
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
