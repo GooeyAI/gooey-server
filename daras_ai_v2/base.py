@@ -11,6 +11,7 @@ import streamlit as st
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
+from streamlit.components.v1 import html
 
 from daras_ai.logo import logo
 from daras_ai.secret_key_checker import check_secret_key
@@ -258,21 +259,42 @@ class BasePage:
                     )
 
             with col2:
-                pressed_share = st.button(
-                    "✉️️ Share", help=f"Share example", key=f"share-{example_id}"
+                html(
+                    """
+                   <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.10/dist/clipboard.min.js"></script>
+                    <script>
+                       window.addEventListener("load", function (event) {
+                        var clipboard = new ClipboardJS('.btn');
+                        clipboard.on('success', function(e) {
+                            alert("✅ Recipe example URL Copied");
+                            });
+                        });
+                    </script>
+                    <button style="color:white" class="btn" data-clipboard-text="%s" >
+                       📎 Copy URL 
+                   </button>
+                   <style>
+                       .btn {
+                            display: inline-flex;
+                            -webkit-box-align: center;
+                            align-items: center;
+                            -webkit-box-pack: center;
+                            justify-content: center;
+                            font-weight: 400;
+                            padding: 0.25rem 0.75rem;
+                            border-radius: 0.25rem;
+                            margin: 0px;
+                            line-height: 1.6;
+                            color: inherit;
+                            width: auto;
+                            user-select: none;
+                            background-color: rgb(8, 8, 8);
+                            border: 1px solid rgba(255, 255, 255, 0.2);
+                        }
+                   </style>
+                    """
+                    % url
                 )
-                if pressed_share:
-                    hidden_html(
-                        f"""
-                        <script>
-                               parent.navigator.clipboard.writeText("{url}").then(
-                                  (e) => console.log("success"),
-                                  (e) => console.log(e)
-                               );
-                        </script>
-                        """
-                    )
-                    st.success("Recipe example URL Copied", icon="✅")
 
             with col3:
                 if allow_delete:
