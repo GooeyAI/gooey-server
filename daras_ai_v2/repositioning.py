@@ -15,7 +15,7 @@ def reposition_object_img_bytes(
 ) -> (bytes, bytes):
     image_cv2 = bytes_to_cv2_img(img_bytes)
     mask_cv2 = bytes_to_cv2_img(mask_bytes)
-    image_cv2, face_mask_cv2 = reposition_object(
+    image_cv2, mask_cv2 = reposition_object(
         orig_img=image_cv2,
         orig_mask=mask_cv2,
         out_size=out_size,
@@ -28,7 +28,7 @@ def reposition_object_img_bytes(
     # face_mask_cv2 = cv2.GaussianBlur(face_mask_cv2, (0, 0), 5)
 
     image_bytes = cv2_img_to_bytes(image_cv2)
-    face_mask_bytes = cv2_img_to_bytes(face_mask_cv2)
+    face_mask_bytes = cv2_img_to_bytes(mask_cv2)
     return image_bytes, face_mask_bytes
 
 

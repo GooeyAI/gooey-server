@@ -11,21 +11,31 @@
     <!-- Primary Meta Tags -->
     <title>Meta Tags — Preview, Edit and Generate</title>
     <meta name="title" content="{{ title }}">
-    <meta name="description" content="{{ description }}">
+    {% if description %}
+        <meta name="description" content="{{ description }}">
+    {% endif %}
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.url }}">
     <meta property="og:title" content="{{ title }}">
-    <meta property="og:description" content="{{ description }}">
-    <meta property="og:image" content="{{ image }}">
+    {% if description %}
+        <meta property="og:description" content="{{ description }}">
+    {% endif %}
+    {% if image %}
+        <meta property="og:image" content="{{ image }}">
+    {% endif %}
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="{{ request.url }}">
     <meta property="twitter:title" content="{{ title }}">
-    <meta property="twitter:description" content="{{ description }}">
-    <meta property="twitter:image" content="{{ image }}">
+    {% if description %}
+        <meta property="twitter:description" content="{{ description }}">
+    {% endif %}
+    {% if image %}
+        <meta property="twitter:image" content="{{ image }}">
+    {% endif %}
 
     <style>
         ::-webkit-scrollbar {
