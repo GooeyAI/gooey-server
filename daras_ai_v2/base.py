@@ -293,6 +293,13 @@ class BasePage:
                             deleted = example.delete()
                             if deleted:
                                 st.success("Deleted", icon="✅")
+                                hidden_html_js(
+                                    """
+                                    <script>
+                                       parent.location.reload();
+                                    </script>
+                                    """
+                                )
 
             self.render_example(doc)
 
