@@ -274,8 +274,8 @@ class BasePage:
                         }
                    </style>
                     """
-                    % (url,)
-                    ,unsafe_allow_html=True
+                    % (url,),
+                    unsafe_allow_html=True,
                 )
 
             with col2:
@@ -316,8 +316,8 @@ class BasePage:
                         }
                    </style>
                     """
-                    % url
-                    ,unsafe_allow_html=True,
+                    % url,
+                    unsafe_allow_html=True,
                 )
 
             with col3:
