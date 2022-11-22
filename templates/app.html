@@ -74,7 +74,7 @@
 
 {% if request.user %}
     <div class="login-container">
-        {{ request.user.display_name }}
+        {{ request.user.display_name or request.user.email or request.user.phone_number }}
         <br>
         <a href="/logout?next={{ request.path }}">Signout</a>
     </div>
@@ -82,7 +82,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <div id="g_id_onload"
-         data-client_id="6678571001-havdpq1g68ljt0qgsdln5s3k0tqau4a0.apps.googleusercontent.com"
+         data-client_id="6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com"
          data-callback="handleCredentialResponse"
          data-auto_prompt="true">
     </div>

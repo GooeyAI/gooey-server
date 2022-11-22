@@ -14,10 +14,15 @@ from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
 from starlette.middleware.authentication import AuthenticationMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from auth_backend import SessionAuthBackend, FIREBASE_SESSION
+from auth_backend import (
+    SessionAuthBackend,
+    FIREBASE_SESSION_COOKIE,
+    ANONYMOUS_USER_COOKIE,
+)
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
@@ -46,7 +51,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
-# app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
@@ -77,18 +82,10 @@ async def authentication(request: Request):
         decoded_claims = auth.verify_id_token(id_token)
         # Only process if the user signed in within the last 5 minutes.
         if time.time() - decoded_claims["auth_time"] < 5 * 60:
-            expires_in = datetime.timedelta(days=5)
+            expires_in = datetime.timedelta(days=14)
             session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
-            response = JSONResponse(content={"status": "success"})
-            response.set_cookie(
-                key=FIREBASE_SESSION,
-                value=str(session_cookie),
-                expires=int(expires_in.total_seconds()),
-                httponly=True,
-                secure=True,
-                samesite="strict",
-            )
-            return response
+            request.session[FIREBASE_SESSION_COOKIE] = session_cookie
+            return JSONResponse(content={"status": "success"})
         # User did not sign in recently. To guard against ID token theft, require
         # re-authentication.
         return PlainTextResponse(status_code=401, content="Recent sign in required")
@@ -102,9 +99,8 @@ async def authentication(request: Request):
 
 @app.get("/logout", include_in_schema=False)
 async def logout(request: Request):
-    response = RedirectResponse(url=request.query_params.get("next", "/"))
-    response.set_cookie(FIREBASE_SESSION, expires=0)
-    return response
+    request.session.pop(FIREBASE_SESSION_COOKIE, None)
+    return RedirectResponse(url=request.query_params.get("next", "/"))
 
 
 @app.post("/v1/run-recipe/", include_in_schema=False)
@@ -249,6 +245,11 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     f = furl(iframe_url)
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
+
+    if not (request.user or request.session.get(ANONYMOUS_USER_COOKIE)):
+        request.session[ANONYMOUS_USER_COOKIE] = {
+            "uid": auth.create_user().uid,
+        }
 
     return templates.TemplateResponse(
         "app.html",

@@ -1,7 +1,7 @@
 import streamlit as st
 
 from daras_ai_v2.hidden_html_widget import hidden_html_js, hidden_html_nojs
-from daras_ai_v2.st_session_cookie import get_current_user
+from daras_ai_v2.st_session_cookie import get_current_user, get_anonymous_user
 
 
 def init_scripts():
@@ -32,4 +32,4 @@ def init_scripts():
     )
 
     if "_current_user" not in st.session_state:
-        st.session_state["_current_user"] = get_current_user()
+        st.session_state["_current_user"] = get_current_user() or get_anonymous_user()
