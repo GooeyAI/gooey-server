@@ -25,31 +25,9 @@ def extract_face_img_bytes(
         out_pos_x=pos_x,
         out_pos_y=pos_y,
     )
-
-    # smooth out the sharp edges
-    face_mask_cv2 = cv2.GaussianBlur(face_mask_cv2, (0, 0), 5)
-
     image_bytes = cv2_img_to_bytes(image_cv2)
     face_mask_bytes = cv2_img_to_bytes(face_mask_cv2)
     return image_bytes, face_mask_bytes
-
-
-def rgb_img_to_rgba(
-    img_bytes: bytes,
-    mask_bytes: bytes = None,
-    alpha: float = 1.0,
-) -> bytes:
-    img_cv2 = bytes_to_cv2_img(img_bytes)
-    alpha_mask_shape = (img_cv2.shape[0], img_cv2.shape[1], 1)
-    strength_int = int(255 * alpha)
-    if mask_bytes:
-        mask_cv2 = bytes_to_cv2_img(mask_bytes)
-        alpha_mask = mask_cv2[:, :, 0] > 0
-        alpha_mask = alpha_mask.reshape(alpha_mask_shape) * strength_int
-    else:
-        alpha_mask = np.ones(alpha_mask_shape) * strength_int
-    ret_img_cv2 = np.append(img_cv2, alpha_mask, axis=2)
-    return cv2_img_to_bytes(ret_img_cv2)
 
 
 def extract_and_reposition_face_cv2(
@@ -66,6 +44,9 @@ def extract_and_reposition_face_cv2(
     for face_vertices in face_oval_hull_generator(orig_img):
         # draw face mask for the original img
         cv2.fillConvexPoly(orig_mask, face_vertices, (255, 255, 255))
+
+        # smooth out the sharp edges
+        orig_mask = cv2.GaussianBlur(orig_mask, (0, 0), 5)
 
         return reposition_object(
             orig_img=orig_img,

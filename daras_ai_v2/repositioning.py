@@ -42,18 +42,21 @@ def reposition_object(
     out_pos_y: float = 3 / 9,
 ):
     out_img_shape = (out_size[1], out_size[0], orig_img.shape[-1])
-    return reposition_object_into(
+    out_img = np.zeros(out_img_shape, dtype=np.uint8)
+    out_mask = np.zeros(out_img_shape, dtype=np.uint8)
+    reposition_object_onto(
         orig_img=orig_img,
         orig_mask=orig_mask,
-        out_img=np.zeros(out_img_shape, dtype=np.uint8),
-        out_mask=np.zeros(out_img_shape, dtype=np.uint8),
+        out_img=out_img,
+        out_mask=out_mask,
         out_obj_scale=out_obj_scale,
         out_pos_x=out_pos_x,
         out_pos_y=out_pos_y,
     )
+    return out_img, out_mask
 
 
-def reposition_object_into(
+def reposition_object_onto(
     *,
     orig_img,
     orig_mask,
@@ -123,8 +126,6 @@ def reposition_object_into(
     # paste crop of resized image onto the crop of output image
     out_img[out_rect_cropper] = re_img[re_rect_cropper]
     out_mask[out_rect_cropper] = re_mask[re_rect_cropper]
-
-    return out_img, out_mask
 
 
 def get_mask_bounds(mask_cv2) -> (int, int, int, int):

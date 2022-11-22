@@ -4,7 +4,7 @@ import openai
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
-from daras_ai_v2.extract_face import rgb_img_to_rgba
+from daras_ai_v2.img_tools import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints, b64_img_decode
 
 

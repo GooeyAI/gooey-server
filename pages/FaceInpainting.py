@@ -15,6 +15,7 @@ from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.extract_face import extract_face_img_bytes
+from daras_ai_v2.img_tools import overlay_rule_of_3rds
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
@@ -220,17 +221,7 @@ class FaceInpaintingPage(BasePage):
             out_pos_y=pos_y,
         )
 
-        # draw rule of 3rds
-        color = (200, 200, 200)
-        stroke = 2
-        img_y, img_x, _ = img.shape
-        for i in range(2):
-            pos = (img_y // 3) * (i + 1)
-            cv2.line(img, (0, pos), (img_x, pos), color, stroke)
-
-            pos = (img_x // 3) * (i + 1)
-            cv2.line(img, (pos, 0), (pos, img_y), color, stroke)
-
+        overlay_rule_of_3rds(img)
         st.image(img, width=300)
 
     def render_output(self):
