@@ -20,6 +20,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
+from pages.CompareText2Img import CompareText2ImgPage
 from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
@@ -29,6 +30,7 @@ from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
 from pages.ObjectInpainting import ObjectInpaintingPage
+from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -257,6 +259,8 @@ all_pages = [
     DeforumSDPage,
     Img2ImgPage,
     ObjectInpaintingPage,
+    SocialLookupEmailPage,
+    CompareText2ImgPage,
 ]
 
 

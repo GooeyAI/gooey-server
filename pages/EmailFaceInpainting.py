@@ -21,30 +21,29 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
     class RequestModel(BaseModel):
         email_address: str
-        text_prompt: str = None
 
-        num_outputs: int = None
-        quality: int = 50
+        text_prompt: str | None
 
-        face_scale: float = None
-        face_pos_x: float = None
-        face_pos_y: float = None
+        num_outputs: int | None
+        quality: int | None
 
-        output_width: int = None
-        output_height: int = None
+        face_scale: float | None
+        face_pos_x: float | None
+        face_pos_y: float | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in InpaintingModels)
-        ] = InpaintingModels.jack_qiao.name
+        output_width: int | None
+        output_height: int | None
 
-        should_send_email: bool = None
-        email_from: str = None
-        email_cc: str = None
-        email_bcc: str = None
-        email_subject: str = None
-        email_body: str = None
-        email_body_enable_html: bool = None
-        fallback_email_body: str = None
+        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+
+        should_send_email: bool | None
+        email_from: str | None
+        email_cc: str | None
+        email_bcc: str | None
+        email_subject: str | None
+        email_body: str | None
+        email_body_enable_html: bool | None
+        fallback_email_body: str | None
 
         class Config:
             schema_extra = {
@@ -142,7 +141,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         )
 
         st.checkbox(
-            "Should Send email",
+            "Send email",
             key="should_send_email",
         )
         st.text_input(

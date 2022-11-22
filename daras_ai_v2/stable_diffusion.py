@@ -9,8 +9,8 @@ from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints, b64_img_de
 
 
 class InpaintingModels(Enum):
-    runway_ml = "SD v1.5 (RunwayML)"
-    jack_qiao = "SD v1.4 (Jack Qiao)"
+    runway_ml = "Stable Diffusion v1.5 (RunwayML)"
+    jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
 
 
@@ -19,6 +19,77 @@ class Img2ImgModels(Enum):
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
+
+
+class Text2ImgModels(Enum):
+    # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
+    sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+    jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
+    # openjourney = "Open Journey (PromptHero)"
+    dall_e = "Dall-E (OpenAI)"
+
+
+def text2img(
+    *,
+    selected_model: str,
+    prompt: str,
+    num_outputs: int,
+    num_inference_steps: int,
+    width: int,
+    height: int,
+):
+    match selected_model:
+        case Img2ImgModels.jack_qiao.name:
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.glid_3_xl_stable,
+                input_data={
+                    "prompt": prompt,
+                    "num_inference_steps": num_inference_steps,
+                    # "init_image": init_image,
+                    # "edit_image": edit_image,
+                    # "mask": mask,
+                    "num_outputs": num_outputs,
+                    # "negative_prompt": "string",
+                    # "outpaint": "expand",
+                    # "skip_timesteps": int(num_inference_steps * (1 - prompt_strength)),
+                    "width": width,
+                    "height": height,
+                },
+            )
+        case Img2ImgModels.dall_e.name:
+            openai.api_key = settings.OPENAI_API_KEY
+            openai.api_base = "https://api.openai.com/v1"
+
+            response = openai.Image.create(
+                n=num_outputs,
+                prompt=prompt,
+                size=f"{width}x{height}",
+                response_format="b64_json",
+            )
+            out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
+        case Img2ImgModels.sd_1_5.name:
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_1_5,
+                input_data={
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    # "init_image": init_image,
+                    # "mask": "string",
+                    # "prompt_strength": prompt_strength,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    # "guidance_scale": 7.5,
+                    # "scheduler": "K-LMS",
+                    # "seed": 0,
+                },
+            )
+        case _:
+            out_imgs = []
+    return [
+        upload_file_from_bytes(f"gooey.ai - {prompt}", sd_img_bytes)
+        for sd_img_bytes in out_imgs
+    ]
 
 
 def img2img(
@@ -82,7 +153,7 @@ def img2img(
         case _:
             out_imgs = []
     return [
-        upload_file_from_bytes("diffusion.png", sd_img_bytes)
+        upload_file_from_bytes(f"gooey.ai - {prompt}", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
 
