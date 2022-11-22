@@ -17,7 +17,6 @@ from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
 from daras_ai_v2.hidden_html_widget import hidden_html_js
-from daras_ai_v2.st_session_cookie import get_current_user
 
 DEFAULT_STATUS = "Running..."
 
