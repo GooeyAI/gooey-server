@@ -180,7 +180,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         responses={500: {"model": RunFailedModel}},
         name=page_cls.title,
     )
-    def run_api(request: page_cls.RequestModel = body_spec):
+    def run_api(request: Request, page_request: page_cls.RequestModel = body_spec):
         # init a new page for every request
         page = page_cls()
 
@@ -191,8 +191,10 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         state = page.RequestModel.parse_obj(state).dict()
 
         # remove None values & update state
-        request_dict = {k: v for k, v in request.dict().items() if v is not None}
+        request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
         state.update(request_dict)
+
+        state["_current_user"] = request.user
 
         # run the script
         try:

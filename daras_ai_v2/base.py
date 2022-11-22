@@ -26,7 +26,6 @@ class BasePage:
     title: str
     slug: str
     version: int = 1
-    user: dict = None
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
 
@@ -43,8 +42,6 @@ class BasePage:
 
     def render(self):
         init_scripts()
-
-        self.user = get_current_user()
 
         st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
