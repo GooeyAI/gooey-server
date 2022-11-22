@@ -17,6 +17,7 @@ from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
 from daras_ai_v2.hidden_html_widget import hidden_html_js
+from daras_ai_v2.st_session_cookie import get_current_user
 
 DEFAULT_STATUS = "Running..."
 
@@ -25,6 +26,7 @@ class BasePage:
     title: str
     slug: str
     version: int = 1
+    user: dict = None
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
 
@@ -41,6 +43,8 @@ class BasePage:
 
     def render(self):
         init_scripts()
+
+        self.user = get_current_user()
 
         st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
