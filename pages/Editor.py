@@ -147,7 +147,7 @@ init_scripts()
 recipe_id = get_or_create_doc_id()
 cached_state = get_firestore_doc(recipe_id)
 
-if not st.session_state:
+if "input_steps" not in st.session_state:
     st.session_state.update(deepcopy(cached_state))
 
 st.session_state.setdefault("input_steps", [])
