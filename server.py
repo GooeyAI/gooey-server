@@ -17,7 +17,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from auth_backend import SessionAuthBackend
+from auth_backend import SessionAuthBackend, FIREBASE_SESSION
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
@@ -81,7 +81,7 @@ async def authentication(request: Request):
             session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
             response = JSONResponse(content={"status": "success"})
             response.set_cookie(
-                key="session",
+                key=FIREBASE_SESSION,
                 value=str(session_cookie),
                 expires=int(expires_in.total_seconds()),
                 httponly=True,
@@ -103,7 +103,7 @@ async def authentication(request: Request):
 @app.get("/logout", include_in_schema=False)
 async def logout(request: Request):
     response = RedirectResponse(url=request.query_params.get("next", "/"))
-    response.set_cookie("session", expires=0)
+    response.set_cookie(FIREBASE_SESSION, expires=0)
     return response
 
 
