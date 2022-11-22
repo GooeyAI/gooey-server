@@ -250,11 +250,10 @@ class BasePage:
             with col1:
                 st.markdown(
                     """
-                    
                     <div style="padding-bottom:8px">
-                        <button style="color:white" class="btn"  onclick="parent.window.open('%s');">
+                        <a target="_top"  style="color:white; text-decoration:none" class="btn"  href='%s'>
                           ✏️ Tweak 
-                       </button>
+                       </a>
                    </div>
                    <style>
                        .btn {
@@ -281,7 +280,7 @@ class BasePage:
                 )
 
             with col2:
-                st.markdown(
+                html(
                     """
                    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.10/dist/clipboard.min.js"></script>
                     <script>
@@ -292,11 +291,9 @@ class BasePage:
                             });
                         });
                     </script>
-                    <div style="padding-bottom:8px">
                         <button style="color:white" class="btn" data-clipboard-text="%s" >
                            📎 Copy URL 
                        </button>
-                    </div>
                     
                    <style>
                        .btn {
@@ -319,7 +316,7 @@ class BasePage:
                    </style>
                     """
                     % url,
-                    unsafe_allow_html=True,
+                    height=40,
                 )
 
             with col3:
