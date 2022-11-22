@@ -243,16 +243,20 @@ class BasePage:
                 / self.slug
             ).url
 
-            col1, col2, col3, *_ = st.columns(3)
+            col1, col2, col3, *_ = st.columns(6)
 
             with col1:
-                html(
+                st.markdown(
                     """
-                    <button style="color:white" class="btn"  onclick="parent.window.open('%s');">
-                      ✏️ Tweak 
-                   </button>
+                    
+                    <div style="padding-bottom:8px">
+                        <button style="color:white" class="btn"  onclick="parent.window.open('%s');">
+                          ✏️ Tweak 
+                       </button>
+                   </div>
                    <style>
                        .btn {
+                       padding:8px;
                             display: inline-flex;
                             -webkit-box-align: center;
                             align-items: center;
@@ -264,7 +268,6 @@ class BasePage:
                             margin: 0px;
                             line-height: 1.6;
                             color: inherit;
-                            width: auto;
                             user-select: none;
                             background-color: rgb(8, 8, 8);
                             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -272,10 +275,11 @@ class BasePage:
                    </style>
                     """
                     % (url,)
+                    ,unsafe_allow_html=True
                 )
 
             with col2:
-                html(
+                st.markdown(
                     """
                    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.10/dist/clipboard.min.js"></script>
                     <script>
@@ -286,9 +290,12 @@ class BasePage:
                             });
                         });
                     </script>
-                    <button style="color:white" class="btn" data-clipboard-text="%s" >
-                       📎 Copy URL 
-                   </button>
+                    <div style="padding-bottom:8px">
+                        <button style="color:white" class="btn" data-clipboard-text="%s" >
+                           📎 Copy URL 
+                       </button>
+                    </div>
+                    
                    <style>
                        .btn {
                             display: inline-flex;
@@ -310,6 +317,7 @@ class BasePage:
                    </style>
                     """
                     % url
+                    ,unsafe_allow_html=True,
                 )
 
             with col3:
