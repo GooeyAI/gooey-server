@@ -37,6 +37,8 @@
         <meta property="twitter:image" content="{{ image }}">
     {% endif %}
 
+    <link rel="stylesheet" href="/static/css/app.css">
+
     <style>
         ::-webkit-scrollbar {
             background: transparent;
@@ -57,7 +59,7 @@
             width: 100%;
         }
 
-        .login_info, .g_id_signin {
+        .login-container {
             position: absolute;
             top: 25px;
             right: 25px;
@@ -65,95 +67,45 @@
         }
     </style>
 
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600&display=swap');
-
-        html, body {
-            background-color: black;
-            color: #03dac5;
-            margin: 0;
-            border: 0;
-            padding: 0;
-            font-family: 'Source Sans Pro', sans-serif;
-        }
-
-        a {
-            text-decoration: none;
-            color: #03dac5;
-            font-size: 17px;
-            font-weight: 600;
-        }
-
-        a:visited {
-            color: #03dac5;
-        }
-
-        a:hover {
-            color: #acd9d6;
-        }
-
-        .logo {
-            width: 150px;
-            padding-top: 20px;
-            padding-bottom: 10px;
-        }
-
-        .header-links a {
-            padding-right: 10px;
-        }
-
-        header {
-            padding-left: 1rem;
-        }
-
-        @media (min-width: 576px) {
-            header {
-                padding-left: 5rem;
-                padding-right: 5rem;
-            }
-        }
-    </style>
 </head>
 <body>
 
-<header>
-    <a href="https://www.gooey.ai" target="_top">
-        <img class="logo"
-             src="https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"></img>
-    </a>
+{% include 'header.html' %}
 
-    <div class="header-links">
-        <a href="https://www.gooey.ai">Home</a>
-        <a href="/">Explore</a>
-        <a href="https://www.gooey.ai/pricing">Pricing</a>
-        <a href="https://dara.network/privacy/">Privacy</a>
-        <a href="https://dara.network/terms/">Terms</a>
-    </div>
-</header>
-
-{% if user %}
-    <div class="login_info">
-        {{ user.name }}
+{% if request.user %}
+    <div class="login-container">
+        {{ request.user.display_name or request.user.email or request.user.phone_number }}
         <br>
-        <a href="/logout">Signout</a>
+        <a href="/logout?next={{ request.path }}">Signout</a>
     </div>
 {% else %}
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <div id="g_id_onload"
-         data-client_id="6678571001-havdpq1g68ljt0qgsdln5s3k0tqau4a0.apps.googleusercontent.com"
-         data-login_uri="/auth"
+         data-client_id="6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com"
+         data-callback="handleCredentialResponse"
          data-auto_prompt="true">
     </div>
 
-    <div class="g_id_signin"
-         data-type="button"
-         data-size="large"
-         data-theme="filled_black"
-         data-text="sign_in_with"
-         data-shape="pill"
-         data-logo_alignment="right">
+    <div class="login-container">
+        <div class="g_id_signin"
+             data-type="button"
+             data-size="large"
+             data-theme="filled_black"
+             data-text="sign_in_with"
+             data-shape="pill"
+             data-logo_alignment="right">
+        </div>
+        <div style="height: 10px"></div>
+        <a style="font-size: 15px; color: wheat" href="/login?next={{ request.path }}">More Options</a>
     </div>
+
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/app.js"></script>
 {% endif %}
 
 <iframe onload="onIframeLoaded(this)"

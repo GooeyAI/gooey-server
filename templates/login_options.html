@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Gooey.AI</title>
+    <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.1/firebase-ui-auth.css"/>
+    <link rel="stylesheet" href="/static/css/app.css">
+    </style>
+</head>
+
+<body>
+
+{% include 'header.html' %}
+
+<h2 style="text-align: center;">Sign in Options</h2>
+
+<div id="firebaseui-auth-container"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/ui/6.0.1/firebase-ui-auth.js"></script>
+
+<script src="/static/js/auth.js"></script>
+<script src="/static/js/login_options.js"></script>
+
+</body>

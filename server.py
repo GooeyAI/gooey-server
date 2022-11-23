@@ -1,3 +1,5 @@
+import datetime
+import time
 import typing
 
 from fastapi import FastAPI
@@ -7,14 +9,20 @@ from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from firebase_admin import auth, exceptions
 from furl import furl
-from google.auth.transport import requests
 from google.cloud import firestore
-from google.oauth2 import id_token
 from pydantic import BaseModel
+from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
+from starlette.responses import PlainTextResponse
 
+from auth_backend import (
+    SessionAuthBackend,
+    FIREBASE_SESSION_COOKIE,
+    ANONYMOUS_USER_COOKIE,
+)
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
@@ -42,55 +50,57 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
 
 
-@app.post("/auth", status_code=302, include_in_schema=False)
+@app.get("/login", include_in_schema=False)
+def authentication(request: Request):
+    if request.user:
+        return RedirectResponse(url=request.query_params.get("next", "/"))
+    return templates.TemplateResponse(
+        "login_options.html",
+        context={
+            "request": request,
+        },
+    )
+
+
+@app.post("/sessionLogin", include_in_schema=False)
 async def authentication(request: Request):
-    body = await request.body()
-    body_str = body.decode("utf-8")
-    creds = body_str.split("&")
-    token = creds[0].split("=")[1]
+    ## Taken from https://firebase.google.com/docs/auth/admin/manage-cookies#create_session_cookie
 
-    csrf_token_cookie = request.cookies.get("g_csrf_token")
-    if not csrf_token_cookie:
-        print(400, "No CSRF token in Cookie.")
-        RedirectResponse(url="/error", status_code=302)
-    csrf_token_body = creds[1].split("=")[1]
-    if not csrf_token_body:
-        print(400, "No CSRF token in post body.")
-        RedirectResponse(url="/error", status_code=302)
-    if csrf_token_cookie != csrf_token_body:
-        print(400, "Failed to verify double submit cookie.")
-        RedirectResponse(url="/error", status_code=302)
+    # Get the ID token sent by the client
+    id_token = await request.body()
 
+    # To ensure that cookies are set only on recently signed in users, check auth_time in
+    # ID token before creating a cookie.
     try:
-        user = id_token.verify_oauth2_token(
-            token,
-            requests.Request(),
-            settings.GOOGLE_CLIENT_ID,
+        decoded_claims = auth.verify_id_token(id_token)
+        # Only process if the user signed in within the last 5 minutes.
+        if time.time() - decoded_claims["auth_time"] < 5 * 60:
+            expires_in = datetime.timedelta(days=14)
+            session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
+            request.session[FIREBASE_SESSION_COOKIE] = session_cookie
+            return JSONResponse(content={"status": "success"})
+        # User did not sign in recently. To guard against ID token theft, require
+        # re-authentication.
+        return PlainTextResponse(status_code=401, content="Recent sign in required")
+    except auth.InvalidIdTokenError:
+        return PlainTextResponse(status_code=401, content="Invalid ID token")
+    except exceptions.FirebaseError:
+        return PlainTextResponse(
+            status_code=401, content="Failed to create a session cookie"
         )
-        # print(user)
-        request.session["user"] = dict(user)
-
-        return RedirectResponse(url="/", status_code=302)
-
-    except ValueError:
-        return RedirectResponse(url="/error", status_code=302)
 
 
-@app.route("/logout", include_in_schema=False)
+@app.get("/logout", include_in_schema=False)
 async def logout(request: Request):
-    request.session.pop("user", None)
-    return RedirectResponse(url="/")
-
-
-@app.route("/error", include_in_schema=False)
-def error(request: Request):
-    return templates.TemplateResponse("error_page.html", context={"request": request})
+    request.session.pop(FIREBASE_SESSION_COOKIE, None)
+    return RedirectResponse(url=request.query_params.get("next", "/"))
 
 
 @app.post("/v1/run-recipe/", include_in_schema=False)
@@ -166,7 +176,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         responses={500: {"model": RunFailedModel}},
         name=page_cls.title,
     )
-    def run_api(request: page_cls.RequestModel = body_spec):
+    def run_api(request: Request, page_request: page_cls.RequestModel = body_spec):
         # init a new page for every request
         page = page_cls()
 
@@ -177,8 +187,10 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         state = page.RequestModel.parse_obj(state).dict()
 
         # remove None values & update state
-        request_dict = {k: v for k, v in request.dict().items() if v is not None}
+        request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
         state.update(request_dict)
+
+        state["_current_user"] = request.user
 
         # run the script
         try:
@@ -203,7 +215,7 @@ def st_home(request: Request):
 
 
 @app.get("/Editor/", include_in_schema=False)
-def st_home(request: Request):
+def st_editor(request: Request):
     iframe_url = furl(settings.IFRAME_BASE_URL) / "Editor"
     return _st_page(
         request,
@@ -234,10 +246,14 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
 
+    if not (request.user or request.session.get(ANONYMOUS_USER_COOKIE)):
+        request.session[ANONYMOUS_USER_COOKIE] = {
+            "uid": auth.create_user().uid,
+        }
+
     return templates.TemplateResponse(
         "app.html",
         context={
-            "user": request.session.get("user"),
             "request": request,
             "iframe_url": f.url,
             "settings": settings,
