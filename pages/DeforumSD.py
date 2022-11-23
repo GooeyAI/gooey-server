@@ -35,6 +35,14 @@ class DeforumSDPage(BasePage):
 
         return submitted
 
+    def render_description(self):
+        st.write(
+            """
+                This recipe takes any text and creates animation. 
+
+                It's based off the Deforum notebook with lots of details at https://deforum.art. 
+            """
+        )
     def render_settings(self):
         st.slider("# of Frames", min_value=100, max_value=1000, key="max_frames")
 
@@ -49,7 +57,8 @@ class DeforumSDPage(BasePage):
     def render_example(self, state: dict):
         output_video = state.get("output_video")
         if output_video:
-            st.write(f"**Output Video** - {state.get('input_prompt')}")
+            #st.write(f"**Output Video** - {state.get('input_prompt')}")
+            st.markdown("```" + state.get('input_prompt') + "```")
             st.video(output_video)
         else:
             st.empty()

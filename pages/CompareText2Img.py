@@ -57,6 +57,15 @@ class CompareText2ImgPage(BasePage):
 
         return submitted
 
+    def render_description(self):
+        st.write(
+            """
+                This recipe takes any text and renders an image using multiple Text2Image engines. 
+                
+                Use it to understand which render e.g. DallE or Stable Diffusion is best for your particular prompt. 
+            """
+        )
+
     def render_settings(self):
         selected_model = enum_multiselect(
             Text2ImgModels,
@@ -136,6 +145,21 @@ class CompareText2ImgPage(BasePage):
                 width=request.output_width,
                 height=request.output_height,
             )
+
+    def render_example(self, state: dict):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("```" + state.get("text_prompt", "") + "```")
+        with col2:
+            output_images: dict = state.get("output_images")
+            if output_images:
+                for key, imgs in output_images.items():
+                    st.write(f"**{Text2ImgModels[key].value}**")
+                    for img in imgs:
+                        st.image(img)
+            else:
+                st.empty()
+
 
 
 if __name__ == "__main__":

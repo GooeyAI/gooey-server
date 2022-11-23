@@ -84,6 +84,8 @@ class BasePage:
         with run_tab:
             col1, col2 = st.columns(2)
 
+            self.render_footer()
+
             with col1:
                 submitted = self.render_form()
                 self.render_description()
@@ -92,7 +94,7 @@ class BasePage:
                 self._runner(submitted)
                 self.save_buttons()
         #
-        # NOTE: Beware of putting code after runner since it will call experimental_rerun
+        # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
 
     def get_doc(self):
@@ -109,6 +111,9 @@ class BasePage:
 
     def render_form(self) -> bool:
         return False
+
+    def render_footer(self):
+        pass
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         raise NotImplemented

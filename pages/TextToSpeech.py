@@ -126,6 +126,21 @@ class TextToSpeechPage(BasePage):
                 key="uberduck_speaking_rate",
             )
 
+    def render_footer(self):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(
+                """
+                ## How to Use This Recipe
+                """
+            )
+            st.markdown(
+                """
+                <div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/2d853b7442874b9cbbf3f27b98594add" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe></div>
+                """,
+                unsafe_allow_html=True,
+            )
+
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
         audio_url = st.session_state.get("audio_url")
