@@ -1,13 +1,14 @@
+import typing
+
 import cv2
 import requests
 import streamlit as st
-import typing
 from pydantic import BaseModel
 
 from daras_ai.image_input import (
     upload_file_from_bytes,
     upload_file_hq,
-    resize_img_pad,
+    resize_img_contain,
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
@@ -51,7 +52,7 @@ class ObjectInpaintingPage(BasePage):
                 Describe the scene that you'd like to generate. 
                 """
             )
-            st.text_input(
+            st.text_area(
                 "text_prompt",
                 label_visibility="collapsed",
                 key="text_prompt",
@@ -264,7 +265,7 @@ class ObjectInpaintingPage(BasePage):
 
         img_bytes = requests.get(request.input_image).content
 
-        padded_img_bytes = resize_img_pad(
+        padded_img_bytes = resize_img_contain(
             img_bytes,
             (request.output_width, request.output_height),
         )
