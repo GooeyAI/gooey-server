@@ -3,6 +3,7 @@ from base64 import b64decode
 
 import itsdangerous
 from firebase_admin import auth
+from itsdangerous import BadSignature
 from starlette.requests import cookie_parser
 from streamlit.web.server.websocket_headers import _get_websocket_headers
 
@@ -47,6 +48,9 @@ def get_request_session() -> dict:
         data = cookies["session"].encode("utf-8")
     except KeyError:
         return {}
-    data = signer.unsign(data, max_age=max_age)
-    session = json.loads(b64decode(data))
+    try:
+        data = signer.unsign(data, max_age=max_age)
+        session = json.loads(b64decode(data))
+    except BadSignature:
+        return {}
     return session
