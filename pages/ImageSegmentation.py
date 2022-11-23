@@ -1,16 +1,22 @@
 import typing
 from pathlib import Path
-
+import numpy as np
+import requests
 import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_hq, upload_file_from_bytes
+from daras_ai.image_input import (
+    upload_file_hq,
+    upload_file_from_bytes,
+    cv2_img_to_bytes,
+    bytes_to_cv2_img,
+)
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.image_segmentation import u2net
+from daras_ai_v2.image_segmentation import u2net, dis
 
 
 class ImageSegmentationPage(BasePage):
-    title = "Image Segmentation"
+    title = "Cutout an object from any image"
     slug = "ImageSegmentation"
     version = 2
 
@@ -19,6 +25,7 @@ class ImageSegmentationPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_image: str
+        cutout_image: str
 
     def render_form(self) -> bool:
         with st.form("my_form"):
@@ -59,13 +66,26 @@ class ImageSegmentationPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
 
-        img_bytes = u2net(request.input_image)
+        mask_bytes = dis(request.input_image)
 
         yield "Uploading..."
 
         state["output_image"] = upload_file_from_bytes(
             f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}",
-            img_bytes,
+            mask_bytes,
+        )
+
+        img_cv2 = bytes_to_cv2_img(requests.get(request.input_image).content)
+        mask_cv2 = bytes_to_cv2_img(mask_bytes)
+
+        cutout_cv2 = np.ones(img_cv2.shape, dtype=np.uint8) * 255
+        cutout_cv2[mask_cv2 > 0] = 0
+        img_cv2[mask_cv2 == 0] = 0
+        cutout_cv2 += img_cv2
+
+        state["cutout_image"] = upload_file_from_bytes(
+            f"gooey.ai Cutout - {Path(request.input_image).stem}",
+            cv2_img_to_bytes(cutout_cv2),
         )
 
     def render_output(self):
@@ -90,6 +110,12 @@ class ImageSegmentationPage(BasePage):
                 st.image(output_image, caption=f"Segmentation Mask")
             else:
                 st.empty()
+
+        cutout_image = state.get("cutout_image")
+        if cutout_image:
+            st.image(cutout_image, caption=f"Cutout Image")
+        else:
+            st.empty()
 
 
 if __name__ == "__main__":
