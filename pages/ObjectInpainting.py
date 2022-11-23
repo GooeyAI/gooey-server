@@ -48,7 +48,7 @@ class ObjectInpaintingPage(BasePage):
             st.write(
                 """
                 ### Prompt
-                Describe the character that you'd like to generate. 
+                Describe the scene that you'd like to generate. 
                 """
             )
             st.text_input(

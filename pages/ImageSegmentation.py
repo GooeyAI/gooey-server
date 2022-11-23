@@ -1,5 +1,7 @@
 import typing
 from pathlib import Path
+
+import cv2
 import numpy as np
 import requests
 import streamlit as st
@@ -12,7 +14,8 @@ from daras_ai.image_input import (
     bytes_to_cv2_img,
 )
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.image_segmentation import u2net, dis
+from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.image_segmentation import u2net, ImageSegmentationModels, dis
 
 
 class ImageSegmentationPage(BasePage):
@@ -23,6 +26,11 @@ class ImageSegmentationPage(BasePage):
     class RequestModel(BaseModel):
         input_image: str
 
+        selected_model: typing.Literal[
+            tuple(e.name for e in ImageSegmentationModels)
+        ] | None
+        mask_threshold: float | None
+
     class ResponseModel(BaseModel):
         output_image: str
         cutout_image: str
@@ -32,7 +40,7 @@ class ImageSegmentationPage(BasePage):
             st.write(
                 """
                 ### Input Photo
-                Give us a photo of yourself, or anyone else
+                Give us a photo of anything
                 """
             )
             st.file_uploader(
@@ -63,25 +71,54 @@ class ImageSegmentationPage(BasePage):
 
         return submitted
 
-    def run(self, state: dict) -> typing.Iterator[str | None]:
-        request = self.RequestModel.parse_obj(state)
+    def render_settings(self):
+        enum_selector(ImageSegmentationModels, "Model", key="selected_model")
 
-        mask_bytes = dis(request.input_image)
-
-        yield "Uploading..."
-
-        state["output_image"] = upload_file_from_bytes(
-            f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}",
-            mask_bytes,
+        st.write(
+            """
+            ##### Edge Threshold
+            Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
+            """
         )
+        st.slider(
+            min_value=0.0,
+            max_value=1.0,
+            label="Threshold",
+            label_visibility="collapsed",
+            key="mask_threshold",
+        )
+
+    def run(self, state: dict) -> typing.Iterator[str | None]:
+        request: ImageSegmentationPage.RequestModel = self.RequestModel.parse_obj(state)
+
+        match request.selected_model:
+            case ImageSegmentationModels.u2net.name:
+                mask_bytes = u2net(request.input_image)
+            case _:
+                mask_bytes = dis(request.input_image)
 
         img_cv2 = bytes_to_cv2_img(requests.get(request.input_image).content)
         mask_cv2 = bytes_to_cv2_img(mask_bytes)
 
-        cutout_cv2 = np.ones(img_cv2.shape, dtype=np.uint8) * 255
-        cutout_cv2[mask_cv2 > 0] = 0
+        threshold_value = int(255 * request.mask_threshold)
+        mask_cv2[mask_cv2 < threshold_value] = 0
+
+        kernel = np.ones((5, 5), np.float32) / 10
+        mask_cv2 = cv2.filter2D(mask_cv2, -1, kernel)
+
+        cutout_cv2 = 255 - mask_cv2
         img_cv2[mask_cv2 == 0] = 0
-        cutout_cv2 += img_cv2
+
+        cutout_cv2 = cv2.add(cutout_cv2, img_cv2)
+
+        yield
+
+        state["output_image"] = upload_file_from_bytes(
+            f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}",
+            cv2_img_to_bytes(mask_cv2),
+        )
+
+        yield
 
         state["cutout_image"] = upload_file_from_bytes(
             f"gooey.ai Cutout - {Path(request.input_image).stem}",
@@ -91,31 +128,46 @@ class ImageSegmentationPage(BasePage):
     def render_output(self):
         self.render_example(st.session_state)
 
-    def render_example(self, state: dict):
-        input_image = state.get("input_image")
-        input_file = state.get("input_file")
-        input_image_or_file = input_image or input_file
-        output_image = state.get("output_image")
+        with st.expander("Steps"):
+            col1, col2, col3 = st.columns(3)
 
+            with col1:
+                input_image = st.session_state.get("input_image")
+                if input_image:
+                    st.image(input_image, caption="Input Photo")
+                else:
+                    st.empty()
+
+            with col2:
+                output_image = st.session_state.get("output_image")
+                if output_image:
+                    st.image(output_image, caption=f"Segmentation Mask")
+                else:
+                    st.empty()
+
+            with col3:
+                cutout_image = st.session_state.get("cutout_image")
+                if cutout_image:
+                    st.image(cutout_image, caption=f"Cutout Image")
+                else:
+                    st.empty()
+
+    def render_example(self, state: dict):
         col1, col2 = st.columns(2)
 
         with col1:
-            if input_image_or_file:
-                st.image(input_image_or_file, caption="Input Photo")
+            input_image = state.get("input_image")
+            if input_image:
+                st.image(input_image, caption="Input Photo")
             else:
                 st.empty()
 
         with col2:
-            if output_image:
-                st.image(output_image, caption=f"Segmentation Mask")
+            cutout_image = state.get("cutout_image")
+            if cutout_image:
+                st.image(cutout_image, caption=f"Cutout Image")
             else:
                 st.empty()
-
-        cutout_image = state.get("cutout_image")
-        if cutout_image:
-            st.image(cutout_image, caption=f"Cutout Image")
-        else:
-            st.empty()
 
 
 if __name__ == "__main__":
