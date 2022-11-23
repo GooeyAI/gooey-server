@@ -10,6 +10,7 @@ from pages.CompareLM import CompareLMPage
 from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Img2Img import Img2ImgPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
@@ -26,6 +27,7 @@ page_classes = [
     TextToSpeechPage,
     LipsyncTTSPage,
     ObjectInpaintingPage,
+    ImageSegmentationPage,
     Img2ImgPage,
     DeforumSDPage,
     CompareLMPage,
@@ -33,7 +35,6 @@ page_classes = [
     SocialLookupEmailPage,
     EmailFaceInpaintingPage,
     # ChyronPlantPage,
-    # ImageSegmentationPage,
 ]
 
 pages = [page_cls() for page_cls in page_classes]
