@@ -93,6 +93,20 @@ class ObjectInpaintingPage(BasePage):
 
         return submitted
 
+    def render_description(self):
+        st.write(
+            """
+                This recipe an image of an object, masks it and then renders the background around the object according to the prompt. 
+                
+                How It Works:
+                1. Takes an image
+                2. Attempts to find an object in the image
+                3. Masks the object
+                4. Adjusts the X/Y position and zoom according to the settings
+                5. Draws the background around the object according to the prompt.
+            """
+        )
+
     def render_settings(self):
         selected_model = enum_selector(
             InpaintingModels,

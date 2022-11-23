@@ -19,6 +19,13 @@ class CompareLMPage(BasePage):
         gpt3_output: str
         flan_t5_output: str
 
+    def render_description(self):
+        st.write(
+            """
+                This recipe takes any prompt and then passes it both OpenAI's GPT3 and Google's FLAN-T5 text generation engines.
+            """
+        )
+
     def render_settings(self):
         st.write(
             """
@@ -129,12 +136,13 @@ class CompareLMPage(BasePage):
         )
 
     def render_example(self, state: dict):
+        st.markdown("```" + state.get("input_prompt", "") + "```")
+
         col1, col2 = st.columns(2)
         with col1:
-            st.write(state.get("input_prompt", ""))
-        with col2:
             st.write("**Flan-T5**")
             st.write(state.get("flan_t5_output", ""))
+        with col2:
             st.write("**GPT-3**")
             st.write(state.get("gpt3_output", ""))
 

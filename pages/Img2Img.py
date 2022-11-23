@@ -84,6 +84,15 @@ class Img2ImgPage(BasePage):
 
         return submitted
 
+    def render_description(self):
+        st.write(
+            """
+                This recipe takes an image and a prompt and then attempts to alter the image, based on the text.
+
+                Adjust the Prompt Strength in Settings to change how strongly the text should influence the image. 
+            """
+        )
+
     def render_settings(self):
         selected_model = enum_selector(
             Img2ImgModels,
@@ -91,10 +100,18 @@ class Img2ImgPage(BasePage):
             key="selected_model",
         )
 
+        st.slider(
+            label="Prompt Strength",
+            key="prompt_strength",
+            min_value=0.0,
+            max_value=1.0,
+            help="How strongly should the prompt alter the image?"
+        )
+
         col1, col2 = st.columns(2, gap="medium")
         with col1:
             st.slider(
-                label="# of Outputs",
+                label="Number of Outputs",
                 key="num_outputs",
                 min_value=1,
                 max_value=4,
@@ -111,12 +128,7 @@ class Img2ImgPage(BasePage):
             else:
                 st.empty()
 
-        st.slider(
-            label="Prompt Strength",
-            key="prompt_strength",
-            min_value=0.0,
-            max_value=1.0,
-        )
+
 
         st.write(
             """

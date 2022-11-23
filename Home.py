@@ -16,6 +16,7 @@ from pages.LipsyncTTS import LipsyncTTSPage
 from pages.ObjectInpainting import ObjectInpaintingPage
 from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
+from pages.CompareText2Img import CompareText2ImgPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
@@ -23,15 +24,16 @@ init_scripts()
 
 page_classes = [
     FaceInpaintingPage,
+    EmailFaceInpaintingPage,
+    SocialLookupEmailPage,
     TextToSpeechPage,
     LipsyncTTSPage,
     ObjectInpaintingPage,
     Img2ImgPage,
     DeforumSDPage,
     CompareLMPage,
-    LipsyncPage,
-    SocialLookupEmailPage,
-    EmailFaceInpaintingPage,
+    CompareText2ImgPage,
+    # LipsyncPage,
     # ChyronPlantPage,
     # ImageSegmentationPage,
 ]
