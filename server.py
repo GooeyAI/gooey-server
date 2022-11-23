@@ -194,7 +194,12 @@ def script_to_api(page_cls: typing.Type[BasePage]):
 
         # run the script
         try:
-            all(page.run(state))
+            gen = page.run(state)
+            try:
+                while True:
+                    next(gen)
+            except StopIteration:
+                pass
         except Exception as e:
             return JSONResponse(
                 status_code=500, content={"error": f"{type(e).__name__} - {e}"}
