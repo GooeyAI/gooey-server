@@ -245,7 +245,7 @@ def inpainting(
 
 
 def _resolution_check(width, height):
-    if width * height > 896 * 768:
+    if width * height > 768 * 768:
         raise ValueError(
-            "Maximum size is 896x768 or 768x896 pixels, because of memory limits. Please select a lower width or height."
+            "Maximum size is 768x768 pixels, because of memory limits. Please select a lower width or height."
         )

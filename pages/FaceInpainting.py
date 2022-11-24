@@ -153,7 +153,6 @@ class FaceInpaintingPage(BasePage):
         st.write(
             """
             ### Output Resolution
-            *Maximum size is 896x768 or 768x896 because of memory limits*
             """
         )
         col1, col2, col3 = st.columns([10, 1, 10])
@@ -162,8 +161,8 @@ class FaceInpaintingPage(BasePage):
                 "Width",
                 key="output_width",
                 min_value=512,
-                max_value=1024,
-                step=128,
+                max_value=768,
+                step=64,
             )
         with col2:
             st.write("X")
@@ -172,8 +171,8 @@ class FaceInpaintingPage(BasePage):
                 "Height",
                 key="output_height",
                 min_value=512,
-                max_value=1024,
-                step=128,
+                max_value=768,
+                step=64,
             )
 
         st.write(
