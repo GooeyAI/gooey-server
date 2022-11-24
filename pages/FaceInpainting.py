@@ -292,6 +292,21 @@ class FaceInpaintingPage(BasePage):
                 else:
                     st.empty()
 
+    def render_footer(self):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(
+                """
+                ## How to Use This Recipe
+                """
+            )
+            st.markdown(
+                """
+                <iframe width="640" height="400" src="https://www.loom.com/embed/788dfdee763a4e329e28e749239f9810" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe> 
+                """,
+                unsafe_allow_html=True,
+            )
+
     def run(self, state: dict):
         yield "Extracting Face..."
 
