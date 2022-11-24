@@ -86,7 +86,6 @@ class CompareText2ImgPage(BasePage):
                 st.slider(
                     label="Quality",
                     key="quality",
-                    value=50,
                     min_value=10,
                     max_value=200,
                     step=10,
