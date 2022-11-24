@@ -13,12 +13,12 @@ window.addEventListener('load', function () {
     // Initialize Firebase
     const app = firebase.initializeApp(firebaseConfig);
 
+    // As httpOnly cookies are to be used, do not persist any state client side.
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
+
     // Initialize Analytics
     const analytics = firebase.analytics(app);
     analytics.logEvent('init');
-
-    // As httpOnly cookies are to be used, do not persist any state client side.
-    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
 });
 
 
