@@ -23,6 +23,7 @@ class Img2ImgModels(Enum):
 
 class Text2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
+    sd_2 = "Stable Diffusion 2 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     # openjourney = "Open Journey (PromptHero)"
@@ -41,7 +42,22 @@ def text2img(
     _resolution_check(width, height)
 
     match selected_model:
-        case Img2ImgModels.jack_qiao.name:
+        case Text2ImgModels.sd_2.name:
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_2,
+                input_data={
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": 7.5,
+                    "strength": 0.8,
+                    # "seed": 0,
+                    # "init_image": "string",
+                },
+            )
+        case Text2ImgModels.jack_qiao.name:
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.glid_3_xl_stable,
                 input_data={
@@ -58,7 +74,7 @@ def text2img(
                     "height": height,
                 },
             )
-        case Img2ImgModels.dall_e.name:
+        case Text2ImgModels.dall_e.name:
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
 
@@ -69,7 +85,7 @@ def text2img(
                 response_format="b64_json",
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
-        case Img2ImgModels.sd_1_5.name:
+        case Text2ImgModels.sd_1_5.name:
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.sd_1_5,
                 input_data={
