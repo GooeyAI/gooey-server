@@ -289,14 +289,18 @@ class BasePage:
                     """
                    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.10/dist/clipboard.min.js"></script>
                     <script>
+                        function changeText(button, text, textToChangeBackTo) {
+                          buttonId = document.getElementById(button);
+                          buttonId.textContent = text;
+                          setTimeout(function() { document.getElementById(button).textContent = textToChangeBackTo; }, 2000);
+                        }
                        window.addEventListener("load", function (event) {
-                        var clipboard = new ClipboardJS('.btn');
-                        clipboard.on('success', function(e) {
-                            alert("✅ Recipe example URL Copied");
-                            });
+                        new ClipboardJS('.btn');
                         });
                     </script>
-                        <button style="color:white" class="btn" data-clipboard-text="%s" >
+                        <button 
+                       onClick="changeText('%s', '👏 Copied', '📎 Copy URL')" 
+                        id="%s" style="color:white" class="btn" data-clipboard-text="%s" >
                            📎 Copy URL 
                        </button>
                     
@@ -320,7 +324,7 @@ class BasePage:
                         }
                    </style>
                     """
-                    % url,
+                    % (example_id, example_id, url),
                     height=40,
                 )
 
