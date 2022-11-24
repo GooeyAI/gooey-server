@@ -138,6 +138,7 @@ class ObjectInpaintingPage(BasePage):
         st.write(
             """
             ### Output Resolution
+            *Maximum size is 896x768 or 768x896 because of memory limits*
             """
         )
         col1, col2, col3 = st.columns([10, 1, 10])

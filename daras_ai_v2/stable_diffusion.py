@@ -38,6 +38,8 @@ def text2img(
     width: int,
     height: int,
 ):
+    _resolution_check(width, height)
+
     match selected_model:
         case Img2ImgModels.jack_qiao.name:
             out_imgs = call_gpu_server_b64(
@@ -104,6 +106,8 @@ def img2img(
     height: int,
     prompt_strength: float,
 ):
+    _resolution_check(width, height)
+
     match selected_model:
         case Img2ImgModels.jack_qiao.name:
             out_imgs = call_gpu_server_b64(
@@ -171,6 +175,8 @@ def inpainting(
     width: int,
     height: int,
 ) -> list[str]:
+    _resolution_check(width, height)
+
     match selected_model:
         case InpaintingModels.runway_ml.name:
             out_imgs = call_gpu_server_b64(
@@ -220,3 +226,10 @@ def inpainting(
         upload_file_from_bytes(f"gooey.ai - {prompt}", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
+
+
+def _resolution_check(width, height):
+    if width * height > 896 * 768:
+        raise ValueError(
+            "Maximum size is 896x768 or 768x896 pixels, because of memory limits. Please select a lower width or height."
+        )

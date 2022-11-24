@@ -105,7 +105,7 @@ class Img2ImgPage(BasePage):
             key="prompt_strength",
             min_value=0.0,
             max_value=1.0,
-            help="How strongly should the prompt alter the image?"
+            help="How strongly should the prompt alter the image?",
         )
 
         col1, col2 = st.columns(2, gap="medium")
@@ -128,11 +128,10 @@ class Img2ImgPage(BasePage):
             else:
                 st.empty()
 
-
-
         st.write(
             """
             ### Output Resolution
+            *Maximum size is 896x768 or 768x896 because of memory limits*
             """
         )
         col1, col2, col3 = st.columns([10, 1, 10])
