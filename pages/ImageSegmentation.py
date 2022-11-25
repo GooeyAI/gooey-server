@@ -178,9 +178,9 @@ class ImageSegmentationPage(BasePage):
                         }
                     </style>
                 
-                """%json.dumps(cutout_images)
+                """
+                % json.dumps(cutout_images)
             )
-
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
 
