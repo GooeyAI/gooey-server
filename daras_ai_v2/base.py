@@ -26,6 +26,7 @@ class BasePage:
     title: str
     slug: str
     version: int = 1
+    sane_defeaults: dict = {}
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
 
@@ -69,6 +70,9 @@ class BasePage:
                     document_id=self.doc_name,
                     sub_collection_id="examples",
                 )
+
+            for k, v in self.sane_defeaults.items():
+                st.session_state.setdefault(k, v)
 
             st.session_state["__loaded__"] = True
 

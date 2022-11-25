@@ -9,6 +9,8 @@ from daras_ai.image_input import (
     upload_file_from_bytes,
     upload_file_hq,
     resize_img_contain,
+    bytes_to_cv2_img,
+    cv2_img_to_bytes,
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
@@ -37,6 +39,7 @@ class ObjectInpaintingPage(BasePage):
         output_height: int | None
 
         selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        mask_threshold: float | None
 
     class ResponseModel(BaseModel):
         resized_image: str
@@ -220,6 +223,20 @@ class ObjectInpaintingPage(BasePage):
 
         st.image(img, width=300)
 
+        st.write(
+            """
+            ##### Edge Threshold
+            Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
+            """
+        )
+        st.slider(
+            min_value=0.0,
+            max_value=1.0,
+            label="Threshold",
+            label_visibility="collapsed",
+            key="mask_threshold",
+        )
+
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
         input_file = st.session_state.get("input_file")
@@ -286,6 +303,11 @@ class ObjectInpaintingPage(BasePage):
         padded_img_url = upload_file_from_bytes("padded_img.png", padded_img_bytes)
 
         obj_mask_bytes = dis(padded_img_url)
+
+        mask_cv2 = bytes_to_cv2_img(obj_mask_bytes)
+        threshold_value = int(255 * request.mask_threshold)
+        mask_cv2[mask_cv2 < threshold_value] = 0
+        obj_mask_bytes = cv2_img_to_bytes(mask_cv2)
 
         yield "Repositioning..."
 

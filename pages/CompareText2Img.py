@@ -12,14 +12,22 @@ class CompareText2ImgPage(BasePage):
     title = "Compare Image Generators"
     slug = "CompareText2Img"
 
+    sane_defeaults = {
+        "guidance_scale": 7.5,
+        "seed": 0,
+    }
+
     class RequestModel(BaseModel):
         text_prompt: str
 
-        output_width: int = 512
-        output_height: int = 512
+        output_width: int | None
+        output_height: int | None
 
-        num_outputs: int = 1
-        quality: int = 50
+        num_outputs: int | None
+        quality: int | None
+
+        guidance_scale: float | None
+        seed: int | None
 
         selected_models: list[typing.Literal[tuple(e.name for e in Text2ImgModels)]] = [
             Text2ImgModels.sd_1_5
@@ -118,6 +126,13 @@ class CompareText2ImgPage(BasePage):
                 step=64,
             )
 
+        st.write("Advanced settings")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.number_input("Guidance scale", key="guidance_scale", step=0.1)
+        with col2:
+            st.number_input("Seed", key="seed", step=1)
+
     def render_output(self):
         output_images: dict = st.session_state.get("output_images")
         if output_images:
@@ -143,6 +158,8 @@ class CompareText2ImgPage(BasePage):
                 num_inference_steps=request.quality,
                 width=request.output_width,
                 height=request.output_height,
+                guidance_scale=request.guidance_scale,
+                seed=request.seed,
             )
 
     def render_example(self, state: dict):

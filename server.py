@@ -194,7 +194,12 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
         state.update(request_dict)
 
+        # pass current user from request
         state["_current_user"] = request.user
+
+        # set sane defaults
+        for k, v in page.sane_defeaults.items():
+            state.setdefault(k, v)
 
         # run the script
         try:
