@@ -299,7 +299,7 @@ class BasePage:
                         });
                     </script>
                         <button 
-                       onClick="changeText('%s', '👏 Copied', '📎 Copy URL')" 
+                       onClick="changeText('%s', '✅ Copied', '📎 Copy URL')" 
                         id="%s" style="color:white" class="btn" data-clipboard-text="%s" >
                            📎 Copy URL 
                        </button>
