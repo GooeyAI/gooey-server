@@ -136,7 +136,7 @@ class CompareLMPage(BasePage):
         )
 
     def render_example(self, state: dict):
-        st.markdown("```" + state.get("input_prompt", "") + "```")
+        st.markdown("```" + state.get("input_prompt", "").replace("\n", "") + "```")
 
         col1, col2 = st.columns(2)
         with col1:

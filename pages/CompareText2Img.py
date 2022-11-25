@@ -13,7 +13,7 @@ class CompareText2ImgPage(BasePage):
     slug = "CompareText2Img"
 
     sane_defeaults = {
-        "guidance_scale": 7.5,
+        "guidance_scale": 10,
         "seed": 0,
     }
 
@@ -165,7 +165,7 @@ class CompareText2ImgPage(BasePage):
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("```" + state.get("text_prompt", "") + "```")
+            st.markdown("```" + state.get("text_prompt", "").replace("\n", "") + "```")
         with col2:
             output_images: dict = state.get("output_images")
             if output_images:

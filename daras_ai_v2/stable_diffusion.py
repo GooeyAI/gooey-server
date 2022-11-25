@@ -142,7 +142,7 @@ def img2img(
                     "init_image": init_image,
                     "strength": prompt_strength,
                     # "sampler": "ddim",
-                    "guidance_scale": 7.5,
+                    "guidance_scale": 10,
                     # "seed": seed,
                 },
             )
@@ -226,7 +226,7 @@ def inpainting(
                     "num_inference_steps": num_inference_steps,
                     "edit_image": edit_image,
                     "mask_image": mask,
-                    "guidance_scale": 7.5,
+                    "guidance_scale": 10,
                     # "seed": seed,
                     # "sampler": "ddim",
                 },
