@@ -5,7 +5,6 @@ import uuid
 import cv2
 import numpy as np
 import streamlit as st
-import wand.image
 from PIL import Image, ImageOps
 from firebase_admin import storage
 from streamlit.runtime.uploaded_file_manager import UploadedFile
@@ -93,6 +92,8 @@ def uploaded_file_get_value(uploaded_file):
     img_bytes = uploaded_file.read()
     filename = uploaded_file.name
     if filename.endswith("HEIC"):
+        import wand.image
+
         with wand.image.Image(blob=img_bytes) as original:
             with original.convert("png") as converted:
                 img_bytes = converted.make_blob()
