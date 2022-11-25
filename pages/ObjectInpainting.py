@@ -24,6 +24,10 @@ class ObjectInpaintingPage(BasePage):
     title = "An Object in Any Scene"
     slug = "ObjectInpainting"
 
+    sane_defeaults = {
+        "mask_threshold": 0.7,
+    }
+
     class RequestModel(BaseModel):
         input_image: str
         text_prompt: str
