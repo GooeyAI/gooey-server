@@ -68,9 +68,9 @@ def image_input(idx, variables, state):
 
 @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 def upload_file(uploaded_file: UploadedFile):
-    img_bytes = uploaded_file.getvalue()
+    img_bytes, filename = uploaded_file_get_value(uploaded_file)
     img_bytes = resize_img_pad(img_bytes, (512, 512))
-    return upload_file_from_bytes(safe_filename(uploaded_file.name), img_bytes)
+    return upload_file_from_bytes(filename, img_bytes)
 
 
 def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
@@ -83,9 +83,22 @@ def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
 
 @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
-    img_bytes = uploaded_file.getvalue()
+    img_bytes, filename = uploaded_file_get_value(uploaded_file)
     img_bytes = resize_img_contain(img_bytes, resize)
-    return upload_file_from_bytes(safe_filename(uploaded_file.name), img_bytes)
+    return upload_file_from_bytes(filename, img_bytes)
+
+
+def uploaded_file_get_value(uploaded_file):
+    img_bytes = uploaded_file.read()
+    filename = uploaded_file.name
+    if filename.endswith("HEIC"):
+        import wand.image
+
+        with wand.image.Image(blob=img_bytes) as original:
+            with original.convert("png") as converted:
+                img_bytes = converted.make_blob()
+                filename += ".png"
+    return img_bytes, safe_filename(filename)
 
 
 def resize_img_contain(img_bytes: bytes, size: (int, int)) -> bytes:
