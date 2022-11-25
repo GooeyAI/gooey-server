@@ -79,7 +79,10 @@ class BasePage:
             self._examples_tab()
 
         with api_tab:
-            run_as_api_tab(self.endpoint, self.RequestModel)
+            if check_secret_key("run as API", settings.API_SECRET_KEY):
+                self.run_as_api_tab()
+            else:
+                st.empty()
 
         with run_tab:
             col1, col2 = st.columns(2)
@@ -96,6 +99,9 @@ class BasePage:
         #
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
+
+    def run_as_api_tab(self):
+        run_as_api_tab(self.endpoint, self.RequestModel)
 
     def get_doc(self):
         return deepcopy(get_saved_doc(get_doc_ref(self.doc_name)))
@@ -116,7 +122,7 @@ class BasePage:
         pass
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        raise NotImplemented
+        raise NotImplemented()
 
     def _runner(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
@@ -418,8 +424,6 @@ def get_doc_ref(
 
 
 def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
-    if not check_secret_key("run as API", settings.API_SECRET_KEY):
-        return
 
     api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
     api_url = str(furl(settings.API_BASE_URL) / endpoint)
