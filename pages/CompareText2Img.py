@@ -36,7 +36,9 @@ class CompareText2ImgPage(BasePage):
         ] | None
 
     class ResponseModel(BaseModel):
-        output_images: dict[typing.Literal[tuple(e.name for e in Text2ImgModels)], str]
+        output_images: dict[
+            typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
+        ]
 
     def render_form(self) -> bool:
         with st.form("my_form"):
