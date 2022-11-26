@@ -15,6 +15,7 @@ class CompareText2ImgPage(BasePage):
     sane_defeaults = {
         "guidance_scale": 10,
         "seed": 0,
+        "sd_2_upscaling": False,
     }
 
     class RequestModel(BaseModel):
@@ -28,6 +29,7 @@ class CompareText2ImgPage(BasePage):
 
         guidance_scale: float | None
         seed: int | None
+        sd_2_upscaling: bool | None
 
         selected_models: list[typing.Literal[tuple(e.name for e in Text2ImgModels)]] = [
             Text2ImgModels.sd_1_5
@@ -126,12 +128,13 @@ class CompareText2ImgPage(BasePage):
                 step=64,
             )
 
-        st.write("Advanced settings")
+        st.write("#### Advanced settings")
         col1, col2 = st.columns(2)
         with col1:
             st.number_input("Guidance scale", key="guidance_scale", step=0.1)
         with col2:
             st.number_input("Seed", key="seed", step=1)
+        st.checkbox("4x Upscaling (SD v2 only)", key="sd_2_upscaling")
 
     def render_output(self):
         output_images: dict = st.session_state.get("output_images")
@@ -160,6 +163,7 @@ class CompareText2ImgPage(BasePage):
                 height=request.output_height,
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
+                sd_2_upscaling=request.sd_2_upscaling,
             )
 
     def render_example(self, state: dict):

@@ -46,6 +46,7 @@ def text2img(
     height: int,
     guidance_scale: float = None,
     seed: float = None,
+    sd_2_upscaling: bool = False,
 ):
     _resolution_check(width, height)
 
@@ -62,6 +63,7 @@ def text2img(
                     "guidance_scale": guidance_scale,
                     "seed": seed,
                     # "sampler": "ddim",
+                    "upscaling_inference_steps": 10 if sd_2_upscaling else 0,
                 },
             )
         case Text2ImgModels.jack_qiao.name:
