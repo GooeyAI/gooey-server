@@ -38,6 +38,7 @@ from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
 from pages.ObjectInpainting import ObjectInpaintingPage
+from pages.SEOSummary import SEOSummaryPage
 from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
 
@@ -291,6 +292,7 @@ all_pages = [
     ObjectInpaintingPage,
     SocialLookupEmailPage,
     CompareText2ImgPage,
+    SEOSummaryPage,
 ]
 
 
