@@ -1,7 +1,9 @@
+import replicate
 import io
 from enum import Enum
 
 import openai
+import requests
 from PIL import Image
 
 from daras_ai.image_input import upload_file_from_bytes
@@ -91,22 +93,42 @@ def text2img(
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
         case Text2ImgModels.sd_1_5.name:
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.sd_1_5,
-                input_data={
-                    "prompt": prompt,
-                    "width": width,
-                    "height": height,
-                    # "init_image": init_image,
-                    # "mask": "string",
-                    # "prompt_strength": prompt_strength,
-                    "num_outputs": num_outputs,
-                    "num_inference_steps": num_inference_steps,
-                    "guidance_scale": guidance_scale,
-                    # "scheduler": "K-LMS",
-                    "seed": seed,
-                },
+            model = replicate.models.get("stability-ai/stable-diffusion")
+            version = model.versions.get(
+                "27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd7478"
             )
+            out_imgs = [
+                requests.get(img).content
+                for img in version.predict(
+                    prompt=prompt,
+                    width=width,
+                    height=height,
+                    # init_image=init_image,
+                    # mask="string",
+                    # prompt_strength=prompt_strength,
+                    num_outputs=num_outputs,
+                    num_inference_steps=num_inference_steps,
+                    guidance_scale=guidance_scale,
+                    # scheduler="K-LMS",
+                    seed=seed,
+                )
+            ]
+            # out_imgs = call_gpu_server_b64(
+            #     endpoint=GpuEndpoints.sd_1_5,
+            #     input_data={
+            #         "prompt": prompt,
+            #         "width": width,
+            #         "height": height,
+            #         # "init_image": init_image,
+            #         # "mask": "string",
+            #         # "prompt_strength": prompt_strength,
+            #         "num_outputs": num_outputs,
+            #         "num_inference_steps": num_inference_steps,
+            #         "guidance_scale": guidance_scale,
+            #         # "scheduler": "K-LMS",
+            #         "seed": seed,
+            #     },
+            # )
         case _:
             out_imgs = []
     return [
@@ -175,22 +197,38 @@ def img2img(
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
         case Img2ImgModels.sd_1_5.name:
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.sd_1_5,
-                input_data={
-                    "prompt": prompt,
-                    "width": width,
-                    "height": height,
-                    "init_image": init_image,
-                    # "mask": "string",
-                    "prompt_strength": prompt_strength,
-                    "num_outputs": num_outputs,
-                    "num_inference_steps": num_inference_steps,
-                    # "guidance_scale": 7.5,
-                    # "scheduler": "K-LMS",
-                    # "seed": 0,
-                },
+            model = replicate.models.get("stability-ai/stable-diffusion")
+            version = model.versions.get(
+                "27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd7478"
             )
+            out_imgs = [
+                requests.get(img).content
+                for img in version.predict(
+                    prompt=prompt,
+                    width=width,
+                    height=height,
+                    init_image=init_image,
+                    prompt_strength=prompt_strength,
+                    num_outputs=num_outputs,
+                    num_inference_steps=num_inference_steps,
+                )
+            ]
+            # out_imgs = call_gpu_server_b64(
+            #     endpoint=GpuEndpoints.sd_1_5,
+            #     input_data={
+            #         "prompt": prompt,
+            #         "width": width,
+            #         "height": height,
+            #         "init_image": init_image,
+            #         # "mask": "string",
+            #         "prompt_strength": prompt_strength,
+            #         "num_outputs": num_outputs,
+            #         "num_inference_steps": num_inference_steps,
+            #         # "guidance_scale": 7.5,
+            #         # "scheduler": "K-LMS",
+            #         # "seed": 0,
+            #     },
+            # )
         case _:
             out_imgs = []
     return [
