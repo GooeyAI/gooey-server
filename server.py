@@ -199,7 +199,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         state["_current_user"] = request.user
 
         # set sane defaults
-        for k, v in page.sane_defeaults.items():
+        for k, v in page.sane_defaults.items():
             state.setdefault(k, v)
 
         # run the script

@@ -23,7 +23,7 @@ class ImageSegmentationPage(BasePage):
     slug = "ImageSegmentation"
     version = 2
 
-    sane_defeaults = {
+    sane_defaults = {
         "mask_threshold": 0.5,
     }
 

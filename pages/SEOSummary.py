@@ -21,7 +21,7 @@ class SEOSummaryPage(BasePage):
     title = "Create the best SEO summary from any query"
     slug = "SEOSummary"
 
-    sane_defeaults = dict(
+    sane_defaults = dict(
         search_query="rugs",
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
         title="Ruggable",

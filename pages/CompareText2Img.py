@@ -12,7 +12,7 @@ class CompareText2ImgPage(BasePage):
     title = "Compare Image Generators"
     slug = "CompareText2Img"
 
-    sane_defeaults = {
+    sane_defaults = {
         "guidance_scale": 10,
         "seed": 0,
         "sd_2_upscaling": False,

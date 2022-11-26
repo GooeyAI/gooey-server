@@ -24,7 +24,7 @@ class ObjectInpaintingPage(BasePage):
     title = "An Object in Any Scene"
     slug = "ObjectInpainting"
 
-    sane_defeaults = {
+    sane_defaults = {
         "mask_threshold": 0.7,
     }
 
