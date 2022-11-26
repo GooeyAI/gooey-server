@@ -188,6 +188,10 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         # get saved state from db
         state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
 
+        # set sane defaults
+        for k, v in page.sane_defaults.items():
+            state.setdefault(k, v)
+
         # only use the request values, discard outputs
         state = page.RequestModel.parse_obj(state).dict()
 
@@ -197,10 +201,6 @@ def script_to_api(page_cls: typing.Type[BasePage]):
 
         # pass current user from request
         state["_current_user"] = request.user
-
-        # set sane defaults
-        for k, v in page.sane_defaults.items():
-            state.setdefault(k, v)
 
         # run the script
         try:

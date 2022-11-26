@@ -31,9 +31,9 @@ class CompareText2ImgPage(BasePage):
         seed: int | None
         sd_2_upscaling: bool | None
 
-        selected_models: list[typing.Literal[tuple(e.name for e in Text2ImgModels)]] = [
-            Text2ImgModels.sd_1_5
-        ]
+        selected_models: list[
+            typing.Literal[tuple(e.name for e in Text2ImgModels)]
+        ] | None
 
     class ResponseModel(BaseModel):
         output_images: dict[typing.Literal[tuple(e.name for e in Text2ImgModels)], str]
