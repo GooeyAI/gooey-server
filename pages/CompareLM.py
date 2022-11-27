@@ -1,7 +1,8 @@
 import typing
 
-from pydantic import BaseModel
 import streamlit as st
+from pydantic import BaseModel
+
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import run_language_model
 

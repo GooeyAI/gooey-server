@@ -1,3 +1,4 @@
+import random
 import typing
 
 import readability
@@ -10,15 +11,18 @@ from pydantic import BaseModel
 
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.language_model import run_language_model
+from daras_ai_v2.language_model import (
+    run_language_model,
+    GPT3_MAX_ALLOED_TOKENS,
+    calc_gpt_tokens,
+)
 
 STOP_SEQ = "###"
-
 ua = UserAgent(browsers=["chrome"])
 
 
 class SEOSummaryPage(BasePage):
-    title = "Create the best SEO summary from any query"
+    title = "Create the best SEO content from any query"
     slug = "SEOSummary"
 
     sane_defaults = dict(
@@ -33,6 +37,7 @@ class SEOSummaryPage(BasePage):
         num_outputs=1,
         quality=1.0,
         max_search_urls=10,
+        task_instructions="I will give you a URL and focus keywords and using the high ranking content from the google search results below you will write 500 words for the given url.",
     )
 
     class RequestModel(BaseModel):
@@ -40,6 +45,8 @@ class SEOSummaryPage(BasePage):
         keywords: str
         title: str
         company_url: str
+
+        task_instructions: str | None
 
         scaleserp_search_field: str | None
         do_html2text: bool | None
@@ -73,6 +80,14 @@ class SEOSummaryPage(BasePage):
         assert st.session_state["company_url"], "Please provide Company URL"
 
     def render_settings(self):
+        st.text_area(
+            "Task Instructions",
+            key="task_instructions",
+            height=200,
+        )
+
+        st.write("---")
+
         st.write(
             "ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)"
         )
@@ -241,17 +256,14 @@ class SEOSummaryPage(BasePage):
             : request.max_search_urls
         ]
 
-        state["search_urls"] = search_urls
         state["scaleserp_results"] = scaleserp_results
+        state["search_urls"] = search_urls
 
-        yield from _summarize_urls(request, state)
-
-        final_prompt = _gen_final_prompt(request, state)
-        state["final_prompt"] = final_prompt
+        yield from _gen_final_prompt(request, state)
 
         yield "Running GPT-3..."
 
-        state["output_content"] = _run_lm(request, final_prompt)
+        state["output_content"] = _run_lm(request, state["final_prompt"])
 
 
 def _run_lm(request: SEOSummaryPage.RequestModel, final_prompt: str) -> list[str]:
@@ -267,68 +279,89 @@ def _run_lm(request: SEOSummaryPage.RequestModel, final_prompt: str) -> list[str
     )
 
 
-def _gen_final_prompt(request: SEOSummaryPage.RequestModel, state: dict) -> str:
-    final_prompt = ""
-    idx = 0
+def _gen_final_prompt(
+    request: SEOSummaryPage.RequestModel,
+    state: dict,
+) -> str:
+    state["summarized_urls"] = summarized_urls = []
 
-    stop_seq_padded = f"\n\n{STOP_SEQ}\n\n"
+    padded_stop_seq = f"\n\n{STOP_SEQ}\n\n"
 
-    # add examples
-    for idx, summary_dict in enumerate(state["summarized_urls"]):
+    end_input_prompt = "\n".join(
+        [
+            "Rank: 1",
+            "URL: " + request.company_url,
+            "Keywords: " + request.keywords,
+            "Content: " + padded_stop_seq,
+        ]
+    )
+
+    max_allowed_tokens = (
+        GPT3_MAX_ALLOED_TOKENS - request.max_tokens - calc_gpt_tokens(end_input_prompt)
+    )
+
+    state["final_prompt"] = request.task_instructions.strip() + "\n\n"
+
+    for idx, url in enumerate(state["search_urls"]):
+        yield f"Summarizing {url}..."
+
+        summary_dict = _summarize_url(request, url)
+        if not summary_dict:
+            continue
+
+        summarized_urls.append(summary_dict)
+
         clean_summary = summary_dict["summary"].replace(STOP_SEQ, "")
-        final_prompt += "\n".join(
+        padded_summary = padded_stop_seq + clean_summary + padded_stop_seq
+
+        next_prompt_part = "\n".join(
             [
                 "Rank: " + str(idx + 1),
                 "URL: " + summary_dict["url"],
                 "Title: " + summary_dict["title"],
-                "Content: " + stop_seq_padded + clean_summary + stop_seq_padded,
+                "Content: " + padded_summary,
             ]
         )
 
+        # used too many tokens, abort!
+        if (
+            calc_gpt_tokens(state["final_prompt"] + next_prompt_part)
+            > max_allowed_tokens
+        ):
+            continue
+
+        state["final_prompt"] += next_prompt_part
+        yield
+
     # add inputs
-    final_prompt += "\n".join(
-        [
-            "Rank: " + str(idx + 1),
-            "URL: " + request.company_url,
-            "Keywords: " + request.keywords,
-            "Content: " + stop_seq_padded,
-        ]
-    )
-
-    return final_prompt
+    state["final_prompt"] += end_input_prompt
+    yield
 
 
-def _summarize_urls(request: SEOSummaryPage.RequestModel, state: dict):
-    state["summarized_urls"] = []
+def _summarize_url(request: SEOSummaryPage.RequestModel, url: str):
+    try:
+        title, summary = _call_summarize_url(url)
+    except requests.HTTPError:
+        return None
 
-    for url in state["search_urls"]:
-        yield f"Summarizing {url}..."
+    if request.do_html2text:
+        title = html2text(title)
+        summary = html2text(summary)
+    title = title.strip()
+    summary = summary.strip()
 
-        try:
-            title, summary = _readiblity_summarize_url(url)
-        except requests.HTTPError:
-            continue
+    if not summary:
+        return None
 
-        if request.do_html2text:
-            title = html2text(title)
-            summary = html2text(summary)
-        title = title.strip()
-        summary = summary.strip()
-
-        if not summary:
-            continue
-
-        state["summarized_urls"].append(
-            {
-                "url": url,
-                "title": title,
-                "summary": summary,
-            }
-        )
+    return {
+        "url": url,
+        "title": title,
+        "summary": summary,
+    }
 
 
 @st.cache(show_spinner=False)
-def _readiblity_summarize_url(url: str) -> (str, str):
+def _call_summarize_url(url: str) -> (str, str):
     r = requests.get(url, headers={"User-Agent": ua.random})
     r.raise_for_status()
     doc = readability.Document(r.text)
@@ -341,6 +374,7 @@ def _extract_search_urls(
     search_urls = [
         result["link"] for result in scaleserp_results[request.scaleserp_search_field]
     ]
+    random.shuffle(search_urls)
     return search_urls
 
 
