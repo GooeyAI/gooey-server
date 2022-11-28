@@ -92,102 +92,109 @@ class ImageSegmentationPage(BasePage):
             label_visibility="collapsed",
             key="mask_threshold",
         )
+        st.markdown("""---""")
+        st.write(
+            """
+            ## Bulk Run
+            """
+        )
+        cutout_images = []
+        input_files = st.file_uploader("input_files", accept_multiple_files=True)
+        pressed_submit = st.button("🏃‍ Submit")
+        container = st.container()
+        if pressed_submit:
+            if not input_files:
+                st.error("No input files")
+
+            for input_file in input_files:
+                with st.spinner(f"Processing {input_file.name}..."):
+                    input_image = upload_file_hq(input_file,resize=(2048, 2048))
+                    response = requests.post(
+                        str(furl(settings.API_BASE_URL) / self.endpoint),
+                        json={
+                            "input_image": input_image,
+                            "selected_model": st.session_state["selected_model"],
+                            "mask_threshold": st.session_state["mask_threshold"],
+                        },
+                    )
+                response.raise_for_status()
+                cutout_image = response.json()["cutout_image"]
+                # To download all locally
+                # r = requests.get(cutout_image, stream=True)
+                # with open(input_file.name, 'wb') as f:
+                #     r.raw.decode_content = True
+                #     shutil.copyfileobj(r.raw, f)
+
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    st.image(input_image, width=100)
+                with col2:
+                    cutout_image = response.json()["cutout_image"]
+                    cutout_images.append(cutout_image)
+                    st.image(cutout_image, width=100)
+                with col3:
+                    html(
+                        """
+                       <script src="https://cdnjs.cloudflare.com/ajax/libs/downloadjs/1.4.8/download.min.js"></script>
+                        <button onClick='download("%s")' class="btn">
+                            ⬇️ Download
+                        </button>
+                        <style>
+                           .btn {
+                           padding:8px;
+                                display: inline-flex;
+                                -webkit-box-align: center;
+                                align-items: center;
+                                -webkit-box-pack: center;
+                                justify-content: center;
+                                font-weight: 400;
+                                padding: 0.25rem 0.75rem;
+                                border-radius: 0.25rem;
+                                margin: 0px;
+                                line-height: 1.6;
+                                color: white;
+                                user-select: none;
+                                background-color: rgb(8, 8, 8);
+                                border: 1px solid rgba(255, 255, 255, 0.2);
+                            }
+                        </style>
+                        """
+                        % cutout_image
+                    )
+            with container:
+                html(
+                    """
+                       <script src="https://cdnjs.cloudflare.com/ajax/libs/downloadjs/1.4.8/download.min.js"></script>
+                        <button onClick='%s.map((e)=>download(e))' class="btn">
+                            ⬇️ Download all
+                        </button>
+                        <style>
+                           .btn {
+                           padding:8px;
+                                display: inline-flex;
+                                -webkit-box-align: center;
+                                align-items: center;
+                                -webkit-box-pack: center;
+                                justify-content: center;
+                                font-weight: 400;
+                                padding: 0.25rem 0.75rem;
+                                border-radius: 0.25rem;
+                                margin: 0px;
+                                line-height: 1.6;
+                                color: white;
+                                user-select: none;
+                                background-color: rgb(8, 8, 8);
+                                border: 1px solid rgba(255, 255, 255, 0.2);
+                            }
+                        </style>
+                    
+                    """
+                    % json.dumps(cutout_images)
+                )
 
     def run_as_api_tab(self):
         super().run_as_api_tab()
-        cutout_images = []
-        input_files = st.file_uploader("input_files", accept_multiple_files=True)
-        container = st.container()
-
-        if not input_files:
-            return
-
-        for input_file in input_files:
-            with st.spinner(f"Processing {input_file.name}..."):
-                input_image = upload_file_hq(input_file,resize=(2048, 2048))
-                response = requests.post(
-                    str(furl(settings.API_BASE_URL) / self.endpoint),
-                    json={
-                        "input_image": input_image,
-                        "selected_model": "dis",
-                        "mask_threshold": 0.6,
-                    },
-                )
-            response.raise_for_status()
-            cutout_image = response.json()["cutout_image"]
-            # To download all locally
-            # r = requests.get(cutout_image, stream=True)
-            # with open(input_file.name, 'wb') as f:
-            #     r.raw.decode_content = True
-            #     shutil.copyfileobj(r.raw, f)
-
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                st.image(input_image, width=100)
-            with col2:
-                cutout_image = response.json()["cutout_image"]
-                cutout_images.append(cutout_image)
-                st.image(cutout_image, width=100)
-            with col3:
-                html(
-                    """
-                   <script src="https://cdnjs.cloudflare.com/ajax/libs/downloadjs/1.4.8/download.min.js"></script>
-                    <button onClick='download("%s")' class="btn">
-                        ⬇️ Download
-                    </button>
-                    <style>
-                       .btn {
-                       padding:8px;
-                            display: inline-flex;
-                            -webkit-box-align: center;
-                            align-items: center;
-                            -webkit-box-pack: center;
-                            justify-content: center;
-                            font-weight: 400;
-                            padding: 0.25rem 0.75rem;
-                            border-radius: 0.25rem;
-                            margin: 0px;
-                            line-height: 1.6;
-                            color: white;
-                            user-select: none;
-                            background-color: rgb(8, 8, 8);
-                            border: 1px solid rgba(255, 255, 255, 0.2);
-                        }
-                    </style>
-                    """
-                    % cutout_image
-                )
-        with container:
-            html(
-                """
-                   <script src="https://cdnjs.cloudflare.com/ajax/libs/downloadjs/1.4.8/download.min.js"></script>
-                    <button onClick='%s.map((e)=>download(e))' class="btn">
-                        ⬇️ Download all
-                    </button>
-                    <style>
-                       .btn {
-                       padding:8px;
-                            display: inline-flex;
-                            -webkit-box-align: center;
-                            align-items: center;
-                            -webkit-box-pack: center;
-                            justify-content: center;
-                            font-weight: 400;
-                            padding: 0.25rem 0.75rem;
-                            border-radius: 0.25rem;
-                            margin: 0px;
-                            line-height: 1.6;
-                            color: white;
-                            user-select: none;
-                            background-color: rgb(8, 8, 8);
-                            border: 1px solid rgba(255, 255, 255, 0.2);
-                        }
-                    </style>
-                
-                """
-                % json.dumps(cutout_images)
-            )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
 
