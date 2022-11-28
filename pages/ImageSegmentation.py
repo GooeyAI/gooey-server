@@ -108,7 +108,7 @@ class ImageSegmentationPage(BasePage):
 
             for input_file in input_files:
                 with st.spinner(f"Processing {input_file.name}..."):
-                    input_image = upload_file_hq(input_file,resize=(2048, 2048))
+                    input_image = upload_file_hq(input_file, resize=(2048, 2048))
                     response = requests.post(
                         str(furl(settings.API_BASE_URL) / self.endpoint),
                         json={
