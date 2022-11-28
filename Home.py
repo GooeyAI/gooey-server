@@ -7,17 +7,17 @@ from daras_ai.init import init_scripts
 from daras_ai_v2 import settings
 from daras_ai_v2.face_restoration import map_parallel
 from pages.CompareLM import CompareLMPage
+from pages.CompareText2Img import CompareText2ImgPage
 from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Img2Img import Img2ImgPage
-from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
 from pages.ObjectInpainting import ObjectInpaintingPage
+from pages.SEOSummary import SEOSummaryPage
 from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
-from pages.CompareText2Img import CompareText2ImgPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
@@ -35,6 +35,7 @@ page_classes = [
     DeforumSDPage,
     CompareLMPage,
     CompareText2ImgPage,
+    SEOSummaryPage,
     # LipsyncPage,
     # ChyronPlantPage,
 ]

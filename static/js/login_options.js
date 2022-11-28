@@ -2,7 +2,7 @@ const CLIENT_ID = "6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleuserco
 
 const uiConfig = {
     // Will use popup for IDP Providers sign-in flow instead of the default, redirect.
-    // signInFlow: 'popup',
+    signInFlow: 'popup',
     // signInSuccessUrl: '/',
     callbacks: {
         signInSuccessWithAuthResult: function (authResult, redirectUrl) {

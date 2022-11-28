@@ -9,6 +9,16 @@
 5. Save `serviceAccountKey.json` to project root (copy from Dara server project)
 
 6. run `pip install --upgrade -r requirements.txt` to get all the latest packages
+
+##### Install imagemagick
+
+Needed for HEIC image support - https://docs.wand-py.org/en/0.5.7/guide/install.html
+
+```
+brew install freetype imagemagick
+export MAGICK_HOME=/opt/homebrew
+```
+
 ### Run
 
 `streamlit run Home.py`

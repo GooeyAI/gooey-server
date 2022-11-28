@@ -70,6 +70,8 @@
 </head>
 <body>
 
+<!-- Google tag (gtag.js) --> <script async src="https://www.googletagmanager.com/gtag/js?id=G-K0XPWGWN9Y"></script> <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-K0XPWGWN9Y'); </script>
+
 {% include 'header.html' %}
 
 {% if request.user %}
@@ -99,14 +101,12 @@
         <div style="height: 10px"></div>
         <a style="font-size: 15px; color: wheat" href="/login?next={{ request.path }}">More Options</a>
     </div>
-
-
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-
-    <script src="/static/js/auth.js"></script>
-    <script src="/static/js/app.js"></script>
 {% endif %}
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
+<script src="/static/js/auth.js"></script>
 
 <iframe onload="onIframeLoaded(this)"
         src="{{ iframe_url }}"

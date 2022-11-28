@@ -6,7 +6,7 @@ ENV WORKDIR /usr/src/app
 RUN mkdir -p $WORKDIR
 WORKDIR $WORKDIR
 
-RUN apt-get update && apt-get install -y python3-opencv
+RUN apt-get update && apt-get install -y python3-opencv libmagickwand-dev
 
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
