@@ -137,7 +137,7 @@ class ImageSegmentationPage(BasePage):
                     html(
                         """
                        <script src="https://cdnjs.cloudflare.com/ajax/libs/downloadjs/1.4.8/download.min.js"></script>
-                        <button onClick='download("%s")' class="btn">
+                        <button onClick='download("%s","%s.png")' class="btn">
                             ⬇️ Download
                         </button>
                         <style>
@@ -160,7 +160,7 @@ class ImageSegmentationPage(BasePage):
                             }
                         </style>
                         """
-                        % cutout_image
+                        % (cutout_image, input_file.name)
                     )
             with container:
                 html(
