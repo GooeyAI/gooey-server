@@ -1,6 +1,7 @@
 import json
 import typing
 from pathlib import Path
+import shutil
 
 import cv2
 import numpy as np
@@ -103,16 +104,22 @@ class ImageSegmentationPage(BasePage):
 
         for input_file in input_files:
             with st.spinner(f"Processing {input_file.name}..."):
-                input_image = upload_file_hq(input_file)
+                input_image = upload_file_hq(input_file,resize=(2048, 2048))
                 response = requests.post(
                     str(furl(settings.API_BASE_URL) / self.endpoint),
                     json={
                         "input_image": input_image,
                         "selected_model": "dis",
-                        "mask_threshold": 0.8,
+                        "mask_threshold": 0.6,
                     },
                 )
             response.raise_for_status()
+            cutout_image = response.json()["cutout_image"]
+            # To download all locally
+            # r = requests.get(cutout_image, stream=True)
+            # with open(input_file.name, 'wb') as f:
+            #     r.raw.decode_content = True
+            #     shutil.copyfileobj(r.raw, f)
 
             col1, col2, col3 = st.columns(3)
 
