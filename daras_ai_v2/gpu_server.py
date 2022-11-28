@@ -15,7 +15,7 @@ class GpuEndpoints:
     runway_ml_inpainting = f"{settings.GPU_SERVER_2}:5006"
     u2net = f"{settings.GPU_SERVER_1}:5007"
     deforum_sd = f"{settings.GPU_SERVER_2}:5008"
-    sd_1_5 = f"{settings.GPU_SERVER_2}:5009"
+    # sd_1_5 = f"{settings.GPU_SERVER_2}:5009"
     sd_2 = f"{settings.GPU_SERVER_1}:5011"
     # openjourney = f"{settings.GPU_SERVER_2}:5010"
 

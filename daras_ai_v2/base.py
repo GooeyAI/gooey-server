@@ -26,6 +26,7 @@ class BasePage:
     title: str
     slug: str
     version: int = 1
+    sane_defaults: dict = {}
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
 
@@ -69,6 +70,9 @@ class BasePage:
                     document_id=self.doc_name,
                     sub_collection_id="examples",
                 )
+
+            for k, v in self.sane_defaults.items():
+                st.session_state.setdefault(k, v)
 
             st.session_state["__loaded__"] = True
 
@@ -115,8 +119,27 @@ class BasePage:
     def render_output(self):
         self.render_example(st.session_state)
 
+    def render_form_v2(self):
+        pass
+
+    def validate_form_v2(self) -> bool:
+        pass
+
     def render_form(self) -> bool:
-        return False
+        with st.form(f"{self.slug}Form"):
+            self.render_form_v2()
+            submitted = st.form_submit_button("🏃‍ Submit")
+
+        if not submitted:
+            return False
+
+        try:
+            self.validate_form_v2()
+        except AssertionError:
+            st.error("Please provide a Prompt and an Email Address", icon="⚠️")
+            return False
+        else:
+            return True
 
     def render_footer(self):
         pass

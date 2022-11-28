@@ -10,6 +10,8 @@ from daras_ai_v2.base import (
     get_doc_ref,
 )
 from pages.ChyronPlant import ChyronPlantPage
+from pages.CompareLM import CompareLMPage
+from pages.CompareText2Img import CompareText2ImgPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
 from pages.ImageSegmentation import ImageSegmentationPage
@@ -18,6 +20,7 @@ from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
 from pages.ObjectInpainting import ObjectInpaintingPage
+from pages.SEOSummary import SEOSummaryPage
 from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
 from server import app
@@ -30,14 +33,16 @@ pages_to_test = [
     EmailFaceInpaintingPage,
     LetterWriterPage,
     LipsyncPage,
-    # CompareLMPage,
+    CompareLMPage,
     ImageSegmentationPage,
     TextToSpeechPage,
     LipsyncTTSPage,
+    # DeforumSDPage, ## too slow!
     Img2ImgPage,
     ObjectInpaintingPage,
     SocialLookupEmailPage,
-    # DeforumSDPage,
+    CompareText2ImgPage,
+    SEOSummaryPage,
 ]
 
 

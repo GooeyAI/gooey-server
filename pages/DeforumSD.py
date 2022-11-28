@@ -59,7 +59,7 @@ class DeforumSDPage(BasePage):
         output_video = state.get("output_video")
         if output_video:
             # st.write(f"**Output Video** - {state.get('input_prompt')}")
-            st.markdown("```" + state.get("input_prompt") + "```")
+            st.markdown("```" + state.get("input_prompt").replace("\n", "") + "```")
             st.video(output_video)
         else:
             st.empty()

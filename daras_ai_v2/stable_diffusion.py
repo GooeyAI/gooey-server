@@ -1,6 +1,10 @@
+import replicate
+import io
 from enum import Enum
 
 import openai
+import requests
+from PIL import Image
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
@@ -9,6 +13,7 @@ from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints, b64_img_de
 
 
 class InpaintingModels(Enum):
+    sd_2 = "Stable Diffusion 2 (stability.ai)"
     runway_ml = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
@@ -16,6 +21,7 @@ class InpaintingModels(Enum):
 
 class Img2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
+    sd_2 = "Stable Diffusion 2 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
@@ -38,6 +44,9 @@ def text2img(
     num_inference_steps: int,
     width: int,
     height: int,
+    guidance_scale: float = None,
+    seed: float = None,
+    sd_2_upscaling: bool = False,
 ):
     _resolution_check(width, height)
 
@@ -51,10 +60,10 @@ def text2img(
                     "height": height,
                     "num_outputs": num_outputs,
                     "num_inference_steps": num_inference_steps,
-                    "guidance_scale": 7.5,
-                    "strength": 0.8,
-                    # "seed": 0,
-                    # "init_image": "string",
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    # "sampler": "ddim",
+                    "upscaling_inference_steps": 10 if sd_2_upscaling else 0,
                 },
             )
         case Text2ImgModels.jack_qiao.name:
@@ -86,26 +95,46 @@ def text2img(
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
         case Text2ImgModels.sd_1_5.name:
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.sd_1_5,
-                input_data={
-                    "prompt": prompt,
-                    "width": width,
-                    "height": height,
-                    # "init_image": init_image,
-                    # "mask": "string",
-                    # "prompt_strength": prompt_strength,
-                    "num_outputs": num_outputs,
-                    "num_inference_steps": num_inference_steps,
-                    # "guidance_scale": 7.5,
-                    # "scheduler": "K-LMS",
-                    # "seed": 0,
-                },
+            model = replicate.models.get("stability-ai/stable-diffusion")
+            version = model.versions.get(
+                "27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd7478"
             )
+            out_imgs = [
+                requests.get(img).content
+                for img in version.predict(
+                    prompt=prompt,
+                    width=width,
+                    height=height,
+                    # init_image=init_image,
+                    # mask="string",
+                    # prompt_strength=prompt_strength,
+                    num_outputs=num_outputs,
+                    num_inference_steps=num_inference_steps,
+                    guidance_scale=guidance_scale,
+                    # scheduler="K-LMS",
+                    seed=seed,
+                )
+            ]
+            # out_imgs = call_gpu_server_b64(
+            #     endpoint=GpuEndpoints.sd_1_5,
+            #     input_data={
+            #         "prompt": prompt,
+            #         "width": width,
+            #         "height": height,
+            #         # "init_image": init_image,
+            #         # "mask": "string",
+            #         # "prompt_strength": prompt_strength,
+            #         "num_outputs": num_outputs,
+            #         "num_inference_steps": num_inference_steps,
+            #         "guidance_scale": guidance_scale,
+            #         # "scheduler": "K-LMS",
+            #         "seed": seed,
+            #     },
+            # )
         case _:
             out_imgs = []
     return [
-        upload_file_from_bytes(f"gooey.ai - {prompt}", sd_img_bytes)
+        upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
 
@@ -125,6 +154,22 @@ def img2img(
     _resolution_check(width, height)
 
     match selected_model:
+        case Img2ImgModels.sd_2.name:
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_2,
+                input_data={
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "init_image": init_image,
+                    "strength": prompt_strength,
+                    # "sampler": "ddim",
+                    "guidance_scale": 10,
+                    # "seed": seed,
+                },
+            )
         case Img2ImgModels.jack_qiao.name:
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.glid_3_xl_stable,
@@ -154,26 +199,42 @@ def img2img(
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
         case Img2ImgModels.sd_1_5.name:
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.sd_1_5,
-                input_data={
-                    "prompt": prompt,
-                    "width": width,
-                    "height": height,
-                    "init_image": init_image,
-                    # "mask": "string",
-                    "prompt_strength": prompt_strength,
-                    "num_outputs": num_outputs,
-                    "num_inference_steps": num_inference_steps,
-                    # "guidance_scale": 7.5,
-                    # "scheduler": "K-LMS",
-                    # "seed": 0,
-                },
+            model = replicate.models.get("stability-ai/stable-diffusion")
+            version = model.versions.get(
+                "27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd7478"
             )
+            out_imgs = [
+                requests.get(img).content
+                for img in version.predict(
+                    prompt=prompt,
+                    width=width,
+                    height=height,
+                    init_image=init_image,
+                    prompt_strength=prompt_strength,
+                    num_outputs=num_outputs,
+                    num_inference_steps=num_inference_steps,
+                )
+            ]
+            # out_imgs = call_gpu_server_b64(
+            #     endpoint=GpuEndpoints.sd_1_5,
+            #     input_data={
+            #         "prompt": prompt,
+            #         "width": width,
+            #         "height": height,
+            #         "init_image": init_image,
+            #         # "mask": "string",
+            #         "prompt_strength": prompt_strength,
+            #         "num_outputs": num_outputs,
+            #         "num_inference_steps": num_inference_steps,
+            #         # "guidance_scale": 7.5,
+            #         # "scheduler": "K-LMS",
+            #         # "seed": 0,
+            #     },
+            # )
         case _:
             out_imgs = []
     return [
-        upload_file_from_bytes(f"gooey.ai - {prompt}", sd_img_bytes)
+        upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
 
@@ -194,6 +255,22 @@ def inpainting(
     _resolution_check(width, height)
 
     match selected_model:
+        case InpaintingModels.sd_2.name:
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_2,
+                input_data={
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "edit_image": edit_image,
+                    "mask_image": mask,
+                    "guidance_scale": 10,
+                    # "seed": seed,
+                    # "sampler": "ddim",
+                },
+            )
         case InpaintingModels.runway_ml.name:
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.runway_ml_inpainting,
@@ -238,10 +315,53 @@ def inpainting(
                     "height": height,
                 },
             )
+
+    out_imgs = _recomposite_inpainting_outputs(out_imgs, edit_image_bytes, mask_bytes)
+
     return [
-        upload_file_from_bytes(f"gooey.ai - {prompt}", sd_img_bytes)
+        upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
+
+
+def _recomposite_inpainting_outputs(
+    out_imgs: list[bytes],
+    orig_bytes: bytes,
+    mask_bytes: bytes,
+    cutdown_factor: float = 0.95,
+) -> list[bytes]:
+    """
+    Pastes the original masked image back onto the output image for perfect results
+    """
+
+    ret = []
+
+    for out_bytes in out_imgs:
+        out_im = Image.open(io.BytesIO(out_bytes))
+        orig_im = Image.open(io.BytesIO(orig_bytes))
+        mask_im = Image.open(io.BytesIO(mask_bytes))
+
+        cutdown_mask_size = (
+            int(orig_im.size[0] * cutdown_factor),
+            int(orig_im.size[1] * cutdown_factor),
+        )
+        mask_im = mask_im.convert("L").resize(cutdown_mask_size)
+
+        result = Image.new("L", orig_im.size, (0,))
+        paste_pos = (
+            (orig_im.size[0] - mask_im.size[0]) // 2,
+            (orig_im.size[1] - mask_im.size[1]) // 2,
+        )
+        result.paste(mask_im, paste_pos)
+        result = Image.composite(orig_im, out_im, result)
+
+        img_byte_arr = io.BytesIO()
+        result.save(img_byte_arr, format="PNG")
+        out_bytes = img_byte_arr.getvalue()
+
+        ret.append(out_bytes)
+
+    return ret
 
 
 def _resolution_check(width, height):
