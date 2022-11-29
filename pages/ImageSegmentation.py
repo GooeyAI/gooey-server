@@ -16,7 +16,7 @@ from daras_ai.image_input import (
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.image_segmentation import u2net, ImageSegmentationModels, dis
-from daras_ai_v2.repositioning import get_mask_bounds, order_points
+from daras_ai_v2.repositioning import get_mask_bounds
 
 
 class ImageSegmentationPage(BasePage):
