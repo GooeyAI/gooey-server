@@ -101,8 +101,38 @@ class ImageSegmentationPage(BasePage):
             label_visibility="collapsed",
             key="mask_threshold",
         )
+
+        st.write(
+            """
+            ##### Fix Skewed Perspective
+            
+            Automatically transform the perspective of the image to make objects look like a perfect rectangle  
+            """
+        )
+        st.checkbox(
+            "Enable Perspective Transform",
+            key="rect_persepective_transform",
+        )
+
+        st.write(
+            """
+            ##### Add reflections
+            """
+        )
+        col1, _ = st.columns(2)
+        with col1:
+            st.slider("Reflection Opacity", key="reflection_opacity")
+
+        # st.write(
+        #     """
+        #     ##### Add Drop shadow
+        #     """
+        # )
+        # col1, _ = st.columns(2)
+        # with col1:
+        #     st.slider("Shadow ", key="reflection_opacity")
+        st.markdown("""---""")
         if check_secret_key("Bulk run", settings.API_SECRET_KEY):
-            st.markdown("""---""")
             st.write(
                 """
                 ## Bulk Run
@@ -205,36 +235,6 @@ class ImageSegmentationPage(BasePage):
 
     def run_as_api_tab(self):
         super().run_as_api_tab()
-
-        st.write(
-            """
-            ##### Fix Skewed Perspective
-            
-            Automatically transform the perspective of the image to make objects look like a perfect rectangle  
-            """
-        )
-        st.checkbox(
-            "Enable Perspective Transform",
-            key="rect_persepective_transform",
-        )
-
-        st.write(
-            """
-            ##### Add reflections
-            """
-        )
-        col1, _ = st.columns(2)
-        with col1:
-            st.slider("Reflection Opacity", key="reflection_opacity")
-
-        st.write(
-            """
-            ##### Add Drop shadow
-            """
-        )
-        # col1, _ = st.columns(2)
-        # with col1:
-        #     st.slider("Shadow ", key="reflection_opacity")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
 
