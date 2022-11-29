@@ -189,6 +189,5 @@ class CompareText2ImgPage(BasePage):
         return "This recipe takes any text and renders an image using multiple Text2Image engines."
 
 
-
 if __name__ == "__main__":
     CompareText2ImgPage().render()
