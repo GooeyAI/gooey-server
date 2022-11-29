@@ -213,6 +213,11 @@ class Img2ImgPage(BasePage):
             width=request.output_width,
             height=request.output_height,
         )
+    def preview_image(self, state: dict) -> str:
+        return state.get("output_images", [""])[0]
+    def preview_description(self) -> str:
+        return "This recipe takes an image and a prompt and then attempts to alter the image, based on the text."
+
 
 
 if __name__ == "__main__":
