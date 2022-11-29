@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -131,6 +132,13 @@ FILENAME_WHITELIST = re.compile(r"[ \w\-_.]")
 def safe_filename(filename: str):
     matches = FILENAME_WHITELIST.finditer(filename)
     filename = "".join(match.group(0) for match in matches)
-    head, tail = os.path.split(filename)
-    out = os.path.join(head[:200], tail)
+    p = Path(filename)
+    out = _truncate(p.stem) + p.suffix
     return out
+
+
+def _truncate(text: str, maxlen: int = 100) -> str:
+    if len(text) < maxlen:
+        return text
+    mid = maxlen // 2
+    return text[: mid - 3] + "..." + text[-mid:]
