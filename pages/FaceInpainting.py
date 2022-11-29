@@ -161,8 +161,8 @@ class FaceInpaintingPage(BasePage):
                 "Width",
                 key="output_width",
                 min_value=512,
-                max_value=1024,
-                step=128,
+                max_value=768,
+                step=64,
             )
         with col2:
             st.write("X")
@@ -171,8 +171,8 @@ class FaceInpaintingPage(BasePage):
                 "Height",
                 key="output_height",
                 min_value=512,
-                max_value=1024,
-                step=128,
+                max_value=768,
+                step=64,
             )
 
         st.write(

@@ -22,14 +22,26 @@ def init_scripts():
     hidden_html_js(
         """
         <script>
+            const stBlock = parent.document.querySelector('[data-testid="stVerticalBlock"]');
+
             const observer = new ResizeObserver(entries => {
-                let height = entries[0].contentRect.height;
-                top.postMessage({ type: "GOOEY_IFRAME_RESIZE", height: height }, "*");
+                notifyHeight(entries[0].contentRect.height);
             });
-            observer.observe(parent.document.querySelector('[data-testid="stVerticalBlock"]'));
+            observer.observe(stBlock);
+
+            setInterval(function() {
+                notifyHeight(stBlock.clientHeight)
+            }, 500);
+            
+            let lastHeight = 0;
+        
+            function notifyHeight(height) {
+                if (lastHeight == height) return;
+                lastHeight = height;
+                top.postMessage({ type: "GOOEY_IFRAME_RESIZE", height: height }, "*");
+            }
         </script>
         """
     )
-
     if "_current_user" not in st.session_state:
         st.session_state["_current_user"] = get_current_user() or get_anonymous_user()

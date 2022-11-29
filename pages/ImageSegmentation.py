@@ -23,6 +23,10 @@ class ImageSegmentationPage(BasePage):
     slug = "ImageSegmentation"
     version = 2
 
+    sane_defaults = {
+        "mask_threshold": 0.5,
+    }
+
     class RequestModel(BaseModel):
         input_image: str
 

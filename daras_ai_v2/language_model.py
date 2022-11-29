@@ -1,8 +1,22 @@
 import openai
 from decouple import config
+from transformers import GPT2TokenizerFast
 
 from daras_ai_v2 import settings
 from daras_ai_v2.gpu_server import call_gpu_server, GpuEndpoints
+
+GPT3_MAX_ALLOED_TOKENS = 4096
+
+_gpt2_tokenizer = None
+
+
+def calc_gpt_tokens(text: str) -> int:
+    global _gpt2_tokenizer
+
+    if not _gpt2_tokenizer:
+        _gpt2_tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+
+    return len(_gpt2_tokenizer(text)["input_ids"])
 
 
 def run_language_model(

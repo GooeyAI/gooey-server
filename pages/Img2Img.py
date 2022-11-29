@@ -105,7 +105,7 @@ class Img2ImgPage(BasePage):
             key="prompt_strength",
             min_value=0.0,
             max_value=1.0,
-            help="How strongly should the prompt alter the image?"
+            help="How strongly should the prompt alter the image?",
         )
 
         col1, col2 = st.columns(2, gap="medium")
@@ -128,8 +128,6 @@ class Img2ImgPage(BasePage):
             else:
                 st.empty()
 
-
-
         st.write(
             """
             ### Output Resolution
@@ -141,8 +139,8 @@ class Img2ImgPage(BasePage):
                 "Width",
                 key="output_width",
                 min_value=512,
-                max_value=1024,
-                step=128,
+                max_value=768,
+                step=64,
             )
         with col2:
             st.write("X")
@@ -151,8 +149,8 @@ class Img2ImgPage(BasePage):
                 "Height",
                 key="output_height",
                 min_value=512,
-                max_value=1024,
-                step=128,
+                max_value=768,
+                step=64,
             )
 
     def render_output(self):
