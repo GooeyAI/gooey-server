@@ -38,6 +38,7 @@ from pages.LetterWriter import LetterWriterPage
 from pages.Lipsync import LipsyncPage
 from pages.LipsyncTTS import LipsyncTTSPage
 from pages.ObjectInpainting import ObjectInpaintingPage
+from pages.SEOSummary import SEOSummaryPage
 from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
 
@@ -193,6 +194,10 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         # get saved state from db
         state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
 
+        # set sane defaults
+        for k, v in page.sane_defaults.items():
+            state.setdefault(k, v)
+
         # only use the request values, discard outputs
         state = page.RequestModel.parse_obj(state).dict()
 
@@ -200,6 +205,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
         state.update(request_dict)
 
+        # pass current user from request
         state["_current_user"] = request.user
 
         # run the script
@@ -292,6 +298,7 @@ all_pages = [
     ObjectInpaintingPage,
     SocialLookupEmailPage,
     CompareText2ImgPage,
+    SEOSummaryPage,
 ]
 
 

@@ -16,12 +16,18 @@ from daras_ai.image_input import (
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.image_segmentation import u2net, ImageSegmentationModels, dis
+from daras_ai_v2.repositioning import get_mask_bounds
 
 
 class ImageSegmentationPage(BasePage):
     title = "Cutout an object from any image"
     slug = "ImageSegmentation"
     version = 2
+
+    sane_defaults = {
+        "mask_threshold": 0.5,
+        "rect_persepective_transform": False,
+    }
 
     class RequestModel(BaseModel):
         input_image: str
@@ -30,6 +36,8 @@ class ImageSegmentationPage(BasePage):
             tuple(e.name for e in ImageSegmentationModels)
         ] | None
         mask_threshold: float | None
+
+        rect_persepective_transform: bool | None
 
     class ResponseModel(BaseModel):
         output_image: str
@@ -88,6 +96,36 @@ class ImageSegmentationPage(BasePage):
             key="mask_threshold",
         )
 
+        st.write(
+            """
+            ##### Fix Skewed Perspective
+            
+            Automatically transform the perspective of the image to make objects look like a perfect rectangle  
+            """
+        )
+        st.checkbox(
+            "Enable Perspective Transform",
+            key="rect_persepective_transform",
+        )
+
+        st.write(
+            """
+            ##### Add reflections
+            """
+        )
+        col1, _ = st.columns(2)
+        with col1:
+            st.slider("Reflection Opacity", key="reflection_opacity")
+
+        st.write(
+            """
+            ##### Add Drop shadow
+            """
+        )
+        # col1, _ = st.columns(2)
+        # with col1:
+        #     st.slider("Shadow ", key="reflection_opacity")
+
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: ImageSegmentationPage.RequestModel = self.RequestModel.parse_obj(state)
 
@@ -96,6 +134,12 @@ class ImageSegmentationPage(BasePage):
                 mask_bytes = u2net(request.input_image)
             case _:
                 mask_bytes = dis(request.input_image)
+
+        state["output_image"] = upload_file_from_bytes(
+            f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}",
+            mask_bytes,
+        )
+        yield
 
         img_cv2 = bytes_to_cv2_img(requests.get(request.input_image).content)
         mask_cv2 = bytes_to_cv2_img(mask_bytes)
@@ -106,24 +150,38 @@ class ImageSegmentationPage(BasePage):
         kernel = np.ones((5, 5), np.float32) / 10
         mask_cv2 = cv2.filter2D(mask_cv2, -1, kernel)
 
+        if request.rect_persepective_transform:
+            mask_cv2_gray = cv2.cvtColor(mask_cv2, cv2.COLOR_RGB2GRAY)
+
+            contours, _ = cv2.findContours(
+                mask_cv2_gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+            )
+            contours = contours[0]
+            approxPoly = cv2.approxPolyDP(
+                contours, 0.01 * cv2.arcLength(contours, True), True
+            )
+            src_quad = np.float32(np.reshape(approxPoly[:4], (4, 2)))
+
+            xmin, xmax, ymin, ymax = get_mask_bounds(mask_cv2)
+            dst_quad = np.float32(
+                [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]],
+            )
+
+            cutout_y, cutout_x, _ = img_cv2.shape
+
+            matrix = cv2.getPerspectiveTransform(src_quad, dst_quad)
+            img_cv2 = cv2.warpPerspective(img_cv2, matrix, (cutout_x, cutout_y))
+            mask_cv2 = cv2.warpPerspective(mask_cv2, matrix, (cutout_x, cutout_y))
+
         cutout_cv2 = 255 - mask_cv2
         img_cv2[mask_cv2 == 0] = 0
-
         cutout_cv2 = cv2.add(cutout_cv2, img_cv2)
-
-        yield
-
-        state["output_image"] = upload_file_from_bytes(
-            f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}",
-            cv2_img_to_bytes(mask_cv2),
-        )
-
-        yield
 
         state["cutout_image"] = upload_file_from_bytes(
             f"gooey.ai Cutout - {Path(request.input_image).stem}",
             cv2_img_to_bytes(cutout_cv2),
         )
+        yield
 
     def render_output(self):
         self.render_example(st.session_state)

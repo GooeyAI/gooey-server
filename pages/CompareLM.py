@@ -1,7 +1,8 @@
 import typing
 
-from pydantic import BaseModel
 import streamlit as st
+from pydantic import BaseModel
+
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import run_language_model
 
@@ -136,7 +137,7 @@ class CompareLMPage(BasePage):
         )
 
     def render_example(self, state: dict):
-        st.markdown("```" + state.get("input_prompt", "") + "```")
+        st.markdown("```" + state.get("input_prompt", "").replace("\n", "") + "```")
 
         col1, col2 = st.columns(2)
         with col1:
