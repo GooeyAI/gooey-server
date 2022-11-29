@@ -188,6 +188,8 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         ),
         page_request: page_cls.RequestModel = body_spec,
     ):
+        if Authorization != f"Token {settings.API_SECRET_KEY}":
+            raise Exception("Invalid API_TOKEN")
         # init a new page for every request
         page = page_cls()
 
