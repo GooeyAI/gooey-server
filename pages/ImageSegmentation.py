@@ -227,6 +227,13 @@ class ImageSegmentationPage(BasePage):
             else:
                 st.empty()
 
+    def preview_image(self, state: dict) -> str:
+        return state.get("cutout_image", "")
+
+    def preview_description(self) -> str:
+        # TODO: updated description
+        return "Cutout an object from any image"
+
 
 if __name__ == "__main__":
     ImageSegmentationPage().render()
