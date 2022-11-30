@@ -54,13 +54,7 @@ class BasePage:
                 query_params = st.experimental_get_query_params()
                 if "example_id" in query_params:
                     st.session_state.update(
-                        get_saved_doc(
-                            get_doc_ref(
-                                self.doc_name,
-                                sub_collection_id="examples",
-                                sub_document_id=query_params["example_id"][0],
-                            )
-                        )
+                        self.get_example_doc(query_params["example_id"][0])
                     )
                 else:
                     st.session_state.update(self.get_doc())
@@ -100,6 +94,17 @@ class BasePage:
         #
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
+
+    def get_example_doc(self, example_id: str):
+        return deepcopy(
+            get_saved_doc(
+                get_doc_ref(
+                    self.doc_name,
+                    sub_collection_id="examples",
+                    sub_document_id=example_id,
+                )
+            )
+        )
 
     def get_doc(self):
         return deepcopy(get_saved_doc(get_doc_ref(self.doc_name)))
@@ -312,14 +317,18 @@ class BasePage:
                     """
                    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.10/dist/clipboard.min.js"></script>
                     <script>
+                        function changeText(button, text, textToChangeBackTo) {
+                          buttonId = document.getElementById(button);
+                          buttonId.textContent = text;
+                          setTimeout(function() { document.getElementById(button).textContent = textToChangeBackTo; }, 2000);
+                        }
                        window.addEventListener("load", function (event) {
-                        var clipboard = new ClipboardJS('.btn');
-                        clipboard.on('success', function(e) {
-                            alert("✅ Recipe example URL Copied");
-                            });
+                        new ClipboardJS('.btn');
                         });
                     </script>
-                        <button style="color:white" class="btn" data-clipboard-text="%s" >
+                        <button 
+                       onClick="changeText('%s', '✅ Copied', '📎 Copy URL')" 
+                        id="%s" style="color:white" class="btn" data-clipboard-text="%s" >
                            📎 Copy URL 
                        </button>
                     
@@ -343,7 +352,7 @@ class BasePage:
                         }
                    </style>
                     """
-                    % url,
+                    % (example_id, example_id, url),
                     height=40,
                 )
 

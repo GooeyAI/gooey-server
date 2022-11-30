@@ -243,7 +243,10 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
     @app.get(f"/{page_cls.slug}/", include_in_schema=False)
     def st_page(request: Request):
         page = page_cls()
-        state = page.get_doc()
+        if "example_id" in request.query_params:
+            state = page.get_example_doc(request.query_params["example_id"])
+        else:
+            state = page.get_doc()
         iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug
         return _st_page(
             request,
