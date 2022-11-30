@@ -16,6 +16,7 @@ from daras_ai_v2.language_model import (
     GPT3_MAX_ALLOED_TOKENS,
     calc_gpt_tokens,
 )
+from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
 
 STOP_SEQ = "###"
 ua = UserAgent(browsers=["chrome"])
@@ -362,7 +363,11 @@ def _summarize_url(request: SEOSummaryPage.RequestModel, url: str):
 
 @st.cache(show_spinner=False)
 def _call_summarize_url(url: str) -> (str, str):
-    r = requests.get(url, headers={"User-Agent": ua.random})
+    r = requests.get(
+        url,
+        headers={"User-Agent": ua.random},
+        timeout=EXTERNAL_REQUEST_TIMEOUT_SEC,
+    )
     r.raise_for_status()
     doc = readability.Document(r.text)
     return doc.title(), doc.summary()
