@@ -341,7 +341,7 @@ def _gen_final_prompt(
 def _summarize_url(request: SEOSummaryPage.RequestModel, url: str):
     try:
         title, summary = _call_summarize_url(url)
-    except requests.HTTPError:
+    except requests.RequestException:
         return None
 
     if request.do_html2text:
