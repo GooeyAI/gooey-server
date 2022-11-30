@@ -4,13 +4,13 @@ import typing
 import readability
 import requests
 import streamlit as st
-from fake_useragent import UserAgent
 from furl import furl
 from html2text import html2text
 from pydantic import BaseModel
 
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.language_model import (
     run_language_model,
     GPT3_MAX_ALLOED_TOKENS,
@@ -19,7 +19,6 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
 
 STOP_SEQ = "###"
-ua = UserAgent(browsers=["chrome"])
 
 
 class SEOSummaryPage(BasePage):
@@ -70,7 +69,7 @@ class SEOSummaryPage(BasePage):
     def render_form_v2(self):
         st.write("### Inputs")
         st.text_input("Search Query", key="search_query")
-        st.text_input("Keywords", key="keywords")
+        st.text_area("Keywords", key="keywords")
         st.text_input("Title", key="title")
         st.text_input("Company URL", key="company_url")
 
@@ -270,7 +269,7 @@ class SEOSummaryPage(BasePage):
 def _run_lm(request: SEOSummaryPage.RequestModel, final_prompt: str) -> list[str]:
     return run_language_model(
         api_provider="openai",
-        engine="text-davinci-002",
+        engine="text-davinci-003",
         quality=request.quality,
         num_outputs=request.num_outputs,
         temperature=request.sampling_temperature,
@@ -365,7 +364,7 @@ def _summarize_url(request: SEOSummaryPage.RequestModel, url: str):
 def _call_summarize_url(url: str) -> (str, str):
     r = requests.get(
         url,
-        headers={"User-Agent": ua.random},
+        headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         timeout=EXTERNAL_REQUEST_TIMEOUT_SEC,
     )
     r.raise_for_status()
