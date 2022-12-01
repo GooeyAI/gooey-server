@@ -56,7 +56,8 @@ def run_language_model(
         best_of=int(num_outputs * quality),
         n=num_outputs,
         temperature=temperature,
-        frequency_penalty=0.05 if avoid_repetition else 0,
+        frequency_penalty=0.1 if avoid_repetition else 0,
+        presence_penalty=0.1 if avoid_repetition else 0,
     )
 
     # choose the completions that aren't empty
