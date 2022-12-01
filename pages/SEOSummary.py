@@ -38,6 +38,7 @@ class SEOSummaryPage(BasePage):
         quality=1.0,
         max_search_urls=10,
         task_instructions="I will give you a URL and focus keywords and using the high ranking content from the google search results below you will write 500 words for the given url.",
+        avoid_repetition=True,
     )
 
     class RequestModel(BaseModel):
@@ -55,6 +56,7 @@ class SEOSummaryPage(BasePage):
         max_tokens: int | None
         num_outputs: int | None
         quality: float | None
+        avoid_repetition: bool | None
 
         max_search_urls: int | None
 
@@ -86,21 +88,9 @@ class SEOSummaryPage(BasePage):
             height=200,
         )
 
-        st.write("---")
+        st.write("#### Language Model Optimizations")
 
-        st.write(
-            "ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)"
-        )
-        st.text_input(
-            "scaleserp_search_field",
-            label_visibility="collapsed",
-            key="scaleserp_search_field",
-        )
-        st.write("---")
-
-        st.checkbox("Convert HTML->Text?", key="do_html2text")
-
-        st.write("---")
+        st.checkbox("Avoid Repetition", key="avoid_repetition")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -121,7 +111,7 @@ class SEOSummaryPage(BasePage):
 
         st.write(
             """
-            ###### Model Risk Factor 
+            ###### Model Creativity 
             *(Sampling Temperature)*
             
             Higher values allow the model to take more risks.
@@ -140,6 +130,19 @@ class SEOSummaryPage(BasePage):
             )
 
         st.write("---")
+
+        st.write("#### Seach Tools")
+
+        st.checkbox("Convert HTML->Text?", key="do_html2text")
+
+        st.write(
+            "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**"
+        )
+        st.text_input(
+            "scaleserp_search_field",
+            label_visibility="collapsed",
+            key="scaleserp_search_field",
+        )
 
         col1, col2 = st.columns(2)
 
@@ -177,12 +180,12 @@ class SEOSummaryPage(BasePage):
         output_content = st.session_state.get("output_content")
         if output_content:
             st.write("### Generated Content")
-            for text in output_content:
+            for idx, text in enumerate(output_content):
                 st.text_area(
-                    "Output",
+                    f"Output {idx}",
                     label_visibility="collapsed",
                     value=text,
-                    height=200,
+                    height=300,
                     disabled=True,
                 )
         else:
@@ -276,6 +279,7 @@ def _run_lm(request: SEOSummaryPage.RequestModel, final_prompt: str) -> list[str
         prompt=final_prompt,
         max_tokens=request.max_tokens,
         stop=[STOP_SEQ],
+        avoid_repetition=request.avoid_repetition,
     )
 
 

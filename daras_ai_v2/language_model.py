@@ -28,6 +28,7 @@ def run_language_model(
     quality: float,
     num_outputs: int,
     temperature: float,
+    avoid_repetition: bool = False,
 ) -> list[str]:
     match api_provider:
         case "openai":
@@ -55,6 +56,7 @@ def run_language_model(
         best_of=int(num_outputs * quality),
         n=num_outputs,
         temperature=temperature,
+        frequency_penalty=0.05 if avoid_repetition else 0,
     )
 
     # choose the completions that aren't empty
