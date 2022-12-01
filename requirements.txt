@@ -131,9 +131,6 @@ exceptiongroup==1.0.1 ; python_version >= "3.10" and python_version < "3.11" \
 face==20.1.1 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:3790311a7329e4b0d90baee346eecad54b337629576edf3a246683a5f0d24446 \
     --hash=sha256:7d59ca5ba341316e58cf72c6aff85cca2541cf5056c4af45cb63af9a814bed3e
-fake-useragent==1.1.0 ; python_version >= "3.10" and python_version < "4.0" \
-    --hash=sha256:b473a8faa9a94014b7ea8783ca36ea2c119e33a9eee1becd2e44398428b0367f \
-    --hash=sha256:f2a3ff23137b834c4fe1dfad177cfb304ce938c71775d0ff86da3fa5a9c84e0b
 fastapi==0.85.0 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:1803d962f169dc9f8dde54a64b22eb16f6d81573f54401971f90f0a67234a8b4 \
     --hash=sha256:bb219cfafd0d2ccf8f32310c9a257a06b0210bd8e2a03706a6f5a9f9f1416878
@@ -621,6 +618,9 @@ mediapipe==0.8.11 ; python_version >= "3.10" and python_version < "4.0" and plat
     --hash=sha256:8a75f387ffc8cd141f081d1f31f7f8be1c724fd1645bf7c0cd131131302dd015 \
     --hash=sha256:b2c106ee1990254d850ef4483cb21d39ff06b545b4c67b25be895eee91e80a46 \
     --hash=sha256:c1b5f2e8bb20bcf6fe5728b5d420d576897e9e92e0ed7e5720944511c9e54c64
+mpmath==1.2.1 ; python_version >= "3.10" and python_version < "4.0" \
+    --hash=sha256:604bc21bd22d2322a177c73bdb573994ef76e62edd595d17e00aff24b0667e5c \
+    --hash=sha256:79ffb45cf9f4b101a807595bcb3e72e0396202e0b1d25d689134b48c4216a81a
 msgpack==1.0.4 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:002b5c72b6cd9b4bafd790f364b8480e859b4712e91f43014fe01e4f957b8467 \
     --hash=sha256:0a68d3ac0104e2d3510de90a1091720157c319ceeb90d74f7b5295a6bee51bae \
@@ -1133,6 +1133,9 @@ streamlit-nested-layout==0.1.1 ; python_version >= "3.10" and python_version < "
 streamlit==1.15.1 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:2ec65c29b6390ff5d8288dac20fa3a4a343ac8f0755de3dc922b468a4d6ea6cc \
     --hash=sha256:ac8b24fa26dd5dfcd1954a340315c0b36c868c7de688259099dfd909524f1d8d
+sympy==1.11.1 ; python_version >= "3.10" and python_version < "4.0" \
+    --hash=sha256:938f984ee2b1e8eae8a07b884c8b7a1146010040fccddc6539c54f401c8f6fcf \
+    --hash=sha256:e32380dce63cb7c0108ed525570092fd45168bdae2faa17e528221ef72e88658
 tokenizers==0.13.2 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:0901a5c6538d2d2dc752c6b4bde7dab170fddce559ec75662cfad03b3187c8f6 \
     --hash=sha256:0b4cb2c60c094f31ea652f6cf9f349aae815f9243b860610c29a69ed0d7a88f8 \
