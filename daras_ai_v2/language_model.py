@@ -5,7 +5,7 @@ from transformers import GPT2TokenizerFast
 from daras_ai_v2 import settings
 from daras_ai_v2.gpu_server import call_gpu_server, GpuEndpoints
 
-GPT3_MAX_ALLOED_TOKENS = 4096
+GPT3_MAX_ALLOED_TOKENS = 4000
 
 _gpt2_tokenizer = None
 
