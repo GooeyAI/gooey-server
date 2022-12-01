@@ -231,7 +231,7 @@ class ImageSegmentationPage(BasePage):
         mask_cv2 = cv2.filter2D(mask_cv2, -1, kernel)
 
         state["output_image"] = upload_file_from_bytes(
-            f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}",
+            f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}.png",
             cv2_img_to_bytes(mask_cv2),
         )
 
@@ -303,7 +303,7 @@ class ImageSegmentationPage(BasePage):
             )
 
         state["cutout_image"] = upload_file_from_bytes(
-            f"gooey.ai Cutout - {Path(request.input_image).stem}",
+            f"gooey.ai Cutout - {Path(request.input_image).stem}.png",
             pil_to_bytes(cutout_pil),
         )
         yield
