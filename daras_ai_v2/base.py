@@ -9,6 +9,7 @@ from time import time
 
 import requests
 import streamlit as st
+from firebase_admin import auth
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
@@ -56,6 +57,12 @@ class BasePage:
                     st.session_state.update(
                         self.get_example_doc(query_params["example_id"][0])
                     )
+                elif "run_id" in query_params:
+                    st.session_state.update(
+                        self.get_run_doc(
+                            query_params["run_id"][0], query_params["uid"][0]
+                        )
+                    )
                 else:
                     st.session_state.update(self.get_doc())
 
@@ -90,10 +97,25 @@ class BasePage:
 
             with col2:
                 self._runner(submitted)
+                run_id = st.session_state.get("run_id", "")
+                if run_id:
+                    self.copy_run_url_button()
                 self.save_buttons()
         #
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
+
+    def get_run_doc(self, run_id: str, uid: str):
+        return deepcopy(
+            get_saved_doc(
+                get_doc_ref(
+                    uid,
+                    collection_id="user_runs",
+                    sub_collection_id=self.doc_name,
+                    sub_document_id=run_id,
+                ),
+            )
+        )
 
     def get_example_doc(self, example_id: str):
         return deepcopy(
@@ -138,6 +160,7 @@ class BasePage:
             st.error("Please provide a Prompt and an Email Address", icon="⚠️")
             return False
         else:
+            print("REstu")
             return True
 
     def render_footer(self):
@@ -145,6 +168,102 @@ class BasePage:
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         raise NotImplemented
+
+    def copy_run_url_button(self):
+        run_id = st.session_state.get("run_id", "")
+        if not run_id:
+            run_id = secrets.token_urlsafe(8)
+            st.session_state["run_id"] = run_id
+        if run_id:
+            current_user: auth.UserRecord = st.session_state.get("_current_user")
+            url = (
+                furl(
+                    settings.APP_BASE_URL,
+                    query_params={"run_id": run_id, "uid": current_user.uid},
+                )
+                / self.slug
+            ).url
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"```{url}```")
+            with col2:
+                html(
+                    """
+                   <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.10/dist/clipboard.min.js"></script>
+                    <script>
+                        function changeText(button, text, textToChangeBackTo) {
+                          buttonId = document.getElementById(button);
+                          buttonId.textContent = text;
+                          setTimeout(function() { document.getElementById(button).textContent = textToChangeBackTo; }, 2000);
+                        }
+                       window.addEventListener("load", function (event) {
+                        new ClipboardJS('.btn');
+                        });
+                    </script>
+                        <button 
+                       onClick="changeText('%s', '✅ Copied', '📎 Copy URL')" 
+                        id="%s" style="color:white" class="btn" data-clipboard-text="%s" >
+                           📎 Copy URL 
+                       </button>
+
+                   <style>
+                       .btn {
+                            display: inline-flex;
+                            -webkit-box-align: center;
+                            align-items: center;
+                            -webkit-box-pack: center;
+                            justify-content: center;
+                            font-weight: 400;
+                            padding: 0.25rem 0.75rem;
+                            border-radius: 0.25rem;
+                            margin: 0px;
+                            line-height: 1.6;
+                            color: inherit;
+                            width: auto;
+                            user-select: none;
+                            background-color: rgb(8, 8, 8);
+                            border: 1px solid rgba(255, 255, 255, 0.2);
+                        }
+                   </style>
+                    """
+                    % (run_id, run_id, url),
+                    height=40,
+                )
+            st.markdown("---")
+
+    def save_run(self, fresh_run=False):
+        current_user: auth.UserRecord = st.session_state.get("_current_user")
+        if fresh_run:
+            run_id = secrets.token_urlsafe(8)
+            st.session_state["run_id"] = run_id
+            hidden_html_js(
+                """
+                <script>
+                    top.postMessage({
+                        "type": "GOOEY_UPDATE_RUN_ID",
+                        "uid": "%s",
+                        "runId":"%s"
+                    }, "*");
+                </script>
+                """
+                % (current_user.uid, run_id)
+            )
+        else:
+            run_id = st.session_state.get("run_id", "")
+        state_to_save = {
+            field_name: deepcopy(st.session_state[field_name])
+            for field_name in self.fields_to_save()
+            if field_name in st.session_state
+        }
+        set_saved_doc(
+            get_doc_ref(
+                current_user.uid,
+                collection_id="user_runs",
+                sub_collection_id=self.doc_name,
+                sub_document_id=run_id,
+            ),
+            state_to_save,
+        )
 
     def _runner(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
@@ -157,6 +276,7 @@ class BasePage:
             self.render_output()
 
         if submitted:
+            self.save_run(fresh_run=True)
             st.session_state["__status"] = DEFAULT_STATUS
             st.session_state["__gen"] = self.run(st.session_state)
             st.session_state["__time_taken"] = 0
@@ -174,8 +294,10 @@ class BasePage:
                     st.session_state["__status"] = next(gen) or DEFAULT_STATUS
                     # increment total time taken after every iteration
                     st.session_state["__time_taken"] += time() - start_time
+                    self.save_run()
 
             except StopIteration:
+                self.save_run()
                 # Weird but important! This measures the runtime of code after the last `yield` in `run()`
                 if start_time:
                     st.session_state["__time_taken"] += time() - start_time

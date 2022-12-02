@@ -127,6 +127,10 @@
                     history.pushState(null, '', url.toString());
                 case "GOOEY_IFRAME_RESIZE":
                     iframe.style.height = `${event.data.height + 100}px`;
+                    break
+                case "GOOEY_UPDATE_RUN_ID":
+                    window.history.pushState(null, null, `?uid=${event.data.uid}&run_id=${event.data.runId}`);
+                    break
             }
         });
     }
