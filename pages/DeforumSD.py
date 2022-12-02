@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
+from daras_ai_v2.video_widget import video_widget
 
 
 class DeforumSDPage(BasePage):
@@ -51,7 +52,7 @@ class DeforumSDPage(BasePage):
         output_video = st.session_state.get("output_video")
         if output_video:
             st.write("Output Video")
-            st.video(output_video)
+            video_widget(output_video)
         else:
             st.empty()
 
@@ -60,7 +61,7 @@ class DeforumSDPage(BasePage):
         if output_video:
             # st.write(f"**Output Video** - {state.get('input_prompt')}")
             st.markdown("```" + state.get("input_prompt").replace("\n", "") + "```")
-            st.video(output_video)
+            video_widget(output_video)
         else:
             st.empty()
 
@@ -75,7 +76,7 @@ class DeforumSDPage(BasePage):
             },
         )[0]
         state["output_video"] = upload_file_from_bytes(
-            f"gooey.ai text to animation - {request.input_prompt}", out_video_bytes
+            f"gooey.ai text to animation - {request.input_prompt}.mp4", out_video_bytes
         )
 
 

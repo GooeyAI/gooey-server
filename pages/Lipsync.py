@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.lipsync_api import wav2lip
+from daras_ai_v2.video_widget import video_widget
 
 
 class LipsyncPage(BasePage):
@@ -128,7 +129,7 @@ class LipsyncPage(BasePage):
                 st.empty()
             elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
                 st.write("Input Face (Video)")
-                st.video(input_face)
+                video_widget(input_face)
             else:
                 st.write("Input Face (Image)")
                 st.image(input_face)
@@ -144,7 +145,7 @@ class LipsyncPage(BasePage):
             output_video = state.get("output_video")
             if output_video:
                 st.write("Output Video")
-                st.video(output_video)
+                video_widget(output_video)
             else:
                 st.empty()
 

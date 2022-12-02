@@ -1,12 +1,12 @@
 const firebaseConfig = {
-    apiKey: 'AIzaSyDZuvLUXo6wzSMGiAOdFWNVXBjVh2MKPYE',
-    appId: '1:6678571001:web:a03359c10efaa1cd713f28',
-    messagingSenderId: '6678571001',
-    projectId: 'dara-c1b52',
-    authDomain: 'dara-c1b52.firebaseapp.com',
-    databaseURL: 'https://dara-c1b52.firebaseio.com',
-    storageBucket: 'dara-c1b52.appspot.com',
-    measurementId: 'G-KGQDVPK6PV',
+    apiKey: "AIzaSyC7j8WI-P_BZQogR809B2QbaH_aP1KsVeM",
+    authDomain: "dara-c1b52.firebaseapp.com",
+    databaseURL: "https://dara-c1b52.firebaseio.com",
+    projectId: "dara-c1b52",
+    storageBucket: "dara-c1b52.appspot.com",
+    messagingSenderId: "6678571001",
+    appId: "1:6678571001:web:885c6e8140b3f9eb713f28",
+    measurementId: "G-09W5N835PE"
 };
 
 window.addEventListener('load', function () {
@@ -15,10 +15,6 @@ window.addEventListener('load', function () {
 
     // As httpOnly cookies are to be used, do not persist any state client side.
     firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
-
-    // Initialize Analytics
-    const analytics = firebase.analytics(app);
-    analytics.logEvent('init');
 });
 
 
