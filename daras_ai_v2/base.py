@@ -134,7 +134,7 @@ class BasePage:
                     sub_collection_id="examples",
                     sub_document_id=example_id,
                 ),
-                create_if_dne=False
+                create_if_dne=False,
             )
         )
 
