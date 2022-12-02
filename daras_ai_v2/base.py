@@ -19,6 +19,7 @@ from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
 from daras_ai_v2.hidden_html_widget import hidden_html_js
+from daras_ai_v2.query_params import gooey_set_query_parm
 
 DEFAULT_STATUS = "Running..."
 
@@ -245,18 +246,7 @@ class BasePage:
         if fresh_run:
             run_id = secrets.token_urlsafe(8)
             st.session_state["run_id"] = run_id
-            hidden_html_js(
-                """
-                <script>
-                    top.postMessage({
-                        "type": "GOOEY_UPDATE_RUN_ID",
-                        "uid": "%s",
-                        "runId":"%s"
-                    }, "*");
-                </script>
-                """
-                % (current_user.uid, run_id)
-            )
+            gooey_set_query_parm(**{"uid": current_user.uid, "run_id": run_id})
         else:
             run_id = st.session_state.get("run_id", "")
         state_to_save = {
