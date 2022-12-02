@@ -51,15 +51,11 @@ class TextToSpeechPage(BasePage):
 
     def render_form(self):
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
                 Enter text you want to convert to speech
-                """
-            )
-            st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="This is a test",
                 value="This is a test",

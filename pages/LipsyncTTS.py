@@ -37,27 +37,21 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            face_file = st.file_uploader(
                 """
                 #### Input Face
                 Upload a video/image that contains faces to use
                 *Recommended - mp4 / mov / png / jpg*
-                """
+                """,
             )
-            face_file = st.file_uploader("input face", label_visibility="collapsed")
 
-            st.write(
+            text_prompt = st.text_area(
                 """
                 #### Input Text
                 This generates audio for your video
-                """
-            )
-            text_prompt = st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="This is a test",
-                value="This is a test",
             )
             submitted = st.form_submit_button("🏃‍ Submit")
 

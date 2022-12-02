@@ -1,6 +1,7 @@
 import typing
 from pathlib import Path
 
+import PIL
 import cv2
 import numpy as np
 import requests
@@ -16,7 +17,15 @@ from daras_ai.image_input import (
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.image_segmentation import u2net, ImageSegmentationModels, dis
-from daras_ai_v2.repositioning import get_mask_bounds
+from daras_ai_v2.img_io import opencv_to_pil, pil_to_bytes
+from daras_ai_v2.polygon_fitter import (
+    appx_best_fit_ngon,
+    best_fit_rotated_rect,
+)
+from daras_ai_v2.repositioning import (
+    reposition_object,
+    get_mask_bounds,
+)
 
 
 class ImageSegmentationPage(BasePage):
@@ -27,6 +36,10 @@ class ImageSegmentationPage(BasePage):
     sane_defaults = {
         "mask_threshold": 0.5,
         "rect_persepective_transform": False,
+        "reflection_opacity": 0,
+        "obj_scale": 0.8,
+        "obj_pos_x": 0.5,
+        "obj_pos_y": 0.5,
     }
 
     class RequestModel(BaseModel):
@@ -38,6 +51,11 @@ class ImageSegmentationPage(BasePage):
         mask_threshold: float | None
 
         rect_persepective_transform: bool | None
+        reflection_opacity: float | None
+
+        obj_scale: float | None
+        obj_pos_x: float | None
+        obj_pos_y: float | None
 
     class ResponseModel(BaseModel):
         output_image: str
@@ -45,19 +63,12 @@ class ImageSegmentationPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            st.file_uploader(
                 """
                 ### Input Photo
                 Give us a photo of anything
-                """
-            )
-            st.file_uploader(
-                "input_file",
-                label_visibility="collapsed",
+                """,
                 key="input_file",
-            )
-            st.caption(
-                "By uploading an image, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")
@@ -75,59 +86,123 @@ class ImageSegmentationPage(BasePage):
         if submitted:
             input_file = st.session_state.get("input_file")
             if input_file:
-                st.session_state["input_image"] = upload_file_hq(input_file)
+                st.session_state["input_image"] = upload_file_hq(
+                    input_file, resize=(2048, 2048)
+                )
 
         return submitted
 
     def render_settings(self):
-        enum_selector(ImageSegmentationModels, "Model", key="selected_model")
-
-        st.write(
-            """
-            ##### Edge Threshold
-            Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
-            """
+        enum_selector(
+            ImageSegmentationModels,
+            "#### Model",
+            key="selected_model",
         )
+
         st.slider(
+            """
+            #### Edge Threshold
+            Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
+            """,
             min_value=0.0,
             max_value=1.0,
-            label="Threshold",
-            label_visibility="collapsed",
             key="mask_threshold",
         )
 
         st.write(
             """
-            ##### Fix Skewed Perspective
+            #### Fix Skewed Perspective
             
             Automatically transform the perspective of the image to make objects look like a perfect rectangle  
             """
         )
         st.checkbox(
-            "Enable Perspective Transform",
+            "Fix Skewed Perspective",
             key="rect_persepective_transform",
         )
 
         st.write(
             """
-            ##### Add reflections
+            #### Add reflections
             """
         )
         col1, _ = st.columns(2)
         with col1:
             st.slider("Reflection Opacity", key="reflection_opacity")
 
-        st.write(
-            """
-            ##### Add Drop shadow
-            """
-        )
+        # st.write(
+        #     """
+        #     ##### Add Drop shadow
+        #     """
+        # )
         # col1, _ = st.columns(2)
         # with col1:
         #     st.slider("Shadow ", key="reflection_opacity")
 
+        st.write(
+            """
+            #### Object Repositioning Settings
+            """
+        )
+
+        st.write("How _big_ should the object look?")
+        col1, _ = st.columns(2)
+        with col1:
+            obj_scale = st.slider(
+                "Scale",
+                min_value=0.1,
+                max_value=1.0,
+                key="obj_scale",
+            )
+
+        st.write("_Where_ would you like to place the object in the scene?")
+        col1, col2 = st.columns(2)
+        with col1:
+            pos_x = st.slider(
+                "Position X",
+                min_value=0.0,
+                max_value=1.0,
+                key="obj_pos_x",
+            )
+        with col2:
+            pos_y = st.slider(
+                "Position Y",
+                min_value=0.0,
+                max_value=1.0,
+                key="obj_pos_y",
+            )
+
+        # show an example image
+        img_cv2 = cv2.imread("static/obj.png")
+        mask_cv2 = cv2.imread("static/obj_mask.png")
+
+        # extract obj
+        img, mask = reposition_object(
+            orig_img=img_cv2,
+            orig_mask=mask_cv2,
+            out_size=(img_cv2.shape[1], img_cv2.shape[0]),
+            out_obj_scale=obj_scale,
+            out_pos_x=pos_x,
+            out_pos_y=pos_y,
+        )
+
+        # draw rule of 3rds
+        color = (200, 200, 200)
+        stroke = 2
+        img_y, img_x, _ = img.shape
+        for i in range(2):
+            pos = (img_y // 3) * (i + 1)
+            cv2.line(img, (0, pos), (img_x, pos), color, stroke)
+
+            pos = (img_x // 3) * (i + 1)
+            cv2.line(img, (pos, 0), (pos, img_y), color, stroke)
+
+        st.image(img, width=300)
+
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: ImageSegmentationPage.RequestModel = self.RequestModel.parse_obj(state)
+
+        yield f"Running {ImageSegmentationModels[request.selected_model].value}..."
 
         match request.selected_model:
             case ImageSegmentationModels.u2net.name:
@@ -135,13 +210,11 @@ class ImageSegmentationPage(BasePage):
             case _:
                 mask_bytes = dis(request.input_image)
 
-        state["output_image"] = upload_file_from_bytes(
-            f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}",
-            mask_bytes,
-        )
-        yield
+        img_bytes = requests.get(request.input_image).content
 
-        img_cv2 = bytes_to_cv2_img(requests.get(request.input_image).content)
+        yield "Thresholding..."
+
+        img_cv2 = bytes_to_cv2_img(img_bytes)
         mask_cv2 = bytes_to_cv2_img(mask_bytes)
 
         threshold_value = int(255 * request.mask_threshold)
@@ -150,36 +223,81 @@ class ImageSegmentationPage(BasePage):
         kernel = np.ones((5, 5), np.float32) / 10
         mask_cv2 = cv2.filter2D(mask_cv2, -1, kernel)
 
+        state["output_image"] = upload_file_from_bytes(
+            f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}.png",
+            cv2_img_to_bytes(mask_cv2),
+        )
+
         if request.rect_persepective_transform:
-            mask_cv2_gray = cv2.cvtColor(mask_cv2, cv2.COLOR_RGB2GRAY)
+            yield "Fixing Perspective..."
 
-            contours, _ = cv2.findContours(
-                mask_cv2_gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-            )
-            contours = contours[0]
-            approxPoly = cv2.approxPolyDP(
-                contours, 0.01 * cv2.arcLength(contours, True), True
-            )
-            src_quad = np.float32(np.reshape(approxPoly[:4], (4, 2)))
+            src_quad = np.float32(appx_best_fit_ngon(mask_cv2))
+            dst_quad = best_fit_rotated_rect(mask_cv2)
 
-            xmin, xmax, ymin, ymax = get_mask_bounds(mask_cv2)
-            dst_quad = np.float32(
-                [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]],
-            )
-
-            cutout_y, cutout_x, _ = img_cv2.shape
+            height, width, _ = img_cv2.shape
 
             matrix = cv2.getPerspectiveTransform(src_quad, dst_quad)
-            img_cv2 = cv2.warpPerspective(img_cv2, matrix, (cutout_x, cutout_y))
-            mask_cv2 = cv2.warpPerspective(mask_cv2, matrix, (cutout_x, cutout_y))
+            img_cv2 = cv2.warpPerspective(img_cv2, matrix, (width, height))
+            mask_cv2 = cv2.warpPerspective(mask_cv2, matrix, (width, height))
 
-        cutout_cv2 = 255 - mask_cv2
-        img_cv2[mask_cv2 == 0] = 0
-        cutout_cv2 = cv2.add(cutout_cv2, img_cv2)
+        yield "Repositioning..."
+
+        img_cv2, mask_cv2 = reposition_object(
+            orig_img=img_cv2,
+            orig_mask=mask_cv2,
+            out_size=(img_cv2.shape[1], img_cv2.shape[0]),
+            out_obj_scale=request.obj_scale,
+            out_pos_x=request.obj_pos_x,
+            out_pos_y=request.obj_pos_y,
+        )
+        state["resized_image"] = upload_file_from_bytes(
+            "re_image.png", cv2_img_to_bytes(img_cv2)
+        )
+        state["resized_mask"] = upload_file_from_bytes(
+            "re_mask.png", cv2_img_to_bytes(mask_cv2)
+        )
+
+        bg_color = (255, 255, 255)
+        # bg_color = (0, 0, 0)
+
+        im_pil = opencv_to_pil(img_cv2)
+        cutout_pil = PIL.Image.new("RGB", im_pil.size, bg_color)
+        mask_pil = opencv_to_pil(mask_cv2).convert("L")
+        cutout_pil.paste(im_pil, mask=mask_pil)
+
+        if request.reflection_opacity:
+            yield "Adding reflections..."
+
+            y_padding = 10
+
+            xmin, xmax, ymin, ymax = get_mask_bounds(mask_cv2)
+            crop = (
+                xmin,
+                ymin,
+                xmax,
+                ymin + (cutout_pil.size[1] - ymax) - y_padding,
+            )
+
+            reflection_pil = PIL.ImageOps.flip(cutout_pil).crop(crop)
+            reflection_mask_pil = PIL.ImageOps.flip(mask_pil).crop(crop).convert("1")
+
+            background_pil = PIL.Image.new("RGB", reflection_pil.size, bg_color)
+            gradient = generate_gradient_pil(
+                *reflection_pil.size, request.reflection_opacity
+            )
+            reflection_pil = PIL.Image.composite(
+                background_pil, reflection_pil, gradient
+            )
+
+            cutout_pil.paste(
+                reflection_pil,
+                (xmin, ymax + y_padding),
+                mask=reflection_mask_pil,
+            )
 
         state["cutout_image"] = upload_file_from_bytes(
-            f"gooey.ai Cutout - {Path(request.input_image).stem}",
-            cv2_img_to_bytes(cutout_cv2),
+            f"gooey.ai Cutout - {Path(request.input_image).stem}.png",
+            pil_to_bytes(cutout_pil),
         )
         yield
 
@@ -187,7 +305,7 @@ class ImageSegmentationPage(BasePage):
         self.render_example(st.session_state)
 
         with st.expander("Steps"):
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
 
             with col1:
                 input_image = st.session_state.get("input_image")
@@ -204,6 +322,19 @@ class ImageSegmentationPage(BasePage):
                     st.empty()
 
             with col3:
+                resized_image = st.session_state.get("resized_image")
+                if resized_image:
+                    st.image(resized_image, caption=f"Resized Image")
+                else:
+                    st.empty()
+
+                resized_mask = st.session_state.get("resized_mask")
+                if resized_mask:
+                    st.image(resized_mask, caption=f"Resized Mask")
+                else:
+                    st.empty()
+
+            with col4:
                 cutout_image = st.session_state.get("cutout_image")
                 if cutout_image:
                     st.image(cutout_image, caption=f"Cutout Image")
@@ -233,6 +364,72 @@ class ImageSegmentationPage(BasePage):
     def preview_description(self) -> str:
         # TODO: updated description
         return "Cutout an object from any image"
+
+
+def _add_shadow(img_pil):
+    draw = PIL.ImageDraw.Draw(img_pil)
+    # draw.ellipse([(xmin, ymin), (xmax, ymin)], fill="#000")
+    return img_pil
+
+
+def generate_gradient_pil(width, height, opacity) -> PIL.Image:
+    top = 100 - opacity
+    btm = 100
+
+    gtop = 255 * top // 100
+    gbtm = 255 * btm // 100
+    grady = np.linspace(gbtm, gtop, height, dtype=np.uint8)
+    gradx = np.linspace(1, 1, width, dtype=np.uint8)
+    grad = np.outer(grady, gradx)
+    grad = np.flip(grad, axis=0)
+
+    # alternate method
+    # grad = np.linspace(0, 255, hh, dtype=np.uint8)
+    # grad = np.linspace(gbtm, gtop, hh, dtype=np.uint8)
+    # grad = np.tile(grad, (ww, 1))
+    # grad = np.transpose(grad)
+    # grad = np.flip(grad, axis=0)
+
+    return PIL.Image.fromarray(grad, mode="L")
+
+
+def _reflect(img_cv2, opacity):
+    top = opacity
+    btm = 0
+
+    # add opaque alpha channel to input
+    img_cv2 = cv2.cvtColor(img_cv2, cv2.COLOR_RGB2BGRA)
+
+    hh, ww = img_cv2.shape[:2]
+
+    # flip the input
+    flip = np.flip(img_cv2, axis=0)
+
+    hh //= 3
+    flip = flip[:hh, :, :]
+
+    # make vertical gradient that is bright at top and dark at bottom as alpha channel for the flipped image
+    gtop = 255 * top // 100
+    gbtm = 255 * btm // 100
+    grady = np.linspace(gbtm, gtop, hh, dtype=np.uint8)
+    gradx = np.linspace(1, 1, ww, dtype=np.uint8)
+    grad = np.outer(grady, gradx)
+    grad = np.flip(grad, axis=0)
+    # # alternate method
+    # grad = np.linspace(0, 255, hh, dtype=np.uint8)
+    # grad = np.linspace(gbtm, gtop, hh, dtype=np.uint8)
+    # grad = np.tile(grad, (ww, 1))
+    # grad = np.transpose(grad)
+    # grad = np.flip(grad, axis=0)
+
+    # put the gradient into the alpha channel of the flipped image
+    flip = cv2.cvtColor(flip, cv2.COLOR_BGR2BGRA)
+    flip[:, :, 3] = grad
+
+    # concatenate the original and the flipped versions
+    result = np.vstack((img_cv2, flip))
+
+    return result
 
 
 if __name__ == "__main__":

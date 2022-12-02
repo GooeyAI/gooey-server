@@ -14,6 +14,10 @@ def init_scripts():
         button[title="View fullscreen"], footer {
             visibility: hidden;
         }
+        textarea {
+            -webkit-text-fill-color: white !important;
+            color: white !important;
+        }
         </style>
         """
     )

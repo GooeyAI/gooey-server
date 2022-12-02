@@ -42,15 +42,11 @@ class CompareText2ImgPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
                 Describe the scene that you'd like to generate. 
-                """
-            )
-            st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="Iron man",
             )
@@ -81,14 +77,14 @@ class CompareText2ImgPage(BasePage):
     def render_settings(self):
         selected_model = enum_multiselect(
             Text2ImgModels,
-            label="Selected Models",
+            label="#### Selected Models",
             key="selected_models",
         )
 
         col1, col2 = st.columns(2, gap="medium")
         with col1:
             st.slider(
-                label="# of Outputs",
+                label="Number of Outputs",
                 key="num_outputs",
                 min_value=1,
                 max_value=4,

@@ -127,16 +127,15 @@ class BasePage:
             )
         )
 
-    def get_example_doc(self, example_id: str):
+    def get_example_doc(self, example_id: str) -> dict | None:
         return deepcopy(
-            get_saved_doc(
-                get_doc_ref(
-                    self.doc_name,
-                    sub_collection_id="examples",
-                    sub_document_id=example_id,
-                ),
-                create_if_dne=False,
+            get_doc_ref(
+                self.doc_name,
+                sub_collection_id="examples",
+                sub_document_id=example_id,
             )
+            .get()
+            .to_dict()
         )
 
     def get_doc(self):
