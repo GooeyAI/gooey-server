@@ -17,27 +17,16 @@ def patch_all():
 
 
 def patch_video():
-    old_func = st.video
-    if hasattr(old_func, "__st_wrapped__"):
-        return
-
-    @wraps(old_func)
     def new_func(url):
         f = furl(url)
         # https://muffinman.io/blog/hack-for-ios-safari-to-display-html-video-thumbnail/
         f.fragment.args["t"] = "0.001"
         return old_func(f.url)
 
-    new_func.__st_wrapped__ = True
-    st.video = new_func
+    old_func = _patcher(st.video.__name__, new_func)
 
 
 def patch_file_uploader():
-    old_func = st.file_uploader
-    if hasattr(old_func, "__st_wrapped__"):
-        return
-
-    @wraps(old_func)
     def new_func(label, label_visibility="markdown", **kwargs):
         if label_visibility == "markdown":
             st.write(label)
@@ -51,16 +40,10 @@ def patch_file_uploader():
 
         return value
 
-    new_func.__st_wrapped__ = True
-    st.file_uploader = new_func
+    old_func = _patcher(st.file_uploader.__name__, new_func)
 
 
 def patch_input_func(func_name: str):
-    old_func = getattr(st, func_name)
-    if hasattr(old_func, "__st_wrapped__"):
-        return
-
-    @wraps(old_func)
     def new_func(
         label,
         key=None,
@@ -97,8 +80,25 @@ def patch_input_func(func_name: str):
 
         return value
 
+    old_func = _patcher(func_name, new_func)
+
+
+def _patcher(func_name, new_func):
+    # get old impl
+    old_func = getattr(st, func_name)
+    if hasattr(old_func, "__st_wrapped__"):
+        # already wrapped, abort
+        return None
+
+    new_func = wraps(old_func)(new_func)
+
+    # mark as wrapped
     new_func.__st_wrapped__ = True
+    # replace with new impl
     setattr(st, func_name, new_func)
+
+    # return the old impl
+    return old_func
 
 
 patch_all()
