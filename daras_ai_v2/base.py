@@ -95,15 +95,15 @@ class BasePage:
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
 
-    def get_example_doc(self, example_id: str):
+    def get_example_doc(self, example_id: str) -> dict | None:
         return deepcopy(
-            get_saved_doc(
-                get_doc_ref(
-                    self.doc_name,
-                    sub_collection_id="examples",
-                    sub_document_id=example_id,
-                )
+            get_doc_ref(
+                self.doc_name,
+                sub_collection_id="examples",
+                sub_document_id=example_id,
             )
+            .get()
+            .to_dict()
         )
 
     def get_doc(self):

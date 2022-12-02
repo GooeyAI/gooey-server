@@ -62,6 +62,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc):
+    return templates.TemplateResponse("404.html", {"request": request})
+
+
 @app.get("/login", include_in_schema=False)
 def authentication(request: Request):
     if request.user:
@@ -247,6 +252,8 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
             state = page.get_example_doc(request.query_params["example_id"])
         else:
             state = page.get_doc()
+        if not state:
+            raise HTTPException(status_code=404)
         iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug
         return _st_page(
             request,
