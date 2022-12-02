@@ -10,10 +10,10 @@ CONTOUR_MODE = cv2.CHAIN_APPROX_SIMPLE
 
 def roll_pts_to_have_same_origin(arr):
     min_idx = min(enumerate(arr), key=lambda x: sum(x[1]))[0]
-    return np.roll(arr, shift=min_idx, axis=0)
+    return np.roll(arr, shift=-min_idx, axis=0)
 
 
-def appx_best_fit_ngon(mask_cv2, n: int = 4) -> list[(int, int)]:
+def appx_best_fit_ngon(mask_cv2, n: int = 4):
     contour = _find_largest_contour(mask_cv2)
 
     # # alternate method

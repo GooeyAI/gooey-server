@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.lipsync_api import wav2lip
-from daras_ai_v2.video_widget import video_widget
 
 
 class LipsyncPage(BasePage):
@@ -28,23 +27,21 @@ class LipsyncPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            face_file = st.file_uploader(
                 """
                 #### Input Face
                 Upload a video/image that contains faces to use  
                 *Recommended - mp4 / mov / png / jpg* 
-                """
+                """,
             )
-            face_file = st.file_uploader("input face", label_visibility="collapsed")
 
-            st.write(
+            audio_file = st.file_uploader(
                 """
                 #### Input Audio
                 Upload the video/audio file to use as audio source for lipsyncing  
                 *Recommended - wav / mp3*
-                """
+                """,
             )
-            audio_file = st.file_uploader("input audio", label_visibility="collapsed")
 
             submitted = st.form_submit_button("🏃‍ Submit")
 
@@ -129,7 +126,7 @@ class LipsyncPage(BasePage):
                 st.empty()
             elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
                 st.write("Input Face (Video)")
-                video_widget(input_face)
+                st.video(input_face)
             else:
                 st.write("Input Face (Image)")
                 st.image(input_face)
@@ -145,7 +142,7 @@ class LipsyncPage(BasePage):
             output_video = state.get("output_video")
             if output_video:
                 st.write("Output Video")
-                video_widget(output_video)
+                st.video(output_video)
             else:
                 st.empty()
 

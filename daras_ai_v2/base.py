@@ -95,15 +95,15 @@ class BasePage:
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
 
-    def get_example_doc(self, example_id: str):
+    def get_example_doc(self, example_id: str) -> dict | None:
         return deepcopy(
-            get_saved_doc(
-                get_doc_ref(
-                    self.doc_name,
-                    sub_collection_id="examples",
-                    sub_document_id=example_id,
-                )
+            get_doc_ref(
+                self.doc_name,
+                sub_collection_id="examples",
+                sub_document_id=example_id,
             )
+            .get()
+            .to_dict()
         )
 
     def get_doc(self):
@@ -230,28 +230,40 @@ class BasePage:
         if not check_secret_key("Save"):
             return
 
-        col1, col2, *_ = st.columns(3)
-        pressed_save = col1.button("🔖 Add as Example")
-        pressed_star = col2.button("💾 Save to Recipe & Settings")
+        doc_ref = None
+        query_params = st.experimental_get_query_params()
+        col1, col2 = st.columns(2)
 
-        if pressed_save:
-            sub_collection = "examples"
-            sub_doc = secrets.token_urlsafe(8)
-        elif pressed_star:
-            sub_collection = None
-            sub_doc = None
-        else:
+        with col2:
+            submitted_1 = st.button("🔖 Add as Example")
+            if submitted_1:
+                new_example_id = secrets.token_urlsafe(8)
+                doc_ref = get_doc_ref(
+                    self.doc_name,
+                    sub_collection_id="examples",
+                    sub_document_id=new_example_id,
+                )
+
+        with col1:
+            if "example_id" in query_params:
+                submitted_2 = st.button("💾 Save This Example & Settings")
+                if submitted_2:
+                    example_id = query_params["example_id"][0]
+                    doc_ref = get_doc_ref(
+                        self.doc_name,
+                        sub_collection_id="examples",
+                        sub_document_id=example_id,
+                    )
+            else:
+                submitted_3 = st.button("💾 Save This Recipe & Settings")
+                if submitted_3:
+                    doc_ref = get_doc_ref(self.doc_name)
+
+        if not doc_ref:
             return
 
         with st.spinner("Saving..."):
-            set_saved_doc(
-                get_doc_ref(
-                    self.doc_name,
-                    sub_collection_id=sub_collection,
-                    sub_document_id=sub_doc,
-                ),
-                state_to_save,
-            )
+            set_saved_doc(doc_ref, state_to_save)
 
         st.success("Done", icon="✅")
 

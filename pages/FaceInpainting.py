@@ -74,32 +74,21 @@ class FaceInpaintingPage(BasePage):
 
     def render_form(self):
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
                 Describe the character that you'd like to generate. 
-                """
-            )
-            st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="Iron man",
             )
 
-            st.write(
+            st.file_uploader(
                 """
                 ### Face Photo
                 Give us a photo of yourself, or anyone else
-                """
-            )
-            st.file_uploader(
-                "input_file",
-                label_visibility="collapsed",
+                """,
                 key="input_file",
-            )
-            st.caption(
-                "By uploading an image, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")
@@ -125,14 +114,14 @@ class FaceInpaintingPage(BasePage):
     def render_settings(self):
         selected_model = enum_selector(
             InpaintingModels,
-            label="Image Model",
+            label="### Image Model",
             key="selected_model",
         )
 
         col1, col2 = st.columns(2, gap="medium")
         with col1:
             st.slider(
-                label="# of Outputs",
+                label="Number of Outputs",
                 key="num_outputs",
                 min_value=1,
                 max_value=4,

@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 site_packages = Path(site.getsitepackages()[0])
-js_file = site_packages / f"streamlit/static/static/js/main.c68b61b6.chunk.js"
+js_file = site_packages / f"streamlit/static/static/js/main.c6074f42.chunk.js"
 
 txt = js_file.read_text()
 

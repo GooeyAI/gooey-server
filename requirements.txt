@@ -1130,9 +1130,9 @@ starlette==0.20.4 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:c0414d5a56297d37f3db96a84034d61ce29889b9eaccf65eb98a0b39441fcaa3
 streamlit-nested-layout==0.1.1 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:8b7ce4d90b76ff8f4fff2cf7b30ae262cd2c068722e5439a3618f9a412ed82fb
-streamlit==1.15.1 ; python_version >= "3.10" and python_version < "4.0" \
-    --hash=sha256:2ec65c29b6390ff5d8288dac20fa3a4a343ac8f0755de3dc922b468a4d6ea6cc \
-    --hash=sha256:ac8b24fa26dd5dfcd1954a340315c0b36c868c7de688259099dfd909524f1d8d
+streamlit==1.15.2 ; python_version >= "3.10" and python_version < "4.0" \
+    --hash=sha256:31b2fa33848f8dbcf526e6c93017cf58c81a8479844c4f6ff553382e1bac6152 \
+    --hash=sha256:40933b64e7b3a1770d798918cbd2ae52a6671a52266ac069f62e1b66f38e0662
 sympy==1.11.1 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:938f984ee2b1e8eae8a07b884c8b7a1146010040fccddc6539c54f401c8f6fcf \
     --hash=sha256:e32380dce63cb7c0108ed525570092fd45168bdae2faa17e528221ef72e88658
