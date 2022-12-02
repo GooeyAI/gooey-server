@@ -1,8 +1,7 @@
+import math
+
 import cv2
-
 import numpy as np
-import sympy
-
 
 CONTOUR_HIREARCY = cv2.RETR_EXTERNAL
 CONTOUR_MODE = cv2.CHAIN_APPROX_SIMPLE
@@ -29,9 +28,6 @@ def appx_best_fit_ngon(mask_cv2, n: int = 4):
     poly = cv2.convexHull(contour)
     poly = np.array(poly).reshape((len(poly), 2))
 
-    # to sympy land
-    poly = [sympy.Point(*pt) for pt in poly]
-
     # run until we cut down to n vertices
     while len(poly) > n:
         best_candidate = None
@@ -43,27 +39,27 @@ def appx_best_fit_ngon(mask_cv2, n: int = 4):
             adj_idx_1 = (edge_idx_1 - 1) % len(poly)
             adj_idx_2 = (edge_idx_1 + 2) % len(poly)
 
-            edge_pt_1 = sympy.Point(*poly[edge_idx_1])
-            edge_pt_2 = sympy.Point(*poly[edge_idx_2])
-            adj_pt_1 = sympy.Point(*poly[adj_idx_1])
-            adj_pt_2 = sympy.Point(*poly[adj_idx_2])
+            edge_pt_1 = poly[edge_idx_1]
+            edge_pt_2 = poly[edge_idx_2]
+            adj_pt_1 = poly[adj_idx_1]
+            adj_pt_2 = poly[adj_idx_2]
 
-            subpoly = sympy.Polygon(adj_pt_1, edge_pt_1, edge_pt_2, adj_pt_2)
-            angle1 = subpoly.angles[edge_pt_1]
-            angle2 = subpoly.angles[edge_pt_2]
+            angle1 = angle_between(adj_pt_1, edge_pt_1, edge_pt_2)
+            angle2 = angle_between(edge_pt_1, edge_pt_2, adj_pt_2)
 
             # we need to first make sure that the sum of the interior angles the edge
             # makes with the two adjacent edges is more than 180°
-            if sympy.N(angle1 + angle2) <= sympy.pi:
+            if angle1 + angle2 <= math.pi:
                 continue
 
             # find the new vertex if we delete this edge
-            adj_edge_1 = sympy.Line(adj_pt_1, edge_pt_1)
-            adj_edge_2 = sympy.Line(edge_pt_2, adj_pt_2)
-            intersect = adj_edge_1.intersection(adj_edge_2)[0]
+            adj_edge_1 = line(adj_pt_1, edge_pt_1)
+            adj_edge_2 = line(edge_pt_2, adj_pt_2)
+            intersect = intersection(adj_edge_1, adj_edge_2)
 
             # the area of the triangle we'll be adding
-            area = sympy.N(sympy.Triangle(edge_pt_1, intersect, edge_pt_2).area)
+            area = triangle_area(edge_pt_1, intersect, edge_pt_2)
+
             # should be the lowest
             if best_candidate and best_candidate[1] < area:
                 continue
@@ -93,6 +89,8 @@ def best_fit_rotated_rect(mask_cv2):
     box2d = cv2.minAreaRect(contour)
     rect = cv2.boxPoints(box2d)
 
+    rect = roll_pts_to_have_same_origin(rect)
+
     center, size, angle = box2d
 
     rect_width, rect_height = size
@@ -110,8 +108,6 @@ def best_fit_rotated_rect(mask_cv2):
     rot_mat = cv2.getRotationMatrix2D(center, rotation, 1)
     rect = cv2.transform(rect.reshape((1, 4, 2)), rot_mat).reshape((4, 2))
 
-    rect = roll_pts_to_have_same_origin(rect)
-
     return rect
 
 
@@ -121,3 +117,55 @@ def _find_largest_contour(mask_cv2):
     contours, _ = cv2.findContours(thresh, CONTOUR_HIREARCY, CONTOUR_MODE)
     best_contour = max(contours, key=len)
     return best_contour
+
+
+def triangle_area(pt_a, pt_b, pt_c):
+    a = math.sqrt(length2(pt_b, pt_c))
+    b = math.sqrt(length2(pt_a, pt_c))
+    c = math.sqrt(length2(pt_a, pt_b))
+
+    s = (a + b + c) / 2
+
+    area = math.sqrt((s * (s - a) * (s - b) * (s - c)))
+
+    return area
+
+
+def angle_between(pt_a, pt_b, pt_c):
+    # square of lengths
+    a2 = length2(pt_b, pt_c)
+    b2 = length2(pt_a, pt_c)
+    c2 = length2(pt_a, pt_b)
+
+    # length of sides
+    a = math.sqrt(a2)
+    # b = math.sqrt(b2)
+    c = math.sqrt(c2)
+
+    # From Cosine law
+    angle_b = math.acos((a2 + c2 - b2) / (2 * a * c))
+
+    return angle_b
+
+
+def length2(pt0, pt1):
+    return (pt0[0] - pt1[0]) ** 2 + (pt0[1] - pt1[1]) ** 2
+
+
+def line(p1, p2):
+    A = p1[1] - p2[1]
+    B = p2[0] - p1[0]
+    C = p1[0] * p2[1] - p2[0] * p1[1]
+    return A, B, -C
+
+
+def intersection(L1, L2):
+    D = L1[0] * L2[1] - L1[1] * L2[0]
+    Dx = L1[2] * L2[1] - L1[1] * L2[2]
+    Dy = L1[0] * L2[2] - L1[2] * L2[0]
+    if D != 0:
+        x = Dx / D
+        y = Dy / D
+        return x, y
+    else:
+        return False
