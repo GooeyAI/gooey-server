@@ -53,32 +53,21 @@ class ObjectInpaintingPage(BasePage):
 
     def render_form(self):
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
                 Describe the scene that you'd like to generate. 
-                """
-            )
-            st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="Iron man",
             )
 
-            st.write(
+            st.file_uploader(
                 """
                 ### Object Photo
                 Give us a photo of anything
-                """
-            )
-            st.file_uploader(
-                "input_file",
-                label_visibility="collapsed",
+                """,
                 key="input_file",
-            )
-            st.caption(
-                "By uploading an image, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")
@@ -118,14 +107,14 @@ class ObjectInpaintingPage(BasePage):
     def render_settings(self):
         selected_model = enum_selector(
             InpaintingModels,
-            label="Image Model",
+            label="### Image Model",
             key="selected_model",
         )
 
         col1, col2 = st.columns(2, gap="medium")
         with col1:
             st.slider(
-                label="# of Outputs",
+                label="Number of Outputs",
                 key="num_outputs",
                 min_value=1,
                 max_value=4,
@@ -227,17 +216,13 @@ class ObjectInpaintingPage(BasePage):
 
         st.image(img, width=300)
 
-        st.write(
+        st.slider(
             """
             ##### Edge Threshold
             Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
-            """
-        )
-        st.slider(
+            """,
             min_value=0.0,
             max_value=1.0,
-            label="Threshold",
-            label_visibility="collapsed",
             key="mask_threshold",
         )
 

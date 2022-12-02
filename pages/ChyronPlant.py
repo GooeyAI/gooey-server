@@ -32,14 +32,10 @@ class ChyronPlantPage(BasePage):
 
     def render_form(self):
         with st.form("my_form"):
-            st.write(
+            st.text_input(
                 """
                 ### Input Midi notes
-                """
-            )
-            st.text_input(
-                "midi_notes",
-                label_visibility="collapsed",
+                """,
                 key="midi_notes",
             )
 
@@ -48,52 +44,36 @@ class ChyronPlantPage(BasePage):
         return submitted
 
     def render_output(self):
-        st.write(
+        st.text_area(
             """
             **MIDI translation**
-            """
-        )
-        st.text_area(
-            "midi_translation",
-            label_visibility="collapsed",
+            """,
             value=st.session_state.get("midi_translation", ""),
             disabled=True,
         )
 
-        st.write(
+        st.text_area(
             """
             ### Chyron Output
-            """
-        )
-        st.text_area(
-            "chyron_output",
-            label_visibility="collapsed",
+            """,
             disabled=True,
             value=st.session_state.get("chyron_output", ""),
             height=300,
         )
 
     def render_settings(self):
-        st.write(
+        st.text_area(
             """
             ### Midi Notes -> English GPT script
-            """
-        )
-        st.text_area(
-            "midi_notes_prompt",
-            label_visibility="collapsed",
+            """,
             key="midi_notes_prompt",
             height=500,
         )
 
-        st.write(
+        st.text_area(
             """
             ### Chyron Plant Radbot script
-            """
-        )
-        st.text_area(
-            "chyron_prompt",
-            label_visibility="collapsed",
+            """,
             key="chyron_prompt",
             height=500,
         )

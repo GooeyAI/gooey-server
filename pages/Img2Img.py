@@ -38,31 +38,20 @@ class Img2ImgPage(BasePage):
     def render_form(self) -> bool:
         with st.form("my_form"):
             if st.session_state["selected_model"] != InpaintingModels.dall_e.name:
-                st.write(
+                st.text_area(
                     """
                     ### Prompt
                     Describe your edits 
-                    """
-                )
-                st.text_area(
-                    "text_prompt",
-                    label_visibility="collapsed",
+                    """,
                     key="text_prompt",
                     placeholder="Iron man",
                 )
 
-            st.write(
+            st.file_uploader(
                 """
                 ### Input Photo
-                """
-            )
-            st.file_uploader(
-                "input_file",
-                label_visibility="collapsed",
+                """,
                 key="input_file",
-            )
-            st.caption(
-                "By uploading an image, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")
@@ -96,7 +85,7 @@ class Img2ImgPage(BasePage):
     def render_settings(self):
         selected_model = enum_selector(
             Img2ImgModels,
-            label="Image Model",
+            label="### Image Model",
             key="selected_model",
         )
 

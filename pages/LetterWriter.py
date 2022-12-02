@@ -80,17 +80,15 @@ class LetterWriterPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write("### Action ID")
             st.text_input(
-                "action_id",
+                "### Action ID",
                 key="action_id",
-                label_visibility="collapsed",
             )
 
             col1, col2 = st.columns(2, gap="medium")
             with col1:
                 st.slider(
-                    label="# of Outputs",
+                    label="Number of Outputs",
                     key="num_outputs",
                     min_value=1,
                     max_value=4,
@@ -163,7 +161,7 @@ class LetterWriterPage(BasePage):
                 key="lm_selected_engine",
             )
 
-        st.write(
+        st.slider(
             """
             ##### Model Risk Factor 
 
@@ -172,28 +170,19 @@ class LetterWriterPage(BasePage):
             Higher values allow the model to take more risks.
             Try 0.9 for more creative applications, 
             and 0 for ones with a well-defined answer. 
-            """
-        )
-        st.slider(
-            label="model risk",
-            label_visibility="collapsed",
+            """,
             key="lm_sampling_temperature",
             min_value=0.0,
             max_value=1.0,
-            value=1.0,
         )
 
         st.write("---")
 
-        st.write("### Task description")
-        st.write(
-            """
-            Briefly describe the task for the language model
-            """
-        )
         st.text_area(
-            "prompt_header",
-            label_visibility="collapsed",
+            """
+            ### Task description
+            Briefly describe the task for the language model
+            """,
             key="prompt_header",
             height=200,
         )
@@ -244,19 +233,15 @@ class LetterWriterPage(BasePage):
 
         st.write("---")
 
-        st.write(
-            """
-        ##### Input Talking Points (Prompt)
-        
-        Specify the input prompt for the model.
-        
-        *You can use the powerful [glom](https://glom.readthedocs.io/en/latest/tutorial.html/) syntax to parse the API JSON response.*  
-        *E.g. `This is my {{ "field.value" }}`*
-        """
-        )
         st.text_area(
-            "input_prompt",
-            label_visibility="collapsed",
+            """
+            ##### Input Talking Points (Prompt)
+    
+            Specify the input prompt for the model.
+    
+            *You can use the powerful [glom](https://glom.readthedocs.io/en/latest/tutorial.html/) syntax to parse the API JSON response.*  
+            *E.g. `This is my {{ "field.value" }}`*
+            """,
             key="input_prompt",
         )
         st.checkbox("Strip all HTML -> Text?", key="strip_html_2_text")
@@ -351,11 +336,10 @@ class LetterWriterPage(BasePage):
             # this default value makes a nicer output while running :)
             [""] * st.session_state["num_outputs"],
         )
-        for i, out in enumerate(output_letters):
+        for idx, out in enumerate(output_letters):
             st.text_area(
-                "output_letter",
+                f"output {idx}",
                 label_visibility="collapsed",
-                help=f"output_letters {i}",
                 value=out,
                 height=300,
                 disabled=True,
@@ -369,20 +353,16 @@ class LetterWriterPage(BasePage):
                 expanded=False,
             )
 
-            st.write("**Input Talking Points (Prompt)**")
             input_prompt = st.session_state.get("generated_input_prompt", "")
             st.text_area(
-                "input_prompt",
-                label_visibility="collapsed",
+                "**Input Talking Points (Prompt)**",
                 value=input_prompt,
                 disabled=True,
             )
 
-            st.write("**Final Language Model Prompt**")
             final_prompt = st.session_state.get("final_prompt", "")
             st.text_area(
-                "final_prompt",
-                label_visibility="collapsed",
+                "**Final Language Model Prompt**",
                 value=final_prompt,
                 disabled=True,
                 height=300,

@@ -4,7 +4,6 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
-from daras_ai_v2.video_widget import video_widget
 
 
 class DeforumSDPage(BasePage):
@@ -20,14 +19,10 @@ class DeforumSDPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
-                """
-            )
-            st.text_area(
-                "input_prompt",
-                label_visibility="collapsed",
+                """,
                 key="input_prompt",
                 height=200,
             )
@@ -46,13 +41,13 @@ class DeforumSDPage(BasePage):
         )
 
     def render_settings(self):
-        st.slider("# of Frames", min_value=100, max_value=1000, key="max_frames")
+        st.slider("Number of Frames", min_value=100, max_value=1000, key="max_frames")
 
     def render_output(self):
         output_video = st.session_state.get("output_video")
         if output_video:
             st.write("Output Video")
-            video_widget(output_video)
+            st.video(output_video)
         else:
             st.empty()
 
@@ -61,7 +56,7 @@ class DeforumSDPage(BasePage):
         if output_video:
             # st.write(f"**Output Video** - {state.get('input_prompt')}")
             st.markdown("```" + state.get("input_prompt").replace("\n", "") + "```")
-            video_widget(output_video)
+            st.video(output_video)
         else:
             st.empty()
 

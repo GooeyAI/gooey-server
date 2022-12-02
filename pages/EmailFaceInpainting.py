@@ -81,28 +81,20 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
     def render_form(self):
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
                 Describe the scene that you'd like to generate around the face. 
-                """
-            )
-            st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="winter's day in paris",
             )
 
-            st.write(
+            st.text_input(
                 """
                 ### Email Address
                 Give us your email address and we'll try to get your photo 
-                """
-            )
-            st.text_input(
-                "email_address",
-                label_visibility="collapsed",
+                """,
                 key="email_address",
                 placeholder="john@appleseed.com",
             )

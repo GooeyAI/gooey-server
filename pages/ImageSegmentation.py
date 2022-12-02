@@ -63,19 +63,12 @@ class ImageSegmentationPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            st.file_uploader(
                 """
                 ### Input Photo
                 Give us a photo of anything
-                """
-            )
-            st.file_uploader(
-                "input_file",
-                label_visibility="collapsed",
+                """,
                 key="input_file",
-            )
-            st.caption(
-                "By uploading an image, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")
@@ -100,25 +93,25 @@ class ImageSegmentationPage(BasePage):
         return submitted
 
     def render_settings(self):
-        enum_selector(ImageSegmentationModels, "Model", key="selected_model")
-
-        st.write(
-            """
-            ##### Edge Threshold
-            Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
-            """
+        enum_selector(
+            ImageSegmentationModels,
+            "#### Model",
+            key="selected_model",
         )
+
         st.slider(
+            """
+            #### Edge Threshold
+            Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
+            """,
             min_value=0.0,
             max_value=1.0,
-            label="Threshold",
-            label_visibility="collapsed",
             key="mask_threshold",
         )
 
         st.write(
             """
-            ##### Fix Skewed Perspective
+            #### Fix Skewed Perspective
             
             Automatically transform the perspective of the image to make objects look like a perfect rectangle  
             """
@@ -130,7 +123,7 @@ class ImageSegmentationPage(BasePage):
 
         st.write(
             """
-            ##### Add reflections
+            #### Add reflections
             """
         )
         col1, _ = st.columns(2)
@@ -148,7 +141,7 @@ class ImageSegmentationPage(BasePage):
 
         st.write(
             """
-            ### Object Repositioning Settings
+            #### Object Repositioning Settings
             """
         )
 

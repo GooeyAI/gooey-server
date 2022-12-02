@@ -12,11 +12,13 @@ def enum_multiselect(
     **kwargs,
 ) -> str:
     label = label or enum_cls.name
+    st.write(label)
     return st.multiselect(
         **kwargs,
         options=[e.name for e in enum_cls],
         format_func=lambda k: enum_cls[k].value,
         label=label,
+        label_visibility="collapsed",
     )
 
 
@@ -26,9 +28,11 @@ def enum_selector(
     **kwargs,
 ) -> str:
     label = label or enum_cls.name
+    st.write(label)
     return st.radio(
         **kwargs,
         options=[e.name for e in enum_cls],
         format_func=lambda k: enum_cls[k].value,
         label=label,
+        label_visibility="collapsed",
     )

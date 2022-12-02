@@ -109,21 +109,17 @@ class SEOSummaryPage(BasePage):
                 step=0.1,
             )
 
-        st.write(
-            """
-            ###### Model Creativity 
-            *(Sampling Temperature)*
-            
-            Higher values allow the model to take more risks.
-            Try 0.9 for more creative applications, 
-            and 0 for ones with a well-defined answer. 
-            """
-        )
         col1, _ = st.columns(2)
         with col1:
             st.slider(
-                label="model risk",
-                label_visibility="collapsed",
+                label="""
+                ###### Model Creativity 
+                *(Sampling Temperature)*
+                
+                Higher values allow the model to take more risks.
+                Try 0.9 for more creative applications, 
+                and 0 for ones with a well-defined answer. 
+                """,
                 key="sampling_temperature",
                 min_value=0.0,
                 max_value=1.0,
@@ -135,42 +131,30 @@ class SEOSummaryPage(BasePage):
 
         st.checkbox("Convert HTML->Text?", key="do_html2text")
 
-        st.write(
-            "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**"
-        )
         st.text_input(
-            "scaleserp_search_field",
-            label_visibility="collapsed",
+            "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**",
             key="scaleserp_search_field",
         )
 
         col1, col2 = st.columns(2)
 
         with col1:
-            st.write(
-                """
+            st.number_input(
+                label="""
                 ###### Max Search URLs
                 The maximum number of search URLs to consider as training data
-                """
-            )
-            st.number_input(
-                label="max_search_urls",
-                label_visibility="collapsed",
+                """,
                 key="max_search_urls",
                 min_value=1,
                 max_value=10,
             )
 
         with col2:
-            st.write(
-                """
+            st.number_input(
+                label="""
                 ###### Max Output Tokens
                 The maximum number of [tokens](https://beta.openai.com/tokenizer) to generate in the completion.
-                """
-            )
-            st.number_input(
-                label="max_tokens",
-                label_visibility="collapsed",
+                """,
                 key="max_tokens",
                 min_value=1,
                 max_value=4096,
@@ -182,7 +166,7 @@ class SEOSummaryPage(BasePage):
             st.write("### Generated Content")
             for idx, text in enumerate(output_content):
                 st.text_area(
-                    f"Output {idx}",
+                    f"output {idx}",
                     label_visibility="collapsed",
                     value=text,
                     height=300,

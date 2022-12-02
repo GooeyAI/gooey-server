@@ -28,7 +28,7 @@ class CompareLMPage(BasePage):
         )
 
     def render_settings(self):
-        st.write(
+        st.slider(
             """
             ##### Model Risk Factor 
 
@@ -37,26 +37,18 @@ class CompareLMPage(BasePage):
             Higher values allow the model to take more risks.
             Try 0.9 for more creative applications, 
             and 0 for ones with a well-defined answer. 
-            """
-        )
-        st.slider(
-            label="model risk",
-            label_visibility="collapsed",
+            """,
             key="sampling_temperature",
             min_value=0.0,
             max_value=1.0,
             value=1.0,
         )
 
-        st.write(
+        st.number_input(
             """
             #### Max Output Tokens
             The maximum number of [tokens](https://beta.openai.com/tokenizer) to generate in the completion.
-            """
-        )
-        st.number_input(
-            label="max_tokens",
-            label_visibility="collapsed",
+            """,
             key="max_tokens",
             min_value=1,
             max_value=4096,
@@ -64,14 +56,10 @@ class CompareLMPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
-                """
-            )
-            st.text_area(
-                "input_prompt",
-                label_visibility="collapsed",
+                """,
                 key="input_prompt",
                 height=200,
             )
@@ -108,29 +96,21 @@ class CompareLMPage(BasePage):
         )[0]
 
     def render_output(self):
-        st.write(
+        st.text_area(
             """
             ### Flan-T5 
             [`flan-t5-xxl`](https://huggingface.co/google/flan-t5-xxl)
-            """
-        )
-        st.text_area(
-            "flan_t5_output",
-            label_visibility="collapsed",
+            """,
             value=st.session_state.get("flan_t5_output", ""),
             disabled=True,
             height=200,
         )
 
-        st.write(
+        st.text_area(
             """
             ### GPT-3 
             [`text-davinci-002`](https://beta.openai.com/docs/models/gpt-3)
-            """
-        )
-        st.text_area(
-            "gpt3_output",
-            label_visibility="collapsed",
+            """,
             disabled=True,
             value=st.session_state.get("gpt3_output", ""),
             height=200,
