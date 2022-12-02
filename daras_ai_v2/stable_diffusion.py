@@ -47,6 +47,7 @@ def text2img(
     guidance_scale: float = None,
     seed: float = None,
     sd_2_upscaling: bool = False,
+    negative_prompt: str,
 ):
     _resolution_check(width, height)
 
@@ -62,8 +63,8 @@ def text2img(
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": guidance_scale,
                     "seed": seed,
-                    # "sampler": "ddim",
                     "upscaling_inference_steps": 10 if sd_2_upscaling else 0,
+                    "negative_prompt": negative_prompt,
                 },
             )
         case Text2ImgModels.jack_qiao.name:
@@ -72,13 +73,8 @@ def text2img(
                 input_data={
                     "prompt": prompt,
                     "num_inference_steps": num_inference_steps,
-                    # "init_image": init_image,
-                    # "edit_image": edit_image,
-                    # "mask": mask,
                     "num_outputs": num_outputs,
-                    # "negative_prompt": "string",
-                    # "outpaint": "expand",
-                    # "skip_timesteps": int(num_inference_steps * (1 - prompt_strength)),
+                    "negative_prompt": negative_prompt,
                     "width": width,
                     "height": height,
                 },
@@ -105,32 +101,13 @@ def text2img(
                     prompt=prompt,
                     width=width,
                     height=height,
-                    # init_image=init_image,
-                    # mask="string",
-                    # prompt_strength=prompt_strength,
                     num_outputs=num_outputs,
                     num_inference_steps=num_inference_steps,
                     guidance_scale=guidance_scale,
-                    # scheduler="K-LMS",
-                    seed=seed,
+                    seed=seed or None,
+                    negative_prompt=negative_prompt,
                 )
             ]
-            # out_imgs = call_gpu_server_b64(
-            #     endpoint=GpuEndpoints.sd_1_5,
-            #     input_data={
-            #         "prompt": prompt,
-            #         "width": width,
-            #         "height": height,
-            #         # "init_image": init_image,
-            #         # "mask": "string",
-            #         # "prompt_strength": prompt_strength,
-            #         "num_outputs": num_outputs,
-            #         "num_inference_steps": num_inference_steps,
-            #         "guidance_scale": guidance_scale,
-            #         # "scheduler": "K-LMS",
-            #         "seed": seed,
-            #     },
-            # )
         case _:
             out_imgs = []
     return [
@@ -150,6 +127,7 @@ def img2img(
     width: int,
     height: int,
     prompt_strength: float,
+    negative_prompt: str,
 ):
     _resolution_check(width, height)
 
@@ -165,9 +143,8 @@ def img2img(
                     "num_inference_steps": num_inference_steps,
                     "init_image": init_image,
                     "strength": prompt_strength,
-                    # "sampler": "ddim",
                     "guidance_scale": 10,
-                    # "seed": seed,
+                    "negative_prompt": negative_prompt,
                 },
             )
         case Img2ImgModels.jack_qiao.name:
@@ -180,7 +157,7 @@ def img2img(
                     # "edit_image": edit_image,
                     # "mask": mask,
                     "num_outputs": num_outputs,
-                    # "negative_prompt": "string",
+                    "negative_prompt": negative_prompt,
                     # "outpaint": "expand",
                     "skip_timesteps": int(num_inference_steps * (1 - prompt_strength)),
                     "width": width,
@@ -213,24 +190,9 @@ def img2img(
                     prompt_strength=prompt_strength,
                     num_outputs=num_outputs,
                     num_inference_steps=num_inference_steps,
+                    negative_prompt=negative_prompt,
                 )
             ]
-            # out_imgs = call_gpu_server_b64(
-            #     endpoint=GpuEndpoints.sd_1_5,
-            #     input_data={
-            #         "prompt": prompt,
-            #         "width": width,
-            #         "height": height,
-            #         "init_image": init_image,
-            #         # "mask": "string",
-            #         "prompt_strength": prompt_strength,
-            #         "num_outputs": num_outputs,
-            #         "num_inference_steps": num_inference_steps,
-            #         # "guidance_scale": 7.5,
-            #         # "scheduler": "K-LMS",
-            #         # "seed": 0,
-            #     },
-            # )
         case _:
             out_imgs = []
     return [
@@ -251,6 +213,7 @@ def inpainting(
     num_inference_steps: int,
     width: int,
     height: int,
+    negative_prompt: str,
 ) -> list[str]:
     _resolution_check(width, height)
 
@@ -267,24 +230,25 @@ def inpainting(
                     "edit_image": edit_image,
                     "mask_image": mask,
                     "guidance_scale": 10,
-                    # "seed": seed,
-                    # "sampler": "ddim",
+                    "negative_prompt": negative_prompt,
                 },
             )
         case InpaintingModels.runway_ml.name:
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.runway_ml_inpainting,
-                input_data={
-                    "prompt": prompt,
-                    "image": edit_image,
-                    "mask": mask,
-                    "invert_mask": True,
-                    "num_outputs": num_outputs,
-                    "num_inference_steps": num_inference_steps,
-                    # "guidance_scale": "...",
-                    # "seed": "...",
-                },
+            model = replicate.models.get("andreasjansson/stable-diffusion-inpainting")
+            version = model.versions.get(
+                "8eb2da8345bee796efcd925573f077e36ed5fb4ea3ba240ef70c23cf33f0d848"
             )
+            out_imgs = [
+                requests.get(img).content
+                for img in version.predict(
+                    prompt=prompt,
+                    image=edit_image,
+                    mask=mask,
+                    invert_mask=True,
+                    num_outputs=num_outputs,
+                    num_inference_steps=num_inference_steps,
+                )
+            ]
         case InpaintingModels.dall_e.name:
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
@@ -308,6 +272,7 @@ def inpainting(
                     "edit_image": edit_image,
                     "mask": mask,
                     "num_outputs": num_outputs,
+                    "negative_prompt": negative_prompt,
                     # "negative_prompt": "string",
                     # "outpaint": "expand",
                     # "skip_timesteps": 0,

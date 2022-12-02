@@ -1,11 +1,11 @@
+import typing
+
 import cv2
 import requests
 import streamlit as st
-import typing
 from pydantic import BaseModel
 
 from daras_ai.extract_face import extract_and_reposition_face_cv2
-from daras_ai_v2.face_restoration import map_parallel, gfpgan
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
@@ -15,7 +15,9 @@ from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.extract_face import extract_face_img_bytes
+from daras_ai_v2.face_restoration import map_parallel, gfpgan
 from daras_ai_v2.loom_video_widget import loom_video
+from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
@@ -27,6 +29,7 @@ class FaceInpaintingPage(BasePage):
     class RequestModel(BaseModel):
         input_image: str
         text_prompt: str
+        negative_prompt: str | None
 
         num_outputs: int | None
         quality: int | None
@@ -118,6 +121,8 @@ class FaceInpaintingPage(BasePage):
             label="### Image Model",
             key="selected_model",
         )
+
+        negative_prompt_setting(selected_model)
 
         col1, col2 = st.columns(2, gap="medium")
         with col1:
@@ -324,6 +329,7 @@ class FaceInpaintingPage(BasePage):
             num_inference_steps=state.get("quality", 50),
             width=state["output_width"],
             height=state["output_height"],
+            negative_prompt=state["negative_prompt"],
         )
         state["diffusion_images"] = diffusion_images
 

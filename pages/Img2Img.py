@@ -11,6 +11,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
 from daras_ai_v2.stable_diffusion import InpaintingModels, Img2ImgModels, img2img
 
 
@@ -21,6 +22,7 @@ class Img2ImgPage(BasePage):
     class RequestModel(BaseModel):
         input_image: str
         text_prompt: str | None
+        negative_prompt: str | None
 
         num_outputs: int | None
         quality: int | None
@@ -88,6 +90,8 @@ class Img2ImgPage(BasePage):
             label="### Image Model",
             key="selected_model",
         )
+
+        negative_prompt_setting(selected_model)
 
         st.slider(
             label="Prompt Strength",
@@ -201,6 +205,7 @@ class Img2ImgPage(BasePage):
             prompt_strength=request.prompt_strength,
             width=request.output_width,
             height=request.output_height,
+            negative_prompt=request.negative_prompt,
         )
 
     def preview_image(self, state: dict) -> str:
