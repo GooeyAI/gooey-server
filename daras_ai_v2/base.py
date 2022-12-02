@@ -114,17 +114,16 @@ class BasePage:
         else:
             st.session_state.update(self.get_doc())
 
-    def get_run_doc(self, run_id: str, uid: str):
+    def get_run_doc(self, run_id: str, uid: str) -> dict | None:
         return deepcopy(
-            get_saved_doc(
-                get_doc_ref(
-                    uid,
-                    collection_id="user_runs",
-                    sub_collection_id=self.doc_name,
-                    sub_document_id=run_id,
-                ),
-                create_if_dne=False,
+            get_doc_ref(
+                uid,
+                collection_id="user_runs",
+                sub_collection_id=self.doc_name,
+                sub_document_id=run_id,
             )
+            .get()
+            .to_dict()
         )
 
     def get_example_doc(self, example_id: str) -> dict | None:
@@ -526,21 +525,13 @@ def set_saved_doc(
 #         firestore.DocumentReference: lambda doc_ref: doc_ref.path,
 #     },
 # )
-def get_saved_doc(doc_ref: firestore.DocumentReference, create_if_dne=True) -> dict:
-    """
-    create_if_dne
-    dne=Does not exist
-    """
-    return get_saved_doc_nocahe(doc_ref, create_if_dne)
+def get_saved_doc(doc_ref: firestore.DocumentReference) -> dict:
+    return get_saved_doc_nocahe(doc_ref)
 
 
-def get_saved_doc_nocahe(doc_ref, create_if_dne=True):
-    """
-    create_if_dne
-    dne=Does not exist
-    """
+def get_saved_doc_nocahe(doc_ref):
     doc = doc_ref.get()
-    if not doc.exists and create_if_dne:
+    if not doc.exists:
         doc_ref.create({})
         doc = doc_ref.get()
     return doc.to_dict()
