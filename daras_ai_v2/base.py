@@ -58,11 +58,7 @@ class BasePage:
                         self.get_example_doc(query_params["example_id"][0])
                     )
                 elif "run_id" in query_params:
-                    st.session_state.update(
-                        self.get_run_doc(
-                            query_params["run_id"][0], query_params["uid"][0]
-                        )
-                    )
+                    self.load_run(query_params)
                 else:
                     st.session_state.update(self.get_doc())
 
@@ -105,6 +101,15 @@ class BasePage:
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
 
+    def load_run(self, query_params):
+        doc = self.get_run_doc(
+            query_params["run_id"][0], query_params["uid"][0]
+        )
+        if doc:
+            st.session_state.update(doc)
+        else:
+            st.session_state.update(self.get_doc())
+
     def get_run_doc(self, run_id: str, uid: str):
         return deepcopy(
             get_saved_doc(
@@ -114,6 +119,7 @@ class BasePage:
                     sub_collection_id=self.doc_name,
                     sub_document_id=run_id,
                 ),
+                create_if_dne=False,
             )
         )
 
@@ -528,13 +534,13 @@ def set_saved_doc(
 #         firestore.DocumentReference: lambda doc_ref: doc_ref.path,
 #     },
 # )
-def get_saved_doc(doc_ref: firestore.DocumentReference) -> dict:
-    return get_saved_doc_nocahe(doc_ref)
+def get_saved_doc(doc_ref: firestore.DocumentReference, create_if_dne=True) -> dict:
+    return get_saved_doc_nocahe(doc_ref, create_if_dne)
 
 
-def get_saved_doc_nocahe(doc_ref):
+def get_saved_doc_nocahe(doc_ref, create_if_dne=True):
     doc = doc_ref.get()
-    if not doc.exists:
+    if not doc.exists and create_if_dne:
         doc_ref.create({})
         doc = doc_ref.get()
     return doc.to_dict()
