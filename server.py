@@ -1,6 +1,7 @@
 import datetime
 import time
 import typing
+import stripe
 
 from fastapi import FastAPI
 from fastapi import HTTPException, Body
@@ -41,9 +42,14 @@ from pages.ObjectInpainting import ObjectInpaintingPage
 from pages.SEOSummary import SEOSummaryPage
 from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
+from routers import credits
+from daras_ai import db
+
+from server_helper import *
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
+app.include_router(credits.router, tags=["credits"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -60,6 +66,23 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
+
+list_subscriptions = [
+    {
+        "title": "MONTHLY @ $10",
+        "description": "1000 Credits to get you up, up and away. Cancel your plan anytime.",
+        "credits": 1000,
+        "lookup_key": "standard_subscription",
+        "display_text": "Standard Plan",
+    },
+    {
+        "title": "MONTHLY @ $50",
+        "description": "5000 Credits + special access to make bespoke interactive video bots! ",
+        "credits": 5000,
+        "lookup_key": "premium_subscription",
+        "display_text": "Premium Plan",
+    },
+]
 
 
 @app.get("/login", include_in_schema=False)
@@ -229,6 +252,27 @@ def st_home(request: Request):
     )
 
 
+@app.get("/account", include_in_schema=False)
+def account(request: Request):
+    if not request.user:
+        return RedirectResponse("/")
+    uid = get_uid(request)
+    user_credits = db.get_user_field(uid, "credits")
+    lookup_key = db.get_user_field(uid, "lookup_key")
+    context = {
+        "request": request,
+        "credits": user_credits,
+        "available_subscriptions": list_subscriptions,
+        "lookup_key": lookup_key,
+        "title": "Account Page",
+    }
+    if lookup_key:
+        for subscription in list_subscriptions:
+            if subscription["lookup_key"] == lookup_key:
+                context["subscription"] = subscription
+    return templates.TemplateResponse("account.html", context)
+
+
 @app.get("/Editor/", include_in_schema=False)
 def st_editor(request: Request):
     iframe_url = furl(settings.IFRAME_BASE_URL) / "Editor"
@@ -237,6 +281,15 @@ def st_editor(request: Request):
         iframe_url,
         context={"title": f"Gooey.AI"},
     )
+
+
+def check_and_create_new_doc_in_db(uid: str, data: dict):
+    if not db.check_for_user_document_avail(uid):
+        db.add_data_to_user_doc(
+            uid,
+            data,
+            new_doc=True,
+        )
 
 
 def script_to_frontend(page_cls: typing.Type[BasePage]):
@@ -263,14 +316,44 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     f = furl(iframe_url)
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
-
+    if request.session.get(ANONYMOUS_USER_COOKIE):
+        uid = request.session.get(ANONYMOUS_USER_COOKIE)["uid"]
+        check_and_create_new_doc_in_db(
+            uid,
+            {
+                "credits": settings.CREDITS_TO_ADD_NEW_USER,
+                "lookup_key": None,
+                "anonymous_user": True,
+            },
+        )
     if not (request.user or request.session.get(ANONYMOUS_USER_COOKIE)):
+        uid = auth.create_user().uid
         request.session[ANONYMOUS_USER_COOKIE] = {
-            "uid": auth.create_user().uid,
+            "uid": uid,
         }
-
+        check_and_create_new_doc_in_db(
+            uid,
+            {
+                "credits": settings.CREDITS_TO_ADD_NEW_USER,
+                "lookup_key": None,
+                "anonymous_user": True,
+            },
+        )
+    if request.user:
+        user = request.user
+        check_and_create_new_doc_in_db(
+            user.uid,
+            {
+                "credits": settings.CREDITS_TO_ADD_NEW_USER,
+                "email": user.email,
+                "name": user.display_name,
+                "uid": user.uid,
+                "lookup_key": None,
+                "anonymous_user": False,
+            },
+        )
     return templates.TemplateResponse(
-        "app.html",
+        "home.html",
         context={
             "request": request,
             "iframe_url": f.url,

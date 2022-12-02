@@ -1,0 +1,54 @@
+{% extends 'app.html' %}
+
+{% block content %}
+    {% if request.user %}
+        <div class="login-container">
+            <a href="/account">{{ request.user.display_name or request.user.email or request.user.phone_number }}</a>
+        </div>
+    {% else %}
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+        <div id="g_id_onload"
+             data-client_id="6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com"
+             data-callback="handleCredentialResponse"
+             data-auto_prompt="true">
+        </div>
+
+        <div class="login-container">
+            <div class="g_id_signin"
+                 data-type="button"
+                 data-size="large"
+                 data-theme="filled_black"
+                 data-text="sign_in_with"
+                 data-shape="pill"
+                 data-logo_alignment="right">
+            </div>
+            <div style="height: 10px"></div>
+            <a style="font-size: 15px; color: wheat" href="/login?next={{ request.path }}">More Options</a>
+        </div>
+    {% endif %}
+
+    <iframe onload="onIframeLoaded(this)"
+            src="{{ iframe_url }}"
+            allow="clipboard-read; clipboard-write; accelerometer; ambient-light-sensor; autoplay; battery; camera; document-domain; encrypted-media; fullscreen; geolocation; gyroscope; layout-animations; legacy-image-formats; magnetometer; microphone; midi; oversized-images; payment; picture-in-picture; publickey-credentials-get; sync-xhr; usb; vr ; wake-lock; xr-spatial-tracking">
+    </iframe>
+
+    <script>
+        function onIframeLoaded(iframe) {
+            window.addEventListener('message', function (event) {
+                switch (event.data.type) {
+                    case "GOOEY_SET_QUERY_PARAM":
+                        let searchParams = new URLSearchParams(window.location.search);
+                        for (let [key, value] of Object.entries(event.data.queryParams)) {
+                            searchParams.set(key, value);
+                        }
+                        let url = new URL(window.location.href);
+                        url.search = searchParams.toString();
+                        history.pushState(null, '', url.toString());
+                    case "GOOEY_IFRAME_RESIZE":
+                        iframe.style.height = `${event.data.height + 100}px`;
+                }
+            });
+        }
+    </script>
+{% endblock content %}

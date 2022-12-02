@@ -18,6 +18,7 @@ from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
 from daras_ai_v2.hidden_html_widget import hidden_html_js
+from daras_ai import db
 
 DEFAULT_STATUS = "Running..."
 
@@ -86,6 +87,9 @@ class BasePage:
 
             with col1:
                 submitted = self.render_form()
+                if submitted:
+                    pass
+                # TODO: add deduct code here.
                 self.render_description()
 
             with col2:
@@ -123,6 +127,26 @@ class BasePage:
 
     def validate_form_v2(self) -> bool:
         pass
+
+    def deduct_credits(self):
+        user = st.session_state.get("_current_user")
+        uid = user.uid
+        if db.get_user_field(uid, "credits") < settings.CREDITS_TO_DEDUCT_PER_RUN:
+            if db.get_user_field(uid, "anonymous_user"):
+                st.error(
+                    f"Doh! You need to login to run more Gooey.AI recipes. [Login]({settings.APP_BASE_URL}/login?next=/) ",
+                    icon="⚠️",
+                )
+                st.write(f"[Login]({settings.APP_BASE_URL}/login?next=/)")
+            else:
+                st.error(
+                    f"Doh! You need to purchase additional credits to run more Gooey.AI recipes. [Login]({settings.APP_BASE_URL}/login?next=/)",
+                    icon="⚠️",
+                )
+                st.write(f"[Buy Credits]({settings.APP_BASE_URL}/account)")
+            return False
+        db.deduct_user_credits(uid, settings.CREDITS_TO_DEDUCT_PER_RUN)
+        return True
 
     def render_form(self) -> bool:
         with st.form(f"{self.slug}Form"):

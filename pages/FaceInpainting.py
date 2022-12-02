@@ -4,6 +4,8 @@ import streamlit as st
 import typing
 from pydantic import BaseModel
 
+import daras_ai.db
+import daras_ai_v2.settings
 from daras_ai.extract_face import extract_and_reposition_face_cv2
 from daras_ai_v2.face_restoration import map_parallel, gfpgan
 from daras_ai.image_input import (
@@ -117,6 +119,9 @@ class FaceInpaintingPage(BasePage):
         # upload input file if submitted
         if submitted:
             input_file = st.session_state.get("input_file")
+            deduct_success = super(FaceInpaintingPage, self).deduct_credits()
+            if not deduct_success:
+                return False
             if input_file:
                 st.session_state["input_image"] = upload_file_hq(input_file)
 
