@@ -170,7 +170,6 @@ class BasePage:
             st.error("Please provide a Prompt and an Email Address", icon="⚠️")
             return False
         else:
-            print("REstu")
             return True
 
     def render_footer(self):
@@ -539,10 +538,18 @@ def set_saved_doc(
 #     },
 # )
 def get_saved_doc(doc_ref: firestore.DocumentReference, create_if_dne=True) -> dict:
+    """
+    create_if_dne
+    dne=Does not exist
+    """
     return get_saved_doc_nocahe(doc_ref, create_if_dne)
 
 
 def get_saved_doc_nocahe(doc_ref, create_if_dne=True):
+    """
+    create_if_dne
+    dne=Does not exist
+    """
     doc = doc_ref.get()
     if not doc.exists and create_if_dne:
         doc_ref.create({})
