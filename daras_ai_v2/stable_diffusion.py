@@ -1,8 +1,8 @@
-import replicate
 import io
 from enum import Enum
 
 import openai
+import replicate
 import requests
 from PIL import Image
 

@@ -50,9 +50,13 @@ def reposition_object(
 
     # original face height
     obj_height = abs(obj_ymax - obj_ymin)
+    obj_width = abs(obj_xmax - obj_xmin)
 
     # image resize ratio
-    re_ratio = (out_img_y / obj_height) * out_obj_scale
+    if obj_height > obj_width:
+        re_ratio = (out_img_y / obj_height) * out_obj_scale
+    else:
+        re_ratio = (out_img_x / obj_width) * out_obj_scale
 
     # resized image size
     re_img_x = int(img_x * re_ratio)

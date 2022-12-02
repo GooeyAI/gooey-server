@@ -4,21 +4,21 @@ import typing
 import readability
 import requests
 import streamlit as st
-from fake_useragent import UserAgent
 from furl import furl
 from html2text import html2text
 from pydantic import BaseModel
 
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.language_model import (
     run_language_model,
     GPT3_MAX_ALLOED_TOKENS,
     calc_gpt_tokens,
 )
+from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
 
 STOP_SEQ = "###"
-ua = UserAgent(browsers=["chrome"])
 
 
 class SEOSummaryPage(BasePage):
@@ -38,6 +38,7 @@ class SEOSummaryPage(BasePage):
         quality=1.0,
         max_search_urls=10,
         task_instructions="I will give you a URL and focus keywords and using the high ranking content from the google search results below you will write 500 words for the given url.",
+        avoid_repetition=True,
     )
 
     class RequestModel(BaseModel):
@@ -55,6 +56,7 @@ class SEOSummaryPage(BasePage):
         max_tokens: int | None
         num_outputs: int | None
         quality: float | None
+        avoid_repetition: bool | None
 
         max_search_urls: int | None
 
@@ -69,7 +71,7 @@ class SEOSummaryPage(BasePage):
     def render_form_v2(self):
         st.write("### Inputs")
         st.text_input("Search Query", key="search_query")
-        st.text_input("Keywords", key="keywords")
+        st.text_area("Keywords", key="keywords")
         st.text_input("Title", key="title")
         st.text_input("Company URL", key="company_url")
 
@@ -86,21 +88,9 @@ class SEOSummaryPage(BasePage):
             height=200,
         )
 
-        st.write("---")
+        st.write("#### Language Model Optimizations")
 
-        st.write(
-            "ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)"
-        )
-        st.text_input(
-            "scaleserp_search_field",
-            label_visibility="collapsed",
-            key="scaleserp_search_field",
-        )
-        st.write("---")
-
-        st.checkbox("Convert HTML->Text?", key="do_html2text")
-
-        st.write("---")
+        st.checkbox("Avoid Repetition", key="avoid_repetition")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -121,7 +111,7 @@ class SEOSummaryPage(BasePage):
 
         st.write(
             """
-            ###### Model Risk Factor 
+            ###### Model Creativity 
             *(Sampling Temperature)*
             
             Higher values allow the model to take more risks.
@@ -140,6 +130,19 @@ class SEOSummaryPage(BasePage):
             )
 
         st.write("---")
+
+        st.write("#### Seach Tools")
+
+        st.checkbox("Convert HTML->Text?", key="do_html2text")
+
+        st.write(
+            "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**"
+        )
+        st.text_input(
+            "scaleserp_search_field",
+            label_visibility="collapsed",
+            key="scaleserp_search_field",
+        )
 
         col1, col2 = st.columns(2)
 
@@ -177,12 +180,12 @@ class SEOSummaryPage(BasePage):
         output_content = st.session_state.get("output_content")
         if output_content:
             st.write("### Generated Content")
-            for text in output_content:
+            for idx, text in enumerate(output_content):
                 st.text_area(
-                    "Output",
+                    f"Output {idx}",
                     label_visibility="collapsed",
                     value=text,
-                    height=200,
+                    height=300,
                     disabled=True,
                 )
         else:
@@ -269,13 +272,14 @@ class SEOSummaryPage(BasePage):
 def _run_lm(request: SEOSummaryPage.RequestModel, final_prompt: str) -> list[str]:
     return run_language_model(
         api_provider="openai",
-        engine="text-davinci-002",
+        engine="text-davinci-003",
         quality=request.quality,
         num_outputs=request.num_outputs,
         temperature=request.sampling_temperature,
         prompt=final_prompt,
         max_tokens=request.max_tokens,
         stop=[STOP_SEQ],
+        avoid_repetition=request.avoid_repetition,
     )
 
 
@@ -341,7 +345,7 @@ def _gen_final_prompt(
 def _summarize_url(request: SEOSummaryPage.RequestModel, url: str):
     try:
         title, summary = _call_summarize_url(url)
-    except requests.HTTPError:
+    except requests.RequestException:
         return None
 
     if request.do_html2text:
@@ -362,7 +366,11 @@ def _summarize_url(request: SEOSummaryPage.RequestModel, url: str):
 
 @st.cache(show_spinner=False)
 def _call_summarize_url(url: str) -> (str, str):
-    r = requests.get(url, headers={"User-Agent": ua.random})
+    r = requests.get(
+        url,
+        headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
+        timeout=EXTERNAL_REQUEST_TIMEOUT_SEC,
+    )
     r.raise_for_status()
     doc = readability.Document(r.text)
     return doc.title(), doc.summary()

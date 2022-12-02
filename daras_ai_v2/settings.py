@@ -48,3 +48,6 @@ GPU_SERVER_1 = config("GPU_SERVER_1", "http://gpu-1.gooey.ai")
 GPU_SERVER_2 = config("GPU_SERVER_2", "http://gpu-2.gooey.ai")
 
 SCALESERP_API_KEY = config("SCALESERP_API_KEY", None)
+
+# timeout for fetching external urls in the wild
+EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
