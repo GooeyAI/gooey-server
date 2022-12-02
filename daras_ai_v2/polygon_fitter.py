@@ -95,9 +95,9 @@ def best_fit_rotated_rect(mask_cv2):
 
     rect_width, rect_height = size
     if rect_width > rect_height:
-        angle += 180
+        angle = (angle + 180) % 180
     else:
-        angle += 90
+        angle = (angle + 90) % 180
 
     img_height, img_width, _ = mask_cv2.shape
     if img_width > img_height:

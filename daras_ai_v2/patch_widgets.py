@@ -18,6 +18,8 @@ def patch_all():
 
 def patch_video():
     old_func = st.video
+    if hasattr(old_func, "__st_wrapped__"):
+        return
 
     @wraps(old_func)
     def new_func(url):
@@ -26,11 +28,14 @@ def patch_video():
         f.fragment.args["t"] = "0.001"
         return old_func(f.url)
 
+    new_func.__st_wrapped__ = True
     st.video = new_func
 
 
 def patch_file_uploader():
     old_func = st.file_uploader
+    if hasattr(old_func, "__st_wrapped__"):
+        return
 
     @wraps(old_func)
     def new_func(label, label_visibility="markdown", **kwargs):
@@ -39,17 +44,21 @@ def patch_file_uploader():
             label_visibility = "collapsed"
 
         value = old_func(label, label_visibility=label_visibility, **kwargs)
+
         st.caption(
-            "By uploading, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
+            "_By uploading, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)_",
         )
 
         return value
 
+    new_func.__st_wrapped__ = True
     st.file_uploader = new_func
 
 
 def patch_input_func(func_name: str):
     old_func = getattr(st, func_name)
+    if hasattr(old_func, "__st_wrapped__"):
+        return
 
     @wraps(old_func)
     def new_func(
@@ -88,10 +97,8 @@ def patch_input_func(func_name: str):
 
         return value
 
+    new_func.__st_wrapped__ = True
     setattr(st, func_name, new_func)
 
 
-patched = False
-if not patched:
-    patched = True
-    patch_all()
+patch_all()
