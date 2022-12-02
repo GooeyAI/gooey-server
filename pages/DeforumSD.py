@@ -36,7 +36,7 @@ class DeforumSDPage(BasePage):
             """
                 This recipe takes any text and creates animation. 
 
-                It's based off the Deforum notebook with lots of details at https://deforum.art. 
+                It's based off the Deforum notebook with lots of details at http://deforum.art. 
             """
         )
 
