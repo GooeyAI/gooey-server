@@ -15,6 +15,7 @@ from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.extract_face import extract_face_img_bytes
+from daras_ai_v2.loom_video_widget import loom_video
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
@@ -289,12 +290,7 @@ class FaceInpaintingPage(BasePage):
                 ## How to Use This Recipe
                 """
             )
-            st.markdown(
-                """
-                <iframe width="640" height="400" src="https://www.loom.com/embed/788dfdee763a4e329e28e749239f9810" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe> 
-                """,
-                unsafe_allow_html=True,
-            )
+            loom_video("788dfdee763a4e329e28e749239f9810")
 
     def run(self, state: dict):
         yield "Extracting Face..."
