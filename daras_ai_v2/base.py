@@ -54,9 +54,7 @@ class BasePage:
             with st.spinner("Loading Settings..."):
                 query_params = st.experimental_get_query_params()
                 if "example_id" in query_params:
-                    st.session_state.update(
-                        self.get_example_doc(query_params["example_id"][0])
-                    )
+                    self.load_example(query_params)
                 elif "run_id" in query_params:
                     self.load_run(query_params)
                 else:
@@ -101,10 +99,15 @@ class BasePage:
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
 
+    def load_example(self, query_params):
+        doc = self.get_example_doc(query_params["example_id"][0])
+        if doc:
+            st.session_state.update(doc)
+        else:
+            st.session_state.update(self.get_doc())
+
     def load_run(self, query_params):
-        doc = self.get_run_doc(
-            query_params["run_id"][0], query_params["uid"][0]
-        )
+        doc = self.get_run_doc(query_params["run_id"][0], query_params["uid"][0])
         if doc:
             st.session_state.update(doc)
         else:
@@ -130,7 +133,8 @@ class BasePage:
                     self.doc_name,
                     sub_collection_id="examples",
                     sub_document_id=example_id,
-                )
+                ),
+                create_if_dne=False
             )
         )
 

@@ -245,6 +245,12 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
         page = page_cls()
         if "example_id" in request.query_params:
             state = page.get_example_doc(request.query_params["example_id"])
+            if not state:
+                state = page.get_doc()
+        elif "run_id" in request.query_params and "uid" in request.query_params:
+            state = page.get_run_doc(run_id=request.query_params["run_id"], uid=request.query_params["uid"])
+            if not state:
+                state = page.get_doc()
         else:
             state = page.get_doc()
         iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug
