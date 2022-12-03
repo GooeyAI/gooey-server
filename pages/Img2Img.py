@@ -164,7 +164,7 @@ class Img2ImgPage(BasePage):
         with col2:
             if output_images:
                 for url in output_images:
-                    st.image(url, caption=f"“{text_prompt}”")
+                    st.image(url, caption=f"{text_prompt}")
             else:
                 st.empty()
 

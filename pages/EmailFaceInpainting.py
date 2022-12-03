@@ -241,8 +241,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         return email_body
 
     def render_example(self, state: dict):
-        st.write("Input Email -", state.get("email_address"))
-        super().render_example(state)
+        st.write("**Input Email** -", state.get("email_address"))
+        output_images = state.get("output_images")
+        if output_images:
+            for img in output_images:
+                st.image(img, caption=state.get("text_prompt", ""))
 
 
 @st.cache()

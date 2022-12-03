@@ -178,10 +178,9 @@ class CompareText2ImgPage(BasePage):
     def _render_outputs(self, state):
         selected_models = state.get("selected_models", [])
         for key in selected_models:
-            st.write(f"**{Text2ImgModels[key].value}**")
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
-                st.image(img)
+                st.image(img, caption=Text2ImgModels[key].value)
 
     # def preview_image(self, state: dict) -> str:
     #     # TODO: Which model to pick and if key will be available

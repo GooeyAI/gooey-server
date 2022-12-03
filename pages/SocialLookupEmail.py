@@ -196,12 +196,10 @@ class SocialLookupEmailPage(BasePage):
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Email Address**")
-            st.write(state.get("email_address", ""))
-        with col2:
-            st.write("**Email Body Output**")
-            st.write(state.get("output_email_body", ""))
+        st.write("**Email Address**")
+        st.write(state.get("email_address", ""))
+        st.write("**Email Body Output**")
+        st.write(state.get("output_email_body", ""))
 
 
 @st.cache()

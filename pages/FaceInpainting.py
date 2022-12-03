@@ -246,7 +246,7 @@ class FaceInpaintingPage(BasePage):
         with col2:
             if output_images:
                 for url in output_images:
-                    st.image(url, caption=f"“{text_prompt}”")
+                    st.image(url, caption=f"{text_prompt}")
             else:
                 st.empty()
 
@@ -276,7 +276,7 @@ class FaceInpaintingPage(BasePage):
                 diffusion_images = st.session_state.get("diffusion_images")
                 if diffusion_images:
                     for url in diffusion_images:
-                        st.image(url, caption=f"Stable Diffusion - “{text_prompt}”")
+                        st.image(url, caption="Generated Image")
                 else:
                     st.empty()
 

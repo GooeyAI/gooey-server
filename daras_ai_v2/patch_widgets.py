@@ -5,6 +5,7 @@ from furl import furl
 
 
 def patch_all():
+    patch_image()
     patch_video()
     patch_file_uploader()
     for fn in [
@@ -16,12 +17,26 @@ def patch_all():
         patch_input_func(fn.__name__)
 
 
+def patch_image():
+    def new_func(image, caption=None, **kwargs):
+        if caption:
+            st.write(f"**{caption.strip()}**")
+        old_func(image)
+
+    old_func = _patcher(st.image.__name__, new_func)
+
+
 def patch_video():
-    def new_func(url):
-        f = furl(url)
+    def new_func(url, caption=None):
+        if caption:
+            st.write(f"**{caption.strip()}**")
+
         # https://muffinman.io/blog/hack-for-ios-safari-to-display-html-video-thumbnail/
+        f = furl(url)
         f.fragment.args["t"] = "0.001"
-        return old_func(f.url)
+        url = f.url
+
+        return old_func(url)
 
     old_func = _patcher(st.video.__name__, new_func)
 
@@ -62,7 +77,7 @@ def patch_input_func(func_name: str):
             label_visibility = "collapsed"
 
         if func_name.startswith("text"):
-            # fix for https://github.com/streamlit/streamlit/issues/5604
+            # fix for https://github.comk/streamlit/streamlit/issues/5604
             value = old_func(
                 label,
                 value=value,
