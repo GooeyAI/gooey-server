@@ -141,7 +141,7 @@ class SocialLookupEmailPage(BasePage):
 
         state["output_email_body"] = run_language_model(
             api_provider="openai",
-            engine="text-davinci-002",
+            engine="text-davinci-003",
             quality=1,
             num_outputs=1,
             temperature=request.sampling_temperature,
