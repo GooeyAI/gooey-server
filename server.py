@@ -1,7 +1,6 @@
 import datetime
 import time
 import typing
-import stripe
 
 from fastapi import FastAPI
 from fastapi import HTTPException, Body
@@ -321,7 +320,7 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
         check_and_create_new_doc_in_db(
             uid,
             {
-                "credits": settings.CREDITS_TO_ADD_NEW_USER,
+                "credits": settings.CREDITS_TO_ADD_NEW_USER_ANONYMOUS,
                 "lookup_key": None,
                 "anonymous_user": True,
             },
@@ -334,7 +333,7 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
         check_and_create_new_doc_in_db(
             uid,
             {
-                "credits": settings.CREDITS_TO_ADD_NEW_USER,
+                "credits": settings.CREDITS_TO_ADD_NEW_USER_ANONYMOUS,
                 "lookup_key": None,
                 "anonymous_user": True,
             },
@@ -344,7 +343,7 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
         check_and_create_new_doc_in_db(
             user.uid,
             {
-                "credits": settings.CREDITS_TO_ADD_NEW_USER,
+                "credits": settings.CREDITS_TO_ADD_NEW_USER_SIGNED_IN,
                 "email": user.email,
                 "name": user.display_name,
                 "uid": user.uid,

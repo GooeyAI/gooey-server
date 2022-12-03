@@ -17,8 +17,7 @@ from streamlit.components.v1 import html
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
-from daras_ai_v2.hidden_html_widget import hidden_html_js
-from daras_ai import db
+from daras_ai_v2 import credits_helper
 
 DEFAULT_STATUS = "Running..."
 
@@ -78,7 +77,7 @@ class BasePage:
             self._examples_tab()
 
         with api_tab:
-            run_as_api_tab(self.endpoint, self.RequestModel)
+            run_as_api_tab(self.endpoint, self.RequestModel, self.slug)
 
         with run_tab:
             col1, col2 = st.columns(2)
@@ -88,8 +87,9 @@ class BasePage:
             with col1:
                 submitted = self.render_form()
                 if submitted:
-                    pass
-                # TODO: add deduct code here.
+                    deduct_success = credits_helper.deduct_credits(self.slug)
+                    if not deduct_success:
+                        return False
                 self.render_description()
 
             with col2:
@@ -127,26 +127,6 @@ class BasePage:
 
     def validate_form_v2(self) -> bool:
         pass
-
-    def deduct_credits(self):
-        user = st.session_state.get("_current_user")
-        uid = user.uid
-        if db.get_user_field(uid, "credits") < settings.CREDITS_TO_DEDUCT_PER_RUN:
-            if db.get_user_field(uid, "anonymous_user"):
-                st.error(
-                    f"Doh! You need to login to run more Gooey.AI recipes. [Login]({settings.APP_BASE_URL}/login?next=/) ",
-                    icon="⚠️",
-                )
-                st.write(f"[Login]({settings.APP_BASE_URL}/login?next=/)")
-            else:
-                st.error(
-                    f"Doh! You need to purchase additional credits to run more Gooey.AI recipes. [Login]({settings.APP_BASE_URL}/login?next=/)",
-                    icon="⚠️",
-                )
-                st.write(f"[Buy Credits]({settings.APP_BASE_URL}/account)")
-            return False
-        db.deduct_user_credits(uid, settings.CREDITS_TO_DEDUCT_PER_RUN)
-        return True
 
     def render_form(self) -> bool:
         with st.form(f"{self.slug}Form"):
@@ -295,11 +275,11 @@ class BasePage:
             doc = snapshot.to_dict()
 
             url = (
-                furl(
-                    settings.APP_BASE_URL,
-                    query_params={"example_id": example_id},
-                )
-                / self.slug
+                    furl(
+                        settings.APP_BASE_URL,
+                        query_params={"example_id": example_id},
+                    )
+                    / self.slug
             ).url
 
             col1, col2, col3, *_ = st.columns(6)
@@ -413,8 +393,8 @@ class BasePage:
 
 
 def set_saved_doc(
-    doc_ref: firestore.DocumentReference,
-    updated_state: dict,
+        doc_ref: firestore.DocumentReference,
+        updated_state: dict,
 ):
     doc_ref.set(updated_state)
     # saved_state = get_saved_doc(doc_ref)
@@ -444,10 +424,10 @@ def get_saved_doc_nocahe(doc_ref):
 
 # @cache_and_refresh
 def list_all_docs(
-    collection_id="daras-ai-v2",
-    *,
-    document_id: str = None,
-    sub_collection_id: str = None,
+        collection_id="daras-ai-v2",
+        *,
+        document_id: str = None,
+        sub_collection_id: str = None,
 ):
     db = firestore.Client()
     db_collection = db.collection(collection_id)
@@ -458,11 +438,11 @@ def list_all_docs(
 
 
 def get_doc_ref(
-    document_id: str,
-    *,
-    collection_id="daras-ai-v2",
-    sub_collection_id: str = None,
-    sub_document_id: str = None,
+        document_id: str,
+        *,
+        collection_id="daras-ai-v2",
+        sub_collection_id: str = None,
+        sub_document_id: str = None,
 ):
     db = firestore.Client()
     db_collection = db.collection(collection_id)
@@ -473,7 +453,7 @@ def get_doc_ref(
     return doc_ref
 
 
-def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
+def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel], slug: str):
     if not check_secret_key("run as API", settings.API_SECRET_KEY):
         return
 
@@ -501,6 +481,9 @@ curl -X 'POST' \
 
     if st.button("Call API 🚀"):
         with st.spinner("Waiting for API..."):
+            deduct_success = credits_helper.deduct_credits(slug)
+            if not deduct_success:
+                return False
             r = requests.post(api_url, json=request_body)
             "### Response"
             r.raise_for_status()
@@ -508,7 +491,7 @@ curl -X 'POST' \
 
 
 def get_example_request_body(
-    request_model: typing.Type[BaseModel], state: dict
+        request_model: typing.Type[BaseModel], state: dict
 ) -> dict:
     return {
         field_name: state.get(field_name)

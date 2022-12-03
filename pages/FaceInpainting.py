@@ -119,9 +119,6 @@ class FaceInpaintingPage(BasePage):
         # upload input file if submitted
         if submitted:
             input_file = st.session_state.get("input_file")
-            deduct_success = super(FaceInpaintingPage, self).deduct_credits()
-            if not deduct_success:
-                return False
             if input_file:
                 st.session_state["input_image"] = upload_file_hq(input_file)
 

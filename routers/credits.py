@@ -26,7 +26,7 @@ def create_checkout_session(request):
                 },
             ],
             mode="payment",
-            success_url=DOMAIN + "/account",
+            success_url=DOMAIN + "/payment-success",
             cancel_url=DOMAIN + "/payment-cancel",
             customer_email=user.email,
             client_reference_id=user.uid,
@@ -40,9 +40,7 @@ def create_checkout_session(request):
 @router.route("/payment-cancel")
 def payment_cancel(request):
     context = {"request": request}
-    return templates.TemplateResponse("payment_cancel.html", context) @ router.route(
-        "/payment-cancel"
-    )
+    return templates.TemplateResponse("payment_cancel.html", context)
 
 
 @router.route("/payment-success")
@@ -86,7 +84,7 @@ async def create_checkout_session(request: Request):
 async def customer_portal(request: Request):
     user = request.user
     stripe_customer_id = db.get_user_field(user.uid, "stripe_customer_id")
-    return_url = DOMAIN + "/account"
+    return_url = DOMAIN + "/payment-success"
     portal_configuration = stripe.billing_portal.Configuration.create(
         features={
             "customer_update": {
@@ -132,12 +130,6 @@ async def webhook_received(request: Request):
         event_type = request_data["type"]
     data_object = data["object"]
 
-    print("event " + event_type)
-    if event_type == "customer.subscription.deleted":
-        customer_id = data_object["customer"]
-        uid = db.search_user_by_stripe_customer_id(customer_id)
-        db.add_data_to_user_doc(uid, {"lookup_key": None})
-
     if event_type == "checkout.session.completed":
         subscription_id = data_object["subscription"]
         uid = data_object["client_reference_id"]
@@ -167,4 +159,5 @@ def cancel_subscription(request: Request):
     subscriptions = stripe.Subscription.list(customer=customer_id)
     subscription_id = subscriptions["data"][0]["id"]
     stripe.Subscription.delete(subscription_id)
+    db.add_data_to_user_doc(user.uid, {"lookup_key": None})
     return RedirectResponse("/account", status_code=303)
