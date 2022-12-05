@@ -1,6 +1,3 @@
-from time import sleep
-
-sleep(100)
 import streamlit as st
 from furl import furl
 from google.cloud.firestore_v1 import DocumentSnapshot
