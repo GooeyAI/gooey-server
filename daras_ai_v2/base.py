@@ -37,6 +37,10 @@ class BasePage:
             return self.slug
         return f"{self.slug}#{self.version}"
 
+    @classmethod
+    def app_url(cls) -> str:
+        return str(furl(settings.APP_BASE_URL) / cls.slug)
+
     @property
     def endpoint(self) -> str:
         return f"/v1/{self.slug}/run"
@@ -195,7 +199,7 @@ class BasePage:
             except Exception as e:
                 traceback.print_exc()
                 with status_area:
-                    st.error(f"{type(e).__name__} - {e}", icon="⚠️")
+                    st.error(f"{type(e).__name__} - {err_msg_for_exc(e)}", icon="⚠️")
                 # cleanup is important!
                 del st.session_state["__status"]
                 del st.session_state["__gen"]
@@ -282,13 +286,12 @@ class BasePage:
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
-            url = (
+            url = str(
                 furl(
-                    settings.APP_BASE_URL,
+                    self.app_url(),
                     query_params={"example_id": example_id},
                 )
-                / self.slug
-            ).url
+            )
 
             col1, col2, col3, *_ = st.columns(6)
 
@@ -503,3 +506,16 @@ def get_example_request_body(
         for field_name, field in request_model.__fields__.items()
         if field.required
     }
+
+
+def err_msg_for_exc(e):
+    if isinstance(e, requests.HTTPError):
+        response: requests.Response = e.response
+        try:
+            err_body = response.json()
+        except requests.JSONDecodeError:
+            err_body = response.text
+        err_msg = f"(HTTP {response.status_code}) {err_body}"
+    else:
+        err_msg = f"{type(e).__name__} - {e}"
+    return err_msg

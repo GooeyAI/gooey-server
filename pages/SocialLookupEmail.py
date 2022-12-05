@@ -141,7 +141,7 @@ class SocialLookupEmailPage(BasePage):
 
         state["output_email_body"] = run_language_model(
             api_provider="openai",
-            engine="text-davinci-002",
+            engine="text-davinci-003",
             quality=1,
             num_outputs=1,
             temperature=request.sampling_temperature,
@@ -196,12 +196,10 @@ class SocialLookupEmailPage(BasePage):
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Email Address**")
-            st.write(state.get("email_address", ""))
-        with col2:
-            st.write("**Email Body Output**")
-            st.write(state.get("output_email_body", ""))
+        st.write("**Email Address**")
+        st.write(state.get("email_address", ""))
+        st.write("**Email Body Output**")
+        st.write(state.get("output_email_body", ""))
 
 
 @st.cache()

@@ -5,6 +5,7 @@ from furl import furl
 
 
 def patch_all():
+    patch_image()
     patch_video()
     patch_file_uploader()
     for fn in [
@@ -16,42 +17,48 @@ def patch_all():
         patch_input_func(fn.__name__)
 
 
+def patch_image():
+    def new_func(image, caption=None, **kwargs):
+        if caption:
+            st.write(f"**{caption.strip()}**")
+        old_func(image)
+
+    old_func = _patcher(st.image.__name__, new_func)
+
+
 def patch_video():
-    old_func = st.video
+    def new_func(url, caption=None):
+        if caption:
+            st.write(f"**{caption.strip()}**")
 
-    @wraps(old_func)
-    def new_func(url):
-        f = furl(url)
         # https://muffinman.io/blog/hack-for-ios-safari-to-display-html-video-thumbnail/
+        f = furl(url)
         f.fragment.args["t"] = "0.001"
-        return old_func(f.url)
+        url = f.url
 
-    st.video = new_func
+        return old_func(url)
+
+    old_func = _patcher(st.video.__name__, new_func)
 
 
 def patch_file_uploader():
-    old_func = st.file_uploader
-
-    @wraps(old_func)
     def new_func(label, label_visibility="markdown", **kwargs):
         if label_visibility == "markdown":
             st.write(label)
             label_visibility = "collapsed"
 
         value = old_func(label, label_visibility=label_visibility, **kwargs)
+
         st.caption(
-            "By uploading, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
+            "_By uploading, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)_",
         )
 
         return value
 
-    st.file_uploader = new_func
+    old_func = _patcher(st.file_uploader.__name__, new_func)
 
 
 def patch_input_func(func_name: str):
-    old_func = getattr(st, func_name)
-
-    @wraps(old_func)
     def new_func(
         label,
         key=None,
@@ -70,7 +77,7 @@ def patch_input_func(func_name: str):
             label_visibility = "collapsed"
 
         if func_name.startswith("text"):
-            # fix for https://github.com/streamlit/streamlit/issues/5604
+            # fix for https://github.comk/streamlit/streamlit/issues/5604
             value = old_func(
                 label,
                 value=value,
@@ -88,10 +95,25 @@ def patch_input_func(func_name: str):
 
         return value
 
+    old_func = _patcher(func_name, new_func)
+
+
+def _patcher(func_name, new_func):
+    # get old impl
+    old_func = getattr(st, func_name)
+    if hasattr(old_func, "__st_wrapped__"):
+        # already wrapped, abort
+        return None
+
+    new_func = wraps(old_func)(new_func)
+
+    # mark as wrapped
+    new_func.__st_wrapped__ = True
+    # replace with new impl
     setattr(st, func_name, new_func)
 
+    # return the old impl
+    return old_func
 
-patched = False
-if not patched:
-    patched = True
-    patch_all()
+
+patch_all()

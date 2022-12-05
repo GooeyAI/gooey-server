@@ -1,8 +1,8 @@
 import re
+import typing
 
 import requests
 import streamlit as st
-import typing
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
@@ -23,6 +23,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         email_address: str
 
         text_prompt: str | None
+        negative_prompt: str | None
 
         num_outputs: int | None
         quality: int | None
@@ -240,8 +241,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         return email_body
 
     def render_example(self, state: dict):
-        st.write("Input Email -", state.get("email_address"))
-        super().render_example(state)
+        st.write("**Input Email** -", state.get("email_address"))
+        output_images = state.get("output_images")
+        if output_images:
+            for img in output_images:
+                st.image(img, caption=state.get("text_prompt", ""))
 
 
 @st.cache()

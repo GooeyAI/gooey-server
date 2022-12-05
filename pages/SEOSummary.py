@@ -4,13 +4,13 @@ import typing
 import readability
 import requests
 import streamlit as st
-from furl import furl
 from html2text import html2text
 from pydantic import BaseModel
 
-from daras_ai_v2 import settings
+from pages.GoogleImageGen import GoogleImageGenPage
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
+from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import (
     run_language_model,
     GPT3_MAX_ALLOED_TOKENS,
@@ -59,6 +59,8 @@ class SEOSummaryPage(BasePage):
         avoid_repetition: bool | None
 
         max_search_urls: int | None
+
+        generate_lead_image: bool | None
 
     class ResponseModel(BaseModel):
         output_content: list[str]
@@ -160,6 +162,12 @@ class SEOSummaryPage(BasePage):
                 max_value=4096,
             )
 
+        st.write("---")
+
+        st.checkbox(
+            f"Generate Lead Image using [GoogleImageGen]({GoogleImageGenPage.app_url()})"
+        )
+
     def render_output(self):
         output_content = st.session_state.get("output_content")
         if output_content:
@@ -236,8 +244,9 @@ class SEOSummaryPage(BasePage):
 
         yield "Running ScaleSERP..."
 
-        scaleserp_results = _call_scaleserp(
-            request.search_query, request.scaleserp_search_field
+        scaleserp_results = call_scaleserp(
+            request.search_query,
+            include_fields=request.scaleserp_search_field,
         )
         search_urls = _extract_search_urls(request, scaleserp_results)[
             : request.max_search_urls
@@ -368,26 +377,6 @@ def _extract_search_urls(
     ]
     random.shuffle(search_urls)
     return search_urls
-
-
-@st.cache(show_spinner=False)
-def _call_scaleserp(search_query: str, search_field: str) -> dict:
-    scaleserp_url = furl(
-        "https://api.scaleserp.com/search",
-        query_params={
-            "api_key": settings.SCALESERP_API_KEY,
-            "q": search_query,
-            "location": "United States",
-            "hl": "en",
-            "google_domain": "google.com",
-            "gl": "us",
-            "include_fields": search_field,
-        },
-    ).url
-    r = requests.get(scaleserp_url)
-    r.raise_for_status()
-    scaleserp_results = r.json()
-    return scaleserp_results
 
 
 if __name__ == "__main__":
