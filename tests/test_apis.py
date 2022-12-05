@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from daras_ai_v2.base import (
     BasePage,
     get_example_request_body,
-    get_saved_doc_nocahe,
+    get_or_create_doc,
     get_doc_ref,
 )
 from pages.ChyronPlant import ChyronPlantPage
@@ -49,7 +49,7 @@ pages_to_test = [
 @pytest.mark.parametrize("page_cls", pages_to_test)
 def test_apis_basic(page_cls: typing.Type[BasePage]):
     page = page_cls()
-    state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
+    state = get_or_create_doc(get_doc_ref(page.doc_name)).to_dict()
 
     r = client.post(
         page.endpoint,

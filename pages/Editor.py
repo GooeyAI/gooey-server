@@ -16,13 +16,13 @@ from daras_ai.db import list_all_docs
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key
 from daras_ai_v2 import settings
-from daras_ai_v2.query_params import gooey_set_query_parm
+from daras_ai_v2.query_params import gooey_reset_query_parm
 
 
 def get_or_create_doc_id():
     query_params = st.experimental_get_query_params()
     doc_id = query_params.get("id", [new_doc_id()])[0]
-    gooey_set_query_parm(id=doc_id)
+    gooey_reset_query_parm(id=doc_id)
     return doc_id
 
 
