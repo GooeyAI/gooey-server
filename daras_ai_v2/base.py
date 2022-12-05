@@ -62,7 +62,10 @@ class BasePage:
     def render(self):
         init_scripts()
 
-        st.caption(st.session_state["_current_user"].uid)
+        try:
+            st.caption(st.session_state["_current_user"].uid)
+        except AttributeError:
+            pass
 
         st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
