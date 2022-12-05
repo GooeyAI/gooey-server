@@ -139,7 +139,7 @@ class BasePage:
 
         return snapshot.to_dict()
 
-    def get_recipe_doc(self):
+    def get_recipe_doc(self) -> firestore.DocumentSnapshot:
         return get_or_create_doc(self._recipe_doc_ref())
 
     def _recipe_doc_ref(self) -> firestore.DocumentReference:

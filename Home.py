@@ -45,7 +45,7 @@ page_classes = [
 pages = [page_cls() for page_cls in page_classes]
 
 with st.spinner():
-    all_examples = map_parallel(lambda page: page.get_recipe_doc(), pages)
+    all_examples = map_parallel(lambda page: page.get_recipe_doc().to_dict(), pages)
 
 for page, example_doc in zip(pages, all_examples):
     col1, col2 = st.columns(2)
