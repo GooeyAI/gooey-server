@@ -2,6 +2,7 @@ import datetime
 import time
 import typing
 
+import requests
 from fastapi import FastAPI
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,7 +26,13 @@ from auth_backend import (
 )
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings
-from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
+from pages.GoogleImageGen import GoogleImageGenPage
+from daras_ai_v2.base import (
+    BasePage,
+    get_doc_ref,
+    get_saved_doc_nocahe,
+    err_msg_for_exc,
+)
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
@@ -216,9 +223,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             except StopIteration:
                 pass
         except Exception as e:
-            return JSONResponse(
-                status_code=500, content={"error": f"{type(e).__name__} - {e}"}
-            )
+            return JSONResponse(status_code=500, content={"error": err_msg_for_exc(e)})
 
         # return updated state
         return state
@@ -252,7 +257,7 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
             state = page.get_example_doc(request.query_params["example_id"])
         else:
             state = page.get_doc()
-        if not state:
+        if state is None:
             raise HTTPException(status_code=404)
         iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug
         return _st_page(
@@ -303,6 +308,7 @@ all_pages = [
     SocialLookupEmailPage,
     CompareText2ImgPage,
     SEOSummaryPage,
+    GoogleImageGenPage,
 ]
 
 

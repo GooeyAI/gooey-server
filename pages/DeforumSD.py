@@ -68,6 +68,7 @@ class DeforumSDPage(BasePage):
             input_data={
                 "max_frames": request.max_frames,
                 "animation_prompts": request.input_prompt,
+                "zoom": "0: (1.004)",
             },
         )[0]
         state["output_video"] = upload_file_from_bytes(
