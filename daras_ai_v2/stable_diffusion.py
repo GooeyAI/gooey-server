@@ -47,7 +47,7 @@ def text2img(
     guidance_scale: float = None,
     seed: float = None,
     sd_2_upscaling: bool = False,
-    negative_prompt: str,
+    negative_prompt: str = None,
 ):
     _resolution_check(width, height)
 
@@ -64,7 +64,7 @@ def text2img(
                     "guidance_scale": guidance_scale,
                     "seed": seed,
                     "upscaling_inference_steps": 10 if sd_2_upscaling else 0,
-                    "negative_prompt": negative_prompt,
+                    "negative_prompt": negative_prompt or "",
                 },
             )
         case Text2ImgModels.jack_qiao.name:
@@ -74,7 +74,7 @@ def text2img(
                     "prompt": prompt,
                     "num_inference_steps": num_inference_steps,
                     "num_outputs": num_outputs,
-                    "negative_prompt": negative_prompt,
+                    "negative_prompt": negative_prompt or "",
                     "width": width,
                     "height": height,
                 },
@@ -105,7 +105,7 @@ def text2img(
                     num_inference_steps=num_inference_steps,
                     guidance_scale=guidance_scale,
                     seed=seed or None,
-                    negative_prompt=negative_prompt,
+                    negative_prompt=negative_prompt or "",
                 )
             ]
         case _:
@@ -127,7 +127,7 @@ def img2img(
     width: int,
     height: int,
     prompt_strength: float,
-    negative_prompt: str,
+    negative_prompt: str = None,
 ):
     _resolution_check(width, height)
 
@@ -144,7 +144,7 @@ def img2img(
                     "init_image": init_image,
                     "strength": prompt_strength,
                     "guidance_scale": 10,
-                    "negative_prompt": negative_prompt,
+                    "negative_prompt": negative_prompt or "",
                 },
             )
         case Img2ImgModels.jack_qiao.name:
@@ -157,7 +157,7 @@ def img2img(
                     # "edit_image": edit_image,
                     # "mask": mask,
                     "num_outputs": num_outputs,
-                    "negative_prompt": negative_prompt,
+                    "negative_prompt": negative_prompt or "",
                     # "outpaint": "expand",
                     "skip_timesteps": int(num_inference_steps * (1 - prompt_strength)),
                     "width": width,
@@ -190,7 +190,7 @@ def img2img(
                     prompt_strength=prompt_strength,
                     num_outputs=num_outputs,
                     num_inference_steps=num_inference_steps,
-                    negative_prompt=negative_prompt,
+                    negative_prompt=negative_prompt or "",
                 )
             ]
         case _:
@@ -213,7 +213,7 @@ def inpainting(
     num_inference_steps: int,
     width: int,
     height: int,
-    negative_prompt: str,
+    negative_prompt: str = None,
 ) -> list[str]:
     _resolution_check(width, height)
 
@@ -230,7 +230,7 @@ def inpainting(
                     "edit_image": edit_image,
                     "mask_image": mask,
                     "guidance_scale": 10,
-                    "negative_prompt": negative_prompt,
+                    "negative_prompt": negative_prompt or "",
                 },
             )
         case InpaintingModels.runway_ml.name:
@@ -272,7 +272,7 @@ def inpainting(
                     "edit_image": edit_image,
                     "mask": mask,
                     "num_outputs": num_outputs,
-                    "negative_prompt": negative_prompt,
+                    "negative_prompt": negative_prompt or "",
                     # "negative_prompt": "string",
                     # "outpaint": "expand",
                     # "skip_timesteps": 0,
