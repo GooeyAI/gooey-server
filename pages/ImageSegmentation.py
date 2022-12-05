@@ -60,6 +60,8 @@ class ImageSegmentationPage(BasePage):
     class ResponseModel(BaseModel):
         output_image: str
         cutout_image: str
+        resized_image: str
+        resized_mask: str
 
     def render_form(self) -> bool:
         with st.form("my_form"):
@@ -361,7 +363,7 @@ class ImageSegmentationPage(BasePage):
     def preview_image(self, state: dict) -> str:
         return state.get("cutout_image", "")
 
-    def preview_description(self) -> str:
+    def preview_description(self, state: dict) -> str:
         # TODO: updated description
         return "Cutout an object from any image"
 
