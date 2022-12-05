@@ -233,6 +233,8 @@ class BasePage:
 
     def save_run(self):
         current_user: auth.UserRecord = st.session_state.get("_current_user")
+        if not current_user:
+            return
 
         query_params = st.experimental_get_query_params()
         run_id = query_params.get(RUN_ID_QUERY_PARAM, [_random_str_id()])[0]
