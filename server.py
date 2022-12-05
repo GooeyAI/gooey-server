@@ -30,7 +30,7 @@ from pages.GoogleImageGen import GoogleImageGenPage
 from daras_ai_v2.base import (
     BasePage,
     get_doc_ref,
-    get_saved_doc_nocahe,
+    get_or_create_doc,
     err_msg_for_exc,
 )
 from pages.ChyronPlant import ChyronPlantPage
@@ -198,7 +198,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page = page_cls()
 
         # get saved state from db
-        state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
+        state = get_or_create_doc(get_doc_ref(page.doc_name)).to_dict()
 
         # set sane defaults
         for k, v in page.sane_defaults.items():
@@ -253,14 +253,7 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
     @app.get(f"/{page_cls.slug}/", include_in_schema=False)
     def st_page(request: Request):
         page = page_cls()
-        if "example_id" in request.query_params:
-            state = page.get_example_doc(request.query_params["example_id"])
-        elif "run_id" in request.query_params and "uid" in request.query_params:
-            state = page.get_run_doc(
-                run_id=request.query_params["run_id"], uid=request.query_params["uid"]
-            )
-        else:
-            state = page.get_doc()
+        state = page.get_doc_from_query_params(dict(request.query_params))
         if state is None:
             raise HTTPException(status_code=404)
         iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug
