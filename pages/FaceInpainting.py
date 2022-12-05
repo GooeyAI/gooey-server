@@ -1,11 +1,11 @@
+import typing
+
 import cv2
 import requests
 import streamlit as st
-import typing
 from pydantic import BaseModel
 
 from daras_ai.extract_face import extract_and_reposition_face_cv2
-from daras_ai_v2.face_restoration import map_parallel, gfpgan
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
@@ -15,6 +15,9 @@ from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.extract_face import extract_face_img_bytes
+from daras_ai_v2.face_restoration import map_parallel, gfpgan
+from daras_ai_v2.loom_video_widget import loom_video
+from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
@@ -26,6 +29,7 @@ class FaceInpaintingPage(BasePage):
     class RequestModel(BaseModel):
         input_image: str
         text_prompt: str
+        negative_prompt: str | None
 
         num_outputs: int | None
         quality: int | None
@@ -53,7 +57,7 @@ class FaceInpaintingPage(BasePage):
         diffusion_images: list[str]
         output_images: list[str]
 
-    def preview_description(self) -> str:
+    def preview_description(self, state: dict) -> str:
         return "This recipe takes a photo with a face and then uses the text prompt to paint a background."
 
     def render_description(self):
@@ -74,32 +78,21 @@ class FaceInpaintingPage(BasePage):
 
     def render_form(self):
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
                 Describe the character that you'd like to generate. 
-                """
-            )
-            st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="Iron man",
             )
 
-            st.write(
+            st.file_uploader(
                 """
                 ### Face Photo
                 Give us a photo of yourself, or anyone else
-                """
-            )
-            st.file_uploader(
-                "input_file",
-                label_visibility="collapsed",
+                """,
                 key="input_file",
-            )
-            st.caption(
-                "By uploading an image, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")
@@ -125,14 +118,16 @@ class FaceInpaintingPage(BasePage):
     def render_settings(self):
         selected_model = enum_selector(
             InpaintingModels,
-            label="Image Model",
+            label="### Image Model",
             key="selected_model",
         )
+
+        negative_prompt_setting(selected_model)
 
         col1, col2 = st.columns(2, gap="medium")
         with col1:
             st.slider(
-                label="# of Outputs",
+                label="Number of Outputs",
                 key="num_outputs",
                 min_value=1,
                 max_value=4,
@@ -251,7 +246,7 @@ class FaceInpaintingPage(BasePage):
         with col2:
             if output_images:
                 for url in output_images:
-                    st.image(url, caption=f"“{text_prompt}”")
+                    st.image(url, caption=f"{text_prompt}")
             else:
                 st.empty()
 
@@ -281,7 +276,7 @@ class FaceInpaintingPage(BasePage):
                 diffusion_images = st.session_state.get("diffusion_images")
                 if diffusion_images:
                     for url in diffusion_images:
-                        st.image(url, caption=f"Stable Diffusion - “{text_prompt}”")
+                        st.image(url, caption="Generated Image")
                 else:
                     st.empty()
 
@@ -291,6 +286,16 @@ class FaceInpaintingPage(BasePage):
                         st.image(url, caption="gfpgan - Face Restoration")
                 else:
                     st.empty()
+
+    def render_footer(self):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(
+                """
+                ## How to Use This Recipe
+                """
+            )
+            loom_video("788dfdee763a4e329e28e749239f9810")
 
     def run(self, state: dict):
         yield "Extracting Face..."
@@ -324,6 +329,7 @@ class FaceInpaintingPage(BasePage):
             num_inference_steps=state.get("quality", 50),
             width=state["output_width"],
             height=state["output_height"],
+            negative_prompt=state["negative_prompt"],
         )
         state["diffusion_images"] = diffusion_images
 

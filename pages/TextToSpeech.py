@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.loom_video_widget import loom_video
 
 
 class TextToSpeechProviders(Enum):
@@ -51,15 +52,11 @@ class TextToSpeechPage(BasePage):
 
     def render_form(self):
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
                 Enter text you want to convert to speech
-                """
-            )
-            st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="This is a test",
                 value="This is a test",
@@ -134,12 +131,7 @@ class TextToSpeechPage(BasePage):
                 ## How to Use This Recipe
                 """
             )
-            st.markdown(
-                """
-                <div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/2d853b7442874b9cbbf3f27b98594add" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe></div>
-                """,
-                unsafe_allow_html=True,
-            )
+            loom_video("2d853b7442874b9cbbf3f27b98594add")
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")

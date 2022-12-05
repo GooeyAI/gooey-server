@@ -16,6 +16,7 @@ from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.image_segmentation import dis
+from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
 from daras_ai_v2.repositioning import reposition_object, reposition_object_img_bytes
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
@@ -31,6 +32,7 @@ class ObjectInpaintingPage(BasePage):
     class RequestModel(BaseModel):
         input_image: str
         text_prompt: str
+        negative_prompt: str | None
 
         num_outputs: int | None
         quality: int | None
@@ -53,32 +55,21 @@ class ObjectInpaintingPage(BasePage):
 
     def render_form(self):
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
                 Describe the scene that you'd like to generate. 
-                """
-            )
-            st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="Iron man",
             )
 
-            st.write(
+            st.file_uploader(
                 """
                 ### Object Photo
                 Give us a photo of anything
-                """
-            )
-            st.file_uploader(
-                "input_file",
-                label_visibility="collapsed",
+                """,
                 key="input_file",
-            )
-            st.caption(
-                "By uploading an image, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")
@@ -118,14 +109,16 @@ class ObjectInpaintingPage(BasePage):
     def render_settings(self):
         selected_model = enum_selector(
             InpaintingModels,
-            label="Image Model",
+            label="### Image Model",
             key="selected_model",
         )
+
+        negative_prompt_setting(selected_model)
 
         col1, col2 = st.columns(2, gap="medium")
         with col1:
             st.slider(
-                label="# of Outputs",
+                label="Number of Outputs",
                 key="num_outputs",
                 min_value=1,
                 max_value=4,
@@ -227,17 +220,13 @@ class ObjectInpaintingPage(BasePage):
 
         st.image(img, width=300)
 
-        st.write(
+        st.slider(
             """
             ##### Edge Threshold
             Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
-            """
-        )
-        st.slider(
+            """,
             min_value=0.0,
             max_value=1.0,
-            label="Threshold",
-            label_visibility="collapsed",
             key="mask_threshold",
         )
 
@@ -259,7 +248,7 @@ class ObjectInpaintingPage(BasePage):
         with col2:
             if output_images:
                 for url in output_images:
-                    st.image(url, caption=f"“{text_prompt}”")
+                    st.image(url, caption=f"{text_prompt}")
             else:
                 st.empty()
 
@@ -289,7 +278,7 @@ class ObjectInpaintingPage(BasePage):
                 diffusion_images = st.session_state.get("output_images")
                 if diffusion_images:
                     for url in diffusion_images:
-                        st.image(url, caption=f"Stable Diffusion - “{text_prompt}”")
+                        st.image(url, caption=f"Generated Image")
                 else:
                     st.empty()
 
@@ -340,6 +329,7 @@ class ObjectInpaintingPage(BasePage):
             num_inference_steps=request.quality,
             width=request.output_width,
             height=request.output_height,
+            negative_prompt=request.negative_prompt,
         )
         state["output_images"] = diffusion_images
 
@@ -354,6 +344,12 @@ class ObjectInpaintingPage(BasePage):
             if output_images:
                 for img in output_images:
                     st.image(img, caption=state.get("text_prompt", ""))
+
+    def preview_image(self, state: dict) -> str:
+        return state.get("output_images", [""])[0]
+
+    def preview_description(self, state: dict) -> str:
+        return "This recipe an image of an object, masks it and then renders the background around the object according to the prompt."
 
 
 if __name__ == "__main__":
