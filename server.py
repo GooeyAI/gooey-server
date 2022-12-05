@@ -248,14 +248,7 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
     @app.get(f"/{page_cls.slug}/", include_in_schema=False)
     def st_page(request: Request):
         page = page_cls()
-        if "example_id" in request.query_params:
-            state = page.get_example_doc(request.query_params["example_id"])
-        elif "run_id" in request.query_params and "uid" in request.query_params:
-            state = page.get_run_doc(
-                run_id=request.query_params["run_id"], uid=request.query_params["uid"]
-            )
-        else:
-            state = page.get_doc()
+        state = page.load_state()
         if not state:
             raise HTTPException(status_code=404)
         iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug

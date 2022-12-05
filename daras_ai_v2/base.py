@@ -53,13 +53,7 @@ class BasePage:
 
         if not st.session_state.get("__loaded__"):
             with st.spinner("Loading Settings..."):
-                query_params = st.experimental_get_query_params()
-                if "example_id" in query_params:
-                    self.load_example(query_params)
-                elif "run_id" in query_params:
-                    self.load_run(query_params)
-                else:
-                    st.session_state.update(self.get_doc())
+                self.load_state()
 
             with st.spinner("Loading Examples..."):
                 st.session_state["__example_docs"] = list_all_docs(
@@ -100,19 +94,27 @@ class BasePage:
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
 
-    def load_example(self, query_params):
-        doc = self.get_example_doc(query_params["example_id"][0])
-        if doc:
-            st.session_state.update(doc)
+    def load_state(self) -> dict | None:
+        query_params = st.experimental_get_query_params()
+        if "example_id" in query_params:
+            doc = self.get_example_doc(query_params["example_id"][0])
+            if doc:
+                st.session_state.update(doc)
+                return doc
+            else:
+                st.session_state.update(self.get_doc())
+        elif "run_id" in query_params:
+            doc = self.get_run_doc(query_params["run_id"][0], query_params["uid"][0])
+            if doc:
+                st.session_state.update(doc)
+                return doc
+            else:
+                st.session_state.update(self.get_doc())
         else:
-            st.session_state.update(self.get_doc())
-
-    def load_run(self, query_params):
-        doc = self.get_run_doc(query_params["run_id"][0], query_params["uid"][0])
-        if doc:
-            st.session_state.update(doc)
-        else:
-            st.session_state.update(self.get_doc())
+            doc = self.get_doc()
+            if doc:
+                st.session_state.update(doc)
+                return doc
 
     def get_run_doc(self, run_id: str, uid: str) -> dict | None:
         return deepcopy(
