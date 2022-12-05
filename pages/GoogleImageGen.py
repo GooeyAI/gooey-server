@@ -24,10 +24,10 @@ class GoogleImageGenPage(BasePage):
         selected_model: str | None
 
     class ResponseModel(BaseModel):
-        output_images: str
+        output_images: list[str]
 
         image_urls: list[str]
-        selected_image: list[str]
+        selected_image: str
 
     def run(self, state: dict):
         request: GoogleImageGenPage.RequestModel = self.RequestModel.parse_obj(state)

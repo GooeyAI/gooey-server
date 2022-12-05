@@ -14,6 +14,7 @@ from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.GoogleImageGen import GoogleImageGenPage
 from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Img2Img import Img2ImgPage
 from pages.LetterWriter import LetterWriterPage
@@ -43,6 +44,7 @@ pages_to_test = [
     SocialLookupEmailPage,
     CompareText2ImgPage,
     SEOSummaryPage,
+    GoogleImageGenPage,
 ]
 
 
