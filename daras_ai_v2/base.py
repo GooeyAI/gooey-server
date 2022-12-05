@@ -53,7 +53,7 @@ class BasePage:
 
     @classmethod
     def app_url(cls) -> str:
-        return str(furl(settings.APP_BASE_URL) / cls.slug)
+        return str(furl(settings.APP_BASE_URL) / (cls.slug + "/"))
 
     @property
     def endpoint(self) -> str:
