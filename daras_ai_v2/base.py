@@ -39,6 +39,10 @@ class BasePage:
             return self.slug
         return f"{self.slug}#{self.version}"
 
+    @classmethod
+    def app_url(cls) -> str:
+        return str(furl(settings.APP_BASE_URL) / cls.slug)
+
     @property
     def endpoint(self) -> str:
         return f"/v1/{self.slug}/run"
@@ -318,7 +322,7 @@ class BasePage:
             except Exception as e:
                 traceback.print_exc()
                 with status_area:
-                    st.error(f"{type(e).__name__} - {e}", icon="⚠️")
+                    st.error(f"{type(e).__name__} - {err_msg_for_exc(e)}", icon="⚠️")
                 # cleanup is important!
                 del st.session_state["__status"]
                 del st.session_state["__gen"]
@@ -353,28 +357,40 @@ class BasePage:
         if not check_secret_key("Save"):
             return
 
-        col1, col2, *_ = st.columns(3)
-        pressed_save = col1.button("🔖 Add as Example")
-        pressed_star = col2.button("💾 Save to Recipe & Settings")
+        doc_ref = None
+        query_params = st.experimental_get_query_params()
+        col1, col2 = st.columns(2)
 
-        if pressed_save:
-            sub_collection = "examples"
-            sub_doc = secrets.token_urlsafe(8)
-        elif pressed_star:
-            sub_collection = None
-            sub_doc = None
-        else:
+        with col2:
+            submitted_1 = st.button("🔖 Add as Example")
+            if submitted_1:
+                new_example_id = secrets.token_urlsafe(8)
+                doc_ref = get_doc_ref(
+                    self.doc_name,
+                    sub_collection_id="examples",
+                    sub_document_id=new_example_id,
+                )
+
+        with col1:
+            if "example_id" in query_params:
+                submitted_2 = st.button("💾 Save This Example & Settings")
+                if submitted_2:
+                    example_id = query_params["example_id"][0]
+                    doc_ref = get_doc_ref(
+                        self.doc_name,
+                        sub_collection_id="examples",
+                        sub_document_id=example_id,
+                    )
+            else:
+                submitted_3 = st.button("💾 Save This Recipe & Settings")
+                if submitted_3:
+                    doc_ref = get_doc_ref(self.doc_name)
+
+        if not doc_ref:
             return
 
         with st.spinner("Saving..."):
-            set_saved_doc(
-                get_doc_ref(
-                    self.doc_name,
-                    sub_collection_id=sub_collection,
-                    sub_document_id=sub_doc,
-                ),
-                state_to_save,
-            )
+            set_saved_doc(doc_ref, state_to_save)
 
         st.success("Done", icon="✅")
 
@@ -393,13 +409,12 @@ class BasePage:
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
-            url = (
+            url = str(
                 furl(
-                    settings.APP_BASE_URL,
+                    self.app_url(),
                     query_params={"example_id": example_id},
                 )
-                / self.slug
-            ).url
+            )
 
             col1, col2, col3, *_ = st.columns(6)
 
@@ -504,7 +519,7 @@ class BasePage:
     def render_example(self, state: dict):
         pass
 
-    def preview_description(self) -> str:
+    def preview_description(self, state: dict) -> str:
         pass
 
     def preview_image(self, state: dict) -> str:
@@ -614,3 +629,16 @@ def get_example_request_body(
         for field_name, field in request_model.__fields__.items()
         if field.required
     }
+
+
+def err_msg_for_exc(e):
+    if isinstance(e, requests.HTTPError):
+        response: requests.Response = e.response
+        try:
+            err_body = response.json()
+        except requests.JSONDecodeError:
+            err_body = response.text
+        err_msg = f"(HTTP {response.status_code}) {err_body}"
+    else:
+        err_msg = f"{type(e).__name__} - {e}"
+    return err_msg

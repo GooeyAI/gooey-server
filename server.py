@@ -2,6 +2,7 @@ import datetime
 import time
 import typing
 
+import requests
 from fastapi import FastAPI
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,7 +26,13 @@ from auth_backend import (
 )
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings
-from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
+from pages.GoogleImageGen import GoogleImageGenPage
+from daras_ai_v2.base import (
+    BasePage,
+    get_doc_ref,
+    get_saved_doc_nocahe,
+    err_msg_for_exc,
+)
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
@@ -216,9 +223,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             except StopIteration:
                 pass
         except Exception as e:
-            return JSONResponse(
-                status_code=500, content={"error": f"{type(e).__name__} - {e}"}
-            )
+            return JSONResponse(status_code=500, content={"error": err_msg_for_exc(e)})
 
         # return updated state
         return state
@@ -257,7 +262,7 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
             iframe_url,
             context={
                 "title": f"{page_cls.title} - Gooey.AI",
-                "description": page.preview_description(),
+                "description": page.preview_description(state),
                 "image": page.preview_image(state),
             },
         )
@@ -300,6 +305,7 @@ all_pages = [
     SocialLookupEmailPage,
     CompareText2ImgPage,
     SEOSummaryPage,
+    GoogleImageGenPage,
 ]
 
 

@@ -86,7 +86,7 @@ class CompareLMPage(BasePage):
         yield "Running GPT-3..."
         state["gpt3_output"] = run_language_model(
             api_provider="openai",
-            engine="text-davinci-002",
+            engine="text-davinci-003",
             quality=1,
             num_outputs=1,
             temperature=request.sampling_temperature,
@@ -109,7 +109,7 @@ class CompareLMPage(BasePage):
         st.text_area(
             """
             ### GPT-3 
-            [`text-davinci-002`](https://beta.openai.com/docs/models/gpt-3)
+            [`text-davinci-003`](https://beta.openai.com/docs/models/gpt-3)
             """,
             disabled=True,
             value=st.session_state.get("gpt3_output", ""),
