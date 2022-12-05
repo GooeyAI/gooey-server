@@ -26,6 +26,15 @@ from daras_ai_v2.query_params import gooey_reset_query_parm
 
 DEFAULT_STATUS = "Running..."
 
+DEFAULT_COLLECTION = "daras-ai-v2"
+
+EXAMPLES_COLLECTION = "examples"
+USER_RUNS_COLLECTION = "user_runs"
+
+EXAMPLE_ID_QUERY_PARAM = "example_id"
+RUN_ID_QUERY_PARAM = "run_id"
+USER_ID_QUERY_PARAM = "uid"
+
 
 class BasePage:
     title: str
@@ -101,7 +110,7 @@ class BasePage:
         with st.spinner("Loading Examples..."):
             st.session_state["__example_docs"] = list_all_docs(
                 document_id=self.doc_name,
-                sub_collection_id="examples",
+                sub_collection_id=EXAMPLES_COLLECTION,
             )
 
         for k, v in self.sane_defaults.items():
@@ -110,9 +119,9 @@ class BasePage:
         st.session_state["__loaded__"] = True
 
     def get_doc_from_query_params(self, query_params) -> dict | None:
-        example_id = query_params.get("example_id")
-        run_id = query_params.get("run_id")
-        uid = query_params.get("uid")
+        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
+        run_id = query_params.get(RUN_ID_QUERY_PARAM)
+        uid = query_params.get(USER_ID_QUERY_PARAM)
 
         if isinstance(example_id, list):
             example_id = example_id[0]
@@ -135,16 +144,16 @@ class BasePage:
 
     def _run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
         return get_doc_ref(
-            uid,
-            collection_id="user_runs",
+            collection_id=USER_RUNS_COLLECTION,
+            document_id=uid,
             sub_collection_id=self.doc_name,
             sub_document_id=run_id,
         )
 
     def _example_doc_ref(self, example_id: str) -> firestore.DocumentReference:
         return get_doc_ref(
-            self.doc_name,
-            sub_collection_id="examples",
+            sub_collection_id=EXAMPLES_COLLECTION,
+            document_id=self.doc_name,
             sub_document_id=example_id,
         )
 
@@ -187,9 +196,10 @@ class BasePage:
 
     def _render_before_output(self):
         query_params = st.experimental_get_query_params()
-        example_id = query_params.get("example_id")
-        run_id = query_params.get("run_id")
-        uid = query_params.get("uid")
+
+        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
+        run_id = query_params.get(RUN_ID_QUERY_PARAM)
+        uid = query_params.get(USER_ID_QUERY_PARAM)
 
         if example_id:
             query_params = dict(example_id=example_id)
@@ -222,7 +232,7 @@ class BasePage:
         current_user: auth.UserRecord = st.session_state.get("_current_user")
 
         query_params = st.experimental_get_query_params()
-        run_id = query_params.get("run_id", [_random_str_id()])[0]
+        run_id = query_params.get(RUN_ID_QUERY_PARAM, [_random_str_id()])[0]
         gooey_reset_query_parm(run_id=run_id, uid=current_user.uid)
 
         run_doc_ref = self._run_doc_ref(run_id, current_user.uid)
@@ -299,6 +309,7 @@ class BasePage:
                 del st.session_state["__time_taken"]
                 return
 
+            # save after every step
             self.save_run()
 
             # this bit of hack streams the outputs from run() in realtime
@@ -344,10 +355,10 @@ class BasePage:
                 doc_ref = self._example_doc_ref(new_example_id)
 
         with col1:
-            if "example_id" in query_params:
+            if EXAMPLE_ID_QUERY_PARAM in query_params:
                 submitted_2 = st.button("💾 Save This Example & Settings")
                 if submitted_2:
-                    example_id = query_params["example_id"][0]
+                    example_id = query_params[EXAMPLE_ID_QUERY_PARAM][0]
                     doc_ref = self._example_doc_ref(example_id)
             else:
                 submitted_3 = st.button("💾 Save This Recipe & Settings")
@@ -392,7 +403,7 @@ class BasePage:
             url = str(
                 furl(
                     self.app_url(),
-                    query_params={"example_id": example_id},
+                    query_params={EXAMPLE_ID_QUERY_PARAM: example_id},
                 )
             )
 
@@ -455,7 +466,7 @@ class BasePage:
 def get_doc_ref(
     document_id: str,
     *,
-    collection_id="daras-ai-v2",
+    collection_id=DEFAULT_COLLECTION,
     sub_collection_id: str = None,
     sub_document_id: str = None,
 ) -> firestore.DocumentReference:
@@ -479,7 +490,7 @@ def get_or_create_doc(
 
 
 def list_all_docs(
-    collection_id="daras-ai-v2",
+    collection_id=DEFAULT_COLLECTION,
     *,
     document_id: str = None,
     sub_collection_id: str = None,
