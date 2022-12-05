@@ -9,6 +9,7 @@ from daras_ai_v2.base import (
     get_saved_doc_nocahe,
     get_doc_ref,
 )
+from daras_ai_v2.settings import API_SECRET_KEY
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
@@ -54,6 +55,7 @@ def test_apis_basic(page_cls: typing.Type[BasePage]):
     r = client.post(
         page.endpoint,
         json=get_example_request_body(page.RequestModel, state),
+        headers={"Authorization": f"Token {API_SECRET_KEY}"},
     )
 
     assert r.ok, r.content
