@@ -135,9 +135,12 @@ class BasePage:
         elif run_id:
             snapshot = self._run_doc_ref(run_id, uid).get()
         else:
-            snapshot = get_or_create_doc(self._recipe_doc_ref())
+            snapshot = self.get_recipe_doc()
 
         return snapshot.to_dict()
+
+    def get_recipe_doc(self):
+        return get_or_create_doc(self._recipe_doc_ref())
 
     def _recipe_doc_ref(self) -> firestore.DocumentReference:
         return get_doc_ref(self.doc_name)
