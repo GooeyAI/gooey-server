@@ -239,14 +239,16 @@ class BasePage:
                 )
             st.markdown("---")
 
-    def save_run(self, fresh_run=False):
+    def new_run(self):
         current_user: auth.UserRecord = st.session_state.get("_current_user")
-        if fresh_run:
-            run_id = secrets.token_urlsafe(8)
-            st.session_state["run_id"] = run_id
-            gooey_set_query_parm(**{"uid": current_user.uid, "run_id": run_id})
-        else:
-            run_id = st.session_state.get("run_id", "")
+        run_id = secrets.token_urlsafe(8)
+        st.session_state["run_id"] = run_id
+        gooey_set_query_parm(**{"uid": current_user.uid, "run_id": run_id})
+        self.save_run()
+
+    def save_run(self):
+        current_user: auth.UserRecord = st.session_state.get("_current_user")
+        run_id = st.session_state.get("run_id", "")
         state_to_save = {
             field_name: deepcopy(st.session_state[field_name])
             for field_name in self.fields_to_save()
@@ -273,7 +275,7 @@ class BasePage:
             self.render_output()
 
         if submitted:
-            self.save_run(fresh_run=True)
+            self.new_run()
             st.session_state["__status"] = DEFAULT_STATUS
             st.session_state["__gen"] = self.run(st.session_state)
             st.session_state["__time_taken"] = 0
