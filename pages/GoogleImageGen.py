@@ -105,7 +105,7 @@ class GoogleImageGenPage(BasePage):
         else:
             st.empty()
 
-        with st.expander("Steps"):
+        with st.expander("Steps", expanded=True):
             image_urls = st.session_state.get("image_urls")
             if image_urls:
                 st.write("**Image URLs**")
@@ -118,6 +118,24 @@ class GoogleImageGenPage(BasePage):
                 st.image(selected_image, caption="Selected Image")
             else:
                 st.empty()
+
+    def render_example(self, state: dict):
+        st.write(
+            f"""
+            **Google Search Query** `{state.get("search_query", '')}` \\
+            **Edit Prompt** `{state.get("text_prompt", '')}`
+            """
+        )
+
+        out_imgs = state.get("output_images")
+        if out_imgs:
+            st.image(out_imgs[0], caption="Generated Image")
+
+    def preview_description(self, state: dict) -> str:
+        return f"""{state.get("search_query", '')} | {state.get("text_prompt", '')}"""
+
+    def preview_image(self, state: dict) -> str:
+        return state.get("output_images", [""])[0]
 
 
 if __name__ == "__main__":

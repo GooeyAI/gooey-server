@@ -57,7 +57,7 @@ class FaceInpaintingPage(BasePage):
         diffusion_images: list[str]
         output_images: list[str]
 
-    def preview_description(self) -> str:
+    def preview_description(self, state: dict) -> str:
         return "This recipe takes a photo with a face and then uses the text prompt to paint a background."
 
     def render_description(self):

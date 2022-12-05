@@ -265,7 +265,7 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
             iframe_url,
             context={
                 "title": f"{page_cls.title} - Gooey.AI",
-                "description": page.preview_description(),
+                "description": page.preview_description(state),
                 "image": page.preview_image(state),
             },
         )

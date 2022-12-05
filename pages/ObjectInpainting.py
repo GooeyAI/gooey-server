@@ -348,7 +348,7 @@ class ObjectInpaintingPage(BasePage):
     def preview_image(self, state: dict) -> str:
         return state.get("output_images", [""])[0]
 
-    def preview_description(self) -> str:
+    def preview_description(self, state: dict) -> str:
         return "This recipe an image of an object, masks it and then renders the background around the object according to the prompt."
 
 

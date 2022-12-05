@@ -185,7 +185,7 @@ class CompareText2ImgPage(BasePage):
     # def preview_image(self, state: dict) -> str:
     #     # TODO: Which model to pick and if key will be available
     #     return state.get("output_images", [""])[0]
-    def preview_description(self) -> str:
+    def preview_description(self, state: dict) -> str:
         return "This recipe takes any text and renders an image using multiple Text2Image engines."
 
 
