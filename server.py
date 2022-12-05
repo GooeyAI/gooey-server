@@ -59,11 +59,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.SECRET_KEY,
-    same_site="Lax",
-)
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
