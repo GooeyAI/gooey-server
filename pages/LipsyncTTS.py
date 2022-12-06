@@ -4,7 +4,6 @@ import streamlit as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.video_widget import video_widget
 from pages.Lipsync import LipsyncPage
 from pages.TextToSpeech import TextToSpeechPage
 
@@ -38,27 +37,21 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            face_file = st.file_uploader(
                 """
                 #### Input Face
                 Upload a video/image that contains faces to use
                 *Recommended - mp4 / mov / png / jpg*
-                """
+                """,
             )
-            face_file = st.file_uploader("input face", label_visibility="collapsed")
 
-            st.write(
+            text_prompt = st.text_area(
                 """
                 #### Input Text
                 This generates audio for your video
-                """
-            )
-            text_prompt = st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="This is a test",
-                value="This is a test",
             )
             submitted = st.form_submit_button("🏃‍ Submit")
 
@@ -110,7 +103,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         with col1:
             input_text = state.get("text_prompt")
             if input_text:
-                st.write("Input Text")
+                st.write("**Input Text**")
                 st.write(input_text)
             else:
                 st.empty()
@@ -126,17 +119,14 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             if not input_face:
                 st.empty()
             elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
-                st.write("Input Face (Video)")
-                video_widget(input_face)
+                st.video(input_face, caption="Input Face (Video)")
             else:
-                st.write("Input Face (Image)")
-                st.image(input_face)
+                st.image(input_face, caption="Input Face (Image)")
 
         with col2:
             output_video = state.get("output_video")
             if output_video:
-                st.write("Output Video")
-                video_widget(output_video)
+                st.video(output_video, caption="Output Video")
             else:
                 st.empty()
 

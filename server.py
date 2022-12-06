@@ -2,6 +2,7 @@ import datetime
 import time
 import typing
 
+import requests
 from fastapi import FastAPI
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,7 +26,13 @@ from auth_backend import (
 )
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings
-from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
+from pages.GoogleImageGen import GoogleImageGenPage
+from daras_ai_v2.base import (
+    BasePage,
+    get_doc_ref,
+    get_or_create_doc,
+    err_msg_for_exc,
+)
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
@@ -52,14 +59,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.SECRET_KEY,
-    same_site="strict",
-)
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
+
+
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc):
+    return templates.TemplateResponse("404.html", {"request": request})
 
 
 @app.get("/login", include_in_schema=False)
@@ -186,7 +194,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page = page_cls()
 
         # get saved state from db
-        state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
+        state = get_or_create_doc(get_doc_ref(page.doc_name)).to_dict()
 
         # set sane defaults
         for k, v in page.sane_defaults.items():
@@ -211,9 +219,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             except StopIteration:
                 pass
         except Exception as e:
-            return JSONResponse(
-                status_code=500, content={"error": f"{type(e).__name__} - {e}"}
-            )
+            return JSONResponse(status_code=500, content={"error": err_msg_for_exc(e)})
 
         # return updated state
         return state
@@ -243,17 +249,16 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
     @app.get(f"/{page_cls.slug}/", include_in_schema=False)
     def st_page(request: Request):
         page = page_cls()
-        if "example_id" in request.query_params:
-            state = page.get_example_doc(request.query_params["example_id"])
-        else:
-            state = page.get_doc()
+        state = page.get_doc_from_query_params(dict(request.query_params))
+        if state is None:
+            raise HTTPException(status_code=404)
         iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug
         return _st_page(
             request,
             iframe_url,
             context={
                 "title": f"{page_cls.title} - Gooey.AI",
-                "description": page.preview_description(),
+                "description": page.preview_description(state),
                 "image": page.preview_image(state),
             },
         )
@@ -296,6 +301,7 @@ all_pages = [
     SocialLookupEmailPage,
     CompareText2ImgPage,
     SEOSummaryPage,
+    GoogleImageGenPage,
 ]
 
 

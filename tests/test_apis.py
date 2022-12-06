@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from daras_ai_v2.base import (
     BasePage,
     get_example_request_body,
-    get_saved_doc_nocahe,
+    get_or_create_doc,
     get_doc_ref,
 )
 from pages.ChyronPlant import ChyronPlantPage
@@ -14,6 +14,7 @@ from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.GoogleImageGen import GoogleImageGenPage
 from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Img2Img import Img2ImgPage
 from pages.LetterWriter import LetterWriterPage
@@ -43,13 +44,14 @@ pages_to_test = [
     SocialLookupEmailPage,
     CompareText2ImgPage,
     SEOSummaryPage,
+    GoogleImageGenPage,
 ]
 
 
 @pytest.mark.parametrize("page_cls", pages_to_test)
 def test_apis_basic(page_cls: typing.Type[BasePage]):
     page = page_cls()
-    state = get_saved_doc_nocahe(get_doc_ref(page.doc_name))
+    state = get_or_create_doc(get_doc_ref(page.doc_name)).to_dict()
 
     r = client.post(
         page.endpoint,
