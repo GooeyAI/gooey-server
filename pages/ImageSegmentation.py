@@ -170,6 +170,12 @@ class ImageSegmentationPage(BasePage):
                                 "input_image": input_image,
                                 "selected_model": st.session_state["selected_model"],
                                 "mask_threshold": st.session_state["mask_threshold"],
+                                "reflection_opacity": st.session_state[
+                                    "reflection_opacity"
+                                ],
+                                "rect_persepective_transform": st.session_state[
+                                    "rect_persepective_transform"
+                                ],
                             },
                         )
                     response.raise_for_status()
