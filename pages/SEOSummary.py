@@ -162,12 +162,6 @@ class SEOSummaryPage(BasePage):
                 max_value=4096,
             )
 
-        st.write("---")
-
-        st.checkbox(
-            f"Generate Lead Image using [GoogleImageGen]({GoogleImageGenPage.app_url()})"
-        )
-
     def render_output(self):
         output_content = st.session_state.get("output_content")
         if output_content:
