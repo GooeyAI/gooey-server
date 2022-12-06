@@ -100,7 +100,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 placeholder="john@appleseed.com",
             )
             st.caption(
-                "By providing your email address, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
+                "By providing your email address, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)"
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")

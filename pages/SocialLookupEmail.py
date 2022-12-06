@@ -89,7 +89,7 @@ class SocialLookupEmailPage(BasePage):
                 placeholder="john@appleseed.com",
             )
             st.caption(
-                "By providing an email address, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
+                "By providing an email address, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)"
             )
 
             st.text_area(
