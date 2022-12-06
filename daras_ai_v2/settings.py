@@ -51,3 +51,11 @@ SCALESERP_API_KEY = config("SCALESERP_API_KEY", None)
 
 # timeout for fetching external urls in the wild
 EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
+
+ADMIN_EMAILS = [
+    "archana@dara.network",
+    "dev@dara.network",
+    "sean@dara.network",
+    "shreeparna@dara.network",
+    "mitesh@dara.network",
+]
