@@ -4,6 +4,7 @@ import typing
 
 import requests
 from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -189,7 +190,15 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         responses={500: {"model": RunFailedModel}},
         name=page_cls.title,
     )
-    def run_api(request: Request, page_request: page_cls.RequestModel = body_spec):
+    def run_api(
+        request: Request,
+        Authorization: typing.Union[str, None] = Header(
+            default=None, description="Token $GOOEY_API_TOKEN"
+        ),
+        page_request: page_cls.RequestModel = body_spec,
+    ):
+        if Authorization != f"Token {settings.API_SECRET_KEY}":
+            raise Exception("Invalid API_TOKEN")
         # init a new page for every request
         page = page_cls()
 
