@@ -491,7 +491,11 @@ curl -X 'POST' \
 
     if st.button("Call API 🚀"):
         with st.spinner("Waiting for API..."):
-            r = requests.post(api_url, json=request_body, headers={"Authorization":f"Token {settings.API_SECRET_KEY}"})
+            r = requests.post(
+                api_url,
+                json=request_body,
+                headers={"Authorization": f"Token {settings.API_SECRET_KEY}"},
+            )
             "### Response"
             r.raise_for_status()
             st.write(r.json())
