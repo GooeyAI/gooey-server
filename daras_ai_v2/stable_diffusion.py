@@ -21,7 +21,7 @@ class InpaintingModels(Enum):
 
 class Img2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
-    sd_2 = "Stable Diffusion 2 (stability.ai)"
+    sd_2 = "Stable Diffusion 2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
@@ -29,7 +29,7 @@ class Img2ImgModels(Enum):
 
 class Text2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
-    sd_2 = "Stable Diffusion 2 (stability.ai)"
+    sd_2 = "Stable Diffusion 2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     # openjourney = "Open Journey (PromptHero)"
