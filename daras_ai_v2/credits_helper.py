@@ -8,6 +8,7 @@ slug_credits_pair = {}
 # If we want to deduct credits for a particular reciepe other than default credits value, then add a recipe slug to
 # slug_credits_pair with key as slug and credits number as value. Ex: {'FaceInpainting': 10}
 
+
 def get_credits_to_deduct_from_slug(slug: str):
     try:
         return int(slug_credits_pair[slug])
@@ -16,7 +17,7 @@ def get_credits_to_deduct_from_slug(slug: str):
         return int(settings.CREDITS_TO_DEDUCT_PER_RUN)
 
 
-def deduct_credits(slug: str) -> bool:
+def check_credits(slug: str) -> bool:
     credits_to_deduct = get_credits_to_deduct_from_slug(slug)
     user = st.session_state.get("_current_user")
     uid = user.uid
@@ -32,5 +33,10 @@ def deduct_credits(slug: str) -> bool:
                 icon="⚠️",
             )
         return False
-    db.deduct_user_credits(uid, credits_to_deduct)
     return True
+
+
+def deduct_credits(slug: str):
+    credits_to_deduct = get_credits_to_deduct_from_slug(slug)
+    user = st.session_state.get("_current_user")
+    db.deduct_user_credits(user.uid, credits_to_deduct)
