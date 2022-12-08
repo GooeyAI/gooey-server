@@ -11,6 +11,7 @@ from time import time
 import requests
 import streamlit as st
 from firebase_admin import auth
+from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
@@ -23,6 +24,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 )
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.query_params import gooey_reset_query_parm
+from daras_ai_v2.send_email import send_email_via_postmark
 
 DEFAULT_STATUS = "Running..."
 
@@ -203,15 +205,38 @@ class BasePage:
         example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
         run_id = query_params.get(RUN_ID_QUERY_PARAM)
         uid = query_params.get(USER_ID_QUERY_PARAM)
+        url = str(furl(self.app_url(), query_params=query_params))
+        current_user: UserRecord = st.session_state.get("_current_user")
 
         if example_id:
             query_params = dict(example_id=example_id)
         elif run_id and uid:
             query_params = dict(run_id=run_id, uid=uid)
+            reported = st.button("❗Report")
+            if reported:
+                with st.spinner("Reporting..."):
+                    self.flag_run(run_id=run_id[0], uid=uid[0])
+                    send_email_via_postmark(
+                        from_address="devs@gooey.ai",
+                        to_address="mitesh@dara.network",
+                        subject=f"Reported: Run '{run_id[0]}'",
+                        html_body=f"""
+                        <p>
+
+                        Reported run:
+                        <a href="{url}">{url}</a>
+                        </p>
+                        <p>
+
+                        Reported by:
+                        <li><b>USER ID:</b> {current_user.uid}</li>
+                        <li><b>EMAIL:</b> {current_user.email}</li>
+                        </p>
+                        """,
+                    )
+                    st.success("Reported")
         else:
             return
-
-        url = str(furl(self.app_url(), query_params=query_params))
 
         col1, col2 = st.columns([3, 1])
 
@@ -230,6 +255,11 @@ class BasePage:
                 style="padding: 6px",
                 height=55,
             )
+
+    def flag_run(self, run_id: str, uid: str):
+        st.write(uid, run_id)
+        ref = self._run_doc_ref(uid=uid, run_id=run_id)
+        ref.set({"is_flagged": True}, merge=True)
 
     def save_run(self):
         current_user: auth.UserRecord = st.session_state.get("_current_user")
