@@ -25,6 +25,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.send_email import send_email_via_postmark
+from daras_ai_v2.utils import email_support_about_reported_run
 
 DEFAULT_STATUS = "Running..."
 
@@ -212,29 +213,15 @@ class BasePage:
             query_params = dict(example_id=example_id)
         elif run_id and uid:
             query_params = dict(run_id=run_id, uid=uid)
+            # ONLY RUNS CAN BE REPORTED
             reported = st.button("❗Report")
             if reported:
                 with st.spinner("Reporting..."):
                     self.flag_run(run_id=run_id[0], uid=uid[0])
-                    send_email_via_postmark(
-                        from_address="devs@gooey.ai",
-                        to_address="mitesh@dara.network",
-                        subject=f"Reported: Run '{run_id[0]}'",
-                        html_body=f"""
-                        <p>
-
-                        Reported run:
-                        <a href="{url}">{url}</a>
-                        </p>
-                        <p>
-
-                        Reported by:
-                        <li><b>USER ID:</b> {current_user.uid}</li>
-                        <li><b>EMAIL:</b> {current_user.email}</li>
-                        </p>
-                        """,
+                    email_support_about_reported_run(
+                        run_id=run_id[0], uid=uid[0], url=url, email=current_user.email
                     )
-                    st.success("Reported")
+                    st.success("Reported. Reload the page to see changes")
         else:
             return
 
