@@ -121,25 +121,29 @@ class BasePage:
 
         st.session_state["__loaded__"] = True
 
-    def get_doc_from_query_params(self, query_params) -> dict | None:
+    def extract_query_params(self, query_params):
         example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
         run_id = query_params.get(RUN_ID_QUERY_PARAM)
         uid = query_params.get(USER_ID_QUERY_PARAM)
-
         if isinstance(example_id, list):
             example_id = example_id[0]
         if isinstance(run_id, list):
             run_id = run_id[0]
         if isinstance(uid, list):
             uid = uid[0]
+        return example_id, run_id, uid
 
+    def get_doc_from_query_params(self, query_params) -> dict | None:
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        return self.get_firestore_state(example_id, run_id, uid)
+
+    def get_firestore_state(self, example_id, run_id, uid):
         if example_id:
             snapshot = self._example_doc_ref(example_id).get()
         elif run_id:
             snapshot = self._run_doc_ref(run_id, uid).get()
         else:
             snapshot = self.get_recipe_doc()
-
         return snapshot.to_dict()
 
     def get_recipe_doc(self) -> firestore.DocumentSnapshot:
@@ -202,10 +206,7 @@ class BasePage:
 
     def _render_before_output(self):
         query_params = st.experimental_get_query_params()
-
-        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
-        run_id = query_params.get(RUN_ID_QUERY_PARAM)
-        uid = query_params.get(USER_ID_QUERY_PARAM)
+        example_id, run_id, uid = self.extract_query_params(query_params)
         url = str(furl(self.app_url(), query_params=query_params))
         current_user: UserRecord = st.session_state.get("_current_user")
 
@@ -217,9 +218,9 @@ class BasePage:
             reported = st.button("❗Report")
             if reported:
                 with st.spinner("Reporting..."):
-                    self.flag_run(run_id=run_id[0], uid=uid[0])
+                    self.flag_run(run_id=run_id, uid=uid)
                     email_support_about_reported_run(
-                        run_id=run_id[0], uid=uid[0], url=url, email=current_user.email
+                        run_id=run_id, uid=uid, url=url, email=current_user.email
                     )
                     st.success("Reported. Reload the page to see changes")
         else:
