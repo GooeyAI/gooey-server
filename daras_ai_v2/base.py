@@ -257,7 +257,6 @@ class BasePage:
             )
 
     def flag_run(self, run_id: str, uid: str):
-        st.write(uid, run_id)
         ref = self._run_doc_ref(uid=uid, run_id=run_id)
         ref.set({"is_flagged": True}, merge=True)
 
