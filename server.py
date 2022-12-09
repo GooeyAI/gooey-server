@@ -203,7 +203,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page_request: page_cls.RequestModel = body_spec,
     ):
         # Authenticate Token
-        authenticate(request)
+        authenticate(Authorization)
 
         # init a new page for every request
         page = page_cls()
