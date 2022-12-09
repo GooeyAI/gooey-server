@@ -27,6 +27,7 @@ from auth_backend import (
 )
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings
+from gooey_token_authentication1.token_authentication import authenticate
 from pages.GoogleImageGen import GoogleImageGenPage
 from daras_ai_v2.base import (
     BasePage,
@@ -197,8 +198,9 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         ),
         page_request: page_cls.RequestModel = body_spec,
     ):
-        if Authorization != f"Token {settings.API_SECRET_KEY}":
-            raise Exception("Invalid API_TOKEN")
+        # Authenticate Token
+        authenticate(Authorization)
+
         # init a new page for every request
         page = page_cls()
 
