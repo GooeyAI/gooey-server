@@ -345,7 +345,7 @@ class BasePage:
         if not state_to_save:
             return
 
-        if is_admin():
+        if not is_admin():
             return
 
         new_example_id = None
