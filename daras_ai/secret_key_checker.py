@@ -4,11 +4,15 @@ from firebase_admin.auth import UserRecord
 from daras_ai_v2 import settings
 
 
-def check_secret_key(label, secret_key=settings.APP_SECRET_KEY):
+def is_admin():
     current_user: UserRecord = st.session_state["_current_user"]
     email = current_user.email
     if email and email in settings.ADMIN_EMAILS:
         return True
+    return False
+
+
+def check_secret_key(label, secret_key=settings.APP_SECRET_KEY):
     if secret_key:
         input_text = st.text_input(
             f"Enter secret key to {label}. Contact support@gooey.ai to obtain a secret key.",
