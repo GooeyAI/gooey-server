@@ -14,9 +14,10 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.image_segmentation import dis
-from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
+from daras_ai_v2.img_model_settings_widgets import (
+    img_model_settings,
+)
 from daras_ai_v2.repositioning import reposition_object, reposition_object_img_bytes
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
@@ -27,25 +28,37 @@ class ObjectInpaintingPage(BasePage):
 
     sane_defaults = {
         "mask_threshold": 0.7,
+        "num_outputs": 1,
+        "quality": 50,
+        "output_width": 512,
+        "output_height": 512,
+        "guidance_scale": 7.5,
+        "sd_2_upscaling": False,
     }
 
     class RequestModel(BaseModel):
         input_image: str
         text_prompt: str
-        negative_prompt: str | None
-
-        num_outputs: int | None
-        quality: int | None
 
         obj_scale: float | None
         obj_pos_x: float | None
         obj_pos_y: float | None
 
+        mask_threshold: float | None
+
+        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+
+        negative_prompt: str | None
+
+        num_outputs: int | None
+        quality: int | None
+
         output_width: int | None
         output_height: int | None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
-        mask_threshold: float | None
+        guidance_scale: float | None
+
+        sd_2_upscaling: bool | None
 
     class ResponseModel(BaseModel):
         resized_image: str
@@ -95,70 +108,21 @@ class ObjectInpaintingPage(BasePage):
     def render_description(self):
         st.write(
             """
-                This recipe an image of an object, masks it and then renders the background around the object according to the prompt. 
-                
-                How It Works:
-                1. Takes an image
-                2. Attempts to find an object in the image
-                3. Masks the object
-                4. Adjusts the X/Y position and zoom according to the settings
-                5. Draws the background around the object according to the prompt.
+            This recipe an image of an object, masks it and then renders the background around the object according to the prompt. 
+            
+            How It Works:
+            1. Takes an image
+            2. Attempts to find an object in the image
+            3. Masks the object
+            4. Adjusts the X/Y position and zoom according to the settings
+            5. Draws the background around the object according to the prompt.
             """
         )
 
     def render_settings(self):
-        selected_model = enum_selector(
-            InpaintingModels,
-            label="### Image Model",
-            key="selected_model",
-        )
+        img_model_settings(InpaintingModels)
 
-        negative_prompt_setting(selected_model)
-
-        col1, col2 = st.columns(2, gap="medium")
-        with col1:
-            st.slider(
-                label="Number of Outputs",
-                key="num_outputs",
-                min_value=1,
-                max_value=4,
-            )
-        with col2:
-            if selected_model != InpaintingModels.dall_e.name:
-                st.slider(
-                    label="Quality",
-                    key="quality",
-                    min_value=10,
-                    max_value=200,
-                    step=10,
-                )
-            else:
-                st.empty()
-
-        st.write(
-            """
-            ### Output Resolution
-            """
-        )
-        col1, col2, col3 = st.columns([10, 1, 10])
-        with col1:
-            output_width = st.slider(
-                "Width",
-                key="output_width",
-                min_value=512,
-                max_value=768,
-                step=64,
-            )
-        with col2:
-            st.write("X")
-        with col3:
-            output_height = st.slider(
-                "Height",
-                key="output_height",
-                min_value=512,
-                max_value=768,
-                step=64,
-            )
+        st.write("---")
 
         st.write(
             """
@@ -201,7 +165,10 @@ class ObjectInpaintingPage(BasePage):
         img, mask = reposition_object(
             orig_img=img_cv2,
             orig_mask=mask_cv2,
-            out_size=(output_width, output_height),
+            out_size=(
+                st.session_state["output_width"],
+                st.session_state["output_height"],
+            ),
             out_obj_scale=obj_scale,
             out_pos_x=pos_x,
             out_pos_y=pos_y,
@@ -330,6 +297,7 @@ class ObjectInpaintingPage(BasePage):
             width=request.output_width,
             height=request.output_height,
             negative_prompt=request.negative_prompt,
+            guidance_scale=request.guidance_scale,
         )
         state["output_images"] = diffusion_images
 

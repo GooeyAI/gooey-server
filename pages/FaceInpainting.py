@@ -13,11 +13,12 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.extract_face import extract_face_img_bytes
 from daras_ai_v2.face_restoration import map_parallel, gfpgan
+from daras_ai_v2.img_model_settings_widgets import (
+    img_model_settings,
+)
 from daras_ai_v2.loom_video_widget import loom_video
-from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
@@ -26,22 +27,36 @@ class FaceInpaintingPage(BasePage):
     slug = "FaceInpainting"
     version = 2
 
+    sane_defaults = {
+        "num_outputs": 1,
+        "quality": 50,
+        "output_width": 512,
+        "output_height": 512,
+        "guidance_scale": 7.5,
+        "sd_2_upscaling": False,
+    }
+
     class RequestModel(BaseModel):
         input_image: str
         text_prompt: str
-        negative_prompt: str | None
-
-        num_outputs: int | None
-        quality: int | None
 
         face_scale: float | None
         face_pos_x: float | None
         face_pos_y: float | None
 
+        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+
+        negative_prompt: str | None
+
+        num_outputs: int | None
+        quality: int | None
+
         output_width: int | None
         output_height: int | None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        guidance_scale: float | None
+
+        sd_2_upscaling: bool | None
 
         class Config:
             schema_extra = {
@@ -116,59 +131,9 @@ class FaceInpaintingPage(BasePage):
         return submitted
 
     def render_settings(self):
-        selected_model = enum_selector(
-            InpaintingModels,
-            label="### Image Model",
-            key="selected_model",
-        )
+        img_model_settings(InpaintingModels)
 
-        negative_prompt_setting(selected_model)
-
-        col1, col2 = st.columns(2, gap="medium")
-        with col1:
-            st.slider(
-                label="Number of Outputs",
-                key="num_outputs",
-                min_value=1,
-                max_value=4,
-            )
-        with col2:
-            if selected_model != InpaintingModels.dall_e.name:
-                st.slider(
-                    label="Quality",
-                    key="quality",
-                    value=50,
-                    min_value=10,
-                    max_value=200,
-                    step=10,
-                )
-            else:
-                st.empty()
-
-        st.write(
-            """
-            ### Output Resolution
-            """
-        )
-        col1, col2, col3 = st.columns([10, 1, 10])
-        with col1:
-            output_width = st.slider(
-                "Width",
-                key="output_width",
-                min_value=512,
-                max_value=768,
-                step=64,
-            )
-        with col2:
-            st.write("X")
-        with col3:
-            output_height = st.slider(
-                "Height",
-                key="output_height",
-                min_value=512,
-                max_value=768,
-                step=64,
-            )
+        st.write("---")
 
         st.write(
             """
@@ -209,7 +174,10 @@ class FaceInpaintingPage(BasePage):
         # extract face
         img, mask = extract_and_reposition_face_cv2(
             img_cv2,
-            out_size=(output_width, output_height),
+            out_size=(
+                st.session_state["output_width"],
+                st.session_state["output_height"],
+            ),
             out_face_scale=face_scale,
             out_pos_x=pos_x,
             out_pos_y=pos_y,
@@ -330,6 +298,7 @@ class FaceInpaintingPage(BasePage):
             width=state["output_width"],
             height=state["output_height"],
             negative_prompt=state["negative_prompt"],
+            guidance_scale=state["guidance_scale"],
         )
         state["diffusion_images"] = diffusion_images
 

@@ -6,32 +6,48 @@ from pydantic import BaseModel
 
 from daras_ai.image_input import (
     upload_file_hq,
-    upload_file_from_bytes,
-    resize_img_pad,
 )
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
-from daras_ai_v2.stable_diffusion import InpaintingModels, Img2ImgModels, img2img
+from daras_ai_v2.img_model_settings_widgets import img_model_settings
+from daras_ai_v2.stable_diffusion import (
+    InpaintingModels,
+    Img2ImgModels,
+    img2img,
+    SD_MAX_SIZE,
+)
 
 
 class Img2ImgPage(BasePage):
     title = "Edit Any Image Using Text"
     slug = "Img2Img"
 
+    sane_defaults = {
+        "num_outputs": 1,
+        "quality": 50,
+        "output_width": 512,
+        "output_height": 512,
+        "guidance_scale": 7.5,
+        "prompt_strength": 0.4,
+        "sd_2_upscaling": False,
+    }
+
     class RequestModel(BaseModel):
         input_image: str
         text_prompt: str | None
+
+        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
         negative_prompt: str | None
 
         num_outputs: int | None
         quality: int | None
-        prompt_strength: float | None
 
         output_width: int | None
         output_height: int | None
 
-        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
+        guidance_scale: float | None
+        prompt_strength: float | None
+
+        sd_2_upscaling: bool | None
 
     class ResponseModel(BaseModel):
         resized_image: str
@@ -71,7 +87,9 @@ class Img2ImgPage(BasePage):
         if submitted:
             input_file = st.session_state.get("input_file")
             if input_file:
-                st.session_state["input_image"] = upload_file_hq(input_file)
+                st.session_state["input_image"] = upload_file_hq(
+                    input_file, resize=SD_MAX_SIZE
+                )
 
         return submitted
 
@@ -85,113 +103,31 @@ class Img2ImgPage(BasePage):
         )
 
     def render_settings(self):
-        selected_model = enum_selector(
-            Img2ImgModels,
-            label="### Image Model",
-            key="selected_model",
-        )
-
-        negative_prompt_setting(selected_model)
-
-        st.slider(
-            label="Prompt Strength",
-            key="prompt_strength",
-            min_value=0.0,
-            max_value=1.0,
-            help="How strongly should the prompt alter the image?",
-        )
-
-        col1, col2 = st.columns(2, gap="medium")
-        with col1:
-            st.slider(
-                label="Number of Outputs",
-                key="num_outputs",
-                min_value=1,
-                max_value=4,
-            )
-        with col2:
-            if selected_model != InpaintingModels.dall_e.name:
-                st.slider(
-                    label="Quality",
-                    key="quality",
-                    min_value=10,
-                    max_value=200,
-                    step=10,
-                )
-            else:
-                st.empty()
-
-        st.write(
-            """
-            ### Output Resolution
-            """
-        )
-        col1, col2, col3 = st.columns([10, 1, 10])
-        with col1:
-            st.slider(
-                "Width",
-                key="output_width",
-                min_value=512,
-                max_value=768,
-                step=64,
-            )
-        with col2:
-            st.write("X")
-        with col3:
-            st.slider(
-                "Height",
-                key="output_height",
-                min_value=512,
-                max_value=768,
-                step=64,
-            )
+        img_model_settings(Img2ImgModels)
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
-        input_file = st.session_state.get("input_file")
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_image
-        output_images = st.session_state.get("output_images")
+        output_images = st.session_state.get("output_images", [])
 
-        col1, col2 = st.columns(2)
+        for url in output_images:
+            st.image(url, caption=f"{text_prompt}")
 
-        with col1:
-            if input_image_or_file:
-                st.image(input_image_or_file, caption="Input Image")
-            else:
-                st.empty()
-
-        with col2:
-            if output_images:
-                for url in output_images:
-                    st.image(url, caption=f"{text_prompt}")
-            else:
-                st.empty()
+        st.image(input_image, caption="Input Image")
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
-        with col1:
-            input_image = state.get("input_image")
-            if input_image:
-                st.image(input_image, caption="Input Image")
-        with col2:
-            output_images = state.get("output_images")
-            if output_images:
-                for img in output_images:
-                    st.image(img, caption=state.get("text_prompt", ""))
+        output_images = state.get("output_images", [])
+        for img in output_images:
+            st.image(img, caption=state.get("text_prompt", ""))
+
+        input_image = state.get("input_image")
+        st.image(input_image, caption="Input Image")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
 
-        img_bytes = requests.get(request.input_image).content
-
-        yield "Resizing Image..."
-
-        init_image_bytes = resize_img_pad(
-            img_bytes, (request.output_width, request.output_height)
-        )
-        init_image = upload_file_from_bytes("resized_image.png", init_image_bytes)
-        state["resized_image"] = init_image
+        init_image = request.input_image
+        init_image_bytes = requests.get(init_image).content
 
         yield "Generating Image..."
 
@@ -203,9 +139,9 @@ class Img2ImgPage(BasePage):
             init_image_bytes=init_image_bytes,
             num_inference_steps=request.quality,
             prompt_strength=request.prompt_strength,
-            width=request.output_width,
-            height=request.output_height,
             negative_prompt=request.negative_prompt,
+            guidance_scale=request.guidance_scale,
+            sd_2_upscaling=request.sd_2_upscaling,
         )
 
     def preview_image(self, state: dict) -> str:

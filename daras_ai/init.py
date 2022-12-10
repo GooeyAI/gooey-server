@@ -16,9 +16,28 @@ def init_scripts():
         button[title="View fullscreen"], footer {
             visibility: hidden;
         }
+        
         textarea, input[type=text] {
             -webkit-text-fill-color: white !important;
             color: white !important;
+        }
+        
+        .stMultiSelect [data-baseweb=select] span {
+            max-width: 500px;
+        }
+        
+        .stTabs [data-baseweb=tab] p {
+            font-size: 1.2rem;
+        } 
+        .stTabs [data-baseweb=tab] {
+            padding: 25px 0;
+            padding-right: 10px;
+        } 
+        .stTabs [data-baseweb=tab-list] {
+            overflow-y: hidden;
+        }
+        .stTabs [data-baseweb=tab-border] {
+            margin-bottom: 10px;
         }
         </style>
         """
