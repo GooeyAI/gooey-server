@@ -55,7 +55,7 @@ def patch_file_uploader():
         value = old_func(label, label_visibility=label_visibility, **kwargs)
 
         st.caption(
-            "_By uploading, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)_",
+            "_By uploading, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)_",
         )
 
         return value
