@@ -198,7 +198,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     def run_api(
         request: Request,
         Authorization: typing.Union[str, None] = Header(
-            default=None, description="Token $GOOEY_API_TOKEN"
+            default="", description="Token $GOOEY_API_TOKEN"
         ),
         page_request: page_cls.RequestModel = body_spec,
     ):
