@@ -3,7 +3,8 @@ from fastapi.requests import Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, JSONResponse
 from daras_ai import db
-from daras_ai_v2.settings import STRIPE_SECRET_KEY, STRIPE_WEBHOOKS_KEY, APP_BASE_URL
+from daras_ai_v2 import settings
+from daras_ai_v2.settings import STRIPE_SECRET_KEY, STRIPE_ENDPOINT_SECRET, APP_BASE_URL
 import stripe
 
 router = APIRouter(tags=["credits"])
@@ -106,28 +107,22 @@ async def customer_portal(request: Request):
     return RedirectResponse(portal_session.url, status_code=303)
 
 
-@router.route("/webhook", methods=["POST"])
+@router.route("/__/stripe/webhook", methods=["POST"])
 async def webhook_received(request: Request):
-    event = None
-    webhook_secret = STRIPE_WEBHOOKS_KEY
     request_data = await request.body()
 
-    if webhook_secret:
-        # Retrieve the event by verifying the signature using the raw body and secret if webhook signing is configured.
-        signature = request.headers.get("stripe-signature")
-        try:
-            event = stripe.Webhook.construct_event(
-                payload=request_data, sig_header=signature, secret=webhook_secret
-            )
-            data = event["data"]
-        except Exception as e:
-            print(e)
-            return
-        # Get the type of webhook event sent - used to check the status of PaymentIntents.
-        event_type = event["type"]
-    else:
-        data = request_data["data"]
-        event_type = request_data["type"]
+    # Retrieve the event by verifying the signature using the raw body and secret if webhook signing is configured.
+    signature = request.headers.get("stripe-signature")
+    event = stripe.Webhook.construct_event(
+        payload=request_data,
+        sig_header=signature,
+        secret=settings.STRIPE_ENDPOINT_SECRET,
+    )
+
+    # Get the type of webhook event sent - used to check the status of PaymentIntents.
+    event_type = event["type"]
+
+    data = event["data"]
     data_object = data["object"]
 
     if event_type == "checkout.session.completed":
@@ -147,7 +142,7 @@ async def webhook_received(request: Request):
             "lookup_key": plan_lookup_key,
             "stripe_customer_id": data_object["customer"],
         }
-        db.add_data_to_user_doc(uid, data_to_add_in_db)
+        db.user_doc_ref(uid).update(data_to_add_in_db)
 
     return JSONResponse({"status": "success"})
 
@@ -159,5 +154,5 @@ def cancel_subscription(request: Request):
     subscriptions = stripe.Subscription.list(customer=customer_id)
     subscription_id = subscriptions["data"][0]["id"]
     stripe.Subscription.delete(subscription_id)
-    db.add_data_to_user_doc(user.uid, {"lookup_key": None})
+    db.user_doc_ref(user.uid).update({"lookup_key": None})
     return RedirectResponse("/account", status_code=303)

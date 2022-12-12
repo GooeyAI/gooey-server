@@ -30,6 +30,8 @@ class BasePage:
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
 
+    price = settings.CREDITS_TO_DEDUCT_PER_RUN
+
     @property
     def doc_name(self) -> str:
         # for backwards compat
@@ -77,7 +79,7 @@ class BasePage:
             self._examples_tab()
 
         with api_tab:
-            run_as_api_tab(self.endpoint, self.RequestModel, self.slug)
+            self.run_as_api_tab()
 
         with run_tab:
             col1, col2 = st.columns(2)
@@ -87,7 +89,7 @@ class BasePage:
             with col1:
                 submitted = self.render_form()
                 if submitted:
-                    deduct_success = credits_helper.deduct_credits(self.slug)
+                    deduct_success = credits_helper.deduct_credits(self.get_price())
                     if not deduct_success:
                         return False
                 self.render_description()
@@ -275,11 +277,11 @@ class BasePage:
             doc = snapshot.to_dict()
 
             url = (
-                    furl(
-                        settings.APP_BASE_URL,
-                        query_params={"example_id": example_id},
-                    )
-                    / self.slug
+                furl(
+                    settings.APP_BASE_URL,
+                    query_params={"example_id": example_id},
+                )
+                / self.slug
             ).url
 
             col1, col2, col3, *_ = st.columns(6)
@@ -391,10 +393,49 @@ class BasePage:
     def preview_image(self, state: dict) -> str:
         pass
 
+    def get_price(self) -> int:
+        return self.price
+
+    def run_as_api_tab(self):
+        if not check_secret_key("run as API", settings.API_SECRET_KEY):
+            return
+
+        api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
+        api_url = str(furl(settings.API_BASE_URL) / self.endpoint)
+
+        request_body = get_example_request_body(self.RequestModel, st.session_state)
+
+        st.markdown(
+            f"""<a href="{api_docs_url}">API Docs</a>""",
+            unsafe_allow_html=True,
+        )
+
+        st.write("### CURL request")
+
+        st.write(
+            rf"""```
+    curl -X 'POST' \
+      {shlex.quote(api_url)} \
+      -H 'accept: application/json' \
+      -H 'Content-Type: application/json' \
+      -d {shlex.quote(json.dumps(request_body, indent=2))}
+    ```"""
+        )
+
+        if st.button("Call API 🚀"):
+            with st.spinner("Waiting for API..."):
+                deduct_success = credits_helper.deduct_credits(self.get_price())
+                if not deduct_success:
+                    return False
+                r = requests.post(api_url, json=request_body)
+                "### Response"
+                r.raise_for_status()
+                st.write(r.json())
+
 
 def set_saved_doc(
-        doc_ref: firestore.DocumentReference,
-        updated_state: dict,
+    doc_ref: firestore.DocumentReference,
+    updated_state: dict,
 ):
     doc_ref.set(updated_state)
     # saved_state = get_saved_doc(doc_ref)
@@ -424,10 +465,10 @@ def get_saved_doc_nocahe(doc_ref):
 
 # @cache_and_refresh
 def list_all_docs(
-        collection_id="daras-ai-v2",
-        *,
-        document_id: str = None,
-        sub_collection_id: str = None,
+    collection_id="daras-ai-v2",
+    *,
+    document_id: str = None,
+    sub_collection_id: str = None,
 ):
     db = firestore.Client()
     db_collection = db.collection(collection_id)
@@ -438,11 +479,11 @@ def list_all_docs(
 
 
 def get_doc_ref(
-        document_id: str,
-        *,
-        collection_id="daras-ai-v2",
-        sub_collection_id: str = None,
-        sub_document_id: str = None,
+    document_id: str,
+    *,
+    collection_id="daras-ai-v2",
+    sub_collection_id: str = None,
+    sub_document_id: str = None,
 ):
     db = firestore.Client()
     db_collection = db.collection(collection_id)
@@ -453,45 +494,8 @@ def get_doc_ref(
     return doc_ref
 
 
-def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel], slug: str):
-    if not check_secret_key("run as API", settings.API_SECRET_KEY):
-        return
-
-    api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
-    api_url = str(furl(settings.API_BASE_URL) / endpoint)
-
-    request_body = get_example_request_body(request_model, st.session_state)
-
-    st.markdown(
-        f"""<a href="{api_docs_url}">API Docs</a>""",
-        unsafe_allow_html=True,
-    )
-
-    st.write("### CURL request")
-
-    st.write(
-        rf"""```
-curl -X 'POST' \
-  {shlex.quote(api_url)} \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d {shlex.quote(json.dumps(request_body, indent=2))}
-```"""
-    )
-
-    if st.button("Call API 🚀"):
-        with st.spinner("Waiting for API..."):
-            deduct_success = credits_helper.deduct_credits(slug)
-            if not deduct_success:
-                return False
-            r = requests.post(api_url, json=request_body)
-            "### Response"
-            r.raise_for_status()
-            st.write(r.json())
-
-
 def get_example_request_body(
-        request_model: typing.Type[BaseModel], state: dict
+    request_model: typing.Type[BaseModel], state: dict
 ) -> dict:
     return {
         field_name: state.get(field_name)

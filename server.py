@@ -23,7 +23,9 @@ from auth_backend import (
     FIREBASE_SESSION_COOKIE,
     ANONYMOUS_USER_COOKIE,
 )
+from daras_ai import db
 from daras_ai.computer import run_compute_steps
+from daras_ai.db import get_or_init_user_data
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, get_doc_ref, get_saved_doc_nocahe
 from pages.ChyronPlant import ChyronPlantPage
@@ -42,9 +44,6 @@ from pages.SEOSummary import SEOSummaryPage
 from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
 from routers import credits
-from daras_ai import db
-
-from server_helper import *
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
@@ -254,10 +253,12 @@ def st_home(request: Request):
 @app.get("/account", include_in_schema=False)
 def account(request: Request):
     if not request.user:
-        return RedirectResponse("/")
-    uid = get_uid(request)
-    user_credits = db.get_user_field(uid, "credits")
-    lookup_key = db.get_user_field(uid, "lookup_key")
+        return RedirectResponse(str(furl("/login", query_params={"next": "/account"})))
+
+    user_data = get_or_init_user_data(request)
+    user_credits = user_data["credits"]
+    lookup_key = user_data["lookup_key"]
+
     context = {
         "request": request,
         "credits": user_credits,
@@ -265,10 +266,12 @@ def account(request: Request):
         "lookup_key": lookup_key,
         "title": "Account Page",
     }
+
     if lookup_key:
         for subscription in list_subscriptions:
             if subscription["lookup_key"] == lookup_key:
                 context["subscription"] = subscription
+
     return templates.TemplateResponse("account.html", context)
 
 
@@ -280,15 +283,6 @@ def st_editor(request: Request):
         iframe_url,
         context={"title": f"Gooey.AI"},
     )
-
-
-def check_and_create_new_doc_in_db(uid: str, data: dict):
-    if not db.check_for_user_document_avail(uid):
-        db.add_data_to_user_doc(
-            uid,
-            data,
-            new_doc=True,
-        )
 
 
 def script_to_frontend(page_cls: typing.Type[BasePage]):
@@ -315,42 +309,9 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     f = furl(iframe_url)
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
-    if request.session.get(ANONYMOUS_USER_COOKIE):
-        uid = request.session.get(ANONYMOUS_USER_COOKIE)["uid"]
-        check_and_create_new_doc_in_db(
-            uid,
-            {
-                "credits": settings.CREDITS_TO_ADD_NEW_USER_ANONYMOUS,
-                "lookup_key": None,
-                "anonymous_user": True,
-            },
-        )
-    if not (request.user or request.session.get(ANONYMOUS_USER_COOKIE)):
-        uid = auth.create_user().uid
-        request.session[ANONYMOUS_USER_COOKIE] = {
-            "uid": uid,
-        }
-        check_and_create_new_doc_in_db(
-            uid,
-            {
-                "credits": settings.CREDITS_TO_ADD_NEW_USER_ANONYMOUS,
-                "lookup_key": None,
-                "anonymous_user": True,
-            },
-        )
-    if request.user:
-        user = request.user
-        check_and_create_new_doc_in_db(
-            user.uid,
-            {
-                "credits": settings.CREDITS_TO_ADD_NEW_USER_SIGNED_IN,
-                "email": user.email,
-                "name": user.display_name,
-                "uid": user.uid,
-                "lookup_key": None,
-                "anonymous_user": False,
-            },
-        )
+
+    get_or_init_user_data(request)
+
     return templates.TemplateResponse(
         "home.html",
         context={
