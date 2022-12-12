@@ -16,7 +16,7 @@ from google.cloud import firestore
 from pydantic import BaseModel
 
 from daras_ai.init import init_scripts
-from daras_ai.secret_key_checker import check_secret_key
+from daras_ai.secret_key_checker import check_secret_key, is_admin
 from daras_ai_v2 import settings
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
@@ -345,7 +345,7 @@ class BasePage:
         if not state_to_save:
             return
 
-        if not check_secret_key("Save"):
+        if not is_admin():
             return
 
         new_example_id = None
@@ -399,7 +399,7 @@ class BasePage:
         ]
 
     def _examples_tab(self):
-        allow_delete = check_secret_key("delete example")
+        allow_delete = is_admin()
 
         for snapshot in st.session_state.get("__example_docs", []):
             example_id = snapshot.id
