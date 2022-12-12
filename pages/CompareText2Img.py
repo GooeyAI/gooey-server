@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
+from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
 from daras_ai_v2.stable_diffusion import Text2ImgModels, text2img
 
 
@@ -20,6 +21,7 @@ class CompareText2ImgPage(BasePage):
 
     class RequestModel(BaseModel):
         text_prompt: str
+        negative_prompt: str | None
 
         output_width: int | None
         output_height: int | None
@@ -42,15 +44,11 @@ class CompareText2ImgPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
                 Describe the scene that you'd like to generate. 
-                """
-            )
-            st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="Iron man",
             )
@@ -81,14 +79,16 @@ class CompareText2ImgPage(BasePage):
     def render_settings(self):
         selected_model = enum_multiselect(
             Text2ImgModels,
-            label="Selected Models",
+            label="#### Selected Models",
             key="selected_models",
         )
+
+        negative_prompt_setting(selected_model)
 
         col1, col2 = st.columns(2, gap="medium")
         with col1:
             st.slider(
-                label="# of Outputs",
+                label="Number of Outputs",
                 key="num_outputs",
                 min_value=1,
                 max_value=4,
@@ -135,18 +135,17 @@ class CompareText2ImgPage(BasePage):
         with col1:
             st.number_input("Guidance scale", key="guidance_scale", step=0.1)
         with col2:
-            st.number_input("Seed", key="seed", step=1)
+            st.number_input(
+                """
+                Seed (_Use 0 to randomize_)
+                """,
+                key="seed",
+                step=1,
+            )
         st.checkbox("4x Upscaling (SD v2 only)", key="sd_2_upscaling")
 
     def render_output(self):
-        output_images: dict = st.session_state.get("output_images")
-        if output_images:
-            for key, imgs in output_images.items():
-                st.write(f"##### {Text2ImgModels[key].value}")
-                for img in imgs:
-                    st.image(img)
-        else:
-            st.empty()
+        self._render_outputs(st.session_state)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareText2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -166,6 +165,7 @@ class CompareText2ImgPage(BasePage):
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
                 sd_2_upscaling=request.sd_2_upscaling,
+                negative_prompt=request.negative_prompt,
             )
 
     def render_example(self, state: dict):
@@ -173,19 +173,19 @@ class CompareText2ImgPage(BasePage):
         with col1:
             st.markdown("```" + state.get("text_prompt", "").replace("\n", "") + "```")
         with col2:
-            output_images: dict = state.get("output_images")
-            if output_images:
-                for key, imgs in output_images.items():
-                    st.write(f"**{Text2ImgModels[key].value}**")
-                    for img in imgs:
-                        st.image(img)
-            else:
-                st.empty()
+            self._render_outputs(state)
+
+    def _render_outputs(self, state):
+        selected_models = state.get("selected_models", [])
+        for key in selected_models:
+            output_images: dict = state.get("output_images", {}).get(key, [])
+            for img in output_images:
+                st.image(img, caption=Text2ImgModels[key].value)
 
     # def preview_image(self, state: dict) -> str:
     #     # TODO: Which model to pick and if key will be available
     #     return state.get("output_images", [""])[0]
-    def preview_description(self) -> str:
+    def preview_description(self, state: dict) -> str:
         return "This recipe takes any text and renders an image using multiple Text2Image engines."
 
 

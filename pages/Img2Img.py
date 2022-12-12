@@ -11,6 +11,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
 from daras_ai_v2.stable_diffusion import InpaintingModels, Img2ImgModels, img2img
 
 
@@ -21,6 +22,7 @@ class Img2ImgPage(BasePage):
     class RequestModel(BaseModel):
         input_image: str
         text_prompt: str | None
+        negative_prompt: str | None
 
         num_outputs: int | None
         quality: int | None
@@ -38,31 +40,20 @@ class Img2ImgPage(BasePage):
     def render_form(self) -> bool:
         with st.form("my_form"):
             if st.session_state["selected_model"] != InpaintingModels.dall_e.name:
-                st.write(
+                st.text_area(
                     """
                     ### Prompt
                     Describe your edits 
-                    """
-                )
-                st.text_area(
-                    "text_prompt",
-                    label_visibility="collapsed",
+                    """,
                     key="text_prompt",
                     placeholder="Iron man",
                 )
 
-            st.write(
+            st.file_uploader(
                 """
                 ### Input Photo
-                """
-            )
-            st.file_uploader(
-                "input_file",
-                label_visibility="collapsed",
+                """,
                 key="input_file",
-            )
-            st.caption(
-                "By uploading an image, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")
@@ -96,9 +87,11 @@ class Img2ImgPage(BasePage):
     def render_settings(self):
         selected_model = enum_selector(
             Img2ImgModels,
-            label="Image Model",
+            label="### Image Model",
             key="selected_model",
         )
+
+        negative_prompt_setting(selected_model)
 
         st.slider(
             label="Prompt Strength",
@@ -171,7 +164,7 @@ class Img2ImgPage(BasePage):
         with col2:
             if output_images:
                 for url in output_images:
-                    st.image(url, caption=f"“{text_prompt}”")
+                    st.image(url, caption=f"{text_prompt}")
             else:
                 st.empty()
 
@@ -212,12 +205,13 @@ class Img2ImgPage(BasePage):
             prompt_strength=request.prompt_strength,
             width=request.output_width,
             height=request.output_height,
+            negative_prompt=request.negative_prompt,
         )
 
     def preview_image(self, state: dict) -> str:
         return state.get("output_images", [""])[0]
 
-    def preview_description(self) -> str:
+    def preview_description(self, state: dict) -> str:
         return "This recipe takes an image and a prompt and then attempts to alter the image, based on the text."
 
 

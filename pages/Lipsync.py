@@ -27,23 +27,21 @@ class LipsyncPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            face_file = st.file_uploader(
                 """
                 #### Input Face
                 Upload a video/image that contains faces to use  
                 *Recommended - mp4 / mov / png / jpg* 
-                """
+                """,
             )
-            face_file = st.file_uploader("input face", label_visibility="collapsed")
 
-            st.write(
+            audio_file = st.file_uploader(
                 """
                 #### Input Audio
                 Upload the video/audio file to use as audio source for lipsyncing  
                 *Recommended - wav / mp3*
-                """
+                """,
             )
-            audio_file = st.file_uploader("input audio", label_visibility="collapsed")
 
             submitted = st.form_submit_button("🏃‍ Submit")
 

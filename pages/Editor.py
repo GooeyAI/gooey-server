@@ -14,15 +14,15 @@ from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
 from daras_ai.db import list_all_docs
 from daras_ai.init import init_scripts
-from daras_ai.secret_key_checker import check_secret_key
+from daras_ai.secret_key_checker import check_secret_key, is_admin
 from daras_ai_v2 import settings
-from daras_ai_v2.query_params import gooey_set_query_parm
+from daras_ai_v2.query_params import gooey_reset_query_parm
 
 
 def get_or_create_doc_id():
     query_params = st.experimental_get_query_params()
     doc_id = query_params.get("id", [new_doc_id()])[0]
-    gooey_set_query_parm(id=doc_id)
+    gooey_reset_query_parm(id=doc_id)
     return doc_id
 
 
@@ -157,11 +157,10 @@ st.session_state.setdefault("output_steps", [])
 st.session_state.setdefault("variables", {})
 variables = st.session_state["variables"]
 
-
 tab1, tab2, tab3 = st.tabs(["Run Recipe 🏃‍♂️", "Edit Recipe ✍️", "Run as API 🚀"])
 
 with tab2:
-    if check_secret_key("save this recipie"):
+    if is_admin():
         action_buttons()
 
     st.text_input("Title", key="header_title")
@@ -181,7 +180,7 @@ with tab2:
     render_steps(key="compute_steps", title="Add a step")
 
 with tab3:
-    if check_secret_key("run as API"):
+    if is_admin():
         api_url = f"{settings.API_BASE_URL}/v1/run-recipe/"
         params = {
             "recipe_id": recipe_id,

@@ -53,34 +53,26 @@ class SocialLookupEmailPage(BasePage):
         )
 
     def render_settings(self):
-        st.write(
+        st.slider(
             """
-            ##### Model Risk Factor 
+            ##### Model Creativity 
 
             *(Sampling Temperature)*
 
             Higher values allow the model to take more risks.
             Try 0.9 for more creative applications, 
             and 0 for ones with a well-defined answer. 
-            """
-        )
-        st.slider(
-            label="model risk",
-            label_visibility="collapsed",
+            """,
             key="sampling_temperature",
             min_value=0.0,
             max_value=1.0,
         )
 
-        st.write(
+        st.number_input(
             """
             #### Max Output Tokens
             The maximum number of [tokens](https://beta.openai.com/tokenizer) to generate in the completion.
-            """
-        )
-        st.number_input(
-            label="max_tokens",
-            label_visibility="collapsed",
+            """,
             key="max_tokens",
             min_value=1,
             max_value=4096,
@@ -88,30 +80,22 @@ class SocialLookupEmailPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            st.text_input(
                 """
                 ### Email Address
                 Give us an email address and we'll try to get determine the profile data associated with it
-                """
-            )
-            st.text_input(
-                "email_address",
-                label_visibility="collapsed",
+                """,
                 key="email_address",
                 placeholder="john@appleseed.com",
             )
             st.caption(
-                "By providing an email address, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
+                "By providing an email address, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)"
             )
 
-            st.write(
+            st.text_area(
                 """
                 ### Email Body
-                """
-            )
-            st.text_area(
-                "input_email_body",
-                label_visibility="collapsed",
+                """,
                 key="input_email_body",
                 height=200,
             )
@@ -157,7 +141,7 @@ class SocialLookupEmailPage(BasePage):
 
         state["output_email_body"] = run_language_model(
             api_provider="openai",
-            engine="text-davinci-002",
+            engine="text-davinci-003",
             quality=1,
             num_outputs=1,
             temperature=request.sampling_temperature,
@@ -179,14 +163,10 @@ class SocialLookupEmailPage(BasePage):
         }
 
     def render_output(self):
-        st.write(
+        st.text_area(
             """
             ### Email Body Output 
-            """
-        )
-        st.text_area(
-            "Output",
-            label_visibility="collapsed",
+            """,
             disabled=True,
             value=st.session_state.get("output_email_body", ""),
             height=200,
@@ -216,12 +196,10 @@ class SocialLookupEmailPage(BasePage):
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Email Address**")
-            st.write(state.get("email_address", ""))
-        with col2:
-            st.write("**Email Body Output**")
-            st.write(state.get("output_email_body", ""))
+        st.write("**Email Address**")
+        st.write(state.get("email_address", ""))
+        st.write("**Email Body Output**")
+        st.write(state.get("output_email_body", ""))
 
 
 @st.cache()

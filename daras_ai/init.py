@@ -1,6 +1,8 @@
 import streamlit as st
 
+from daras_ai_v2.copy_to_clipboard_button_widget import st_like_btn_css_html
 from daras_ai_v2.hidden_html_widget import hidden_html_js, hidden_html_nojs
+from daras_ai_v2.html_spinner_widget import html_spinner_css
 from daras_ai_v2.st_session_cookie import get_current_user, get_anonymous_user
 
 
@@ -14,8 +16,14 @@ def init_scripts():
         button[title="View fullscreen"], footer {
             visibility: hidden;
         }
+        textarea, input[type=text] {
+            -webkit-text-fill-color: white !important;
+            color: white !important;
+        }
         </style>
         """
+        + st_like_btn_css_html
+        + html_spinner_css
     )
 
     # for automatically resizing the iframe

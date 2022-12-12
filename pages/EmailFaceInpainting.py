@@ -1,12 +1,12 @@
 import re
+import typing
 
 import requests
 import streamlit as st
-import typing
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.base import get_saved_doc, set_saved_doc, get_doc_ref
+from daras_ai_v2.base import get_or_create_doc, get_doc_ref
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from pages.FaceInpainting import FaceInpaintingPage
@@ -23,6 +23,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         email_address: str
 
         text_prompt: str | None
+        negative_prompt: str | None
 
         num_outputs: int | None
         quality: int | None
@@ -81,33 +82,25 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
     def render_form(self):
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
                 Describe the scene that you'd like to generate around the face. 
-                """
-            )
-            st.text_area(
-                "text_prompt",
-                label_visibility="collapsed",
+                """,
                 key="text_prompt",
                 placeholder="winter's day in paris",
             )
 
-            st.write(
+            st.text_input(
                 """
                 ### Email Address
                 Give us your email address and we'll try to get your photo 
-                """
-            )
-            st.text_input(
-                "email_address",
-                label_visibility="collapsed",
+                """,
                 key="email_address",
                 placeholder="john@appleseed.com",
             )
             st.caption(
-                "By providing your email address, you agree to Gooey.AI's [Privacy Policy](https://dara.network/privacy)"
+                "By providing your email address, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)"
             )
 
             submitted = st.form_submit_button("🏃‍ Submit")
@@ -248,15 +241,19 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         return email_body
 
     def render_example(self, state: dict):
-        st.write("Input Email -", state.get("email_address"))
-        super().render_example(state)
+        st.write("**Input Email** -", state.get("email_address"))
+        output_images = state.get("output_images")
+        if output_images:
+            for img in output_images:
+                st.image(img, caption=state.get("text_prompt", ""))
 
 
 @st.cache()
 def get_photo_for_email(email_address):
-    state = get_saved_doc(
+    state = get_or_create_doc(
         get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
-    )
+    ).to_dict()
+
     photo_url = state.get("photo_url")
     if photo_url:
         return photo_url
@@ -277,10 +274,11 @@ def get_photo_for_email(email_address):
     photo_url = upload_file_from_bytes(
         "face_photo.png", requests.get(photo_url).content
     )
-    set_saved_doc(
-        get_doc_ref(email_address, collection_id="apollo_io_photo_cache"),
-        {"photo_url": photo_url},
-    )
+
+    get_doc_ref(
+        email_address,
+        collection_id="apollo_io_photo_cache",
+    ).set({"photo_url": photo_url})
 
     return photo_url
 

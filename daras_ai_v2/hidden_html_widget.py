@@ -4,7 +4,7 @@ import streamlit.components.v1 as components
 
 def hidden_html_nojs(raw_html: str):
     st.markdown(
-        raw_html,
+        raw_html.strip(),
         unsafe_allow_html=True,
     )
 

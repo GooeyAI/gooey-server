@@ -1,7 +1,7 @@
 import os
 
 import firebase_admin
-from decouple import config, UndefinedValueError
+from decouple import config, UndefinedValueError, Csv
 from google.oauth2 import service_account
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -48,6 +48,11 @@ GPU_SERVER_1 = config("GPU_SERVER_1", "http://gpu-1.gooey.ai")
 GPU_SERVER_2 = config("GPU_SERVER_2", "http://gpu-2.gooey.ai")
 
 SCALESERP_API_KEY = config("SCALESERP_API_KEY", None)
+
+# timeout for fetching external urls in the wild
+EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
+
+ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="sean@dara.network")
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)

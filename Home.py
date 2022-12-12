@@ -5,6 +5,7 @@ from google.cloud.firestore_v1 import DocumentSnapshot
 from daras_ai.db import list_all_docs
 from daras_ai.init import init_scripts
 from daras_ai_v2 import settings
+from pages.GoogleImageGen import GoogleImageGenPage
 from daras_ai_v2.face_restoration import map_parallel
 from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
@@ -26,6 +27,8 @@ init_scripts()
 page_classes = [
     FaceInpaintingPage,
     EmailFaceInpaintingPage,
+    SEOSummaryPage,
+    GoogleImageGenPage,
     SocialLookupEmailPage,
     TextToSpeechPage,
     LipsyncTTSPage,
@@ -35,7 +38,6 @@ page_classes = [
     DeforumSDPage,
     CompareLMPage,
     CompareText2ImgPage,
-    SEOSummaryPage,
     # LipsyncPage,
     # ChyronPlantPage,
 ]
@@ -43,7 +45,7 @@ page_classes = [
 pages = [page_cls() for page_cls in page_classes]
 
 with st.spinner():
-    all_examples = map_parallel(lambda page: page.get_doc(), pages)
+    all_examples = map_parallel(lambda page: page.get_recipe_doc().to_dict(), pages)
 
 for page, example_doc in zip(pages, all_examples):
     col1, col2 = st.columns(2)
@@ -51,7 +53,7 @@ for page, example_doc in zip(pages, all_examples):
     with col1:
         st.markdown(
             f"""
-            <a style="font-size: 24px" href="{furl(settings.APP_BASE_URL) / page.slug}" target = "_top">
+            <a style="font-size: 24px" href="{page.app_url()}" target = "_top">
                 <h2>{page.title}</h2>
             </a>
             """,

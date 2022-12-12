@@ -275,14 +275,6 @@ python-versions = "*"
 boltons = ">=20.0.0"
 
 [[package]]
-name = "fake-useragent"
-version = "1.1.0"
-description = "Up-to-date simple useragent faker with real world database"
-category = "main"
-optional = false
-python-versions = "*"
-
-[[package]]
 name = "fastapi"
 version = "0.85.0"
 description = "FastAPI framework, high performance, easy to learn, fast to code, ready for production"
@@ -872,6 +864,18 @@ matplotlib = "*"
 numpy = "*"
 opencv-contrib-python = "*"
 protobuf = ">=3.11,<4"
+
+[[package]]
+name = "mpmath"
+version = "1.2.1"
+description = "Python library for arbitrary-precision floating-point arithmetic"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.extras]
+develop = ["codecov", "pycodestyle", "pytest (>=4.6)", "pytest-cov", "wheel"]
+tests = ["pytest (>=4.6)"]
 
 [[package]]
 name = "msgpack"
@@ -1488,7 +1492,7 @@ full = ["itsdangerous", "jinja2", "python-multipart", "pyyaml", "requests"]
 
 [[package]]
 name = "streamlit"
-version = "1.15.1"
+version = "1.15.2"
 description = "The fastest way to build data apps in Python"
 category = "main"
 optional = false
@@ -1541,6 +1545,17 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.dependencies]
 requests = {version = ">=2.20", markers = "python_version >= \"3.0\""}
+
+[[package]]
+name = "sympy"
+version = "1.11.1"
+description = "Computer algebra system (CAS) in Python"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.dependencies]
+mpmath = ">=0.19"
 
 [[package]]
 name = "tokenizers"
@@ -1843,7 +1858,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "dc842b069edad6d31e827ea11b1ce696957cb6ab4c211123899db62faded1bb8"
+content-hash = "94a537d7ff38394719c45efb492dd0d967c3984cf07ac8201fb6c6c5c42b8ad2"
 
 [metadata.files]
 absl-py = [
@@ -2016,10 +2031,6 @@ executing = [
 face = [
     {file = "face-20.1.1-py2-none-any.whl", hash = "sha256:3790311a7329e4b0d90baee346eecad54b337629576edf3a246683a5f0d24446"},
     {file = "face-20.1.1.tar.gz", hash = "sha256:7d59ca5ba341316e58cf72c6aff85cca2541cf5056c4af45cb63af9a814bed3e"},
-]
-fake-useragent = [
-    {file = "fake-useragent-1.1.0.tar.gz", hash = "sha256:b473a8faa9a94014b7ea8783ca36ea2c119e33a9eee1becd2e44398428b0367f"},
-    {file = "fake_useragent-1.1.0-py3-none-any.whl", hash = "sha256:f2a3ff23137b834c4fe1dfad177cfb304ce938c71775d0ff86da3fa5a9c84e0b"},
 ]
 fastapi = [
     {file = "fastapi-0.85.0-py3-none-any.whl", hash = "sha256:1803d962f169dc9f8dde54a64b22eb16f6d81573f54401971f90f0a67234a8b4"},
@@ -2554,6 +2565,10 @@ mediapipe-silicon = [
     {file = "mediapipe_silicon-0.8.11-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:53bb85f7c1891522914d5cd10e152114ea9984a311cc7f16a7e2d0f64762d8c5"},
     {file = "mediapipe_silicon-0.8.11-cp38-cp38-macosx_12_0_arm64.whl", hash = "sha256:9eef96f94cc4644c1f821aced016eefe2a336e2b3b2d8c46eb01d30e7cc89416"},
     {file = "mediapipe_silicon-0.8.11-cp39-cp39-macosx_12_0_arm64.whl", hash = "sha256:f17f1f4d8d56feb637f2f734b37e8556782011a7e104d278ed60cf754d639015"},
+]
+mpmath = [
+    {file = "mpmath-1.2.1-py3-none-any.whl", hash = "sha256:604bc21bd22d2322a177c73bdb573994ef76e62edd595d17e00aff24b0667e5c"},
+    {file = "mpmath-1.2.1.tar.gz", hash = "sha256:79ffb45cf9f4b101a807595bcb3e72e0396202e0b1d25d689134b48c4216a81a"},
 ]
 msgpack = [
     {file = "msgpack-1.0.4-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:4ab251d229d10498e9a2f3b1e68ef64cb393394ec477e3370c457f9430ce9250"},
@@ -3170,11 +3185,15 @@ starlette = [
     {file = "starlette-0.20.4.tar.gz", hash = "sha256:42fcf3122f998fefce3e2c5ad7e5edbf0f02cf685d646a83a08d404726af5084"},
 ]
 streamlit = [
-    {file = "streamlit-1.15.1-py2.py3-none-any.whl", hash = "sha256:ac8b24fa26dd5dfcd1954a340315c0b36c868c7de688259099dfd909524f1d8d"},
-    {file = "streamlit-1.15.1.tar.gz", hash = "sha256:2ec65c29b6390ff5d8288dac20fa3a4a343ac8f0755de3dc922b468a4d6ea6cc"},
+    {file = "streamlit-1.15.2-py2.py3-none-any.whl", hash = "sha256:40933b64e7b3a1770d798918cbd2ae52a6671a52266ac069f62e1b66f38e0662"},
+    {file = "streamlit-1.15.2.tar.gz", hash = "sha256:31b2fa33848f8dbcf526e6c93017cf58c81a8479844c4f6ff553382e1bac6152"},
 ]
 streamlit-nested-layout = [
     {file = "streamlit-nested-layout-0.1.1.tar.gz", hash = "sha256:8b7ce4d90b76ff8f4fff2cf7b30ae262cd2c068722e5439a3618f9a412ed82fb"},
+]
+sympy = [
+    {file = "sympy-1.11.1-py3-none-any.whl", hash = "sha256:938f984ee2b1e8eae8a07b884c8b7a1146010040fccddc6539c54f401c8f6fcf"},
+    {file = "sympy-1.11.1.tar.gz", hash = "sha256:e32380dce63cb7c0108ed525570092fd45168bdae2faa17e528221ef72e88658"},
 ]
 stripe = [
     {file = "stripe-5.0.0-py2.py3-none-any.whl", hash = "sha256:50f69a5fc9cd6f7629861b80ea70a3c6da0c76401ddc159474f2d45fab9215d6"},

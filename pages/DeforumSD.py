@@ -19,14 +19,10 @@ class DeforumSDPage(BasePage):
 
     def render_form(self) -> bool:
         with st.form("my_form"):
-            st.write(
+            st.text_area(
                 """
                 ### Prompt
-                """
-            )
-            st.text_area(
-                "input_prompt",
-                label_visibility="collapsed",
+                """,
                 key="input_prompt",
                 height=200,
             )
@@ -40,12 +36,12 @@ class DeforumSDPage(BasePage):
             """
                 This recipe takes any text and creates animation. 
 
-                It's based off the Deforum notebook with lots of details at https://deforum.art. 
+                It's based off the Deforum notebook with lots of details at http://deforum.art. 
             """
         )
 
     def render_settings(self):
-        st.slider("# of Frames", min_value=100, max_value=1000, key="max_frames")
+        st.slider("Number of Frames", min_value=100, max_value=1000, key="max_frames")
 
     def render_output(self):
         output_video = st.session_state.get("output_video")
@@ -72,10 +68,11 @@ class DeforumSDPage(BasePage):
             input_data={
                 "max_frames": request.max_frames,
                 "animation_prompts": request.input_prompt,
+                "zoom": "0: (1.004)",
             },
         )[0]
         state["output_video"] = upload_file_from_bytes(
-            f"gooey.ai text to animation - {request.input_prompt}", out_video_bytes
+            f"gooey.ai text to animation - {request.input_prompt}.mp4", out_video_bytes
         )
 
 
