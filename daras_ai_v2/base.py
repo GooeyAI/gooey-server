@@ -88,10 +88,6 @@ class BasePage:
 
             with col1:
                 submitted = self.render_form()
-                if submitted:
-                    has_credits = credits_helper.check_credits(self.get_price())
-                    if not has_credits:
-                        return
                 self.render_description()
 
             with col2:
@@ -274,6 +270,9 @@ class BasePage:
             with status_area:
                 html_spinner("Starting...")
 
+                if not credits_helper.check_credits(self.get_price()):
+                    return
+
             self.clear_outputs()
             self.save_run()
 
@@ -310,6 +309,8 @@ class BasePage:
                 del st.session_state["__status"]
                 del st.session_state["__gen"]
 
+                credits_helper.deduct_credits(self.get_price())
+
             # render errors nicely
             except Exception as e:
                 traceback.print_exc()
@@ -335,7 +336,6 @@ class BasePage:
                         f"Success! Run Time: `{time_taken:.2f}` seconds. ",
                         icon="✅",
                     )
-                    credits_helper.deduct_credits(self.slug)
                     del st.session_state["__time_taken"]
 
     def clear_outputs(self):

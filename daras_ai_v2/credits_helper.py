@@ -5,6 +5,8 @@ from daras_ai_v2 import settings
 
 def check_credits(credits_to_deduct: int) -> bool:
     user = st.session_state.get("_current_user")
+    if not user:
+        return True
     uid = user.uid
     if db.get_user_field(uid, "credits") < credits_to_deduct:
         if db.get_user_field(uid, "anonymous_user"):
@@ -23,4 +25,6 @@ def check_credits(credits_to_deduct: int) -> bool:
 
 def deduct_credits(credits_to_deduct: int):
     user = st.session_state.get("_current_user")
+    if not user:
+        return
     db.deduct_user_credits(user.uid, credits_to_deduct)

@@ -239,9 +239,6 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
         state.update(request_dict)
 
-        # pass current user from request
-        state["_current_user"] = request.user
-
         # run the script
         try:
             gen = page.run(state)
