@@ -1,11 +1,12 @@
+import stripe
 from fastapi import APIRouter
 from fastapi.requests import Request
-from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, JSONResponse
-from daras_ai import db
+from fastapi.templating import Jinja2Templates
+
+from daras_ai_v2 import db
 from daras_ai_v2 import settings
-from daras_ai_v2.settings import STRIPE_SECRET_KEY, STRIPE_ENDPOINT_SECRET, APP_BASE_URL
-import stripe
+from daras_ai_v2.settings import STRIPE_SECRET_KEY, APP_BASE_URL
 
 router = APIRouter(tags=["credits"])
 
@@ -140,7 +141,7 @@ async def webhook_received(request: Request):
             "lookup_key": plan_lookup_key,
             "stripe_customer_id": data_object["customer"],
         }
-        db.user_doc_ref(uid).update(data_to_add_in_db)
+        db.get_user_doc_ref(uid).update(data_to_add_in_db)
 
     return JSONResponse({"status": "success"})
 
@@ -152,5 +153,5 @@ def cancel_subscription(request: Request):
     subscriptions = stripe.Subscription.list(customer=customer_id)
     subscription_id = subscriptions["data"][0]["id"]
     stripe.Subscription.delete(subscription_id)
-    db.user_doc_ref(user.uid).update({"lookup_key": None})
+    db.get_user_doc_ref(user.uid).update({"lookup_key": None})
     return RedirectResponse("/account", status_code=303)
