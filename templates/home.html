@@ -38,15 +38,18 @@
             window.addEventListener('message', function (event) {
                 switch (event.data.type) {
                     case "GOOEY_SET_QUERY_PARAM":
-                        let searchParams = new URLSearchParams(window.location.search);
+                        let searchParams = new URLSearchParams();
                         for (let [key, value] of Object.entries(event.data.queryParams)) {
                             searchParams.set(key, value);
                         }
                         let url = new URL(window.location.href);
                         url.search = searchParams.toString();
                         history.pushState(null, '', url.toString());
+                        break;
+
                     case "GOOEY_IFRAME_RESIZE":
                         iframe.style.height = `${event.data.height + 100}px`;
+                        break;
                 }
             });
         }
