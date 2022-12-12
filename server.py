@@ -2,8 +2,6 @@ import datetime
 import time
 import typing
 
-import requests
-from fastapi import FastAPI
 from fastapi import FastAPI, Header
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,26 +21,21 @@ from starlette.responses import PlainTextResponse
 from auth_backend import (
     SessionAuthBackend,
     FIREBASE_SESSION_COOKIE,
-    ANONYMOUS_USER_COOKIE,
 )
-from daras_ai import db
 from daras_ai.computer import run_compute_steps
-from daras_ai.db import get_or_init_user_data
-from daras_ai_v2 import settings
-from gooey_token_authentication1.token_authentication import authenticate
-from pages.GoogleImageGen import GoogleImageGenPage
+from daras_ai_v2 import settings, db
 from daras_ai_v2.base import (
     BasePage,
-    get_doc_ref,
-    get_or_create_doc,
     err_msg_for_exc,
 )
+from gooey_token_authentication1.token_authentication import authenticate
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
 from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.GoogleImageGen import GoogleImageGenPage
 from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Img2Img import Img2ImgPage
 from pages.LetterWriter import LetterWriterPage
@@ -226,7 +219,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page = page_cls()
 
         # get saved state from db
-        state = get_or_create_doc(get_doc_ref(page.doc_name)).to_dict()
+        state = db.get_or_create_doc(db.get_doc_ref(page.doc_name)).to_dict()
 
         # set sane defaults
         for k, v in page.sane_defaults.items():
@@ -269,7 +262,7 @@ def account(request: Request):
     if not request.user:
         return RedirectResponse(str(furl("/login", query_params={"next": "/account"})))
 
-    user_data = get_or_init_user_data(request)
+    user_data = db.get_or_init_user_data(request)
     user_credits = user_data["credits"]
     lookup_key = user_data["lookup_key"]
 
@@ -323,7 +316,7 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
 
-    get_or_init_user_data(request)
+    db.get_or_init_user_data(request)
 
     return templates.TemplateResponse(
         "home.html",
