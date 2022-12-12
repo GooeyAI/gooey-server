@@ -89,9 +89,9 @@ class BasePage:
             with col1:
                 submitted = self.render_form()
                 if submitted:
-                    deduct_success = credits_helper.deduct_credits(self.get_price())
-                    if not deduct_success:
-                        return False
+                    has_credits = credits_helper.check_credits(self.get_price())
+                    if not has_credits:
+                        return
                 self.render_description()
 
             with col2:
@@ -219,6 +219,7 @@ class BasePage:
                         f"Success! Run Time: `{time_taken:.2f}` seconds. ",
                         icon="✅",
                     )
+                    credits_helper.deduct_credits(self.slug)
                     del st.session_state["__time_taken"]
 
     def clear_outputs(self):
@@ -424,12 +425,14 @@ class BasePage:
 
         if st.button("Call API 🚀"):
             with st.spinner("Waiting for API..."):
-                deduct_success = credits_helper.deduct_credits(self.get_price())
-                if not deduct_success:
+                price = self.get_price()
+                has_credits = credits_helper.check_credits(price)
+                if not has_credits:
                     return False
                 r = requests.post(api_url, json=request_body)
                 "### Response"
                 r.raise_for_status()
+                credits_helper.deduct_credits(price)
                 st.write(r.json())
 
 
