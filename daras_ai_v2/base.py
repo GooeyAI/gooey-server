@@ -17,17 +17,17 @@ from pydantic import BaseModel
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key, is_admin
+from daras_ai_v2 import credits_helper
+from daras_ai_v2 import db
 from daras_ai_v2 import settings
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
 )
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.query_params import gooey_reset_query_parm
-from daras_ai_v2 import credits_helper
 
 DEFAULT_STATUS = "Running..."
 
-DEFAULT_COLLECTION = "daras-ai-v2"
 
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
@@ -111,7 +111,7 @@ class BasePage:
             st.session_state.update(state)
 
         with st.spinner("Loading Examples..."):
-            st.session_state["__example_docs"] = list_all_docs(
+            st.session_state["__example_docs"] = db.list_all_docs(
                 document_id=self.doc_name,
                 sub_collection_id=EXAMPLES_COLLECTION,
             )
@@ -143,13 +143,13 @@ class BasePage:
         return snapshot.to_dict()
 
     def get_recipe_doc(self) -> firestore.DocumentSnapshot:
-        return get_or_create_doc(self._recipe_doc_ref())
+        return db.get_or_create_doc(self._recipe_doc_ref())
 
     def _recipe_doc_ref(self) -> firestore.DocumentReference:
-        return get_doc_ref(self.doc_name)
+        return db.get_doc_ref(self.doc_name)
 
     def _run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
-        return get_doc_ref(
+        return db.get_doc_ref(
             collection_id=USER_RUNS_COLLECTION,
             document_id=uid,
             sub_collection_id=self.doc_name,
@@ -157,7 +157,7 @@ class BasePage:
         )
 
     def _example_doc_ref(self, example_id: str) -> firestore.DocumentReference:
-        return get_doc_ref(
+        return db.get_doc_ref(
             sub_collection_id=EXAMPLES_COLLECTION,
             document_id=self.doc_name,
             sub_document_id=example_id,
@@ -376,7 +376,7 @@ class BasePage:
             else:
                 submitted_3 = st.button("💾 Save This Recipe & Settings")
                 if submitted_3:
-                    doc_ref = get_doc_ref(self.doc_name)
+                    doc_ref = db.get_doc_ref(self.doc_name)
 
         if not doc_ref:
             return
@@ -520,62 +520,6 @@ class BasePage:
                 r.raise_for_status()
                 credits_helper.deduct_credits(price)
                 st.write(r.json())
-
-
-def get_doc_ref(
-    document_id: str,
-    *,
-    collection_id=DEFAULT_COLLECTION,
-    sub_collection_id: str = None,
-    sub_document_id: str = None,
-) -> firestore.DocumentReference:
-    db = firestore.Client()
-    db_collection = db.collection(collection_id)
-    doc_ref = db_collection.document(document_id)
-    if sub_collection_id:
-        sub_collection = doc_ref.collection(sub_collection_id)
-        doc_ref = sub_collection.document(sub_document_id)
-    return doc_ref
-
-
-def get_or_create_doc(
-    doc_ref: firestore.DocumentReference,
-) -> firestore.DocumentSnapshot:
-    doc = doc_ref.get()
-    if not doc.exists:
-        doc_ref.create({})
-        doc = doc_ref.get()
-    return doc
-
-
-def list_all_docs(
-    collection_id=DEFAULT_COLLECTION,
-    *,
-    document_id: str = None,
-    sub_collection_id: str = None,
-) -> list:
-    db = firestore.Client()
-    db_collection = db.collection(collection_id)
-    if sub_collection_id:
-        doc_ref = db_collection.document(document_id)
-        db_collection = doc_ref.collection(sub_collection_id)
-    return db_collection.get()
-
-
-def get_doc_ref(
-    document_id: str,
-    *,
-    collection_id="daras-ai-v2",
-    sub_collection_id: str = None,
-    sub_document_id: str = None,
-):
-    db = firestore.Client()
-    db_collection = db.collection(collection_id)
-    doc_ref = db_collection.document(document_id)
-    if sub_collection_id:
-        sub_collection = doc_ref.collection(sub_collection_id)
-        doc_ref = sub_collection.document(sub_document_id)
-    return doc_ref
 
 
 def get_example_request_body(

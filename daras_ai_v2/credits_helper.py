@@ -1,5 +1,6 @@
 import streamlit as st
-from daras_ai import db
+
+from daras_ai_v2 import db
 from daras_ai_v2 import settings
 
 
