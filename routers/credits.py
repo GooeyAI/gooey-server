@@ -8,8 +8,6 @@ import stripe
 
 router = APIRouter(tags=["credits"])
 
-DOMAIN = APP_BASE_URL
-
 stripe.api_key = STRIPE_SECRET_KEY
 templates = Jinja2Templates(directory="templates")
 
@@ -26,8 +24,8 @@ def create_checkout_session(request):
                 },
             ],
             mode="payment",
-            success_url=DOMAIN + "/payment-success",
-            cancel_url=DOMAIN + "/payment-cancel",
+            success_url=APP_BASE_URL + "/payment-success",
+            cancel_url=APP_BASE_URL + "/payment-cancel",
             customer_email=user.email,
             client_reference_id=user.uid,
         )
@@ -69,8 +67,8 @@ async def create_checkout_session(request: Request):
                 },
             ],
             mode="subscription",
-            success_url=DOMAIN + "/payment-success",
-            cancel_url=DOMAIN + "/payment-cancel",
+            success_url=APP_BASE_URL + "/payment-success",
+            cancel_url=APP_BASE_URL + "/payment-cancel",
             customer_email=user.email,
             client_reference_id=user.uid,
         )
@@ -84,7 +82,7 @@ async def create_checkout_session(request: Request):
 async def customer_portal(request: Request):
     user = request.user
     stripe_customer_id = db.get_user_field(user.uid, "stripe_customer_id")
-    return_url = DOMAIN + "/payment-success"
+    return_url = APP_BASE_URL + "/payment-success"
     portal_configuration = stripe.billing_portal.Configuration.create(
         features={
             "customer_update": {
