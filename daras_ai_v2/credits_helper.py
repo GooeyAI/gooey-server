@@ -1,3 +1,5 @@
+import uuid
+
 import streamlit as st
 
 from daras_ai_v2 import db
@@ -24,8 +26,8 @@ def check_credits(credits_to_deduct: int) -> bool:
     return True
 
 
-def deduct_credits(credits_to_deduct: int):
+def deduct_credits(amount: int):
     user = st.session_state.get("_current_user")
     if not user:
         return
-    db.deduct_user_credits(user.uid, credits_to_deduct)
+    db.update_user_credits(user.uid, -abs(amount), str(uuid.uuid1()))

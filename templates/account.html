@@ -22,39 +22,33 @@
         </div>
         <hr>
         <div class="credits-container"><h2>Credits: {{ credits }} </h2></div>
-        {% if lookup_key is none %}
+        {% if not subscription %}
             <hr>
             <div class="buy-credits-container"><h2>Buy Credits</h2>
                 <div class="plans-container">
-                    {% for subscription in available_subscriptions %}
+                    {% for lookup_key, subscription in available_subscriptions.items() %}
                         <ul class="product">
-                            <li><h3>{{ subscription['title'] }}</h3></li>
-                            <li><h4>{{ subscription['description'] }}</h4></li>
+                            <li><h3>{{ subscription["display"]["title"] }}</h3></li>
+                            <li><h4>{{ subscription["display"]["description"] }}</h4></li>
                             <li>
-                                <form action="/create-checkout-session" method="POST">
+                                <form action="/__/stripe/create-checkout-session" method="POST">
                                     <!-- Add a hidden field with the lookup_key of your Price -->
-                                    <input type="hidden" name="lookup_key" value="{{ subscription['lookup_key'] }}"/>
+                                    <input type="hidden" name="lookup_key" value="{{ lookup_key }}"/>
                                     <button class="btn-outline-dark" type="submit">Buy</button>
                                 </form>
                             </li>
                         </ul>
                     {% endfor %}
-                    <ul>
-                        <li><h3>Pay an additional $10 to get 1000 extra credits on any monthly plan.</h3></li>
-                        <li>
-                            <form style="margin-top: 10px" action="/create-checkout-session-add-on" method="POST">
-                                <button class="btn-outline-dark" type="submit">Add Credits</button>
-                            </form>
-                        </li>
-                    </ul>
                 </div>
             </div>
 
         {% else %}
             <h3 id="subscription-text">You are subscribed
-                to {{ subscription['display_text'] }}, {{ subscription['title'] }}</h3>
+                to {{ subscription["display"]["name"] }}, {{ subscription["display"]["title"] }}</h3>
             <h3 id="add-on-text">Pay an additional $10 to get 1000 extra credits on any monthly plan.</h3>
-            <form style="margin-top: 10px" action="/create-checkout-session-add-on" method="POST">
+            <form action="/__/stripe/create-checkout-session" method="POST">
+                <!-- Add a hidden field with the lookup_key of your Price -->
+                <input type="hidden" name="lookup_key" value="{{ lookup_key }}"/>
                 <button class="btn-outline-dark" type="submit">Add Credits</button>
             </form>
             <hr>

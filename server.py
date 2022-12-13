@@ -45,11 +45,11 @@ from pages.ObjectInpainting import ObjectInpaintingPage
 from pages.SEOSummary import SEOSummaryPage
 from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
-from routers import credits
+from routers import stripe_apis
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
-app.include_router(credits.router, tags=["credits"])
+app.include_router(stripe_apis.router, tags=["credits"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -62,23 +62,6 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
-
-list_subscriptions = [
-    {
-        "title": "MONTHLY @ $10",
-        "description": "1000 Credits to get you up, up and away. Cancel your plan anytime.",
-        "credits": 1000,
-        "lookup_key": "standard_subscription",
-        "display_text": "Standard Plan",
-    },
-    {
-        "title": "MONTHLY @ $50",
-        "description": "5000 Credits + special access to make bespoke interactive video bots! ",
-        "credits": 5000,
-        "lookup_key": "premium_subscription",
-        "display_text": "Premium Plan",
-    },
-]
 
 
 @app.exception_handler(404)
@@ -263,21 +246,15 @@ def account(request: Request):
         return RedirectResponse(str(furl("/login", query_params={"next": "/account"})))
 
     user_data = db.get_or_init_user_data(request)
-    user_credits = user_data["credits"]
-    lookup_key = user_data["lookup_key"]
 
     context = {
         "request": request,
-        "credits": user_credits,
-        "available_subscriptions": list_subscriptions,
-        "lookup_key": lookup_key,
-        "title": "Account Page",
+        "available_subscriptions": stripe_apis.available_subscriptions,
+        "credits": user_data.get("credits", 0),
+        "subscription": stripe_apis.available_subscriptions.get(
+            user_data.get("subscription")
+        ),
     }
-
-    if lookup_key:
-        for subscription in list_subscriptions:
-            if subscription["lookup_key"] == lookup_key:
-                context["subscription"] = subscription
 
     return templates.TemplateResponse("account.html", context)
 
