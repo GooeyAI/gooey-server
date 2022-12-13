@@ -14,7 +14,6 @@ def check_credits(credits_to_deduct: int) -> bool:
         return True
 
     balance = get_doc_field(db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0)
-    print(">>", user.uid, balance)
 
     if balance < credits_to_deduct:
         account_url = str(furl(settings.APP_BASE_URL) / "account")
