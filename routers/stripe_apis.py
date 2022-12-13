@@ -3,10 +3,13 @@ from fastapi import APIRouter
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from firebase_admin.auth import UserRecord
 from furl import furl
 
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
+
+STRIPE_CUSTOMER_ID_FIELD = "stripe_customer_id"
 
 router = APIRouter(tags=["credits"])
 
@@ -75,13 +78,27 @@ available_subscriptions = {
 
 @router.route("/__/stripe/create-checkout-session", methods=["POST"])
 async def create_checkout_session(request: Request):
-    user = request.user
-    form = await request.form()
+    user: UserRecord = request.user
 
+    user_data_ref = db.get_user_doc_ref(user.uid)
+    user_data = user_data_ref.get()
+
+    form = await request.form()
     lookup_key = form["lookup_key"]
-    if lookup_key == db.get_user_field(user.uid, "lookup_key"):
+
+    if lookup_key == user_data.get("lookup_key"):
         # already subscribed
         return RedirectResponse("/", status_code=303)
+
+    customer_id = user_data.get(STRIPE_CUSTOMER_ID_FIELD)
+    if not customer_id:
+        customer = stripe.Customer.create(
+            name=user.display_name,
+            email=user.email,
+            phone=user.phone_number,
+        )
+        customer_id = customer.id
+        user_data_ref.update({STRIPE_CUSTOMER_ID_FIELD: customer_id})
 
     price = available_subscriptions[lookup_key]["price"]
 
@@ -97,11 +114,11 @@ async def create_checkout_session(request: Request):
         mode=mode,
         success_url=str(furl(settings.APP_BASE_URL) / "payment-success"),
         cancel_url=str(furl(settings.APP_BASE_URL) / "payment-cancel"),
-        customer_email=user.email,
         client_reference_id=user.uid,
         metadata={
             "subscription": lookup_key,
         },
+        customer=customer_id,
     )
 
     return RedirectResponse(checkout_session.url, status_code=303)
@@ -122,7 +139,7 @@ def payment_success(request):
 @router.route("/create-portal-session", methods=["POST"])
 async def customer_portal(request: Request):
     user = request.user
-    stripe_customer_id = db.get_user_field(user.uid, "stripe_customer_id")
+    stripe_customer_id = db.get_user_field(user.uid, STRIPE_CUSTOMER_ID_FIELD)
     return_url = str(furl(settings.APP_BASE_URL) / "payment-success")
     portal_configuration = stripe.billing_portal.Configuration.create(
         features={
@@ -168,30 +185,25 @@ async def webhook_received(request: Request):
 def _handle_checkout_session_completed(event):
     data = event["data"]["object"]
 
-    txn_id = data["id"]
+    checkout_id = data["id"]
 
     uid = data["client_reference_id"]
     assert uid, "client_reference_id not found"
 
-    lookup_key = data["metadata"]["subscription"]
-    assert lookup_key, "subscription metadata not found"
-
-    amount = available_subscriptions[lookup_key]["price"]["quantity"]
-    db.update_user_credits(uid, amount, txn_id)
+    line_items = stripe.checkout.Session.list_line_items(checkout_id)
+    quantity = line_items.data[0].quantity
+    db.update_user_credits(uid, quantity, checkout_id)
 
     if data["mode"] == "subscription":
-        db.get_user_doc_ref(uid).update(
-            {
-                "subscription": lookup_key,
-                "stripe_customer_id": data["customer"],
-            }
-        )
+        subscription = data["metadata"]["subscription"]
+        assert subscription, "subscription metadata not found"
+        db.get_user_doc_ref(uid).update({"subscription": subscription})
 
 
 @router.route("/cancel-subscription")
 def cancel_subscription(request: Request):
     user = request.user
-    customer_id = db.get_user_field(user.uid, "stripe_customer_id")
+    customer_id = db.get_user_field(user.uid, STRIPE_CUSTOMER_ID_FIELD)
     subscriptions = stripe.Subscription.list(customer=customer_id)
     subscription_id = subscriptions["data"][0]["id"]
     stripe.Subscription.delete(subscription_id)
