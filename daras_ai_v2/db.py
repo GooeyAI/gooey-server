@@ -53,6 +53,7 @@ def update_user_balance(uid: str, amount: int, invoice_id: str):
             invoice_ref,
             {
                 "amount": amount,
+                "end_balance": balance,
                 "timestamp": datetime.datetime.utcnow(),
             },
         )
