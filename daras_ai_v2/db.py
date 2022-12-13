@@ -24,8 +24,6 @@ def get_doc_field(doc_ref: firestore.DocumentReference, field: str, default=None
 
 
 def update_user_balance(uid: str, amount: int, invoice_id: str):
-    transaction = _db.transaction()
-
     @firestore.transactional
     def _update_user_balance_in_txn(transaction: Transaction):
         user_doc_ref = get_user_doc_ref(uid)
@@ -38,9 +36,12 @@ def update_user_balance(uid: str, amount: int, invoice_id: str):
             return
 
         # get current balance
-        snapshot = user_doc_ref.get(transaction=transaction)
         try:
-            balance = snapshot.get(USER_BALANCE_FIELD)
+            balance = user_doc_ref.get(
+                [USER_BALANCE_FIELD], transaction=transaction
+            ).get(
+                USER_BALANCE_FIELD,
+            )
         except KeyError:
             balance = 0
 
@@ -58,7 +59,7 @@ def update_user_balance(uid: str, amount: int, invoice_id: str):
             },
         )
 
-    _update_user_balance_in_txn(transaction)
+    _update_user_balance_in_txn(_db.transaction())
 
 
 def get_or_init_user_data(request: Request) -> dict:
