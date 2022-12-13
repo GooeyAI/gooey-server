@@ -19,7 +19,7 @@ def check_credits(credits_to_deduct: int) -> bool:
     if balance < credits_to_deduct:
         account_url = str(furl(settings.APP_BASE_URL, "/account"))
         if getattr(user, "_is_anonymous", False):
-            error = f"Doh! You need to login to run more Gooey.AI recipes. [Login]({account_url}"
+            error = f"Doh! You need to login to run more Gooey.AI recipes. [Login]({account_url})"
         else:
             error = f"Doh! You need to purchase additional credits to run more Gooey.AI recipes. [Buy Credits]({account_url})"
         st.error(error, icon="⚠️")
