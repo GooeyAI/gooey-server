@@ -57,13 +57,13 @@
             <div class="billing-button-container">
                 <h2>Billing</h2>
                 <div class="billing-button-container-row">
-                    <form action="/create-portal-session" method="POST">
+                    <form action="/__/stripe/create-portal-session" method="POST">
                         <button class="btn-outline-dark" id="portal-button" type="submit">Manage your billing
                             information
                         </button>
                     </form>
 
-                    <form action="/cancel-subscription" method="GET">
+                    <form action="/__/stripe/cancel-subscription" method="POST">
                         <button class="btn-outline-cancel" id="cancel-button" type="submit">Cancel Subscription</button>
                     </form>
                 </div>

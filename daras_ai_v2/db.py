@@ -59,7 +59,6 @@ def get_or_init_user_data(request: Request) -> dict:
         uid = user.uid
         default_data = {
             "credits": settings.LOGIN_USER_FREE_CREDITS,
-            "lookup_key": None,
             "anonymous_user": False,
         }
     else:
@@ -71,7 +70,6 @@ def get_or_init_user_data(request: Request) -> dict:
         uid = request.session[ANONYMOUS_USER_COOKIE]["uid"]
         default_data = {
             "credits": settings.ANON_USER_FREE_CREDITS,
-            "lookup_key": None,
             "anonymous_user": True,
         }
 

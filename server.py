@@ -45,11 +45,11 @@ from pages.ObjectInpainting import ObjectInpaintingPage
 from pages.SEOSummary import SEOSummaryPage
 from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
-from routers import stripe_apis
+from routers import billing
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
-app.include_router(stripe_apis.router, tags=["credits"])
+app.include_router(billing.router, tags=["credits"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -238,25 +238,6 @@ def st_home(request: Request):
         iframe_url,
         context={"title": "Home - Gooey.AI"},
     )
-
-
-@app.get("/account", include_in_schema=False)
-def account(request: Request):
-    if not request.user:
-        return RedirectResponse(str(furl("/login", query_params={"next": "/account"})))
-
-    user_data = db.get_or_init_user_data(request)
-
-    context = {
-        "request": request,
-        "available_subscriptions": stripe_apis.available_subscriptions,
-        "credits": user_data.get("credits", 0),
-        "subscription": stripe_apis.available_subscriptions.get(
-            user_data.get("subscription")
-        ),
-    }
-
-    return templates.TemplateResponse("account.html", context)
 
 
 @app.get("/Editor/", include_in_schema=False)
