@@ -13,9 +13,7 @@ from daras_ai_v2 import settings
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
-router = APIRouter(tags=["credits"])
-
-stripe.api_key = settings.STRIPE_SECRET_KEY
+router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 
@@ -118,7 +116,7 @@ def account(request: Request):
     context = {
         "request": request,
         "available_subscriptions": available_subscriptions,
-        "credits": user_data.get("credits", 0),
+        "user_credits": user_data.get(db.USER_BALANCE_FIELD, 0),
         "subscription": get_user_subscription(request.user),
     }
 
@@ -204,31 +202,10 @@ async def webhook_received(request: Request):
 
     # Get the type of webhook event sent - used to check the status of PaymentIntents.
     match event["type"]:
-        # case "checkout.session.completed":
-        #     _handle_checkout_session_completed(uid, data)
-        # case "customer.subscription.deleted":
-        #     _handle_customer_subscription_deleted(uid, data)
         case "invoice.paid":
             _handle_invoice_paid(uid, data)
 
     return JSONResponse({"status": "success"})
-
-
-# def _handle_checkout_session_completed(uid, data):
-#     if data.mode != "subscription":
-#         return
-#
-#     subscription_key = data["metadata"][USER_SUBSCRIPTION_KEY_FIELD]
-#     assert subscription_key, "metadata.subscription_key not found"
-#
-#     db.get_user_doc_ref(uid).update({USER_SUBSCRIPTION_KEY_FIELD: subscription_key})
-#
-#
-# def _handle_customer_subscription_deleted(uid, data):
-#     if data.mode != "subscription":
-#         return
-#
-#     db.get_user_doc_ref(uid).update({USER_SUBSCRIPTION_KEY_FIELD: None})
 
 
 def _handle_invoice_paid(uid: str, invoice_data):
@@ -237,8 +214,8 @@ def _handle_invoice_paid(uid: str, invoice_data):
         "get",
         "/v1/invoices/{invoice}/lines".format(invoice=quote_plus(invoice_id)),
     )
-    quantity = line_items.data[0].quantity
-    db.update_user_credits(uid, quantity, invoice_id)
+    amount = line_items.data[0].quantity
+    db.update_user_balance(uid, amount, invoice_id)
 
 
 @router.route("/__/stripe/cancel-subscription", methods=["POST"])

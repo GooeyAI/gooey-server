@@ -1,8 +1,7 @@
-import stripe
+import datetime
+
 from firebase_admin import auth
 from google.cloud import firestore
-
-from google.cloud.firestore import DocumentReference
 from google.cloud.firestore_v1.transaction import Transaction
 from starlette.requests import Request
 
@@ -12,44 +11,53 @@ from daras_ai_v2 import settings
 DEFAULT_COLLECTION = "daras-ai-v2"
 USERS_COLLECTION = "users"
 
+USER_BALANCE_FIELD = "balance"
+
 _db = firestore.Client()
 
 
-def get_user_field(uid: str, field: str):
-    user_doc = get_user_doc_ref(uid).get()
-    return user_doc.get(field)
+def get_doc_field(doc_ref: firestore.DocumentReference, field: str, default=None):
+    try:
+        return doc_ref.get([field]).get(field)
+    except KeyError:
+        return default
 
 
-def update_user_credits(uid: str, amount: int, txn_id: str):
+def update_user_balance(uid: str, amount: int, invoice_id: str):
     transaction = _db.transaction()
-    user_doc_ref = get_user_doc_ref(uid)
-    _update_user_credits_in_txn(transaction, user_doc_ref, amount, txn_id)
 
+    @firestore.transactional
+    def _update_user_balance_in_txn(transaction: Transaction):
+        user_doc_ref = get_user_doc_ref(uid)
 
-@firestore.transactional
-def _update_user_credits_in_txn(
-    transaction: Transaction,
-    user_doc_ref: DocumentReference,
-    amount: int,
-    txn_id: str,
-):
-    snapshot = user_doc_ref.get(transaction=transaction)
+        invoice_ref: firestore.DocumentReference
+        invoice_ref = user_doc_ref.collection("invoices").document(invoice_id)
+        # if an invoice entry exists
+        if invoice_ref.get(transaction=transaction).exists:
+            # avoid updating twice for same invoice
+            return
 
-    # avoid updating twice
-    try:
-        last_txn_id = snapshot.get("last_txn_id")
-    except KeyError:
-        last_txn_id = None
-    if last_txn_id == txn_id:
-        return
+        # get current balance
+        snapshot = user_doc_ref.get(transaction=transaction)
+        try:
+            balance = snapshot.get(USER_BALANCE_FIELD)
+        except KeyError:
+            balance = 0
 
-    try:
-        user_credits = snapshot.get("credits")
-    except KeyError:
-        user_credits = 0
-    user_credits += amount
+        # update balance
+        balance += amount
+        transaction.update(user_doc_ref, {USER_BALANCE_FIELD: balance})
 
-    transaction.update(user_doc_ref, {"credits": user_credits, "last_txn_id": txn_id})
+        # create invoice entry
+        transaction.create(
+            invoice_ref,
+            {
+                "amount": amount,
+                "timestamp": datetime.datetime.utcnow(),
+            },
+        )
+
+    _update_user_balance_in_txn(transaction)
 
 
 def get_or_init_user_data(request: Request) -> dict:
@@ -58,8 +66,7 @@ def get_or_init_user_data(request: Request) -> dict:
 
         uid = user.uid
         default_data = {
-            "credits": settings.LOGIN_USER_FREE_CREDITS,
-            "anonymous_user": False,
+            USER_BALANCE_FIELD: settings.LOGIN_USER_FREE_CREDITS,
         }
     else:
         if not request.session.get(ANONYMOUS_USER_COOKIE):
@@ -69,8 +76,7 @@ def get_or_init_user_data(request: Request) -> dict:
 
         uid = request.session[ANONYMOUS_USER_COOKIE]["uid"]
         default_data = {
-            "credits": settings.ANON_USER_FREE_CREDITS,
-            "anonymous_user": True,
+            USER_BALANCE_FIELD: settings.ANON_USER_FREE_CREDITS,
         }
 
     doc_ref = get_user_doc_ref(uid)
@@ -80,7 +86,7 @@ def get_or_init_user_data(request: Request) -> dict:
     return doc_ref.get().to_dict()
 
 
-def get_user_doc_ref(uid: str) -> DocumentReference:
+def get_user_doc_ref(uid: str) -> firestore.DocumentReference:
     return get_doc_ref(collection_id=USERS_COLLECTION, document_id=uid)
 
 

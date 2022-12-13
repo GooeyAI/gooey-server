@@ -49,7 +49,7 @@ from routers import billing
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
-app.include_router(billing.router, tags=["credits"])
+app.include_router(billing.router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
