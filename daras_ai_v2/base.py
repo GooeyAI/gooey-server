@@ -5,6 +5,7 @@ import shlex
 import string
 import traceback
 import typing
+import uuid
 from copy import deepcopy
 from time import time
 
@@ -17,7 +18,6 @@ from pydantic import BaseModel
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key, is_admin
-from daras_ai_v2 import credits_helper
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -201,20 +201,9 @@ class BasePage:
         raise NotImplemented
 
     def _render_before_output(self):
-        query_params = st.experimental_get_query_params()
-
-        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
-        run_id = query_params.get(RUN_ID_QUERY_PARAM)
-        uid = query_params.get(USER_ID_QUERY_PARAM)
-
-        if example_id:
-            query_params = dict(example_id=example_id)
-        elif run_id and uid:
-            query_params = dict(run_id=run_id, uid=uid)
-        else:
+        url = self._get_current_url()
+        if not url:
             return
-
-        url = str(furl(self.app_url(), query_params=query_params))
 
         col1, col2 = st.columns([3, 1])
 
@@ -233,6 +222,22 @@ class BasePage:
                 style="padding: 6px",
                 height=55,
             )
+
+    def _get_current_url(self) -> str | None:
+        query_params = st.experimental_get_query_params()
+        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
+        run_id = query_params.get(RUN_ID_QUERY_PARAM)
+        uid = query_params.get(USER_ID_QUERY_PARAM)
+
+        if example_id:
+            query_params = dict(example_id=example_id)
+        elif run_id and uid:
+            query_params = dict(run_id=run_id, uid=uid)
+        else:
+            return None
+
+        url = str(furl(self.app_url(), query_params=query_params))
+        return url
 
     def save_run(self):
         current_user: auth.UserRecord = st.session_state.get("_current_user")
@@ -270,26 +275,28 @@ class BasePage:
             with status_area:
                 html_spinner("Starting...")
 
-                if not credits_helper.check_credits(self.get_price()):
-                    return
-
             self.clear_outputs()
             self.save_run()
+
+            if not self.check_credits():
+                status_area.empty()
+                return
 
         gen = st.session_state.get("__gen")
         start_time = None
 
+        # render outputs
         with output_area.container():
             self.render_output()
 
-        # only render if not running
+        # render before/after output blocks if not running
         if not gen:
             with before_output.container():
                 self._render_before_output()
             with after_output.container():
                 self._render_after_output()
 
-        if gen:
+        if gen:  # if running...
             try:
                 start_time = time()
                 # advance the generator (to further progress of run())
@@ -309,7 +316,7 @@ class BasePage:
                 del st.session_state["__status"]
                 del st.session_state["__gen"]
 
-                credits_helper.deduct_credits(self.get_price())
+                self.deduct_credits()
 
             # render errors nicely
             except Exception as e:
@@ -475,9 +482,6 @@ class BasePage:
     def preview_image(self, state: dict) -> str:
         pass
 
-    def get_price(self) -> int:
-        return self.price
-
     def run_as_api_tab(self):
         if not check_secret_key("run as API", settings.API_SECRET_KEY):
             return
@@ -507,8 +511,7 @@ class BasePage:
 
         if st.button("Call API 🚀"):
             with st.spinner("Waiting for API..."):
-                price = self.get_price()
-                has_credits = credits_helper.check_credits(price)
+                has_credits = self.check_credits()
                 if not has_credits:
                     return False
                 r = requests.post(
@@ -518,8 +521,40 @@ class BasePage:
                 )
                 "### Response"
                 r.raise_for_status()
-                credits_helper.deduct_credits(price)
+                self.deduct_credits()
                 st.write(r.json())
+
+    def check_credits(self) -> bool:
+        user = st.session_state.get("_current_user")
+        if not user:
+            return True
+
+        balance = db.get_doc_field(
+            db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
+        )
+
+        if balance < self.get_price():
+            account_url = furl(settings.APP_BASE_URL) / "account"
+            if getattr(user, "_is_anonymous", False):
+                account_url.query.params["next"] = self._get_current_url()
+                error = f"Doh! You need to login to run more Gooey.AI recipes. [Login]({account_url})"
+            else:
+                error = f"Doh! You need to purchase additional credits to run more Gooey.AI recipes. [Buy Credits]({account_url})"
+            st.error(error, icon="⚠️")
+            return False
+
+        return True
+
+    def deduct_credits(self):
+        user = st.session_state.get("_current_user")
+        if not user:
+            return
+
+        amount = self.get_price()
+        db.update_user_balance(user.uid, -abs(amount), f"gooey_in_{uuid.uuid1()}")
+
+    def get_price(self) -> int:
+        return self.price
 
 
 def get_example_request_body(

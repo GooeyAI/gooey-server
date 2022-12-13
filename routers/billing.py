@@ -109,7 +109,9 @@ available_subscriptions = {
 @router.route("/account", include_in_schema=False)
 def account(request: Request):
     if not request.user:
-        return RedirectResponse(str(furl("/login", query_params={"next": "/account"})))
+        next_url = request.query_params.get("next", "/account")
+        redirect_url = furl("/login", query_params={"next": next_url})
+        return RedirectResponse(str(redirect_url))
 
     user_data = db.get_or_init_user_data(request)
 
