@@ -2,8 +2,6 @@ import datetime
 import time
 import typing
 
-import requests
-from fastapi import FastAPI
 from fastapi import FastAPI, Header
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,24 +21,21 @@ from starlette.responses import PlainTextResponse
 from auth_backend import (
     SessionAuthBackend,
     FIREBASE_SESSION_COOKIE,
-    ANONYMOUS_USER_COOKIE,
 )
 from daras_ai.computer import run_compute_steps
-from daras_ai_v2 import settings
-from gooey_token_authentication1.token_authentication import authenticate
-from pages.GoogleImageGen import GoogleImageGenPage
+from daras_ai_v2 import settings, db
 from daras_ai_v2.base import (
     BasePage,
-    get_doc_ref,
-    get_or_create_doc,
     err_msg_for_exc,
 )
+from gooey_token_authentication1.token_authentication import authenticate
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
 from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.GoogleImageGen import GoogleImageGenPage
 from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Img2Img import Img2ImgPage
 from pages.LetterWriter import LetterWriterPage
@@ -50,9 +45,11 @@ from pages.ObjectInpainting import ObjectInpaintingPage
 from pages.SEOSummary import SEOSummaryPage
 from pages.SocialLookupEmail import SocialLookupEmailPage
 from pages.TextToSpeech import TextToSpeechPage
+from routers import stripe_apis
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
+app.include_router(stripe_apis.router, tags=["credits"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -205,7 +202,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page = page_cls()
 
         # get saved state from db
-        state = get_or_create_doc(get_doc_ref(page.doc_name)).to_dict()
+        state = db.get_or_create_doc(db.get_doc_ref(page.doc_name)).to_dict()
 
         # set sane defaults
         for k, v in page.sane_defaults.items():
@@ -217,9 +214,6 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         # remove None values & update state
         request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
         state.update(request_dict)
-
-        # pass current user from request
-        state["_current_user"] = request.user
 
         # run the script
         try:
@@ -244,6 +238,25 @@ def st_home(request: Request):
         iframe_url,
         context={"title": "Home - Gooey.AI"},
     )
+
+
+@app.get("/account", include_in_schema=False)
+def account(request: Request):
+    if not request.user:
+        return RedirectResponse(str(furl("/login", query_params={"next": "/account"})))
+
+    user_data = db.get_or_init_user_data(request)
+
+    context = {
+        "request": request,
+        "available_subscriptions": stripe_apis.available_subscriptions,
+        "credits": user_data.get("credits", 0),
+        "subscription": stripe_apis.available_subscriptions.get(
+            user_data.get("subscription")
+        ),
+    }
+
+    return templates.TemplateResponse("account.html", context)
 
 
 @app.get("/Editor/", include_in_schema=False)
@@ -282,13 +295,10 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
 
-    if not (request.user or request.session.get(ANONYMOUS_USER_COOKIE)):
-        request.session[ANONYMOUS_USER_COOKIE] = {
-            "uid": auth.create_user().uid,
-        }
+    db.get_or_init_user_data(request)
 
     return templates.TemplateResponse(
-        "app.html",
+        "home.html",
         context={
             "request": request,
             "iframe_url": f.url,

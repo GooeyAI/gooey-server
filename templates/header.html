@@ -7,8 +7,13 @@
     <div class="header-links">
         <a href="https://www.gooey.ai">Home</a>
         <a href="/">Explore</a>
-        <a href="https://www.gooey.ai/pricing">Pricing</a>
+        {% if not request.user %}
+            <a href="https://www.gooey.ai/pricing">Pricing</a>
+        {% endif %}
         <a href="https://www.gooey.ai/privacy">Privacy</a>
         <a href="https://www.gooey.ai/terms">Terms</a>
+        {% if request.user %}
+            <a href="/account">Account</a>
+        {% endif %}
     </div>
 </header>

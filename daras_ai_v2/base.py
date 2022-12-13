@@ -18,6 +18,8 @@ from pydantic import BaseModel
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key, is_admin
+from daras_ai_v2 import credits_helper
+from daras_ai_v2 import db
 from daras_ai_v2 import settings
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
@@ -29,7 +31,6 @@ from daras_ai_v2.utils import email_support_about_reported_run
 
 DEFAULT_STATUS = "Running..."
 
-DEFAULT_COLLECTION = "daras-ai-v2"
 
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
@@ -46,6 +47,8 @@ class BasePage:
     sane_defaults: dict = {}
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
+
+    price = settings.CREDITS_TO_DEDUCT_PER_RUN
 
     @property
     def doc_name(self) -> str:
@@ -79,7 +82,7 @@ class BasePage:
             self._examples_tab()
 
         with api_tab:
-            run_as_api_tab(self.endpoint, self.RequestModel)
+            self.run_as_api_tab()
 
         with run_tab:
             col1, col2 = st.columns(2)
@@ -111,7 +114,7 @@ class BasePage:
             st.session_state.update(state)
 
         with st.spinner("Loading Examples..."):
-            st.session_state["__example_docs"] = list_all_docs(
+            st.session_state["__example_docs"] = db.list_all_docs(
                 document_id=self.doc_name,
                 sub_collection_id=EXAMPLES_COLLECTION,
             )
@@ -147,13 +150,13 @@ class BasePage:
         return snapshot.to_dict()
 
     def get_recipe_doc(self) -> firestore.DocumentSnapshot:
-        return get_or_create_doc(self._recipe_doc_ref())
+        return db.get_or_create_doc(self._recipe_doc_ref())
 
     def _recipe_doc_ref(self) -> firestore.DocumentReference:
-        return get_doc_ref(self.doc_name)
+        return db.get_doc_ref(self.doc_name)
 
     def _run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
-        return get_doc_ref(
+        return db.get_doc_ref(
             collection_id=USER_RUNS_COLLECTION,
             document_id=uid,
             sub_collection_id=self.doc_name,
@@ -161,7 +164,7 @@ class BasePage:
         )
 
     def _example_doc_ref(self, example_id: str) -> firestore.DocumentReference:
-        return get_doc_ref(
+        return db.get_doc_ref(
             sub_collection_id=EXAMPLES_COLLECTION,
             document_id=self.doc_name,
             sub_document_id=example_id,
@@ -284,6 +287,9 @@ class BasePage:
             with status_area:
                 html_spinner("Starting...")
 
+                if not credits_helper.check_credits(self.get_price()):
+                    return
+
             self.clear_outputs()
             self.save_run()
 
@@ -319,6 +325,8 @@ class BasePage:
                 # cleanup is important!
                 del st.session_state["__status"]
                 del st.session_state["__gen"]
+
+                credits_helper.deduct_credits(self.get_price())
 
             # render errors nicely
             except Exception as e:
@@ -385,7 +393,7 @@ class BasePage:
             else:
                 submitted_3 = st.button("💾 Save This Recipe & Settings")
                 if submitted_3:
-                    doc_ref = get_doc_ref(self.doc_name)
+                    doc_ref = db.get_doc_ref(self.doc_name)
 
         if not doc_ref:
             return
@@ -484,82 +492,51 @@ class BasePage:
     def preview_image(self, state: dict) -> str:
         pass
 
+    def get_price(self) -> int:
+        return self.price
 
-def get_doc_ref(
-    document_id: str,
-    *,
-    collection_id=DEFAULT_COLLECTION,
-    sub_collection_id: str = None,
-    sub_document_id: str = None,
-) -> firestore.DocumentReference:
-    db = firestore.Client()
-    db_collection = db.collection(collection_id)
-    doc_ref = db_collection.document(document_id)
-    if sub_collection_id:
-        sub_collection = doc_ref.collection(sub_collection_id)
-        doc_ref = sub_collection.document(sub_document_id)
-    return doc_ref
+    def run_as_api_tab(self):
+        if not check_secret_key("run as API", settings.API_SECRET_KEY):
+            return
 
+        api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
+        api_url = str(furl(settings.API_BASE_URL) / self.endpoint)
 
-def get_or_create_doc(
-    doc_ref: firestore.DocumentReference,
-) -> firestore.DocumentSnapshot:
-    doc = doc_ref.get()
-    if not doc.exists:
-        doc_ref.create({})
-        doc = doc_ref.get()
-    return doc
+        request_body = get_example_request_body(self.RequestModel, st.session_state)
 
+        st.markdown(
+            f"""<a href="{api_docs_url}">API Docs</a>""",
+            unsafe_allow_html=True,
+        )
 
-def list_all_docs(
-    collection_id=DEFAULT_COLLECTION,
-    *,
-    document_id: str = None,
-    sub_collection_id: str = None,
-) -> list:
-    db = firestore.Client()
-    db_collection = db.collection(collection_id)
-    if sub_collection_id:
-        doc_ref = db_collection.document(document_id)
-        db_collection = doc_ref.collection(sub_collection_id)
-    return db_collection.get()
+        st.write("### CURL request")
 
+        st.write(
+            rf"""```
+    curl -X 'POST' \
+      {shlex.quote(api_url)} \
+      -H 'accept: application/json' \
+      -H 'Content-Type: application/json' \
+      -H 'Authorization: Token $GOOEY_API_KEY' \
+      -d {shlex.quote(json.dumps(request_body, indent=2))}
+    ```"""
+        )
 
-def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
-
-    api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
-    api_url = str(furl(settings.API_BASE_URL) / endpoint)
-
-    request_body = get_example_request_body(request_model, st.session_state)
-
-    st.markdown(
-        f"""<a href="{api_docs_url}">API Docs</a>""",
-        unsafe_allow_html=True,
-    )
-
-    st.write("### CURL request")
-
-    st.write(
-        rf"""```
-curl -X 'POST' \
-  {shlex.quote(api_url)} \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Token $GOOEY_API_KEY' \
-  -d {shlex.quote(json.dumps(request_body, indent=2))}
-```"""
-    )
-
-    if st.button("Call API 🚀"):
-        with st.spinner("Waiting for API..."):
-            r = requests.post(
-                api_url,
-                json=request_body,
-                headers={"Authorization": f"Token {settings.API_SECRET_KEY}"},
-            )
-            "### Response"
-            r.raise_for_status()
-            st.write(r.json())
+        if st.button("Call API 🚀"):
+            with st.spinner("Waiting for API..."):
+                price = self.get_price()
+                has_credits = credits_helper.check_credits(price)
+                if not has_credits:
+                    return False
+                r = requests.post(
+                    api_url,
+                    json=request_body,
+                    headers={"Authorization": f"Token {settings.API_SECRET_KEY}"},
+                )
+                "### Response"
+                r.raise_for_status()
+                credits_helper.deduct_credits(price)
+                st.write(r.json())
 
 
 def get_example_request_body(
