@@ -1,7 +1,7 @@
 import os
 
 import firebase_admin
-from decouple import config, UndefinedValueError
+from decouple import config, UndefinedValueError, Csv
 from google.oauth2 import service_account
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -51,3 +51,5 @@ SCALESERP_API_KEY = config("SCALESERP_API_KEY", None)
 
 # timeout for fetching external urls in the wild
 EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
+
+ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="sean@dara.network")

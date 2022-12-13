@@ -4,6 +4,7 @@ import typing
 
 import requests
 from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -26,6 +27,7 @@ from auth_backend import (
 )
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings
+from gooey_token_authentication1.token_authentication import authenticate
 from pages.GoogleImageGen import GoogleImageGenPage
 from daras_ai_v2.base import (
     BasePage,
@@ -189,7 +191,16 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         responses={500: {"model": RunFailedModel}},
         name=page_cls.title,
     )
-    def run_api(request: Request, page_request: page_cls.RequestModel = body_spec):
+    def run_api(
+        request: Request,
+        Authorization: typing.Union[str, None] = Header(
+            default="", description="Token $GOOEY_API_TOKEN"
+        ),
+        page_request: page_cls.RequestModel = body_spec,
+    ):
+        # Authenticate Token
+        authenticate(Authorization)
+
         # init a new page for every request
         page = page_cls()
 
