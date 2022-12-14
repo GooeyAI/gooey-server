@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from auth_backend import force_authentication
-from routers.stripe_apis import available_subscriptions
+from routers.billing import available_subscriptions
 from server import app
 
 client = TestClient(app)

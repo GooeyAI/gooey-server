@@ -17,11 +17,11 @@
                 {% if request.user.display_name %}
                     <h3>{{ request.user.email }}</h3>
                 {% endif %}
-                <a href="/logout?next={{ request.path }}">Signout</a>
+                <a href="/logout">Signout</a>
             </div>
         </div>
         <hr>
-        <div class="credits-container"><h2>Credits: {{ credits }} </h2></div>
+        <div class="credits-container"><h2>Credits: {{ user_credits }} </h2></div>
         {% if not subscription %}
             <hr>
             <div class="buy-credits-container"><h2>Buy Credits</h2>
@@ -57,13 +57,13 @@
             <div class="billing-button-container">
                 <h2>Billing</h2>
                 <div class="billing-button-container-row">
-                    <form action="/create-portal-session" method="POST">
+                    <form action="/__/stripe/create-portal-session" method="POST">
                         <button class="btn-outline-dark" id="portal-button" type="submit">Manage your billing
                             information
                         </button>
                     </form>
 
-                    <form action="/cancel-subscription" method="GET">
+                    <form action="/__/stripe/cancel-subscription" method="POST">
                         <button class="btn-outline-cancel" id="cancel-button" type="submit">Cancel Subscription</button>
                     </form>
                 </div>
