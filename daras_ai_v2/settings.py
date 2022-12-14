@@ -1,6 +1,7 @@
 import os
 
 import firebase_admin
+import stripe
 from decouple import config, UndefinedValueError, Csv
 from google.oauth2 import service_account
 
@@ -53,3 +54,10 @@ SCALESERP_API_KEY = config("SCALESERP_API_KEY", None)
 EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="sean@dara.network")
+
+CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
+ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
+LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 1000, cast=int)
+
+stripe.api_key = config("STRIPE_SECRET_KEY", None)
+STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)

@@ -5,6 +5,7 @@ import shlex
 import string
 import traceback
 import typing
+import uuid
 from copy import deepcopy
 from time import time
 
@@ -17,6 +18,7 @@ from pydantic import BaseModel
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key, is_admin
+from daras_ai_v2 import db
 from daras_ai_v2 import settings
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
@@ -26,7 +28,6 @@ from daras_ai_v2.query_params import gooey_reset_query_parm
 
 DEFAULT_STATUS = "Running..."
 
-DEFAULT_COLLECTION = "daras-ai-v2"
 
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
@@ -43,6 +44,8 @@ class BasePage:
     sane_defaults: dict = {}
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
+
+    price = settings.CREDITS_TO_DEDUCT_PER_RUN
 
     @property
     def doc_name(self) -> str:
@@ -76,7 +79,7 @@ class BasePage:
             self._examples_tab()
 
         with api_tab:
-            run_as_api_tab(self.endpoint, self.RequestModel)
+            self.run_as_api_tab()
 
         with run_tab:
             col1, col2 = st.columns(2)
@@ -108,7 +111,7 @@ class BasePage:
             st.session_state.update(state)
 
         with st.spinner("Loading Examples..."):
-            st.session_state["__example_docs"] = list_all_docs(
+            st.session_state["__example_docs"] = db.list_all_docs(
                 document_id=self.doc_name,
                 sub_collection_id=EXAMPLES_COLLECTION,
             )
@@ -140,13 +143,13 @@ class BasePage:
         return snapshot.to_dict()
 
     def get_recipe_doc(self) -> firestore.DocumentSnapshot:
-        return get_or_create_doc(self._recipe_doc_ref())
+        return db.get_or_create_doc(self._recipe_doc_ref())
 
     def _recipe_doc_ref(self) -> firestore.DocumentReference:
-        return get_doc_ref(self.doc_name)
+        return db.get_doc_ref(self.doc_name)
 
     def _run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
-        return get_doc_ref(
+        return db.get_doc_ref(
             collection_id=USER_RUNS_COLLECTION,
             document_id=uid,
             sub_collection_id=self.doc_name,
@@ -154,7 +157,7 @@ class BasePage:
         )
 
     def _example_doc_ref(self, example_id: str) -> firestore.DocumentReference:
-        return get_doc_ref(
+        return db.get_doc_ref(
             sub_collection_id=EXAMPLES_COLLECTION,
             document_id=self.doc_name,
             sub_document_id=example_id,
@@ -198,20 +201,9 @@ class BasePage:
         raise NotImplemented
 
     def _render_before_output(self):
-        query_params = st.experimental_get_query_params()
-
-        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
-        run_id = query_params.get(RUN_ID_QUERY_PARAM)
-        uid = query_params.get(USER_ID_QUERY_PARAM)
-
-        if example_id:
-            query_params = dict(example_id=example_id)
-        elif run_id and uid:
-            query_params = dict(run_id=run_id, uid=uid)
-        else:
+        url = self._get_current_url()
+        if not url:
             return
-
-        url = str(furl(self.app_url(), query_params=query_params))
 
         col1, col2 = st.columns([3, 1])
 
@@ -230,6 +222,22 @@ class BasePage:
                 style="padding: 6px",
                 height=55,
             )
+
+    def _get_current_url(self) -> str | None:
+        query_params = st.experimental_get_query_params()
+        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
+        run_id = query_params.get(RUN_ID_QUERY_PARAM)
+        uid = query_params.get(USER_ID_QUERY_PARAM)
+
+        if example_id:
+            query_params = dict(example_id=example_id)
+        elif run_id and uid:
+            query_params = dict(run_id=run_id, uid=uid)
+        else:
+            return None
+
+        url = str(furl(self.app_url(), query_params=query_params))
+        return url
 
     def save_run(self):
         current_user: auth.UserRecord = st.session_state.get("_current_user")
@@ -270,20 +278,25 @@ class BasePage:
             self.clear_outputs()
             self.save_run()
 
+            if not self.check_credits():
+                status_area.empty()
+                return
+
         gen = st.session_state.get("__gen")
         start_time = None
 
+        # render outputs
         with output_area.container():
             self.render_output()
 
-        # only render if not running
+        # render before/after output blocks if not running
         if not gen:
             with before_output.container():
                 self._render_before_output()
             with after_output.container():
                 self._render_after_output()
 
-        if gen:
+        if gen:  # if running...
             try:
                 start_time = time()
                 # advance the generator (to further progress of run())
@@ -302,6 +315,8 @@ class BasePage:
                 # cleanup is important!
                 del st.session_state["__status"]
                 del st.session_state["__gen"]
+
+                self.deduct_credits()
 
             # render errors nicely
             except Exception as e:
@@ -368,7 +383,7 @@ class BasePage:
             else:
                 submitted_3 = st.button("💾 Save This Recipe & Settings")
                 if submitted_3:
-                    doc_ref = get_doc_ref(self.doc_name)
+                    doc_ref = db.get_doc_ref(self.doc_name)
 
         if not doc_ref:
             return
@@ -467,82 +482,79 @@ class BasePage:
     def preview_image(self, state: dict) -> str:
         pass
 
+    def run_as_api_tab(self):
+        if not check_secret_key("run as API", settings.API_SECRET_KEY):
+            return
 
-def get_doc_ref(
-    document_id: str,
-    *,
-    collection_id=DEFAULT_COLLECTION,
-    sub_collection_id: str = None,
-    sub_document_id: str = None,
-) -> firestore.DocumentReference:
-    db = firestore.Client()
-    db_collection = db.collection(collection_id)
-    doc_ref = db_collection.document(document_id)
-    if sub_collection_id:
-        sub_collection = doc_ref.collection(sub_collection_id)
-        doc_ref = sub_collection.document(sub_document_id)
-    return doc_ref
+        api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
+        api_url = str(furl(settings.API_BASE_URL) / self.endpoint)
 
+        request_body = get_example_request_body(self.RequestModel, st.session_state)
 
-def get_or_create_doc(
-    doc_ref: firestore.DocumentReference,
-) -> firestore.DocumentSnapshot:
-    doc = doc_ref.get()
-    if not doc.exists:
-        doc_ref.create({})
-        doc = doc_ref.get()
-    return doc
+        st.markdown(
+            f"""<a href="{api_docs_url}">API Docs</a>""",
+            unsafe_allow_html=True,
+        )
 
+        st.write("### CURL request")
 
-def list_all_docs(
-    collection_id=DEFAULT_COLLECTION,
-    *,
-    document_id: str = None,
-    sub_collection_id: str = None,
-) -> list:
-    db = firestore.Client()
-    db_collection = db.collection(collection_id)
-    if sub_collection_id:
-        doc_ref = db_collection.document(document_id)
-        db_collection = doc_ref.collection(sub_collection_id)
-    return db_collection.get()
+        st.write(
+            rf"""```
+    curl -X 'POST' \
+      {shlex.quote(api_url)} \
+      -H 'accept: application/json' \
+      -H 'Content-Type: application/json' \
+      -H 'Authorization: Token $GOOEY_API_KEY' \
+      -d {shlex.quote(json.dumps(request_body, indent=2))}
+    ```"""
+        )
 
+        if st.button("Call API 🚀"):
+            with st.spinner("Waiting for API..."):
+                has_credits = self.check_credits()
+                if not has_credits:
+                    return False
+                r = requests.post(
+                    api_url,
+                    json=request_body,
+                    headers={"Authorization": f"Token {settings.API_SECRET_KEY}"},
+                )
+                "### Response"
+                r.raise_for_status()
+                self.deduct_credits()
+                st.write(r.json())
 
-def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
+    def check_credits(self) -> bool:
+        user = st.session_state.get("_current_user")
+        if not user:
+            return True
 
-    api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
-    api_url = str(furl(settings.API_BASE_URL) / endpoint)
+        balance = db.get_doc_field(
+            db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
+        )
 
-    request_body = get_example_request_body(request_model, st.session_state)
+        if balance < self.get_price():
+            account_url = furl(settings.APP_BASE_URL) / "account"
+            if getattr(user, "_is_anonymous", False):
+                account_url.query.params["next"] = self._get_current_url()
+                error = f"Doh! You need to login to run more Gooey.AI recipes. [Login]({account_url})"
+            else:
+                error = f"Doh! You need to purchase additional credits to run more Gooey.AI recipes. [Buy Credits]({account_url})"
+            st.error(error, icon="⚠️")
+            return False
 
-    st.markdown(
-        f"""<a href="{api_docs_url}">API Docs</a>""",
-        unsafe_allow_html=True,
-    )
+        return True
 
-    st.write("### CURL request")
+    def deduct_credits(self):
+        user = st.session_state.get("_current_user")
+        if not user:
+            return
 
-    st.write(
-        rf"""```
-curl -X 'POST' \
-  {shlex.quote(api_url)} \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Token $GOOEY_API_KEY' \
-  -d {shlex.quote(json.dumps(request_body, indent=2))}
-```"""
-    )
+        amount = self.get_price()
+        db.update_user_balance(user.uid, -abs(amount), f"gooey_in_{uuid.uuid1()}")
 
-    if st.button("Call API 🚀"):
-        with st.spinner("Waiting for API..."):
-            r = requests.post(
-                api_url,
-                json=request_body,
-                headers={"Authorization": f"Token {settings.API_SECRET_KEY}"},
-            )
-            "### Response"
-            r.raise_for_status()
-            st.write(r.json())
+    def get_price(self) -> int:
+        return self.price
 
 
 def get_example_request_body(

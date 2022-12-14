@@ -20,7 +20,9 @@ def get_anonymous_user() -> auth.UserRecord | None:
     uid = session.get(ANONYMOUS_USER_COOKIE, {}).get("uid")
     if not uid:
         return None
-    return auth.get_user(uid)
+    user = auth.get_user(uid)
+    user._is_anonymous = True
+    return user
 
 
 def get_current_user() -> auth.UserRecord | None:
