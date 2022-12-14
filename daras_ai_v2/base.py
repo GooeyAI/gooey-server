@@ -16,7 +16,7 @@ from google.cloud import firestore
 from pydantic import BaseModel
 
 from daras_ai.init import init_scripts
-from daras_ai.secret_key_checker import check_secret_key
+from daras_ai.secret_key_checker import check_secret_key, is_admin
 from daras_ai_v2 import settings
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
@@ -345,7 +345,7 @@ class BasePage:
         if not state_to_save:
             return
 
-        if not check_secret_key("Save"):
+        if not is_admin():
             return
 
         new_example_id = None
@@ -399,7 +399,7 @@ class BasePage:
         ]
 
     def _examples_tab(self):
-        allow_delete = check_secret_key("delete example")
+        allow_delete = is_admin()
 
         for snapshot in st.session_state.get("__example_docs", []):
             example_id = snapshot.id
@@ -509,8 +509,6 @@ def list_all_docs(
 
 
 def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
-    if not check_secret_key("run as API", settings.API_SECRET_KEY):
-        return
 
     api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
     api_url = str(furl(settings.API_BASE_URL) / endpoint)
@@ -530,13 +528,18 @@ curl -X 'POST' \
   {shlex.quote(api_url)} \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
+  -H 'Authorization: Token $GOOEY_API_KEY' \
   -d {shlex.quote(json.dumps(request_body, indent=2))}
 ```"""
     )
 
     if st.button("Call API 🚀"):
         with st.spinner("Waiting for API..."):
-            r = requests.post(api_url, json=request_body)
+            r = requests.post(
+                api_url,
+                json=request_body,
+                headers={"Authorization": f"Token {settings.API_SECRET_KEY}"},
+            )
             "### Response"
             r.raise_for_status()
             st.write(r.json())
