@@ -50,7 +50,6 @@ class Img2ImgPage(BasePage):
         sd_2_upscaling: bool | None
 
     class ResponseModel(BaseModel):
-        resized_image: str
         output_images: list[str]
 
     def render_form(self) -> bool:
