@@ -3,7 +3,11 @@
 {% block content %}
     {% if request.user %}
         <div class="login-container">
-            <a href="/account">{{ request.user.display_name or request.user.email or request.user.phone_number }}</a>
+            <a href="/account">
+                {{ request.user.display_name }}
+                <br>
+                <i style="font-weight: normal">{{ request.user.email or request.user.phone_number }}</i>
+            </a>
         </div>
     {% else %}
         <script src="https://accounts.google.com/gsi/client" async defer></script>

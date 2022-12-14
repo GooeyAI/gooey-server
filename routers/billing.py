@@ -83,26 +83,26 @@ available_subscriptions = {
     #
     # just for testing
     #
-    "daily": {
-        "display": {
-            "name": "Daily Plan",
-            "title": "DAILY @ $1",
-            "description": "100 credits everyday.",
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Daily Plan",
-                },
-                "unit_amount": 1,  # in cents
-                "recurring": {
-                    "interval": "day",
-                },
-            },
-            "quantity": 100,  # number of credits
-        },
-    },
+    # "daily": {
+    #     "display": {
+    #         "name": "Daily Plan",
+    #         "title": "DAILY @ $1",
+    #         "description": "100 credits everyday.",
+    #     },
+    #     "stripe": {
+    #         "price_data": {
+    #             "currency": "usd",
+    #             "product_data": {
+    #                 "name": "Gooey.AI Daily Plan",
+    #             },
+    #             "unit_amount": 1,  # in cents
+    #             "recurring": {
+    #                 "interval": "day",
+    #             },
+    #         },
+    #         "quantity": 100,  # number of credits
+    #     },
+    # },
 }
 
 

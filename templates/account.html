@@ -8,15 +8,10 @@
                 <img id="profile-picture" src="{{ request.user.photo_url }}" alt="" width="128" height="128">
             {% endif %}
             <div class="user-info-text-box">
-                {% if request.user.display_name %}
-                    <h2>{{ request.user.display_name }}</h2>
-                {% endif %}
-                {% if request.user.phone_number %}
-                    <h2>{{ request.user.phone_number }}</h2>
-                {% endif %}
-                {% if request.user.display_name %}
-                    <h3>{{ request.user.email }}</h3>
-                {% endif %}
+                <h2>{{ request.user.display_name }}</h2>
+                <i style="font-weight: normal">{{ request.user.email or request.user.phone_number }}</i>
+                <br>
+                <br>
                 <a href="/logout">Signout</a>
             </div>
         </div>
