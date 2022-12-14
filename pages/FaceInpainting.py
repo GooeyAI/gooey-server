@@ -33,7 +33,6 @@ class FaceInpaintingPage(BasePage):
         "output_width": 512,
         "output_height": 512,
         "guidance_scale": 7.5,
-        "sd_2_upscaling": False,
     }
 
     class RequestModel(BaseModel):
@@ -55,8 +54,6 @@ class FaceInpaintingPage(BasePage):
         output_height: int | None
 
         guidance_scale: float | None
-
-        sd_2_upscaling: bool | None
 
         class Config:
             schema_extra = {
