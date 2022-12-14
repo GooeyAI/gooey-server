@@ -65,12 +65,31 @@ class BasePage:
     def render(self):
         init_scripts()
 
+        self._load_session_state()
+        if "is_flagged" in st.session_state and st.session_state["is_flagged"]:
+            if is_admin():
+                st.write("## " + "Recipe Run Currently Hidden")
+                unflag_pressed = st.button("UnFlag")
+                if unflag_pressed:
+                    with st.spinner("Removing flag..."):
+                        query_params = st.experimental_get_query_params()
+                        example_id, run_id, uid = self.extract_query_params(
+                            query_params
+                        )
+                        if run_id and uid:
+                            self.flag_run(run_id=run_id, uid=uid, is_flagged=False)
+                        st.success("Removed flag. Reload the page to see changes")
+            else:
+                st.write("## " + "This Recipe Run is Flagged")
+                st.write(
+                    "Our support team is reviewing this run. Please come back after some time."
+                )
+                return
+
         st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
             ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
         )
-
-        self._load_session_state()
 
         with settings_tab:
             self.render_settings()
@@ -244,9 +263,9 @@ class BasePage:
                 height=55,
             )
 
-    def flag_run(self, run_id: str, uid: str):
+    def flag_run(self, run_id: str, uid: str, is_flagged: bool = True):
         ref = self._run_doc_ref(uid=uid, run_id=run_id)
-        ref.set({"is_flagged": True}, merge=True)
+        ref.set({"is_flagged": is_flagged}, merge=True)
 
     def save_run(self):
         current_user: auth.UserRecord = st.session_state.get("_current_user")
@@ -526,7 +545,6 @@ def list_all_docs(
 
 
 def run_as_api_tab(endpoint: str, request_model: typing.Type[BaseModel]):
-
     api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
     api_url = str(furl(settings.API_BASE_URL) / endpoint)
 
