@@ -31,7 +31,6 @@ from daras_ai_v2.utils import email_support_about_reported_run
 
 DEFAULT_STATUS = "Running..."
 
-
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
 
@@ -227,10 +226,28 @@ class BasePage:
     def run(self, state: dict) -> typing.Iterator[str | None]:
         raise NotImplemented
 
+    def _render_report_button(self, url: str):
+        current_user: UserRecord = st.session_state.get("_current_user")
+        query_params = st.experimental_get_query_params()
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        if not run_id or not uid:
+            return
+        # ONLY RUNS CAN BE REPORTED
+        reported = st.button("❗Report")
+        if reported:
+            with st.spinner("Reporting..."):
+                self.flag_run(run_id=run_id, uid=uid)
+                email_support_about_reported_run(
+                    run_id=run_id, uid=uid, url=url, email=current_user.email
+                )
+                st.success("Reported. Reload the page to see changes")
+
     def _render_before_output(self):
         url = self._get_current_url()
         if not url:
             return
+
+        self._render_report_button(url=url)
 
         col1, col2 = st.columns([3, 1])
 
