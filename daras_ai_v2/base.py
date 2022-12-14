@@ -84,6 +84,7 @@ class BasePage:
                 st.write(
                     "Our support team is reviewing this run. Please come back after some time."
                 )
+                # Return and Don't render the run any further
                 return
 
         st.write("## " + self.title)
