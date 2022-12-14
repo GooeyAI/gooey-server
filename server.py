@@ -257,8 +257,6 @@ def script_to_frontend(page_cls: typing.Type[BasePage]):
         state = page.get_doc_from_query_params(dict(request.query_params))
         if state is None:
             raise HTTPException(status_code=404)
-        if "is_flagged" in state and state["is_flagged"]:
-            raise HTTPException(status_code=404)
         iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug
         return _st_page(
             request,
