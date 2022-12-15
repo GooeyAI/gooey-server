@@ -17,6 +17,7 @@ from daras_ai_v2.language_model import (
     GPT3_MAX_ALLOED_TOKENS,
     calc_gpt_tokens,
 )
+from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
 
@@ -113,55 +114,19 @@ class SEOSummaryPage(BasePage):
         # st.checkbox("Blog Generator Mode", key="enable_blog_mode")
         st.checkbox("Enable HTML Formatting", key="enable_html")
 
-        st.write("#### Language Model Optimizations")
-
-        st.checkbox("Avoid Repetition", key="avoid_repetition")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.slider(
-                label="Number of Outputs",
-                key="num_outputs",
-                min_value=1,
-                max_value=4,
-            )
-        with col2:
-            st.slider(
-                label="Quality",
-                key="quality",
-                min_value=1.0,
-                max_value=5.0,
-                step=0.1,
-            )
-
-        col1, _ = st.columns(2)
-        with col1:
-            st.slider(
-                label="""
-                ###### Model Creativity 
-                *(Sampling Temperature)*
-                
-                Higher values allow the model to take more risks.
-                Try 0.9 for more creative applications, 
-                and 0 for ones with a well-defined answer. 
-                """,
-                key="sampling_temperature",
-                min_value=0.0,
-                max_value=1.0,
-            )
+        language_model_settings()
 
         st.write("---")
 
         st.write("#### Seach Tools")
 
-        st.text_input(
-            "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**",
-            key="scaleserp_search_field",
-        )
-
         col1, col2 = st.columns(2)
-
         with col1:
+            st.text_input(
+                "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**",
+                key="scaleserp_search_field",
+            )
+        with col2:
             st.number_input(
                 label="""
                 ###### Max Search URLs
@@ -170,17 +135,6 @@ class SEOSummaryPage(BasePage):
                 key="max_search_urls",
                 min_value=1,
                 max_value=10,
-            )
-
-        with col2:
-            st.number_input(
-                label="""
-                ###### Max Output Tokens
-                The maximum number of [tokens](https://beta.openai.com/tokenizer) to generate in the completion.
-                """,
-                key="max_tokens",
-                min_value=1,
-                max_value=4096,
             )
 
     def render_output(self):
