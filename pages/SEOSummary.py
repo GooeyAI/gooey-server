@@ -24,6 +24,7 @@ STOP_SEQ = "$" * 10
 
 BANNED_HOSTS = [
     # youtube generally returns garbage
+    "www.youtube.com",
     "youtube.com",
     "youtu.be",
 ]
