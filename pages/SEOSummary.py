@@ -264,7 +264,7 @@ class SEOSummaryPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: SEOSummaryPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        yield "Running ScaleSERP..."
+        yield "Googling..."
 
         scaleserp_results = call_scaleserp(
             request.search_query,

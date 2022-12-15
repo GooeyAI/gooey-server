@@ -59,7 +59,6 @@ class TextToSpeechPage(BasePage):
                 """,
                 key="text_prompt",
                 placeholder="This is a test",
-                value="This is a test",
             )
 
             submitted = st.form_submit_button("🚀 Submit")

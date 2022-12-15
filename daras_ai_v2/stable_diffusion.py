@@ -6,10 +6,12 @@ import replicate
 import requests
 from PIL import Image
 
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, bytes_to_cv2_img
 from daras_ai_v2 import settings
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints, b64_img_decode
+
+SD_MAX_SIZE = (768, 768)
 
 
 class InpaintingModels(Enum):
@@ -21,7 +23,7 @@ class InpaintingModels(Enum):
 
 class Img2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
-    sd_2 = "Stable Diffusion 2.1 (stability.ai)"
+    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
@@ -29,7 +31,7 @@ class Img2ImgModels(Enum):
 
 class Text2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
-    sd_2 = "Stable Diffusion 2.1 (stability.ai)"
+    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     # openjourney = "Open Journey (PromptHero)"
@@ -44,8 +46,8 @@ def text2img(
     num_inference_steps: int,
     width: int,
     height: int,
-    guidance_scale: float = None,
     seed: float = None,
+    guidance_scale: float = None,
     sd_2_upscaling: bool = False,
     negative_prompt: str = None,
 ):
@@ -124,11 +126,14 @@ def img2img(
     init_image: str,
     init_image_bytes: bytes = None,
     num_inference_steps: int,
-    width: int,
-    height: int,
     prompt_strength: float,
     negative_prompt: str = None,
+    guidance_scale: float = None,
+    sd_2_upscaling: bool = False,
 ):
+    assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
+
+    height, width, _ = bytes_to_cv2_img(init_image_bytes).shape
     _resolution_check(width, height)
 
     match selected_model:
@@ -143,8 +148,9 @@ def img2img(
                     "num_inference_steps": num_inference_steps,
                     "init_image": init_image,
                     "strength": prompt_strength,
-                    "guidance_scale": 10,
+                    "guidance_scale": guidance_scale,
                     "negative_prompt": negative_prompt or "",
+                    "upscaling_inference_steps": 10 if sd_2_upscaling else 0,
                 },
             )
         case Img2ImgModels.jack_qiao.name:
@@ -191,6 +197,7 @@ def img2img(
                     num_outputs=num_outputs,
                     num_inference_steps=num_inference_steps,
                     negative_prompt=negative_prompt or "",
+                    guidance_scale=guidance_scale,
                 )
             ]
         case _:
@@ -214,6 +221,7 @@ def inpainting(
     width: int,
     height: int,
     negative_prompt: str = None,
+    guidance_scale: float = None,
 ) -> list[str]:
     _resolution_check(width, height)
 
@@ -229,7 +237,7 @@ def inpainting(
                     "num_inference_steps": num_inference_steps,
                     "edit_image": edit_image,
                     "mask_image": mask,
-                    "guidance_scale": 10,
+                    "guidance_scale": guidance_scale,
                     "negative_prompt": negative_prompt or "",
                 },
             )
@@ -247,6 +255,7 @@ def inpainting(
                     invert_mask=True,
                     num_outputs=num_outputs,
                     num_inference_steps=num_inference_steps,
+                    guidance_scale=guidance_scale,
                 )
             ]
         case InpaintingModels.dall_e.name:
@@ -330,7 +339,8 @@ def _recomposite_inpainting_outputs(
 
 
 def _resolution_check(width, height):
-    if width * height > 768 * 768:
+    if width * height > SD_MAX_SIZE[0] * SD_MAX_SIZE[1]:
         raise ValueError(
-            "Maximum size is 768x768 pixels, because of memory limits. Please select a lower width or height."
+            f"Maximum size is {SD_MAX_SIZE[0]}x{SD_MAX_SIZE[1]} pixels, because of memory limits. "
+            f"Please select a lower width or height."
         )

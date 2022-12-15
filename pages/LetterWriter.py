@@ -92,7 +92,6 @@ class LetterWriterPage(BasePage):
                     key="num_outputs",
                     min_value=1,
                     max_value=4,
-                    value=1,
                 )
             with col2:
                 st.slider(
@@ -101,7 +100,6 @@ class LetterWriterPage(BasePage):
                     min_value=1.0,
                     max_value=5.0,
                     step=0.1,
-                    value=1.0,
                 )
 
             submitted = st.form_submit_button("🏃‍ Submit")
