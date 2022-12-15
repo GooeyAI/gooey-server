@@ -79,7 +79,9 @@ class BasePage:
                             query_params
                         )
                         if run_id and uid:
-                            self.flag_run(run_id=run_id, uid=uid, is_flagged=False)
+                            self.update_flag_for_run(
+                                run_id=run_id, uid=uid, is_flagged=False
+                            )
                         st.success("Removed flag. Reload the page to see changes")
             else:
                 st.write("## " + "This Recipe Run is Flagged")
@@ -236,7 +238,7 @@ class BasePage:
         reported = st.button("❗Report")
         if reported:
             with st.spinner("Reporting..."):
-                self.flag_run(run_id=run_id, uid=uid)
+                self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
                 email_support_about_reported_run(
                     run_id=run_id, uid=uid, url=url, email=current_user.email
                 )
@@ -283,7 +285,7 @@ class BasePage:
         url = str(furl(self.app_url(), query_params=query_params))
         return url
 
-    def flag_run(self, run_id: str, uid: str, is_flagged: bool = True):
+    def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self._run_doc_ref(uid=uid, run_id=run_id)
         ref.set({"is_flagged": is_flagged}, merge=True)
 
