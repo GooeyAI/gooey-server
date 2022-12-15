@@ -29,7 +29,7 @@
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="{{ request.url }}">
+    <meta property="twitter:url" content="{{ request.url|safe }}">
     <meta property="twitter:title" content="{{ title }}">
     {% if description %}
         <meta property="twitter:description" content="{{ description }}">
