@@ -25,6 +25,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 )
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.query_params import gooey_reset_query_parm
+from daras_ai_v2.st_session_cookie import is_anonymous_user
 
 DEFAULT_STATUS = "Running..."
 
@@ -530,12 +531,14 @@ class BasePage:
             return True
 
         balance = db.get_doc_field(
-            db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
+            db.get_user_doc_ref(user.uid),
+            db.USER_BALANCE_FIELD,
+            default=0,
         )
 
         if balance < self.get_price():
             account_url = furl(settings.APP_BASE_URL) / "account"
-            if getattr(user, "_is_anonymous", False):
+            if is_anonymous_user(user):
                 account_url.query.params["next"] = self._get_current_url()
                 error = f"Doh! You need to login to run more Gooey.AI recipes. [Login]({account_url})"
             else:
@@ -551,7 +554,11 @@ class BasePage:
             return
 
         amount = self.get_price()
-        db.update_user_balance(user.uid, -abs(amount), f"gooey_in_{uuid.uuid1()}")
+        db.update_user_balance(
+            uid=user.uid,
+            amount=-abs(amount),
+            invoice_id=f"gooey_in_{uuid.uuid1()}",
+        )
 
     def get_price(self) -> int:
         return self.price

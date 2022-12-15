@@ -6,7 +6,6 @@ from starlette.authentication import AuthCredentials, AuthenticationBackend
 
 
 FIREBASE_SESSION_COOKIE = "firebase_session"
-ANONYMOUS_USER_COOKIE = "anonymous_user"
 
 # quick and dirty way to bypass authentication for testing
 _forced_auth_user: UserRecord | None = None

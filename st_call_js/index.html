@@ -1,0 +1,53 @@
+<script>
+    window.frameElement.parentElement.style.display = "none";
+
+    // ----------------------------------------------------
+    // Just copy/paste these functions as-is:
+
+    function sendMessageToStreamlitClient(type, data) {
+        let outData = Object.assign({
+            isStreamlitMessage: true,
+            type: type,
+        }, data);
+        window.parent.postMessage(outData, "*");
+    }
+
+    function init() {
+        sendMessageToStreamlitClient("streamlit:componentReady", {apiVersion: 1});
+    }
+
+    function setFrameHeight(height) {
+        sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: height});
+    }
+
+    // The `data` argument can be any JSON-serializable value.
+    function sendDataToPython(data) {
+        sendMessageToStreamlitClient("streamlit:setComponentValue", {
+            value: data,
+            dataType: "json",
+        });
+    }
+
+    // ----------------------------------------------------
+    // Now modify this part of the code to fit your needs:
+
+    // data is any JSON-serializable value you sent from Python,
+    // and it's already deserialized for you.
+
+    let lastCode;
+
+    function onDataFromPython(event) {
+        if (event.data.type !== "streamlit:render") return;
+        let code = event.data.args.code;  // Access values sent from Python here!
+        if (lastCode == code) return;
+        lastCode = code;
+        let fn = eval(`() => {${code}}`);
+        fn();
+    }
+
+    // Hook things up!
+    window.addEventListener("message", onDataFromPython);
+    init();
+
+    setFrameHeight(0);
+</script>

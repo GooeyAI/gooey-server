@@ -1,6 +1,8 @@
 const CLIENT_ID = "6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com";
 
 const uiConfig = {
+    // upgrade" an anonymous account to a permanent account
+    autoUpgradeAnonymousUsers: true,
     // Will use popup for IDP Providers sign-in flow instead of the default, redirect.
     signInFlow: 'popup',
     // signInSuccessUrl: '/',
@@ -11,6 +13,12 @@ const uiConfig = {
             // or whether we leave that to developer to handle.
             onSignIn(authResult.user);
             return false;
+        },
+        signInFailure: function (error) {
+            let cred = error.credential;
+            return firebase.auth().signInWithCredential(cred).then(authResult => {
+                onSignIn(authResult.user);
+            });
         },
     },
     signInOptions: [

@@ -9,36 +9,36 @@ const firebaseConfig = {
     measurementId: "G-09W5N835PE"
 };
 
-window.addEventListener('load', function () {
-    // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
+// Initialize Firebase
+const app = firebase.initializeApp(firebaseConfig);
 
-    // As httpOnly cookies are to be used, do not persist any state client side.
-    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
-});
-
+firebase.auth().signInAnonymously();
 
 function onSignIn(user) {
     if (!user) return;
 
+    // As httpOnly cookies are to be used, do not persist any state client side.
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
+
     // Get the user's ID token as it is needed to exchange for a session cookie.
     user.getIdToken().then(idToken => {
-        // Session login endpoint is queried and the session cookie is set.
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", '/sessionLogin', true);
+            // Session login endpoint is queried and the session cookie is set.
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", '/sessionLogin', true);
 
-        // Send the proper header information along with the request
-        xhr.setRequestHeader("Content-Type", "application/json");
+            // Send the proper header information along with the request
+            xhr.setRequestHeader("Content-Type", "application/json");
 
-        xhr.onreadystatechange = () => { // Call a function when the state changes.
-            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                // Request finished. Do processing here.
-                const next = new URLSearchParams(window.location.search).get("next") || window.location;
-                window.location = next;
+            xhr.onreadystatechange = () => { // Call a function when the state changes.
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    // Request finished. Do processing here.
+                    const nextUrl = new URLSearchParams(window.location.search).get("next") || window.location;
+                    window.location = nextUrl;
+                }
             }
+            xhr.send(idToken);
         }
-        xhr.send(idToken);
-    });
+    );
 }
 
 function handleCredentialResponse(response) {
@@ -47,7 +47,11 @@ function handleCredentialResponse(response) {
     const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
 
     // Sign in with credential from the Google user.
-    firebase.auth().signInWithCredential(credential).then(authResult => {
+    firebase.auth().currentUser.linkWithCredential(credential).then(authResult => {
         onSignIn(authResult.user);
+    }, _ => {
+        firebase.auth().signInWithCredential(credential).then(authResult => {
+            onSignIn(authResult.user);
+        });
     });
 }

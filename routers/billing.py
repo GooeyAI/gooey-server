@@ -113,12 +113,16 @@ def account(request: Request):
         redirect_url = furl("/login", query_params={"next": next_url})
         return RedirectResponse(str(redirect_url))
 
-    user_data = db.get_or_init_user_data(request)
+    # user_data = db.get_or_init_user_data(request)
 
     context = {
         "request": request,
         "available_subscriptions": available_subscriptions,
-        "user_credits": user_data.get(db.USER_BALANCE_FIELD, 0),
+        "user_credits": db.get_doc_field(
+            db.get_user_doc_ref(request.user.uid),
+            db.USER_BALANCE_FIELD,
+            default=0,
+        ),
         "subscription": get_user_subscription(request.user),
     }
 
@@ -217,7 +221,7 @@ def _handle_invoice_paid(uid: str, invoice_data):
         "/v1/invoices/{invoice}/lines".format(invoice=quote_plus(invoice_id)),
     )
     amount = line_items.data[0].quantity
-    db.update_user_balance(uid, amount, invoice_id)
+    db.update_user_balance(uid=uid, amount=amount, invoice_id=invoice_id)
 
 
 @router.route("/__/stripe/cancel-subscription", methods=["POST"])

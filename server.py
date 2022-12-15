@@ -1,6 +1,7 @@
 import datetime
 import time
 import typing
+import uuid
 
 from fastapi import FastAPI, Header
 from fastapi import HTTPException, Body
@@ -21,6 +22,7 @@ from starlette.responses import PlainTextResponse
 from auth_backend import (
     SessionAuthBackend,
     FIREBASE_SESSION_COOKIE,
+    verify_session_cookie,
 )
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings, db
@@ -28,6 +30,8 @@ from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
 )
+from daras_ai_v2.db import get_doc_field
+from daras_ai_v2.st_session_cookie import IS_ANONYMOUS
 from gooey_token_authentication1.token_authentication import authenticate
 from pages.ChyronPlant import ChyronPlantPage
 from pages.CompareLM import CompareLMPage
@@ -97,6 +101,20 @@ async def authentication(request: Request):
             expires_in = datetime.timedelta(days=14)
             session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
             request.session[FIREBASE_SESSION_COOKIE] = session_cookie
+
+            user = verify_session_cookie(session_cookie)
+            user_doc_ref = db.get_user_doc_ref(user.uid)
+            if get_doc_field(user_doc_ref, IS_ANONYMOUS):
+                user_doc_ref.update(
+                    {
+                        db.USER_BALANCE_FIELD: settings.LOGIN_USER_FREE_CREDITS,
+                        IS_ANONYMOUS: False,
+                        "display_name": user.display_name,
+                        "email": user.email,
+                        "phone_number": user.phone_number,
+                    }
+                )
+
             return JSONResponse(content={"status": "success"})
         # User did not sign in recently. To guard against ID token theft, require
         # re-authentication.
@@ -273,8 +291,6 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     f = furl(iframe_url)
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
-
-    db.get_or_init_user_data(request)
 
     return templates.TemplateResponse(
         "home.html",

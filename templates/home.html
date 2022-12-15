@@ -4,7 +4,9 @@
     {% if request.user %}
         <div class="login-container">
             <a href="/account">
-                {{ request.user.display_name }}
+                {% if request.user.display_name %}
+                    {{ request.user.display_name }}
+                {% endif %}
                 <br>
                 <i style="font-weight: normal">{{ request.user.email or request.user.phone_number }}</i>
             </a>
@@ -40,7 +42,6 @@
                     `<h3 style='text-align: center; padding: 20px'>
                         Sorry! We can't let you use this app in incognito mode. Please login to continue.
                     </h3>`;
-
             });
         </script>
     {% endif %}

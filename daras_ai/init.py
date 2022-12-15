@@ -3,7 +3,7 @@ import streamlit as st
 from daras_ai_v2.copy_to_clipboard_button_widget import st_like_btn_css_html
 from daras_ai_v2.hidden_html_widget import hidden_html_js, hidden_html_nojs
 from daras_ai_v2.html_spinner_widget import html_spinner_css
-from daras_ai_v2.st_session_cookie import get_current_user, get_anonymous_user
+from daras_ai_v2.st_session_cookie import get_signed_in_user, get_anonymous_user
 
 
 def init_scripts():
@@ -52,9 +52,11 @@ def init_scripts():
         """
     )
 
-    if "_current_user" not in st.session_state:
-        st.session_state["_current_user"] = get_current_user() or get_anonymous_user()
+    if not st.session_state.get("_current_user"):
+        with st.spinner():
+            st.session_state["_current_user"] = (
+                get_signed_in_user() or get_anonymous_user()
+            )
 
     if not st.session_state["_current_user"]:
-        st.error("Sorry, we can't let you do that! Please login to continue.")
         st.stop()
