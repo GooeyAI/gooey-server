@@ -83,26 +83,26 @@ available_subscriptions = {
     #
     # just for testing
     #
-    "daily": {
-        "display": {
-            "name": "Daily Plan",
-            "title": "DAILY @ $1",
-            "description": "100 credits everyday.",
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Daily Plan",
-                },
-                "unit_amount": 1,  # in cents
-                "recurring": {
-                    "interval": "day",
-                },
-            },
-            "quantity": 100,  # number of credits
-        },
-    },
+    # "daily": {
+    #     "display": {
+    #         "name": "Daily Plan",
+    #         "title": "DAILY @ $1",
+    #         "description": "100 credits everyday.",
+    #     },
+    #     "stripe": {
+    #         "price_data": {
+    #             "currency": "usd",
+    #             "product_data": {
+    #                 "name": "Gooey.AI Daily Plan",
+    #             },
+    #             "unit_amount": 1,  # in cents
+    #             "recurring": {
+    #                 "interval": "day",
+    #             },
+    #         },
+    #         "quantity": 100,  # number of credits
+    #     },
+    # },
 }
 
 
@@ -200,7 +200,7 @@ async def webhook_received(request: Request):
     data = event.data.object
 
     uid = stripe.Customer.retrieve(data.customer).metadata.uid
-    assert uid, "client_reference_id not found"
+    assert uid, "customer.metadata.uid not found"
 
     # Get the type of webhook event sent - used to check the status of PaymentIntents.
     match event["type"]:
