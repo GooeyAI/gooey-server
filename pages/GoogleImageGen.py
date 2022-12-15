@@ -62,9 +62,11 @@ class GoogleImageGenPage(BasePage):
             include_fields="image_results",
             images_size="medium",
         )
-        image_urls = [result["image"] for result in scaleserp_results["image_results"]][
-            :10
-        ]
+        image_urls = [
+            result["image"]
+            for result in scaleserp_results["image_results"]
+            if "image" in result
+        ][:10]
         random.shuffle(image_urls)
 
         state["image_urls"] = image_urls
