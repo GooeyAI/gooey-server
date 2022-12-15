@@ -57,7 +57,7 @@ def run_language_model(
         n=num_outputs,
         temperature=temperature,
         frequency_penalty=0.1 if avoid_repetition else 0,
-        presence_penalty=0.1 if avoid_repetition else 0,
+        presence_penalty=0.25 if avoid_repetition else 0,
     )
 
     # choose the completions that aren't empty
