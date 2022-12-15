@@ -19,23 +19,34 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     slug = "EmailFaceInpainting"
     version = 2
 
+    sane_defaults = {
+        "num_outputs": 1,
+        "quality": 50,
+        "output_width": 512,
+        "output_height": 512,
+        "guidance_scale": 7.5,
+    }
+
     class RequestModel(BaseModel):
         email_address: str
 
-        text_prompt: str | None
-        negative_prompt: str | None
-
-        num_outputs: int | None
-        quality: int | None
+        text_prompt: str
 
         face_scale: float | None
         face_pos_x: float | None
         face_pos_y: float | None
 
+        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+
+        negative_prompt: str | None
+
+        num_outputs: int | None
+        quality: int | None
+
         output_width: int | None
         output_height: int | None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        guidance_scale: float | None
 
         should_send_email: bool | None
         email_from: str | None

@@ -41,7 +41,6 @@ class CompareLMPage(BasePage):
             key="sampling_temperature",
             min_value=0.0,
             max_value=1.0,
-            value=1.0,
         )
 
         st.number_input(
