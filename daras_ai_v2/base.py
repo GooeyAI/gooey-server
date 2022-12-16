@@ -28,13 +28,15 @@ from daras_ai_v2.query_params import gooey_reset_query_parm
 
 DEFAULT_STATUS = "Running..."
 
-
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
 
 EXAMPLE_ID_QUERY_PARAM = "example_id"
 RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
+GOOEY_LOGO = (
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"
+)
 
 
 class BasePage:
@@ -489,7 +491,7 @@ class BasePage:
         pass
 
     def preview_image(self, state: dict) -> str:
-        pass
+        return GOOEY_LOGO
 
     def run_as_api_tab(self):
         if not check_secret_key("run as API", settings.API_SECRET_KEY):
