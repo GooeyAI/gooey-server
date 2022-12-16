@@ -48,7 +48,10 @@ if exclude_team:
     all_users = [
         user
         for user in all_users
-        if not (user.email.endswith("dara.network") or user.email.endswith("gooey.ai"))
+        if not (
+            user.email
+            and (user.email.endswith("dara.network") or user.email.endswith("gooey.ai"))
+        )
         and not (user.email in team_emails)
     ]
 
