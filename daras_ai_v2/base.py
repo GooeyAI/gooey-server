@@ -195,6 +195,16 @@ class BasePage:
             return True
 
     def render_footer(self):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(
+                """
+                ## How to Use This Recipe
+                """
+            )
+            self.render_usage_guide()
+
+    def render_usage_guide(self):
         pass
 
     def run(self, state: dict) -> typing.Iterator[str | None]:

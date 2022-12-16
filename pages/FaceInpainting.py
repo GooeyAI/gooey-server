@@ -18,7 +18,7 @@ from daras_ai_v2.face_restoration import map_parallel, gfpgan
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
-from daras_ai_v2.loom_video_widget import loom_video
+from daras_ai_v2.loom_video_widget import loom_video, youtube_video
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
@@ -252,15 +252,9 @@ class FaceInpaintingPage(BasePage):
                 else:
                     st.empty()
 
-    def render_footer(self):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(
-                """
-                ## How to Use This Recipe
-                """
-            )
-            loom_video("788dfdee763a4e329e28e749239f9810")
+    def render_usage_guide(self):
+        youtube_video("L-yHhIq3sE0")
+        # loom_video("788dfdee763a4e329e28e749239f9810")
 
     def run(self, state: dict):
         yield "Extracting Face..."

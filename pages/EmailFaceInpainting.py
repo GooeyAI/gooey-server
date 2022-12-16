@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import db
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from pages.FaceInpainting import FaceInpaintingPage
@@ -257,6 +258,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         if output_images:
             for img in output_images:
                 st.image(img, caption=state.get("text_prompt", ""))
+
+    def render_usage_guide(self):
+        youtube_video("bffH8X3YBCQ")
 
 
 @st.cache()

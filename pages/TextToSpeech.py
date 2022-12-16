@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.loom_video_widget import loom_video
+from daras_ai_v2.loom_video_widget import loom_video, youtube_video
 
 
 class TextToSpeechProviders(Enum):
@@ -122,15 +122,9 @@ class TextToSpeechPage(BasePage):
                 key="uberduck_speaking_rate",
             )
 
-    def render_footer(self):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(
-                """
-                ## How to Use This Recipe
-                """
-            )
-            loom_video("2d853b7442874b9cbbf3f27b98594add")
+    def render_usage_guide(self):
+        youtube_video("pZ9ldun8aXo")
+        # loom_video("2d853b7442874b9cbbf3f27b98594add")
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")

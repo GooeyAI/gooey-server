@@ -18,6 +18,7 @@ from daras_ai_v2.image_segmentation import dis
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.repositioning import reposition_object, reposition_object_img_bytes
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
@@ -318,6 +319,9 @@ class ObjectInpaintingPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return "This recipe an image of an object, masks it and then renders the background around the object according to the prompt."
+
+    def render_usage_guide(self):
+        youtube_video("to6_17XJeck")
 
 
 if __name__ == "__main__":
