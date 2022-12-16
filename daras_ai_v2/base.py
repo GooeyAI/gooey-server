@@ -17,7 +17,7 @@ from google.cloud import firestore
 from pydantic import BaseModel
 
 from daras_ai.init import init_scripts
-from daras_ai.secret_key_checker import check_secret_key, is_admin
+from daras_ai.secret_key_checker import is_admin
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -493,9 +493,6 @@ class BasePage:
         pass
 
     def run_as_api_tab(self):
-        if not check_secret_key("run as API", settings.API_SECRET_KEY):
-            return
-
         api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
         api_url = str(furl(settings.API_BASE_URL) / self.endpoint)
 
@@ -509,14 +506,16 @@ class BasePage:
         st.write("### CURL request")
 
         st.write(
-            rf"""```
-    curl -X 'POST' \
-      {shlex.quote(api_url)} \
-      -H 'accept: application/json' \
-      -H 'Content-Type: application/json' \
-      -H 'Authorization: Token $GOOEY_API_KEY' \
-      -d {shlex.quote(json.dumps(request_body, indent=2))}
-    ```"""
+            rf"""
+```
+curl -X 'POST' \
+  {shlex.quote(api_url)} \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Token $GOOEY_API_KEY' \
+  -d {shlex.quote(json.dumps(request_body, indent=2))}
+```
+            """
         )
 
         if st.button("Call API 🚀"):
