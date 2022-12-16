@@ -15,6 +15,7 @@ from firebase_admin import auth
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
+from sentry_sdk import capture_exception
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import check_secret_key, is_admin
@@ -63,38 +64,42 @@ class BasePage:
         return f"/v1/{self.slug}/run"
 
     def render(self):
-        init_scripts()
+        try:
+            init_scripts()
 
-        st.write("## " + self.title)
-        run_tab, settings_tab, examples_tab, api_tab = st.tabs(
-            ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
-        )
+            st.write("## " + self.title)
+            run_tab, settings_tab, examples_tab, api_tab = st.tabs(
+                ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
+            )
 
-        self._load_session_state()
+            self._load_session_state()
 
-        with settings_tab:
-            self.render_settings()
+            with settings_tab:
+                self.render_settings()
 
-        with examples_tab:
-            self._examples_tab()
+            with examples_tab:
+                self._examples_tab()
 
-        with api_tab:
-            self.run_as_api_tab()
+            with api_tab:
+                self.run_as_api_tab()
 
-        with run_tab:
-            col1, col2 = st.columns(2)
+            with run_tab:
+                col1, col2 = st.columns(2)
 
-            self.render_footer()
+                self.render_footer()
 
-            with col1:
-                submitted = self.render_form()
-                self.render_description()
+                with col1:
+                    submitted = self.render_form()
+                    self.render_description()
 
-            with col2:
-                self._runner(submitted)
-        #
-        # NOTE: Beware of putting code here since runner will call experimental_rerun
-        #
+                with col2:
+                    self._runner(submitted)
+            #
+            # NOTE: Beware of putting code here since runner will call experimental_rerun
+            #
+        except Exception as e:
+            capture_exception(e)
+            raise e
 
     def _load_session_state(self):
         if st.session_state.get("__loaded__"):
@@ -330,6 +335,7 @@ class BasePage:
 
             # render errors nicely
             except Exception as e:
+                capture_exception(e)
                 traceback.print_exc()
                 with status_area:
                     st.error(f"{type(e).__name__} - {err_msg_for_exc(e)}", icon="⚠️")

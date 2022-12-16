@@ -4,11 +4,20 @@ import firebase_admin
 import stripe
 from decouple import config, UndefinedValueError, Csv
 from google.oauth2 import service_account
+import sentry_sdk
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 GOOGLE_APPLICATION_CREDENTIALS = os.path.join(BASE_DIR, "serviceAccountKey.json")
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
+
+sentry_sdk.init(
+    dsn="https://236492339ce148cd80593c9acdcdd9fa@o425905.ingest.sentry.io/4504338635423744",
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for performance monitoring.
+    # We recommend adjusting this value in production.
+    traces_sample_rate=1.0
+)
 
 # load google app credentials from env var if available
 try:
