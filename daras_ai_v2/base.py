@@ -197,18 +197,35 @@ class BasePage:
     def render_footer(self):
         col1, col2 = st.columns(2)
         with col1:
-            st.write(
+            placeholder = st.empty()
+            try:
+                self.render_usage_guide()
+            except NotImplementedError:
+                pass
+            else:
+                with placeholder:
+                    st.write(
+                        """
+                        ## How to Use This Recipe
+                        """
+                    )
+
+        with col2:
+            st.write("## [Join Our Discord!](https://discord.gg/KQCrzgMPJ2)")
+            st.markdown(
                 """
-                ## How to Use This Recipe
-                """
+                <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
+                <iframe src="https://e.widgetbot.io/channels/643360566970155029/1039656158417399818" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-            self.render_usage_guide()
 
     def render_usage_guide(self):
-        pass
+        raise NotImplementedError
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        raise NotImplemented
+        raise NotImplementedError
 
     def _render_before_output(self):
         url = self._get_current_url()
