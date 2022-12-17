@@ -1,4 +1,23 @@
 import streamlit as st
+
+from server import normalize_slug, page_map
+
+# try to load page from query params
+#
+query_params = st.experimental_get_query_params()
+try:
+    page_slug = normalize_slug(query_params["page_slug"][0])
+except KeyError:
+    pass
+else:
+    try:
+        page = page_map[page_slug]
+    except KeyError:
+        st.error(f"## 404 - Page {page_slug!r} Not found")
+    else:
+        page().render()
+    st.stop()
+
 from furl import furl
 from google.cloud.firestore_v1 import DocumentSnapshot
 
@@ -81,7 +100,7 @@ with st.expander("Early Recipes"):
 
         tagline = doc.get("header_tagline", "")
         editor_url = (
-            furl(settings.APP_BASE_URL, query_params={"id": recipe_id}) / "Editor"
+            furl(settings.APP_BASE_URL, query_params={"id": recipe_id}) / "Editor/"
         )
 
         st.markdown(
