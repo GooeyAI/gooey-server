@@ -5,13 +5,12 @@ from google.cloud.firestore_v1 import DocumentSnapshot
 from daras_ai.db import list_all_docs
 from daras_ai.init import init_scripts
 from daras_ai_v2 import settings
-from pages.GoogleImageGen import GoogleImageGenPage
 from daras_ai_v2.face_restoration import map_parallel
-from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
 from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.GoogleImageGen import GoogleImageGenPage
 from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Img2Img import Img2ImgPage
 from pages.LipsyncTTS import LipsyncTTSPage
@@ -36,7 +35,7 @@ page_classes = [
     ImageSegmentationPage,
     Img2ImgPage,
     DeforumSDPage,
-    CompareLMPage,
+    # CompareLMPage,
     CompareText2ImgPage,
     # LipsyncPage,
     # ChyronPlantPage,
