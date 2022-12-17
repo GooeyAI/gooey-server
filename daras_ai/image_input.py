@@ -92,13 +92,18 @@ def uploaded_file_get_value(uploaded_file):
     img_bytes = uploaded_file.read()
     filename = uploaded_file.name
     if filename.endswith("HEIC"):
-        import wand.image
-
-        with wand.image.Image(blob=img_bytes) as original:
-            with original.convert("png") as converted:
-                img_bytes = converted.make_blob()
-                filename += ".png"
+        img_bytes = _heic_to_png(img_bytes)
+        filename += ".png"
     return img_bytes, safe_filename(filename)
+
+
+def _heic_to_png(img_bytes: bytes) -> bytes:
+    from wand.image import Image
+
+    with Image(blob=img_bytes) as original:
+        with original.convert("png") as converted:
+            img_bytes = converted.make_blob()
+    return img_bytes
 
 
 def resize_img_contain(img_bytes: bytes, size: (int, int)) -> bytes:
