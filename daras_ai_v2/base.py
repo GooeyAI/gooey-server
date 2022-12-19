@@ -29,7 +29,6 @@ from daras_ai_v2.query_params import gooey_reset_query_parm
 
 DEFAULT_STATUS = "Running..."
 
-
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
 
@@ -65,41 +64,38 @@ class BasePage:
 
     def render(self):
         try:
-            init_scripts()
-
-            st.write("## " + self.title)
-            run_tab, settings_tab, examples_tab, api_tab = st.tabs(
-                ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
-            )
-
-            self._load_session_state()
-
-            with settings_tab:
-                self.render_settings()
-
-            with examples_tab:
-                self._examples_tab()
-
-            with api_tab:
-                self.run_as_api_tab()
-
-            with run_tab:
-                col1, col2 = st.columns(2)
-
-                self.render_footer()
-
-                with col1:
-                    submitted = self.render_form()
-                    self.render_description()
-
-                with col2:
-                    self._runner(submitted)
-            #
-            # NOTE: Beware of putting code here since runner will call experimental_rerun
-            #
+            self._render()
         except Exception as e:
             capture_exception(e)
             raise e
+
+    def _render(self):
+        init_scripts()
+        st.write("## " + self.title)
+        run_tab, settings_tab, examples_tab, api_tab = st.tabs(
+            ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
+        )
+        self._load_session_state()
+        with settings_tab:
+            self.render_settings()
+        with examples_tab:
+            self._examples_tab()
+        with api_tab:
+            self.run_as_api_tab()
+        with run_tab:
+            col1, col2 = st.columns(2)
+
+            self.render_footer()
+
+            with col1:
+                submitted = self.render_form()
+                self.render_description()
+
+            with col2:
+                self._runner(submitted)
+        #
+        # NOTE: Beware of putting code here since runner will call experimental_rerun
+        #
 
     def _load_session_state(self):
         if st.session_state.get("__loaded__"):
