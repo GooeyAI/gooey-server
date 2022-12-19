@@ -10,11 +10,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 GOOGLE_APPLICATION_CREDENTIALS = os.path.join(BASE_DIR, "serviceAccountKey.json")
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
-DEBUG = config("DEBUG", False, cast=bool)
+DEBUG = config("DEBUG", cast=bool)
 
 if not DEBUG:
     sentry_sdk.init(
-        dsn="https://236492339ce148cd80593c9acdcdd9fa@o425905.ingest.sentry.io/4504338635423744",
+        dsn=config("SENTRY_DSN"),
         # Set traces_sample_rate to 1.0 to capture 100%
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
