@@ -41,7 +41,7 @@ sanitizer = Sanitizer(
 
 class SEOSummaryPage(BasePage):
     title = "Create the best SEO content from any query"
-    slug = "SEOSummary"
+    slug_versions = ["SEOSummary"]
 
     sane_defaults = dict(
         search_query="rugs",

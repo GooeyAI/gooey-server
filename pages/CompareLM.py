@@ -9,7 +9,7 @@ from daras_ai_v2.language_model import run_language_model
 
 class CompareLMPage(BasePage):
     title = "Compare Text LLMs: GPT3 vs Flan-T5"
-    slug = "CompareLM"
+    slug_versions = ["CompareLM"]
 
     class RequestModel(BaseModel):
         input_prompt: str

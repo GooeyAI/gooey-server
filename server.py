@@ -265,7 +265,7 @@ def st_page(request: Request, page_slug):
         raise HTTPException(status_code=404)
 
     iframe_url = furl(
-        settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug}
+        settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
     )
     return _st_page(
         request,
@@ -321,7 +321,7 @@ def normalize_slug(page_slug):
 
 
 page_map: dict[str, typing.Type[BasePage]] = {
-    normalize_slug(page.slug): page for page in all_pages
+    normalize_slug(slug): page for page in all_pages for slug in page.slug_versions
 }
 
 

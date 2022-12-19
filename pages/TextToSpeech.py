@@ -20,7 +20,7 @@ class TextToSpeechProviders(Enum):
 
 class TextToSpeechPage(BasePage):
     title = "Speak Any Text"
-    slug = "TextToSpeech"
+    slug_versions = ["TextToSpeech"]
 
     class RequestModel(BaseModel):
         text_prompt: str

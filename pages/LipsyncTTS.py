@@ -10,7 +10,7 @@ from pages.TextToSpeech import TextToSpeechPage
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lipsync from Any Text + Video"
-    slug = "LipsyncTTS"
+    slug_versions = ["LipsyncTTS"]
 
     class RequestModel(BaseModel):
         input_face: str

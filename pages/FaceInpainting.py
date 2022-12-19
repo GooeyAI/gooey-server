@@ -23,8 +23,8 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
 class FaceInpaintingPage(BasePage):
-    title = "A Face in Any Scene"
-    slug = "FaceInpainting"
+    title = "AI Image with a Face"
+    slug_versions = ["FaceInpainting", "Face-in-AI-Generated-Photo"]
     version = 2
 
     sane_defaults = {

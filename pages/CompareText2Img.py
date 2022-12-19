@@ -16,7 +16,7 @@ from daras_ai_v2.stable_diffusion import Text2ImgModels, text2img
 
 class CompareText2ImgPage(BasePage):
     title = "Compare Image Generators"
-    slug = "CompareText2Img"
+    slug_versions = ["CompareText2Img"]
 
     sane_defaults = {
         "guidance_scale": 10,

@@ -19,7 +19,7 @@ from daras_ai_v2.stable_diffusion import (
 
 class Img2ImgPage(BasePage):
     title = "Edit Any Image Using Text"
-    slug = "Img2Img"
+    slug_versions = ["Img2Img"]
 
     sane_defaults = {
         "num_outputs": 1,

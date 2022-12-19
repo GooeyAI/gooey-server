@@ -43,7 +43,7 @@ GOOEY_LOGO = (
 
 class BasePage:
     title: str
-    slug: str
+    slug_versions: list[str]
     version: int = 1
     sane_defaults: dict = {}
     RequestModel: typing.Type[BaseModel]
@@ -55,16 +55,16 @@ class BasePage:
     def doc_name(self) -> str:
         # for backwards compat
         if self.version == 1:
-            return self.slug
-        return f"{self.slug}#{self.version}"
+            return self.slug_versions[0]
+        return f"{self.slug_versions[0]}#{self.version}"
 
     @classmethod
     def app_url(cls) -> str:
-        return str(furl(settings.APP_BASE_URL) / (cls.slug + "/"))
+        return str(furl(settings.APP_BASE_URL) / (cls.slug_versions[-1] + "/"))
 
     @property
     def endpoint(self) -> str:
-        return f"/v1/{self.slug}/run"
+        return f"/v1/{self.slug_versions[0]}/run"
 
     def render(self):
         init_scripts()
@@ -211,7 +211,7 @@ class BasePage:
         pass
 
     def render_form(self) -> bool:
-        with st.form(f"{self.slug}Form"):
+        with st.form(f"{self.slug_versions[0]}Form"):
             self.render_form_v2()
             submitted = st.form_submit_button("🏃‍ Submit")
 

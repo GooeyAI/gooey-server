@@ -19,7 +19,7 @@ from daras_ai_v2.stable_diffusion import img2img, Img2ImgModels, SD_MAX_SIZE
 
 class GoogleImageGenPage(BasePage):
     title = "Generate Images From Google Images"
-    slug = "GoogleImageGen"
+    slug_versions = ["GoogleImageGen"]
 
     sane_defaults = {
         "num_outputs": 1,

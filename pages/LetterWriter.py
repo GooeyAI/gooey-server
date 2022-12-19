@@ -13,7 +13,7 @@ from daras_ai_v2.text_training_data_widget import text_training_data, TrainingDa
 
 class LetterWriterPage(BasePage):
     title = "Letter Writer"
-    slug = "LetterWriter"
+    slug_versions = ["LetterWriter"]
 
     class RequestModel(BaseModel):
         action_id: str

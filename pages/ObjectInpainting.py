@@ -25,7 +25,7 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 
 class ObjectInpaintingPage(BasePage):
     title = "An Object in Any Scene"
-    slug = "ObjectInpainting"
+    slug_versions = ["ObjectInpainting"]
 
     sane_defaults = {
         "mask_threshold": 0.7,

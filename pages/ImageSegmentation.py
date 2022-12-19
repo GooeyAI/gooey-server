@@ -31,7 +31,7 @@ from daras_ai_v2.repositioning import (
 
 class ImageSegmentationPage(BasePage):
     title = "Cutout an object from any image"
-    slug = "ImageSegmentation"
+    slug_versions = ["ImageSegmentation"]
     version = 2
 
     sane_defaults = {

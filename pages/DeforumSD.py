@@ -8,7 +8,7 @@ from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
 
 class DeforumSDPage(BasePage):
     title = "Text to Animation"
-    slug = "DeforumSD"
+    slug_versions = ["DeforumSD"]
 
     class RequestModel(BaseModel):
         input_prompt: str

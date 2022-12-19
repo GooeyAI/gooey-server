@@ -17,7 +17,7 @@ email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
     title = "Email of You In Any Scene"
-    slug = "EmailFaceInpainting"
+    slug_versions = ["EmailFaceInpainting"]
     version = 2
 
     sane_defaults = {
