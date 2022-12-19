@@ -127,7 +127,7 @@ class BasePage:
         if not st.session_state.get("is_flagged"):
             return
 
-        st.write("## This Content has been Flagged")
+        st.error("### This Content has been Flagged")
 
         if is_admin():
             unflag_pressed = st.button("UnFlag")
