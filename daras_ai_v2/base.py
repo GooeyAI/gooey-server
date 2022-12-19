@@ -26,7 +26,6 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 )
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.query_params import gooey_reset_query_parm
-from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.utils import email_support_about_reported_run
 
 DEFAULT_STATUS = "Running..."
@@ -68,28 +67,7 @@ class BasePage:
         init_scripts()
 
         self._load_session_state()
-        if "is_flagged" in st.session_state and st.session_state["is_flagged"]:
-            if is_admin():
-                st.write("## " + "Recipe Run Currently Hidden")
-                unflag_pressed = st.button("UnFlag")
-                if unflag_pressed:
-                    with st.spinner("Removing flag..."):
-                        query_params = st.experimental_get_query_params()
-                        example_id, run_id, uid = self.extract_query_params(
-                            query_params
-                        )
-                        if run_id and uid:
-                            self.update_flag_for_run(
-                                run_id=run_id, uid=uid, is_flagged=False
-                            )
-                        st.success("Removed flag. Reload the page to see changes")
-            else:
-                st.write("## " + "This Recipe Run is Flagged")
-                st.write(
-                    "Our support team is reviewing this run. Please come back after some time."
-                )
-                # Return and Don't render the run any further
-                return
+        self._check_if_flagged()
 
         st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
@@ -144,6 +122,29 @@ class BasePage:
             st.session_state.setdefault(k, v)
 
         st.session_state["__loaded__"] = True
+
+    def _check_if_flagged(self):
+        if not st.session_state.get("is_flagged"):
+            return
+
+        st.write("## This Content has been Flagged")
+
+        if is_admin():
+            unflag_pressed = st.button("UnFlag")
+            if not unflag_pressed:
+                return
+            with st.spinner("Removing flag..."):
+                query_params = st.experimental_get_query_params()
+                example_id, run_id, uid = self.extract_query_params(query_params)
+                if run_id and uid:
+                    self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=False)
+            st.success("Removed flag. Reload the page to see changes")
+        else:
+            st.write(
+                "Our support team is reviewing this run. Please come back after some time."
+            )
+            # Return and Don't render the run any further
+            st.stop()
 
     def extract_query_params(self, query_params):
         example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
@@ -314,7 +315,7 @@ class BasePage:
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self._run_doc_ref(uid=uid, run_id=run_id)
-        ref.set({"is_flagged": is_flagged}, merge=True)
+        ref.update({"is_flagged": is_flagged})
 
     def save_run(self):
         current_user: auth.UserRecord = st.session_state.get("_current_user")
