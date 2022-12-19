@@ -1,4 +1,5 @@
 import datetime
+import re
 import time
 import typing
 
@@ -236,7 +237,7 @@ def st_home(request: Request):
     return _st_page(
         request,
         iframe_url,
-        context={"title": "Home - Gooey.AI"},
+        context={"title": "Explore - Gooey.AI"},
     )
 
 
@@ -250,23 +251,31 @@ def st_editor(request: Request):
     )
 
 
-def script_to_frontend(page_cls: typing.Type[BasePage]):
-    @app.get(f"/{page_cls.slug}/", include_in_schema=False)
-    def st_page(request: Request):
-        page = page_cls()
-        state = page.get_doc_from_query_params(dict(request.query_params))
-        if state is None:
-            raise HTTPException(status_code=404)
-        iframe_url = furl(settings.IFRAME_BASE_URL) / page_cls.slug
-        return _st_page(
-            request,
-            iframe_url,
-            context={
-                "title": page.preview_title(state),
-                "description": page.preview_description(state),
-                "image": page.preview_image(state),
-            },
-        )
+@app.get("/{page_slug}/", include_in_schema=False)
+def st_page(request: Request, page_slug):
+    page_slug = normalize_slug(page_slug)
+    try:
+        page_cls = page_map[page_slug]
+    except KeyError:
+        raise HTTPException(status_code=404)
+    page = page_cls()
+
+    state = page.get_doc_from_query_params(dict(request.query_params))
+    if state is None:
+        raise HTTPException(status_code=404)
+
+    iframe_url = furl(
+        settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug}
+    )
+    return _st_page(
+        request,
+        iframe_url,
+        context={
+            "title": f"{page_cls.title} - Gooey.AI",
+            "description": page.preview_description(state),
+            "image": page.preview_image(state),
+        },
+    )
 
 
 def _st_page(request: Request, iframe_url: str, *, context: dict):
@@ -287,7 +296,7 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     )
 
 
-all_pages = [
+all_pages: list[typing.Type[BasePage]] = [
     ChyronPlantPage,
     FaceInpaintingPage,
     EmailFaceInpaintingPage,
@@ -307,10 +316,18 @@ all_pages = [
 ]
 
 
+def normalize_slug(page_slug):
+    return re.sub(r"[-_]", "", page_slug.lower())
+
+
+page_map: dict[str, typing.Type[BasePage]] = {
+    normalize_slug(page.slug): page for page in all_pages
+}
+
+
 def setup_pages():
     for page_cls in all_pages:
         script_to_api(page_cls)
-        script_to_frontend(page_cls)
 
 
 setup_pages()
