@@ -1,6 +1,9 @@
 [ui]
 hideSidebarNav = true
 
+[browser]
+gatherUsageStats = false
+
 [theme]
 base="dark"
 

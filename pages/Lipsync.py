@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.lipsync_api import wav2lip
+from daras_ai_v2.loom_video_widget import youtube_video
 
 
 class LipsyncPage(BasePage):
@@ -148,6 +149,9 @@ class LipsyncPage(BasePage):
 
     def render_output(self):
         self.render_example(st.session_state)
+
+    def render_usage_guide(self):
+        youtube_video("J87EtK7ZVz0")
 
 
 if __name__ == "__main__":

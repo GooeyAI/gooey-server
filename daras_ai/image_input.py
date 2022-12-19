@@ -92,13 +92,18 @@ def uploaded_file_get_value(uploaded_file):
     img_bytes = uploaded_file.read()
     filename = uploaded_file.name
     if filename.endswith("HEIC"):
-        import wand.image
-
-        with wand.image.Image(blob=img_bytes) as original:
-            with original.convert("png") as converted:
-                img_bytes = converted.make_blob()
-                filename += ".png"
+        img_bytes = _heic_to_png(img_bytes)
+        filename += ".png"
     return img_bytes, safe_filename(filename)
+
+
+def _heic_to_png(img_bytes: bytes) -> bytes:
+    from wand.image import Image
+
+    with Image(blob=img_bytes) as original:
+        with original.convert("png") as converted:
+            img_bytes = converted.make_blob()
+    return img_bytes
 
 
 def resize_img_contain(img_bytes: bytes, size: (int, int)) -> bytes:
@@ -122,7 +127,17 @@ def cv2_img_to_bytes(img):
 
 
 def bytes_to_cv2_img(img_bytes: bytes):
-    return cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+    img_cv2 = cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if not img_exists(img_cv2):
+        raise ValueError("Bad Image")
+    return img_cv2
+
+
+def img_exists(img) -> bool:
+    if isinstance(img, np.ndarray):
+        return bool(len(img))
+    else:
+        return bool(img)
 
 
 FILENAME_WHITELIST = re.compile(r"[ \w\-_.]")

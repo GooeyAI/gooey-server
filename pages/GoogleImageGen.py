@@ -1,27 +1,49 @@
 import random
+import typing
 
 import requests
 import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import (
+    upload_file_from_bytes,
+    resize_img_contain,
+)
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.google_search import call_scaleserp
-from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
-from daras_ai_v2.stable_diffusion import img2img, Img2ImgModels
+from daras_ai_v2.img_model_settings_widgets import (
+    img_model_settings,
+)
+from daras_ai_v2.stable_diffusion import img2img, Img2ImgModels, SD_MAX_SIZE
 
 
 class GoogleImageGenPage(BasePage):
     title = "Generate Images From Google Images"
     slug = "GoogleImageGen"
 
+    sane_defaults = {
+        "num_outputs": 1,
+        "quality": 50,
+        "guidance_scale": 7.5,
+        "prompt_strength": 0.5,
+        "sd_2_upscaling": False,
+    }
+
     class RequestModel(BaseModel):
         search_query: str
         text_prompt: str
+
+        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
+
         negative_prompt: str | None
 
-        selected_model: str | None
+        num_outputs: int | None
+        quality: int | None
+
+        guidance_scale: float | None
+        prompt_strength: float | None
+
+        sd_2_upscaling: bool | None
 
     class ResponseModel(BaseModel):
         output_images: list[str]
@@ -40,16 +62,32 @@ class GoogleImageGenPage(BasePage):
             include_fields="image_results",
             images_size="medium",
         )
-        image_urls = [result["image"] for result in scaleserp_results["image_results"]][
-            :10
-        ]
-        selected_image_url = random.choice(image_urls)
+        image_urls = [
+            result["image"]
+            for result in scaleserp_results["image_results"]
+            if "image" in result
+        ][:10]
+        random.shuffle(image_urls)
 
         state["image_urls"] = image_urls
 
         yield "Downloading..."
 
-        selected_image_bytes = requests.get(selected_image_url).content
+        selected_image_bytes = None
+        for selected_image_url in image_urls:
+            print(selected_image_url)
+            selected_image_bytes = requests.get(selected_image_url).content
+            try:
+                selected_image_bytes = resize_img_contain(
+                    selected_image_bytes, SD_MAX_SIZE
+                )
+            except ValueError:
+                continue
+            else:
+                break
+        if not selected_image_bytes:
+            raise ValueError("Could not find an image! Please try another query?")
+
         selected_image_url = upload_file_from_bytes(
             "selected_img.png", selected_image_bytes
         )
@@ -65,11 +103,11 @@ class GoogleImageGenPage(BasePage):
             init_image_bytes=selected_image_bytes,
             ##
             selected_model=request.selected_model,
-            num_inference_steps=50,
-            width=512,
-            height=512,
-            prompt_strength=0.5,
-            num_outputs=1,
+            num_inference_steps=request.quality,
+            prompt_strength=request.prompt_strength,
+            num_outputs=request.num_outputs,
+            guidance_scale=request.guidance_scale,
+            sd_2_upscaling=request.sd_2_upscaling,
         )
 
     def render_form_v2(self):
@@ -89,13 +127,7 @@ class GoogleImageGenPage(BasePage):
         )
 
     def render_settings(self):
-        selected_model = enum_selector(
-            Img2ImgModels,
-            label="### Selected Model",
-            key="selected_model",
-        )
-
-        negative_prompt_setting(selected_model)
+        img_model_settings(Img2ImgModels)
 
     def render_output(self):
         out_imgs = st.session_state.get("output_images")

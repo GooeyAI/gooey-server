@@ -34,7 +34,7 @@ pages_to_test = [
     EmailFaceInpaintingPage,
     LetterWriterPage,
     LipsyncPage,
-    CompareLMPage,
+    # CompareLMPage,
     ImageSegmentationPage,
     TextToSpeechPage,
     LipsyncTTSPage,

@@ -5,7 +5,12 @@ from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.neg_prompt_widget import negative_prompt_setting
+from daras_ai_v2.img_model_settings_widgets import (
+    negative_prompt_setting,
+    guidance_scale_setting,
+    num_outputs_setting,
+    output_resolution_setting,
+)
 from daras_ai_v2.stable_diffusion import Text2ImgModels, text2img
 
 
@@ -83,66 +88,23 @@ class CompareText2ImgPage(BasePage):
             key="selected_models",
         )
 
+        num_outputs_setting(selected_model)
+        st.checkbox("**4x Upscaling (SD v2 only)**", key="sd_2_upscaling")
         negative_prompt_setting(selected_model)
+        output_resolution_setting()
 
-        col1, col2 = st.columns(2, gap="medium")
-        with col1:
-            st.slider(
-                label="Number of Outputs",
-                key="num_outputs",
-                min_value=1,
-                max_value=4,
-            )
-        with col2:
-            if selected_model != Text2ImgModels.dall_e.name:
-                st.slider(
-                    label="Quality",
-                    key="quality",
-                    min_value=10,
-                    max_value=200,
-                    step=10,
-                )
-            else:
-                st.empty()
-
-        st.write(
-            """
-            ### Output Resolution
-            """
-        )
-        col1, col2, col3 = st.columns([10, 1, 10])
-        with col1:
-            st.slider(
-                "Width",
-                key="output_width",
-                min_value=512,
-                max_value=768,
-                step=64,
-            )
-        with col2:
-            st.write("X")
-        with col3:
-            st.slider(
-                "Height",
-                key="output_height",
-                min_value=512,
-                max_value=768,
-                step=64,
-            )
-
-        st.write("#### Advanced settings")
         col1, col2 = st.columns(2)
         with col1:
-            st.number_input("Guidance scale", key="guidance_scale", step=0.1)
+            guidance_scale_setting(selected_model)
         with col2:
             st.number_input(
                 """
-                Seed (_Use 0 to randomize_)
+                ##### Seed 
+                (_Use 0 to randomize_)
                 """,
                 key="seed",
                 step=1,
             )
-        st.checkbox("4x Upscaling (SD v2 only)", key="sd_2_upscaling")
 
     def render_output(self):
         self._render_outputs(st.session_state)
