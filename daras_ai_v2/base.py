@@ -66,13 +66,13 @@ class BasePage:
     def render(self):
         init_scripts()
 
-        self._load_session_state()
-        self._check_if_flagged()
-
         st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
             ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
         )
+
+        self._load_session_state()
+        self._check_if_flagged()
 
         with settings_tab:
             self.render_settings()
