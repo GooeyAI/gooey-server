@@ -564,7 +564,7 @@ class BasePage:
             title = f"{input_as_text[:100]} ... {self.title}"
         else:
             title = f"{self.title}"
-        return f"{title} on Gooey.AI"
+        return f"{title} • AI API, workflow & prompt shared on Gooey.AI"
 
     def preview_description(self, state: dict) -> str:
         pass
