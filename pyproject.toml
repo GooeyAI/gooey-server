@@ -36,6 +36,8 @@ transformers = "^4.24.0"
 sympy = "^1.11.1"
 stripe = "^5.0.0"
 python-multipart = "^0.0.5"
+html-sanitizer = "^1.9.3"
+plotly = "^5.11.0"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"

@@ -17,7 +17,7 @@ from google.cloud import firestore
 from pydantic import BaseModel
 
 from daras_ai.init import init_scripts
-from daras_ai.secret_key_checker import check_secret_key, is_admin
+from daras_ai.secret_key_checker import is_admin
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -197,10 +197,37 @@ class BasePage:
             return True
 
     def render_footer(self):
-        pass
+        col1, col2 = st.columns(2)
+        with col1:
+            placeholder = st.empty()
+            try:
+                self.render_usage_guide()
+            except NotImplementedError:
+                pass
+            else:
+                with placeholder:
+                    st.write(
+                        """
+                        ## How to Use This Recipe
+                        """
+                    )
+
+        with col2:
+            st.write("## [Join Our Discord!](https://discord.gg/KQCrzgMPJ2)")
+            st.markdown(
+                """
+                <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
+                <iframe src="https://e.widgetbot.io/channels/643360566970155029/1039656158417399818" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    def render_usage_guide(self):
+        raise NotImplementedError
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        raise NotImplemented
+        raise NotImplementedError
 
     def _render_before_output(self):
         url = self._get_current_url()
@@ -494,9 +521,6 @@ class BasePage:
         return GOOEY_LOGO
 
     def run_as_api_tab(self):
-        if not check_secret_key("run as API", settings.API_SECRET_KEY):
-            return
-
         api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
         api_url = str(furl(settings.API_BASE_URL) / self.endpoint)
 
@@ -510,14 +534,16 @@ class BasePage:
         st.write("### CURL request")
 
         st.write(
-            rf"""```
-    curl -X 'POST' \
-      {shlex.quote(api_url)} \
-      -H 'accept: application/json' \
-      -H 'Content-Type: application/json' \
-      -H 'Authorization: Token $GOOEY_API_KEY' \
-      -d {shlex.quote(json.dumps(request_body, indent=2))}
-    ```"""
+            rf"""
+```
+curl -X 'POST' \
+  {shlex.quote(api_url)} \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Token $GOOEY_API_KEY' \
+  -d {shlex.quote(json.dumps(request_body, indent=2))}
+```
+            """
         )
 
         if st.button("Call API 🚀"):

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import db
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from pages.FaceInpainting import FaceInpaintingPage
@@ -19,23 +20,34 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     slug = "EmailFaceInpainting"
     version = 2
 
+    sane_defaults = {
+        "num_outputs": 1,
+        "quality": 50,
+        "output_width": 512,
+        "output_height": 512,
+        "guidance_scale": 7.5,
+    }
+
     class RequestModel(BaseModel):
         email_address: str
 
-        text_prompt: str | None
-        negative_prompt: str | None
-
-        num_outputs: int | None
-        quality: int | None
+        text_prompt: str
 
         face_scale: float | None
         face_pos_x: float | None
         face_pos_y: float | None
 
+        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+
+        negative_prompt: str | None
+
+        num_outputs: int | None
+        quality: int | None
+
         output_width: int | None
         output_height: int | None
 
-        selected_model: typing.Literal[tuple(e.name for e in InpaintingModels)] | None
+        guidance_scale: float | None
 
         should_send_email: bool | None
         email_from: str | None
@@ -246,6 +258,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         if output_images:
             for img in output_images:
                 st.image(img, caption=state.get("text_prompt", ""))
+
+    def render_usage_guide(self):
+        youtube_video("bffH8X3YBCQ")
 
 
 @st.cache()

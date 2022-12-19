@@ -18,6 +18,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.image_segmentation import u2net, ImageSegmentationModels, dis
 from daras_ai_v2.img_io import opencv_to_pil, pil_to_bytes
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.polygon_fitter import (
     appx_best_fit_ngon,
     best_fit_rotated_rect,
@@ -366,6 +367,9 @@ class ImageSegmentationPage(BasePage):
     def preview_description(self, state: dict) -> str:
         # TODO: updated description
         return "Cutout an object from any image"
+
+    def render_usage_guide(self):
+        youtube_video("hSsCMloAQ-8")
 
 
 def _add_shadow(img_pil):
