@@ -70,7 +70,7 @@ class FaceInpaintingPage(BasePage):
         output_images: list[str]
 
     def preview_description(self, state: dict) -> str:
-        return "This recipe takes a photo with a face and then uses the text prompt to paint a background."
+        return "Upload & extract a face into an AI photo using your own text + the latest Stable Diffusion or DallE image generator."
 
     def render_description(self):
         st.write(

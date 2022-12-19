@@ -40,8 +40,11 @@ sanitizer = Sanitizer(
 
 
 class SEOSummaryPage(BasePage):
-    title = "Create the best SEO content from any query"
-    slug_versions = ["SEOSummary"]
+    title = "AI Generated SEO page summary for any search query"
+    slug_versions = ["SEOSummary", "AI-Generated-SEO-from-Search-Query"]
+
+    def preview_description(self, state: dict) -> str:
+        return "Input a Google search query + your website & keywords to get an AI search engine optimised page summary. This workflow parses the current top ranked sites and generates the best SEO content using OpenAI’s GPT3."
 
     sane_defaults = dict(
         search_query="rugs",
