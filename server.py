@@ -271,7 +271,7 @@ def st_page(request: Request, page_slug):
         request,
         iframe_url,
         context={
-            "title": f"{page_cls.title} - Gooey.AI",
+            "title": page.preview_title(state),
             "description": page.preview_description(state),
             "image": page.preview_image(state),
         },
