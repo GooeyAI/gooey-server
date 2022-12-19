@@ -12,6 +12,7 @@ from time import time
 import requests
 import streamlit as st
 from firebase_admin import auth
+from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
@@ -26,6 +27,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 )
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.query_params import gooey_reset_query_parm
+from daras_ai_v2.utils import email_support_about_reported_run
 
 DEFAULT_STATUS = "Running..."
 
@@ -71,17 +73,26 @@ class BasePage:
 
     def _render(self):
         init_scripts()
+
+        self._load_session_state()
+        self._check_if_flagged()
+
         st.write("## " + self.title)
         run_tab, settings_tab, examples_tab, api_tab = st.tabs(
             ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
         )
+
         self._load_session_state()
+
         with settings_tab:
             self.render_settings()
+
         with examples_tab:
             self._examples_tab()
+
         with api_tab:
             self.run_as_api_tab()
+
         with run_tab:
             col1, col2 = st.columns(2)
 
@@ -122,25 +133,52 @@ class BasePage:
 
         st.session_state["__loaded__"] = True
 
-    def get_doc_from_query_params(self, query_params) -> dict | None:
+    def _check_if_flagged(self):
+        if not st.session_state.get("is_flagged"):
+            return
+
+        st.error("### This Content has been Flagged")
+
+        if is_admin():
+            unflag_pressed = st.button("UnFlag")
+            if not unflag_pressed:
+                return
+            with st.spinner("Removing flag..."):
+                query_params = st.experimental_get_query_params()
+                example_id, run_id, uid = self.extract_query_params(query_params)
+                if run_id and uid:
+                    self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=False)
+            st.success("Removed flag. Reload the page to see changes")
+        else:
+            st.write(
+                "Our support team is reviewing this run. Please come back after some time."
+            )
+            # Return and Don't render the run any further
+            st.stop()
+
+    def extract_query_params(self, query_params):
         example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
         run_id = query_params.get(RUN_ID_QUERY_PARAM)
         uid = query_params.get(USER_ID_QUERY_PARAM)
-
         if isinstance(example_id, list):
             example_id = example_id[0]
         if isinstance(run_id, list):
             run_id = run_id[0]
         if isinstance(uid, list):
             uid = uid[0]
+        return example_id, run_id, uid
 
+    def get_doc_from_query_params(self, query_params) -> dict | None:
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        return self.get_firestore_state(example_id, run_id, uid)
+
+    def get_firestore_state(self, example_id, run_id, uid):
         if example_id:
             snapshot = self._example_doc_ref(example_id).get()
         elif run_id:
             snapshot = self._run_doc_ref(run_id, uid).get()
         else:
             snapshot = self.get_recipe_doc()
-
         return snapshot.to_dict()
 
     def get_recipe_doc(self) -> firestore.DocumentSnapshot:
@@ -228,10 +266,28 @@ class BasePage:
     def run(self, state: dict) -> typing.Iterator[str | None]:
         raise NotImplementedError
 
+    def _render_report_button(self, url: str):
+        current_user: UserRecord = st.session_state.get("_current_user")
+        query_params = st.experimental_get_query_params()
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        if not run_id or not uid:
+            return
+        # ONLY RUNS CAN BE REPORTED
+        reported = st.button("❗Report")
+        if reported:
+            with st.spinner("Reporting..."):
+                self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
+                email_support_about_reported_run(
+                    run_id=run_id, uid=uid, url=url, email=current_user.email
+                )
+                st.success("Reported. Reload the page to see changes")
+
     def _render_before_output(self):
         url = self._get_current_url()
         if not url:
             return
+
+        self._render_report_button(url=url)
 
         col1, col2 = st.columns([3, 1])
 
@@ -266,6 +322,10 @@ class BasePage:
 
         url = str(furl(self.app_url(), query_params=query_params))
         return url
+
+    def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
+        ref = self._run_doc_ref(uid=uid, run_id=run_id)
+        ref.update({"is_flagged": is_flagged})
 
     def save_run(self):
         current_user: auth.UserRecord = st.session_state.get("_current_user")

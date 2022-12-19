@@ -1,17 +1,35 @@
 import streamlit as st
+
+from server import normalize_slug, page_map
+
+# try to load page from query params
+#
+query_params = st.experimental_get_query_params()
+try:
+    page_slug = normalize_slug(query_params["page_slug"][0])
+except KeyError:
+    pass
+else:
+    try:
+        page = page_map[page_slug]
+    except KeyError:
+        st.error(f"## 404 - Page {page_slug!r} Not found")
+    else:
+        page().render()
+    st.stop()
+
 from furl import furl
 from google.cloud.firestore_v1 import DocumentSnapshot
 
 from daras_ai.db import list_all_docs
 from daras_ai.init import init_scripts
 from daras_ai_v2 import settings
-from pages.GoogleImageGen import GoogleImageGenPage
 from daras_ai_v2.face_restoration import map_parallel
-from pages.CompareLM import CompareLMPage
 from pages.CompareText2Img import CompareText2ImgPage
 from pages.DeforumSD import DeforumSDPage
 from pages.EmailFaceInpainting import EmailFaceInpaintingPage
 from pages.FaceInpainting import FaceInpaintingPage
+from pages.GoogleImageGen import GoogleImageGenPage
 from pages.ImageSegmentation import ImageSegmentationPage
 from pages.Img2Img import Img2ImgPage
 from pages.LipsyncTTS import LipsyncTTSPage
@@ -36,7 +54,7 @@ page_classes = [
     ImageSegmentationPage,
     Img2ImgPage,
     DeforumSDPage,
-    CompareLMPage,
+    # CompareLMPage,
     CompareText2ImgPage,
     # LipsyncPage,
     # ChyronPlantPage,
@@ -82,7 +100,7 @@ with st.expander("Early Recipes"):
 
         tagline = doc.get("header_tagline", "")
         editor_url = (
-            furl(settings.APP_BASE_URL, query_params={"id": recipe_id}) / "Editor"
+            furl(settings.APP_BASE_URL, query_params={"id": recipe_id}) / "Editor/"
         )
 
         st.markdown(
