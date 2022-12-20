@@ -1,5 +1,7 @@
 import random
+import re
 import typing
+from functools import partial
 
 import readability
 import requests
@@ -10,6 +12,7 @@ from html_sanitizer import Sanitizer
 from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import (
@@ -20,6 +23,8 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
+
+KEYWORDS_SEP = re.compile(r"[\n,]")
 
 STOP_SEQ = "$" * 10
 
@@ -235,7 +240,61 @@ class SEOSummaryPage(BasePage):
 
         yield "Generating content using GPT-3..."
 
-        state["output_content"] = _run_lm(request, state["final_prompt"])
+        output_content = _run_lm(request, state["final_prompt"])
+
+        yield "Cross-linking keywords..."
+
+        output_content = _crosslink_keywords(output_content, request)
+
+        state["output_content"] = output_content
+
+
+def _crosslink_keywords(output_content, request):
+    relevant_keywords = []
+
+    for text in output_content:
+        for keyword in KEYWORDS_SEP.split(request.keywords):
+            keyword = keyword.strip()
+            if not keyword:
+                continue
+            escaped = re.escape(keyword)
+            if not re.search(pattern=escaped, string=text, flags=re.IGNORECASE):
+                continue
+            relevant_keywords.append(keyword)
+
+    if not relevant_keywords:
+        return output_content
+
+    host = furl(request.company_url).host
+
+    all_results = map_parallel(
+        partial(
+            call_scaleserp,
+            include_fields="organic_results",
+        ),
+        # fmt: off
+        [
+            f"site:{host} {keyword}"
+            for keyword in relevant_keywords
+        ],
+    )
+
+    for keyword, results in zip(relevant_keywords, all_results):
+        try:
+            href = results["organic_results"][0]["link"]
+        except (IndexError, KeyError):
+            continue
+
+        escaped = re.escape(keyword)
+        for idx, text in enumerate(output_content):
+            output_content[idx] = re.sub(
+                pattern=escaped,
+                repl=f'<a href="{href}">{keyword}</a>',
+                string=text,
+                flags=re.IGNORECASE,
+            )
+
+    return output_content
 
 
 def _run_lm(request: SEOSummaryPage.RequestModel, final_prompt: str) -> list[str]:
@@ -306,11 +365,9 @@ def _gen_final_prompt(
             continue
 
         state["final_prompt"] += next_prompt_part
-        yield
 
     # add inputs
     state["final_prompt"] += end_input_prompt
-    yield
 
 
 def _summarize_url(url: str, enable_html: bool):
@@ -339,7 +396,7 @@ def _summarize_url(url: str, enable_html: bool):
 
 
 def html_to_text(text):
-    return BeautifulSoup(text).get_text(separator=" ", strip=True)
+    return BeautifulSoup(text, "html.parser").get_text(separator=" ", strip=True)
 
 
 @st.cache(show_spinner=False)

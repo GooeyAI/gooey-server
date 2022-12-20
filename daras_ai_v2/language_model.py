@@ -16,7 +16,7 @@ def calc_gpt_tokens(text: str) -> int:
     if not _gpt2_tokenizer:
         _gpt2_tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
 
-    return len(_gpt2_tokenizer(text)["input_ids"])
+    return len(_gpt2_tokenizer.encode(text, verbose=False))
 
 
 def run_language_model(
