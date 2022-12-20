@@ -277,8 +277,6 @@ class BasePage:
         if not url:
             return
 
-        self._render_report_button(url=url)
-
         col1, col2 = st.columns([3, 1])
 
         with col1:
@@ -437,6 +435,9 @@ class BasePage:
         )
         if not state_to_save:
             return
+        url = self._get_current_url()
+        if url:
+            self._render_report_button(url=url)
 
         if not is_admin():
             return
