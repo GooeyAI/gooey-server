@@ -248,11 +248,13 @@ class BasePage:
                     )
 
         with col2:
-            st.write("## [Join Our Discord!](https://discord.gg/KQCrzgMPJ2)")
+            st.write(
+                "#### Need Help? [Join our Discord](https://discord.gg/KQCrzgMPJ2)"
+            )
             st.markdown(
                 """
                 <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
-                <iframe src="https://e.widgetbot.io/channels/643360566970155029/1039656158417399818" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+                <iframe src="https://e.widgetbot.io/channels/643360566970155029/1046049067337273444" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
                 </div>
                 """,
                 unsafe_allow_html=True,
