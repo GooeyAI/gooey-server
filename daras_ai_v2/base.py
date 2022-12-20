@@ -69,7 +69,7 @@ class BasePage:
             self._render()
         except Exception as e:
             capture_exception(e)
-            raise e
+            raise
 
     def _render(self):
         init_scripts()
