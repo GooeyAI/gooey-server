@@ -62,6 +62,7 @@ class SEOSummaryPage(BasePage):
         max_search_urls=10,
         task_instructions="I will give you a URL and focus keywords and using the high ranking content from the google search results below you will write 500 words for the given url.",
         avoid_repetition=True,
+        enable_crosslinks=False,
         # enable_blog_mode=False,
     )
 
@@ -84,8 +85,8 @@ class SEOSummaryPage(BasePage):
 
         max_search_urls: int | None
 
-        generate_lead_image: bool | None
-
+        enable_crosslinks: bool | None
+        # generate_lead_image: bool | None
         # enable_blog_mode: bool | None
 
     class ResponseModel(BaseModel):
@@ -117,6 +118,7 @@ class SEOSummaryPage(BasePage):
         )
 
         # st.checkbox("Blog Generator Mode", key="enable_blog_mode")
+        st.checkbox("Enable Internal Cross-Linking", key="enable_crosslinks")
         st.checkbox("Enable HTML Formatting", key="enable_html")
 
         language_model_settings()
@@ -242,9 +244,9 @@ class SEOSummaryPage(BasePage):
 
         output_content = _run_lm(request, state["final_prompt"])
 
-        yield "Cross-linking keywords..."
-
-        output_content = _crosslink_keywords(output_content, request)
+        if request.enable_crosslinks:
+            yield "Cross-linking keywords..."
+            output_content = _crosslink_keywords(output_content, request)
 
         state["output_content"] = output_content
 
