@@ -10,7 +10,7 @@ from daras_ai_v2 import db
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
-from pages.FaceInpainting import FaceInpaintingPage
+from recipes.FaceInpainting import FaceInpaintingPage
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 

@@ -31,22 +31,22 @@ from daras_ai_v2.base import (
     err_msg_for_exc,
 )
 from gooey_token_authentication1.token_authentication import authenticate
-from pages.ChyronPlant import ChyronPlantPage
-from pages.CompareLM import CompareLMPage
-from pages.CompareText2Img import CompareText2ImgPage
-from pages.DeforumSD import DeforumSDPage
-from pages.EmailFaceInpainting import EmailFaceInpaintingPage
-from pages.FaceInpainting import FaceInpaintingPage
-from pages.GoogleImageGen import GoogleImageGenPage
-from pages.ImageSegmentation import ImageSegmentationPage
-from pages.Img2Img import Img2ImgPage
-from pages.LetterWriter import LetterWriterPage
-from pages.Lipsync import LipsyncPage
-from pages.LipsyncTTS import LipsyncTTSPage
-from pages.ObjectInpainting import ObjectInpaintingPage
-from pages.SEOSummary import SEOSummaryPage
-from pages.SocialLookupEmail import SocialLookupEmailPage
-from pages.TextToSpeech import TextToSpeechPage
+from recipes.ChyronPlant import ChyronPlantPage
+from recipes.CompareLM import CompareLMPage
+from recipes.CompareText2Img import CompareText2ImgPage
+from recipes.DeforumSD import DeforumSDPage
+from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
+from recipes.FaceInpainting import FaceInpaintingPage
+from recipes.GoogleImageGen import GoogleImageGenPage
+from recipes.ImageSegmentation import ImageSegmentationPage
+from recipes.Img2Img import Img2ImgPage
+from recipes.LetterWriter import LetterWriterPage
+from recipes.Lipsync import LipsyncPage
+from recipes.LipsyncTTS import LipsyncTTSPage
+from recipes.ObjectInpainting import ObjectInpaintingPage
+from recipes.SEOSummary import SEOSummaryPage
+from recipes.SocialLookupEmail import SocialLookupEmailPage
+from recipes.TextToSpeech import TextToSpeechPage
 from routers import billing
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
