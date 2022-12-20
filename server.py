@@ -14,6 +14,7 @@ from firebase_admin import auth, exceptions
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
+from sentry_sdk import capture_exception
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
@@ -225,6 +226,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             except StopIteration:
                 pass
         except Exception as e:
+            capture_exception(e)
             return JSONResponse(status_code=500, content={"error": err_msg_for_exc(e)})
 
         # return updated state

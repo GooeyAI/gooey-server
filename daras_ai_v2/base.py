@@ -16,6 +16,7 @@ from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
+from sentry_sdk import capture_exception
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
@@ -64,6 +65,13 @@ class BasePage:
         return f"/v1/{self.slug}/run"
 
     def render(self):
+        try:
+            self._render()
+        except Exception as e:
+            capture_exception(e)
+            raise
+
+    def _render(self):
         init_scripts()
 
         st.write("## " + self.title)
@@ -398,6 +406,7 @@ class BasePage:
 
             # render errors nicely
             except Exception as e:
+                capture_exception(e)
                 traceback.print_exc()
                 with status_area:
                     st.error(f"{type(e).__name__} - {err_msg_for_exc(e)}", icon="⚠️")
