@@ -15,8 +15,8 @@ from daras_ai_v2.stable_diffusion import Text2ImgModels, text2img
 
 
 class CompareText2ImgPage(BasePage):
-    title = "Compare Image Generators"
-    slug_versions = ["CompareText2Img"]
+    title = "Compare AI Image Generators"
+    slug_versions = ["CompareText2Img", "compare-DalleE-vs-Stable-Diffusion", ""]
 
     sane_defaults = {
         "guidance_scale": 10,
@@ -148,7 +148,7 @@ class CompareText2ImgPage(BasePage):
     #     # TODO: Which model to pick and if key will be available
     #     return state.get("output_images", [""])[0]
     def preview_description(self, state: dict) -> str:
-        return "This recipe takes any text and renders an image using multiple Text2Image engines."
+        return "Add your image prompt to create multiple AI photos from Stable Diffusion (1.5 -> 2.1) and DallE. Use this workflow to determine which AI image generator & version works best for your specific prompt."
 
 
 if __name__ == "__main__":
