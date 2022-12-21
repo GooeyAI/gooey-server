@@ -80,7 +80,6 @@ class BasePage:
         )
 
         self._load_session_state()
-        self._check_if_flagged()
 
         with settings_tab:
             self.render_settings()
@@ -92,6 +91,8 @@ class BasePage:
             self.run_as_api_tab()
 
         with run_tab:
+            self._check_if_flagged()
+
             col1, col2 = st.columns(2)
 
             self.render_footer()
@@ -158,12 +159,14 @@ class BasePage:
         example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
         run_id = query_params.get(RUN_ID_QUERY_PARAM)
         uid = query_params.get(USER_ID_QUERY_PARAM)
+
         if isinstance(example_id, list):
             example_id = example_id[0]
         if isinstance(run_id, list):
             run_id = run_id[0]
         if isinstance(uid, list):
             uid = uid[0]
+
         return example_id, run_id, uid
 
     def get_doc_from_query_params(self, query_params) -> dict | None:
@@ -266,28 +269,34 @@ class BasePage:
     def run(self, state: dict) -> typing.Iterator[str | None]:
         raise NotImplementedError
 
-    def _render_report_button(self, url: str):
+    def _render_report_button(self):
         current_user: UserRecord = st.session_state.get("_current_user")
+
         query_params = st.experimental_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
-        if not run_id or not uid:
+
+        if not (current_user and run_id and uid):
+            # ONLY RUNS CAN BE REPORTED
             return
-        # ONLY RUNS CAN BE REPORTED
+
         reported = st.button("❗Report")
-        if reported:
-            with st.spinner("Reporting..."):
-                self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
-                email_support_about_reported_run(
-                    run_id=run_id, uid=uid, url=url, email=current_user.email
-                )
-                st.success("Reported. Reload the page to see changes")
+        if not reported:
+            return
+
+        with st.spinner("Reporting..."):
+            self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
+            email_support_about_reported_run(
+                run_id=run_id,
+                uid=uid,
+                url=self._get_current_url(),
+                email=current_user.email,
+            )
+            st.success("Reported. Reload the page to see changes")
 
     def _render_before_output(self):
         url = self._get_current_url()
         if not url:
             return
-
-        self._render_report_button(url=url)
 
         col1, col2 = st.columns([3, 1])
 
@@ -443,6 +452,8 @@ class BasePage:
         gooey_reset_query_parm()
 
     def _render_after_output(self):
+        self._render_report_button()
+
         state_to_save = (
             st.session_state.get("__state_to_save") or self._get_state_to_save()
         )
