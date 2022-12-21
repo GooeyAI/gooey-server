@@ -35,6 +35,7 @@ class ObjectInpaintingPage(BasePage):
         "output_height": 512,
         "guidance_scale": 7.5,
         "sd_2_upscaling": False,
+        "seed": 42,
     }
 
     class RequestModel(BaseModel):
@@ -61,50 +62,46 @@ class ObjectInpaintingPage(BasePage):
 
         sd_2_upscaling: bool | None
 
+        seed: int | None
+
     class ResponseModel(BaseModel):
         resized_image: str
         obj_mask: str
         # diffusion_images: list[str]
         output_images: list[str]
 
-    def render_form(self):
-        with st.form("my_form"):
-            st.text_area(
-                """
-                ### Prompt
-                Describe the scene that you'd like to generate. 
-                """,
-                key="text_prompt",
-                placeholder="Iron man",
-            )
+    def render_form_v2(self):
+        st.text_area(
+            """
+            ### Prompt
+            Describe the scene that you'd like to generate. 
+            """,
+            key="text_prompt",
+            placeholder="Iron man",
+        )
 
-            st.file_uploader(
-                """
-                ### Object Photo
-                Give us a photo of anything
-                """,
-                key="input_file",
-            )
+        st.file_uploader(
+            """
+            ### Object Photo
+            Give us a photo of anything
+            """,
+            key="input_file",
+        )
 
-            submitted = st.form_submit_button("🏃‍ Submit")
-
+    def validate_form_v2(self):
         text_prompt = st.session_state.get("text_prompt")
         input_file = st.session_state.get("input_file")
         input_image = st.session_state.get("input_image")
         input_image_or_file = input_file or input_image
 
         # form validation
-        if submitted and not (text_prompt and input_image_or_file):
-            st.error("Please provide a Prompt and a Object Photo", icon="⚠️")
-            return False
+        assert (
+            text_prompt and input_image_or_file
+        ), "Please provide a Prompt and a Object Photo"
 
-        # upload input file if submitted
-        if submitted:
-            input_file = st.session_state.get("input_file")
-            if input_file:
-                st.session_state["input_image"] = upload_file_hq(input_file)
-
-        return submitted
+        # upload input file
+        if input_file:
+            st.session_state["input_image"] = upload_file_hq(input_file)
 
     def render_description(self):
         st.write(
@@ -299,6 +296,7 @@ class ObjectInpaintingPage(BasePage):
             height=request.output_height,
             negative_prompt=request.negative_prompt,
             guidance_scale=request.guidance_scale,
+            seed=request.seed,
         )
         state["output_images"] = diffusion_images
 

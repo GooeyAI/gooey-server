@@ -1,4 +1,3 @@
-import random
 import re
 import typing
 from functools import partial
@@ -23,6 +22,7 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
+from daras_ai_v2.utils import random
 
 KEYWORDS_SEP = re.compile(r"[\n,]")
 
@@ -63,6 +63,7 @@ class SEOSummaryPage(BasePage):
         task_instructions="I will give you a URL and focus keywords and using the high ranking content from the google search results below you will write 500 words for the given url.",
         avoid_repetition=True,
         enable_crosslinks=False,
+        seed=42,
         # enable_blog_mode=False,
     )
 
@@ -88,6 +89,8 @@ class SEOSummaryPage(BasePage):
         enable_crosslinks: bool | None
         # generate_lead_image: bool | None
         # enable_blog_mode: bool | None
+
+        seed: int | None
 
     class ResponseModel(BaseModel):
         output_content: list[str]

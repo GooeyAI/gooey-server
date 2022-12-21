@@ -1,6 +1,5 @@
 import inspect
 import json
-import random
 import shlex
 import string
 import traceback
@@ -28,6 +27,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.utils import email_support_about_reported_run
+from daras_ai_v2.utils import random
 
 DEFAULT_STATUS = "Running..."
 
@@ -218,7 +218,15 @@ class BasePage:
     def render_form(self) -> bool:
         with st.form(f"{self.slug}Form"):
             self.render_form_v2()
-            submitted = st.form_submit_button("🏃‍ Submit")
+            col1, col2 = st.columns(2)
+            with col1:
+                submitted = st.form_submit_button("🏃‍ Submit")
+            with col2:
+                randomize = st.form_submit_button("🔀‍ Randomize")
+
+        st.session_state["__randomize"] = randomize
+        if randomize:
+            submitted = True
 
         if not submitted:
             return False
@@ -363,8 +371,7 @@ class BasePage:
             with status_area:
                 html_spinner("Starting...")
 
-            self.clear_outputs()
-            self.save_run()
+            self._pre_run_checklist()
 
             if not self.check_credits():
                 status_area.empty()
@@ -376,6 +383,9 @@ class BasePage:
         # render outputs
         with output_area.container():
             self.render_output()
+            seed = st.session_state.get("seed")
+            if seed:
+                st.write(f"`Seed: {seed}`")
 
         # render before/after output blocks if not running
         if not gen:
@@ -433,6 +443,20 @@ class BasePage:
                         icon="✅",
                     )
                     del st.session_state["__time_taken"]
+
+    def _pre_run_checklist(self):
+        self._setup_rng_seed()
+        self.clear_outputs()
+        self.save_run()
+
+    def _setup_rng_seed(self):
+        if st.session_state.get("__randomize"):
+            st.session_state["seed"] = int(random.randrange(4294967294))
+            st.session_state.pop("__randomize", None)
+
+        seed = st.session_state.get("seed")
+        if seed:
+            random.seed(seed)
 
     def clear_outputs(self):
         for field_name in self.ResponseModel.__fields__:

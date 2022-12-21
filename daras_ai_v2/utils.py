@@ -1,5 +1,9 @@
 from daras_ai_v2.send_email import send_email_via_postmark
 
+from random import Random
+
+random = Random()
+
 
 def email_support_about_reported_run(run_id: str, uid: str, email: str, url: str):
     send_email_via_postmark(
