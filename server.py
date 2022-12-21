@@ -3,6 +3,7 @@ import re
 import time
 import typing
 
+import httpx
 from fastapi import FastAPI, Header
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,12 +14,14 @@ from fastapi.templating import Jinja2Templates
 from firebase_admin import auth, exceptions
 from furl import furl
 from google.cloud import firestore
+from lxml.html import HtmlElement
 from pydantic import BaseModel
+from pyquery import PyQuery as pq
 from sentry_sdk import capture_exception
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import PlainTextResponse, Response
 
 from auth_backend import (
     SessionAuthBackend,
@@ -66,9 +69,43 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
+WIX_SITE_URL = "https://www.gooey.ai"
+_proxy_client = httpx.AsyncClient(base_url=WIX_SITE_URL)
+
+
 @app.exception_handler(404)
 async def custom_404_handler(request: Request, exc):
-    return templates.TemplateResponse("404.html", {"request": request})
+    url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
+    req = _proxy_client.build_request(
+        request.method, url, headers={"user-agent": request.headers.get("user-agent")}
+    )
+    resp = await _proxy_client.send(req)
+
+    if resp.status_code == 404:
+        return templates.TemplateResponse(
+            "404.html",
+            {"request": request},
+            status_code=404,
+        )
+    elif resp.status_code != 200:
+        return Response(content=resp.content, status_code=resp.status_code)
+
+    # convert links
+    d = pq(resp.content)
+    for el in d("a"):
+        el: HtmlElement
+        href = el.attrib["href"]
+        if href == "https://app.gooey.ai":
+            href = "/explore"
+        elif href.startswith(WIX_SITE_URL):
+            href = href[len(WIX_SITE_URL) :]
+            if not href.startswith("/"):
+                href = "/" + href
+        else:
+            continue
+        el.attrib["href"] = href
+
+    return Response(content=d.outer_html(), status_code=resp.status_code)
 
 
 @app.get("/login", include_in_schema=False)
@@ -233,7 +270,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         return state
 
 
-@app.get("/", include_in_schema=False)
+@app.get("/explore", include_in_schema=False)
 def st_home(request: Request):
     iframe_url = furl(settings.IFRAME_BASE_URL).url
     return _st_page(
