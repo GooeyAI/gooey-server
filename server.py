@@ -271,7 +271,9 @@ def st_page(request: Request, page_slug):
         request,
         iframe_url,
         context={
-            "title": page.preview_title(state),
+            "title": page.preview_title(
+                state=state, query_params=dict(request.query_params)
+            ),
             "description": page.preview_description(state),
             "image": page.preview_image(state),
         },

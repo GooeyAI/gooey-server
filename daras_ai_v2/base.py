@@ -557,9 +557,8 @@ class BasePage:
     def render_example(self, state: dict):
         pass
 
-    def preview_title(self, state: dict) -> str:
+    def preview_title(self, state: dict, query_params: dict) -> str:
         input_as_text = state.get("text_prompt", state.get("input_prompt"))
-        query_params = st.experimental_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
         title = f"{self.title}"
         if run_id and uid:
