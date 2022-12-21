@@ -215,7 +215,7 @@ class BasePage:
     def render_form_v2(self):
         pass
 
-    def validate_form_v2(self) -> bool:
+    def validate_form_v2(self):
         pass
 
     def render_form(self) -> bool:
