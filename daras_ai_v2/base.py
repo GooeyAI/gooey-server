@@ -559,11 +559,12 @@ class BasePage:
 
     def preview_title(self, state: dict) -> str:
         input_as_text = state.get("text_prompt", state.get("input_prompt"))
-        title = ""
-        if input_as_text:
-            title = f"{input_as_text[:100]} ... {self.title}"
-        else:
-            title = f"{self.title}"
+        query_params = st.experimental_get_query_params()
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        title = f"{self.title}"
+        if run_id and uid:
+            if input_as_text:
+                title = f"{input_as_text[:100]} ... {self.title}"
         return f"{title} • AI API, workflow & prompt shared on Gooey.AI"
 
     def preview_description(self, state: dict) -> str:
