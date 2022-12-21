@@ -101,8 +101,9 @@ def init_scripts():
 def _event_processor(event, hint):
     request = _st_session_client().request
 
-    url = event.get("extra", {}).pop("url", "")
-    query_params = event.get("extra", {}).pop("query_params", {})
+    extra = event.get("extra", {})
+    url = extra.get("url", "")
+    query_params = extra.get("query_params", {})
     url = str(furl(url, query_params=query_params))
 
     event["request"] = {
@@ -110,7 +111,7 @@ def _event_processor(event, hint):
         "method": request.method,
         "headers": request.headers,
         "env": {"REMOTE_ADDR": request.remote_ip},
-        "data": st.session_state,
+        "data": st.session_state.to_dict(),
     }
 
     return event
