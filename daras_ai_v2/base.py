@@ -1,3 +1,4 @@
+import datetime
 import inspect
 import json
 import shlex
@@ -9,13 +10,14 @@ from copy import deepcopy
 from time import time
 
 import requests
+import sentry_sdk
 import streamlit as st
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
-from sentry_sdk import capture_exception
+from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
@@ -68,10 +70,15 @@ class BasePage:
         try:
             self._render()
         except Exception as e:
-            capture_exception(e)
+            sentry_sdk.capture_exception(e)
             raise
 
     def _render(self):
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_extra("url", self.app_url())
+            scope.set_extra("query_params", st.experimental_get_query_params())
+            scope.set_transaction_name("/" + self.slug, source=TRANSACTION_SOURCE_ROUTE)
+
         init_scripts()
 
         st.write("## " + self.title)
@@ -427,7 +434,7 @@ class BasePage:
 
             # render errors nicely
             except Exception as e:
-                capture_exception(e)
+                sentry_sdk.capture_exception(e)
                 traceback.print_exc()
                 with status_area:
                     st.error(f"{type(e).__name__} - {err_msg_for_exc(e)}", icon="⚠️")
@@ -527,6 +534,8 @@ class BasePage:
             field_name: deepcopy(st.session_state[field_name])
             for field_name in self.fields_to_save()
             if field_name in st.session_state
+        } | {
+            "updated_at": datetime.datetime.utcnow(),
         }
 
     def fields_to_save(self) -> [str]:

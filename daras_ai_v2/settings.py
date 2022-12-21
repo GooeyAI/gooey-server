@@ -19,6 +19,7 @@ if not DEBUG:
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
         traces_sample_rate=1.0,
+        send_default_pii=True,
     )
 
 # load google app credentials from env var if available
