@@ -29,6 +29,7 @@ class Img2ImgPage(BasePage):
         "guidance_scale": 7.5,
         "prompt_strength": 0.4,
         "sd_2_upscaling": False,
+        "seed": 42,
     }
 
     class RequestModel(BaseModel):
@@ -49,48 +50,42 @@ class Img2ImgPage(BasePage):
 
         sd_2_upscaling: bool | None
 
+        seed: int | None
+
     class ResponseModel(BaseModel):
         output_images: list[str]
 
-    def render_form(self) -> bool:
-        with st.form("my_form"):
-            if st.session_state["selected_model"] != InpaintingModels.dall_e.name:
-                st.text_area(
-                    """
-                    ### Prompt
-                    Describe your edits 
-                    """,
-                    key="text_prompt",
-                    placeholder="Iron man",
-                )
-
-            st.file_uploader(
+    def render_form_v2(self):
+        if st.session_state["selected_model"] != InpaintingModels.dall_e.name:
+            st.text_area(
                 """
-                ### Input Photo
+                ### Prompt
+                Describe your edits 
                 """,
-                key="input_file",
+                key="text_prompt",
+                placeholder="Iron man",
             )
 
-            submitted = st.form_submit_button("🏃‍ Submit")
+        st.file_uploader(
+            """
+            ### Input Photo
+            """,
+            key="input_file",
+        )
 
+    def validate_form_v2(self):
         input_file = st.session_state.get("input_file")
         input_image = st.session_state.get("input_image")
         input_image_or_file = input_file or input_image
 
         # form validation
-        if submitted and not input_image_or_file:
-            st.error("Please provide an Input Image", icon="⚠️")
-            return False
+        assert input_image_or_file, "Please provide an Input Image"
 
-        # upload input file if submitted
-        if submitted:
-            input_file = st.session_state.get("input_file")
-            if input_file:
-                st.session_state["input_image"] = upload_file_hq(
-                    input_file, resize=SD_MAX_SIZE
-                )
-
-        return submitted
+        # upload input file
+        if input_file:
+            st.session_state["input_image"] = upload_file_hq(
+                input_file, resize=SD_MAX_SIZE
+            )
 
     def render_description(self):
         st.write(
@@ -141,6 +136,7 @@ class Img2ImgPage(BasePage):
             negative_prompt=request.negative_prompt,
             guidance_scale=request.guidance_scale,
             sd_2_upscaling=request.sd_2_upscaling,
+            seed=request.seed,
         )
 
     def preview_image(self, state: dict) -> str:

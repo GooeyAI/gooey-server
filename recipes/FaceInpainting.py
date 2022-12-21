@@ -33,6 +33,7 @@ class FaceInpaintingPage(BasePage):
         "output_width": 512,
         "output_height": 512,
         "guidance_scale": 7.5,
+        "seed": 42,
     }
 
     class RequestModel(BaseModel):
@@ -54,6 +55,8 @@ class FaceInpaintingPage(BasePage):
         output_height: int | None
 
         guidance_scale: float | None
+
+        seed: int | None
 
         class Config:
             schema_extra = {
@@ -88,44 +91,38 @@ class FaceInpaintingPage(BasePage):
     """
         )
 
-    def render_form(self):
-        with st.form("my_form"):
-            st.text_area(
-                """
-                ### Prompt
-                Describe the character that you'd like to generate. 
-                """,
-                key="text_prompt",
-                placeholder="Iron man",
-            )
+    def render_form_v2(self):
+        st.text_area(
+            """
+            ### Prompt
+            Describe the character that you'd like to generate. 
+            """,
+            key="text_prompt",
+            placeholder="Iron man",
+        )
 
-            st.file_uploader(
-                """
-                ### Face Photo
-                Give us a photo of yourself, or anyone else
-                """,
-                key="input_file",
-            )
+        st.file_uploader(
+            """
+            ### Face Photo
+            Give us a photo of yourself, or anyone else
+            """,
+            key="input_file",
+        )
 
-            submitted = st.form_submit_button("🏃‍ Submit")
-
+    def validate_form_v2(self):
         text_prompt = st.session_state.get("text_prompt")
         input_file = st.session_state.get("input_file")
         input_image = st.session_state.get("input_image")
         input_image_or_file = input_file or input_image
 
         # form validation
-        if submitted and not (text_prompt and input_image_or_file):
-            st.error("Please provide a Prompt and a Face Photo", icon="⚠️")
-            return False
+        assert (
+            text_prompt and input_image_or_file
+        ), "Please provide a Prompt and a Face Photo"
 
-        # upload input file if submitted
-        if submitted:
-            input_file = st.session_state.get("input_file")
-            if input_file:
-                st.session_state["input_image"] = upload_file_hq(input_file)
-
-        return submitted
+        # upload input file
+        if input_file:
+            st.session_state["input_image"] = upload_file_hq(input_file)
 
     def render_settings(self):
         img_model_settings(InpaintingModels)
@@ -290,6 +287,7 @@ class FaceInpaintingPage(BasePage):
             height=state["output_height"],
             negative_prompt=state["negative_prompt"],
             guidance_scale=state["guidance_scale"],
+            seed=state["seed"],
         )
         state["diffusion_images"] = diffusion_images
 
