@@ -26,6 +26,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
 )
+from daras_ai_v2.hidden_html_widget import hidden_html_nojs
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.utils import email_support_about_reported_run
@@ -226,13 +227,19 @@ class BasePage:
         pass
 
     def render_form(self) -> bool:
+        _submit_btn_button_css()
+
         with st.form(f"{self.slug}Form"):
             self.render_form_v2()
+
             col1, col2 = st.columns(2)
             with col1:
-                submitted = st.form_submit_button("🏃‍ Submit")
+                if "seed" in self.RequestModel.schema_json():
+                    randomize = st.form_submit_button("🔀 Mix It Up!")
+                else:
+                    randomize = False
             with col2:
-                randomize = st.form_submit_button("🔀‍ Randomize")
+                submitted = st.form_submit_button("🏃 Submit", type="primary")
 
         st.session_state["__randomize"] = randomize
         if randomize:
@@ -243,8 +250,8 @@ class BasePage:
 
         try:
             self.validate_form_v2()
-        except AssertionError:
-            st.error("Please provide a Prompt and an Email Address", icon="⚠️")
+        except AssertionError as e:
+            st.error(e, icon="⚠️")
             return False
         else:
             return True
@@ -401,7 +408,7 @@ class BasePage:
             self.render_output()
             seed = st.session_state.get("seed")
             if seed:
-                st.write(f"`Seed: {seed}`")
+                st.caption(f"*Your lucky number (seed) is `{seed}`*")
 
         # render before/after output blocks if not running
         if not gen:
@@ -715,3 +722,26 @@ def err_msg_for_exc(e):
 def _random_str_id(n=8):
     charset = string.ascii_lowercase + string.digits
     return "".join(random.choice(charset) for _ in range(n))
+
+
+def _submit_btn_button_css():
+    hidden_html_nojs(
+        """
+        <style>
+        button[kind="primaryFormSubmit"] {
+            background-color: #b2ebf2;
+            text-shadow: 0 0 0 black;
+            color: transparent;  
+        }
+
+        @media (min-width: 640px) {
+        .row-widget:has(button[kind="primaryFormSubmit"]) {
+            text-align: right;
+        }
+
+        button[kind="secondaryFormSubmit"] {
+            color: #adadad;
+        }
+        </style>
+        """
+    )

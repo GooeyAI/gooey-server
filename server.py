@@ -50,6 +50,7 @@ from recipes.ObjectInpainting import ObjectInpaintingPage
 from recipes.SEOSummary import SEOSummaryPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
+from recipes.VideoBots import VideoBotsPage
 from routers import billing
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -280,7 +281,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         return state
 
 
-@app.get("/explore", include_in_schema=False)
+@app.get("/explore/", include_in_schema=False)
 def st_home(request: Request):
     iframe_url = furl(settings.IFRAME_BASE_URL).url
     return _st_page(
@@ -371,6 +372,7 @@ all_pages: list[typing.Type[BasePage]] = [
     CompareText2ImgPage,
     SEOSummaryPage,
     GoogleImageGenPage,
+    VideoBotsPage,
 ]
 
 
