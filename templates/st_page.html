@@ -1,36 +1,9 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    {% if request.user %}
-        <div class="login-container">
-            <a href="/account">
-                {{ request.user.display_name }}
-                <br>
-                <i style="font-weight: normal">{{ request.user.email or request.user.phone_number }}</i>
-            </a>
-        </div>
-    {% else %}
-        <script src="https://accounts.google.com/gsi/client" async defer></script>
+    {% include 'login_container.html' %}
 
-        <div id="g_id_onload"
-             data-client_id="6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com"
-             data-callback="handleCredentialResponse"
-             data-auto_prompt="true">
-        </div>
-
-        <div class="login-container">
-            <div class="g_id_signin"
-                 data-type="button"
-                 data-size="large"
-                 data-theme="filled_black"
-                 data-text="sign_in_with"
-                 data-shape="pill"
-                 data-logo_alignment="right">
-            </div>
-            <div style="height: 10px"></div>
-            <a style="font-size: 15px; color: wheat" href="/login?next={{ request.path }}">More Options</a>
-        </div>
-
+    {% if not request.user and block_incognito %}
         <script src="https://cdn.jsdelivr.net/gh/Joe12387/detectIncognito@main/detectIncognito.min.js"></script>
         <script>
             detectIncognito().then((result) => {
@@ -40,7 +13,6 @@
                     `<h3 style='text-align: center; padding: 20px'>
                         Sorry! We can't let you use this app in incognito mode. Please login to continue.
                     </h3>`;
-
             });
         </script>
     {% endif %}

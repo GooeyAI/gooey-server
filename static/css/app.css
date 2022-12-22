@@ -4,7 +4,7 @@
     --default-top-padding: 20px
 }
 
-html, body {
+html, body, .align-header {
     background-color: black;
     color: white;
     margin: 0;
@@ -53,12 +53,12 @@ ul {
     padding-right: 10px;
 }
 
-header, .align-header {
+.align-header {
     padding-left: 1rem;
 }
 
 @media (min-width: 576px) {
-    header, .align-header {
+    .align-header {
         padding-left: 5rem;
         padding-right: 5rem;
     }
@@ -162,4 +162,30 @@ button {
 
 #add-on-text {
     padding-top: 10px;
+}
+
+::-webkit-scrollbar {
+    background: transparent;
+    color: white;
+    width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: gray;
+    border-radius: 100px;
+}
+
+iframe {
+    overflow-y: scroll;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.login-container {
+    position: absolute;
+    top: 25px;
+    right: 25px;
+    text-align: center;
 }

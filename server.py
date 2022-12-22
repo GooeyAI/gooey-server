@@ -21,7 +21,7 @@ from sentry_sdk import capture_exception
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response
+from starlette.responses import PlainTextResponse, Response, FileResponse
 
 from auth_backend import (
     SessionAuthBackend,
@@ -69,6 +69,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse("static/favicon.ico")
+
+
 _proxy_client = httpx.AsyncClient(base_url=settings.WIX_SITE_URL)
 
 
@@ -86,7 +91,7 @@ async def custom_404_handler(request: Request, exc):
             {"request": request},
             status_code=404,
         )
-    elif resp.status_code != 200:
+    elif resp.status_code != 200 or "text/html" not in resp.headers["content-type"]:
         return Response(content=resp.content, status_code=resp.status_code)
 
     # convert links
@@ -104,7 +109,13 @@ async def custom_404_handler(request: Request, exc):
             continue
         el.attrib["href"] = href
 
-    return Response(content=d.outer_html(), status_code=resp.status_code)
+    return templates.TemplateResponse(
+        "wix_site.html",
+        context={
+            "request": request,
+            "wix_site_html": d.outer_html(),
+        },
+    )
 
 
 @app.get("/login", include_in_schema=False)
@@ -285,6 +296,7 @@ def st_editor(request: Request):
     return _st_page(
         request,
         iframe_url,
+        block_incognito=True,
         context={"title": f"Gooey.AI"},
     )
 
@@ -307,7 +319,8 @@ def st_page(request: Request, page_slug):
     )
     return _st_page(
         request,
-        iframe_url,
+        str(iframe_url),
+        block_incognito=True,
         context={
             "title": f"{page_cls.title} - Gooey.AI",
             "description": page.preview_description(state),
@@ -316,7 +329,13 @@ def st_page(request: Request, page_slug):
     )
 
 
-def _st_page(request: Request, iframe_url: str, *, context: dict):
+def _st_page(
+    request: Request,
+    iframe_url: str,
+    *,
+    block_incognito: bool = False,
+    context: dict,
+):
     f = furl(iframe_url)
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
@@ -324,11 +343,12 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     db.get_or_init_user_data(request)
 
     return templates.TemplateResponse(
-        "home.html",
+        "st_page.html",
         context={
             "request": request,
             "iframe_url": f.url,
             "settings": settings,
+            "block_incognito": block_incognito,
             **context,
         },
     )
