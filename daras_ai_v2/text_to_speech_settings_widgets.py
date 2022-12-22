@@ -46,7 +46,7 @@ def text_to_speech_settings():
                     """,
                     min_value=0.25,
                     max_value=4.0,
-                    step=0.25,
+                    step=0.1,
                     key="google_speaking_rate",
                 )
             with col2:
