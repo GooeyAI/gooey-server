@@ -82,7 +82,9 @@ _proxy_client = httpx.AsyncClient(base_url=settings.WIX_SITE_URL)
 async def custom_404_handler(request: Request, exc):
     url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
     req = _proxy_client.build_request(
-        request.method, url, headers={"user-agent": request.headers.get("user-agent")}
+        request.method,
+        url,
+        headers={"user-agent": request.headers.get("user-agent", "")},
     )
     resp = await _proxy_client.send(req)
 
