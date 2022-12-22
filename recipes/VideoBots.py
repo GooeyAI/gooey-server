@@ -125,13 +125,15 @@ class VideoBotsPage(BasePage):
         lipsync_settings()
 
     def render_example(self, state: dict):
-        input_prompt = state.get("input_prompt")
-        if input_prompt:
-            st.markdown("```" + input_prompt.replace("\n", "") + "```")
-
-        output_video = state.get("output_video")
-        if output_video:
-            st.video(output_video[0])
+        col1, col2 = st.columns(2)
+        with col1:
+            input_prompt = state.get("input_prompt")
+            if input_prompt:
+                st.markdown("```" + input_prompt.replace("\n", "") + "```")
+        with col2:
+            output_video = state.get("output_video")
+            if output_video:
+                st.video(output_video[0])
 
     def render_output(self):
         st.write(f"Bot Responses")
