@@ -104,7 +104,13 @@ async def custom_404_handler(request: Request, exc):
             continue
         el.attrib["href"] = href
 
-    return Response(content=d.outer_html(), status_code=resp.status_code)
+    return templates.TemplateResponse(
+        "wix_site.html",
+        context={
+            "request": request,
+            "wix_site_html": d.outer_html(),
+        },
+    )
 
 
 @app.get("/login", include_in_schema=False)
@@ -324,7 +330,7 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     db.get_or_init_user_data(request)
 
     return templates.TemplateResponse(
-        "home.html",
+        "st_page.html",
         context={
             "request": request,
             "iframe_url": f.url,

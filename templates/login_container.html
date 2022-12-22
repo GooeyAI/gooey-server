@@ -1,0 +1,32 @@
+{% if request.user %}
+    <div class="login-container">
+        <a href="/account">
+            {% if request.user.display_name %}
+                {{ request.user.display_name }}
+            {% endif %}
+            <br>
+            <i style="font-weight: normal">{{ request.user.email or request.user.phone_number }}</i>
+        </a>
+    </div>
+{% else %}
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <div id="g_id_onload"
+         data-client_id="6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com"
+         data-callback="handleCredentialResponse"
+         data-auto_prompt="{{ enable_onetap or "true" }}">
+    </div>
+
+    <div class="login-container">
+        <div class="g_id_signin"
+             data-type="button"
+             data-size="large"
+             data-theme="filled_black"
+             data-text="sign_in_with"
+             data-shape="pill"
+             data-logo_alignment="right">
+        </div>
+        <div style="height: 10px"></div>
+        <a style="font-size: 15px; color: wheat" href="/login?next={{ request.path }}">More Options</a>
+    </div>
+{% endif %}
