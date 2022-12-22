@@ -21,7 +21,7 @@ from sentry_sdk import capture_exception
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response
+from starlette.responses import PlainTextResponse, Response, FileResponse
 
 from auth_backend import (
     SessionAuthBackend,
@@ -69,6 +69,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse("static/favicon.ico")
+
+
 _proxy_client = httpx.AsyncClient(base_url=settings.WIX_SITE_URL)
 
 
@@ -86,7 +91,7 @@ async def custom_404_handler(request: Request, exc):
             {"request": request},
             status_code=404,
         )
-    elif resp.status_code != 200:
+    elif resp.status_code != 200 or "text/html" not in resp.headers["content-type"]:
         return Response(content=resp.content, status_code=resp.status_code)
 
     # convert links

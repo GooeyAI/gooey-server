@@ -1,20 +1,21 @@
-<link rel="stylesheet" href="/static/css/app.css">
-
 <style>
     #SITE_HEADER_WRAPPER {
         display: none;
     }
-
-    .align-header {
-        padding-bottom: 20px;
-    }
 </style>
 
 {% include 'header.html' %}
-{% include 'login_scripts.html' %}
 
+{% include 'login_scripts.html' %}
 {% with enable_onetap = "false" %}
     {% include 'login_container.html' %}
 {% endwith %}
 
 {{ wix_site_html | safe }}
+
+<link rel="stylesheet" href="/static/css/app.css">
+<style>
+    .align-header {
+        padding-bottom: 20px;
+    }
+</style>
