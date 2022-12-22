@@ -55,7 +55,7 @@ POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN")
 
 APP_BASE_URL = config("APP_BASE_URL")
 API_BASE_URL = config("API_BASE_URL")
-IFRAME_BASE_URL = config("IFRAME_BASE_URL")
+IFRAME_BASE_URL = config("IFRAME_BASE_URL", "/__/st/")
 
 GPU_SERVER_1 = config("GPU_SERVER_1", "http://gpu-1.gooey.ai")
 GPU_SERVER_2 = config("GPU_SERVER_2", "http://gpu-2.gooey.ai")
