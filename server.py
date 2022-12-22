@@ -69,8 +69,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
-WIX_SITE_URL = "https://www.gooey.ai"
-_proxy_client = httpx.AsyncClient(base_url=WIX_SITE_URL)
+_proxy_client = httpx.AsyncClient(base_url=settings.WIX_SITE_URL)
 
 
 @app.exception_handler(404)
@@ -97,8 +96,8 @@ async def custom_404_handler(request: Request, exc):
         href = el.attrib["href"]
         if href == "https://app.gooey.ai":
             href = "/explore"
-        elif href.startswith(WIX_SITE_URL):
-            href = href[len(WIX_SITE_URL) :]
+        elif href.startswith(settings.WIX_SITE_URL):
+            href = href[len(settings.WIX_SITE_URL) :]
             if not href.startswith("/"):
                 href = "/" + href
         else:
