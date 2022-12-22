@@ -19,6 +19,7 @@ if not DEBUG:
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
         traces_sample_rate=1.0,
+        send_default_pii=True,
     )
 
 # load google app credentials from env var if available
@@ -72,3 +73,5 @@ LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 1000, cast=int)
 
 stripe.api_key = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
+
+WIX_SITE_URL = config("WIX_SITE_URL", "https://www.gooey.ai")
