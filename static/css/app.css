@@ -21,7 +21,7 @@ a {
     text-decoration: none;
     color: #03dac5;
     font-size: 17px;
-    font-weight: 600;
+    /* font-weight: 600; */
 }
 
 a:visited {
@@ -150,6 +150,7 @@ button {
 .product {
     display: flex;
     flex-direction: column;
+    padding-inline-start: 10px
 }
 
 .buy-credits-container {
@@ -185,7 +186,7 @@ iframe {
 
 .login-container {
     position: absolute;
-    top: 25px;
-    right: 25px;
-    text-align: center;
+    top: 20px;
+    right: 20px;
+    text-align: right;
 }
