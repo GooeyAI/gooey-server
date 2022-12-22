@@ -291,6 +291,7 @@ def st_editor(request: Request):
     return _st_page(
         request,
         iframe_url,
+        block_incognito=True,
         context={"title": f"Gooey.AI"},
     )
 
@@ -313,7 +314,8 @@ def st_page(request: Request, page_slug):
     )
     return _st_page(
         request,
-        iframe_url,
+        str(iframe_url),
+        block_incognito=True,
         context={
             "title": f"{page_cls.title} - Gooey.AI",
             "description": page.preview_description(state),
@@ -322,7 +324,13 @@ def st_page(request: Request, page_slug):
     )
 
 
-def _st_page(request: Request, iframe_url: str, *, context: dict):
+def _st_page(
+    request: Request,
+    iframe_url: str,
+    *,
+    block_incognito: bool = False,
+    context: dict,
+):
     f = furl(iframe_url)
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
@@ -335,6 +343,7 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
             "request": request,
             "iframe_url": f.url,
             "settings": settings,
+            "block_incognito": block_incognito,
             **context,
         },
     )
