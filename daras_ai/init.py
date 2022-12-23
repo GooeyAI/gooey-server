@@ -19,6 +19,16 @@ def init_scripts():
     hidden_html_nojs(
         """
         <style>
+        button[kind="primaryFormSubmit"] {
+            background-color: #b2ebf2;
+            text-shadow: 0 0 0 black;
+            color: transparent;  
+        }
+
+        .row-widget:has(button[kind="primaryFormSubmit"]) {
+            text-align: right;
+        }
+
         button[title="View fullscreen"], footer {
             visibility: hidden;
         }
