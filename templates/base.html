@@ -7,8 +7,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>{{ title }}</title>
-    <link rel="icon" type="image/x-icon" href="/static/favicon.png">
-
 
     <!-- Primary Meta Tags -->
     <meta name="title" content="{{ title }}">
@@ -39,44 +37,11 @@
     {% endif %}
 
     <link rel="stylesheet" href="/static/css/app.css">
-
-    <style>
-        ::-webkit-scrollbar {
-            background: transparent;
-            color: white;
-            width: 6px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: gray;
-            border-radius: 100px;
-        }
-
-        iframe {
-            overflow-y: scroll;
-            border: 0;
-            margin: 0;
-            padding: 0;
-            width: 100%;
-        }
-
-        .login-container {
-            position: absolute;
-            top: 25px;
-            right: 25px;
-            text-align: center;
-        }
-    </style>
-
 </head>
 <body>
 
 {% include 'header.html' %}
-
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
-<script src="/static/js/auth.js"></script>
+{% include 'login_scripts.html' %}
 
 {% block content %}
 {% endblock content %}

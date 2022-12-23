@@ -3,6 +3,7 @@ import re
 import time
 import typing
 
+import httpx
 from fastapi import FastAPI, Header
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,11 +14,14 @@ from fastapi.templating import Jinja2Templates
 from firebase_admin import auth, exceptions
 from furl import furl
 from google.cloud import firestore
+from lxml.html import HtmlElement
 from pydantic import BaseModel
+from pyquery import PyQuery as pq
+from sentry_sdk import capture_exception
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import PlainTextResponse, Response, FileResponse
 
 from auth_backend import (
     SessionAuthBackend,
@@ -30,22 +34,23 @@ from daras_ai_v2.base import (
     err_msg_for_exc,
 )
 from gooey_token_authentication1.token_authentication import authenticate
-from pages.ChyronPlant import ChyronPlantPage
-from pages.CompareLM import CompareLMPage
-from pages.CompareText2Img import CompareText2ImgPage
-from pages.DeforumSD import DeforumSDPage
-from pages.EmailFaceInpainting import EmailFaceInpaintingPage
-from pages.FaceInpainting import FaceInpaintingPage
-from pages.GoogleImageGen import GoogleImageGenPage
-from pages.ImageSegmentation import ImageSegmentationPage
-from pages.Img2Img import Img2ImgPage
-from pages.LetterWriter import LetterWriterPage
-from pages.Lipsync import LipsyncPage
-from pages.LipsyncTTS import LipsyncTTSPage
-from pages.ObjectInpainting import ObjectInpaintingPage
-from pages.SEOSummary import SEOSummaryPage
-from pages.SocialLookupEmail import SocialLookupEmailPage
-from pages.TextToSpeech import TextToSpeechPage
+from recipes.ChyronPlant import ChyronPlantPage
+from recipes.CompareLM import CompareLMPage
+from recipes.CompareText2Img import CompareText2ImgPage
+from recipes.DeforumSD import DeforumSDPage
+from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
+from recipes.FaceInpainting import FaceInpaintingPage
+from recipes.GoogleImageGen import GoogleImageGenPage
+from recipes.ImageSegmentation import ImageSegmentationPage
+from recipes.Img2Img import Img2ImgPage
+from recipes.LetterWriter import LetterWriterPage
+from recipes.Lipsync import LipsyncPage
+from recipes.LipsyncTTS import LipsyncTTSPage
+from recipes.ObjectInpainting import ObjectInpaintingPage
+from recipes.SEOSummary import SEOSummaryPage
+from recipes.SocialLookupEmail import SocialLookupEmailPage
+from recipes.TextToSpeech import TextToSpeechPage
+from recipes.VideoBots import VideoBotsPage
 from routers import billing
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -65,9 +70,55 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse("static/favicon.ico")
+
+
+_proxy_client = httpx.AsyncClient(base_url=settings.WIX_SITE_URL)
+
+
 @app.exception_handler(404)
 async def custom_404_handler(request: Request, exc):
-    return templates.TemplateResponse("404.html", {"request": request})
+    url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
+    req = _proxy_client.build_request(
+        request.method,
+        url,
+        headers={"user-agent": request.headers.get("user-agent", "")},
+    )
+    resp = await _proxy_client.send(req)
+
+    if resp.status_code == 404:
+        return templates.TemplateResponse(
+            "404.html",
+            {"request": request},
+            status_code=404,
+        )
+    elif resp.status_code != 200 or "text/html" not in resp.headers["content-type"]:
+        return Response(content=resp.content, status_code=resp.status_code)
+
+    # convert links
+    d = pq(resp.content)
+    for el in d("a"):
+        el: HtmlElement
+        href = el.attrib["href"]
+        if href == "https://app.gooey.ai":
+            href = "/explore"
+        elif href.startswith(settings.WIX_SITE_URL):
+            href = href[len(settings.WIX_SITE_URL) :]
+            if not href.startswith("/"):
+                href = "/" + href
+        else:
+            continue
+        el.attrib["href"] = href
+
+    return templates.TemplateResponse(
+        "wix_site.html",
+        context={
+            "request": request,
+            "wix_site_html": d.outer_html(),
+        },
+    )
 
 
 @app.get("/login", include_in_schema=False)
@@ -225,13 +276,14 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             except StopIteration:
                 pass
         except Exception as e:
+            capture_exception(e)
             return JSONResponse(status_code=500, content={"error": err_msg_for_exc(e)})
 
         # return updated state
         return state
 
 
-@app.get("/", include_in_schema=False)
+@app.get("/explore/", include_in_schema=False)
 def st_home(request: Request):
     iframe_url = furl(settings.IFRAME_BASE_URL).url
     return _st_page(
@@ -247,6 +299,7 @@ def st_editor(request: Request):
     return _st_page(
         request,
         iframe_url,
+        block_incognito=True,
         context={"title": f"Gooey.AI"},
     )
 
@@ -269,7 +322,8 @@ def st_page(request: Request, page_slug):
     )
     return _st_page(
         request,
-        iframe_url,
+        str(iframe_url),
+        block_incognito=True,
         context={
             "title": page.preview_title(
                 state=state, query_params=dict(request.query_params)
@@ -280,7 +334,13 @@ def st_page(request: Request, page_slug):
     )
 
 
-def _st_page(request: Request, iframe_url: str, *, context: dict):
+def _st_page(
+    request: Request,
+    iframe_url: str,
+    *,
+    block_incognito: bool = False,
+    context: dict,
+):
     f = furl(iframe_url)
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
@@ -288,11 +348,12 @@ def _st_page(request: Request, iframe_url: str, *, context: dict):
     db.get_or_init_user_data(request)
 
     return templates.TemplateResponse(
-        "home.html",
+        "st_page.html",
         context={
             "request": request,
             "iframe_url": f.url,
             "settings": settings,
+            "block_incognito": block_incognito,
             **context,
         },
     )
@@ -315,6 +376,7 @@ all_pages: list[typing.Type[BasePage]] = [
     CompareText2ImgPage,
     SEOSummaryPage,
     GoogleImageGenPage,
+    VideoBotsPage,
 ]
 
 

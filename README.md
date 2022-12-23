@@ -21,7 +21,13 @@ export MAGICK_HOME=/opt/homebrew
 
 ### Run
 
-`streamlit run Home.py`
+```
+streamlit run Home.py
+```
+
+```
+uvicorn server:app --reload
+```
 
 ### Our Colors
 pink: #ff66c6

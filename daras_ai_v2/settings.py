@@ -4,11 +4,23 @@ import firebase_admin
 import stripe
 from decouple import config, UndefinedValueError, Csv
 from google.oauth2 import service_account
+import sentry_sdk
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 GOOGLE_APPLICATION_CREDENTIALS = os.path.join(BASE_DIR, "serviceAccountKey.json")
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
+DEBUG = config("DEBUG", cast=bool)
+
+if not DEBUG:
+    sentry_sdk.init(
+        dsn=config("SENTRY_DSN"),
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for performance monitoring.
+        # We recommend adjusting this value in production.
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
 
 # load google app credentials from env var if available
 try:
@@ -43,7 +55,7 @@ POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN")
 
 APP_BASE_URL = config("APP_BASE_URL")
 API_BASE_URL = config("API_BASE_URL")
-IFRAME_BASE_URL = config("IFRAME_BASE_URL")
+IFRAME_BASE_URL = config("IFRAME_BASE_URL", "/__/st/")
 
 GPU_SERVER_1 = config("GPU_SERVER_1", "http://gpu-1.gooey.ai")
 GPU_SERVER_2 = config("GPU_SERVER_2", "http://gpu-2.gooey.ai")
@@ -61,3 +73,5 @@ LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 1000, cast=int)
 
 stripe.api_key = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
+
+WIX_SITE_URL = config("WIX_SITE_URL", "https://archanaprasad.wixsite.com/daras-ai")

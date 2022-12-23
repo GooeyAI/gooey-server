@@ -46,7 +46,7 @@ def text2img(
     num_inference_steps: int,
     width: int,
     height: int,
-    seed: float = None,
+    seed: int = 42,
     guidance_scale: float = None,
     sd_2_upscaling: bool = False,
     negative_prompt: str = None,
@@ -130,6 +130,7 @@ def img2img(
     negative_prompt: str = None,
     guidance_scale: float = None,
     sd_2_upscaling: bool = False,
+    seed: int = 42,
 ):
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
 
@@ -151,6 +152,7 @@ def img2img(
                     "guidance_scale": guidance_scale,
                     "negative_prompt": negative_prompt or "",
                     "upscaling_inference_steps": 10 if sd_2_upscaling else 0,
+                    "seed": seed,
                 },
             )
         case Img2ImgModels.jack_qiao.name:
@@ -168,6 +170,7 @@ def img2img(
                     "skip_timesteps": int(num_inference_steps * (1 - prompt_strength)),
                     "width": width,
                     "height": height,
+                    "seed": seed,
                 },
             )
         case Img2ImgModels.dall_e.name:
@@ -198,6 +201,7 @@ def img2img(
                     num_inference_steps=num_inference_steps,
                     negative_prompt=negative_prompt or "",
                     guidance_scale=guidance_scale,
+                    seed=seed,
                 )
             ]
         case _:
@@ -222,6 +226,7 @@ def inpainting(
     height: int,
     negative_prompt: str = None,
     guidance_scale: float = None,
+    seed: int = 42,
 ) -> list[str]:
     _resolution_check(width, height)
 
@@ -239,6 +244,7 @@ def inpainting(
                     "mask_image": mask,
                     "guidance_scale": guidance_scale,
                     "negative_prompt": negative_prompt or "",
+                    "seed": seed,
                 },
             )
         case InpaintingModels.runway_ml.name:
@@ -256,6 +262,7 @@ def inpainting(
                     num_outputs=num_outputs,
                     num_inference_steps=num_inference_steps,
                     guidance_scale=guidance_scale,
+                    seed=seed,
                 )
             ]
         case InpaintingModels.dall_e.name:
@@ -287,6 +294,7 @@ def inpainting(
                     # "skip_timesteps": 0,
                     "width": width,
                     "height": height,
+                    "seed": seed,
                 },
             )
 

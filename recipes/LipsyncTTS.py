@@ -4,8 +4,8 @@ import streamlit as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
-from pages.Lipsync import LipsyncPage
-from pages.TextToSpeech import TextToSpeechPage
+from recipes.Lipsync import LipsyncPage
+from recipes.TextToSpeech import TextToSpeechPage
 
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):

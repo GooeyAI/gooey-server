@@ -84,6 +84,7 @@ df = (
     pd.DataFrame.from_records(
         [
             {
+                "ID": user.uid,
                 "Name": user.display_name or "",
                 "User": user.email or user.phone_number or user.uid or "",
                 "All Recipes": sum(runs.values()),

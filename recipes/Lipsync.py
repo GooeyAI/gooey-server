@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.lipsync_api import wav2lip
+from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 
 
@@ -61,43 +62,7 @@ class LipsyncPage(BasePage):
         return submitted
 
     def render_settings(self):
-        st.write(
-            """
-        ### Face Padding
-        Adjust the detected face bounding box. Often leads to improved results.  
-        Recommended to give at least 10 padding for the chin region. 
-        """
-        )
-
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.slider(
-                "Head",
-                min_value=0,
-                max_value=50,
-                key="face_padding_top",
-            )
-        with col2:
-            st.slider(
-                "Chin",
-                min_value=0,
-                max_value=50,
-                key="face_padding_bottom",
-            )
-        with col3:
-            st.slider(
-                "Left Cheek",
-                min_value=0,
-                max_value=50,
-                key="face_padding_left",
-            )
-        with col4:
-            st.slider(
-                "Right Cheek",
-                min_value=0,
-                max_value=50,
-                key="face_padding_right",
-            )
+        lipsync_settings()
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
@@ -114,6 +79,8 @@ class LipsyncPage(BasePage):
                 request.face_padding_right,
             ),
         )
+
+        yield "Uploading Video..."
 
         out_filename = f"gooey.ai lipsync - {Path(request.input_face).stem}.mp4"
         state["output_video"] = upload_file_from_bytes(out_filename, img_bytes)

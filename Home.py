@@ -1,5 +1,6 @@
 import streamlit as st
 
+from recipes.VideoBots import VideoBotsPage
 from server import normalize_slug, page_map
 
 # try to load page from query params
@@ -25,28 +26,30 @@ from daras_ai.db import list_all_docs
 from daras_ai.init import init_scripts
 from daras_ai_v2 import settings
 from daras_ai_v2.face_restoration import map_parallel
-from pages.CompareText2Img import CompareText2ImgPage
-from pages.DeforumSD import DeforumSDPage
-from pages.EmailFaceInpainting import EmailFaceInpaintingPage
-from pages.FaceInpainting import FaceInpaintingPage
-from pages.GoogleImageGen import GoogleImageGenPage
-from pages.ImageSegmentation import ImageSegmentationPage
-from pages.Img2Img import Img2ImgPage
-from pages.LipsyncTTS import LipsyncTTSPage
-from pages.ObjectInpainting import ObjectInpaintingPage
-from pages.SEOSummary import SEOSummaryPage
-from pages.SocialLookupEmail import SocialLookupEmailPage
-from pages.TextToSpeech import TextToSpeechPage
+from recipes.CompareText2Img import CompareText2ImgPage
+from recipes.DeforumSD import DeforumSDPage
+from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
+from recipes.FaceInpainting import FaceInpaintingPage
+from recipes.GoogleImageGen import GoogleImageGenPage
+from recipes.ImageSegmentation import ImageSegmentationPage
+from recipes.Img2Img import Img2ImgPage
+from recipes.LipsyncTTS import LipsyncTTSPage
+from recipes.ObjectInpainting import ObjectInpaintingPage
+from recipes.SEOSummary import SEOSummaryPage
+from recipes.SocialLookupEmail import SocialLookupEmailPage
+from recipes.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
 init_scripts()
 
 page_classes = [
-    FaceInpaintingPage,
-    EmailFaceInpaintingPage,
+    VideoBotsPage,
     SEOSummaryPage,
     GoogleImageGenPage,
+    CompareText2ImgPage,
+    FaceInpaintingPage,
+    EmailFaceInpaintingPage,
     SocialLookupEmailPage,
     TextToSpeechPage,
     LipsyncTTSPage,
@@ -55,7 +58,6 @@ page_classes = [
     Img2ImgPage,
     DeforumSDPage,
     # CompareLMPage,
-    CompareText2ImgPage,
     # LipsyncPage,
     # ChyronPlantPage,
 ]

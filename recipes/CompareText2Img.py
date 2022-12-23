@@ -23,7 +23,7 @@ class CompareText2ImgPage(BasePage):
 
     sane_defaults = {
         "guidance_scale": 10,
-        "seed": 0,
+        "seed": 42,
         "sd_2_upscaling": False,
     }
 
@@ -50,30 +50,19 @@ class CompareText2ImgPage(BasePage):
             typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
         ]
 
-    def render_form(self) -> bool:
-        with st.form("my_form"):
-            st.text_area(
-                """
-                ### Prompt
-                Describe the scene that you'd like to generate. 
-                """,
-                key="text_prompt",
-                placeholder="Iron man",
-            )
+    def render_form_v2(self):
+        st.text_area(
+            """
+            ### Prompt
+            Describe the scene that you'd like to generate. 
+            """,
+            key="text_prompt",
+            placeholder="Iron man",
+        )
 
-            submitted = st.form_submit_button("🏃‍ Submit")
-
-        text_prompt = st.session_state.get("text_prompt")
-        if submitted and not text_prompt:
-            st.error("Please provide a Prompt", icon="⚠️")
-            return False
-
-        selected_models = st.session_state.get("selected_models")
-        if submitted and not selected_models:
-            st.error("Please Select at least one model", icon="⚠️")
-            return False
-
-        return submitted
+    def validate_form_v2(self):
+        assert st.session_state["text_prompt"], "Please provide a Prompt"
+        assert st.session_state["selected_models"], "Please Select at least one model"
 
     def render_description(self):
         st.write(
@@ -99,15 +88,6 @@ class CompareText2ImgPage(BasePage):
         col1, col2 = st.columns(2)
         with col1:
             guidance_scale_setting(selected_model)
-        with col2:
-            st.number_input(
-                """
-                ##### Seed 
-                (_Use 0 to randomize_)
-                """,
-                key="seed",
-                step=1,
-            )
 
     def render_output(self):
         self._render_outputs(st.session_state)

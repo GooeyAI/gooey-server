@@ -1,6 +1,6 @@
+import datetime
 import inspect
 import json
-import random
 import shlex
 import string
 import traceback
@@ -10,12 +10,14 @@ from copy import deepcopy
 from time import time
 
 import requests
+import sentry_sdk
 import streamlit as st
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
+from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
@@ -24,9 +26,11 @@ from daras_ai_v2 import settings
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
 )
+from daras_ai_v2.hidden_html_widget import hidden_html_nojs
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.utils import email_support_about_reported_run
+from daras_ai_v2.utils import random
 
 DEFAULT_STATUS = "Running..."
 
@@ -67,6 +71,18 @@ class BasePage:
         return f"/v1/{self.slug_versions[0]}/run"
 
     def render(self):
+        try:
+            self._render()
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            raise
+
+    def _render(self):
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_extra("url", self.app_url())
+            scope.set_extra("query_params", st.experimental_get_query_params())
+            scope.set_transaction_name("/" + self.slug, source=TRANSACTION_SOURCE_ROUTE)
+
         init_scripts()
 
         st.write("## " + self.title)
@@ -75,7 +91,6 @@ class BasePage:
         )
 
         self._load_session_state()
-        self._check_if_flagged()
 
         with settings_tab:
             self.render_settings()
@@ -87,6 +102,8 @@ class BasePage:
             self.run_as_api_tab()
 
         with run_tab:
+            self._check_if_flagged()
+
             col1, col2 = st.columns(2)
 
             self.render_footer()
@@ -153,12 +170,14 @@ class BasePage:
         example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
         run_id = query_params.get(RUN_ID_QUERY_PARAM)
         uid = query_params.get(USER_ID_QUERY_PARAM)
+
         if isinstance(example_id, list):
             example_id = example_id[0]
         if isinstance(run_id, list):
             run_id = run_id[0]
         if isinstance(uid, list):
             uid = uid[0]
+
         return example_id, run_id, uid
 
     def get_doc_from_query_params(self, query_params) -> dict | None:
@@ -207,21 +226,21 @@ class BasePage:
     def render_form_v2(self):
         pass
 
-    def validate_form_v2(self) -> bool:
+    def validate_form_v2(self):
         pass
 
     def render_form(self) -> bool:
         with st.form(f"{self.slug_versions[0]}Form"):
             self.render_form_v2()
-            submitted = st.form_submit_button("🏃‍ Submit")
+            submitted = st.form_submit_button("🏃 Submit", type="primary")
 
         if not submitted:
             return False
 
         try:
             self.validate_form_v2()
-        except AssertionError:
-            st.error("Please provide a Prompt and an Email Address", icon="⚠️")
+        except AssertionError as e:
+            st.error(e, icon="⚠️")
             return False
         else:
             return True
@@ -243,11 +262,13 @@ class BasePage:
                     )
 
         with col2:
-            st.write("## [Join Our Discord!](https://discord.gg/KQCrzgMPJ2)")
+            st.write(
+                "#### Need Help? [Join our Discord](https://discord.gg/KQCrzgMPJ2)"
+            )
             st.markdown(
                 """
                 <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
-                <iframe src="https://e.widgetbot.io/channels/643360566970155029/1039656158417399818" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+                <iframe src="https://e.widgetbot.io/channels/643360566970155029/1046049067337273444" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -259,28 +280,34 @@ class BasePage:
     def run(self, state: dict) -> typing.Iterator[str | None]:
         raise NotImplementedError
 
-    def _render_report_button(self, url: str):
+    def _render_report_button(self):
         current_user: UserRecord = st.session_state.get("_current_user")
+
         query_params = st.experimental_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
-        if not run_id or not uid:
+
+        if not (current_user and run_id and uid):
+            # ONLY RUNS CAN BE REPORTED
             return
-        # ONLY RUNS CAN BE REPORTED
+
         reported = st.button("❗Report")
-        if reported:
-            with st.spinner("Reporting..."):
-                self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
-                email_support_about_reported_run(
-                    run_id=run_id, uid=uid, url=url, email=current_user.email
-                )
-                st.success("Reported. Reload the page to see changes")
+        if not reported:
+            return
+
+        with st.spinner("Reporting..."):
+            self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
+            email_support_about_reported_run(
+                run_id=run_id,
+                uid=uid,
+                url=self._get_current_url(),
+                email=current_user.email,
+            )
+            st.success("Reported. Reload the page to see changes")
 
     def _render_before_output(self):
         url = self._get_current_url()
         if not url:
             return
-
-        self._render_report_button(url=url)
 
         col1, col2 = st.columns([3, 1])
 
@@ -348,6 +375,11 @@ class BasePage:
             with status_area:
                 html_spinner(st.session_state["__status"])
 
+        if st.session_state.get("__randomize"):
+            st.session_state["seed"] = int(random.randrange(4294967294))
+            st.session_state.pop("__randomize", None)
+            submitted = True
+
         if submitted:
             st.session_state["__status"] = DEFAULT_STATUS
             st.session_state["__gen"] = self.run(st.session_state)
@@ -356,8 +388,7 @@ class BasePage:
             with status_area:
                 html_spinner("Starting...")
 
-            self.clear_outputs()
-            self.save_run()
+            self._pre_run_checklist()
 
             if not self.check_credits():
                 status_area.empty()
@@ -401,6 +432,7 @@ class BasePage:
 
             # render errors nicely
             except Exception as e:
+                sentry_sdk.capture_exception(e)
                 traceback.print_exc()
                 with status_area:
                     st.error(f"{type(e).__name__} - {err_msg_for_exc(e)}", icon="⚠️")
@@ -426,6 +458,17 @@ class BasePage:
                     )
                     del st.session_state["__time_taken"]
 
+    def _pre_run_checklist(self):
+        self._setup_rng_seed()
+        self.clear_outputs()
+        self.save_run()
+
+    def _setup_rng_seed(self):
+        seed = st.session_state.get("seed")
+        if not seed:
+            return
+        random.seed(seed)
+
     def clear_outputs(self):
         for field_name in self.ResponseModel.__fields__:
             try:
@@ -435,6 +478,21 @@ class BasePage:
         gooey_reset_query_parm()
 
     def _render_after_output(self):
+        if "seed" in self.RequestModel.schema_json():
+            seed = st.session_state.get("seed")
+            st.caption(f"*Seed: `{seed}`*")
+            st.write("Don't like what you see? ")
+            col1, col2 = st.columns(2)
+            with col1:
+                randomize = st.button("♻️ Regenerate")
+                if randomize:
+                    st.session_state["__randomize"] = True
+                    st.experimental_rerun()
+            with col2:
+                self._render_report_button()
+        else:
+            self._render_report_button()
+
         state_to_save = (
             st.session_state.get("__state_to_save") or self._get_state_to_save()
         )
@@ -484,6 +542,8 @@ class BasePage:
             field_name: deepcopy(st.session_state[field_name])
             for field_name in self.fields_to_save()
             if field_name in st.session_state
+        } | {
+            "updated_at": datetime.datetime.utcnow(),
         }
 
     def fields_to_save(self) -> [str]:

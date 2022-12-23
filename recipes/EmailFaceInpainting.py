@@ -10,7 +10,7 @@ from daras_ai_v2 import db
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
-from pages.FaceInpainting import FaceInpaintingPage
+from recipes.FaceInpainting import FaceInpaintingPage
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
@@ -26,6 +26,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         "output_width": 512,
         "output_height": 512,
         "guidance_scale": 7.5,
+        "seed": 42,
     }
 
     class RequestModel(BaseModel):
@@ -57,6 +58,8 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         email_body: str | None
         email_body_enable_html: bool | None
         fallback_email_body: str | None
+
+        seed: int | None
 
         class Config:
             schema_extra = {
@@ -95,50 +98,45 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     """
         )
 
-    def render_form(self):
-        with st.form("my_form"):
-            st.text_area(
-                """
-                ### Prompt
-                Describe the scene that you'd like to generate around the face. 
-                """,
-                key="text_prompt",
-                placeholder="winter's day in paris",
-            )
+    def render_form_v2(self):
+        st.text_area(
+            """
+            ### Prompt
+            Describe the scene that you'd like to generate around the face. 
+            """,
+            key="text_prompt",
+            placeholder="winter's day in paris",
+        )
 
-            st.text_input(
-                """
-                ### Email Address
-                Give us your email address and we'll try to get your photo 
-                """,
-                key="email_address",
-                placeholder="john@appleseed.com",
-            )
-            st.caption(
-                "By providing your email address, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)"
-            )
+        st.text_input(
+            """
+            ### Email Address
+            Give us your email address and we'll try to get your photo 
+            """,
+            key="email_address",
+            placeholder="john@appleseed.com",
+        )
+        st.caption(
+            "By providing your email address, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)"
+        )
 
-            submitted = st.form_submit_button("🏃‍ Submit")
+    def validate_form_v2(self):
+        text_prompt = st.session_state.get("text_prompt")
+        email_address = st.session_state.get("email_address")
+        assert (
+            text_prompt and email_address
+        ), "Please provide a Prompt and your Email Address"
 
-        if submitted:
-            text_prompt = st.session_state.get("text_prompt")
-            email_address = st.session_state.get("email_address")
-            if not (text_prompt and email_address):
-                st.error("Please provide a Prompt and your Email Address", icon="⚠️")
-                return False
+        assert re.fullmatch(
+            email_regex, email_address
+        ), "Please provide a valid Email Address"
 
-            if not re.fullmatch(email_regex, email_address):
-                st.error("Please provide a valid Email Address", icon="⚠️")
-                return False
-
-            from_email = st.session_state.get("email_from")
-            email_subject = st.session_state.get("email_subject")
-            email_body = st.session_state.get("email_body")
-            if not (from_email and email_subject and email_body):
-                st.error("Please provide a From Email, Subject & Body")
-                return False
-
-        return submitted
+        from_email = st.session_state.get("email_from")
+        email_subject = st.session_state.get("email_subject")
+        email_body = st.session_state.get("email_body")
+        assert (
+            from_email and email_subject and email_body
+        ), "Please provide a From Email, Subject & Body"
 
     def render_settings(self):
         super().render_settings()

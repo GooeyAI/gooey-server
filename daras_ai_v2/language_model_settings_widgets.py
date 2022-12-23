@@ -27,11 +27,12 @@ def language_model_settings():
     with col1:
         st.number_input(
             label="""
-            ###### Max Output Tokens
-            The maximum number of [tokens](https://beta.openai.com/tokenizer) to generate in the completion.
+            ###### Output Size
+            *The maximum number of [tokens](https://beta.openai.com/tokenizer) to generate in the completion.*
             """,
             key="max_tokens",
-            min_value=1,
+            min_value=10,
+            step=10,
             max_value=4096,
         )
     with col2:

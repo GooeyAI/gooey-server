@@ -1,4 +1,3 @@
-import random
 import typing
 
 import requests
@@ -15,6 +14,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
 from daras_ai_v2.stable_diffusion import img2img, Img2ImgModels, SD_MAX_SIZE
+from daras_ai_v2.utils import random
 
 
 class GoogleImageGenPage(BasePage):
@@ -27,6 +27,7 @@ class GoogleImageGenPage(BasePage):
         "guidance_scale": 7.5,
         "prompt_strength": 0.5,
         "sd_2_upscaling": False,
+        "seed": 42,
     }
 
     class RequestModel(BaseModel):
@@ -44,6 +45,8 @@ class GoogleImageGenPage(BasePage):
         prompt_strength: float | None
 
         sd_2_upscaling: bool | None
+
+        seed: int | None
 
     class ResponseModel(BaseModel):
         output_images: list[str]
@@ -108,6 +111,7 @@ class GoogleImageGenPage(BasePage):
             num_outputs=request.num_outputs,
             guidance_scale=request.guidance_scale,
             sd_2_upscaling=request.sd_2_upscaling,
+            seed=request.seed,
         )
 
     def render_form_v2(self):
