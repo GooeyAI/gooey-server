@@ -30,8 +30,8 @@ from daras_ai_v2.repositioning import (
 
 
 class ImageSegmentationPage(BasePage):
-    title = "Cutout an object from any image"
-    slug_versions = ["ImageSegmentation"]
+    title = "AI Background Changer"
+    slug_versions = ["ImageSegmentation", "remove-image-background-with-ai"]
     version = 2
 
     sane_defaults = {
@@ -365,8 +365,7 @@ class ImageSegmentationPage(BasePage):
         return state.get("cutout_image", "")
 
     def preview_description(self, state: dict) -> str:
-        # TODO: updated description
-        return "Cutout an object from any image"
+        return "Use Dichotomous Image Segmentation to remove unwanted backgrounds from your images and correct perspective. Awesome when used with other Gooey.AI steps."
 
     def render_usage_guide(self):
         youtube_video("hSsCMloAQ-8")
