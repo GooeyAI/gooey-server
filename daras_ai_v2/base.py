@@ -81,7 +81,9 @@ class BasePage:
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("url", self.app_url())
             scope.set_extra("query_params", st.experimental_get_query_params())
-            scope.set_transaction_name("/" + self.slug, source=TRANSACTION_SOURCE_ROUTE)
+            scope.set_transaction_name(
+                "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
+            )
 
         init_scripts()
 
