@@ -16,7 +16,7 @@
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="{{ request.url|safe }}">
+    <meta property="og:url" content="{{ request.url }}">
     <meta property="og:title" content="{{ title }}">
     {% if description %}
         <meta property="og:description" content="{{ description }}">
@@ -27,7 +27,7 @@
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="{{ request.url|safe }}">
+    <meta property="twitter:url" content="{{ request.url }}">
     <meta property="twitter:title" content="{{ title }}">
     {% if description %}
         <meta property="twitter:description" content="{{ description }}">
