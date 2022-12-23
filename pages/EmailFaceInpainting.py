@@ -16,8 +16,8 @@ email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
-    title = "AI Photo Generated from the Face of a Email"
-    slug_versions = ["EmailFaceInpainting", "AI-Photo-with-Email-Face-Lookup"]
+    title = "AI Generated Photo from Email Profile Lookup"
+    slug_versions = ["EmailFaceInpainting", "ai-image-from-email-lookup"]
     version = 2
 
     sane_defaults = {
@@ -75,7 +75,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         email_sent: bool = False
 
     def preview_description(self, state: dict) -> str:
-        return "Input an email and prompt and this workflow looks up the email’s associated photo from the web, extracts the face and then draws an AI generated image around it."
+        return "Find an email's public photo and then draw the face into an AI generated scene using your own prompt + the latest Stable Diffusion or DallE image generator."
 
     def render_description(self):
         st.write(
