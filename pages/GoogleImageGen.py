@@ -18,8 +18,8 @@ from daras_ai_v2.stable_diffusion import img2img, Img2ImgModels, SD_MAX_SIZE
 
 
 class GoogleImageGenPage(BasePage):
-    title = "Generate Images From Google Images"
-    slug_versions = ["GoogleImageGen"]
+    title = "Render Image Search Results with AI"
+    slug_versions = ["GoogleImageGen", "render-images-with-ai"]
 
     sane_defaults = {
         "num_outputs": 1,
@@ -164,7 +164,7 @@ class GoogleImageGenPage(BasePage):
             st.image(out_imgs[0], caption="Generated Image")
 
     def preview_description(self, state: dict) -> str:
-        return f"""{state.get("search_query", '')} | {state.get("text_prompt", '')}"""
+        return "Enter a Google Image Search query + your Img2Img text prompt describing how to alter the result to create a unique, relevant ai generated images for any search query."
 
     def preview_image(self, state: dict) -> str:
         return state.get("output_images", [""])[0]
