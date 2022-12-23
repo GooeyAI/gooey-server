@@ -22,7 +22,7 @@ BOT_SCRIPT_RE = re.compile(r"(\n)([\w\ ]+)(:)")
 
 class VideoBotsPage(BasePage):
     title = "Create Interactive Video Bots"
-    slug_verions = ["video-bots"]
+    slug_versions = ["video-bots"]
 
     sane_defaults = {
         # tts
