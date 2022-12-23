@@ -13,8 +13,8 @@ email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
 
 class SocialLookupEmailPage(BasePage):
-    title = "Get Your Emails Actually Read"
-    slug_versions = ["SocialLookupEmail"]
+    title = "Profile Lookup + GPT3 for AI-Personalized Emails"
+    slug_versions = ["SocialLookupEmail", "email-writer-with-profile-lookup"]
 
     class RequestModel(BaseModel):
         email_address: str
@@ -35,6 +35,9 @@ class SocialLookupEmailPage(BasePage):
         person_data: dict
         final_prompt: str
         output_email_body: str
+
+    def preview_description(self, state: dict) -> str:
+        return "Look up any email's public social profile (from LinkedIn, Facebook, the web, etc) and then use the profile's name, employment history, city, etc in your GPT3-powered AI mail merge to create personalized emails that get through spam filters."
 
     def render_description(self):
         st.write(
