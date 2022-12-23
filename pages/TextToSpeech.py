@@ -20,7 +20,7 @@ class TextToSpeechProviders(Enum):
 
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"
-    slug_versions = ["TextToSpeech", "compare-text-to-speech-engine"]
+    slug_versions = ["TextToSpeech", "compare-text-to-speech-engines"]
 
     class RequestModel(BaseModel):
         text_prompt: str
@@ -38,7 +38,7 @@ class TextToSpeechPage(BasePage):
         audio_url: str
 
     def preview_description(self, state: dict) -> str:
-        return "Input your text, pick a voice & Text-to-Speech AI engine to create an audio file. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website or app."
+        return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
 
     def render_description(self):
         st.write(
