@@ -8,8 +8,8 @@ from daras_ai_v2.language_model import run_language_model
 
 
 class CompareLMPage(BasePage):
-    title = "Compare Text LLMs: GPT3 vs Flan-T5"
-    slug_versions = ["CompareLM"]
+    title = "Compare GPT3 vs FLAN-T5"
+    slug_versions = ["CompareLM", "compare-large-language-models"]
 
     class RequestModel(BaseModel):
         input_prompt: str
@@ -19,6 +19,9 @@ class CompareLMPage(BasePage):
     class ResponseModel(BaseModel):
         gpt3_output: str
         flan_t5_output: str
+
+    def preview_description(self, state: dict) -> str:
+        return "Compare OpenAI's GPT3 vs Google's FLAN-T5 on your text prompt. Head to head showdown of LLMs!"
 
     def render_description(self):
         st.write(
