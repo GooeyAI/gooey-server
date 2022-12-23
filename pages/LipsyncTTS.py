@@ -9,8 +9,8 @@ from pages.TextToSpeech import TextToSpeechPage
 
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
-    title = "Lipsync from Any Text + Video"
-    slug_versions = ["LipsyncTTS"]
+    title = "Lipsync Video with Any Text"
+    slug_versions = ["LipsyncTTS", "lipsync-maker"]
 
     class RequestModel(BaseModel):
         input_face: str
@@ -72,6 +72,9 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
                     )
 
         return submitted
+
+    def preview_description(self, state: dict) -> str:
+        return "Add your text prompt, pick a voice & upload a sample video to quickly create realistic lipsync videos. Discover the ease of text-to-video AI."
 
     def render_description(self):
         st.write(
