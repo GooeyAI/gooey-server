@@ -24,7 +24,7 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 
 class FaceInpaintingPage(BasePage):
     title = "AI Image with a Face"
-    slug_versions = ["FaceInpainting", "Face-in-ai-generated-photo"]
+    slug_versions = ["FaceInpainting", "face-in-ai-generated-photo"]
     version = 2
 
     sane_defaults = {
@@ -70,7 +70,7 @@ class FaceInpaintingPage(BasePage):
         output_images: list[str]
 
     def preview_description(self, state: dict) -> str:
-        return "Upload & extract a face into an AI generated photo using your own text + the latest Stable Diffusion or DallE image generator."
+        return "Upload & extract a face into an AI-generated photo using your text + the latest Stable Diffusion or DallE image generator."
 
     def render_description(self):
         st.write(
