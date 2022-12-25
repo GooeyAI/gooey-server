@@ -21,14 +21,11 @@ def img_model_settings(models_enum):
     if models_enum is not InpaintingModels:
         sd_2_upscaling_setting(selected_model)
 
-    col1, col2 = st.columns(2)
 
-    with col1:
-        guidance_scale_setting(selected_model)
+    guidance_scale_setting(selected_model)
 
     if models_enum is Img2ImgModels:
-        with col2:
-            prompt_strength_setting(selected_model)
+        prompt_strength_setting(selected_model)
 
     return selected_model
 
