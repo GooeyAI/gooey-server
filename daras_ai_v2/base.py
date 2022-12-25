@@ -227,23 +227,9 @@ class BasePage:
         pass
 
     def render_form(self) -> bool:
-        _submit_btn_button_css()
-
         with st.form(f"{self.slug}Form"):
             self.render_form_v2()
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if "seed" in self.RequestModel.schema_json():
-                    randomize = st.form_submit_button("🔀 Mix It Up!")
-                else:
-                    randomize = False
-            with col2:
-                submitted = st.form_submit_button("🏃 Submit", type="primary")
-
-        st.session_state["__randomize"] = randomize
-        if randomize:
-            submitted = True
+            submitted = st.form_submit_button("🏃 Submit", type="primary")
 
         if not submitted:
             return False
@@ -385,6 +371,11 @@ class BasePage:
             with status_area:
                 html_spinner(st.session_state["__status"])
 
+        if st.session_state.get("__randomize"):
+            st.session_state["seed"] = int(random.randrange(4294967294))
+            st.session_state.pop("__randomize", None)
+            submitted = True
+
         if submitted:
             st.session_state["__status"] = DEFAULT_STATUS
             st.session_state["__gen"] = self.run(st.session_state)
@@ -405,9 +396,6 @@ class BasePage:
         # render outputs
         with output_area.container():
             self.render_output()
-            seed = st.session_state.get("seed")
-            if seed:
-                st.caption(f"*Your lucky number (seed) is `{seed}`*")
 
         # render before/after output blocks if not running
         if not gen:
@@ -472,13 +460,10 @@ class BasePage:
         self.save_run()
 
     def _setup_rng_seed(self):
-        if st.session_state.get("__randomize"):
-            st.session_state["seed"] = int(random.randrange(4294967294))
-            st.session_state.pop("__randomize", None)
-
         seed = st.session_state.get("seed")
-        if seed:
-            random.seed(seed)
+        if not seed:
+            return
+        random.seed(seed)
 
     def clear_outputs(self):
         for field_name in self.ResponseModel.__fields__:
@@ -489,7 +474,20 @@ class BasePage:
         gooey_reset_query_parm()
 
     def _render_after_output(self):
-        self._render_report_button()
+        if "seed" in self.RequestModel.schema_json():
+            seed = st.session_state.get("seed")
+            st.caption(f"*Seed: `{seed}`*")
+            st.write("Don't like what you see? ")
+            col1, col2 = st.columns(2)
+            with col1:
+                randomize = st.button("♻️ Regenerate")
+                if randomize:
+                    st.session_state["__randomize"] = True
+                    st.experimental_rerun()
+            with col2:
+                self._render_report_button()
+        else:
+            self._render_report_button()
 
         state_to_save = (
             st.session_state.get("__state_to_save") or self._get_state_to_save()
@@ -721,26 +719,3 @@ def err_msg_for_exc(e):
 def _random_str_id(n=8):
     charset = string.ascii_lowercase + string.digits
     return "".join(random.choice(charset) for _ in range(n))
-
-
-def _submit_btn_button_css():
-    hidden_html_nojs(
-        """
-        <style>
-        button[kind="primaryFormSubmit"] {
-            background-color: #b2ebf2;
-            text-shadow: 0 0 0 black;
-            color: transparent;  
-        }
-
-        @media (min-width: 640px) {
-        .row-widget:has(button[kind="primaryFormSubmit"]) {
-            text-align: right;
-        }
-
-        button[kind="secondaryFormSubmit"] {
-            color: #adadad;
-        }
-        </style>
-        """
-    )
