@@ -1,5 +1,6 @@
 import streamlit as st
 
+from recipes.VideoBots import VideoBotsPage
 from server import normalize_slug, page_map
 
 # try to load page from query params
@@ -43,10 +44,12 @@ assert settings.GOOGLE_APPLICATION_CREDENTIALS
 init_scripts()
 
 page_classes = [
-    FaceInpaintingPage,
-    EmailFaceInpaintingPage,
+    VideoBotsPage,
     SEOSummaryPage,
     GoogleImageGenPage,
+    CompareText2ImgPage,
+    FaceInpaintingPage,
+    EmailFaceInpaintingPage,
     SocialLookupEmailPage,
     TextToSpeechPage,
     LipsyncTTSPage,
@@ -55,7 +58,6 @@ page_classes = [
     Img2ImgPage,
     DeforumSDPage,
     # CompareLMPage,
-    CompareText2ImgPage,
     # LipsyncPage,
     # ChyronPlantPage,
 ]

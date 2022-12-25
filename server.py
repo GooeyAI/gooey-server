@@ -50,6 +50,7 @@ from recipes.ObjectInpainting import ObjectInpaintingPage
 from recipes.SEOSummary import SEOSummaryPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
+from recipes.VideoBots import VideoBotsPage
 from routers import billing
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -81,7 +82,9 @@ _proxy_client = httpx.AsyncClient(base_url=settings.WIX_SITE_URL)
 async def custom_404_handler(request: Request, exc):
     url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
     req = _proxy_client.build_request(
-        request.method, url, headers={"user-agent": request.headers.get("user-agent")}
+        request.method,
+        url,
+        headers={"user-agent": request.headers.get("user-agent", "")},
     )
     resp = await _proxy_client.send(req)
 
@@ -280,7 +283,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         return state
 
 
-@app.get("/explore", include_in_schema=False)
+@app.get("/explore/", include_in_schema=False)
 def st_home(request: Request):
     iframe_url = furl(settings.IFRAME_BASE_URL).url
     return _st_page(
@@ -371,6 +374,7 @@ all_pages: list[typing.Type[BasePage]] = [
     CompareText2ImgPage,
     SEOSummaryPage,
     GoogleImageGenPage,
+    VideoBotsPage,
 ]
 
 

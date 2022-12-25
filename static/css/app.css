@@ -10,7 +10,7 @@ html, body, .align-header {
     margin: 0;
     border: 0;
     padding: 0;
-    font-family: 'Source Sans Pro', 'Arial', sans-serif;
+    font-family: 'Source Sans Pro', 'Arial', sans-serif !important;
 }
 
 h1, h2, h3 {

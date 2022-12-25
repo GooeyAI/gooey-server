@@ -1,31 +1,41 @@
 import json
 import time
-from enum import Enum
 
 import requests
 import streamlit as st
+import typing
 from google.cloud import texttospeech
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.loom_video_widget import loom_video, youtube_video
-
-
-class TextToSpeechProviders(Enum):
-    GOOGLE_TTS = 1
-    UBERDUCK = 2
+from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.text_to_speech_settings_widgets import (
+    text_to_speech_settings,
+    TextToSpeechProviders,
+)
 
 
 class TextToSpeechPage(BasePage):
     title = "Speak Any Text"
     slug = "TextToSpeech"
 
+    sane_defaults = {
+        "tts_provider": TextToSpeechProviders.GOOGLE_TTS.value,
+        "google_voice_name": "en-IN-Wavenet-A",
+        "google_pitch": 0.0,
+        "google_speaking_rate": 1.0,
+        "uberduck_voice_name": "kanye-west-rap",
+        "uberduck_speaking_rate": 1.0,
+    }
+
     class RequestModel(BaseModel):
         text_prompt: str
 
-        tts_provider: str | None
+        tts_provider: typing.Literal[
+            tuple(e.name for e in TextToSpeechProviders)
+        ] | None
 
         uberduck_voice_name: str | None
         uberduck_speaking_rate: float | None
@@ -40,13 +50,13 @@ class TextToSpeechPage(BasePage):
     def render_description(self):
         st.write(
             """
-                *Convert text into audio in the voice of your choice*
+            *Convert text into audio in the voice of your choice*
 
-                How It Works:
+            How It Works:
 
-                1. Takes any text input
-                2. Generates an audio file in voice of your choice (from Settings)
-                3. Creates an audio file
+            1. Takes any text input
+            2. Generates an audio file in voice of your choice (from Settings)
+            3. Creates an audio file
             """
         )
 
@@ -72,55 +82,7 @@ class TextToSpeechPage(BasePage):
         return submitted
 
     def render_settings(self):
-        st.write(
-            """
-            ### Voice Settings
-            """
-        )
-        tts_provider = st.radio(
-            "Provider",
-            horizontal=True,
-            options=[provider.name for provider in TextToSpeechProviders],
-            key="tts_provider",
-        )
-        if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
-            st.text_input(
-                label="Voice name(Google TTS)",
-                value="en-US-Neural2-F",
-                key="google_voice_name",
-            )
-            st.write(
-                "Get more voice names [here](https://cloud.google.com/text-to-speech/docs/voices)"
-            )
-            st.slider(
-                "Pitch", min_value=-20.0, max_value=20.0, value=0.0, key="google_pitch"
-            )
-            st.slider(
-                "Speaking rate (1.0 is the normal native speed)",
-                min_value=0.25,
-                max_value=4.0,
-                step=0.1,
-                value=1.0,
-                key="google_speaking_rate",
-            )
-
-        if tts_provider == TextToSpeechProviders.UBERDUCK.name:
-            st.text_input(
-                label="Voice name (Uberduck)",
-                value="kanye-west-rap",
-                key="uberduck_voice_name",
-            )
-            st.write(
-                "Get more voice names [here](https://app.uberduck.ai/leaderboard/voice)"
-            )
-            st.slider(
-                "Speaking rate (1.0 is the normal native speed)",
-                min_value=0.5,
-                max_value=3.0,
-                step=0.1,
-                value=1.0,
-                key="uberduck_speaking_rate",
-            )
+        text_to_speech_settings()
 
     def render_usage_guide(self):
         youtube_video("pZ9ldun8aXo")
@@ -199,7 +161,7 @@ class TextToSpeechPage(BasePage):
 
             synthesis_input = texttospeech.SynthesisInput(text=text)
             voice = texttospeech.VoiceSelectionParams()
-            voice.language_code = "en-US"
+            voice.language_code = "-".join(voice_name.split("-")[:2])
             voice.name = voice_name  # optional
 
             # Select the type of audio file you want returned
