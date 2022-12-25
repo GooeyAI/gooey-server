@@ -141,6 +141,9 @@ class VideoBotsPage(BasePage):
             st.video(video_url)
 
         with st.expander("Steps"):
+            st.write("Input Face")
+            st.video(st.session_state.get("input_face"))
+
             st.text_area(
                 "Final Prompt",
                 value=st.session_state.get("final_prompt"),
