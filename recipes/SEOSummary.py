@@ -128,7 +128,7 @@ class SEOSummaryPage(BasePage):
 
         st.write("---")
 
-        st.write("#### Seach Tools")
+        st.write("#### Search Tools")
 
         col1, col2 = st.columns(2)
         with col1:
