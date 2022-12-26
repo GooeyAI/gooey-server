@@ -623,7 +623,7 @@ class BasePage:
         input_as_text = state.get("text_prompt", state.get("input_prompt"))
         example_id, run_id, uid = self.extract_query_params(query_params)
         title = f"{self.title}"
-        if run_id and uid or example_id:
+        if (run_id and uid) or example_id:
             if input_as_text:
                 title = f"{input_as_text[:100]} ... {self.title}"
         return f"{title} • AI API, workflow & prompt shared on Gooey.AI"
