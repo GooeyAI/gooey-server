@@ -59,8 +59,8 @@ def safe_preview(password: str) -> str:
     if len(password) < 20:
         return "****"
     else:
-        # e.g. gsk-4QB...mvo
-        return password[:7] + "..." + password[-3:]
+        # e.g. sk-4QB...mvo
+        return password[:6] + "..." + password[-3:]
 
 
 def get_random_doc_id() -> str:
@@ -70,7 +70,7 @@ def get_random_doc_id() -> str:
 
 
 def get_random_api_key() -> str:
-    return "gsk-" + get_random_string(length=48, allowed_chars=RANDOM_STRING_CHARS)
+    return "sk-" + get_random_string(length=48, allowed_chars=RANDOM_STRING_CHARS)
 
 
 def get_random_string(length: int, allowed_chars: str) -> str:
