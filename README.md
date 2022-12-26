@@ -19,6 +19,15 @@ brew install freetype imagemagick
 export MAGICK_HOME=/opt/homebrew
 ```
 
+##### Install black (code formatter)
+
+Needed for uniform formatting - https://pypi.org/project/black
+
+###### Recommended:
+
+Black IDE integration
+Guide: [Pycharm](https://black.readthedocs.io/en/stable/integrations/editors.html#pycharm-intellij-idea)
+
 ### Run
 
 ```
