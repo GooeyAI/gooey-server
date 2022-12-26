@@ -249,7 +249,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         response_model=response_model,
         responses={500: {"model": FailedReponseModel}},
         name=page_cls.title,
-        operation_id=page_cls.slug,
+        operation_id=page_cls.slug_versions[0],
     )
     def run_api(
         user: auth.UserRecord = Depends(api_auth_header),

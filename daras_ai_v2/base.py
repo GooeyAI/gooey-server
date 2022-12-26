@@ -667,7 +667,11 @@ class BasePage:
 
     def run_as_api_tab(self):
         api_docs_url = str(
-            furl(settings.API_BASE_URL, fragment_path=f"operation/{self.slug}") / "docs"
+            furl(
+                settings.API_BASE_URL,
+                fragment_path=f"operation/{self.slug_versions[0]}",
+            )
+            / "docs"
         )
         st.markdown(f"### [📖 API Docs]({api_docs_url})")
 
