@@ -1,9 +1,11 @@
+import uuid
 from contextlib import contextmanager
 
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from starlette.authentication import AuthCredentials, AuthenticationBackend
 
+from daras_ai_v2 import db
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
 
 # quick and dirty way to bypass authentication for testing
@@ -15,6 +17,7 @@ def force_authentication(user: UserRecord = None):
     is_temp_user = not user
     if is_temp_user:
         user = auth.create_user()
+        db.update_user_balance(user.uid, abs(1000), f"gooey_test_in_{uuid.uuid1()}")
     try:
         _forced_auth_user.append(user)
         yield
