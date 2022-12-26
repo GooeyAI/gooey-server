@@ -74,8 +74,16 @@ class BasePage:
         return f"{self.slug_versions[0]}#{self.version}"
 
     @classmethod
-    def app_url(cls) -> str:
-        return str(furl(settings.APP_BASE_URL) / (cls.slug_versions[-1] + "/"))
+    def app_url(cls, example_id=None, run_id=None, uid=None) -> str:
+        query_params = {}
+        if example_id:
+            query_params = dict(example_id=example_id)
+        elif run_id and uid:
+            query_params = dict(run_id=run_id, uid=uid)
+        return str(
+            furl(settings.APP_BASE_URL, query_params=query_params)
+            / (cls.slug_versions[-1] + "/")
+        )
 
     @property
     def endpoint(self) -> str:
@@ -336,19 +344,8 @@ class BasePage:
 
     def _get_current_url(self) -> str | None:
         query_params = st.experimental_get_query_params()
-        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
-        run_id = query_params.get(RUN_ID_QUERY_PARAM)
-        uid = query_params.get(USER_ID_QUERY_PARAM)
-
-        if example_id:
-            query_params = dict(example_id=example_id)
-        elif run_id and uid:
-            query_params = dict(run_id=run_id, uid=uid)
-        else:
-            return None
-
-        url = str(furl(self.app_url(), query_params=query_params))
-        return url
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        return self.app_url(example_id, run_id, uid)
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self.run_doc_ref(uid=uid, run_id=run_id)
@@ -677,7 +674,7 @@ class BasePage:
 
         api_url = str(furl(settings.API_BASE_URL) / self.endpoint)
         request_body = get_example_request_body(self.RequestModel, st.session_state)
-        response_body = get_example_request_body(self.ResponseModel, st.session_state)
+        response_body = self.get_example_response_body(st.session_state)
 
         st.write("#### 📤 Example Request")
         with st.columns([3, 1])[0]:
@@ -688,15 +685,9 @@ class BasePage:
             st.write("**Please Login to generate the `$GOOEY_API_KEY`**")
             return
 
-        response = ApiResponseModel[self.ResponseModel](
-            id="zxcv",
-            url=self._get_current_url(),
-            created_at=datetime.datetime.utcnow().isoformat(),
-            output=response_body,
-        )
         st.write("#### 🎁 Example Response")
         st.json(
-            response.json(),
+            response_body,
             expanded=False,
         )
 
@@ -737,6 +728,18 @@ class BasePage:
 
     def get_price(self) -> int:
         return self.price
+
+    def get_example_response_body(self, state: dict) -> dict:
+        _, run_id, uid = self.extract_query_params(st.experimental_get_query_params())
+        run_id = run_id or get_random_doc_id()
+        uid = uid or get_random_doc_id()
+        response = ApiResponseModel[self.ResponseModel](
+            id=run_id,
+            url=self.app_url(run_id=run_id, uid=uid),
+            created_at=datetime.datetime.utcnow().isoformat(),
+            output=get_example_request_body(self.ResponseModel, state),
+        )
+        return response.dict()
 
 
 def get_example_request_body(
