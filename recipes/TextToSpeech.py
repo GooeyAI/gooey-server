@@ -18,8 +18,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
 
 
 class TextToSpeechPage(BasePage):
-    title = "Speak Any Text"
-    slug = "TextToSpeech"
+    title = "Compare AI Voice Generators"
+    slug_versions = ["TextToSpeech", "compare-text-to-speech-engines"]
 
     sane_defaults = {
         "tts_provider": TextToSpeechProviders.GOOGLE_TTS.value,
@@ -46,6 +46,9 @@ class TextToSpeechPage(BasePage):
 
     class ResponseModel(BaseModel):
         audio_url: str
+
+    def preview_description(self, state: dict) -> str:
+        return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
 
     def render_description(self):
         st.write(

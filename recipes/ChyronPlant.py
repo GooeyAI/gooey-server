@@ -11,7 +11,7 @@ from daras_ai_v2.base import (
 
 class ChyronPlantPage(BasePage):
     title = "Chyron Plant Bot"
-    slug = "ChyronPlant"
+    slug_versions = ["ChyronPlant"]
 
     class RequestModel(BaseModel):
         midi_notes: str

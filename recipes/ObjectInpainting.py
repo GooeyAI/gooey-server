@@ -24,8 +24,8 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
 class ObjectInpaintingPage(BasePage):
-    title = "An Object in Any Scene"
-    slug = "ObjectInpainting"
+    title = "Generate Product Photo Backgrounds"
+    slug_versions = ["ObjectInpainting", "product-photo-background-generator"]
 
     sane_defaults = {
         "mask_threshold": 0.7,
@@ -312,11 +312,8 @@ class ObjectInpaintingPage(BasePage):
                 for img in output_images:
                     st.image(img, caption=state.get("text_prompt", ""))
 
-    def preview_image(self, state: dict) -> str:
-        return state.get("output_images", [""])[0]
-
     def preview_description(self, state: dict) -> str:
-        return "This recipe an image of an object, masks it and then renders the background around the object according to the prompt."
+        return "Upload your product photo and describe the background. Then use Stable Diffusion's Inpainting AI to create professional background scenery without the photoshoot."
 
     def render_usage_guide(self):
         youtube_video("to6_17XJeck")

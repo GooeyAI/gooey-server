@@ -18,8 +18,8 @@ from daras_ai_v2.stable_diffusion import (
 
 
 class Img2ImgPage(BasePage):
-    title = "Edit Any Image Using Text"
-    slug = "Img2Img"
+    title = "Edit An Image with AI prompt"
+    slug_versions = ["Img2Img", "ai-photo-editor"]
 
     sane_defaults = {
         "num_outputs": 1,
@@ -139,11 +139,8 @@ class Img2ImgPage(BasePage):
             seed=request.seed,
         )
 
-    def preview_image(self, state: dict) -> str:
-        return state.get("output_images", [""])[0]
-
     def preview_description(self, state: dict) -> str:
-        return "This recipe takes an image and a prompt and then attempts to alter the image, based on the text."
+        return "Add an image and a prompt and this workflow will alter the image using your text & the latest Stable Difussion Img2Img AI model."
 
 
 if __name__ == "__main__":

@@ -21,8 +21,8 @@ BOT_SCRIPT_RE = re.compile(r"(\n)([\w\ ]+)(:)")
 
 
 class VideoBotsPage(BasePage):
-    title = "Interactive Video Bots"
-    slug = "video-bots"
+    title = "Create Interactive Video Bots"
+    slug_versions = ["video-bots"]
 
     sane_defaults = {
         # tts
@@ -77,6 +77,9 @@ class VideoBotsPage(BasePage):
         output_text: list[str]
         output_audio: list[str]
         output_video: list[str]
+
+    def preview_description(self, state: dict) -> str:
+        return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. The host it on your own site or app."
 
     def render_form_v2(self):
         tab1, tab2 = st.tabs(["💬 Chat", "📝 Script"])

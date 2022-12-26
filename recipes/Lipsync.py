@@ -13,7 +13,7 @@ from daras_ai_v2.loom_video_widget import youtube_video
 
 class LipsyncPage(BasePage):
     title = "Lip Syncing"
-    slug = "Lipsync"
+    slug_versions = ["Lipsync"]
 
     class RequestModel(BaseModel):
         input_face: str

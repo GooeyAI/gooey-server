@@ -15,8 +15,11 @@ from daras_ai_v2.stable_diffusion import Text2ImgModels, text2img
 
 
 class CompareText2ImgPage(BasePage):
-    title = "Compare Image Generators"
-    slug = "CompareText2Img"
+    title = "Compare AI Image Generators"
+    slug_versions = [
+        "CompareText2Img",
+        "compare-ai-image-generators",
+    ]
 
     sane_defaults = {
         "guidance_scale": 10,
@@ -124,11 +127,8 @@ class CompareText2ImgPage(BasePage):
             for img in output_images:
                 st.image(img, caption=Text2ImgModels[key].value)
 
-    # def preview_image(self, state: dict) -> str:
-    #     # TODO: Which model to pick and if key will be available
-    #     return state.get("output_images", [""])[0]
     def preview_description(self, state: dict) -> str:
-        return "This recipe takes any text and renders an image using multiple Text2Image engines."
+        return "Create multiple AI photos from Stable Diffusion (1.5 -> 2.1) and DallE from one prompt. Determine which AI image generator from OpenAI, Stability.AI works best for your text."
 
 
 if __name__ == "__main__":
