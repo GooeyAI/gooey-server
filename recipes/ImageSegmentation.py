@@ -305,7 +305,7 @@ class ImageSegmentationPage(BasePage):
         yield
 
     def render_output(self):
-        self.render_example(st.session_state)
+        self.render_example(st.session_state, show_download_button=True)
 
         with st.expander("Steps"):
             col1, col2, col3, col4 = st.columns(4)
@@ -344,7 +344,7 @@ class ImageSegmentationPage(BasePage):
                 else:
                     st.empty()
 
-    def render_example(self, state: dict):
+    def render_example(self, state: dict, show_download_button=False):
         col1, col2 = st.columns(2)
 
         with col1:
@@ -358,6 +358,13 @@ class ImageSegmentationPage(BasePage):
             cutout_image = state.get("cutout_image")
             if cutout_image:
                 st.image(cutout_image, caption=f"Cutout Image")
+                if show_download_button:
+                    self.render_download_button(
+                        cutout_image,
+                        format_category="image",
+                        prompt="",
+                        recipe_name=self.title,
+                    )
             else:
                 st.empty()
 

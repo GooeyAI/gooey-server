@@ -107,7 +107,7 @@ class CompareText2ImgPage(BasePage):
             )
 
     def render_output(self):
-        self._render_outputs(st.session_state)
+        self._render_outputs(st.session_state, show_download_button=True)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareText2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -137,12 +137,20 @@ class CompareText2ImgPage(BasePage):
         with col2:
             self._render_outputs(state)
 
-    def _render_outputs(self, state):
+    def _render_outputs(self, state, show_download_button=False):
         selected_models = state.get("selected_models", [])
+        text_prompt = st.session_state.get("text_prompt")
         for key in selected_models:
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
                 st.image(img, caption=Text2ImgModels[key].value)
+                if show_download_button:
+                    self.render_download_button(
+                        img,
+                        format_category="image",
+                        prompt=text_prompt,
+                        recipe_name=self.title,
+                    )
 
     # def preview_image(self, state: dict) -> str:
     #     # TODO: Which model to pick and if key will be available

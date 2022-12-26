@@ -45,9 +45,16 @@ class DeforumSDPage(BasePage):
 
     def render_output(self):
         output_video = st.session_state.get("output_video")
+        text_prompt = st.session_state.get("input_prompt")
         if output_video:
             st.write("Output Video")
             st.video(output_video)
+            self.render_download_button(
+                output_video,
+                format_category="video",
+                prompt=text_prompt,
+                recipe_name=self.title,
+            )
         else:
             st.empty()
 

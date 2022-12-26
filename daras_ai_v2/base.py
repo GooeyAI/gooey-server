@@ -323,6 +323,24 @@ class BasePage:
         url = str(furl(self.app_url(), query_params=query_params))
         return url
 
+    def _get_download_file_name(self, prompt: str, recipe_name: str, file_format: str):
+        prompt_text = prompt[:50] if len(prompt) > 50 else prompt
+        name_suffix = "on Gooey AI"
+        return f"{prompt_text}-{recipe_name} {name_suffix}.{file_format}"
+
+    def render_download_button(
+        self, url: str, format_category: str, prompt: str, recipe_name: str
+    ):
+        file_format = url.split(".")[-1]
+        st.download_button(
+            label="Download",
+            data=requests.get(url).content,
+            file_name=self._get_download_file_name(
+                prompt=prompt, recipe_name=recipe_name, file_format=file_format
+            ),
+            mime=f"{format_category}/{file_format}",
+        )
+
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self._run_doc_ref(uid=uid, run_id=run_id)
         ref.update({"is_flagged": is_flagged})

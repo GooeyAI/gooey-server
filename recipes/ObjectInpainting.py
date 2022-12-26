@@ -217,6 +217,12 @@ class ObjectInpaintingPage(BasePage):
             if output_images:
                 for url in output_images:
                     st.image(url, caption=f"{text_prompt}")
+                    self.render_download_button(
+                        url,
+                        format_category="image",
+                        prompt=text_prompt,
+                        recipe_name=self.title,
+                    )
             else:
                 st.empty()
 

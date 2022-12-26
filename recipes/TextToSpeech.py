@@ -131,6 +131,12 @@ class TextToSpeechPage(BasePage):
         audio_url = st.session_state.get("audio_url")
         if audio_url:
             st.audio(audio_url)
+            self.render_download_button(
+                audio_url,
+                format_category="audio",
+                prompt=text_prompt,
+                recipe_name=self.title,
+            )
         else:
             st.empty()
 

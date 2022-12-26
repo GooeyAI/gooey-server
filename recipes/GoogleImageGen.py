@@ -131,9 +131,16 @@ class GoogleImageGenPage(BasePage):
 
     def render_output(self):
         out_imgs = st.session_state.get("output_images")
+        text_prompt = st.session_state.get("text_prompt")
         if out_imgs:
             for img in out_imgs:
                 st.image(img, caption="Generated Image")
+                self.render_download_button(
+                    img,
+                    format_category="image",
+                    prompt=text_prompt,
+                    recipe_name=self.title,
+                )
         else:
             st.empty()
 
