@@ -10,9 +10,9 @@ from streamlit.web.server.websocket_headers import _get_websocket_headers
 from auth_backend import (
     FIREBASE_SESSION_COOKIE,
     verify_session_cookie,
-    ANONYMOUS_USER_COOKIE,
 )
 from daras_ai_v2 import settings
+from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 
 
 def get_anonymous_user() -> auth.UserRecord | None:

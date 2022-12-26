@@ -1,8 +1,5 @@
 import datetime
 import inspect
-import json
-import shlex
-import string
 import traceback
 import typing
 import uuid
@@ -17,17 +14,22 @@ from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
+from pydantic.generics import GenericModel
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
+from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
 )
-from daras_ai_v2.hidden_html_widget import hidden_html_nojs
+from daras_ai_v2.crypto import (
+    get_random_doc_id,
+)
 from daras_ai_v2.html_spinner_widget import html_spinner
+from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.utils import email_support_about_reported_run
 from daras_ai_v2.utils import random
@@ -43,6 +45,15 @@ USER_ID_QUERY_PARAM = "uid"
 GOOEY_LOGO = (
     "https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"
 )
+
+O = typing.TypeVar("O")
+
+
+class ApiResponseModel(GenericModel, typing.Generic[O]):
+    id: str
+    url: str
+    created_at: str
+    output: O
 
 
 class BasePage:
@@ -63,12 +74,20 @@ class BasePage:
         return f"{self.slug_versions[0]}#{self.version}"
 
     @classmethod
-    def app_url(cls) -> str:
-        return str(furl(settings.APP_BASE_URL) / (cls.slug_versions[-1] + "/"))
+    def app_url(cls, example_id=None, run_id=None, uid=None) -> str:
+        query_params = {}
+        if example_id:
+            query_params = dict(example_id=example_id)
+        elif run_id and uid:
+            query_params = dict(run_id=run_id, uid=uid)
+        return str(
+            furl(settings.APP_BASE_URL, query_params=query_params)
+            / (cls.slug_versions[-1] + "/")
+        )
 
     @property
     def endpoint(self) -> str:
-        return f"/v1/{self.slug_versions[0]}/run"
+        return f"/v2/{self.slug_versions[0]}/"
 
     def render(self):
         try:
@@ -94,6 +113,17 @@ class BasePage:
 
         self._load_session_state()
 
+        with run_tab:
+            self._check_if_flagged()
+
+            form_col, runner_col = st.columns(2)
+
+            self.render_footer()
+
+            with form_col:
+                submitted = self.render_form()
+                self.render_description()
+
         with settings_tab:
             self.render_settings()
 
@@ -103,19 +133,8 @@ class BasePage:
         with api_tab:
             self.run_as_api_tab()
 
-        with run_tab:
-            self._check_if_flagged()
-
-            col1, col2 = st.columns(2)
-
-            self.render_footer()
-
-            with col1:
-                submitted = self.render_form()
-                self.render_description()
-
-            with col2:
-                self._runner(submitted)
+        with runner_col:
+            self._runner(submitted)
         #
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
@@ -133,12 +152,6 @@ class BasePage:
                 st.stop()
 
             st.session_state.update(state)
-
-        with st.spinner("Loading Examples..."):
-            st.session_state["__example_docs"] = db.list_all_docs(
-                document_id=self.doc_name,
-                sub_collection_id=EXAMPLES_COLLECTION,
-            )
 
         for k, v in self.sane_defaults.items():
             st.session_state.setdefault(k, v)
@@ -190,7 +203,7 @@ class BasePage:
         if example_id:
             snapshot = self._example_doc_ref(example_id).get()
         elif run_id:
-            snapshot = self._run_doc_ref(run_id, uid).get()
+            snapshot = self.run_doc_ref(run_id, uid).get()
         else:
             snapshot = self.get_recipe_doc()
         return snapshot.to_dict()
@@ -201,7 +214,7 @@ class BasePage:
     def _recipe_doc_ref(self) -> firestore.DocumentReference:
         return db.get_doc_ref(self.doc_name)
 
-    def _run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
+    def run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
         return db.get_doc_ref(
             collection_id=USER_RUNS_COLLECTION,
             document_id=uid,
@@ -331,22 +344,11 @@ class BasePage:
 
     def _get_current_url(self) -> str | None:
         query_params = st.experimental_get_query_params()
-        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
-        run_id = query_params.get(RUN_ID_QUERY_PARAM)
-        uid = query_params.get(USER_ID_QUERY_PARAM)
-
-        if example_id:
-            query_params = dict(example_id=example_id)
-        elif run_id and uid:
-            query_params = dict(run_id=run_id, uid=uid)
-        else:
-            return None
-
-        url = str(furl(self.app_url(), query_params=query_params))
-        return url
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        return self.app_url(example_id, run_id, uid)
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
-        ref = self._run_doc_ref(uid=uid, run_id=run_id)
+        ref = self.run_doc_ref(uid=uid, run_id=run_id)
         ref.update({"is_flagged": is_flagged})
 
     def save_run(self):
@@ -355,12 +357,11 @@ class BasePage:
             return
 
         query_params = st.experimental_get_query_params()
-        run_id = query_params.get(RUN_ID_QUERY_PARAM, [_random_str_id()])[0]
+        run_id = query_params.get(RUN_ID_QUERY_PARAM, [get_random_doc_id()])[0]
         gooey_reset_query_parm(run_id=run_id, uid=current_user.uid)
 
-        run_doc_ref = self._run_doc_ref(run_id, current_user.uid)
-        state_to_save = self._get_state_to_save()
-
+        run_doc_ref = self.run_doc_ref(run_id, current_user.uid)
+        state_to_save = self.state_to_doc(st.session_state)
         run_doc_ref.set(state_to_save)
 
     def _runner(self, submitted: bool):
@@ -424,7 +425,9 @@ class BasePage:
                     st.session_state["__time_taken"] += time() - start_time
 
                 # save a snapshot of the params used to create this output
-                st.session_state["__state_to_save"] = self._get_state_to_save()
+                st.session_state["__state_to_save"] = self.state_to_doc(
+                    st.session_state
+                )
 
                 # cleanup is important!
                 del st.session_state["__status"]
@@ -495,8 +498,8 @@ class BasePage:
         else:
             self._render_report_button()
 
-        state_to_save = (
-            st.session_state.get("__state_to_save") or self._get_state_to_save()
+        state_to_save = st.session_state.get("__state_to_save") or self.state_to_doc(
+            st.session_state
         )
         if not state_to_save:
             return
@@ -512,7 +515,7 @@ class BasePage:
         with col2:
             submitted_1 = st.button("🔖 Add as Example")
             if submitted_1:
-                new_example_id = _random_str_id()
+                new_example_id = get_random_doc_id()
                 doc_ref = self._example_doc_ref(new_example_id)
 
         with col1:
@@ -539,11 +542,11 @@ class BasePage:
 
         st.success("Done", icon="✅")
 
-    def _get_state_to_save(self):
+    def state_to_doc(self, state: dict):
         return {
-            field_name: deepcopy(st.session_state[field_name])
+            field_name: deepcopy(state[field_name])
             for field_name in self.fields_to_save()
-            if field_name in st.session_state
+            if field_name in state
         } | {
             "updated_at": datetime.datetime.utcnow(),
         }
@@ -557,9 +560,19 @@ class BasePage:
         ]
 
     def _examples_tab(self):
+        example_docs = st.session_state.setdefault("__example_docs", [])
+        if not example_docs:
+            with st.spinner("Loading Examples..."):
+                example_docs.extend(
+                    db.list_all_docs(
+                        document_id=self.doc_name,
+                        sub_collection_id=EXAMPLES_COLLECTION,
+                    )
+                )
+
         allow_delete = is_admin()
 
-        for snapshot in st.session_state.get("__example_docs", []):
+        for snapshot in example_docs:
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
@@ -650,45 +663,36 @@ class BasePage:
         return GOOEY_LOGO
 
     def run_as_api_tab(self):
-        api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
+        api_docs_url = str(
+            furl(
+                settings.API_BASE_URL,
+                fragment_path=f"operation/{self.slug_versions[0]}",
+            )
+            / "docs"
+        )
+        st.markdown(f"### [📖 API Docs]({api_docs_url})")
+
         api_url = str(furl(settings.API_BASE_URL) / self.endpoint)
-
         request_body = get_example_request_body(self.RequestModel, st.session_state)
+        response_body = self.get_example_response_body(st.session_state)
 
-        st.markdown(
-            f"""<a href="{api_docs_url}">API Docs</a>""",
-            unsafe_allow_html=True,
-        )
+        st.write("#### 📤 Example Request")
+        with st.columns([3, 1])[0]:
+            api_example_generator(api_url, request_body)
 
-        st.write("### CURL request")
+        user = st.session_state.get("_current_user")
+        if hasattr(user, "_is_anonymous"):
+            st.write("**Please Login to generate the `$GOOEY_API_KEY`**")
+            return
 
-        st.write(
-            rf"""
-```
-curl -X 'POST' \
-  {shlex.quote(api_url)} \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Token $GOOEY_API_KEY' \
-  -d {shlex.quote(json.dumps(request_body, indent=2))}
-```
-            """
-        )
+        st.write("#### 🎁 Example Response")
+        st.json(response_body, expanded=False)
 
-        if st.button("Call API 🚀"):
-            with st.spinner("Waiting for API..."):
-                has_credits = self.check_credits()
-                if not has_credits:
-                    return False
-                r = requests.post(
-                    api_url,
-                    json=request_body,
-                    headers={"Authorization": f"Token {settings.API_SECRET_KEY}"},
-                )
-                "### Response"
-                r.raise_for_status()
-                self.deduct_credits()
-                st.write(r.json())
+        st.write("---")
+        st.write("### 🔐 API keys")
+
+        with st.columns([3, 1])[0]:
+            manage_api_keys(user)
 
     def check_credits(self) -> bool:
         user = st.session_state.get("_current_user")
@@ -722,6 +726,17 @@ curl -X 'POST' \
     def get_price(self) -> int:
         return self.price
 
+    def get_example_response_body(self, state: dict) -> dict:
+        example_id, run_id, uid = self.extract_query_params(
+            st.experimental_get_query_params()
+        )
+        return dict(
+            id=run_id or example_id or get_random_doc_id(),
+            url=self._get_current_url(),
+            created_at=datetime.datetime.utcnow().isoformat(),
+            output=get_example_request_body(self.ResponseModel, state),
+        )
+
 
 def get_example_request_body(
     request_model: typing.Type[BaseModel], state: dict
@@ -744,8 +759,3 @@ def err_msg_for_exc(e):
     else:
         err_msg = f"{type(e).__name__} - {e}"
     return err_msg
-
-
-def _random_str_id(n=8):
-    charset = string.ascii_lowercase + string.digits
-    return "".join(random.choice(charset) for _ in range(n))
