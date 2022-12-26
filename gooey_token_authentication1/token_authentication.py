@@ -1,7 +1,6 @@
 # Header encoding (see RFC5987)
-import requests
+
 from fastapi import HTTPException
-from starlette.requests import Request
 
 from daras_ai_v2 import settings
 

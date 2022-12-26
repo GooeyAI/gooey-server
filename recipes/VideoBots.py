@@ -73,10 +73,10 @@ class VideoBotsPage(BasePage):
         face_padding_right: int | None
 
     class ResponseModel(BaseModel):
-        final_prompt: str
         output_text: list[str]
         output_audio: list[str]
         output_video: list[str]
+        final_prompt: str
 
     def render_form_v2(self):
         tab1, tab2 = st.tabs(["💬 Chat", "📝 Script"])

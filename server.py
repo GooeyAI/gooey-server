@@ -239,16 +239,18 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         response_model=page_cls.ResponseModel,
         responses={500: {"model": RunFailedModel}},
         name=page_cls.title,
+        operation_id=page_cls.slug,
     )
     def run_api(
-        request: Request,
-        Authorization: typing.Union[str, None] = Header(
-            default="", description="Token $GOOEY_API_TOKEN"
+        Authorization: str
+        | None = Header(
+            default=None,
+            description="Token $GOOEY_API_TOKEN",
         ),
         page_request: page_cls.RequestModel = body_spec,
     ):
         # Authenticate Token
-        authenticate(Authorization)
+        authenticate(Authorization or "")
 
         # init a new page for every request
         page = page_cls()

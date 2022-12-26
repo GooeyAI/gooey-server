@@ -1,14 +1,12 @@
 import datetime
 import inspect
-import json
-import shlex
-import string
 import traceback
 import typing
 import uuid
 from copy import deepcopy
 from time import time
 
+import pandas as pd
 import requests
 import sentry_sdk
 import streamlit as st
@@ -23,8 +21,16 @@ from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
+from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
+)
+from daras_ai_v2.crypto import (
+    get_random_string,
+    PBKDF2PasswordHasher,
+    safe_preview,
+    get_random_string_lowercase,
+    RANDOM_STRING_CHARS,
 )
 from daras_ai_v2.hidden_html_widget import hidden_html_nojs
 from daras_ai_v2.html_spinner_widget import html_spinner
@@ -89,6 +95,17 @@ class BasePage:
 
         self._load_session_state()
 
+        with run_tab:
+            self._check_if_flagged()
+
+            form_col, runner_col = st.columns(2)
+
+            self.render_footer()
+
+            with form_col:
+                submitted = self.render_form()
+                self.render_description()
+
         with settings_tab:
             self.render_settings()
 
@@ -98,19 +115,8 @@ class BasePage:
         with api_tab:
             self.run_as_api_tab()
 
-        with run_tab:
-            self._check_if_flagged()
-
-            col1, col2 = st.columns(2)
-
-            self.render_footer()
-
-            with col1:
-                submitted = self.render_form()
-                self.render_description()
-
-            with col2:
-                self._runner(submitted)
+        with runner_col:
+            self._runner(submitted)
         #
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
@@ -128,12 +134,6 @@ class BasePage:
                 st.stop()
 
             st.session_state.update(state)
-
-        with st.spinner("Loading Examples..."):
-            st.session_state["__example_docs"] = db.list_all_docs(
-                document_id=self.doc_name,
-                sub_collection_id=EXAMPLES_COLLECTION,
-            )
 
         for k, v in self.sane_defaults.items():
             st.session_state.setdefault(k, v)
@@ -350,7 +350,9 @@ class BasePage:
             return
 
         query_params = st.experimental_get_query_params()
-        run_id = query_params.get(RUN_ID_QUERY_PARAM, [_random_str_id()])[0]
+        run_id = query_params.get(RUN_ID_QUERY_PARAM, [get_random_string_lowercase()])[
+            0
+        ]
         gooey_reset_query_parm(run_id=run_id, uid=current_user.uid)
 
         run_doc_ref = self._run_doc_ref(run_id, current_user.uid)
@@ -507,7 +509,7 @@ class BasePage:
         with col2:
             submitted_1 = st.button("🔖 Add as Example")
             if submitted_1:
-                new_example_id = _random_str_id()
+                new_example_id = get_random_string_lowercase()
                 doc_ref = self._example_doc_ref(new_example_id)
 
         with col1:
@@ -552,9 +554,19 @@ class BasePage:
         ]
 
     def _examples_tab(self):
+        example_docs = st.session_state.setdefault("__example_docs", [])
+        if not example_docs:
+            with st.spinner("Loading Examples..."):
+                example_docs.extend(
+                    db.list_all_docs(
+                        document_id=self.doc_name,
+                        sub_collection_id=EXAMPLES_COLLECTION,
+                    )
+                )
+
         allow_delete = is_admin()
 
-        for snapshot in st.session_state.get("__example_docs", []):
+        for snapshot in example_docs:
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
@@ -621,45 +633,121 @@ class BasePage:
         pass
 
     def run_as_api_tab(self):
-        api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
+        api_docs_url = str(
+            furl(settings.API_BASE_URL, fragment_path=f"operation/{self.slug}") / "docs"
+        )
+        st.markdown(f"### [📖 API Docs]({api_docs_url})")
+
         api_url = str(furl(settings.API_BASE_URL) / self.endpoint)
-
         request_body = get_example_request_body(self.RequestModel, st.session_state)
+        response_body = get_example_request_body(self.ResponseModel, st.session_state)
 
-        st.markdown(
-            f"""<a href="{api_docs_url}">API Docs</a>""",
-            unsafe_allow_html=True,
-        )
+        st.write("#### 📤 Example Request")
 
-        st.write("### CURL request")
+        with st.columns([3, 1])[0]:
+            api_example_generator(api_url, request_body)
 
-        st.write(
-            rf"""
-```
-curl -X 'POST' \
-  {shlex.quote(api_url)} \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Token $GOOEY_API_KEY' \
-  -d {shlex.quote(json.dumps(request_body, indent=2))}
-```
-            """
-        )
+        user = st.session_state.get("_current_user")
+        if hasattr(user, "_is_anonymous"):
+            st.write("**Please Login to generate the `$GOOEY_API_KEY`**")
+            return
 
-        if st.button("Call API 🚀"):
-            with st.spinner("Waiting for API..."):
-                has_credits = self.check_credits()
-                if not has_credits:
-                    return False
-                r = requests.post(
-                    api_url,
-                    json=request_body,
-                    headers={"Authorization": f"Token {settings.API_SECRET_KEY}"},
+        st.write("#### 🎁 Example Response")
+        st.json(response_body, expanded=False)
+
+        with st.columns([3, 1])[0]:
+            st.write(
+                """
+---
+### 🔐 API keys
+
+Your secret API keys are listed below. Please note that we do not display your secret API keys again after you generate them.
+
+Do not share your API key with others, or expose it in the browser or other client-side code. In order to protect the security of your account, Gooey.AI may also automatically rotate any API key that we've found has leaked publicly.
+                """
+            )
+
+            db_collection = db._db.collection(db.API_KEYS_COLLECTION)
+
+            api_keys = st.session_state.setdefault("__api_keys", [])
+            if not api_keys:
+                with st.spinner("Loading API Keys..."):
+                    api_keys.extend(
+                        [
+                            snap.to_dict()
+                            for snap in db_collection.where("uid", "==", user.uid)
+                            # .order_by("created_at")
+                            .get()
+                        ]
+                    )
+
+            table_area = st.container()
+
+            if st.button("＋ Create new secret key"):
+                with st.spinner("Generating a new API key..."):
+                    new_api_key = "gsk-" + get_random_string(
+                        length=48, allowed_chars=RANDOM_STRING_CHARS
+                    )
+
+                    hasher = PBKDF2PasswordHasher()
+                    secret_key_hash = hasher.encode(new_api_key, hasher.salt())
+                    created_at = datetime.datetime.utcnow()
+
+                    doc = {
+                        "uid": user.uid,
+                        "secret_key_hash": secret_key_hash,
+                        "secret_key_preview": safe_preview(new_api_key),
+                        "created_at": created_at,
+                    }
+
+                    api_keys.append(doc)
+                    db_collection.add(doc)
+
+                st.success(
+                    f"""
+##### API key generated
+
+Please save this secret key somewhere safe and accessible. 
+For security reasons, **you won't be able to view it again** through your account. 
+If you lose this secret key, you'll need to generate a new one.
+                    """
                 )
-                "### Response"
-                r.raise_for_status()
-                self.deduct_credits()
-                st.write(r.json())
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.text_input(
+                        "recipe url",
+                        label_visibility="collapsed",
+                        disabled=True,
+                        value=new_api_key,
+                    )
+                with col2:
+                    copy_to_clipboard_button(
+                        "📎 Copy Secret Key",
+                        value=new_api_key,
+                        style="padding: 6px",
+                        height=55,
+                    )
+
+            with table_area:
+                st.table(
+                    pd.DataFrame.from_records(
+                        [
+                            (api_key["secret_key_preview"], api_key["created_at"])
+                            for api_key in api_keys
+                        ],
+                        columns=["Secret Key (Preview)", "Created At"],
+                    ),
+                )
+                # hide table index
+                hidden_html_nojs(
+                    """
+                    <style>
+                    table {font-family:"Source Code Pro", monospace}
+                    thead tr th:first-child {display:none}
+                    tbody th {display:none}
+                    </style>
+                    """
+                )
 
     def check_credits(self) -> bool:
         user = st.session_state.get("_current_user")
@@ -715,8 +803,3 @@ def err_msg_for_exc(e):
     else:
         err_msg = f"{type(e).__name__} - {e}"
     return err_msg
-
-
-def _random_str_id(n=8):
-    charset = string.ascii_lowercase + string.digits
-    return "".join(random.choice(charset) for _ in range(n))

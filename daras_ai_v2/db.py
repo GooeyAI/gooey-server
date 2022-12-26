@@ -10,6 +10,7 @@ from daras_ai_v2 import settings
 
 DEFAULT_COLLECTION = "daras-ai-v2"
 USERS_COLLECTION = "users"
+API_KEYS_COLLECTION = "api_keys"
 
 USER_BALANCE_FIELD = "balance"
 
