@@ -5,8 +5,10 @@ from google.cloud import firestore
 from google.cloud.firestore_v1.transaction import Transaction
 from starlette.requests import Request
 
-from auth_backend import ANONYMOUS_USER_COOKIE
 from daras_ai_v2 import settings
+
+FIREBASE_SESSION_COOKIE = "firebase_session"
+ANONYMOUS_USER_COOKIE = "anonymous_user"
 
 DEFAULT_COLLECTION = "daras-ai-v2"
 USERS_COLLECTION = "users"

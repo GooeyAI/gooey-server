@@ -4,7 +4,6 @@ Stolen code from https://docs.djangoproject.com/en/3.2/_modules/django/contrib/a
 
 import base64
 import hashlib
-import math
 import secrets
 import string
 
@@ -25,21 +24,12 @@ class PBKDF2PasswordHasher:
     digest = hashlib.sha256
     salt_entropy = 128
 
-    def salt(self):
-        """
-        Generate a cryptographically secure nonce salt in ASCII with an entropy
-        of at least `salt_entropy` bits.
-        """
-        # Each character in the salt provides
-        # log_2(len(alphabet)) bits of entropy.
-        char_count = math.ceil(self.salt_entropy / math.log2(len(RANDOM_STRING_CHARS)))
-        return get_random_string(char_count, allowed_chars=RANDOM_STRING_CHARS)
-
-    def encode(self, password, salt, iterations=None):
+    # salt is not needed for api keys - https://security.stackexchange.com/questions/180345/do-i-need-to-hash-or-encrypt-api-keys-before-storing-them-in-a-database/180348
+    def encode(self, password, salt="", iterations=None):
         assert password is not None
-        assert salt and "$" not in salt
+        # assert salt and "$" not in salt
         iterations = iterations or self.iterations
-        hash = pbkdf2(password, salt, iterations, digest=self.digest)
+        hash = pbkdf2(password, "", iterations, digest=self.digest)
         hash = base64.b64encode(hash).decode("ascii").strip()
         return "%s$%d$%s$%s" % (self.algorithm, iterations, salt, hash)
 
@@ -52,16 +42,6 @@ class PBKDF2PasswordHasher:
             "iterations": int(iterations),
             "salt": salt,
         }
-
-    def verify(self, password, encoded):
-        decoded = self.decode(encoded)
-        encoded_2 = self.encode(password, decoded["salt"], decoded["iterations"])
-        return constant_time_compare(encoded, encoded_2)
-
-
-def constant_time_compare(val1, val2):
-    """Return True if the two strings are equal, False otherwise."""
-    return secrets.compare_digest(val1.encode(), val2.encode())
 
 
 def pbkdf2(password: str, salt: str, iterations: int, dklen=0, digest=None):
@@ -83,11 +63,15 @@ def safe_preview(password: str) -> str:
         return password[:7] + "..." + password[-3:]
 
 
-def get_random_string_lowercase(
-    length=8, allowed_chars=string.ascii_lowercase + string.digits
-):
-    return "".join(secrets.choice(allowed_chars) for _ in range(length))
+def get_random_doc_id() -> str:
+    return get_random_string(
+        length=8, allowed_chars=string.ascii_lowercase + string.digits
+    )
 
 
-def get_random_string(length: int, allowed_chars: str):
+def get_random_api_key() -> str:
+    return "gsk-" + get_random_string(length=48, allowed_chars=RANDOM_STRING_CHARS)
+
+
+def get_random_string(length: int, allowed_chars: str) -> str:
     return "".join(secrets.choice(allowed_chars) for _ in range(length))

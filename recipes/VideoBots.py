@@ -176,8 +176,6 @@ class VideoBotsPage(BasePage):
             common_names[1][0].strip(),
         )
 
-        print(user_script_name, bot_script_name)
-
         username = user_script_name
         current_user = st.session_state.get("_current_user")
         if current_user and current_user.display_name:

@@ -4,6 +4,8 @@ from textwrap import indent
 
 import streamlit as st
 
+from gooey_token_authentication1.token_authentication import auth_keyword
+
 
 def api_example_generator(api_url: str, request_body):
     curl, python, js = st.tabs(["`curl`", "`python`", "`node.js`"])
@@ -16,11 +18,11 @@ curl -X 'POST' \
   %s \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Token $GOOEY_API_KEY' \
+  -H 'Authorization: %s $GOOEY_API_KEY' \
   -d %s
 ```
             """
-            % (api_url, shlex.quote(json.dumps(request_body, indent=2)))
+            % (api_url, auth_keyword, shlex.quote(json.dumps(request_body, indent=2)))
         )
 
     with python:
@@ -36,7 +38,7 @@ import requests
 response = requests.post(
     "%s",
     headers={
-        "Authorization": "Token $GOOEY_API_KEY",
+        "Authorization": "%s $GOOEY_API_KEY",
     },
     json=%s,
 )
@@ -45,7 +47,11 @@ data = response.json()
 print(response.status_code, data)
 ```
             """
-            % (api_url, indent(json.dumps(request_body, indent=4), " " * 4)[4:])
+            % (
+                api_url,
+                auth_keyword,
+                indent(json.dumps(request_body, indent=4), " " * 4)[4:],
+            )
         )
 
     with js:
@@ -62,7 +68,7 @@ async function callApi() {
   const response = await fetch("%s", {
     method: "POST",
     headers: {
-        Authorization: "Token $GOOEY_API_KEY",
+        "Authorization": "%s $GOOEY_API_KEY",
         "Content-Type": "application/json",
     },
     body: JSON.stringify(%s),
@@ -75,5 +81,9 @@ async function callApi() {
 callApi();
 ```
             """
-            % (api_url, indent(json.dumps(request_body, indent=2), " " * 4)[4:])
+            % (
+                api_url,
+                auth_keyword,
+                indent(json.dumps(request_body, indent=2), " " * 4)[4:],
+            )
         )

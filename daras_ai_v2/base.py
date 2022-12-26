@@ -6,7 +6,6 @@ import uuid
 from copy import deepcopy
 from time import time
 
-import pandas as pd
 import requests
 import sentry_sdk
 import streamlit as st
@@ -15,6 +14,7 @@ from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
+from pydantic.generics import GenericModel
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 
 from daras_ai.init import init_scripts
@@ -26,14 +26,10 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
 )
 from daras_ai_v2.crypto import (
-    get_random_string,
-    PBKDF2PasswordHasher,
-    safe_preview,
-    get_random_string_lowercase,
-    RANDOM_STRING_CHARS,
+    get_random_doc_id,
 )
-from daras_ai_v2.hidden_html_widget import hidden_html_nojs
 from daras_ai_v2.html_spinner_widget import html_spinner
+from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.utils import email_support_about_reported_run
 from daras_ai_v2.utils import random
@@ -46,6 +42,15 @@ USER_RUNS_COLLECTION = "user_runs"
 EXAMPLE_ID_QUERY_PARAM = "example_id"
 RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
+
+O = typing.TypeVar("O")
+
+
+class ApiResponseModel(GenericModel, typing.Generic[O]):
+    id: str
+    url: str
+    created_at: str
+    output: O
 
 
 class BasePage:
@@ -71,7 +76,7 @@ class BasePage:
 
     @property
     def endpoint(self) -> str:
-        return f"/v1/{self.slug}/run"
+        return f"/v2/{self.slug}/"
 
     def render(self):
         try:
@@ -185,7 +190,7 @@ class BasePage:
         if example_id:
             snapshot = self._example_doc_ref(example_id).get()
         elif run_id:
-            snapshot = self._run_doc_ref(run_id, uid).get()
+            snapshot = self.run_doc_ref(run_id, uid).get()
         else:
             snapshot = self.get_recipe_doc()
         return snapshot.to_dict()
@@ -196,7 +201,7 @@ class BasePage:
     def _recipe_doc_ref(self) -> firestore.DocumentReference:
         return db.get_doc_ref(self.doc_name)
 
-    def _run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
+    def run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
         return db.get_doc_ref(
             collection_id=USER_RUNS_COLLECTION,
             document_id=uid,
@@ -341,7 +346,7 @@ class BasePage:
         return url
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
-        ref = self._run_doc_ref(uid=uid, run_id=run_id)
+        ref = self.run_doc_ref(uid=uid, run_id=run_id)
         ref.update({"is_flagged": is_flagged})
 
     def save_run(self):
@@ -350,14 +355,11 @@ class BasePage:
             return
 
         query_params = st.experimental_get_query_params()
-        run_id = query_params.get(RUN_ID_QUERY_PARAM, [get_random_string_lowercase()])[
-            0
-        ]
+        run_id = query_params.get(RUN_ID_QUERY_PARAM, [get_random_doc_id()])[0]
         gooey_reset_query_parm(run_id=run_id, uid=current_user.uid)
 
-        run_doc_ref = self._run_doc_ref(run_id, current_user.uid)
-        state_to_save = self._get_state_to_save()
-
+        run_doc_ref = self.run_doc_ref(run_id, current_user.uid)
+        state_to_save = self.state_to_doc(st.session_state)
         run_doc_ref.set(state_to_save)
 
     def _runner(self, submitted: bool):
@@ -421,7 +423,9 @@ class BasePage:
                     st.session_state["__time_taken"] += time() - start_time
 
                 # save a snapshot of the params used to create this output
-                st.session_state["__state_to_save"] = self._get_state_to_save()
+                st.session_state["__state_to_save"] = self.state_to_doc(
+                    st.session_state
+                )
 
                 # cleanup is important!
                 del st.session_state["__status"]
@@ -492,8 +496,8 @@ class BasePage:
         else:
             self._render_report_button()
 
-        state_to_save = (
-            st.session_state.get("__state_to_save") or self._get_state_to_save()
+        state_to_save = st.session_state.get("__state_to_save") or self.state_to_doc(
+            st.session_state
         )
         if not state_to_save:
             return
@@ -509,7 +513,7 @@ class BasePage:
         with col2:
             submitted_1 = st.button("🔖 Add as Example")
             if submitted_1:
-                new_example_id = get_random_string_lowercase()
+                new_example_id = get_random_doc_id()
                 doc_ref = self._example_doc_ref(new_example_id)
 
         with col1:
@@ -536,11 +540,11 @@ class BasePage:
 
         st.success("Done", icon="✅")
 
-    def _get_state_to_save(self):
+    def state_to_doc(self, state: dict):
         return {
-            field_name: deepcopy(st.session_state[field_name])
+            field_name: deepcopy(state[field_name])
             for field_name in self.fields_to_save()
-            if field_name in st.session_state
+            if field_name in state
         } | {
             "updated_at": datetime.datetime.utcnow(),
         }
@@ -643,7 +647,6 @@ class BasePage:
         response_body = get_example_request_body(self.ResponseModel, st.session_state)
 
         st.write("#### 📤 Example Request")
-
         with st.columns([3, 1])[0]:
             api_example_generator(api_url, request_body)
 
@@ -652,102 +655,23 @@ class BasePage:
             st.write("**Please Login to generate the `$GOOEY_API_KEY`**")
             return
 
+        response = ApiResponseModel[self.ResponseModel](
+            id="zxcv",
+            url=self._get_current_url(),
+            created_at=datetime.datetime.utcnow().isoformat(),
+            output=response_body,
+        )
         st.write("#### 🎁 Example Response")
-        st.json(response_body, expanded=False)
+        st.json(
+            response.json(),
+            expanded=False,
+        )
+
+        st.write("---")
+        st.write("### 🔐 API keys")
 
         with st.columns([3, 1])[0]:
-            st.write(
-                """
----
-### 🔐 API keys
-
-Your secret API keys are listed below. Please note that we do not display your secret API keys again after you generate them.
-
-Do not share your API key with others, or expose it in the browser or other client-side code. In order to protect the security of your account, Gooey.AI may also automatically rotate any API key that we've found has leaked publicly.
-                """
-            )
-
-            db_collection = db._db.collection(db.API_KEYS_COLLECTION)
-
-            api_keys = st.session_state.setdefault("__api_keys", [])
-            if not api_keys:
-                with st.spinner("Loading API Keys..."):
-                    api_keys.extend(
-                        [
-                            snap.to_dict()
-                            for snap in db_collection.where("uid", "==", user.uid)
-                            # .order_by("created_at")
-                            .get()
-                        ]
-                    )
-
-            table_area = st.container()
-
-            if st.button("＋ Create new secret key"):
-                with st.spinner("Generating a new API key..."):
-                    new_api_key = "gsk-" + get_random_string(
-                        length=48, allowed_chars=RANDOM_STRING_CHARS
-                    )
-
-                    hasher = PBKDF2PasswordHasher()
-                    secret_key_hash = hasher.encode(new_api_key, hasher.salt())
-                    created_at = datetime.datetime.utcnow()
-
-                    doc = {
-                        "uid": user.uid,
-                        "secret_key_hash": secret_key_hash,
-                        "secret_key_preview": safe_preview(new_api_key),
-                        "created_at": created_at,
-                    }
-
-                    api_keys.append(doc)
-                    db_collection.add(doc)
-
-                st.success(
-                    f"""
-##### API key generated
-
-Please save this secret key somewhere safe and accessible. 
-For security reasons, **you won't be able to view it again** through your account. 
-If you lose this secret key, you'll need to generate a new one.
-                    """
-                )
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.text_input(
-                        "recipe url",
-                        label_visibility="collapsed",
-                        disabled=True,
-                        value=new_api_key,
-                    )
-                with col2:
-                    copy_to_clipboard_button(
-                        "📎 Copy Secret Key",
-                        value=new_api_key,
-                        style="padding: 6px",
-                        height=55,
-                    )
-
-            with table_area:
-                st.table(
-                    pd.DataFrame.from_records(
-                        [
-                            (api_key["secret_key_preview"], api_key["created_at"])
-                            for api_key in api_keys
-                        ],
-                        columns=["Secret Key (Preview)", "Created At"],
-                    ),
-                )
-                # hide table index
-                hidden_html_nojs(
-                    """
-                    <style>
-                    table {font-family:"Source Code Pro", monospace}
-                    thead tr th:first-child {display:none}
-                    tbody th {display:none}
-                    </style>
-                    """
-                )
+            manage_api_keys(user)
 
     def check_credits(self) -> bool:
         user = st.session_state.get("_current_user")

@@ -9,10 +9,9 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
 )
 from daras_ai_v2.crypto import (
-    get_random_string,
     PBKDF2PasswordHasher,
     safe_preview,
-    RANDOM_STRING_CHARS,
+    get_random_api_key,
 )
 from daras_ai_v2.hidden_html_widget import hidden_html_nojs
 
@@ -72,7 +71,7 @@ def _load_api_keys(db_collection, user):
                 [
                     snap.to_dict()
                     for snap in db_collection.where("uid", "==", user.uid)
-                    # .order_by("created_at")
+                    .order_by("created_at")
                     .get()
                 ]
             )
@@ -80,12 +79,9 @@ def _load_api_keys(db_collection, user):
 
 
 def _generate_new_key_doc() -> dict:
-    new_api_key = "gsk-" + get_random_string(
-        length=48, allowed_chars=RANDOM_STRING_CHARS
-    )
-
+    new_api_key = get_random_api_key()
     hasher = PBKDF2PasswordHasher()
-    secret_key_hash = hasher.encode(new_api_key, hasher.salt())
+    secret_key_hash = hasher.encode(new_api_key)
     created_at = datetime.datetime.utcnow()
 
     st.success(
