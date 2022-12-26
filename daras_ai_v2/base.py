@@ -733,13 +733,12 @@ class BasePage:
         _, run_id, uid = self.extract_query_params(st.experimental_get_query_params())
         run_id = run_id or get_random_doc_id()
         uid = uid or get_random_doc_id()
-        response = ApiResponseModel[self.ResponseModel](
+        return dict(
             id=run_id,
             url=self.app_url(run_id=run_id, uid=uid),
             created_at=datetime.datetime.utcnow().isoformat(),
             output=get_example_request_body(self.ResponseModel, state),
         )
-        return response.dict()
 
 
 def get_example_request_body(
