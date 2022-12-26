@@ -72,6 +72,29 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
+@app.get("/sitemap.xml", include_in_schema=False)
+async def get_sitemap():
+    my_sitemap = """<?xml version="1.0" encoding="UTF-8"?>
+                <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"""
+
+    all_paths = ["/", "/faq", "/pricing", "/privacy", "/terms"] + [
+        page.slug_versions[-1] for page in all_pages
+    ]
+
+    for path in all_paths:
+        url = furl(settings.APP_BASE_URL) / path
+        my_sitemap += f"""<url>
+              <loc>{url}</loc>
+              <lastmod>2022-12-26</lastmod>
+              <changefreq>daily</changefreq>
+              <priority>1.0</priority>
+          </url>"""
+
+    my_sitemap += """</urlset>"""
+
+    return Response(content=my_sitemap, media_type="application/xml")
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return FileResponse("static/favicon.ico")
@@ -401,7 +424,7 @@ all_pages: list[typing.Type[BasePage]] = [
     EmailFaceInpaintingPage,
     LetterWriterPage,
     LipsyncPage,
-    CompareLMPage,
+    # CompareLMPage,
     ImageSegmentationPage,
     TextToSpeechPage,
     LipsyncTTSPage,
