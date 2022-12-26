@@ -3,7 +3,7 @@ import typing
 import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai_v2.base import BasePage, GOOEY_LOGO
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.img_model_settings_widgets import (
     negative_prompt_setting,
@@ -126,16 +126,6 @@ class CompareText2ImgPage(BasePage):
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
                 st.image(img, caption=Text2ImgModels[key].value)
-
-    def preview_image(self, state: dict) -> str:
-        output_images = state.get("output_images", [""])
-        image = ""
-        if output_images:
-            if isinstance(output_images, dict):
-                first_value = next(iter(output_images.values()))
-                if isinstance(first_value, list) and first_value:
-                    image = first_value[0]
-        return image if image else GOOEY_LOGO
 
     def preview_description(self, state: dict) -> str:
         return "Create multiple AI photos from Stable Diffusion (1.5 -> 2.1) and DallE from one prompt. Determine which AI image generator from OpenAI, Stability.AI works best for your text."

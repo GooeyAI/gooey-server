@@ -640,7 +640,11 @@ class BasePage:
             if isinstance(images, list):
                 return images[0]
             elif isinstance(images, dict):
-                return GOOEY_LOGO
+                first_value = next(iter(images.values()))
+                if isinstance(first_value, list) and first_value:
+                    return first_value[0]
+                elif isinstance(first_value, str) and first_value:
+                    return first_value
             else:
                 return images
         return GOOEY_LOGO
