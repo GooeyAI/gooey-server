@@ -72,7 +72,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
-@app.get("/sitemap.xml", include_in_schema=False)
+@app.get("/sitemap.xml/", include_in_schema=False)
 async def get_sitemap():
     my_sitemap = """<?xml version="1.0" encoding="UTF-8"?>
                 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"""
@@ -95,7 +95,7 @@ async def get_sitemap():
     return Response(content=my_sitemap, media_type="application/xml")
 
 
-@app.get("/favicon.ico", include_in_schema=False)
+@app.get("/favicon.ico/", include_in_schema=False)
 async def favicon():
     return FileResponse("static/favicon.ico")
 
