@@ -361,9 +361,6 @@ class ImageSegmentationPage(BasePage):
             else:
                 st.empty()
 
-    def preview_image(self, state: dict) -> str:
-        return state.get("cutout_image", "")
-
     def preview_description(self, state: dict) -> str:
         return "Use Dichotomous Image Segmentation to remove unwanted backgrounds from your images and correct perspective. Awesome when used with other Gooey.AI steps."
 

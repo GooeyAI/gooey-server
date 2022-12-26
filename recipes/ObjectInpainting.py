@@ -312,9 +312,6 @@ class ObjectInpaintingPage(BasePage):
                 for img in output_images:
                     st.image(img, caption=state.get("text_prompt", ""))
 
-    def preview_image(self, state: dict) -> str:
-        return state.get("output_images", [""])[0]
-
     def preview_description(self, state: dict) -> str:
         return "Upload your product photo and describe the background. Then use Stable Diffusion's Inpainting AI to create professional background scenery without the photoshoot."
 

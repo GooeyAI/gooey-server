@@ -632,6 +632,17 @@ class BasePage:
         pass
 
     def preview_image(self, state: dict) -> str:
+        images = state.get(
+            "output_images",
+            state.get("output_image", state.get("cutout_image", "")),
+        )
+        if images:
+            if isinstance(images, list):
+                return images[0]
+            elif isinstance(images, dict):
+                return GOOEY_LOGO
+            else:
+                return images
         return GOOEY_LOGO
 
     def run_as_api_tab(self):

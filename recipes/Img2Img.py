@@ -139,9 +139,6 @@ class Img2ImgPage(BasePage):
             seed=request.seed,
         )
 
-    def preview_image(self, state: dict) -> str:
-        return state.get("output_images", [""])[0]
-
     def preview_description(self, state: dict) -> str:
         return "Add an image and a prompt and this workflow will alter the image using your text & the latest Stable Difussion Img2Img AI model."
 

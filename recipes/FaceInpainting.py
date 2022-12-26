@@ -316,9 +316,6 @@ class FaceInpaintingPage(BasePage):
                 for img in output_images:
                     st.image(img, caption=state.get("text_prompt", ""))
 
-    def preview_image(self, state: dict) -> str:
-        return state.get("output_images", [""])[0]
-
 
 if __name__ == "__main__":
     FaceInpaintingPage().render()
