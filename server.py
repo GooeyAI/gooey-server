@@ -4,6 +4,7 @@ import time
 import typing
 
 import httpx
+import streamlit
 from fastapi import FastAPI, Depends
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -270,7 +271,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         page_cls().endpoint,
         response_model=response_model,
-        responses={500: {"model": FailedReponseModel}},
+        responses={500: {"model": FailedReponseModel}, 402: {}},
         name=page_cls.title,
         operation_id=page_cls.slug_versions[0],
     )
@@ -278,10 +279,23 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         user: auth.UserRecord = Depends(api_auth_header),
         page_request: page_cls.RequestModel = body_spec,
     ):
-        created_at = datetime.datetime.utcnow().isoformat()
-
         # init a new page for every request
         page = page_cls()
+
+        # check the balance
+        balance = db.get_doc_field(
+            db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
+        )
+        if balance < page.get_price():
+            account_url = furl(settings.APP_BASE_URL) / "account"
+            return JSONResponse(
+                status_code=402,
+                content={
+                    "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
+                },
+            )
+
+        created_at = datetime.datetime.utcnow().isoformat()
 
         # get saved state from db
         state = db.get_or_create_doc(db.get_doc_ref(page.doc_name)).to_dict()
@@ -299,6 +313,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
 
         # set the current user
         state["_current_user"] = user
+        streamlit.session_state = state
 
         # create the run
         run_id = get_random_doc_id()
@@ -332,6 +347,8 @@ def script_to_api(page_cls: typing.Type[BasePage]):
 
         # save the run
         run_doc_ref.set(page.state_to_doc(state))
+        # deuct credits
+        page.deduct_credits()
 
         # return updated state
         return {
