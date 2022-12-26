@@ -686,10 +686,7 @@ class BasePage:
             return
 
         st.write("#### 🎁 Example Response")
-        st.json(
-            response_body,
-            expanded=False,
-        )
+        st.json(response_body, expanded=False)
 
         st.write("---")
         st.write("### 🔐 API keys")
@@ -731,11 +728,9 @@ class BasePage:
 
     def get_example_response_body(self, state: dict) -> dict:
         _, run_id, uid = self.extract_query_params(st.experimental_get_query_params())
-        run_id = run_id or get_random_doc_id()
-        uid = uid or get_random_doc_id()
         return dict(
-            id=run_id,
-            url=self.app_url(run_id=run_id, uid=uid),
+            id=run_id or get_random_doc_id(),
+            url=self._get_current_url(),
             created_at=datetime.datetime.utcnow().isoformat(),
             output=get_example_request_body(self.ResponseModel, state),
         )
