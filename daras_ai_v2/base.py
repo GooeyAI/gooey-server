@@ -42,6 +42,9 @@ USER_RUNS_COLLECTION = "user_runs"
 EXAMPLE_ID_QUERY_PARAM = "example_id"
 RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
+GOOEY_LOGO = (
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"
+)
 
 O = typing.TypeVar("O")
 
@@ -55,7 +58,7 @@ class ApiResponseModel(GenericModel, typing.Generic[O]):
 
 class BasePage:
     title: str
-    slug: str
+    slug_versions: list[str]
     version: int = 1
     sane_defaults: dict = {}
     RequestModel: typing.Type[BaseModel]
@@ -67,16 +70,16 @@ class BasePage:
     def doc_name(self) -> str:
         # for backwards compat
         if self.version == 1:
-            return self.slug
-        return f"{self.slug}#{self.version}"
+            return self.slug_versions[0]
+        return f"{self.slug_versions[0]}#{self.version}"
 
     @classmethod
     def app_url(cls) -> str:
-        return str(furl(settings.APP_BASE_URL) / (cls.slug + "/"))
+        return str(furl(settings.APP_BASE_URL) / (cls.slug_versions[-1] + "/"))
 
     @property
     def endpoint(self) -> str:
-        return f"/v2/{self.slug}/"
+        return f"/v2/{self.slug_versions[0]}/"
 
     def render(self):
         try:
@@ -89,7 +92,9 @@ class BasePage:
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("url", self.app_url())
             scope.set_extra("query_params", st.experimental_get_query_params())
-            scope.set_transaction_name("/" + self.slug, source=TRANSACTION_SOURCE_ROUTE)
+            scope.set_transaction_name(
+                "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
+            )
 
         init_scripts()
 
@@ -232,7 +237,7 @@ class BasePage:
         pass
 
     def render_form(self) -> bool:
-        with st.form(f"{self.slug}Form"):
+        with st.form(f"{self.slug_versions[0]}Form"):
             self.render_form_v2()
             submitted = st.form_submit_button("🏃 Submit", type="primary")
 
@@ -630,11 +635,35 @@ class BasePage:
     def render_example(self, state: dict):
         pass
 
+    def preview_title(self, state: dict, query_params: dict) -> str:
+        input_as_text = state.get("text_prompt", state.get("input_prompt"))
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        title = f"{self.title}"
+        if (run_id and uid) or example_id:
+            if input_as_text:
+                title = f"{input_as_text[:100]} ... {self.title}"
+        return f"{title} • AI API, workflow & prompt shared on Gooey.AI"
+
     def preview_description(self, state: dict) -> str:
         pass
 
     def preview_image(self, state: dict) -> str:
-        pass
+        images = state.get(
+            "output_images",
+            state.get("output_image", state.get("cutout_image", "")),
+        )
+        if images:
+            if isinstance(images, list):
+                return images[0]
+            elif isinstance(images, dict):
+                first_value = next(iter(images.values()))
+                if isinstance(first_value, list) and first_value:
+                    return first_value[0]
+                elif isinstance(first_value, str) and first_value:
+                    return first_value
+            else:
+                return images
+        return GOOEY_LOGO
 
     def run_as_api_tab(self):
         api_docs_url = str(
