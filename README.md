@@ -1,6 +1,5 @@
 ### Setup
 
-
 1. Install [poetry](https://python-poetry.org/docs/)
 2. Run `poetry install --with dev`
 
@@ -39,11 +38,14 @@ uvicorn server:app --reload
 ```
 
 ### Our Colors
+
 pink: #ff66c6
 azure: #aae3ef
 
-### Github self-hosted runner 
+### Github self-hosted runner
+
 #### additional installs on top of GCP ubuntu:18.04
+
 ```
 apt-get install python3-venv ffmpeg libsm6 libxext6  -y
 ```
