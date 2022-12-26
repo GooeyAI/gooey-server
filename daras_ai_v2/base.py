@@ -727,9 +727,11 @@ class BasePage:
         return self.price
 
     def get_example_response_body(self, state: dict) -> dict:
-        _, run_id, uid = self.extract_query_params(st.experimental_get_query_params())
+        example_id, run_id, uid = self.extract_query_params(
+            st.experimental_get_query_params()
+        )
         return dict(
-            id=run_id or get_random_doc_id(),
+            id=run_id or example_id or get_random_doc_id(),
             url=self._get_current_url(),
             created_at=datetime.datetime.utcnow().isoformat(),
             output=get_example_request_body(self.ResponseModel, state),
