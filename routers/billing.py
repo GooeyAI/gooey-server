@@ -209,7 +209,7 @@ async def webhook_received(request: Request):
         return JSONResponse(
             {
                 "status": "failed",
-                "error": f"customer.metadata.uid not found for {customer}",
+                "error": f"customer.metadata.uid not found",
             },
             status_code=400,
         )
