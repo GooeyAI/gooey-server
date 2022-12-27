@@ -258,7 +258,10 @@ class BasePage:
                         """
                     )
 
-            with st.expander("Need more help? [Join our Discord](https://discord.gg/KQCrzgMPJ2)", expanded=False):
+            with st.expander(
+                "**Need more help? [Join our Discord](https://discord.gg/KQCrzgMPJ2)**",
+                expanded=False,
+            ):
                 st.markdown(
                     """
                     <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
@@ -267,8 +270,6 @@ class BasePage:
                     """,
                     unsafe_allow_html=True,
                 )
-
-
 
     def render_usage_guide(self):
         raise NotImplementedError
