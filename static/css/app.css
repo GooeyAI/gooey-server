@@ -21,7 +21,7 @@ a {
     text-decoration: none;
     color: #03dac5;
     font-size: 17px;
-    font-weight: 600;
+    /* font-weight: 600; */
 }
 
 a:visited {
@@ -51,17 +51,6 @@ ul {
 
 .header-links a {
     padding-right: 10px;
-}
-
-.align-header {
-    padding-left: 1rem;
-}
-
-@media (min-width: 576px) {
-    .align-header {
-        padding-left: 5rem;
-        padding-right: 5rem;
-    }
 }
 
 #profile-picture {
@@ -150,6 +139,7 @@ button {
 .product {
     display: flex;
     flex-direction: column;
+    padding-inline-start: 10px
 }
 
 .buy-credits-container {
@@ -185,7 +175,31 @@ iframe {
 
 .login-container {
     position: absolute;
-    top: 25px;
-    right: 25px;
-    text-align: center;
+    top: 1rem;
+    right: 1rem;
+    text-align: right;
+    font-size: 15px;
+}
+
+.login-name {
+    font-size: 1rem;
+}
+
+.login-id {
+    color: white;
+    font-size: .8rem;
+}
+
+.align-header {
+    padding-left: 1rem;
+}
+
+@media (min-width: 576px) {
+    .align-header {
+        padding-left: 5rem;
+        padding-right: 5rem;
+    }
+    .login-container {
+        right: 5rem;
+    }
 }

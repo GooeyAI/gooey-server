@@ -61,15 +61,15 @@ class CompareText2ImgPage(BasePage):
         )
 
     def validate_form_v2(self):
-        assert st.session_state["text_prompt"], "Please provide a Prompt"
-        assert st.session_state["selected_models"], "Please Select at least one model"
+        assert st.session_state["text_prompt"], "Please provide a prompt"
+        assert st.session_state["selected_models"], "Please select at least one model"
 
     def render_description(self):
         st.write(
             """
                 This recipe takes any text and renders an image using multiple Text2Image engines. 
                 
-                Use it to understand which render e.g. DallE or Stable Diffusion is best for your particular prompt. 
+                Use it to understand which image generator e.g. DallE or Stable Diffusion is best for your particular prompt. 
             """
         )
 

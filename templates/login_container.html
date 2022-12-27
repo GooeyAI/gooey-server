@@ -1,11 +1,10 @@
 {% if request.user %}
     <div class="login-container">
-        <a href="/account">
+        <a href="/account" class="login-name">
             {% if request.user.display_name %}
                 {{ request.user.display_name }}
             {% endif %}
-            <br>
-            <i style="font-weight: normal">{{ request.user.email or request.user.phone_number }}</i>
+            <div class="login-id" >{{ request.user.email or request.user.phone_number }}</div>
         </a>
     </div>
 {% else %}
@@ -26,7 +25,7 @@
              data-shape="pill"
              data-logo_alignment="right">
         </div>
-        <div style="height: 10px"></div>
-        <a style="font-size: 15px; color: wheat" href="/login?next={{ request.path }}">More Options</a>
+        <div style="height: 6px"></div>
+        <a style="font-size: 10px; color: wheat" href="/login?next={{ request.path }}">or another way...</a>&nbsp;
     </div>
 {% endif %}
