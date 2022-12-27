@@ -343,28 +343,28 @@ class LetterWriterPage(BasePage):
                 disabled=True,
             )
 
-        with st.expander("Steps", expanded=True):
-            response_json = st.session_state.get("response_json", {})
-            st.write("**API Response**")
-            st.json(
-                response_json,
-                expanded=False,
-            )
+    def render_steps(self):
+        response_json = st.session_state.get("response_json", {})
+        st.write("**API Response**")
+        st.json(
+            response_json,
+            expanded=False,
+        )
 
-            input_prompt = st.session_state.get("generated_input_prompt", "")
-            st.text_area(
-                "**Input Talking Points (Prompt)**",
-                value=input_prompt,
-                disabled=True,
-            )
+        input_prompt = st.session_state.get("generated_input_prompt", "")
+        st.text_area(
+            "**Input Talking Points (Prompt)**",
+            value=input_prompt,
+            disabled=True,
+        )
 
-            final_prompt = st.session_state.get("final_prompt", "")
-            st.text_area(
-                "**Final Language Model Prompt**",
-                value=final_prompt,
-                disabled=True,
-                height=300,
-            )
+        final_prompt = st.session_state.get("final_prompt", "")
+        st.text_area(
+            "**Final Language Model Prompt**",
+            value=final_prompt,
+            disabled=True,
+            height=300,
+        )
 
 
 if __name__ == "__main__":

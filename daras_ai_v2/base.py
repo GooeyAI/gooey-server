@@ -117,12 +117,11 @@ class BasePage:
             self._check_if_flagged()
 
             form_col, runner_col = st.columns(2)
-
-            self.render_footer()
-
             with form_col:
                 submitted = self.render_form()
-                self.render_description()
+
+            self.render_step_row()
+            self.render_footer()
 
         with settings_tab:
             self.render_settings()
@@ -247,7 +246,14 @@ class BasePage:
     def render_form(self) -> bool:
         with st.form(f"{self.slug_versions[0]}Form"):
             self.render_form_v2()
-            submitted = st.form_submit_button("🏃 Submit", type="primary")
+
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.caption(
+                    "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy_policy](https://gooey.ai/privacy)_",
+                )
+            with col2:
+                submitted = st.form_submit_button("🏃 Submit", type="primary")
 
         if not submitted:
             return False
@@ -259,6 +265,14 @@ class BasePage:
             return False
         else:
             return True
+
+    def render_step_row(self):
+        with st.expander("**Steps**"):
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                self.render_description()
+            with col2:
+                self.render_steps()
 
     def render_footer(self):
         col1, col2 = st.columns(2)
@@ -288,6 +302,10 @@ class BasePage:
                     """,
                     unsafe_allow_html=True,
                 )
+
+        with col2:
+            pass
+            # self._render_admin_options()
 
     def render_usage_guide(self):
         raise NotImplementedError
@@ -486,7 +504,7 @@ class BasePage:
         if "seed" in self.RequestModel.schema_json():
             seed = st.session_state.get("seed")
             st.caption(f"*Seed: `{seed}`*")
-            st.write("Don't like what you see? ")
+            # st.write("is_admin" + str(is_admin()))
             col1, col2 = st.columns(2)
             with col1:
                 randomize = st.button("♻️ Regenerate")
@@ -501,6 +519,8 @@ class BasePage:
         state_to_save = st.session_state.get("__state_to_save") or self.state_to_doc(
             st.session_state
         )
+        # st.write("state_to_save " + str(state_to_save))
+
         if not state_to_save:
             return
 
@@ -630,6 +650,18 @@ class BasePage:
                 st.experimental_rerun()
 
     def render_example(self, state: dict):
+        pass
+
+    def preview_title(self, state: dict, query_params: dict) -> str:
+        input_as_text = state.get("text_prompt", state.get("input_prompt"))
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        title = f"{self.title}"
+        if (run_id and uid) or example_id:
+            if input_as_text:
+                title = f"{input_as_text[:100]} ... {self.title}"
+        return f"{title} • AI API, workflow & prompt shared on Gooey.AI"
+
+    def render_steps(self):
         pass
 
     def preview_title(self, state: dict, query_params: dict) -> str:

@@ -143,31 +143,29 @@ class VideoBotsPage(BasePage):
         for idx, video_url in enumerate(st.session_state.get("output_video", [])):
             st.video(video_url)
 
-        with st.expander("Steps"):
-            st.write("Input Face")
-            st.video(st.session_state.get("input_face"))
+    def render_steps(self):
+        st.write("Input Face")
+        st.video(st.session_state.get("input_face"))
 
-            st.text_area(
-                "Final Prompt",
-                value=st.session_state.get("final_prompt"),
-                height=200,
-                disabled=True,
-            )
+        st.text_area(
+            "Final Prompt",
+            value=st.session_state.get("final_prompt"),
+            height=200,
+            disabled=True,
+        )
 
-            col1, col2 = st.columns(2)
-            with col1:
-                for idx, text in enumerate(st.session_state.get("output_text", [])):
-                    st.text_area(
-                        f"Text Response {idx + 1}",
-                        value=text,
-                        disabled=True,
-                    )
-            with col2:
-                for idx, audio_url in enumerate(
-                    st.session_state.get("output_audio", [])
-                ):
-                    st.write(f"Generated Audio {idx + 1}")
-                    st.audio(audio_url)
+        col1, col2 = st.columns(2)
+        with col1:
+            for idx, text in enumerate(st.session_state.get("output_text", [])):
+                st.text_area(
+                    f"Text Response {idx + 1}",
+                    value=text,
+                    disabled=True,
+                )
+        with col2:
+            for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
+                st.write(f"Generated Audio {idx + 1}")
+                st.audio(audio_url)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
