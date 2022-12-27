@@ -26,6 +26,14 @@ tasks:
 
 ports:
   - port: 8080
+    name: nginx
     onOpen: open-browser
+    visibility: public
+
   - port: 8000
+    name: uvicorn
+    visibility: public
+
   - port: 8501
+    name: streamlit
+    visibility: public
