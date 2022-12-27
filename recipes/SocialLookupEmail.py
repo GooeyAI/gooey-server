@@ -172,27 +172,27 @@ class SocialLookupEmailPage(BasePage):
             height=200,
         )
 
-        with st.expander("Steps", expanded=True):
-            person_data = st.session_state.get("person_data")
-            if person_data:
-                st.write("**Input Variables**")
-                st.json(
-                    self._input_variables(st.session_state),
-                    expanded=False,
-                )
-            else:
-                st.empty()
+    def render_steps(self):
+        person_data = st.session_state.get("person_data")
+        if person_data:
+            st.write("**Input Variables**")
+            st.json(
+                self._input_variables(st.session_state),
+                expanded=False,
+            )
+        else:
+            st.empty()
 
-            final_prompt = st.session_state.get("final_prompt")
-            if final_prompt:
-                st.text_area(
-                    "Final Prompt",
-                    disabled=True,
-                    value=final_prompt,
-                    height=200,
-                )
-            else:
-                st.empty()
+        final_prompt = st.session_state.get("final_prompt")
+        if final_prompt:
+            st.text_area(
+                "Final Prompt",
+                disabled=True,
+                value=final_prompt,
+                height=200,
+            )
+        else:
+            st.empty()
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)

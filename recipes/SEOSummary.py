@@ -166,42 +166,42 @@ class SEOSummaryPage(BasePage):
         else:
             st.empty()
 
-        with st.expander("Steps"):
-            col1, col2 = st.columns(2)
+    def render_steps(self):
+        col1, col2 = st.columns(2)
 
-            with col1:
-                scaleserp_results = st.session_state.get("scaleserp_results")
-                if scaleserp_results:
-                    st.write("**ScaleSERP Results**")
-                    st.json(scaleserp_results, expanded=False)
-                else:
-                    st.empty()
-
-            with col2:
-                search_urls = st.session_state.get("search_urls")
-                if search_urls:
-                    st.write("**Search URLs**")
-                    st.json(search_urls, expanded=False)
-                else:
-                    st.empty()
-
-            summarized_urls = st.session_state.get("summarized_urls")
-            if summarized_urls:
-                st.write("**Summarized URLs**")
-                st.json(summarized_urls, expanded=False)
+        with col1:
+            scaleserp_results = st.session_state.get("scaleserp_results")
+            if scaleserp_results:
+                st.write("**ScaleSERP Results**")
+                st.json(scaleserp_results, expanded=False)
             else:
                 st.empty()
 
-            final_prompt = st.session_state.get("final_prompt")
-            if final_prompt:
-                st.text_area(
-                    "Final Prompt",
-                    value=final_prompt,
-                    height=400,
-                    disabled=True,
-                )
+        with col2:
+            search_urls = st.session_state.get("search_urls")
+            if search_urls:
+                st.write("**Search URLs**")
+                st.json(search_urls, expanded=False)
             else:
                 st.empty()
+
+        summarized_urls = st.session_state.get("summarized_urls")
+        if summarized_urls:
+            st.write("**Summarized URLs**")
+            st.json(summarized_urls, expanded=False)
+        else:
+            st.empty()
+
+        final_prompt = st.session_state.get("final_prompt")
+        if final_prompt:
+            st.text_area(
+                "Final Prompt",
+                value=final_prompt,
+                height=400,
+                disabled=True,
+            )
+        else:
+            st.empty()
 
     def render_example(self, state: dict):
         st.write(
