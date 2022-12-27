@@ -248,12 +248,12 @@ class BasePage:
             self.render_form_v2()
 
             col1, col2 = st.columns([2, 1])
-            with col2:
-                submitted = st.form_submit_button("🏃 Submit", type="primary")
             with col1:
                 st.caption(
                     "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy_policy](https://gooey.ai/privacy)_",
                 )
+            with col2:
+                submitted = st.form_submit_button("🏃 Submit", type="primary")
 
         if not submitted:
             return False
@@ -268,7 +268,7 @@ class BasePage:
 
     def render_step_row(self):
         with st.expander("**Steps**"):
-            col1, col2 = st.columns(2)
+            col1, col2 = st.columns([1, 2])
             with col1:
                 self.render_description()
             with col2:
