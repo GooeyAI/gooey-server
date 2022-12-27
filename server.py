@@ -396,18 +396,28 @@ def st_page(request: Request, page_slug):
     iframe_url = furl(
         settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
     )
+    example_id, run_id, uid = page.extract_query_params(dict(request.query_params))
+    description = _build_description(example_id, page, run_id, state, uid)
+
     return _st_page(
         request,
         str(iframe_url),
         block_incognito=True,
         context={
             "title": page.preview_title(
-                state=state, query_params=dict(request.query_params)
+                state=state, run_id=run_id, uid=uid, example_id=example_id
             ),
-            "description": page.preview_description(state),
+            "description": description,
             "image": page.preview_image(state),
         },
     )
+
+
+def _build_description(example_id, page, run_id, state, uid):
+    description = page.preview_description(state)
+    if (run_id and uid) or example_id:
+        description += " AI API, workflow & prompt shared on Gooey.AI."
+    return description
 
 
 def _st_page(

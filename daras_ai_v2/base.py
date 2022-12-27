@@ -28,6 +28,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
+from daras_ai_v2.db import get_user_doc_ref
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.query_params import gooey_reset_query_parm
@@ -632,14 +633,33 @@ class BasePage:
     def render_example(self, state: dict):
         pass
 
-    def preview_title(self, state: dict, query_params: dict) -> str:
+    def preview_title(self, state: dict, run_id: str, uid: str, example_id: str) -> str:
         input_as_text = state.get("text_prompt", state.get("input_prompt"))
-        example_id, run_id, uid = self.extract_query_params(query_params)
-        title = f"{self.title}"
-        if (run_id and uid) or example_id:
-            if input_as_text:
-                title = f"{input_as_text[:100]} ... {self.title}"
-        return f"{title} • AI API, workflow & prompt shared on Gooey.AI"
+        prev_title = f"{self.title}"  # PREVIEW TITLE
+        if run_id and uid:
+            prev_title = self._build_preview_title_for_run(input_as_text, uid)
+            return f"{prev_title} on Gooey.AI"
+        if example_id and input_as_text:
+            prev_title = f"{input_as_text[:100]} ... {self.title}"
+            return f"{prev_title} on Gooey.AI"
+        return f"{prev_title} • AI API, workflow & prompt shared on Gooey.AI"
+
+    def _build_preview_title_for_run(self, input_as_text, uid):
+        if input_as_text:
+            # INPUT PROMPT
+            title = f"{input_as_text[:100]} ... "
+
+            # USER NAME
+            user_ref = get_user_doc_ref(uid)
+            user = user_ref.get().to_dict()
+            if "name" in user:
+                name = user.get("name")
+                title += f"• {name}'s "
+
+            # RECIPE TITLE
+            title += f"{self.title}"
+            return title
+        return ""
 
     def preview_description(self, state: dict) -> str:
         pass
