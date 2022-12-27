@@ -141,19 +141,19 @@ class GoogleImageGenPage(BasePage):
         else:
             st.empty()
 
-        with st.expander("Steps", expanded=True):
-            image_urls = st.session_state.get("image_urls")
-            if image_urls:
-                st.write("**Image URLs**")
-                st.json(image_urls, expanded=False)
-            else:
-                st.empty()
+    def render_steps(self):
+        image_urls = st.session_state.get("image_urls")
+        if image_urls:
+            st.write("**Image URLs**")
+            st.json(image_urls, expanded=False)
+        else:
+            st.empty()
 
-            selected_image = st.session_state.get("selected_image")
-            if selected_image:
-                st.image(selected_image, caption="Selected Image")
-            else:
-                st.empty()
+        selected_image = st.session_state.get("selected_image")
+        if selected_image:
+            st.image(selected_image, caption="Selected Image")
+        else:
+            st.empty()
 
     def render_example(self, state: dict):
         st.write(

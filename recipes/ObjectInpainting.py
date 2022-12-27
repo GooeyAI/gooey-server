@@ -217,35 +217,38 @@ class ObjectInpaintingPage(BasePage):
             else:
                 st.empty()
 
-        with st.expander("Steps"):
-            col1, col2, col3 = st.columns(3)
+    def render_steps(self):
+        input_file = st.session_state.get("input_file")
+        input_image = st.session_state.get("input_image")
+        input_image_or_file = input_image or input_file
+        col1, col2, col3 = st.columns(3)
 
-            with col1:
-                if input_image_or_file:
-                    st.image(input_image_or_file, caption="Input Image")
-                else:
-                    st.empty()
+        with col1:
+            if input_image_or_file:
+                st.image(input_image_or_file, caption="Input Image")
+            else:
+                st.empty()
 
-            with col2:
-                resized_image = st.session_state.get("resized_image")
-                if resized_image:
-                    st.image(resized_image, caption="Repositioned Object")
-                else:
-                    st.empty()
+        with col2:
+            resized_image = st.session_state.get("resized_image")
+            if resized_image:
+                st.image(resized_image, caption="Repositioned Object")
+            else:
+                st.empty()
 
-                obj_mask = st.session_state.get("obj_mask")
-                if obj_mask:
-                    st.image(obj_mask, caption="Object Mask")
-                else:
-                    st.empty()
+            obj_mask = st.session_state.get("obj_mask")
+            if obj_mask:
+                st.image(obj_mask, caption="Object Mask")
+            else:
+                st.empty()
 
-            with col3:
-                diffusion_images = st.session_state.get("output_images")
-                if diffusion_images:
-                    for url in diffusion_images:
-                        st.image(url, caption=f"Generated Image")
-                else:
-                    st.empty()
+        with col3:
+            diffusion_images = st.session_state.get("output_images")
+            if diffusion_images:
+                for url in diffusion_images:
+                    st.image(url, caption=f"Generated Image")
+            else:
+                st.empty()
 
     def run(self, state: dict):
         request: ObjectInpaintingPage.RequestModel = self.RequestModel.parse_obj(state)
