@@ -6,16 +6,11 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - name: shell
-    command: poetry shell
-
-  - name: nginx
-    command: sudo nginx -c $PWD/nginx.dev.conf
-
-  - name: poetry
-    init: |
-      poetry install --with dev
+  - name: install deps
+    init: >
+      poetry install --sync --with dev &&
       gp sync-done poetry
+    command: poetry shell
 
   - name: streamlit
     init: gp sync-await poetry
@@ -24,6 +19,10 @@ tasks:
   - name: uvicorn
     init: gp sync-await poetry
     command: poetry run uvicorn server:app --reload --port 8000
+
+  - name: nginx
+    init: gp sync-await poetry
+    command: sleep 10 && sudo nginx -c $PWD/nginx.dev.conf
 
 ports:
   - port: 8080
