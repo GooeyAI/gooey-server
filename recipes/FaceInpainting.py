@@ -1,4 +1,5 @@
 import typing
+from functools import partial
 
 import cv2
 import requests
@@ -34,6 +35,7 @@ class FaceInpaintingPage(BasePage):
         "output_height": 512,
         "guidance_scale": 7.5,
         "seed": 42,
+        "upscale_factor": 1.0,
     }
 
     class RequestModel(BaseModel):
@@ -50,6 +52,7 @@ class FaceInpaintingPage(BasePage):
 
         num_outputs: int | None
         quality: int | None
+        upscale_factor: float | None
 
         output_width: int | None
         output_height: int | None
@@ -126,6 +129,16 @@ class FaceInpaintingPage(BasePage):
 
     def render_settings(self):
         img_model_settings(InpaintingModels)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.slider(
+                "##### Upscaling",
+                min_value=1.0,
+                max_value=4.0,
+                step=0.5,
+                key="upscale_factor",
+            )
 
         st.write("---")
 
@@ -298,7 +311,10 @@ class FaceInpaintingPage(BasePage):
 
         yield "Running gfpgan..."
 
-        output_images = map_parallel(gfpgan, diffusion_images)
+        output_images = map_parallel(
+            partial(gfpgan, scale=state["upscale_factor"]),
+            diffusion_images,
+        )
 
         state["output_images"] = [
             upload_file_from_bytes(

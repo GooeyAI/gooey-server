@@ -9,8 +9,8 @@ client = TestClient(app)
 
 
 @pytest.mark.parametrize("subscription", available_subscriptions.keys())
-def test_create_checkout_session(subscription: str):
-    with force_authentication():
+def test_create_checkout_session(subscription: str, test_auth_user):
+    with force_authentication(test_auth_user):
         r = client.post(
             "/__/stripe/create-checkout-session",
             data={"lookup_key": subscription},

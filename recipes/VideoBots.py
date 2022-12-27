@@ -147,7 +147,8 @@ class VideoBotsPage(BasePage):
         st.write("Input Face")
         st.video(st.session_state.get("input_face"))
 
-        st.text_area(
+        st.write("Input Face")
+            st.video(st.session_state.get("input_face"))st.text_area(
             "Final Prompt",
             value=st.session_state.get("final_prompt"),
             height=200,
@@ -174,10 +175,15 @@ class VideoBotsPage(BasePage):
 
         all_names = [m.group(2) for m in BOT_SCRIPT_RE.finditer(request.bot_script)]
         common_names = collections.Counter(all_names).most_common()
-        user_script_name, bot_script_name = (
-            common_names[0][0].strip(),
-            common_names[1][0].strip(),
-        )
+
+        try:
+            user_script_name, bot_script_name = (
+                common_names[0][0].strip(),
+                common_names[1][0].strip(),
+            )
+        except IndexError:
+            user_script_name = "User"
+            bot_script_name = "Bot"
 
         username = user_script_name
         current_user = st.session_state.get("_current_user")

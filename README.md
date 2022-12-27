@@ -1,5 +1,4 @@
 ## Setup
-
 1. Install [poetry](https://python-poetry.org/docs/)
 2. Run `poetry install --with dev`
 3. Active virtualenv (likely `poetry shell`)

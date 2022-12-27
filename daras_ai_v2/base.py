@@ -115,14 +115,12 @@ class BasePage:
 
         with run_tab:
             self._check_if_flagged()
+
             form_col, runner_col = st.columns(2)
             with form_col:
                 submitted = self.render_form()
-            with runner_col:
-                self._runner(submitted)
 
             self.render_step_row()
-
             self.render_footer()
 
         with settings_tab:
@@ -134,6 +132,8 @@ class BasePage:
         with api_tab:
             self.run_as_api_tab()
 
+        with runner_col:
+            self._runner(submitted)
         #
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
@@ -651,6 +651,15 @@ class BasePage:
 
     def render_example(self, state: dict):
         pass
+
+    def preview_title(self, state: dict, query_params: dict) -> str:
+        input_as_text = state.get("text_prompt", state.get("input_prompt"))
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        title = f"{self.title}"
+        if (run_id and uid) or example_id:
+            if input_as_text:
+                title = f"{input_as_text[:100]} ... {self.title}"
+        return f"{title} • AI API, workflow & prompt shared on Gooey.AI"
 
     def render_steps(self):
         pass
