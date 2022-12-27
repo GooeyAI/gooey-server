@@ -159,6 +159,7 @@ async def create_checkout_session(request: Request):
         metadata=metadata,
         subscription_data=subscription_data,
         invoice_creation=invoice_creation,
+        allow_promotion_codes=True,
     )
 
     return RedirectResponse(checkout_session.url, status_code=303)
