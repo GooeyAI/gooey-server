@@ -147,8 +147,7 @@ class VideoBotsPage(BasePage):
         st.write("Input Face")
         st.video(st.session_state.get("input_face"))
 
-        st.write("Input Face")
-            st.video(st.session_state.get("input_face"))st.text_area(
+        st.text_area(
             "Final Prompt",
             value=st.session_state.get("final_prompt"),
             height=200,
@@ -164,9 +163,7 @@ class VideoBotsPage(BasePage):
                     disabled=True,
                 )
         with col2:
-            for idx, audio_url in enumerate(
-                st.session_state.get("output_audio", [])
-            ):
+            for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
                 st.write(f"Generated Audio {idx + 1}")
                 st.audio(audio_url)
 

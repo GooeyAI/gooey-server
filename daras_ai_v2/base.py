@@ -305,7 +305,7 @@ class BasePage:
 
         with col2:
             pass
-            #self._render_admin_options()
+            # self._render_admin_options()
 
     def render_usage_guide(self):
         raise NotImplementedError
@@ -504,7 +504,7 @@ class BasePage:
         if "seed" in self.RequestModel.schema_json():
             seed = st.session_state.get("seed")
             st.caption(f"*Seed: `{seed}`*")
-            #st.write("is_admin" + str(is_admin()))
+            # st.write("is_admin" + str(is_admin()))
             col1, col2 = st.columns(2)
             with col1:
                 randomize = st.button("♻️ Regenerate")
@@ -519,7 +519,7 @@ class BasePage:
         state_to_save = st.session_state.get("__state_to_save") or self.state_to_doc(
             st.session_state
         )
-        #st.write("state_to_save " + str(state_to_save))
+        # st.write("state_to_save " + str(state_to_save))
 
         if not state_to_save:
             return
