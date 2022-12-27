@@ -7,8 +7,8 @@ from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
 
 
 class DeforumSDPage(BasePage):
-    title = "Text to Animation"
-    slug = "DeforumSD"
+    title = "AI Animation Generator"
+    slug_versions = ["DeforumSD", "animation-generator"]
 
     class RequestModel(BaseModel):
         input_prompt: str
@@ -30,6 +30,9 @@ class DeforumSDPage(BasePage):
             submitted = st.form_submit_button("🏃‍ Submit")
 
         return submitted
+
+    def preview_description(self, state: dict) -> str:
+        return "Input your text (including keyframes!) and animate using Stable Diffusion's Deforum. Create AI generated animation for free and easier than CoLab notebooks. Inspired by deforum.art."
 
     def render_description(self):
         st.write(

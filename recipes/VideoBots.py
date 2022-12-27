@@ -21,8 +21,8 @@ BOT_SCRIPT_RE = re.compile(r"(\n)([\w\ ]+)(:)")
 
 
 class VideoBotsPage(BasePage):
-    title = "Interactive Video Bots"
-    slug = "video-bots"
+    title = "Create Interactive Video Bots"
+    slug_versions = ["video-bots"]
 
     sane_defaults = {
         # tts
@@ -73,10 +73,13 @@ class VideoBotsPage(BasePage):
         face_padding_right: int | None
 
     class ResponseModel(BaseModel):
-        final_prompt: str
         output_text: list[str]
         output_audio: list[str]
         output_video: list[str]
+        final_prompt: str
+
+    def preview_description(self, state: dict) -> str:
+        return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. The host it on your own site or app."
 
     def render_form_v2(self):
         tab1, tab2 = st.tabs(["💬 Chat", "📝 Script"])
@@ -141,6 +144,9 @@ class VideoBotsPage(BasePage):
             st.video(video_url)
 
         with st.expander("Steps"):
+            st.write("Input Face")
+            st.video(st.session_state.get("input_face"))
+
             st.text_area(
                 "Final Prompt",
                 value=st.session_state.get("final_prompt"),
@@ -172,8 +178,6 @@ class VideoBotsPage(BasePage):
             common_names[0][0].strip(),
             common_names[1][0].strip(),
         )
-
-        print(user_script_name, bot_script_name)
 
         username = user_script_name
         current_user = st.session_state.get("_current_user")

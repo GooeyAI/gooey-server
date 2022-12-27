@@ -159,6 +159,7 @@ async def create_checkout_session(request: Request):
         metadata=metadata,
         subscription_data=subscription_data,
         invoice_creation=invoice_creation,
+        allow_promotion_codes=True,
     )
 
     return RedirectResponse(checkout_session.url, status_code=303)
@@ -199,8 +200,19 @@ async def webhook_received(request: Request):
 
     data = event.data.object
 
-    uid = stripe.Customer.retrieve(data.customer).metadata.uid
-    assert uid, "customer.metadata.uid not found"
+    customer = stripe.Customer.retrieve(data.customer)
+    try:
+        uid = customer.metadata.uid
+    except AttributeError:
+        uid = None
+    if not uid:
+        return JSONResponse(
+            {
+                "status": "failed",
+                "error": f"customer.metadata.uid not found",
+            },
+            status_code=400,
+        )
 
     # Get the type of webhook event sent - used to check the status of PaymentIntents.
     match event["type"]:

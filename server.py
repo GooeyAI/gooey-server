@@ -4,7 +4,8 @@ import time
 import typing
 
 import httpx
-from fastapi import FastAPI, Header
+import streamlit
+from fastapi import FastAPI, Depends
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,7 +16,7 @@ from firebase_admin import auth, exceptions
 from furl import furl
 from google.cloud import firestore
 from lxml.html import HtmlElement
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
 from pyquery import PyQuery as pq
 from sentry_sdk import capture_exception
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -32,8 +33,10 @@ from daras_ai_v2 import settings, db
 from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
+    ApiResponseModel,
 )
-from gooey_token_authentication1.token_authentication import authenticate
+from daras_ai_v2.crypto import get_random_doc_id
+from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLM import CompareLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
@@ -70,7 +73,30 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
-@app.get("/favicon.ico", include_in_schema=False)
+@app.get("/sitemap.xml/", include_in_schema=False)
+async def get_sitemap():
+    my_sitemap = """<?xml version="1.0" encoding="UTF-8"?>
+                <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"""
+
+    all_paths = ["/", "/faq", "/pricing", "/privacy", "/terms"] + [
+        page.slug_versions[-1] for page in all_pages
+    ]
+
+    for path in all_paths:
+        url = furl(settings.APP_BASE_URL) / path
+        my_sitemap += f"""<url>
+              <loc>{url}</loc>
+              <lastmod>2022-12-26</lastmod>
+              <changefreq>daily</changefreq>
+              <priority>1.0</priority>
+          </url>"""
+
+    my_sitemap += """</urlset>"""
+
+    return Response(content=my_sitemap, media_type="application/xml")
+
+
+@app.get("/favicon.ico/", include_in_schema=False)
 async def favicon():
     return FileResponse("static/favicon.ico")
 
@@ -227,31 +253,49 @@ def run(
     return {"outputs": outputs}
 
 
-class RunFailedModel(BaseModel):
-    error: str
+class FailedReponseModel(BaseModel):
+    id: str | None
+    url: str | None
+    created_at: str | None
+    error: str | None
 
 
 def script_to_api(page_cls: typing.Type[BasePage]):
     body_spec = Body(examples=page_cls.RequestModel.Config.schema_extra.get("examples"))
 
+    response_model = create_model(
+        page_cls.__name__ + "Response",
+        __base__=ApiResponseModel[page_cls.ResponseModel],
+    )
+
     @app.post(
         page_cls().endpoint,
-        response_model=page_cls.ResponseModel,
-        responses={500: {"model": RunFailedModel}},
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModel}, 402: {}},
         name=page_cls.title,
+        operation_id=page_cls.slug_versions[0],
     )
     def run_api(
-        request: Request,
-        Authorization: typing.Union[str, None] = Header(
-            default="", description="Token $GOOEY_API_TOKEN"
-        ),
+        user: auth.UserRecord = Depends(api_auth_header),
         page_request: page_cls.RequestModel = body_spec,
     ):
-        # Authenticate Token
-        authenticate(Authorization)
-
         # init a new page for every request
         page = page_cls()
+
+        # check the balance
+        balance = db.get_doc_field(
+            db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
+        )
+        if balance < page.get_price():
+            account_url = furl(settings.APP_BASE_URL) / "account"
+            return JSONResponse(
+                status_code=402,
+                content={
+                    "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
+                },
+            )
+
+        created_at = datetime.datetime.utcnow().isoformat()
 
         # get saved state from db
         state = db.get_or_create_doc(db.get_doc_ref(page.doc_name)).to_dict()
@@ -267,6 +311,20 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
         state.update(request_dict)
 
+        # set the current user
+        state["_current_user"] = user
+        streamlit.session_state = state
+
+        # create the run
+        run_id = get_random_doc_id()
+        run_url = str(
+            furl(page.app_url(), query_params=dict(run_id=run_id, uid=user.uid))
+        )
+        run_doc_ref = page.run_doc_ref(run_id, user.uid)
+
+        # save the run
+        run_doc_ref.set(page.state_to_doc(state))
+
         # run the script
         try:
             gen = page.run(state)
@@ -277,10 +335,28 @@ def script_to_api(page_cls: typing.Type[BasePage]):
                 pass
         except Exception as e:
             capture_exception(e)
-            return JSONResponse(status_code=500, content={"error": err_msg_for_exc(e)})
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "id": run_id,
+                    "url": run_url,
+                    "created_at": created_at,
+                    "error": err_msg_for_exc(e),
+                },
+            )
+
+        # save the run
+        run_doc_ref.set(page.state_to_doc(state))
+        # deuct credits
+        page.deduct_credits()
 
         # return updated state
-        return state
+        return {
+            "id": run_id,
+            "url": run_url,
+            "created_at": created_at,
+            "output": state,
+        }
 
 
 @app.get("/explore/", include_in_schema=False)
@@ -318,14 +394,16 @@ def st_page(request: Request, page_slug):
         raise HTTPException(status_code=404)
 
     iframe_url = furl(
-        settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug}
+        settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
     )
     return _st_page(
         request,
         str(iframe_url),
         block_incognito=True,
         context={
-            "title": f"{page_cls.title} - Gooey.AI",
+            "title": page.preview_title(
+                state=state, query_params=dict(request.query_params)
+            ),
             "description": page.preview_description(state),
             "image": page.preview_image(state),
         },
@@ -363,7 +441,7 @@ all_pages: list[typing.Type[BasePage]] = [
     EmailFaceInpaintingPage,
     LetterWriterPage,
     LipsyncPage,
-    CompareLMPage,
+    # CompareLMPage,
     ImageSegmentationPage,
     TextToSpeechPage,
     LipsyncTTSPage,
@@ -383,7 +461,7 @@ def normalize_slug(page_slug):
 
 
 page_map: dict[str, typing.Type[BasePage]] = {
-    normalize_slug(page.slug): page for page in all_pages
+    normalize_slug(slug): page for page in all_pages for slug in page.slug_versions
 }
 
 

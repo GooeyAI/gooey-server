@@ -23,8 +23,8 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
 class FaceInpaintingPage(BasePage):
-    title = "A Face in Any Scene"
-    slug = "FaceInpainting"
+    title = "AI Image with a Face"
+    slug_versions = ["FaceInpainting", "face-in-ai-generated-photo"]
     version = 2
 
     sane_defaults = {
@@ -73,7 +73,7 @@ class FaceInpaintingPage(BasePage):
         output_images: list[str]
 
     def preview_description(self, state: dict) -> str:
-        return "This recipe takes a photo with a face and then uses the text prompt to paint a background."
+        return "Upload & extract a face into an AI-generated photo using your text + the latest Stable Diffusion or DallE image generator."
 
     def render_description(self):
         st.write(
@@ -320,9 +320,6 @@ class FaceInpaintingPage(BasePage):
             if output_images:
                 for img in output_images:
                     st.image(img, caption=state.get("text_prompt", ""))
-
-    def preview_image(self, state: dict) -> str:
-        return state.get("output_images", [""])[0]
 
 
 if __name__ == "__main__":

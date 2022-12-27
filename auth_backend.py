@@ -1,36 +1,36 @@
+import uuid
 from contextlib import contextmanager
 
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from starlette.authentication import AuthCredentials, AuthenticationBackend
 
-
-FIREBASE_SESSION_COOKIE = "firebase_session"
-ANONYMOUS_USER_COOKIE = "anonymous_user"
+from daras_ai_v2 import db
+from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
 
 # quick and dirty way to bypass authentication for testing
-_forced_auth_user: UserRecord | None = None
+_forced_auth_user = []
 
 
 @contextmanager
 def force_authentication(user: UserRecord = None):
-    global _forced_auth_user
     is_temp_user = not user
     if is_temp_user:
         user = auth.create_user()
+        db.update_user_balance(user.uid, abs(1000), f"gooey_test_in_{uuid.uuid1()}")
     try:
-        _forced_auth_user = user
+        _forced_auth_user.append(user)
         yield
     finally:
         if is_temp_user:
             auth.delete_user(user.uid)
-        _forced_auth_user = None
+        _forced_auth_user.clear()
 
 
 class SessionAuthBackend(AuthenticationBackend):
     async def authenticate(self, conn):
         if _forced_auth_user:
-            return AuthCredentials(["authenticated"]), _forced_auth_user
+            return AuthCredentials(["authenticated"]), _forced_auth_user[0]
 
         session_cookie = conn.session.get(FIREBASE_SESSION_COOKIE)
         if not session_cookie:

@@ -1,16 +1,13 @@
-### Setup
-
+## Setup
 
 1. Install [poetry](https://python-poetry.org/docs/)
 2. Run `poetry install --with dev`
-
 3. Active virtualenv (likely `poetry shell`)
 4. Copy `.env.example` -> `.env` (have someone send you the contents and then paste into the .env file)
 5. Save `serviceAccountKey.json` to project root (copy from Dara server project)
-
 6. run `pip install --upgrade -r requirements.txt` to get all the latest packages
 
-##### Install imagemagick
+### Install imagemagick
 
 Needed for HEIC image support - https://docs.wand-py.org/en/0.5.7/guide/install.html
 
@@ -18,6 +15,15 @@ Needed for HEIC image support - https://docs.wand-py.org/en/0.5.7/guide/install.
 brew install freetype imagemagick
 export MAGICK_HOME=/opt/homebrew
 ```
+
+### Install black (code formatter)
+
+Needed for uniform formatting - https://pypi.org/project/black
+
+### Recommended:
+
+Black IDE integration
+Guide: [Pycharm](https://black.readthedocs.io/en/stable/integrations/editors.html#pycharm-intellij-idea)
 
 ### Run
 
@@ -30,11 +36,14 @@ uvicorn server:app --reload
 ```
 
 ### Our Colors
+
 pink: #ff66c6
 azure: #aae3ef
 
-### Github self-hosted runner 
+### Github self-hosted runner
+
 #### additional installs on top of GCP ubuntu:18.04
+
 ```
 apt-get install python3-venv ffmpeg libsm6 libxext6  -y
 ```
