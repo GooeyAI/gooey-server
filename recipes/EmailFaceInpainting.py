@@ -27,6 +27,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         "output_height": 512,
         "guidance_scale": 7.5,
         "seed": 42,
+        "upscale_factor": 1.0,
     }
 
     class RequestModel(BaseModel):
@@ -44,6 +45,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         num_outputs: int | None
         quality: int | None
+        upscale_factor: float | None
 
         output_width: int | None
         output_height: int | None

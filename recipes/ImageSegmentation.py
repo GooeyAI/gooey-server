@@ -307,42 +307,42 @@ class ImageSegmentationPage(BasePage):
     def render_output(self):
         self.render_example(st.session_state)
 
-        with st.expander("Steps"):
-            col1, col2, col3, col4 = st.columns(4)
+    def render_steps(self):
+        col1, col2, col3, col4 = st.columns(4)
 
-            with col1:
-                input_image = st.session_state.get("input_image")
-                if input_image:
-                    st.image(input_image, caption="Input Photo")
-                else:
-                    st.empty()
+        with col1:
+            input_image = st.session_state.get("input_image")
+            if input_image:
+                st.image(input_image, caption="Input Photo")
+            else:
+                st.empty()
 
-            with col2:
-                output_image = st.session_state.get("output_image")
-                if output_image:
-                    st.image(output_image, caption=f"Segmentation Mask")
-                else:
-                    st.empty()
+        with col2:
+            output_image = st.session_state.get("output_image")
+            if output_image:
+                st.image(output_image, caption=f"Segmentation Mask")
+            else:
+                st.empty()
 
-            with col3:
-                resized_image = st.session_state.get("resized_image")
-                if resized_image:
-                    st.image(resized_image, caption=f"Resized Image")
-                else:
-                    st.empty()
+        with col3:
+            resized_image = st.session_state.get("resized_image")
+            if resized_image:
+                st.image(resized_image, caption=f"Resized Image")
+            else:
+                st.empty()
 
-                resized_mask = st.session_state.get("resized_mask")
-                if resized_mask:
-                    st.image(resized_mask, caption=f"Resized Mask")
-                else:
-                    st.empty()
+            resized_mask = st.session_state.get("resized_mask")
+            if resized_mask:
+                st.image(resized_mask, caption=f"Resized Mask")
+            else:
+                st.empty()
 
-            with col4:
-                cutout_image = st.session_state.get("cutout_image")
-                if cutout_image:
-                    st.image(cutout_image, caption=f"Cutout Image")
-                else:
-                    st.empty()
+        with col4:
+            cutout_image = st.session_state.get("cutout_image")
+            if cutout_image:
+                st.image(cutout_image, caption=f"Cutout Image")
+            else:
+                st.empty()
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)

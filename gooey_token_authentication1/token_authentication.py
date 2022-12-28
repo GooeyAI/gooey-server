@@ -35,7 +35,7 @@ def authenticate(auth_token: str):
     return authenticate_credentials(auth[1])
 
 
-def authenticate_credentials(token: str):
+def authenticate_credentials(token: str) -> auth.UserRecord:
     db_collection = db._db.collection(db.API_KEYS_COLLECTION)
     hasher = PBKDF2PasswordHasher()
     secret_key_hash = hasher.encode(token)

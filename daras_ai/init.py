@@ -55,6 +55,15 @@ def init_scripts():
         .stTabs [data-baseweb=tab-border] {
             margin-bottom: 10px;
         }
+        
+        .streamlit-expanderHeader p {
+            font-size: 1.2rem;
+        }
+        
+        video, img {
+            max-width: 350px;
+            max-height: 350px;
+        }
         </style>
         """
         + st_like_btn_css_html
@@ -83,6 +92,13 @@ def init_scripts():
                 lastHeight = height;
                 top.postMessage({ type: "GOOEY_IFRAME_RESIZE", height: height }, "*");
             }
+        </script>
+        <script>
+            parent.document.addEventListener("click", (e) => {
+                if (e.target.tagName == "IMG") {
+                    window.open(e.target.src);                    
+                }
+            });
         </script>
         """
     )
