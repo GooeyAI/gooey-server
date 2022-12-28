@@ -14,7 +14,7 @@ from daras_ai.computer import run_compute_steps
 from daras_ai.core import STEPS_REPO, IO_REPO
 from daras_ai.db import list_all_docs
 from daras_ai.init import init_scripts
-from daras_ai.secret_key_checker import check_secret_key, is_admin
+from daras_ai.secret_key_checker import is_admin
 from daras_ai_v2 import settings
 from daras_ai_v2.query_params import gooey_reset_query_parm
 

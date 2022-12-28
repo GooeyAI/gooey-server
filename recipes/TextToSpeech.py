@@ -101,7 +101,7 @@ class TextToSpeechPage(BasePage):
 
     def run(self, state: dict):
         yield "Generating Audio..."
-        text = state["text_prompt"]
+        text = state["text_prompt"].strip()
         tts_provider = (
             state["tts_provider"]
             if "tts_provider" in state
@@ -112,7 +112,7 @@ class TextToSpeechPage(BasePage):
                 state["uberduck_voice_name"]
                 if "uberduck_voice_name" in state
                 else "kanye-west-rap"
-            )
+            ).strip()
             pace = (
                 state["uberduck_speaking_rate"]
                 if "uberduck_speaking_rate" in state
@@ -150,7 +150,7 @@ class TextToSpeechPage(BasePage):
                 state["google_voice_name"]
                 if "google_voice_name" in state
                 else "en-US-Neural2-F"
-            )
+            ).strip()
             pitch = state["google_pitch"] if "google_pitch" in state else 0.0
             speaking_rate = (
                 state["google_speaking_rate"]

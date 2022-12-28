@@ -1,4 +1,5 @@
 import typing
+from functools import partial
 
 import cv2
 import requests
@@ -34,6 +35,7 @@ class FaceInpaintingPage(BasePage):
         "output_height": 512,
         "guidance_scale": 7.5,
         "seed": 42,
+        "upscale_factor": 1.0,
     }
 
     class RequestModel(BaseModel):
@@ -50,6 +52,7 @@ class FaceInpaintingPage(BasePage):
 
         num_outputs: int | None
         quality: int | None
+        upscale_factor: float | None
 
         output_width: int | None
         output_height: int | None
@@ -126,6 +129,16 @@ class FaceInpaintingPage(BasePage):
 
     def render_settings(self):
         img_model_settings(InpaintingModels)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.slider(
+                "##### Upscaling",
+                min_value=1.0,
+                max_value=4.0,
+                step=0.5,
+                key="upscale_factor",
+            )
 
         st.write("---")
 
@@ -212,42 +225,47 @@ class FaceInpaintingPage(BasePage):
             else:
                 st.empty()
 
-        with st.expander("Steps", expanded=True):
-            col1, col2, col3, col4 = st.columns(4)
+    def render_steps(self):
+        input_file = st.session_state.get("input_file")
+        input_image = st.session_state.get("input_image")
+        input_image_or_file = input_image or input_file
+        output_images = st.session_state.get("output_images")
 
-            with col1:
-                if input_image_or_file:
-                    st.image(input_image_or_file, caption="Input Image")
-                else:
-                    st.empty()
+        col1, col2, col3, col4 = st.columns(4)
 
-            with col2:
-                resized_image = st.session_state.get("resized_image")
-                if resized_image:
-                    st.image(resized_image, caption="Repositioned Face")
-                else:
-                    st.empty()
+        with col1:
+            if input_image_or_file:
+                st.image(input_image_or_file, caption="Input Image")
+            else:
+                st.empty()
 
-                face_mask = st.session_state.get("face_mask")
-                if face_mask:
-                    st.image(face_mask, caption="Face Mask")
-                else:
-                    st.empty()
+        with col2:
+            resized_image = st.session_state.get("resized_image")
+            if resized_image:
+                st.image(resized_image, caption="Repositioned Face")
+            else:
+                st.empty()
 
-            with col3:
-                diffusion_images = st.session_state.get("diffusion_images")
-                if diffusion_images:
-                    for url in diffusion_images:
-                        st.image(url, caption="Generated Image")
-                else:
-                    st.empty()
+            face_mask = st.session_state.get("face_mask")
+            if face_mask:
+                st.image(face_mask, caption="Face Mask")
+            else:
+                st.empty()
 
-            with col4:
-                if output_images:
-                    for url in output_images:
-                        st.image(url, caption="gfpgan - Face Restoration")
-                else:
-                    st.empty()
+        with col3:
+            diffusion_images = st.session_state.get("diffusion_images")
+            if diffusion_images:
+                for url in diffusion_images:
+                    st.image(url, caption="Generated Image")
+            else:
+                st.empty()
+
+        with col4:
+            if output_images:
+                for url in output_images:
+                    st.image(url, caption="gfpgan - Face Restoration")
+            else:
+                st.empty()
 
     def render_usage_guide(self):
         youtube_video("L-yHhIq3sE0")
@@ -293,7 +311,10 @@ class FaceInpaintingPage(BasePage):
 
         yield "Running gfpgan..."
 
-        output_images = map_parallel(gfpgan, diffusion_images)
+        output_images = map_parallel(
+            partial(gfpgan, scale=state["upscale_factor"]),
+            diffusion_images,
+        )
 
         state["output_images"] = [
             upload_file_from_bytes(
