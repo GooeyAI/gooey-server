@@ -410,6 +410,14 @@ def st_page(request: Request, page_slug):
     )
 
 
+def get_admin_status(request):
+    if request.user:
+        for admin_email in settings.ADMIN_EMAILS:
+            if request.user.email == admin_email:
+                return True
+    return False
+
+
 def _st_page(
     request: Request,
     iframe_url: str,
@@ -417,11 +425,13 @@ def _st_page(
     block_incognito: bool = False,
     context: dict,
 ):
+
     f = furl(iframe_url)
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
 
     db.get_or_init_user_data(request)
+    isAdmin = get_admin_status(request)
 
     return templates.TemplateResponse(
         "st_page.html",
@@ -430,6 +440,7 @@ def _st_page(
             "iframe_url": f.url,
             "settings": settings,
             "block_incognito": block_incognito,
+            "isAdmin": isAdmin,
             **context,
         },
     )
