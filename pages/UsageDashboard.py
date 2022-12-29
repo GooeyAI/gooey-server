@@ -143,6 +143,8 @@ with col2:
 Pro Tip: double click on any user to drill-down
 """
 
+time_axis = "1D"
+
 df = pd.DataFrame.from_records(
     [
         {
@@ -160,18 +162,19 @@ df["Time"] = pd.to_datetime(df["Time"])
 df = df.sort_values("Time")
 df = df.set_index("Time")
 
-df_area = df[["User"]].groupby("User").resample("1D").count()
+df_area = df[["User"]].groupby("User").resample(time_axis).count()
 df_area = df_area.reset_index(1)
-df_area.columns = ["Date", "Total Runs"]
+df_area.columns = ["Time", "Total Runs"]
 df_area = df_area[df_area["Total Runs"] > 0]
 
 st.plotly_chart(
     px.bar(
         df_area,
-        x="Date",
+        x="Time",
         y="Total Runs",
         color=df_area.index,
         text=df_area.index,
+        color_discrete_sequence=px.colors.qualitative.Light24,
     ),
     use_container_width=True,
 )
@@ -181,66 +184,19 @@ st.plotly_chart(
 Pro Tip: double click on any recipe to drill-down
 """
 
-df_area = df[["Recipe"]].groupby("Recipe").resample("1D").count()
+df_area = df[["Recipe"]].groupby("Recipe").resample(time_axis).count()
 df_area = df_area.reset_index(1)
-df_area.columns = ["Date", "Total Runs"]
+df_area.columns = ["Time", "Total Runs"]
 df_area = df_area[df_area["Total Runs"] > 0]
 
 st.plotly_chart(
     px.bar(
         df_area,
-        x="Date",
+        x="Time",
         y="Total Runs",
         color=df_area.index,
         text=df_area.index,
+        color_discrete_sequence=px.colors.qualitative.Light24,
     ),
     use_container_width=True,
 )
-
-# selected_user = st.selectbox("Filter By User", [""] + list(set(df["User"])))
-# if selected_user:
-#     df_for_user = df.where(df["User"] == selected_user)
-
-#     df_for_user = df_for_user[["ID"]].resample("1D").count()
-#     df_for_user.index.names = ["Date"]
-#     df_for_user.columns = ["Total Runs"]
-
-#     st.plotly_chart(
-#         px.line(df_for_user, y="Total Runs"),
-#         use_container_width=True,
-#     )
-
-
-# df_by_date = df[["ID"]].resample("1D").count()
-# df_by_date.index.names = ["Date"]
-# df_by_date.columns = ["Total Runs"]
-
-# col1, col2 = st.columns(2)
-# with col1:
-#     st.plotly_chart(
-#         px.line(df_by_date, y="Total Runs"),
-#         use_container_width=True,
-#     )
-# selected_date = st.selectbox(
-#     "Filter by Date",
-#     [""] + list(df_by_date.index),
-# )
-# if selected_date:
-#     df_by_date = df[["User"]].groupby("User").resample("1D").count()
-#     df_by_date = df_by_date[df_by_date.index.get_level_values("Time") == selected_date]
-#     df_by_date = df_by_date.reset_index(1)
-#     df_by_date = df_by_date[["User"]]
-#     df_by_date.columns = ["Total Runs"]
-
-#     col1, col2 = st.columns(2)
-#     with col1:
-#         st.write(df_by_date)
-#     with col2:
-#         st.plotly_chart(
-#             px.pie(
-#                 df_by_date,
-#                 values="Total Runs",
-#                 names=df_by_date.index,
-#             ),
-#             use_container_width=True,
-#         )
