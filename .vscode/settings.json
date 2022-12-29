@@ -2,5 +2,6 @@
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter",
         "editor.formatOnSave": true
-    }
+    },
+    "python.defaultInterpreterPath": "/workspace/.pyenv_mirror/poetry/virtualenvs/ddgai-_uKek8NR-py3.10/bin/python"
 }
