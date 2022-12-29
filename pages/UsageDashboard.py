@@ -63,7 +63,7 @@ st.json(
 )
 
 user_runs, user_runs_by_time = st.session_state.setdefault(
-    f"user_runs#9#{exclude_anon}#{exclude_team}", ([], [])
+    f"user_runs#{exclude_anon}#{exclude_team}", ([], [])
 )
 if not user_runs:
     with st.spinner(f"fetching user runs..."):
@@ -75,11 +75,14 @@ if not user_runs:
                 .document(user.uid)
                 .collections()
             )
-            total = {}
-            for recipe in recipes:
-                total[recipe.id] = len(recipe.select([]).get())
 
-                for snap in recipe.select(["updated_at"]).get():
+            total = {}
+            
+            for recipe in recipes:
+                runs = recipe.select(["updated_at"]).get()
+                total[recipe.id] = len(runs)
+                
+                for snap in runs:
                     updated_at = snap.to_dict().get("updated_at")
                     if not updated_at:
                         continue
