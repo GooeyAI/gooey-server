@@ -203,3 +203,9 @@ iframe {
         right: 5rem;
     }
 }
+
+.error-404-div {
+    width: 100vw;
+    height: 70vh;
+    text-align: center;
+}
