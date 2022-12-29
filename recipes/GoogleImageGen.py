@@ -54,6 +54,19 @@ class GoogleImageGenPage(BasePage):
         image_urls: list[str]
         selected_image: str
 
+    def render_description(self):
+        st.write(
+            """
+        This workflow creates unique, relevant images to help your site rank well for a given search query.
+
+How It Works:
+1. Looks up the top-ranked image for your search query
+2. Alters the image using your text prompt using Stable Diffusion or DallE
+
+The result is a fantastic, one of kind image that image that relevant to your search (and should rank well on Google).
+        """
+        )
+
     def run(self, state: dict):
         request: GoogleImageGenPage.RequestModel = self.RequestModel.parse_obj(state)
 
