@@ -17,6 +17,7 @@ team_emails = [
     "devxpy@gmail.com",
     "devxpy.spam@gmail.com",
     "sean@blagsvedt.com",
+    "ambika@ajaibghar.com",
 ]
 
 user_runs = st.session_state.setdefault("user_runs", [])
@@ -77,11 +78,11 @@ if not user_runs:
             )
 
             total = {}
-            
+
             for recipe in recipes:
                 runs = recipe.select(["updated_at"]).get()
                 total[recipe.id] = len(runs)
-                
+
                 for snap in runs:
                     updated_at = snap.to_dict().get("updated_at")
                     if not updated_at:
