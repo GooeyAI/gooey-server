@@ -106,6 +106,14 @@ available_subscriptions = {
 }
 
 
+def get_admin_status(request):
+    if request.user:
+        for admin_email in settings.ADMIN_EMAILS:
+            if request.user.email == admin_email:
+                return True
+    return False
+
+
 @router.route("/account", include_in_schema=False)
 def account(request: Request):
     if not request.user:
@@ -115,11 +123,14 @@ def account(request: Request):
 
     user_data = db.get_or_init_user_data(request)
 
+    isAdmin = get_admin_status(request)
+
     context = {
         "request": request,
         "available_subscriptions": available_subscriptions,
         "user_credits": user_data.get(db.USER_BALANCE_FIELD, 0),
         "subscription": get_user_subscription(request.user),
+        "isAdmin": isAdmin,
     }
 
     return templates.TemplateResponse("account.html", context)

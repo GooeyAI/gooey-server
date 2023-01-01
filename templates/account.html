@@ -20,29 +20,43 @@
                 <a href="/logout">Signout</a>
             </div>
         </div>
+        {% if isAdmin %}
+            <hr>
+            <div class="admin-div"><h2>Admin Links</h2>
+                <ul>
+                    <li><a href="https://gooey.ai/__/st/UsageDashboard" target="_blank">Usage Dashboard</a></li>
+                    <li><a href="https://datastudio.google.com/reporting/5c9bb981-ef13-4e46-a5af-eef92f3c42d7"
+                           target="_blank">Traffic
+                        Dashboard</a></li>
+                    <li><a href="https://sentry.io/organizations/dara-network/issues/?project=4504338635423744"
+                           target="_blank">Sentry</a></li>
+                </ul>
+            </div>
+        {% endif %}
+
         <hr>
         <div class="credits-container"><h2>Credits: {{ user_credits }} </h2></div>
-    {% if not subscription %}
-        <hr>
-        <div class="buy-credits-container"><h2>Buy Credits</h2>
-            <div class="plans-container">
-                {% for lookup_key, subscription in available_subscriptions.items() %}
-                    <ul class="product">
-                        <li><h3>{{ subscription["display"]["title"] }}</h3></li>
-                        <li><h4>{{ subscription["display"]["description"] }}</h4></li>
-                        <li>
-                            <form action="/__/stripe/create-checkout-session" method="POST">
-                                <!-- Add a hidden field with the lookup_key of your Price -->
-                                <input type="hidden" name="lookup_key" value="{{ lookup_key }}"/>
-                                <button class="btn-outline-dark" type="submit">Buy</button>
-                            </form>
-                        </li>
-                    </ul>
-                {% endfor %}
+        {% if not subscription %}
+            <hr>
+            <div class="buy-credits-container"><h2>Buy Credits</h2>
+                <div class="plans-container">
+                    {% for lookup_key, subscription in available_subscriptions.items() %}
+                        <ul class="product">
+                            <li><h3>{{ subscription["display"]["title"] }}</h3></li>
+                            <li><h4>{{ subscription["display"]["description"] }}</h4></li>
+                            <li>
+                                <form action="/__/stripe/create-checkout-session" method="POST">
+                                    <!-- Add a hidden field with the lookup_key of your Price -->
+                                    <input type="hidden" name="lookup_key" value="{{ lookup_key }}"/>
+                                    <button class="btn-outline-dark" type="submit">Buy</button>
+                                </form>
+                            </li>
+                        </ul>
+                    {% endfor %}
+                </div>
             </div>
-        </div>
 
-    {% else %}
+        {% else %}
             <h3 id="subscription-text">You are subscribed
                 to {{ subscription["display"]["name"] }}, {{ subscription["display"]["title"] }}</h3>
             <div style="height: 25px;"></div>
