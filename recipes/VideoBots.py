@@ -95,9 +95,7 @@ How It Works:
 4. Lip syncs the face video clip to the voice clip
 5. Shows the resulting video to the user
 
-PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing.  
-
-This is the workflow that inspired our company. 
+PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing.
         """
         )
 

@@ -63,7 +63,7 @@ How It Works:
 1. Looks up the top-ranked image for your search query
 2. Alters the image using your text prompt using Stable Diffusion or DallE
 
-The result is a fantastic, one of kind image that image that relevant to your search (and should rank well on Google).
+The result is a fantastic, one of kind image that's relevant to your search (and should rank well on Google).
         """
         )
 
