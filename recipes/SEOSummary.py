@@ -103,6 +103,26 @@ class SEOSummaryPage(BasePage):
         summarized_urls: list[dict]
         final_prompt: str
 
+    def render_description(self):
+        st.write(
+            """
+        This workflow is designed to make it incredibly easy to create a webpage that Google's search engine will rank well. 
+
+It takes as inputs:
+* The **search query** for which you'd like your page to be highly listed
+* **Website name** - the name of your website or company
+* **Website URL** - your site URL
+* Focus **keywords** - any additional keywords that the workflow should include as it builds your page's content
+
+How It Works:
+1. Looks up the top 10 ranked sites for your search query
+2. Parses their title, description and page content
+3. Takes the parsed content + your site's URL, name and keywords to train a GPT3 script to build your page's suggested content.
+
+SearchSEO > Page Parsing > GPT3
+        """
+        )
+
     def render_form_v2(self):
         st.write("### Inputs")
         st.text_input("Google Search Query", key="search_query")
