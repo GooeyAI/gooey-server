@@ -190,6 +190,15 @@ iframe {
     font-size: .8rem;
 }
 
+.admin-div  {
+    padding: var(--default-top-padding) 0;
+}
+
+.admin-div ul {
+    padding: 0 20px;
+    list-style: disc;
+}
+
 .align-header {
     padding-left: 1rem;
 }
@@ -199,7 +208,14 @@ iframe {
         padding-left: 5rem;
         padding-right: 5rem;
     }
+
     .login-container {
         right: 5rem;
     }
+}
+
+.error-404-div {
+    width: 100vw;
+    height: 70vh;
+    text-align: center;
 }

@@ -37,3 +37,7 @@ ports:
   - port: 8501
     name: streamlit
     visibility: public
+
+vscode:
+  extensions:
+    - ms-python.black-formatter

@@ -114,12 +114,14 @@ def account(request: Request):
         return RedirectResponse(str(redirect_url))
 
     user_data = db.get_or_init_user_data(request)
+    is_admin = request.user.email in settings.ADMIN_EMAILS
 
     context = {
         "request": request,
         "available_subscriptions": available_subscriptions,
         "user_credits": user_data.get(db.USER_BALANCE_FIELD, 0),
         "subscription": get_user_subscription(request.user),
+        "is_admin": is_admin,
     }
 
     return templates.TemplateResponse("account.html", context)
