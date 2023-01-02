@@ -81,6 +81,24 @@ class VideoBotsPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. The host it on your own site or app."
 
+    def render_description(self):
+        st.write(
+            """
+        Have you ever wanted to create a character that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots? This is how. 
+
+This workflow takes a dialog script describing your character (with some sample questions you expect folks to ask), a video clip of your character’s face and finally voice settings to build a videobot that anyone can speak to about anything and you can host directly in your own site or app. 
+
+How It Works:
+1. Appends the user's question to the bottom of your dialog script. 
+2. Sends the appended script to OpenAI’s GPT3 asking it to respond to the question in the style of your character
+3. Synthesizes your character's response as audio using your voice settings (using Google Text-To-Speech or Uberduck)
+4. Lip syncs the face video clip to the voice clip
+5. Shows the resulting video to the user
+
+PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing.
+        """
+        )
+
     def render_form_v2(self):
         tab1, tab2 = st.tabs(["💬 Chat", "📝 Script"])
         with tab1:
