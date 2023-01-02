@@ -305,7 +305,7 @@ class BasePage:
 
         with col2:
             pass
-            #self._render_admin_options()
+            # self._render_admin_options()
 
     def render_usage_guide(self):
         raise NotImplementedError
@@ -505,16 +505,36 @@ class BasePage:
                 pass
         gooey_reset_query_parm()
 
-    def _render_admin_options(self):
-        if not is_admin():
-            return
+    def _render_after_output(self):
+        if "seed" in self.RequestModel.schema_json():
+            seed = st.session_state.get("seed")
+            # st.write("is_admin" + str(is_admin()))
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.caption(f"*Seed: `{seed}`*")
+            with col2:
+                randomize = st.button("♻️ Regenerate")
+                if randomize:
+                    st.session_state["__randomize"] = True
+                    st.experimental_rerun()
+            with col3:
+                self._render_report_button()
+        else:
+            self._render_report_button()
 
+        self._render_admin_options()
+
+    def _render_admin_options(self):
         state_to_save = st.session_state.get("__state_to_save") or self.state_to_doc(
             st.session_state
         )
+        # st.write("state_to_save " + str(state_to_save))
+
         if not state_to_save:
             return
 
+        if not is_admin():
+            return
 
         new_example_id = None
         doc_ref = None
@@ -551,33 +571,6 @@ class BasePage:
                     st.experimental_rerun()
 
             st.success("Saved", icon="✅")
-
-    def _render_after_output(self):
-        if "seed" in self.RequestModel.schema_json():
-            seed = st.session_state.get("seed")
-            # st.write("is_admin" + str(is_admin()))
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.caption(f"*Seed: `{seed}`*")
-            with col2:
-                randomize = st.button("♻️ Regenerate")
-                if randomize:
-                    st.session_state["__randomize"] = True
-                    st.experimental_rerun()
-            with col3:
-                self._render_report_button()
-        else:
-            self._render_report_button()
-
-        state_to_save = st.session_state.get("__state_to_save") or self.state_to_doc(
-            st.session_state
-        )
-        # st.write("state_to_save " + str(state_to_save))
-
-        if not state_to_save:
-            return
-
-        self._render_admin_options()
 
     def state_to_doc(self, state: dict):
         return {
