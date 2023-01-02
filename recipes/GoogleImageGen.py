@@ -117,8 +117,8 @@ class GoogleImageGenPage(BasePage):
     def render_form_v2(self):
         st.text_input(
             """
-            ### Google Search Query
-            Type in what you'd normally enter into [google image search](https://images.google.com/?gws_rd=ssl)
+            ### Google Image Search
+            Type a query you'd use in [Google image search](https://images.google.com/?gws_rd=ssl)
             """,
             key="search_query",
         )

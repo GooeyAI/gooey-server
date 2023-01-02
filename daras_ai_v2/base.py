@@ -267,7 +267,7 @@ class BasePage:
             return True
 
     def render_step_row(self):
-        with st.expander("**Steps**"):
+        with st.expander("**👣 Steps**"):
             col1, col2 = st.columns([1, 2])
             with col1:
                 self.render_description()
@@ -291,7 +291,7 @@ class BasePage:
                     )
 
             with st.expander(
-                "**Need more help? [Join our Discord](https://discord.gg/KQCrzgMPJ2)**",
+                "**🙋🏽‍♀️ Need more help? [Join our Discord](https://discord.gg/KQCrzgMPJ2)**",
                 expanded=False,
             ):
                 st.markdown(
@@ -304,8 +304,8 @@ class BasePage:
                 )
 
         with col2:
-            pass
-            # self._render_admin_options()
+            #pass
+            self._render_admin_options()
 
     def render_usage_guide(self):
         raise NotImplementedError
@@ -500,18 +500,66 @@ class BasePage:
                 pass
         gooey_reset_query_parm()
 
+    def _render_admin_options(self):
+        if not is_admin():
+            return
+
+        state_to_save = st.session_state.get("__state_to_save") or self.state_to_doc(
+            st.session_state
+        )
+        if not state_to_save:
+            return
+
+
+        new_example_id = None
+        doc_ref = None
+        query_params = st.experimental_get_query_params()
+
+        with st.expander("🛠️ Admin Options"):
+            col1, col2 = st.columns(2)
+            with col2:
+                submitted_1 = st.button("🔖 Add as Example")
+                if submitted_1:
+                    new_example_id = get_random_doc_id()
+                    doc_ref = self._example_doc_ref(new_example_id)
+
+            with col1:
+                if EXAMPLE_ID_QUERY_PARAM in query_params:
+                    submitted_2 = st.button("💾 Save Example & Settings")
+                    if submitted_2:
+                        example_id = query_params[EXAMPLE_ID_QUERY_PARAM][0]
+                        doc_ref = self._example_doc_ref(example_id)
+                else:
+                    submitted_3 = st.button("💾 Save Workflow & Settings")
+                    if submitted_3:
+                        doc_ref = db.get_doc_ref(self.doc_name)
+
+            if not doc_ref:
+                return
+
+            with st.spinner("Saving..."):
+                doc_ref.set(state_to_save)
+
+                if new_example_id:
+                    gooey_reset_query_parm(example_id=new_example_id)
+                    st.session_state["__example_docs"].append(doc_ref.get())
+                    st.experimental_rerun()
+
+            st.success("Saved", icon="✅")
+
     def _render_after_output(self):
         if "seed" in self.RequestModel.schema_json():
             seed = st.session_state.get("seed")
-            st.caption(f"*Seed: `{seed}`*")
             # st.write("is_admin" + str(is_admin()))
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             with col1:
+                st.caption(f"*Seed: `{seed}`*")
+            with col2:
                 randomize = st.button("♻️ Regenerate")
                 if randomize:
                     st.session_state["__randomize"] = True
                     st.experimental_rerun()
-            with col2:
+            with col3:
                 self._render_report_button()
         else:
             self._render_report_button()
@@ -523,44 +571,6 @@ class BasePage:
 
         if not state_to_save:
             return
-
-        if not is_admin():
-            return
-
-        new_example_id = None
-        doc_ref = None
-        query_params = st.experimental_get_query_params()
-        col1, col2 = st.columns(2)
-
-        with col2:
-            submitted_1 = st.button("🔖 Add as Example")
-            if submitted_1:
-                new_example_id = get_random_doc_id()
-                doc_ref = self._example_doc_ref(new_example_id)
-
-        with col1:
-            if EXAMPLE_ID_QUERY_PARAM in query_params:
-                submitted_2 = st.button("💾 Save This Example & Settings")
-                if submitted_2:
-                    example_id = query_params[EXAMPLE_ID_QUERY_PARAM][0]
-                    doc_ref = self._example_doc_ref(example_id)
-            else:
-                submitted_3 = st.button("💾 Save This Recipe & Settings")
-                if submitted_3:
-                    doc_ref = db.get_doc_ref(self.doc_name)
-
-        if not doc_ref:
-            return
-
-        with st.spinner("Saving..."):
-            doc_ref.set(state_to_save)
-
-            if new_example_id:
-                gooey_reset_query_parm(example_id=new_example_id)
-                st.session_state["__example_docs"].append(doc_ref.get())
-                st.experimental_rerun()
-
-        st.success("Done", icon="✅")
 
     def state_to_doc(self, state: dict):
         return {
