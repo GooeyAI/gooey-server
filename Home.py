@@ -79,7 +79,7 @@ for page, example_doc in zip(pages, all_examples):
             """,
             unsafe_allow_html=True,
         )
-        page.render_description()
+        page.render_preview_description()
 
     with col2:
         page.render_example(example_doc)
