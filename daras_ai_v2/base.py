@@ -250,7 +250,7 @@ class BasePage:
             col1, col2 = st.columns([2, 1])
             with col1:
                 st.caption(
-                    "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy_policy](https://gooey.ai/privacy)_",
+                    "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)_",
                 )
             with col2:
                 submitted = st.form_submit_button("🏃 Submit", type="primary")
