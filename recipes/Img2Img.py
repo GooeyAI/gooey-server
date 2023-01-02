@@ -104,18 +104,21 @@ class Img2ImgPage(BasePage):
         input_image = st.session_state.get("input_image")
         output_images = st.session_state.get("output_images", [])
 
+        st.markdown("```" + text_prompt + "```")
         for url in output_images:
-            st.image(url, caption=f"{text_prompt}")
+            st.image(url)
 
         st.image(input_image, caption="Input Image")
 
     def render_example(self, state: dict):
-        output_images = state.get("output_images", [])
-        for img in output_images:
-            st.image(img, caption=state.get("text_prompt", ""))
-
         input_image = state.get("input_image")
         st.image(input_image, caption="Input Image")
+        st.markdown("```" + state.get("text_prompt") + "```")
+
+        output_images = state.get("output_images", [])
+        for img in output_images:
+            st.image(img)
+
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)

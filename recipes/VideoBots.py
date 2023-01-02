@@ -150,8 +150,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         with col1:
             input_prompt = state.get("input_prompt")
             if input_prompt:
-                st.markdown("```" + input_prompt.replace("\n", "") + "```")
+                st.write(
+                    f"""
+                    Question `{state.get('input_prompt', '')}`          
+                    """
+                )
         with col2:
+            st.write("Response")
             output_video = state.get("output_video")
             if output_video:
                 st.video(output_video[0])

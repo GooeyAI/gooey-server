@@ -219,11 +219,31 @@ class FaceInpaintingPage(BasePage):
                 st.empty()
 
         with col2:
+            st.markdown("```" + text_prompt + "```")
+
             if output_images:
                 for url in output_images:
-                    st.image(url, caption=f"{text_prompt}")
+                    st.image(url)
             else:
                 st.empty()
+
+    def render_example(self, state: dict):
+        col1, col2 = st.columns(2)
+        with col1:
+            input_image = state.get("input_image")
+            if input_image:
+                st.image(input_image, caption="Face Photo")
+        with col2:
+            st.write(
+                f"""
+                           **Prompt** `{state.get("text_prompt", '')}`
+                           """
+            )
+
+            output_images = state.get("output_images")
+            if output_images:
+                for img in output_images:
+                    st.image(img)
 
     def render_steps(self):
         input_file = st.session_state.get("input_file")
@@ -324,19 +344,6 @@ class FaceInpaintingPage(BasePage):
             )
             for img_bytes in output_images
         ]
-
-    def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
-        with col1:
-            input_image = state.get("input_image")
-            if input_image:
-                st.image(input_image, caption="Input Image")
-        with col2:
-            output_images = state.get("output_images")
-            if output_images:
-                for img in output_images:
-                    st.image(img, caption=state.get("text_prompt", ""))
-
 
 if __name__ == "__main__":
     FaceInpaintingPage().render()

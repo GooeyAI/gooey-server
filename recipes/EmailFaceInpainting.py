@@ -256,11 +256,19 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         return email_body
 
     def render_example(self, state: dict):
-        st.write("**Input Email** -", state.get("email_address"))
+        st.write(
+            f"""
+                 **Input Email** `{state.get("email_address", '')}` \\
+                 **Prompt** `{state.get("text_prompt", '')}`
+                 """
+        )
+
+        #st.write("**Input Email** `" + state.get("email_address") + "`")
+        #st.markdown("```" + state.get("text_prompt", "") + "```")
         output_images = state.get("output_images")
         if output_images:
             for img in output_images:
-                st.image(img, caption=state.get("text_prompt", ""))
+                st.image(img)
 
     def render_usage_guide(self):
         youtube_video("bffH8X3YBCQ")

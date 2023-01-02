@@ -172,7 +172,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         st.write(
             f"""
             **Google Search Query** `{state.get("search_query", '')}` \\
-            **Edit Prompt** `{state.get("text_prompt", '')}`
+            **Prompt** `{state.get("text_prompt", '')}`
             """
         )
 
