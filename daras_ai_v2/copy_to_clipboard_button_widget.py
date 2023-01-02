@@ -9,7 +9,7 @@ st_like_btn_css_html = """
     .streamlit-like-btn:hover, 
     .streamlit-like-btn:active {
         cursor: pointer;
-        font-family: 'Arial', sans-serif;
+        font-family: "Source Sans Pro", sans-serif;
         font-size: 15px;
         text-decoration: none !important;
         color: white !important;
@@ -47,7 +47,7 @@ def copy_to_clipboard_button(
         """
         <style>
             body {
-                margin: 0
+                margin: 0;
             }
         </style>
         """

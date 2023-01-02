@@ -338,6 +338,11 @@ class BasePage:
             st.success("Reported. Reload the page to see changes")
 
     def _render_before_output(self):
+        query_params = st.experimental_get_query_params()
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        if not (run_id or example_id):
+            return
+
         url = self._get_current_url()
         if not url:
             return
@@ -354,7 +359,7 @@ class BasePage:
 
         with col2:
             copy_to_clipboard_button(
-                "📎 Copy URL",
+                "🔗 Copy URL",
                 value=url,
                 style="padding: 6px",
                 height=55,
@@ -626,7 +631,7 @@ class BasePage:
                 )
 
             with col2:
-                copy_to_clipboard_button("📎 Copy URL", value=url)
+                copy_to_clipboard_button("🔗 Copy URL", value=url)
 
             with col3:
                 if allow_delete:
