@@ -664,7 +664,9 @@ class BasePage:
         pass
 
     def preview_title(self, state: dict, run_id: str, uid: str, example_id: str) -> str:
-        input_as_text = state.get("text_prompt", state.get("input_prompt"))
+        input_as_text = state.get(
+            "text_prompt", state.get("input_prompt", state.get("search_query"))
+        )
         prev_title = f"{self.title}"  # PREVIEW TITLE
         if run_id and uid:
             prev_title = self._build_preview_title_for_run(input_as_text, uid)
@@ -689,7 +691,7 @@ class BasePage:
             # RECIPE TITLE
             title += f"{self.title}"
             return title
-        return ""
+        return f"{self.title}"
 
     def render_steps(self):
         pass
