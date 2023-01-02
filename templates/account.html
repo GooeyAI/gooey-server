@@ -1,87 +1,94 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <script src="https://js.stripe.com/v3/" async defer></script>
-    <div class="align-header">
-        <div class="user-info">
-            {% if request.user.photo_url %}
-                <img id="profile-picture" src="{{ request.user.photo_url }}" alt="" width="128" height="128">
+<script src="https://js.stripe.com/v3/" async defer></script>
+<div class="align-header">
+    <div class="user-info">
+        {% if request.user.photo_url %}
+        <img id="profile-picture" src="{{ request.user.photo_url }}" alt="" width="128" height="128">
+        {% endif %}
+        <div class="user-info-text-box">
+            {% if request.user.display_name %}
+            <h2>{{ request.user.display_name }}</h2>
             {% endif %}
-            <div class="user-info-text-box">
-                {% if request.user.display_name %}
-                    <h2>{{ request.user.display_name }}</h2>
-                {% endif %}
-                <span style="font-weight: normal">{{ request.user.email or request.user.phone_number }}</span>
-                <div style="font-weight: normal; font-size: x-small">
-                    <a href="/privacy">Privacy</a>&nbsp & &nbsp;<a href="/terms">Terms</a>
-                </div>
-                <br/>
-                <br/>
-                <a href="/logout">Signout</a>
+            <span style="font-weight: normal">{{ request.user.email or request.user.phone_number }}</span>
+            <div style="font-weight: normal; font-size: x-small">
+                <a href="/privacy">Privacy</a>&nbsp & &nbsp;<a href="/terms">Terms</a>
             </div>
+            <br />
+            <br />
+            <a href="/logout">Signout</a>
         </div>
-        {% if isAdmin %}
-            <hr>
-            <div class="admin-div"><h2>Admin Links</h2>
-                <ul>
-                    <li><a href="https://gooey.ai/__/st/UsageDashboard" target="_blank">Usage Dashboard</a></li>
-                    <li><a href="https://datastudio.google.com/reporting/5c9bb981-ef13-4e46-a5af-eef92f3c42d7"
-                           target="_blank">Traffic
-                        Dashboard</a></li>
-                    <li><a href="https://sentry.io/organizations/dara-network/issues/?project=4504338635423744"
-                           target="_blank">Sentry</a></li>
-                </ul>
-            </div>
-        {% endif %}
-
-        <hr>
-        <div class="credits-container"><h2>Credits: {{ user_credits }} </h2></div>
-        {% if not subscription %}
-            <hr>
-            <div class="buy-credits-container"><h2>Buy Credits</h2>
-                <div class="plans-container">
-                    {% for lookup_key, subscription in available_subscriptions.items() %}
-                        <ul class="product">
-                            <li><h3>{{ subscription["display"]["title"] }}</h3></li>
-                            <li><h4>{{ subscription["display"]["description"] }}</h4></li>
-                            <li>
-                                <form action="/__/stripe/create-checkout-session" method="POST">
-                                    <!-- Add a hidden field with the lookup_key of your Price -->
-                                    <input type="hidden" name="lookup_key" value="{{ lookup_key }}"/>
-                                    <button class="btn-outline-dark" type="submit">Buy</button>
-                                </form>
-                            </li>
-                        </ul>
-                    {% endfor %}
-                </div>
-            </div>
-
-        {% else %}
-            <h3 id="subscription-text">You are subscribed
-                to {{ subscription["display"]["name"] }}, {{ subscription["display"]["title"] }}</h3>
-            <div style="height: 25px;"></div>
-            <h3 id="add-on-text">Pay an additional $10 to get 1000 extra credits on any monthly plan.</h3>
-            <div style="height: 15px;"></div>
-            <form action="/__/stripe/create-checkout-session" method="POST">
-                <!-- Add a hidden field with the lookup_key of your Price -->
-                <input type="hidden" name="lookup_key" value="addon"/>
-                <button class="btn-outline-dark" type="submit">Add Credits</button>
-            </form>
-            <hr>
-            <div class="billing-button-container">
-                <h2>Billing</h2>
-                <div class="billing-button-container-row">
-                    <form action="/__/stripe/create-portal-session" method="POST">
-                        <button class="btn-outline-dark" id="portal-button" type="submit">Manage your billing
-                            information
-                        </button>
-                    </form>
-
-                    <form action="/__/stripe/cancel-subscription" method="POST">
-                        <button class="btn-outline-cancel" id="cancel-button" type="submit">Cancel Subscription</button>
-                    </form>
-                </div>
-            </div>
-        {% endif %}
     </div>
+    {% if is_admin %}
+    <hr>
+    <div class="admin-div">
+        <h2>Admin Links</h2>
+        <ul>
+            <li><a href="/__/st/UsageDashboard" target="_blank">Usage Dashboard</a></li>
+            <li><a href="https://datastudio.google.com/reporting/5c9bb981-ef13-4e46-a5af-eef92f3c42d7"
+                    target="_blank">Traffic Dashboard</a></li>
+            <li><a href="https://sentry.io/organizations/dara-network/issues/?project=4504338635423744"
+                    target="_blank">Sentry</a></li>
+        </ul>
+    </div>
+    {% endif %}
+
+    <hr>
+    <div class="credits-container">
+        <h2>Credits: {{ user_credits }} </h2>
+    </div>
+    {% if not subscription %}
+    <hr>
+    <div class="buy-credits-container">
+        <h2>Buy Credits</h2>
+        <div class="plans-container">
+            {% for lookup_key, subscription in available_subscriptions.items() %}
+            <ul class="product">
+                <li>
+                    <h3>{{ subscription["display"]["title"] }}</h3>
+                </li>
+                <li>
+                    <h4>{{ subscription["display"]["description"] }}</h4>
+                </li>
+                <li>
+                    <form action="/__/stripe/create-checkout-session" method="POST">
+                        <!-- Add a hidden field with the lookup_key of your Price -->
+                        <input type="hidden" name="lookup_key" value="{{ lookup_key }}" />
+                        <button class="btn-outline-dark" type="submit">Buy</button>
+                    </form>
+                </li>
+            </ul>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% else %}
+    <h3 id="subscription-text">You are subscribed
+        to {{ subscription["display"]["name"] }}, {{ subscription["display"]["title"] }}</h3>
+    <div style="height: 25px;"></div>
+    <h3 id="add-on-text">Pay an additional $10 to get 1000 extra credits on any monthly plan.</h3>
+    <div style="height: 15px;"></div>
+    <form action="/__/stripe/create-checkout-session" method="POST">
+        <!-- Add a hidden field with the lookup_key of your Price -->
+        <input type="hidden" name="lookup_key" value="addon" />
+        <button class="btn-outline-dark" type="submit">Add Credits</button>
+    </form>
+    <hr>
+    <div class="billing-button-container">
+        <h2>Billing</h2>
+        <div class="billing-button-container-row">
+            <form action="/__/stripe/create-portal-session" method="POST">
+                <button class="btn-outline-dark" id="portal-button" type="submit">Manage your billing
+                    information
+                </button>
+            </form>
+
+            <form action="/__/stripe/cancel-subscription" method="POST">
+                <button class="btn-outline-cancel" id="cancel-button" type="submit">Cancel Subscription</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
 {% endblock content %}

@@ -417,7 +417,6 @@ def _st_page(
     block_incognito: bool = False,
     context: dict,
 ):
-
     f = furl(iframe_url)
     f.query.params["embed"] = "true"
     f.query.params.update(**request.query_params)  # pass down query params
