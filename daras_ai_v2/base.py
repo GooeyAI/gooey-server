@@ -304,8 +304,8 @@ class BasePage:
                 )
 
         with col2:
-            #pass
-            self._render_admin_options()
+            pass
+            #self._render_admin_options()
 
     def render_usage_guide(self):
         raise NotImplementedError
@@ -576,6 +576,8 @@ class BasePage:
 
         if not state_to_save:
             return
+
+        self._render_admin_options()
 
     def state_to_doc(self, state: dict):
         return {
