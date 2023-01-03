@@ -669,29 +669,34 @@ class BasePage:
         )
         prev_title = f"{self.title}"  # PREVIEW TITLE
         if run_id and uid:
-            prev_title = self._build_preview_title_for_run(input_as_text, uid)
-            return f"{prev_title} on Gooey.AI"
+            return (
+                f"{self._build_preview_title_for_run(input_as_text, uid)} on Gooey.AI"
+            )
         if example_id and input_as_text:
-            prev_title = f"{input_as_text[:100]} ... {self.title}"
-            return f"{prev_title} on Gooey.AI"
+            return (
+                f"{self.get_first_100_chars(input_as_text)} • {self.title} on Gooey.AI"
+            )
         return f"{prev_title} • AI API, workflow & prompt shared on Gooey.AI"
 
     def _build_preview_title_for_run(self, input_as_text, uid):
         if input_as_text:
             # INPUT PROMPT
-            title = f"{input_as_text[:100]} ... "
+            title = f"{self.get_first_100_chars(input_as_text)} • "
 
             # USER NAME
             user_ref = get_user_doc_ref(uid)
             user = user_ref.get().to_dict()
             if "name" in user:
                 name = user.get("name")
-                title += f"• {name}'s "
+                title += f"{name}'s "
 
             # RECIPE TITLE
             title += f"{self.title}"
             return title
         return f"{self.title}"
+
+    def get_first_100_chars(self, text_input):
+        return f"{text_input[:100]}..." if len(text_input) > 100 else text_input
 
     def render_steps(self):
         pass
