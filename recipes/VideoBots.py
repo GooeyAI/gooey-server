@@ -79,7 +79,7 @@ class VideoBotsPage(BasePage):
         final_prompt: str
 
     def preview_description(self, state: dict) -> str:
-        return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. The host it on your own site or app."
+        return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. Then host it on your own site or app."
 
     def render_description(self):
         st.write(
