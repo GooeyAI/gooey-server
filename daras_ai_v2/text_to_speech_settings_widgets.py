@@ -18,6 +18,7 @@ UBERDUCK_VOICES = {
     "mark-elliott": "Friendly Older Male US",
     "woody-jh": "Cheery Southern Male US",
     "judy-hopps": "Upbeat Female US",
+    "the-rock": "The Rock",
 }
 
 
