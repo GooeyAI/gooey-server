@@ -34,7 +34,7 @@ class Text2ImgModels(Enum):
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
-    # openjourney = "Open Journey (PromptHero)"
+    openjourney = "Open Journey (PromptHero)"
     dall_e = "Dall-E (OpenAI)"
 
 
@@ -96,6 +96,24 @@ def text2img(
             model = replicate.models.get("stability-ai/stable-diffusion")
             version = model.versions.get(
                 "27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd7478"
+            )
+            out_imgs = [
+                requests.get(img).content
+                for img in version.predict(
+                    prompt=prompt,
+                    width=width,
+                    height=height,
+                    num_outputs=num_outputs,
+                    num_inference_steps=num_inference_steps,
+                    guidance_scale=guidance_scale,
+                    seed=seed or None,
+                    negative_prompt=negative_prompt or "",
+                )
+            ]
+        case Text2ImgModels.openjourney.name:
+            model = replicate.models.get("prompthero/openjourney")
+            version = model.versions.get(
+                "9936c2001faa2194a261c01381f90e65261879985476014a0a37a334593a05eb"
             )
             out_imgs = [
                 requests.get(img).content
