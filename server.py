@@ -36,9 +36,9 @@ from daras_ai_v2.base import (
     ApiResponseModel,
 )
 from daras_ai_v2.crypto import get_random_doc_id
+from daras_ai_v2.meta_content import meta_title_for_page, meta_description_for_page
 from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
-from recipes.CompareLM import CompareLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
 from recipes.DeforumSD import DeforumSDPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
@@ -397,27 +397,29 @@ def st_page(request: Request, page_slug):
         settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
     )
     example_id, run_id, uid = page.extract_query_params(dict(request.query_params))
-    description = _build_description(example_id, page, run_id, state, uid)
 
     return _st_page(
         request,
         str(iframe_url),
         block_incognito=True,
         context={
-            "title": page.preview_title(
-                state=state, run_id=run_id, uid=uid, example_id=example_id
+            "title": meta_title_for_page(
+                page=page,
+                state=state,
+                run_id=run_id,
+                uid=uid,
+                example_id=example_id,
             ),
-            "description": description,
+            "description": meta_description_for_page(
+                page=page,
+                state=state,
+                run_id=run_id,
+                uid=uid,
+                example_id=example_id,
+            ),
             "image": page.preview_image(state),
         },
     )
-
-
-def _build_description(example_id, page, run_id, state, uid):
-    description = page.preview_description(state)
-    if (run_id and uid) or example_id:
-        description += " AI API, workflow & prompt shared on Gooey.AI."
-    return description
 
 
 def _st_page(

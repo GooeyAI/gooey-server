@@ -28,7 +28,6 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
-from daras_ai_v2.db import get_user_doc_ref
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.query_params import gooey_reset_query_parm
@@ -663,63 +662,26 @@ class BasePage:
     def render_example(self, state: dict):
         pass
 
-    def preview_title(self, state: dict, run_id: str, uid: str, example_id: str) -> str:
-        input_as_text = state.get(
-            "text_prompt", state.get("input_prompt", state.get("search_query"))
-        )
-        if run_id and uid:
-            return (
-                f"{self._build_preview_title_for_run(input_as_text, uid)} on Gooey.AI"
-            )
-        if example_id and input_as_text:
-            return (
-                f"{self.get_first_100_chars(input_as_text)} • {self.title} on Gooey.AI"
-            )
-        return f"{self.title} • AI API, workflow & prompt shared on Gooey.AI"
-
-    def _build_preview_title_for_run(self, input_as_text, uid):
-        if input_as_text:
-            # INPUT PROMPT
-            prev_title = f"{self.get_first_100_chars(input_as_text)} • "
-
-            # USER NAME
-            user_ref = get_user_doc_ref(uid)
-            user = user_ref.get().to_dict()
-            if "name" in user and user.get("name"):
-                name = user.get("name")
-                prev_title += f"{name}'s "
-
-            # RECIPE TITLE
-            prev_title += f"{self.title}"
-            return prev_title
-        return f"{self.title}"
-
-    def get_first_100_chars(self, text_input):
-        return f"{text_input[:100]}..." if len(text_input) > 100 else text_input
-
     def render_steps(self):
         pass
 
-    def preview_description(self, state: dict) -> str:
+    def preview_input(self, state: dict) -> str | None:
+        return (
+            state.get("text_prompt")
+            or state.get("input_prompt")
+            or state.get("search_query")
+        )
+
+    def preview_description(self, state: dict) -> str | None:
         pass
 
-    def preview_image(self, state: dict) -> str:
-        images = state.get(
-            "output_images",
-            state.get("output_image", state.get("cutout_image", "")),
+    def preview_image(self, state: dict) -> str | None:
+        out = (
+            state.get("output_images")
+            or state.get("output_image")
+            or state.get("cutout_image")
         )
-        if images:
-            if isinstance(images, list):
-                return images[0]
-            elif isinstance(images, dict):
-                first_value = next(iter(images.values()))
-                if isinstance(first_value, list) and first_value:
-                    return first_value[0]
-                elif isinstance(first_value, str) and first_value:
-                    return first_value
-            else:
-                return images
-        return GOOEY_LOGO
+        return extract_nested_str(out) or GOOEY_LOGO
 
     def run_as_api_tab(self):
         api_docs_url = str(
@@ -805,6 +767,22 @@ def get_example_request_body(
         for field_name, field in request_model.__fields__.items()
         if field.required
     }
+
+
+def extract_nested_str(obj) -> str:
+    if isinstance(obj, str):
+        return obj
+    elif isinstance(obj, dict):
+        obj = obj.values()
+    try:
+        items = iter(obj)
+    except TypeError:
+        pass
+    else:
+        for it in items:
+            if it:
+                return extract_nested_str(it)
+    return ""
 
 
 def err_msg_for_exc(e):
