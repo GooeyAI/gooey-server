@@ -14,7 +14,7 @@ def meta_title_for_page(
 ) -> str:
     parts = []
 
-    prompt = truncate_text(page.preview_input(state))
+    prompt = truncate_text(page.preview_input(state) or "")
     end_suffix = f"{page.title} on Gooey.AI"
 
     if run_id and uid:
@@ -49,13 +49,13 @@ def meta_description_for_page(
     uid: str,
     example_id: str,
 ) -> str:
-    description = page.preview_description(state)
+    description = page.preview_description(state) or ""
 
     updated_at = state.get("updated_at")
     if updated_at:
         description = updated_at.strftime("%d-%b-%Y") + " — " + description
 
-    if (run_id and uid) or example_id:
+    if (run_id and uid) or example_id or not description:
         description += " AI API, workflow & prompt shared on Gooey.AI."
 
     return description
