@@ -79,7 +79,12 @@ for page, example_doc in zip(pages, all_examples):
             """,
             unsafe_allow_html=True,
         )
-        page.render_description()
+        # render preview if available
+        preview = page.preview_description(example_doc)
+        if preview:
+            st.write(preview)
+        else:
+            page.render_description()
 
     with col2:
         page.render_example(example_doc)

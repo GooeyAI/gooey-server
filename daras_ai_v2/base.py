@@ -118,6 +118,7 @@ class BasePage:
 
             form_col, runner_col = st.columns(2)
             with form_col:
+                st.write(self.preview_description(st.session_state))
                 submitted = self.render_form()
 
             self.render_step_row()
