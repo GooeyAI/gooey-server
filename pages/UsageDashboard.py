@@ -18,6 +18,7 @@ team_emails = [
     "devxpy.spam@gmail.com",
     "sean@blagsvedt.com",
     "ambika@ajaibghar.com",
+    "faraazmohd07@gmail.com",
 ]
 
 user_runs = st.session_state.setdefault("user_runs", [])
@@ -118,6 +119,7 @@ df = (
     .fillna(0)
 )
 df = df.sort_values("All", ascending=False)
+df = df.reset_index(drop=True)
 st.write(df)
 
 """
@@ -126,6 +128,7 @@ st.write(df)
 
 total_runs = df.sum().rename("Total Runs").to_frame().reset_index(names=["Recipe"])
 total_runs = total_runs.sort_values("Total Runs", ascending=False)
+total_runs = total_runs.reset_index(drop=True)
 
 col1, col2 = st.columns(2)
 

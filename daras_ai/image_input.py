@@ -147,11 +147,11 @@ def safe_filename(filename: str):
     matches = FILENAME_WHITELIST.finditer(filename)
     filename = "".join(match.group(0) for match in matches)
     p = Path(filename)
-    out = _truncate(p.stem) + p.suffix
+    out = truncate_text(p.stem) + p.suffix
     return out
 
 
-def _truncate(text: str, maxlen: int = 100) -> str:
+def truncate_text(text: str, maxlen: int = 100) -> str:
     if len(text) < maxlen:
         return text
     mid = maxlen // 2
