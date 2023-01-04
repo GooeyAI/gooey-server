@@ -115,6 +115,8 @@ def text2img(
             version = model.versions.get(
                 "9936c2001faa2194a261c01381f90e65261879985476014a0a37a334593a05eb"
             )
+            # Modify the prompt
+            prompt = "mdjrny-v4 style " + prompt
             out_imgs = [
                 requests.get(img).content
                 for img in version.predict(
