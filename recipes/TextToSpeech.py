@@ -169,7 +169,7 @@ class TextToSpeechPage(BasePage):
 
             # Select the type of audio file you want returned
             audio_config = texttospeech.AudioConfig()
-            audio_config.audio_encoding = texttospeech.AudioEncoding.MP3
+            audio_config.audio_encoding = texttospeech.AudioEncoding.LINEAR16
             audio_config.pitch = pitch  # optional
             audio_config.speaking_rate = speaking_rate  # optional
 
@@ -180,7 +180,7 @@ class TextToSpeechPage(BasePage):
             )
             yield "Uploading Audio file..."
             state["audio_url"] = upload_file_from_bytes(
-                "google_tts_gen.mp3", response.audio_content
+                "google_tts_gen.wav", response.audio_content
             )
 
     def render_example(self, state: dict):
