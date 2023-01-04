@@ -4,6 +4,23 @@ import streamlit as st
 
 from daras_ai_v2.enum_selector_widget import enum_selector
 
+UBERDUCK_VOICES = {
+    "hecko": "Reserved Male European",
+    "ryan-gosling": "Laidback US Male",
+    "elsa": "Earnest Female US",
+    "judi-dench": "Older Female UK 70s",
+    "rc-bray": "Wise Male US 50s",
+    "dr-phil": "Southern Drawl US Male",
+    "3kliksphilip": "Upbeat Male UK",
+    "ellen": "Mellow Female US",
+    "steve-irwin": "Casual Male Australian",
+    "pam-beesly": "Soft-spoken Female US",
+    "mark-elliott": "Friendly Older Male US",
+    "woody-jh": "Cheery Southern Male US",
+    "judy-hopps": "Upbeat Female US",
+    "the-rock": "The Rock",
+}
+
 
 class TextToSpeechProviders(Enum):
     GOOGLE_TTS = "Google Cloud Text-to-Speech"
@@ -62,17 +79,21 @@ def text_to_speech_settings():
                 )
 
         case TextToSpeechProviders.UBERDUCK.name:
-            st.write(
-                "*Please refer to the list of voice names [here](https://app.uberduck.ai/leaderboard/voice)*"
-            )
             col1, col2 = st.columns(2)
             with col1:
-                st.text_input(
-                    label="""
+                st.write(
+                    """
                     ###### Voice name (Uberduck)
                     """,
-                    key="uberduck_voice_name",
                 )
+                st.selectbox(
+                    label="",
+                    label_visibility="collapsed",
+                    key="uberduck_voice_name",
+                    format_func=lambda option: f"{UBERDUCK_VOICES[option]} | {option}",
+                    options=UBERDUCK_VOICES.keys(),
+                )
+
                 st.slider(
                     """
                     ###### Speaking rate 
