@@ -667,7 +667,6 @@ class BasePage:
         input_as_text = state.get(
             "text_prompt", state.get("input_prompt", state.get("search_query"))
         )
-        prev_title = f"{self.title}"  # PREVIEW TITLE
         if run_id and uid:
             return (
                 f"{self._build_preview_title_for_run(input_as_text, uid)} on Gooey.AI"
@@ -676,23 +675,23 @@ class BasePage:
             return (
                 f"{self.get_first_100_chars(input_as_text)} • {self.title} on Gooey.AI"
             )
-        return f"{prev_title} • AI API, workflow & prompt shared on Gooey.AI"
+        return f"{self.title} • AI API, workflow & prompt shared on Gooey.AI"
 
     def _build_preview_title_for_run(self, input_as_text, uid):
         if input_as_text:
             # INPUT PROMPT
-            title = f"{self.get_first_100_chars(input_as_text)} • "
+            prev_title = f"{self.get_first_100_chars(input_as_text)} • "
 
             # USER NAME
             user_ref = get_user_doc_ref(uid)
             user = user_ref.get().to_dict()
-            if "name" in user:
+            if "name" in user and user.get("name"):
                 name = user.get("name")
-                title += f"{name}'s "
+                prev_title += f"{name}'s "
 
             # RECIPE TITLE
-            title += f"{self.title}"
-            return title
+            prev_title += f"{self.title}"
+            return prev_title
         return f"{self.title}"
 
     def get_first_100_chars(self, text_input):
