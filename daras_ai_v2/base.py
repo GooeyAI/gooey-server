@@ -118,7 +118,7 @@ class BasePage:
 
             form_col, runner_col = st.columns(2)
             with form_col:
-                self.render_preview_description()
+                st.write(self.preview_description(st.session_state))
                 submitted = self.render_form()
 
             self.render_step_row()
@@ -686,9 +686,6 @@ class BasePage:
 
     def preview_description(self, state: dict) -> str:
         pass
-
-    def render_preview_description(self):
-        st.write(self.preview_description(state={}))
 
     def preview_image(self, state: dict) -> str:
         images = state.get(
