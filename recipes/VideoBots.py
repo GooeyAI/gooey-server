@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.language_model import run_language_model
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -157,6 +158,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.video(output_video[0])
 
     def render_output(self):
+        hidden_html_js(
+            """
+            <script>
+              var myLandbot = new top.Landbot.Livechat({
+                configUrl: 'https://storage.googleapis.com/landbot.online/v3/H-1449451-6K7T28JP5I3ZG4DQ/index.json',
+              });
+            </script>
+            """
+        )
+
         st.write(f"Bot Responses")
         for idx, video_url in enumerate(st.session_state.get("output_video", [])):
             st.video(video_url)
