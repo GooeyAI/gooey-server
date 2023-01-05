@@ -18,7 +18,8 @@ UBERDUCK_VOICES = {
     "mark-elliott": "Friendly Older Male US",
     "woody-jh": "Cheery Southern Male US",
     "judy-hopps": "Upbeat Female US",
-    "the-rock": "The Rock",
+    "the-rock": "Samoan Action Star",
+    "eminem-arpa2": "Angry US Male Rapper",
 }
 
 
