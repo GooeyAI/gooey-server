@@ -128,7 +128,7 @@ class CompareText2ImgPage(BasePage):
                 st.image(img, caption=Text2ImgModels[key].value)
 
     def preview_description(self, state: dict) -> str:
-        return "Create multiple AI photos from Stable Diffusion (1.5 -> 2.1) and DallE from one prompt. Determine which AI image generator from OpenAI, Stability.AI works best for your text."
+        return "Create multiple AI photos from Stable Diffusion (1.5 -> 2.1, Open/Midjourney) DallE from one prompt. Determine which AI image generator from OpenAI, Stability.AI works best for your text."
 
 
 if __name__ == "__main__":
