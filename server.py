@@ -276,6 +276,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         operation_id=page_cls.slug_versions[0],
     )
     def run_api(
+        request: Request,
         user: auth.UserRecord = Depends(api_auth_header),
         page_request: page_cls.RequestModel = body_spec,
     ):
@@ -298,7 +299,9 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         created_at = datetime.datetime.utcnow().isoformat()
 
         # get saved state from db
-        state = db.get_or_create_doc(db.get_doc_ref(page.doc_name)).to_dict()
+        state = page.get_doc_from_query_params(request.query_params)
+        if state is None:
+            raise HTTPException(status_code=404)
 
         # set sane defaults
         for k, v in page.sane_defaults.items():

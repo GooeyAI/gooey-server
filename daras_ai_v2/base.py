@@ -85,6 +85,16 @@ class BasePage:
             / (cls.slug_versions[-1] + "/")
         )
 
+    def api_url(self, example_id=None, run_id=None, uid=None) -> str:
+        query_params = {}
+        if example_id:
+            query_params = dict(example_id=example_id)
+        elif run_id and uid:
+            query_params = dict(run_id=run_id, uid=uid)
+        return str(
+            furl(settings.API_BASE_URL, query_params=query_params) / self.endpoint
+        )
+
     @property
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
@@ -333,7 +343,7 @@ class BasePage:
             email_support_about_reported_run(
                 run_id=run_id,
                 uid=uid,
-                url=self._get_current_url(),
+                url=self._get_current_app_url(),
                 email=current_user.email,
             )
             st.success("Reported. Reload the page to see changes")
@@ -344,7 +354,7 @@ class BasePage:
         if not (run_id or example_id):
             return
 
-        url = self._get_current_url()
+        url = self._get_current_app_url()
         if not url:
             return
 
@@ -366,10 +376,15 @@ class BasePage:
                 height=55,
             )
 
-    def _get_current_url(self) -> str | None:
+    def _get_current_app_url(self) -> str | None:
         query_params = st.experimental_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
         return self.app_url(example_id, run_id, uid)
+
+    def _get_current_api_url(self) -> str | None:
+        query_params = st.experimental_get_query_params()
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        return self.api_url(example_id, run_id, uid)
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self.run_doc_ref(uid=uid, run_id=run_id)
@@ -694,7 +709,7 @@ class BasePage:
         )
         st.markdown(f"### [📖 API Docs]({api_docs_url})")
 
-        api_url = str(furl(settings.API_BASE_URL) / self.endpoint)
+        api_url = self._get_current_api_url()
         request_body = get_example_request_body(self.RequestModel, st.session_state)
         response_body = self.get_example_response_body(st.session_state)
 
@@ -728,7 +743,7 @@ class BasePage:
         if balance < self.get_price():
             account_url = furl(settings.APP_BASE_URL) / "account"
             if getattr(user, "_is_anonymous", False):
-                account_url.query.params["next"] = self._get_current_url()
+                account_url.query.params["next"] = self._get_current_app_url()
                 error = f"Doh! You need to login to run more Gooey.AI recipes. [Login]({account_url})"
             else:
                 error = f"Doh! You need to purchase additional credits to run more Gooey.AI recipes. [Buy Credits]({account_url})"
@@ -754,7 +769,7 @@ class BasePage:
         )
         return dict(
             id=run_id or example_id or get_random_doc_id(),
-            url=self._get_current_url(),
+            url=self._get_current_app_url(),
             created_at=datetime.datetime.utcnow().isoformat(),
             output=get_example_request_body(self.ResponseModel, state),
         )

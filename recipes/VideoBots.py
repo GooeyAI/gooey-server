@@ -19,6 +19,7 @@ from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 
 BOT_SCRIPT_RE = re.compile(r"(\n)([\w\ ]+)(:)")
+LANDBOT_URL_RE = re.compile(r"(\/)([A-z0-9]+\-[A-z0-9]+\-[A-z0-9]+)(\/)")
 
 
 class VideoBotsPage(BasePage):
@@ -146,6 +147,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         language_model_settings()
         lipsync_settings()
 
+        st.text_input("##### Landbot URL", key="landbot_url")
+
+    def fields_to_save(self) -> [str]:
+        return super().fields_to_save() + ["landbot_url"]
+
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
         with col1:
@@ -158,19 +164,37 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.video(output_video[0])
 
     def render_output(self):
-        hidden_html_js(
-            """
-            <script>
-              var myLandbot = new top.Landbot.Livechat({
-                configUrl: 'https://storage.googleapis.com/landbot.online/v3/H-1449451-6K7T28JP5I3ZG4DQ/index.json',
-              });
-            </script>
-            """
-        )
-
         st.write(f"Bot Responses")
         for idx, video_url in enumerate(st.session_state.get("output_video", [])):
             st.video(video_url)
+        self.show_landbot_widget()
+
+    def show_landbot_widget(self):
+        landbot_url = st.session_state.get("landbot_url")
+        if not landbot_url:
+            return
+
+        match = LANDBOT_URL_RE.search(landbot_url)
+        if not match:
+            return
+
+        config_url = f"https://storage.googleapis.com/landbot.online/v3/{match.group(2)}/index.json"
+
+        hidden_html_js(
+            """
+<script>
+// destroy existing instance
+if (top.myLandbot) {
+    top.myLandbot.destroy();
+}
+// create new instance
+top.myLandbot = new top.Landbot.Livechat({
+    configUrl: %r,
+});
+</script>
+            """
+            % config_url
+        )
 
     def render_steps(self):
         st.write("Input Face")
