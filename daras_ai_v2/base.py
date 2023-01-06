@@ -42,8 +42,9 @@ USER_RUNS_COLLECTION = "user_runs"
 EXAMPLE_ID_QUERY_PARAM = "example_id"
 RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
-GOOEY_LOGO = (
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"
+DEFAULT_META_IMG = (
+    # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
 )
 
 O = typing.TypeVar("O")
@@ -697,7 +698,7 @@ class BasePage:
             or state.get("output_image")
             or state.get("cutout_image")
         )
-        return extract_nested_str(out) or GOOEY_LOGO
+        return extract_nested_str(out) or DEFAULT_META_IMG
 
     def run_as_api_tab(self):
         api_docs_url = str(
