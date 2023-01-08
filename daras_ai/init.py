@@ -106,7 +106,7 @@ def init_scripts():
     if "_current_user" not in st.session_state:
         st.session_state["_current_user"] = get_current_user() or get_anonymous_user()
 
-    if not st.session_state["_current_user"]:
+    if not st.session_state.get("_current_user"):
         st.error("Sorry, we can't let you do that! Please login to continue.")
         st.stop()
 
