@@ -27,6 +27,8 @@ class Img2ImgModels(Enum):
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
+    openjourney = "Open Journey (PromptHero)"
+    analog_diffusion = "Analog Diffusion (wavymulder)"
 
 
 class Text2ImgModels(Enum):
@@ -35,6 +37,7 @@ class Text2ImgModels(Enum):
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     openjourney = "Open Journey (PromptHero)"
+    analog_diffusion = "Analog Diffusion (wavymulder)"
     dall_e = "Dall-E (OpenAI)"
 
 
@@ -85,6 +88,11 @@ def text2img(
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
 
+            if 512 < width < 1024:
+                width = 512
+            if 512 < height < 1024:
+                height = 512
+
             response = openai.Image.create(
                 n=num_outputs,
                 prompt=prompt,
@@ -93,43 +101,52 @@ def text2img(
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
         case Text2ImgModels.sd_1_5.name:
-            model = replicate.models.get("stability-ai/stable-diffusion")
-            version = model.versions.get(
-                "27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd7478"
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": "runwayml/stable-diffusion-v1-5",
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                },
             )
-            out_imgs = [
-                requests.get(img).content
-                for img in version.predict(
-                    prompt=prompt,
-                    width=width,
-                    height=height,
-                    num_outputs=num_outputs,
-                    num_inference_steps=num_inference_steps,
-                    guidance_scale=guidance_scale,
-                    seed=seed or None,
-                    negative_prompt=negative_prompt or "",
-                )
-            ]
         case Text2ImgModels.openjourney.name:
-            model = replicate.models.get("prompthero/openjourney")
-            version = model.versions.get(
-                "9936c2001faa2194a261c01381f90e65261879985476014a0a37a334593a05eb"
-            )
-            # Modify the prompt
             prompt = "mdjrny-v4 style " + prompt
-            out_imgs = [
-                requests.get(img).content
-                for img in version.predict(
-                    prompt=prompt,
-                    width=width,
-                    height=height,
-                    num_outputs=num_outputs,
-                    num_inference_steps=num_inference_steps,
-                    guidance_scale=guidance_scale,
-                    seed=seed or None,
-                    negative_prompt=negative_prompt or "",
-                )
-            ]
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": "prompthero/openjourney",
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                },
+            )
+        case Text2ImgModels.analog_diffusion.name:
+            prompt = "analog style " + prompt
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": "wavymulder/Analog-Diffusion",
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                },
+            )
         case _:
             out_imgs = []
     return [
@@ -197,6 +214,11 @@ def img2img(
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
 
+            if 512 < width < 1024:
+                width = 512
+            if 512 < height < 1024:
+                height = 512
+
             response = openai.Image.create_variation(
                 image=init_image_bytes,
                 n=num_outputs,
@@ -205,25 +227,58 @@ def img2img(
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
         case Img2ImgModels.sd_1_5.name:
-            model = replicate.models.get("stability-ai/stable-diffusion")
-            version = model.versions.get(
-                "27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd7478"
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": "runwayml/stable-diffusion-v1-5",
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                    "init_image": init_image,
+                    "strength": prompt_strength,
+                },
             )
-            out_imgs = [
-                requests.get(img).content
-                for img in version.predict(
-                    prompt=prompt,
-                    width=width,
-                    height=height,
-                    init_image=init_image,
-                    prompt_strength=prompt_strength,
-                    num_outputs=num_outputs,
-                    num_inference_steps=num_inference_steps,
-                    negative_prompt=negative_prompt or "",
-                    guidance_scale=guidance_scale,
-                    seed=seed,
-                )
-            ]
+        case Img2ImgModels.openjourney.name:
+            prompt = "mdjrny-v4 style " + prompt
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": "prompthero/openjourney",
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                    "init_image": init_image,
+                    "strength": prompt_strength,
+                },
+            )
+        case Img2ImgModels.analog_diffusion.name:
+            prompt = "analog style " + prompt
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": "wavymulder/Analog-Diffusion",
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                    "init_image": init_image,
+                    "strength": prompt_strength,
+                },
+            )
         case _:
             out_imgs = []
     return [

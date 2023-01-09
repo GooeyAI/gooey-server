@@ -17,6 +17,7 @@ class GpuEndpoints:
     deforum_sd = f"{settings.GPU_SERVER_2}:5008"
     # sd_1_5 = f"{settings.GPU_SERVER_2}:5009"
     sd_2 = f"{settings.GPU_SERVER_1}:5011"
+    sd_multi = f"{settings.GPU_SERVER_1}:5012"
     # openjourney = f"{settings.GPU_SERVER_2}:5010"
 
 
@@ -28,6 +29,8 @@ def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
 
 
 def b64_img_decode(b64_data):
+    if not b64_data:
+        raise ValueError("Empty Ouput")
     return base64.b64decode(b64_data[b64_data.find(",") + 1 :])
 
 
