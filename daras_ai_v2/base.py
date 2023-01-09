@@ -424,8 +424,8 @@ class BasePage:
 
         if submitted:
             st.session_state["__status"] = DEFAULT_STATUS
-            st.session_state["__gen"] = self.run(st.session_state)
             st.session_state["__time_taken"] = 0
+            st.session_state["__gen"] = self.run(st.session_state)
 
             with status_area:
                 html_spinner("Starting...")
@@ -456,12 +456,16 @@ class BasePage:
                 # advance the generator (to further progress of run())
                 st.session_state["__status"] = next(gen) or DEFAULT_STATUS
                 # increment total time taken after every iteration
-                st.session_state["__time_taken"] += time() - start_time
+                st.session_state["__time_taken"] = (
+                    st.session_state.get("__time_taken", 0) + time() - start_time
+                )
 
             except StopIteration:
                 # Weird but important! This measures the runtime of code after the last `yield` in `run()`
                 if start_time:
-                    st.session_state["__time_taken"] += time() - start_time
+                    st.session_state["__time_taken"] = (
+                        st.session_state.get("__time_taken", 0) + time() - start_time
+                    )
 
                 # save a snapshot of the params used to create this output
                 st.session_state["__state_to_save"] = self.state_to_doc(
@@ -469,8 +473,8 @@ class BasePage:
                 )
 
                 # cleanup is important!
-                del st.session_state["__status"]
-                del st.session_state["__gen"]
+                st.session_state.pop("__status", None)
+                st.session_state.pop("__gen", None)
 
                 self.deduct_credits()
 
@@ -481,9 +485,9 @@ class BasePage:
                 with status_area:
                     st.error(f"{type(e).__name__} - {err_msg_for_exc(e)}", icon="⚠️")
                 # cleanup is important!
-                del st.session_state["__status"]
-                del st.session_state["__gen"]
-                del st.session_state["__time_taken"]
+                st.session_state.pop("__status", None)
+                st.session_state.pop("__gen", None)
+                st.session_state.pop("__time_taken", None)
                 return
 
             # save after every step
