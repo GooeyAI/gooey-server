@@ -58,6 +58,8 @@ def text2img(
 
     match selected_model:
         case Text2ImgModels.sd_2.name:
+            if num_inference_steps == 110:
+                num_inference_steps = 100
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.sd_2,
                 input_data={
@@ -176,6 +178,8 @@ def img2img(
 
     match selected_model:
         case Img2ImgModels.sd_2.name:
+            if num_inference_steps == 110:
+                num_inference_steps = 100
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.sd_2,
                 input_data={
@@ -307,6 +311,8 @@ def inpainting(
 
     match selected_model:
         case InpaintingModels.sd_2.name:
+            if num_inference_steps == 110:
+                num_inference_steps = 100
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.sd_2,
                 input_data={
