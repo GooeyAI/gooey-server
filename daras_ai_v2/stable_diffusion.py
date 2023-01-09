@@ -30,6 +30,7 @@ class Img2ImgModels(Enum):
     openjourney = "Open Journey (PromptHero)"
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
 
 
 class Text2ImgModels(Enum):
@@ -40,6 +41,7 @@ class Text2ImgModels(Enum):
     openjourney = "Open Journey (PromptHero)"
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
     dall_e = "Dall-E (OpenAI)"
 
 
@@ -156,6 +158,22 @@ def text2img(
                 endpoint=GpuEndpoints.sd_multi,
                 input_data={
                     "hf_model_id": "wavymulder/Analog-Diffusion",
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                },
+            )
+        case Text2ImgModels.protogen_5_3.name:
+            prompt = "modelshoot style " + prompt
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": "darkstorm2150/Protogen_v5.3_Official_Release",
                     "prompt": prompt,
                     "width": width,
                     "height": height,
@@ -305,6 +323,24 @@ def img2img(
                 endpoint=GpuEndpoints.sd_multi,
                 input_data={
                     "hf_model_id": "wavymulder/Analog-Diffusion",
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                    "init_image": init_image,
+                    "strength": prompt_strength,
+                },
+            )
+        case Img2ImgModels.protogen_5_3.name:
+            prompt = "modelshoot style " + prompt
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": "darkstorm2150/Protogen_v5.3_Official_Release",
                     "prompt": prompt,
                     "width": width,
                     "height": height,
