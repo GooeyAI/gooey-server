@@ -8,7 +8,11 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.hidden_html_widget import hidden_html_js
-from daras_ai_v2.language_model import run_language_model
+from daras_ai_v2.language_model import (
+    run_language_model,
+    GPT3_MAX_ALLOED_TOKENS,
+    calc_gpt_tokens,
+)
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -253,6 +257,9 @@ top.myLandbot = new top.Landbot.Livechat({
 
         yield "Running GPT-3..."
 
+        max_allowed_tokens = GPT3_MAX_ALLOED_TOKENS - calc_gpt_tokens(prompt)
+        max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
+
         state["output_text"] = run_language_model(
             api_provider="openai",
             engine="text-davinci-003",
@@ -260,7 +267,7 @@ top.myLandbot = new top.Landbot.Livechat({
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
             prompt=prompt,
-            max_tokens=request.max_tokens,
+            max_tokens=max_allowed_tokens,
             stop=[f"{user_script_name}:", f"{bot_script_name}:"],
             avoid_repetition=request.avoid_repetition,
         )
