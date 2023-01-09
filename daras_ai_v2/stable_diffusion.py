@@ -28,6 +28,7 @@ class Img2ImgModels(Enum):
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
     openjourney = "Open Journey (PromptHero)"
+    openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
 
 
@@ -37,6 +38,7 @@ class Text2ImgModels(Enum):
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     openjourney = "Open Journey (PromptHero)"
+    openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
     dall_e = "Dall-E (OpenAI)"
 
@@ -123,6 +125,21 @@ def text2img(
                 endpoint=GpuEndpoints.sd_multi,
                 input_data={
                     "hf_model_id": "prompthero/openjourney",
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                },
+            )
+        case Text2ImgModels.openjourney_2.name:
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": "prompthero/openjourney-v2",
                     "prompt": prompt,
                     "width": width,
                     "height": height,
@@ -253,6 +270,23 @@ def img2img(
                 endpoint=GpuEndpoints.sd_multi,
                 input_data={
                     "hf_model_id": "prompthero/openjourney",
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                    "init_image": init_image,
+                    "strength": prompt_strength,
+                },
+            )
+        case Img2ImgModels.openjourney_2.name:
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": "prompthero/openjourney-v2",
                     "prompt": prompt,
                     "width": width,
                     "height": height,
