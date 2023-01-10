@@ -31,6 +31,7 @@ class Img2ImgModels(Enum):
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
     protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
+    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
 
 
 class Text2ImgModels(Enum):
@@ -42,6 +43,7 @@ class Text2ImgModels(Enum):
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
     protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
+    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     dall_e = "Dall-E (OpenAI)"
 
 
@@ -94,15 +96,10 @@ def text2img(
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
 
-            if 512 < width < 1024:
-                width = 512
-            if 512 < height < 1024:
-                height = 512
-
             response = openai.Image.create(
                 n=num_outputs,
                 prompt=prompt,
-                size=f"{width}x{height}",
+                size=_get_dalle_img_size(width, height),
                 response_format="b64_json",
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
@@ -121,6 +118,9 @@ def text2img(
                 case Text2ImgModels.protogen_5_3.name:
                     prompt = "modelshoot style " + prompt
                     hf_model_id = "darkstorm2150/Protogen_v5.3_Official_Release"
+                case Text2ImgModels.dreamlike_2.name:
+                    prompt = "photo, " + prompt
+                    hf_model_id = "dreamlike-art/dreamlike-photoreal-2.0"
                 case _:
                     return []
             out_imgs = call_gpu_server_b64(
@@ -141,6 +141,17 @@ def text2img(
         upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
+
+
+def _get_dalle_img_size(width: int, height: int) -> str:
+    edge = max(width, height)
+    if edge < 512:
+        edge = 256
+    elif 512 < edge < 1024:
+        edge = 512
+    elif edge > 1024:
+        edge = 1024
+    return f"{edge}x{edge}"
 
 
 def img2img(
@@ -212,7 +223,7 @@ def img2img(
             response = openai.Image.create_variation(
                 image=init_image_bytes,
                 n=num_outputs,
-                size=f"{width}x{height}",
+                size=_get_dalle_img_size(width, height),
                 response_format="b64_json",
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
@@ -231,6 +242,9 @@ def img2img(
                 case Img2ImgModels.protogen_5_3.name:
                     prompt = "modelshoot style " + prompt
                     hf_model_id = "darkstorm2150/Protogen_v5.3_Official_Release"
+                case Img2ImgModels.dreamlike_2.name:
+                    prompt = "photo, " + prompt
+                    hf_model_id = "dreamlike-art/dreamlike-photoreal-2.0"
                 case _:
                     return []
             out_imgs = call_gpu_server_b64(
@@ -319,7 +333,7 @@ def inpainting(
                 image=rgb_img_to_rgba(edit_image_bytes, mask_bytes),
                 mask=None,
                 n=num_outputs,
-                size=f"{width}x{height}",
+                size=_get_dalle_img_size(width, height),
                 response_format="b64_json",
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
