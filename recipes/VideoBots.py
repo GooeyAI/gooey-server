@@ -152,6 +152,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         lipsync_settings()
 
         st.text_input("##### Landbot URL", key="landbot_url")
+        self.show_landbot_widget()
 
     def fields_to_save(self) -> [str]:
         return super().fields_to_save() + ["landbot_url"]
@@ -171,7 +172,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         st.write(f"Bot Responses")
         for idx, video_url in enumerate(st.session_state.get("output_video", [])):
             st.video(video_url)
-        self.show_landbot_widget()
 
     def show_landbot_widget(self):
         landbot_url = st.session_state.get("landbot_url")
