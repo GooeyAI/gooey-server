@@ -68,9 +68,9 @@ def image_input(idx, variables, state):
 
 @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 def upload_file(uploaded_file: UploadedFile):
-    img_bytes, filename = uploaded_file_get_value(uploaded_file)
+    img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
     img_bytes = resize_img_pad(img_bytes, (512, 512))
-    return upload_file_from_bytes(filename, img_bytes)
+    return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
 
 
 def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
@@ -83,18 +83,20 @@ def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
 
 @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
-    img_bytes, filename = uploaded_file_get_value(uploaded_file)
+    img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
     img_bytes = resize_img_contain(img_bytes, resize)
-    return upload_file_from_bytes(filename, img_bytes)
+    return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
 
 
 def uploaded_file_get_value(uploaded_file):
     img_bytes = uploaded_file.read()
     filename = uploaded_file.name
+    content_type = uploaded_file.type
     if filename.endswith("HEIC"):
         img_bytes = _heic_to_png(img_bytes)
         filename += ".png"
-    return img_bytes, safe_filename(filename)
+        content_type = "image/png"
+    return img_bytes, safe_filename(filename), content_type
 
 
 def _heic_to_png(img_bytes: bytes) -> bytes:
@@ -114,11 +116,14 @@ def resize_img_contain(img_bytes: bytes, size: (int, int)) -> bytes:
     return cv2_img_to_bytes(img_cv2)
 
 
-def upload_file_from_bytes(filename: str, img_bytes: bytes) -> str:
+def upload_file_from_bytes(
+    filename: str, img_bytes: bytes, content_type="text/plain"
+) -> str:
     filename = safe_filename(filename)
     bucket = storage.bucket(settings.GS_BUCKET_NAME)
     blob = bucket.blob(f"daras_ai/media/{uuid.uuid1()}/{filename}")
-    blob.upload_from_string(img_bytes)
+    blob.upload_from_string(img_bytes, content_type=content_type)
+    print(blob.content_type)
     return blob.public_url
 
 

@@ -67,8 +67,7 @@ def extract_face(idx, state, variables):
             face_mask = extract_face_cv2(image_cv2)
 
             variables[face_mask_var] = upload_file_from_bytes(
-                "face_mask.png",
-                cv2_img_to_bytes(face_mask),
+                "face_mask.png", cv2_img_to_bytes(face_mask), content_type="image/png"
             )
 
             if face_cutout_var:
