@@ -6,6 +6,7 @@ import streamlit as st
 from firebase_admin import auth
 from google.cloud import firestore
 
+from daras_ai_v2 import db
 from daras_ai_v2.face_restoration import map_parallel
 
 st.set_page_config(layout="wide")
@@ -21,13 +22,13 @@ team_emails = [
     "faraazmohd07@gmail.com",
 ]
 
-user_runs = st.session_state.setdefault("user_runs", [])
-if not user_runs:
+user_run_counts = st.session_state.setdefault("user_runs", [])
+if not user_run_counts:
     with st.spinner("fetching user IDs..."):
         db_collection = firestore.Client().collection("user_runs")
-        user_runs.extend(db_collection.list_documents(page_size=batch_size))
+        user_run_counts.extend(db_collection.list_documents(page_size=batch_size))
 
-all_user_ids = [doc.id for doc in user_runs]
+all_user_ids = [doc.id for doc in user_run_counts]
 # st.json(all_user_ids, expanded=False)
 
 all_users = st.session_state.setdefault("all_users", [])
@@ -64,10 +65,10 @@ st.json(
     expanded=False,
 )
 
-user_runs, user_runs_by_time = st.session_state.setdefault(
+user_run_counts, user_runs_by_time = st.session_state.setdefault(
     f"user_runs#{exclude_anon}#{exclude_team}", ([], [])
 )
-if not user_runs:
+if not user_run_counts:
     with st.spinner(f"fetching user runs..."):
 
         def _fetch_total_runs(user: auth.UserRecord):
@@ -78,11 +79,13 @@ if not user_runs:
                 .collections()
             )
 
-            total = {}
+            profile = db.get_user_doc_ref(user.uid).get().to_dict() or {}
+
+            run_counts = {}
 
             for recipe in recipes:
                 runs = recipe.select(["updated_at"]).get()
-                total[recipe.id] = len(runs)
+                run_counts[recipe.id] = len(runs)
 
                 for snap in runs:
                     updated_at = snap.to_dict().get("updated_at")
@@ -90,9 +93,9 @@ if not user_runs:
                         continue
                     user_runs_by_time.append((updated_at, user, recipe.id))
 
-            return user, total
+            return user, profile, run_counts
 
-        user_runs.extend(map_parallel(_fetch_total_runs, all_users))
+        user_run_counts.extend(map_parallel(_fetch_total_runs, all_users))
 
 # user_runs.sort(key=lambda x: sum(x[1].values()), reverse=True)
 
@@ -102,22 +105,19 @@ Pro Tip: Click on the table, then Press Ctrl/Cmd + F to search.
 Press Ctrl/Cmd + A to copy all and paste into a excel.
 """
 
-df = (
-    pd.DataFrame.from_records(
-        [
-            {
-                "ID": user.uid,
-                "Name": user.display_name or "",
-                "User": user.email or user.phone_number or user.uid or "",
-                "All": sum(runs.values()),
-                **runs,
-            }
-            for user, runs in user_runs
-        ],
-    )
-    .convert_dtypes()
-    .fillna(0)
-)
+df = pd.DataFrame.from_records(
+    [
+        {
+            "ID": user.uid,
+            "Name": user.display_name or "",
+            "User": user.email or user.phone_number or user.uid or "",
+            "Balance": profile.get("balance"),
+            "All": sum(run_counts.values()),
+            **run_counts,
+        }
+        for user, profile, run_counts in user_run_counts
+    ],
+).convert_dtypes()
 df = df.sort_values("All", ascending=False)
 df = df.reset_index(drop=True)
 st.write(df)
@@ -138,7 +138,7 @@ with col1:
 with col2:
     st.plotly_chart(
         px.pie(
-            total_runs.iloc[1:],
+            total_runs.iloc[2:],
             values="Total Runs",
             names="Recipe",
         ),
