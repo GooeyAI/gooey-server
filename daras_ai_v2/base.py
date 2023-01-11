@@ -434,18 +434,17 @@ class BasePage:
             submitted = True
 
         if submitted:
-            st.session_state["__status"] = DEFAULT_STATUS
-            st.session_state["__time_taken"] = 0
-            st.session_state["__gen"] = self.run(st.session_state)
-
             with status_area:
                 html_spinner("Starting...")
 
             self._pre_run_checklist()
-
             if not self.check_credits():
                 status_area.empty()
                 return
+
+            st.session_state["__status"] = DEFAULT_STATUS
+            st.session_state["__time_taken"] = 0
+            st.session_state["__gen"] = self.run(st.session_state)
 
         gen = st.session_state.get("__gen")
         start_time = None
