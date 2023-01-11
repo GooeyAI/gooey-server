@@ -9,7 +9,7 @@ st_like_btn_css_html = """
     .streamlit-like-btn:hover, 
     .streamlit-like-btn:active {
         cursor: pointer;
-        font-family: "Source Sans Pro", sans-serif;
+        font-family: Arial, "Source Sans Pro", sans-serif;
         font-size: 15px;
         text-decoration: none !important;
         color: white !important;
@@ -39,7 +39,7 @@ def copy_to_clipboard_button(
     message: str = "✅ Copied",
     timeout_ms: float = 2000,
     style: str = "",
-    height: int = 50,
+    height: int = 35,
 ):
     button_id = secrets.token_urlsafe(8)
 

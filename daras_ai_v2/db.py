@@ -95,20 +95,6 @@ def get_user_doc_ref(uid: str) -> firestore.DocumentReference:
     return get_doc_ref(collection_id=USERS_COLLECTION, document_id=uid)
 
 
-def list_all_docs(
-    collection_id=DEFAULT_COLLECTION,
-    *,
-    document_id: str = None,
-    sub_collection_id: str = None,
-) -> list:
-    db = firestore.Client()
-    db_collection = db.collection(collection_id)
-    if sub_collection_id:
-        doc_ref = db_collection.document(document_id)
-        db_collection = doc_ref.collection(sub_collection_id)
-    return db_collection.get()
-
-
 def get_or_create_doc(
     doc_ref: firestore.DocumentReference,
 ) -> firestore.DocumentSnapshot:
@@ -117,6 +103,20 @@ def get_or_create_doc(
         doc_ref.create({})
         doc = doc_ref.get()
     return doc
+
+
+def get_collection_ref(
+    collection_id=DEFAULT_COLLECTION,
+    *,
+    document_id: str = None,
+    sub_collection_id: str = None,
+) -> firestore.CollectionReference:
+    db = firestore.Client()
+    db_collection = db.collection(collection_id)
+    if sub_collection_id:
+        doc_ref = db_collection.document(document_id)
+        db_collection = doc_ref.collection(sub_collection_id)
+    return db_collection
 
 
 def get_doc_ref(

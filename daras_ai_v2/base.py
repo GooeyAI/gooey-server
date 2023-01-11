@@ -75,22 +75,27 @@ class BasePage:
 
     @classmethod
     def app_url(cls, example_id=None, run_id=None, uid=None) -> str:
-        query_params = {}
-        if example_id:
-            query_params = dict(example_id=example_id)
-        elif run_id and uid:
-            query_params = dict(run_id=run_id, uid=uid)
+        query_params = cls._clean_query_params(example_id, run_id, uid)
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
             / (cls.slug_versions[-1] + "/")
         )
 
+    @classmethod
+    def _clean_query_params(cls, example_id, run_id, uid) -> dict:
+        query_params = {}
+        if run_id and uid:
+            query_params |= dict(run_id=run_id, uid=uid)
+        if example_id:
+            query_params |= dict(example_id=example_id)
+        return query_params
+
     def api_url(self, example_id=None, run_id=None, uid=None) -> str:
         query_params = {}
-        if example_id:
-            query_params = dict(example_id=example_id)
-        elif run_id and uid:
+        if run_id and uid:
             query_params = dict(run_id=run_id, uid=uid)
+        elif example_id:
+            query_params = dict(example_id=example_id)
         return str(
             furl(settings.API_BASE_URL, query_params=query_params) / self.endpoint
         )
@@ -210,10 +215,10 @@ class BasePage:
         return self.get_firestore_state(example_id, run_id, uid)
 
     def get_firestore_state(self, example_id, run_id, uid):
-        if example_id:
-            snapshot = self._example_doc_ref(example_id).get()
-        elif run_id:
+        if run_id and uid:
             snapshot = self.run_doc_ref(run_id, uid).get()
+        elif example_id:
+            snapshot = self._example_doc_ref(example_id).get()
         else:
             snapshot = self.get_recipe_doc()
         return snapshot.to_dict()
@@ -302,7 +307,7 @@ class BasePage:
                     )
 
             with st.expander(
-                "**🙋🏽‍♀️ Need more help? [Join our Discord](https://discord.gg/KQCrzgMPJ2)**",
+                "**🙋🏽‍♀️ Need more help? [Join our Discord](https://discord.gg/7C84UyzVDg)**",
                 expanded=False,
             ):
                 st.markdown(
@@ -390,14 +395,20 @@ class BasePage:
         ref = self.run_doc_ref(uid=uid, run_id=run_id)
         ref.update({"is_flagged": is_flagged})
 
-    def save_run(self):
+    def save_run(self, new_run: bool = False):
         current_user: auth.UserRecord = st.session_state.get("_current_user")
         if not current_user:
             return
 
         query_params = st.experimental_get_query_params()
-        run_id = query_params.get(RUN_ID_QUERY_PARAM, [get_random_doc_id()])[0]
-        gooey_reset_query_parm(run_id=run_id, uid=current_user.uid)
+        example_id, run_id, _ = self.extract_query_params(query_params)
+        if new_run:
+            run_id = get_random_doc_id()
+        gooey_reset_query_parm(
+            **self._clean_query_params(
+                example_id=example_id, run_id=run_id, uid=current_user.uid
+            )
+        )
 
         run_doc_ref = self.run_doc_ref(run_id, current_user.uid)
         state_to_save = self.state_to_doc(st.session_state)
@@ -509,7 +520,7 @@ class BasePage:
     def _pre_run_checklist(self):
         self._setup_rng_seed()
         self.clear_outputs()
-        self.save_run()
+        self.save_run(new_run=True)
 
     def _setup_rng_seed(self):
         seed = st.session_state.get("seed")
@@ -523,7 +534,6 @@ class BasePage:
                 del st.session_state[field_name]
             except KeyError:
                 pass
-        gooey_reset_query_parm()
 
     def _render_after_output(self):
         if "seed" in self.RequestModel.schema_json():
@@ -545,9 +555,7 @@ class BasePage:
         self._render_admin_options()
 
     def _render_admin_options(self):
-        state_to_save = st.session_state.get("__state_to_save") or self.state_to_doc(
-            st.session_state
-        )
+        state_to_save = st.session_state.get("__state_to_save")
         # st.write("state_to_save " + str(state_to_save))
 
         if not state_to_save:
@@ -561,23 +569,25 @@ class BasePage:
         query_params = st.experimental_get_query_params()
 
         with st.expander("🛠️ Admin Options"):
-            col1, col2 = st.columns(2)
-            with col2:
-                submitted_1 = st.button("🔖 Add as Example")
-                if submitted_1:
-                    new_example_id = get_random_doc_id()
-                    doc_ref = self._example_doc_ref(new_example_id)
+            col1, col2, col3 = st.columns(3)
 
             with col1:
-                if EXAMPLE_ID_QUERY_PARAM in query_params:
-                    submitted_2 = st.button("💾 Save Example & Settings")
-                    if submitted_2:
-                        example_id = query_params[EXAMPLE_ID_QUERY_PARAM][0]
-                        doc_ref = self._example_doc_ref(example_id)
-                else:
-                    submitted_3 = st.button("💾 Save Workflow & Settings")
-                    if submitted_3:
-                        doc_ref = db.get_doc_ref(self.doc_name)
+                if st.button("⭐️ Save Workflow & Settings"):
+                    doc_ref = db.get_doc_ref(self.doc_name)
+
+            with col2:
+                if st.button("🔖 Add as Example"):
+                    new_example_id = get_random_doc_id()
+                    doc_ref = self._example_doc_ref(new_example_id)
+                    gooey_reset_query_parm(example_id=new_example_id)
+
+            with col3:
+                if EXAMPLE_ID_QUERY_PARAM in query_params and st.button(
+                    "💾 Save Example & Settings"
+                ):
+                    example_id = query_params[EXAMPLE_ID_QUERY_PARAM][0]
+                    doc_ref = self._example_doc_ref(example_id)
+                    gooey_reset_query_parm(example_id=example_id)
 
             if not doc_ref:
                 return
@@ -586,8 +596,7 @@ class BasePage:
                 doc_ref.set(state_to_save)
 
                 if new_example_id:
-                    gooey_reset_query_parm(example_id=new_example_id)
-                    st.session_state["__example_docs"].append(doc_ref.get())
+                    st.session_state["__example_docs"].insert(0, doc_ref.get())
                     st.experimental_rerun()
 
             st.success("Saved", icon="✅")
@@ -614,10 +623,16 @@ class BasePage:
         if not example_docs:
             with st.spinner("Loading Examples..."):
                 example_docs.extend(
-                    db.list_all_docs(
+                    db.get_collection_ref(
                         document_id=self.doc_name,
                         sub_collection_id=EXAMPLES_COLLECTION,
-                    )
+                    ).get()
+                )
+                example_docs.sort(
+                    key=lambda s: s.to_dict()
+                    .get("updated_at", datetime.datetime.fromtimestamp(0))
+                    .timestamp(),
+                    reverse=True,
                 )
 
         allow_delete = is_admin()
@@ -626,6 +641,9 @@ class BasePage:
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
+            if doc.get("__hidden"):
+                continue
+
             url = str(
                 furl(
                     self.app_url(),
@@ -633,26 +651,27 @@ class BasePage:
                 )
             )
 
-            col1, col2, col3, *_ = st.columns(6)
+            col1, col2 = st.columns([1, 5])
 
             with col1:
                 st.markdown(
                     f"""
-                    <a target="_top" class="streamlit-like-btn" href="{url}">
-                      ✏️ Tweak 
-                    </a>
+                    <div style="height: 50px;">
+                        <a target="_top" class="streamlit-like-btn" href="{url}">
+                          ✏️ Tweak 
+                        </a>
+                    </div>
                     """,
                     unsafe_allow_html=True,
                 )
 
-            with col2:
                 copy_to_clipboard_button("🔗 Copy URL", value=url)
 
-            with col3:
                 if allow_delete:
                     self._example_delete_button(example_id)
 
-            self.render_example(doc)
+            with col2:
+                self.render_example(doc)
 
             st.write("---")
 
@@ -668,10 +687,7 @@ class BasePage:
         example = self._example_doc_ref(example_id)
 
         with st.spinner("deleting..."):
-            deleted = example.delete()
-            if not deleted:
-                st.error("Failed")
-                return
+            example.update({"__hidden": True})
 
         example_docs = st.session_state["__example_docs"]
         for idx, snapshot in enumerate(example_docs):
