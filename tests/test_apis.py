@@ -16,7 +16,6 @@ from recipes.FaceInpainting import FaceInpaintingPage
 from recipes.GoogleImageGen import GoogleImageGenPage
 from recipes.ImageSegmentation import ImageSegmentationPage
 from recipes.Img2Img import Img2ImgPage
-from recipes.LetterWriter import LetterWriterPage
 from recipes.Lipsync import LipsyncPage
 from recipes.LipsyncTTS import LipsyncTTSPage
 from recipes.ObjectInpainting import ObjectInpaintingPage
@@ -31,7 +30,7 @@ pages_to_test = [
     ChyronPlantPage,
     FaceInpaintingPage,
     EmailFaceInpaintingPage,
-    LetterWriterPage,
+    # LetterWriterPage,
     LipsyncPage,
     # CompareLMPage,
     ImageSegmentationPage,
