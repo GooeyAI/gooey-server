@@ -304,7 +304,7 @@ class FaceInpaintingPage(BasePage):
             width=state["output_width"],
             height=state["output_height"],
             negative_prompt=state["negative_prompt"],
-            guidance_scale=state["guidance_scale"],
+            guidance_scale=state.get("guidance_scale"),
             seed=state["seed"],
         )
         state["diffusion_images"] = diffusion_images

@@ -6,7 +6,12 @@ import replicate
 import requests
 from PIL import Image
 
-from daras_ai.image_input import upload_file_from_bytes, bytes_to_cv2_img
+from daras_ai.image_input import (
+    upload_file_from_bytes,
+    bytes_to_cv2_img,
+    resize_img_pad,
+    resize_img_fit,
+)
 from daras_ai_v2 import settings
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints, b64_img_decode
@@ -95,10 +100,11 @@ def text2img(
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
 
+            edge = _get_dalle_img_size(width, height)
             response = openai.Image.create(
                 n=num_outputs,
                 prompt=prompt,
-                size=_get_dalle_img_size(width, height),
+                size=f"{edge}x{edge}",
                 response_format="b64_json",
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
@@ -142,7 +148,7 @@ def text2img(
     ]
 
 
-def _get_dalle_img_size(width: int, height: int) -> str:
+def _get_dalle_img_size(width: int, height: int) -> int:
     edge = max(width, height)
     if edge < 512:
         edge = 256
@@ -150,7 +156,7 @@ def _get_dalle_img_size(width: int, height: int) -> str:
         edge = 512
     elif edge > 1024:
         edge = 1024
-    return f"{edge}x{edge}"
+    return edge
 
 
 def img2img(
@@ -161,12 +167,13 @@ def img2img(
     init_image: str,
     init_image_bytes: bytes = None,
     num_inference_steps: int,
-    prompt_strength: float,
+    prompt_strength: float = None,
     negative_prompt: str = None,
     guidance_scale: float = None,
     sd_2_upscaling: bool = False,
     seed: int = 42,
 ):
+    prompt_strength = prompt_strength or 0.7
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
 
     height, width, _ = bytes_to_cv2_img(init_image_bytes).shape
@@ -214,18 +221,20 @@ def img2img(
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
 
-            if 512 < width < 1024:
-                width = 512
-            if 512 < height < 1024:
-                height = 512
+            edge = _get_dalle_img_size(width, height)
+            image = resize_img_pad(init_image_bytes, (edge, edge))
 
             response = openai.Image.create_variation(
-                image=init_image_bytes,
+                image=image,
                 n=num_outputs,
-                size=_get_dalle_img_size(width, height),
+                size=f"{edge}x{edge}",
                 response_format="b64_json",
             )
-            out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
+
+            out_imgs = [
+                resize_img_fit(b64_img_decode(part["b64_json"]), (width, height))
+                for part in response["data"]
+            ]
         case _:
             match selected_model:
                 case Img2ImgModels.sd_1_5.name:
@@ -324,12 +333,17 @@ def inpainting(
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
 
+            edge = _get_dalle_img_size(width, height)
+            edit_image_bytes = resize_img_pad(edit_image_bytes, (edge, edge))
+            mask_bytes = resize_img_pad(mask_bytes, (edge, edge))
+            image = rgb_img_to_rgba(edit_image_bytes, mask_bytes)
+
             response = openai.Image.create_edit(
                 prompt=prompt,
-                image=rgb_img_to_rgba(edit_image_bytes, mask_bytes),
+                image=image,
                 mask=None,
                 n=num_outputs,
-                size=_get_dalle_img_size(width, height),
+                size=f"{edge}x{edge}",
                 response_format="b64_json",
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
