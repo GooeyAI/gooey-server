@@ -1,6 +1,6 @@
 from firebase_admin import auth
 
-from daras_ai.image_input import truncate_text
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.base import BasePage
 
 
@@ -14,7 +14,7 @@ def meta_title_for_page(
 ) -> str:
     parts = []
 
-    prompt = truncate_text(page.preview_input(state) or "")
+    prompt = truncate_text_words(page.preview_input(state) or "", maxlen=100)
     end_suffix = f"{page.title} on Gooey.AI"
 
     if run_id and uid:

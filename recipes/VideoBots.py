@@ -5,7 +5,10 @@ import typing
 import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_from_bytes, truncate_text
+from daras_ai.image_input import (
+    upload_file_from_bytes,
+    truncate_text_words,
+)
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.language_model import (
@@ -174,7 +177,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         output_text = state.get("output_text")
         if output_text:
-            st.caption(truncate_text(output_text[0].replace("\n", ""), maxlen=200))
+            st.caption(truncate_text_words(output_text[0], maxlen=200))
 
     def render_output(self):
         st.write(f"#### 💬 Response")
