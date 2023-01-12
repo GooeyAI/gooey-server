@@ -121,35 +121,52 @@ class BasePage:
 
         init_scripts()
 
-        st.write("## " + self.title)
-        run_tab, settings_tab, examples_tab, api_tab = st.tabs(
-            ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
+        st.write("## " + (st.session_state.get("__title") or self.title))
+        st.write(
+            st.session_state.get("__notes")
+            or self.preview_description(st.session_state)
         )
 
-        self._load_session_state()
+        left_col, output_col = st.columns([3, 2], gap="medium")
 
-        with run_tab:
-            self._check_if_flagged()
+        with left_col:
+            run_tab, settings_tab, examples_tab, api_tab = st.tabs(
+                ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
+            )
 
-            form_col, runner_col = st.columns(2)
-            with form_col:
-                st.write(self.preview_description(st.session_state))
+            with run_tab:
+                self._load_session_state()
+                self._check_if_flagged()
                 submitted = self.render_form()
 
-            self.render_step_row()
-            self.render_footer()
+            with settings_tab:
+                self.render_settings()
 
-        with settings_tab:
-            self.render_settings()
+                st.write("---")
+                st.write("##### 🖌️ Personalize")
+                st.text_input("Title", key="__title", value=self.title)
+                st.text_area(
+                    "Notes",
+                    key="__notes",
+                    value=self.preview_description(st.session_state),
+                )
+                st.write("---")
 
-        with examples_tab:
-            self._examples_tab()
+                submitted = submitted or self.render_submit_button(key="2")
 
-        with api_tab:
-            self.run_as_api_tab()
+            with examples_tab:
+                self._examples_tab()
 
-        with runner_col:
+            with api_tab:
+                self.run_as_api_tab()
+
+        self.render_step_row()
+        self.render_footer()
+
+        with output_col:
             self._runner(submitted)
+
+        self._render_save_options()
         #
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
@@ -260,20 +277,19 @@ class BasePage:
         pass
 
     def render_form(self) -> bool:
-        with st.form(f"{self.slug_versions[0]}Form"):
-            self.render_form_v2()
+        self.render_form_v2()
+        return self.render_submit_button()
 
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                st.caption(
-                    "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)_",
-                )
-            with col2:
-                submitted = st.form_submit_button("🏃 Submit", type="primary")
-
+    def render_submit_button(self, key=None):
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.caption(
+                "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)_",
+            )
+        with col2:
+            submitted = st.button("🏃 Submit", key=key, type="primary")
         if not submitted:
             return False
-
         try:
             self.validate_form_v2()
         except AssertionError as e:
@@ -283,12 +299,19 @@ class BasePage:
             return True
 
     def render_step_row(self):
-        with st.expander("**👣 Steps**"):
+        with st.expander("**ℹ️ Details**"):
             col1, col2 = st.columns([1, 2])
             with col1:
                 self.render_description()
             with col2:
-                self.render_steps()
+                placeholder = st.empty()
+                try:
+                    self.render_steps()
+                except NotImplementedError:
+                    pass
+                else:
+                    with placeholder:
+                        st.write("##### 👣 Steps")
 
     def render_footer(self):
         col1, col2 = st.columns(2)
@@ -318,10 +341,6 @@ class BasePage:
                     """,
                     unsafe_allow_html=True,
                 )
-
-        with col2:
-            pass
-            # self._render_admin_options()
 
     def render_usage_guide(self):
         raise NotImplementedError
@@ -363,7 +382,7 @@ class BasePage:
         if not url:
             return
 
-        col1, col2 = st.columns([3, 1])
+        col1, col2 = st.columns([2, 1])
 
         with col1:
             st.text_input(
@@ -551,12 +570,12 @@ class BasePage:
         else:
             self._render_report_button()
 
-        self._render_admin_options()
+    def _render_save_options(self):
+        query_params = st.experimental_get_query_params()
 
     def _render_admin_options(self):
         state_to_save = st.session_state.get("__state_to_save")
         # st.write("state_to_save " + str(state_to_save))
-
         if not state_to_save:
             return
 
@@ -698,7 +717,7 @@ class BasePage:
         pass
 
     def render_steps(self):
-        pass
+        raise NotImplementedError
 
     def preview_input(self, state: dict) -> str | None:
         return (
@@ -733,8 +752,7 @@ class BasePage:
         response_body = self.get_example_response_body(st.session_state)
 
         st.write("#### 📤 Example Request")
-        with st.columns([3, 1])[0]:
-            api_example_generator(api_url, request_body)
+        api_example_generator(api_url, request_body)
 
         user = st.session_state.get("_current_user")
         if hasattr(user, "_is_anonymous"):
@@ -747,8 +765,7 @@ class BasePage:
         st.write("---")
         st.write("### 🔐 API keys")
 
-        with st.columns([3, 1])[0]:
-            manage_api_keys(user)
+        manage_api_keys(user)
 
     def check_credits(self) -> bool:
         user = st.session_state.get("_current_user")

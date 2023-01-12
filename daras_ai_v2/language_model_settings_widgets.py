@@ -2,7 +2,7 @@ import streamlit as st
 
 
 def language_model_settings():
-    st.write("#### Language Model Optimizations")
+    st.write("#### 🔠 Language Model Optimizations")
 
     st.checkbox("Avoid Repetition", key="avoid_repetition")
 

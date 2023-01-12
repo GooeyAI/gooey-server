@@ -96,14 +96,14 @@ def guidance_scale_setting(selected_model: str = None):
 
     st.number_input(
         label="""
-            ##### Artistic Pressure
-            ([*Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter))
-    
-            How pressurized should the AI feel to produce what you want?
-    
-            At lower values the image will effectively be random. \\
-            Values that are too high can also distort the image by putting too much pressure on the AI.
-            """,
+        ##### Artistic Pressure
+        ([*Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter))
+        
+        How pressurized should the AI feel to produce what you want?
+        
+        At lower values the image will effectively be random. \\
+        Values that are too high can also distort the image by putting too much pressure on the AI.
+        """,
         key="guidance_scale",
         min_value=0.0,
         max_value=50.0,

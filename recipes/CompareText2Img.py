@@ -59,6 +59,11 @@ class CompareText2ImgPage(BasePage):
             key="text_prompt",
             placeholder="Iron man",
         )
+        enum_multiselect(
+            Text2ImgModels,
+            label="#### Selected Models",
+            key="selected_models",
+        )
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
@@ -67,27 +72,18 @@ class CompareText2ImgPage(BasePage):
     def render_description(self):
         st.write(
             """
-                This recipe takes any text and renders an image using multiple Text2Image engines. 
-                
-                Use it to understand which image generator e.g. DallE or Stable Diffusion is best for your particular prompt. 
+            This recipe takes any text and renders an image using multiple Text2Image engines. 
+            
+            Use it to understand which image generator e.g. DallE or Stable Diffusion is best for your particular prompt. 
             """
         )
 
     def render_settings(self):
-        selected_model = enum_multiselect(
-            Text2ImgModels,
-            label="#### Selected Models",
-            key="selected_models",
-        )
-
-        num_outputs_setting(selected_model)
-        st.checkbox("**4x Upscaling (SD v2 only)**", key="sd_2_upscaling")
-        negative_prompt_setting(selected_model)
+        negative_prompt_setting()
+        num_outputs_setting()
         output_resolution_setting()
-
-        col1, col2 = st.columns(2)
-        with col1:
-            guidance_scale_setting(selected_model)
+        st.checkbox("**4x Upscaling (SD v2 only)**", key="sd_2_upscaling")
+        guidance_scale_setting()
 
     def render_output(self):
         self._render_outputs(st.session_state)

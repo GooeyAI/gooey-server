@@ -81,7 +81,7 @@ def patch_input_func(func_name: str):
             elif key and key in st.session_state:
                 st.session_state[key] = st.session_state[key] or ""
 
-        if "value" in kwargs or not key:
+        if "value" in kwargs or not key or not func_name.startswith("text_"):
             return old_func(
                 label,
                 key=key,

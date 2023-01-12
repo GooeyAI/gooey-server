@@ -27,6 +27,10 @@ class DeforumSDPage(BasePage):
                 height=200,
             )
 
+            st.slider(
+                "Number of Frames", min_value=100, max_value=1000, key="max_frames"
+            )
+
             submitted = st.form_submit_button("🏃‍ Submit")
 
         return submitted
@@ -37,14 +41,11 @@ class DeforumSDPage(BasePage):
     def render_description(self):
         st.write(
             """
-                This recipe takes any text and creates animation. 
+            This recipe takes any text and creates animation. 
 
-                It's based off the Deforum notebook with lots of details at http://deforum.art. 
+            It's based off the Deforum notebook with lots of details at http://deforum.art. 
             """
         )
-
-    def render_settings(self):
-        st.slider("Number of Frames", min_value=100, max_value=1000, key="max_frames")
 
     def render_output(self):
         output_video = st.session_state.get("output_video")

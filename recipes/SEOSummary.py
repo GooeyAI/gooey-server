@@ -231,9 +231,9 @@ SearchSEO > Page Parsing > GPT3
         st.write(
             f"""
             Search Query `{state.get('search_query', '')}` \\
-            Focus Keywords `{state.get('keywords', '')}` \\
             Company Name `{state.get('title', '')}` \\
-            Company URL `{state.get('company_url', '')}`               
+            Company URL `{state.get('company_url', '')}` \\               
+            Focus Keywords `{state.get('keywords', '')}`
             """
         )
 

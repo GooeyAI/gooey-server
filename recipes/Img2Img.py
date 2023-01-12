@@ -104,15 +104,18 @@ class Img2ImgPage(BasePage):
         input_image = st.session_state.get("input_image")
         output_images = st.session_state.get("output_images", [])
 
-        for url in output_images:
-            st.image(url, caption=f"{text_prompt}")
+        for img in output_images:
+            st.image(img, caption="```" + text_prompt.replace("\n", "") + "```")
 
         st.image(input_image, caption="Input Image")
 
     def render_example(self, state: dict):
         output_images = state.get("output_images", [])
         for img in output_images:
-            st.image(img, caption=state.get("text_prompt", ""))
+            st.image(
+                img,
+                caption="```" + state.get("text_prompt", "").replace("\n", "") + "```",
+            )
 
         input_image = state.get("input_image")
         st.image(input_image, caption="Input Image")

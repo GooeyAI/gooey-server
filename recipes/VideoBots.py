@@ -5,7 +5,7 @@ import typing
 import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, truncate_text
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.language_model import (
@@ -106,31 +106,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
     def render_form_v2(self):
-        tab1, tab2 = st.tabs(["💬 Chat", "📝 Script"])
-        with tab1:
-            st.text_area(
-                """
-                Type in what you'd like to say to the bot
-                """,
-                key="input_prompt",
-                height=50,
-            )
-        with tab2:
-            st.text_area(
-                """
-                An example conversation with this bot
-                """,
-                key="bot_script",
-                height=300,
-            )
-            st.file_uploader(
-                """
-                #### Input Face
-                Upload a video/image that contains faces to use  
-                *Recommended - mp4 / mov / png / jpg / gif* 
-                """,
-                key="face_file",
-            )
+        st.text_area(
+            """
+            #### 👩‍💻 Prompt
+            Ask me anything!
+            """,
+            key="input_prompt",
+            help="What a fine day..",
+            height=50,
+        )
 
     def validate_form_v2(self):
         assert st.session_state["input_prompt"], "Please type in a Messsage"
@@ -147,31 +131,60 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )
 
     def render_settings(self):
-        text_to_speech_settings()
-        language_model_settings()
-        lipsync_settings()
+        st.write("#### 📝 Script")
+        st.text_area(
+            """
+            An example conversation with this bot
+            """,
+            key="bot_script",
+            height=300,
+        )
+        st.file_uploader(
+            """
+            #### 👩‍🦰 Input Face
+            Upload a video/image that contains faces to use  
+            *Recommended - mp4 / mov / png / jpg / gif* 
+            """,
+            key="face_file",
+        )
 
-        st.text_input("##### Landbot URL", key="landbot_url")
+        st.write("---")
+
+        text_to_speech_settings()
+        st.write("---")
+        language_model_settings()
+        st.write("---")
+        lipsync_settings()
+        st.write("---")
+
+        st.text_input("##### 🤖 Landbot URL", key="landbot_url")
         self.show_landbot_widget()
 
     def fields_to_save(self) -> [str]:
         return super().fields_to_save() + ["landbot_url"]
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
-        with col1:
-            input_prompt = state.get("input_prompt")
-            if input_prompt:
-                st.markdown("```" + input_prompt.replace("\n", "") + "```")
-        with col2:
-            output_video = state.get("output_video")
-            if output_video:
-                st.video(output_video[0])
+        input_prompt = state.get("input_prompt")
+        if input_prompt:
+            st.markdown("Prompt ```" + input_prompt.replace("\n", "") + "```")
+
+        output_video = state.get("output_video")
+        if output_video:
+            st.video(output_video[0])
+
+        output_text = state.get("output_text")
+        if output_text:
+            st.caption(truncate_text(output_text[0].replace("\n", ""), maxlen=200))
 
     def render_output(self):
-        st.write(f"Bot Responses")
-        for idx, video_url in enumerate(st.session_state.get("output_video", [])):
-            st.video(video_url)
+        st.write(f"#### 💬 Response")
+        for idx, output_text in enumerate(st.session_state.get("output_text", [])):
+            try:
+                output_video = st.session_state.get("output_video", [])[idx]
+                st.video(output_video)
+            except IndexError:
+                pass
+            st.caption(output_text.replace("\n", ""))
 
     def show_landbot_widget(self):
         landbot_url = st.session_state.get("landbot_url")

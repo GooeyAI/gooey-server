@@ -260,7 +260,12 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         output_images = state.get("output_images")
         if output_images:
             for img in output_images:
-                st.image(img, caption=state.get("text_prompt", ""))
+                st.image(
+                    img,
+                    caption="```"
+                    + state.get("text_prompt", "").replace("\n", "")
+                    + "```",
+                )
 
     def render_usage_guide(self):
         youtube_video("bffH8X3YBCQ")
