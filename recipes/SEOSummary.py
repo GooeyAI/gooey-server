@@ -232,7 +232,7 @@ SearchSEO > Page Parsing > GPT3
             f"""
             Search Query `{state.get('search_query', '')}` \\
             Company Name `{state.get('title', '')}` \\
-            Company URL `{state.get('company_url', '')}` \\               
+            Company URL `{state.get('company_url', '')}` \\
             Focus Keywords `{state.get('keywords', '')}`
             """
         )
