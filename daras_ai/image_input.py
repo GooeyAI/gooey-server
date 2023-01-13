@@ -131,7 +131,6 @@ def upload_file_from_bytes(
     bucket = storage.bucket(settings.GS_BUCKET_NAME)
     blob = bucket.blob(f"daras_ai/media/{uuid.uuid1()}/{filename}")
     blob.upload_from_string(img_bytes, content_type=content_type)
-    print(blob.content_type)
     return blob.public_url
 
 

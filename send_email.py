@@ -67,7 +67,6 @@ def send_smtp_message(
 
 
 def send_email():
-    print([to_email, from_email, files])
     try:
         with smtplib.SMTP(
             config("AWS_SMTP_SERVER"), config("AWS_SMTP_PORT")
