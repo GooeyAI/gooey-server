@@ -1,12 +1,13 @@
 from urllib.parse import quote_plus
 
 import stripe
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from firebase_admin.auth import UserRecord
 from furl import furl
+from starlette.datastructures import FormData
 
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
@@ -127,10 +128,15 @@ def account(request: Request):
     return templates.TemplateResponse("account.html", context)
 
 
+async def request_form(request: Request):
+    return await request.form()
+
+
 @router.route("/__/stripe/create-checkout-session", methods=["POST"])
-async def create_checkout_session(request: Request):
-    form = await request.form()
-    lookup_key = form["lookup_key"]
+def create_checkout_session(
+    request: Request, body_form: FormData = Depends(request_form)
+):
+    lookup_key = body_form["lookup_key"]
     subscription = available_subscriptions[lookup_key]
     line_item = subscription["stripe"]
 
@@ -180,7 +186,7 @@ def payment_cancel(request):
 
 
 @router.route("/__/stripe/create-portal-session", methods=["POST"])
-async def customer_portal(request: Request):
+def customer_portal(request: Request):
     customer = get_or_create_stripe_customer(request.user)
     portal_session = stripe.billing_portal.Session.create(
         customer=customer,
@@ -189,13 +195,16 @@ async def customer_portal(request: Request):
     return RedirectResponse(portal_session.url, status_code=303)
 
 
+async def request_body(request: Request):
+    return await request.body()
+
+
 @router.route("/__/stripe/webhook", methods=["POST"])
-async def webhook_received(request: Request):
-    request_data = await request.body()
+def webhook_received(request: Request, payload: bytes = Depends(request_body)):
 
     # Retrieve the event by verifying the signature using the raw body and secret if webhook signing is configured.
     event = stripe.Webhook.construct_event(
-        payload=request_data,
+        payload=payload,
         sig_header=request.headers["stripe-signature"],
         secret=settings.STRIPE_ENDPOINT_SECRET,
     )

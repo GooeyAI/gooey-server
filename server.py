@@ -54,11 +54,13 @@ from recipes.SEOSummary import SEOSummaryPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
-from routers import billing
+from routers import billing, facebook
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
-app.include_router(billing.router)
+app.include_router(billing.router, include_in_schema=False)
+app.include_router(facebook.router, include_in_schema=False)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -159,12 +161,16 @@ def authentication(request: Request):
     )
 
 
+async def request_json(request: Request):
+    return await request.json()
+
+
 @app.post("/sessionLogin", include_in_schema=False)
-async def authentication(request: Request):
+def authentication(request: Request, body_json=Depends(request_json)):
     ## Taken from https://firebase.google.com/docs/auth/admin/manage-cookies#create_session_cookie
 
     # Get the ID token sent by the client
-    id_token = await request.body()
+    id_token = body_json
 
     # To ensure that cookies are set only on recently signed in users, check auth_time in
     # ID token before creating a cookie.
@@ -188,7 +194,7 @@ async def authentication(request: Request):
 
 
 @app.get("/logout", include_in_schema=False)
-async def logout(request: Request):
+def logout(request: Request):
     request.session.pop(FIREBASE_SESSION_COOKIE, None)
     return RedirectResponse(url=request.query_params.get("next", "/"))
 

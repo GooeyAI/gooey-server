@@ -33,6 +33,7 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.utils import email_support_about_reported_run
 from daras_ai_v2.utils import random
+from routers.facebook import ig_connect_url, fb_connect_url, get_page_display_name
 
 DEFAULT_STATUS = "Running..."
 
@@ -130,8 +131,14 @@ class BasePage:
         left_col, output_col = st.columns([3, 2], gap="medium")
 
         with left_col:
-            run_tab, settings_tab, examples_tab, api_tab = st.tabs(
-                ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
+            run_tab, settings_tab, examples_tab, api_tab, integrations_tab = st.tabs(
+                [
+                    "🏃‍♀️Run",
+                    "⚙️ Settings",
+                    "🔖 Examples",
+                    "🚀 Run as API",
+                    "🔌 Integrations",
+                ]
             )
 
             with run_tab:
@@ -160,6 +167,11 @@ class BasePage:
             with api_tab:
                 self.run_as_api_tab()
 
+            with integrations_tab:
+                self.integrations_tab()
+
+            st.write("---")
+
         self.render_step_row()
         self.render_footer()
 
@@ -170,6 +182,88 @@ class BasePage:
         #
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
+
+    def integrations_tab(self):
+        user = st.session_state.get("_current_user")
+        if not user:
+            return
+
+        st.markdown(
+            f"""
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
+                  <img height="20" src="https://www.instagram.com/favicon.ico">️
+                  &nbsp; 
+                  Add Your Instagram Page
+                </a>
+            </div>
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
+                  <img height="20" src="https://www.facebook.com/favicon.ico">️             
+                  &nbsp; 
+                  Add Your Facebook Page
+                </a>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        fb_pages = st.session_state.get("__fb_pages#3")
+        if fb_pages is None:
+            with st.spinner("Loading Facebook Pages..."):
+                fb_pages = (
+                    db.get_collection_ref(db.FB_PAGES_COLLECTION)
+                    .where("uid", "==", user.uid)
+                    .get()
+                )
+            st.session_state["__fb_pages#3"] = fb_pages
+
+        st.write("#### Select a Page to Integrate")
+        selected_pages = {}
+        for snapshot in fb_pages:
+            page = snapshot.to_dict()
+            if st.checkbox(get_page_display_name(page)):
+                selected_pages[snapshot.id] = page
+            else:
+                selected_pages.pop(snapshot.id, None)
+            connected_to = page.get("connected_to")
+            if connected_to:
+                st.caption(f"Currently Connected to `{connected_to}`")
+        if selected_pages:
+            if st.button("Connect"):
+                for page in selected_pages.values():
+                    page["connected_to"] = "asdf"
+
+        # st.markdown(
+        #     f"""
+        #     <div style='height: 50px'>
+        #         <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
+        #           🔗️ Add it to your website
+        #         </a>
+        #     </div>
+        #     """,
+        #     unsafe_allow_html=True,
+        # )
+        # st.markdown(
+        #     f"""
+        #     <div style='height: 50px'>
+        #         <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
+        #           🔗️ Connect a new Whatsapp Businuess Account
+        #         </a>
+        #     </div>
+        #     """,
+        #     unsafe_allow_html=True,
+        # )
+        # st.markdown(
+        #     f"""
+        #     <div style='height: 50px'>
+        #         <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
+        #           🔗️ Connect a new Discord Bot
+        #         </a>
+        #     </div>
+        #     """,
+        #     unsafe_allow_html=True,
+        # )
 
     def _load_session_state(self):
         if st.session_state.get("__loaded__"):
@@ -637,21 +731,20 @@ class BasePage:
         ]
 
     def _examples_tab(self):
-        example_docs = st.session_state.setdefault("__example_docs", [])
-        if not example_docs:
+        example_docs = st.session_state.get("__example_docs")
+        if example_docs is None:
             with st.spinner("Loading Examples..."):
-                example_docs.extend(
-                    db.get_collection_ref(
-                        document_id=self.doc_name,
-                        sub_collection_id=EXAMPLES_COLLECTION,
-                    ).get()
-                )
-                example_docs.sort(
-                    key=lambda s: s.to_dict()
-                    .get("updated_at", datetime.datetime.fromtimestamp(0))
-                    .timestamp(),
-                    reverse=True,
-                )
+                example_docs = db.get_collection_ref(
+                    document_id=self.doc_name,
+                    sub_collection_id=EXAMPLES_COLLECTION,
+                ).get()
+            example_docs.sort(
+                key=lambda s: s.to_dict()
+                .get("updated_at", datetime.datetime.fromtimestamp(0))
+                .timestamp(),
+                reverse=True,
+            )
+            st.session_state["__example_docs"] = example_docs
 
         allow_delete = is_admin()
 

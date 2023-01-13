@@ -7,6 +7,8 @@ from starlette.requests import Request
 
 from daras_ai_v2 import settings
 
+FB_PAGES_COLLECTION = "fb_pages"
+
 FIREBASE_SESSION_COOKIE = "firebase_session"
 ANONYMOUS_USER_COOKIE = "anonymous_user"
 
@@ -132,3 +134,26 @@ def get_doc_ref(
         sub_collection = doc_ref.collection(sub_collection_id)
         doc_ref = sub_collection.document(sub_document_id)
     return doc_ref
+
+
+def get_page_access_token(page_id: str) -> str | None:
+    doc_ref = get_fb_page_ref(page_id)
+    return get_doc_field(doc_ref, "access_token")
+
+
+def get_fb_page_ref(page_id):
+    return _db.collection(FB_PAGES_COLLECTION).document(page_id)
+
+
+def update_pages_for_user(page_docs: list[(str, dict)], uid: str):
+    batch = _db.batch()
+
+    # delete existing pages
+    for snapshot in _db.collection(FB_PAGES_COLLECTION).where("uid", "==", uid).get():
+        batch.delete(snapshot.reference)
+
+    # create incoming pages
+    for page_id, page_doc in page_docs:
+        batch.create(get_fb_page_ref(page_id), page_doc)
+
+    batch.commit()

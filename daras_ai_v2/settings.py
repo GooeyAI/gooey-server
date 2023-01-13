@@ -72,3 +72,7 @@ stripe.api_key = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
 
 WIX_SITE_URL = config("WIX_SITE_URL", "https://archanaprasad.wixsite.com/daras-ai")
+
+FB_APP_ID = config("FB_APP_ID", "")
+FB_APP_SECRET = config("FB_APP_SECRET", "")
+FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
