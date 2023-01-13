@@ -571,9 +571,6 @@ class BasePage:
             self._render_report_button()
 
     def _render_save_options(self):
-        query_params = st.experimental_get_query_params()
-
-    def _render_admin_options(self):
         state_to_save = st.session_state.get("__state_to_save")
         # st.write("state_to_save " + str(state_to_save))
         if not state_to_save:
