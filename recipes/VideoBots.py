@@ -86,12 +86,13 @@ class VideoBotsPage(BasePage):
         output_video: list[str]
         final_prompt: str
 
-    def preview_image(self, state:dict)->str |None:
+    def preview_image(self, state: dict) -> str | None:
         output_video = state.get("output_video")[0]
         filename_with_ext = os.path.basename(output_video)
         filename_without_ext = Path(output_video).resolve().stem
-        return output_video.replace(filename_with_ext, f"thumbs/{filename_without_ext}.gif")
-
+        return output_video.replace(
+            filename_with_ext, f"thumbs/{filename_without_ext}.gif"
+        )
 
     def preview_description(self, state: dict) -> str:
         return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
