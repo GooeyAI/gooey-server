@@ -19,13 +19,13 @@ def init_scripts():
     hidden_html_nojs(
         """
         <style>
-        button[kind="primaryFormSubmit"] {
+        button[kind="primary"] {
             background-color: #b2ebf2;
             text-shadow: 0 0 0 black;
             color: transparent;  
         }
 
-        .row-widget:has(button[kind="primaryFormSubmit"]) {
+        .row-widget:has(button[kind="primary"]) {
             text-align: right;
         }
 
@@ -40,6 +40,7 @@ def init_scripts():
         
         .stMultiSelect [data-baseweb=select] span {
             max-width: 500px;
+            color: black;
         }
         
         .stTabs [data-baseweb=tab] p {

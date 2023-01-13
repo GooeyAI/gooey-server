@@ -130,14 +130,14 @@ The result is a fantastic, one of kind image that's relevant to your search (and
     def render_form_v2(self):
         st.text_input(
             """
-            ### Google Image Search
+            ### 🔎 Google Image Search
             Type a query you'd use in [Google image search](https://images.google.com/?gws_rd=ssl)
             """,
             key="search_query",
         )
         st.text_area(
             """
-            ### Edit Prompt
+            ### 👩‍💻 Prompt
             Describe how you want to edit the photo in words
             """,
             key="text_prompt",
@@ -172,7 +172,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         st.write(
             f"""
             **Google Search Query** `{state.get("search_query", '')}` \\
-            **Edit Prompt** `{state.get("text_prompt", '')}`
+            **Prompt** `{state.get("text_prompt", '')}`
             """
         )
 

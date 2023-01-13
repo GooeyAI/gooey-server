@@ -36,6 +36,7 @@
                         }
                         let url = new URL(window.location.href);
                         url.search = searchParams.toString();
+                        if (url.toString() == window.location.href) return;
                         history.pushState(null, '', url.toString());
                         break;
 

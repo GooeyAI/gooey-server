@@ -4,7 +4,7 @@ import streamlit as st
 def lipsync_settings():
     st.write(
         """
-        #### Face Padding
+        #### 😶 Face Padding
         Adjust the detected face bounding box. Often leads to improved results.  
         Recommended to give at least 10 padding for the chin region. 
         """

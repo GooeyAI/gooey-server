@@ -1,5 +1,9 @@
+from functools import wraps
+from time import sleep
+
 import openai
 from decouple import config
+from openai.error import ServiceUnavailableError, RateLimitError
 from transformers import GPT2TokenizerFast
 
 from daras_ai_v2 import settings
@@ -19,6 +23,32 @@ def calc_gpt_tokens(text: str) -> int:
     return len(_gpt2_tokenizer.encode(text, verbose=False))
 
 
+def do_retry(
+    max_retries: int = 5,
+    retry_delay: float = 1.0,
+    error_cls=(ServiceUnavailableError, RateLimitError),
+):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            n = 0
+            while True:
+                try:
+                    return fn(*args, **kwargs)
+                except error_cls as e:
+                    if n < max_retries:
+                        n += 1
+                        print(f"({n}/5) captured error, retry in 1s:", repr(e))
+                        sleep(retry_delay)
+                    else:
+                        raise
+
+        return wrapper
+
+    return decorator
+
+
+@do_retry()
 def run_language_model(
     api_provider: str,
     engine: str,

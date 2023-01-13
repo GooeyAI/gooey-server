@@ -31,28 +31,29 @@ class TextToSpeechProviders(Enum):
 def text_to_speech_settings():
     st.write(
         """
-        #### Voice Settings
+        #### 🗣️ Voice Settings
         """
     )
 
-    tts_provider = enum_selector(
-        TextToSpeechProviders,
-        "###### Speech Provider",
-        key="tts_provider",
-    )
+    col1, col2 = st.columns(2)
+    with col1:
+        tts_provider = enum_selector(
+            TextToSpeechProviders,
+            "###### Speech Provider",
+            key="tts_provider",
+        )
 
     match tts_provider:
         case TextToSpeechProviders.GOOGLE_TTS.name:
-            st.write(
-                "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*"
-            )
-            col1, col2 = st.columns(2)
-            with col1:
+            with col2:
                 st.text_input(
                     label="""
                     ###### Voice name (Google TTS)
                     """,
                     key="google_voice_name",
+                )
+                st.caption(
+                    "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*"
                 )
 
             col1, col2 = st.columns(2)
@@ -80,8 +81,7 @@ def text_to_speech_settings():
                 )
 
         case TextToSpeechProviders.UBERDUCK.name:
-            col1, col2 = st.columns(2)
-            with col1:
+            with col2:
                 st.write(
                     """
                     ###### Voice name (Uberduck)
@@ -95,6 +95,8 @@ def text_to_speech_settings():
                     options=UBERDUCK_VOICES.keys(),
                 )
 
+            col1, col2 = st.columns(2)
+            with col1:
                 st.slider(
                     """
                     ###### Speaking rate 

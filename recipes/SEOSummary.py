@@ -8,6 +8,7 @@ import streamlit as st
 from bs4 import BeautifulSoup
 from furl import furl
 from html_sanitizer import Sanitizer
+from lxml import etree
 from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage
@@ -230,9 +231,9 @@ SearchSEO > Page Parsing > GPT3
         st.write(
             f"""
             Search Query `{state.get('search_query', '')}` \\
-            Focus Keywords `{state.get('keywords', '')}` \\
             Company Name `{state.get('title', '')}` \\
-            Company URL `{state.get('company_url', '')}`               
+            Company URL `{state.get('company_url', '')}` \\
+            Focus Keywords `{state.get('keywords', '')}`
             """
         )
 
@@ -401,7 +402,7 @@ def _gen_final_prompt(
 def _summarize_url(url: str, enable_html: bool):
     try:
         title, summary = _call_summarize_url(url)
-    except requests.RequestException:
+    except (requests.RequestException, etree.LxmlError):
         return None
 
     title = html_to_text(title)

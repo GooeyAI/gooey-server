@@ -304,7 +304,7 @@ class FaceInpaintingPage(BasePage):
             width=state["output_width"],
             height=state["output_height"],
             negative_prompt=state["negative_prompt"],
-            guidance_scale=state["guidance_scale"],
+            guidance_scale=state.get("guidance_scale"),
             seed=state["seed"],
         )
         state["diffusion_images"] = diffusion_images
@@ -326,16 +326,19 @@ class FaceInpaintingPage(BasePage):
         ]
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
-        with col1:
-            input_image = state.get("input_image")
-            if input_image:
-                st.image(input_image, caption="Input Image")
-        with col2:
-            output_images = state.get("output_images")
-            if output_images:
-                for img in output_images:
-                    st.image(img, caption=state.get("text_prompt", ""))
+        output_images = state.get("output_images")
+        if output_images:
+            for img in output_images:
+                st.image(
+                    img,
+                    caption="```"
+                    + state.get("text_prompt", "").replace("\n", "")
+                    + "```",
+                )
+
+        input_image = state.get("input_image")
+        if input_image:
+            st.image(input_image, caption="Input Image")
 
 
 if __name__ == "__main__":

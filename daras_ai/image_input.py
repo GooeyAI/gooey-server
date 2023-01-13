@@ -116,6 +116,14 @@ def resize_img_contain(img_bytes: bytes, size: (int, int)) -> bytes:
     return cv2_img_to_bytes(img_cv2)
 
 
+def resize_img_fit(img_bytes: bytes, size: (int, int)) -> bytes:
+    img_cv2 = bytes_to_cv2_img(img_bytes)
+    img_pil = Image.fromarray(img_cv2)
+    img_pil = ImageOps.fit(img_pil, size)
+    img_cv2 = np.array(img_pil)
+    return cv2_img_to_bytes(img_cv2)
+
+
 def upload_file_from_bytes(
     filename: str, img_bytes: bytes, content_type="text/plain"
 ) -> str:
@@ -145,7 +153,7 @@ def img_exists(img) -> bool:
         return bool(img)
 
 
-FILENAME_WHITELIST = re.compile(r"[ \w\-_.]")
+FILENAME_WHITELIST = re.compile(r"[ A-z0-9\-_.]")
 
 
 def safe_filename(filename: str):

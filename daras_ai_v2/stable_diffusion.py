@@ -6,7 +6,12 @@ import replicate
 import requests
 from PIL import Image
 
-from daras_ai.image_input import upload_file_from_bytes, bytes_to_cv2_img
+from daras_ai.image_input import (
+    upload_file_from_bytes,
+    bytes_to_cv2_img,
+    resize_img_pad,
+    resize_img_fit,
+)
 from daras_ai_v2 import settings
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints, b64_img_decode
@@ -27,6 +32,10 @@ class Img2ImgModels(Enum):
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
+    openjourney = "Open Journey (PromptHero)"
+    openjourney_2 = "Open Journey v2 beta (PromptHero)"
+    analog_diffusion = "Analog Diffusion (wavymulder)"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
 
 
 class Text2ImgModels(Enum):
@@ -35,6 +44,10 @@ class Text2ImgModels(Enum):
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     openjourney = "Open Journey (PromptHero)"
+    openjourney_2 = "Open Journey v2 beta (PromptHero)"
+    analog_diffusion = "Analog Diffusion (wavymulder)"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
+    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     dall_e = "Dall-E (OpenAI)"
 
 
@@ -55,6 +68,8 @@ def text2img(
 
     match selected_model:
         case Text2ImgModels.sd_2.name:
+            if num_inference_steps == 110:
+                num_inference_steps = 100
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.sd_2,
                 input_data={
@@ -85,57 +100,63 @@ def text2img(
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
 
+            edge = _get_dalle_img_size(width, height)
             response = openai.Image.create(
                 n=num_outputs,
                 prompt=prompt,
-                size=f"{width}x{height}",
+                size=f"{edge}x{edge}",
                 response_format="b64_json",
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
-        case Text2ImgModels.sd_1_5.name:
-            model = replicate.models.get("stability-ai/stable-diffusion")
-            version = model.versions.get(
-                "27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd7478"
-            )
-            out_imgs = [
-                requests.get(img).content
-                for img in version.predict(
-                    prompt=prompt,
-                    width=width,
-                    height=height,
-                    num_outputs=num_outputs,
-                    num_inference_steps=num_inference_steps,
-                    guidance_scale=guidance_scale,
-                    seed=seed or None,
-                    negative_prompt=negative_prompt or "",
-                )
-            ]
-        case Text2ImgModels.openjourney.name:
-            model = replicate.models.get("prompthero/openjourney")
-            version = model.versions.get(
-                "9936c2001faa2194a261c01381f90e65261879985476014a0a37a334593a05eb"
-            )
-            # Modify the prompt
-            prompt = "mdjrny-v4 style " + prompt
-            out_imgs = [
-                requests.get(img).content
-                for img in version.predict(
-                    prompt=prompt,
-                    width=width,
-                    height=height,
-                    num_outputs=num_outputs,
-                    num_inference_steps=num_inference_steps,
-                    guidance_scale=guidance_scale,
-                    seed=seed or None,
-                    negative_prompt=negative_prompt or "",
-                )
-            ]
         case _:
-            out_imgs = []
+            match selected_model:
+                case Text2ImgModels.sd_1_5.name:
+                    hf_model_id = "runwayml/stable-diffusion-v1-5"
+                case Text2ImgModels.openjourney.name:
+                    prompt = "mdjrny-v4 style " + prompt
+                    hf_model_id = "prompthero/openjourney"
+                case Text2ImgModels.openjourney_2.name:
+                    hf_model_id = "prompthero/openjourney-v2"
+                case Text2ImgModels.analog_diffusion.name:
+                    prompt = "analog style " + prompt
+                    hf_model_id = "wavymulder/Analog-Diffusion"
+                case Text2ImgModels.protogen_5_3.name:
+                    prompt = "modelshoot style " + prompt
+                    hf_model_id = "darkstorm2150/Protogen_v5.3_Official_Release"
+                case Text2ImgModels.dreamlike_2.name:
+                    prompt = "photo, " + prompt
+                    hf_model_id = "dreamlike-art/dreamlike-photoreal-2.0"
+                case _:
+                    return []
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": hf_model_id,
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                },
+            )
     return [
         upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
+
+
+def _get_dalle_img_size(width: int, height: int) -> int:
+    edge = max(width, height)
+    if edge < 512:
+        edge = 256
+    elif 512 < edge < 1024:
+        edge = 512
+    elif edge > 1024:
+        edge = 1024
+    return edge
 
 
 def img2img(
@@ -146,12 +167,13 @@ def img2img(
     init_image: str,
     init_image_bytes: bytes = None,
     num_inference_steps: int,
-    prompt_strength: float,
+    prompt_strength: float = None,
     negative_prompt: str = None,
     guidance_scale: float = None,
     sd_2_upscaling: bool = False,
     seed: int = 42,
 ):
+    prompt_strength = prompt_strength or 0.7
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
 
     height, width, _ = bytes_to_cv2_img(init_image_bytes).shape
@@ -159,6 +181,8 @@ def img2img(
 
     match selected_model:
         case Img2ImgModels.sd_2.name:
+            if num_inference_steps == 110:
+                num_inference_steps = 100
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.sd_2,
                 input_data={
@@ -197,35 +221,53 @@ def img2img(
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
 
+            edge = _get_dalle_img_size(width, height)
+            image = resize_img_pad(init_image_bytes, (edge, edge))
+
             response = openai.Image.create_variation(
-                image=init_image_bytes,
+                image=image,
                 n=num_outputs,
-                size=f"{width}x{height}",
+                size=f"{edge}x{edge}",
                 response_format="b64_json",
             )
-            out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
-        case Img2ImgModels.sd_1_5.name:
-            model = replicate.models.get("stability-ai/stable-diffusion")
-            version = model.versions.get(
-                "27b93a2413e7f36cd83da926f3656280b2931564ff050bf9575f1fdf9bcd7478"
-            )
+
             out_imgs = [
-                requests.get(img).content
-                for img in version.predict(
-                    prompt=prompt,
-                    width=width,
-                    height=height,
-                    init_image=init_image,
-                    prompt_strength=prompt_strength,
-                    num_outputs=num_outputs,
-                    num_inference_steps=num_inference_steps,
-                    negative_prompt=negative_prompt or "",
-                    guidance_scale=guidance_scale,
-                    seed=seed,
-                )
+                resize_img_fit(b64_img_decode(part["b64_json"]), (width, height))
+                for part in response["data"]
             ]
         case _:
-            out_imgs = []
+            match selected_model:
+                case Img2ImgModels.sd_1_5.name:
+                    hf_model_id = "runwayml/stable-diffusion-v1-5"
+                case Img2ImgModels.openjourney.name:
+                    prompt = "mdjrny-v4 style " + prompt
+                    hf_model_id = "prompthero/openjourney"
+                case Img2ImgModels.openjourney_2.name:
+                    hf_model_id = "prompthero/openjourney-v2"
+                case Img2ImgModels.analog_diffusion.name:
+                    prompt = "analog style " + prompt
+                    hf_model_id = "wavymulder/Analog-Diffusion"
+                case Img2ImgModels.protogen_5_3.name:
+                    prompt = "modelshoot style " + prompt
+                    hf_model_id = "darkstorm2150/Protogen_v5.3_Official_Release"
+                case _:
+                    return []
+            out_imgs = call_gpu_server_b64(
+                endpoint=GpuEndpoints.sd_multi,
+                input_data={
+                    "hf_model_id": hf_model_id,
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_outputs": num_outputs,
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": guidance_scale,
+                    "seed": seed,
+                    "negative_prompt": negative_prompt or "",
+                    "init_image": init_image,
+                    "strength": prompt_strength,
+                },
+            )
     return [
         upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
@@ -252,6 +294,8 @@ def inpainting(
 
     match selected_model:
         case InpaintingModels.sd_2.name:
+            if num_inference_steps == 110:
+                num_inference_steps = 100
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.sd_2,
                 input_data={
@@ -289,12 +333,17 @@ def inpainting(
             openai.api_key = settings.OPENAI_API_KEY
             openai.api_base = "https://api.openai.com/v1"
 
+            edge = _get_dalle_img_size(width, height)
+            edit_image_bytes = resize_img_pad(edit_image_bytes, (edge, edge))
+            mask_bytes = resize_img_pad(mask_bytes, (edge, edge))
+            image = rgb_img_to_rgba(edit_image_bytes, mask_bytes)
+
             response = openai.Image.create_edit(
                 prompt=prompt,
-                image=rgb_img_to_rgba(edit_image_bytes, mask_bytes),
+                image=image,
                 mask=None,
                 n=num_outputs,
-                size=f"{width}x{height}",
+                size=f"{edge}x{edge}",
                 response_format="b64_json",
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]

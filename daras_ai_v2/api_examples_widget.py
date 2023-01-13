@@ -22,7 +22,11 @@ curl -X 'POST' \
   -d %s
 ```
             """
-            % (api_url, auth_keyword, shlex.quote(json.dumps(request_body, indent=2)))
+            % (
+                shlex.quote(api_url),
+                auth_keyword,
+                shlex.quote(json.dumps(request_body, indent=2)),
+            )
         )
 
     with python:

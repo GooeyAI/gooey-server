@@ -29,6 +29,7 @@ def scrollable_html(text: str, *, height=500):
             border-radius: 100px;
         }
         </style>
+        <base target="_blank">
         </head>
 
         <div class="content">
