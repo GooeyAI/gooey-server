@@ -121,11 +121,7 @@ class BasePage:
 
         init_scripts()
 
-        st.write("## " + (st.session_state.get("__title") or self.title))
-        st.write(
-            st.session_state.get("__notes")
-            or self.preview_description(st.session_state)
-        )
+        title_area = st.empty()
 
         left_col, output_col = st.columns([3, 2], gap="medium")
 
@@ -139,17 +135,22 @@ class BasePage:
                 self._check_if_flagged()
                 submitted = self.render_form()
 
+            with title_area.container():
+                st.session_state.setdefault("__title", self.title)
+                st.session_state.setdefault(
+                    "__notes", self.preview_description(st.session_state)
+                )
+
+                st.write("## " + st.session_state.get("__title"))
+                st.write(st.session_state.get("__notes"))
+
             with settings_tab:
                 self.render_settings()
 
                 st.write("---")
                 st.write("##### 🖌️ Personalize")
-                st.text_input("Title", key="__title", value=self.title)
-                st.text_area(
-                    "Notes",
-                    key="__notes",
-                    value=self.preview_description(st.session_state),
-                )
+                st.text_input("Title", key="__title")
+                st.text_area("Notes", key="__notes")
                 st.write("---")
 
                 submitted = submitted or self.render_submit_button(key="2")
