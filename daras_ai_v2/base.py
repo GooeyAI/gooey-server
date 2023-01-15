@@ -631,6 +631,9 @@ class BasePage:
             field_name
             for model in (self.RequestModel, self.ResponseModel)
             for field_name in model.__fields__
+        ] + [
+            "__title",
+            "__notes",
         ]
 
     def _examples_tab(self):
