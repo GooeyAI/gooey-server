@@ -106,7 +106,7 @@ available_subscriptions = {
 }
 
 
-@router.route("/account", include_in_schema=False)
+@router.get("/account/", include_in_schema=False)
 def account(request: Request):
     if not request.user:
         next_url = request.query_params.get("next", "/account")
@@ -128,7 +128,7 @@ def account(request: Request):
     return templates.TemplateResponse("account.html", context)
 
 
-@router.route("/__/stripe/create-checkout-session", methods=["POST"])
+@router.post("/__/stripe/create-checkout-session")
 async def create_checkout_session(request: Request):
     form = await request.form()
     lookup_key = form["lookup_key"]
@@ -168,19 +168,19 @@ async def create_checkout_session(request: Request):
     return RedirectResponse(checkout_session.url, status_code=303)
 
 
-@router.route("/payment-success")
-def payment_success(request):
+@router.get("/payment-success")
+def payment_success(request: Request):
     context = {"request": request}
     return templates.TemplateResponse("payment_success.html", context)
 
 
-@router.route("/payment-cancel")
-def payment_cancel(request):
+@router.get("/payment-cancel")
+def payment_cancel(request: Request):
     context = {"request": request}
     return templates.TemplateResponse("payment_cancel.html", context)
 
 
-@router.route("/__/stripe/create-portal-session", methods=["POST"])
+@router.post("/__/stripe/create-portal-session")
 async def customer_portal(request: Request):
     customer = get_or_create_stripe_customer(request.user)
     portal_session = stripe.billing_portal.Session.create(
@@ -190,7 +190,7 @@ async def customer_portal(request: Request):
     return RedirectResponse(portal_session.url, status_code=303)
 
 
-@router.route("/__/stripe/webhook", methods=["POST"])
+@router.post("/__/stripe/webhook")
 async def webhook_received(request: Request):
     request_data = await request.body()
 
@@ -235,7 +235,7 @@ def _handle_invoice_paid(uid: str, invoice_data):
     db.update_user_balance(uid, amount, invoice_id)
 
 
-@router.route("/__/stripe/cancel-subscription", methods=["POST"])
+@router.post("/__/stripe/cancel-subscription")
 def cancel_subscription(request: Request):
     customer = get_or_create_stripe_customer(request.user)
     subscriptions = stripe.Subscription.list(customer=customer).data
