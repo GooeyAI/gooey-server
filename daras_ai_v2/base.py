@@ -33,7 +33,6 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.utils import email_support_about_reported_run
 from daras_ai_v2.utils import random
-from routers.facebook import ig_connect_url, fb_connect_url, get_page_display_name
 
 DEFAULT_STATUS = "Running..."
 
@@ -91,15 +90,13 @@ class BasePage:
             query_params |= dict(example_id=example_id)
         return query_params
 
-    def api_url(self, example_id=None, run_id=None, uid=None) -> str:
+    def api_url(self, example_id=None, run_id=None, uid=None) -> furl:
         query_params = {}
         if run_id and uid:
             query_params = dict(run_id=run_id, uid=uid)
         elif example_id:
             query_params = dict(example_id=example_id)
-        return str(
-            furl(settings.API_BASE_URL, query_params=query_params) / self.endpoint
-        )
+        return furl(settings.API_BASE_URL, query_params=query_params) / self.endpoint
 
     @property
     def endpoint(self) -> str:
@@ -184,86 +181,7 @@ class BasePage:
         #
 
     def integrations_tab(self):
-        user = st.session_state.get("_current_user")
-        if not user:
-            return
-
-        st.markdown(
-            f"""
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
-                  <img height="20" src="https://www.instagram.com/favicon.ico">️
-                  &nbsp; 
-                  Add Your Instagram Page
-                </a>
-            </div>
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
-                  <img height="20" src="https://www.facebook.com/favicon.ico">️             
-                  &nbsp; 
-                  Add Your Facebook Page
-                </a>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        fb_pages = st.session_state.get("__fb_pages#3")
-        if fb_pages is None:
-            with st.spinner("Loading Facebook Pages..."):
-                fb_pages = (
-                    db.get_collection_ref(db.FB_PAGES_COLLECTION)
-                    .where("uid", "==", user.uid)
-                    .get()
-                )
-            st.session_state["__fb_pages#3"] = fb_pages
-
-        st.write("#### Select a Page to Integrate")
-        selected_pages = {}
-        for snapshot in fb_pages:
-            page = snapshot.to_dict()
-            if st.checkbox(get_page_display_name(page)):
-                selected_pages[snapshot.id] = page
-            else:
-                selected_pages.pop(snapshot.id, None)
-            connected_to = page.get("connected_to")
-            if connected_to:
-                st.caption(f"Currently Connected to `{connected_to}`")
-        if selected_pages:
-            if st.button("Connect"):
-                for page in selected_pages.values():
-                    page["connected_to"] = "asdf"
-
-        # st.markdown(
-        #     f"""
-        #     <div style='height: 50px'>
-        #         <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
-        #           🔗️ Add it to your website
-        #         </a>
-        #     </div>
-        #     """,
-        #     unsafe_allow_html=True,
-        # )
-        # st.markdown(
-        #     f"""
-        #     <div style='height: 50px'>
-        #         <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
-        #           🔗️ Connect a new Whatsapp Businuess Account
-        #         </a>
-        #     </div>
-        #     """,
-        #     unsafe_allow_html=True,
-        # )
-        # st.markdown(
-        #     f"""
-        #     <div style='height: 50px'>
-        #         <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
-        #           🔗️ Connect a new Discord Bot
-        #         </a>
-        #     </div>
-        #     """,
-        #     unsafe_allow_html=True,
-        # )
+        st.write("Sorry! No integrations available for this workflow.")
 
     def _load_session_state(self):
         if st.session_state.get("__loaded__"):
@@ -499,7 +417,7 @@ class BasePage:
         example_id, run_id, uid = self.extract_query_params(query_params)
         return self.app_url(example_id, run_id, uid)
 
-    def _get_current_api_url(self) -> str | None:
+    def _get_current_api_url(self) -> furl | None:
         query_params = st.experimental_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
         return self.api_url(example_id, run_id, uid)
@@ -840,7 +758,7 @@ class BasePage:
         )
         st.markdown(f"### [📖 API Docs]({api_docs_url})")
 
-        api_url = self._get_current_api_url()
+        api_url = str(self._get_current_api_url())
         request_body = get_example_request_body(self.RequestModel, st.session_state)
         response_body = self.get_example_response_body(st.session_state)
 

@@ -3,6 +3,7 @@ from functools import partial
 import requests
 from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
+from firebase_admin import auth
 from furl import furl
 from starlette.background import BackgroundTasks
 from starlette.requests import Request
@@ -39,18 +40,28 @@ def _on_message(object_: str, messaging: dict):
     recipient_id = messaging["recipient"]["id"]
 
     if object_ == "instagram":
-        page_id = list(
-            db.get_collection_ref(db.FB_PAGES_COLLECTION)
-            .where("ig_account_id", "==", recipient_id)
-            .limit(1)
-            .get()
-        )[0].id
+        try:
+            snapshot = list(
+                db.get_collection_ref(db.FB_PAGES_COLLECTION)
+                .where("ig_account_id", "==", recipient_id)
+                .limit(1)
+                .get()
+            )[0]
+        except IndexError:
+            return
+        page_id = snapshot.id
     elif object_ == "page":
         page_id = recipient_id
+        snapshot = db.get_fb_page_ref(page_id).get()
     else:
         return
 
-    access_token = db.get_page_access_token(page_id)
+    if not snapshot.exists:
+        return
+    fb_page = snapshot.to_dict()
+
+    # access_token = db.get_page_access_token(page_id)
+    access_token = fb_page.get("access_token")
     if not access_token:
         return
 
@@ -65,8 +76,24 @@ def _on_message(object_: str, messaging: dict):
             ],
         )
 
-    response_text = "hello world!" + text
-    response_video = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d8a021ca-91c9-11ed-bbf6-02420a00015c/gooey.ai%20lipsync%20-%2052b62bff-de40-4a26-a499-4ab5dbac7d5a201.mp4"
+    from server import call_api, page_map, normalize_slug
+
+    page_slug = fb_page.get("connected_page_slug")
+    page_slug = normalize_slug(page_slug)
+    try:
+        page_cls = page_map[page_slug]
+    except KeyError:
+        return
+    result = call_api(
+        page_cls=page_cls,
+        user=auth.get_user(fb_page["uid"]),
+        request_body={
+            "input_prompt": text,
+        },
+        query_params=fb_page.get("connected_query_params") or {},
+    )
+    response_text = result["output"]["output_text"][0]
+    response_video = result["output"]["output_video"][0]
 
     _send_messages(
         page_id=page_id,

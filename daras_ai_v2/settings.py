@@ -76,3 +76,6 @@ WIX_SITE_URL = config("WIX_SITE_URL", "https://archanaprasad.wixsite.com/daras-a
 FB_APP_ID = config("FB_APP_ID", "")
 FB_APP_SECRET = config("FB_APP_SECRET", "")
 FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
+
+TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
+TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")
