@@ -150,7 +150,9 @@ with col2:
 Pro Tip: double click on any user to drill-down
 """
 
-time_axis = "1D"
+col1, col2 = st.columns(2)
+with col2:
+    time_axis = st.selectbox("Frequency", ["1D", "1W"])
 
 df = pd.DataFrame.from_records(
     [
@@ -165,9 +167,26 @@ df = pd.DataFrame.from_records(
     ],
 ).convert_dtypes()
 
+
 df["Time"] = pd.to_datetime(df["Time"])
 df = df.sort_values("Time")
 df = df.set_index("Time")
+
+# df = df.last("4W")
+
+df_bar = df[["User"]].resample(time_axis).nunique()
+df_bar = df_bar.reset_index()
+df_bar.columns = ["Time", "Unique Users"]
+
+st.plotly_chart(
+    px.bar(
+        df_bar,
+        x="Time",
+        y="Unique Users",
+        color_discrete_sequence=px.colors.qualitative.Light24,
+    ),
+    use_container_width=True,
+)
 
 df_area = df[["User"]].groupby("User").resample(time_axis).count()
 df_area = df_area.reset_index(1)
