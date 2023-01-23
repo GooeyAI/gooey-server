@@ -34,6 +34,7 @@ from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
     ApiResponseModel,
+    DEFAULT_META_IMG,
 )
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import meta_title_for_page, meta_description_for_page
@@ -368,7 +369,10 @@ def st_home(request: Request):
     return _st_page(
         request,
         iframe_url,
-        context={"title": "Explore - Gooey.AI"},
+        context={
+            "title": "Explore - Gooey.AI",
+            "image": DEFAULT_META_IMG,
+        },
     )
 
 
