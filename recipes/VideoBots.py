@@ -1,8 +1,10 @@
 import collections
+import os.path
 import re
 import typing
 
 import streamlit as st
+from furl import furl
 from pydantic import BaseModel
 
 from daras_ai.image_input import (
@@ -26,7 +28,6 @@ from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 
 BOT_SCRIPT_RE = re.compile(r"(\n)([\w\ ]+)(:)")
-LANDBOT_URL_RE = re.compile(r"(\/)([A-z0-9]+\-[A-z0-9]+\-[A-z0-9]+)(\/)")
 
 
 class VideoBotsPage(BasePage):
@@ -194,11 +195,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if not landbot_url:
             return
 
-        match = LANDBOT_URL_RE.search(landbot_url)
-        if not match:
-            return
-
-        config_url = f"https://storage.googleapis.com/landbot.online/v3/{match.group(2)}/index.json"
+        f = furl(landbot_url)
+        config_path = os.path.join(f.host, *f.path.segments[:2])
+        config_url = f"https://storage.googleapis.com/{config_path}/index.json"
 
         hidden_html_js(
             """
