@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import run_language_model
 
+DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/compare%20text%20-%20with%20logos.png"
+
 
 class CompareLMPage(BasePage):
     title = "Compare GPT3 vs FLAN-T5"
@@ -20,6 +22,8 @@ class CompareLMPage(BasePage):
         gpt3_output: str
         flan_t5_output: str
 
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_COMPARE_LM_META_IMG
     def preview_description(self, state: dict) -> str:
         return "Compare OpenAI's GPT3 vs Google's FLAN-T5 on your text prompt. Head to head showdown of LLMs!"
 
