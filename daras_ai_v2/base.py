@@ -121,7 +121,16 @@ class BasePage:
 
         init_scripts()
 
-        title_area = st.empty()
+        self._load_session_state()
+        self._check_if_flagged()
+
+        st.session_state.setdefault("__title", self.title)
+        st.session_state.setdefault(
+            "__notes", self.preview_description(st.session_state)
+        )
+
+        st.write("## " + st.session_state.get("__title"))
+        st.write(st.session_state.get("__notes"))
 
         left_col, output_col = st.columns([3, 2], gap="medium")
 
@@ -131,18 +140,7 @@ class BasePage:
             )
 
             with run_tab:
-                self._load_session_state()
-                self._check_if_flagged()
                 submitted = self.render_form()
-
-            with title_area.container():
-                st.session_state.setdefault("__title", self.title)
-                st.session_state.setdefault(
-                    "__notes", self.preview_description(st.session_state)
-                )
-
-                st.write("## " + st.session_state.get("__title"))
-                st.write(st.session_state.get("__notes"))
 
             with settings_tab:
                 self.render_settings()
@@ -173,10 +171,12 @@ class BasePage:
         #
 
     def _load_session_state(self):
+        placeholder = st.empty()
+
         if st.session_state.get("__loaded__"):
             return
 
-        with st.spinner("Loading Settings..."):
+        with placeholder.container(), st.spinner("Loading Settings..."):
             query_params = st.experimental_get_query_params()
             state = self.get_doc_from_query_params(query_params)
 
