@@ -24,6 +24,7 @@ class CompareLMPage(BasePage):
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COMPARE_LM_META_IMG
+
     def preview_description(self, state: dict) -> str:
         return "Compare OpenAI's GPT3 vs Google's FLAN-T5 on your text prompt. Head to head showdown of LLMs!"
 
