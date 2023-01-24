@@ -19,7 +19,6 @@ UBERDUCK_VOICES = {
     "woody-jh": "Cheery Southern Male US",
     "judy-hopps": "Upbeat Female US",
     "the-rock": "Samoan Action Star",
-    "eminem-arpa2": "Angry US Male Rapper",
 }
 
 
