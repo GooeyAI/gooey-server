@@ -77,6 +77,7 @@ def extract_face(idx, state, variables):
                     "face_cutout.png",
                     # img_to_png((gaussian & ~face_mask) + (image_cv2 & face_mask)),
                     cv2_img_to_bytes((image_cv2 & face_mask)),
+                    content_type="image/png",
                 )
 
 

@@ -47,7 +47,9 @@ def send_smtp_message(
     # html_message += "<h1>hiiiiii<img width='300px' src='https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a4691908-511d-11ed-8fcf-921309c00215/out.png'</h1>"
     for f in files or []:
         if f.name.lower().endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
-            url = upload_file_from_bytes(filename=f.name, img_bytes=f.getvalue())
+            url = upload_file_from_bytes(
+                filename=f.name, img_bytes=f.getvalue(), content_type=f.type
+            )
             html_message += f"<img width='300px', src='{url}'/><br>"
             # st.write(url)
         else:

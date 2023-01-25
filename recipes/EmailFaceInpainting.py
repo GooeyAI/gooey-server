@@ -295,7 +295,9 @@ def get_photo_for_email(email_address):
         return
 
     photo_url = upload_file_from_bytes(
-        "face_photo.png", requests.get(photo_url).content
+        "face_photo.png",
+        requests.get(photo_url).content,
+        content_type="image/png",
     )
 
     db.get_doc_ref(

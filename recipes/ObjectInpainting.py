@@ -261,7 +261,11 @@ class ObjectInpaintingPage(BasePage):
             img_bytes,
             (request.output_width, request.output_height),
         )
-        padded_img_url = upload_file_from_bytes("padded_img.png", padded_img_bytes)
+        padded_img_url = upload_file_from_bytes(
+            "padded_img.png",
+            padded_img_bytes,
+            content_type="image/png",
+        )
 
         obj_mask_bytes = dis(padded_img_url)
 
@@ -281,8 +285,16 @@ class ObjectInpaintingPage(BasePage):
             out_pos_y=request.obj_pos_y,
         )
 
-        state["resized_image"] = upload_file_from_bytes("re_img.png", re_img_bytes)
-        state["obj_mask"] = upload_file_from_bytes("obj_mask.png", re_mask_bytes)
+        state["resized_image"] = upload_file_from_bytes(
+            "re_img.png",
+            re_img_bytes,
+            content_type="image/png",
+        )
+        state["obj_mask"] = upload_file_from_bytes(
+            "obj_mask.png",
+            re_mask_bytes,
+            content_type="image/png",
+        )
 
         yield f"Generating Image..."
 
