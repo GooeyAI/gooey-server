@@ -281,11 +281,19 @@ class BasePage:
         self.render_form_v2()
         return self.render_submit_button()
 
+    def get_credits_click_url(self):
+        current_user: UserRecord = st.session_state.get("_current_user")
+        account_url = furl(settings.APP_BASE_URL) / "account"
+        pricing_url = furl(settings.APP_BASE_URL) / "pricing"
+        if hasattr(current_user, "_is_anonymous"):
+            return pricing_url
+        return account_url
+
     def render_submit_button(self, key=None):
         col1, col2 = st.columns([2, 1])
         with col1:
             st.caption(
-                "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)_",
+                f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ Run cost: [{self.get_price()} credits]({self.get_credits_click_url()})",
             )
         with col2:
             submitted = st.button("🏃 Submit", key=key, type="primary")
@@ -779,11 +787,20 @@ class BasePage:
 
         if balance < self.get_price():
             account_url = furl(settings.APP_BASE_URL) / "account"
+            pricing_url = furl(settings.APP_BASE_URL) / "pricing"
             if getattr(user, "_is_anonymous", False):
                 account_url.query.params["next"] = self._get_current_app_url()
-                error = f"Doh! You need to login to run more Gooey.AI recipes. [Login]({account_url})"
+                error = f"""Doh! [Please login]({account_url}) to run more Gooey.AI workflows.
+                
+You’ll receive 1000 Gooey.AI credits (for ~200 Runs) but after then will need to [purchase more]({pricing_url})."""
             else:
-                error = f"Doh! You need to purchase additional credits to run more Gooey.AI recipes. [Buy Credits]({account_url})"
+                apply_for_grant_link = "https://forms.gle/asc3SAzvh1nMj5fq5"
+                discord_link = "https://discord.gg/7C84UyzVDg"
+                error = f"""Doh! You’re out of Gooey.AI credits.
+                
+Please [apply for a grant]({apply_for_grant_link}) or [buy more]({account_url}) to run more workflows.
+                
+We’re always on [discord]({discord_link}) if you’ve questions too."""
             st.error(error, icon="⚠️")
             return False
 

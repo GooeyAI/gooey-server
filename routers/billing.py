@@ -18,51 +18,11 @@ templates = Jinja2Templates(directory="templates")
 
 
 available_subscriptions = {
-    "basic": {
-        "display": {
-            "name": "Basic Plan",
-            "title": "MONTHLY @ $10",
-            "description": "1000 Credits to get you up, up and away. Cancel your plan anytime.",
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Basic Plan",
-                },
-                "unit_amount": 1,  # in cents
-                "recurring": {
-                    "interval": "month",
-                },
-            },
-            "quantity": 1000,  # number of credits
-        },
-    },
-    "premium": {
-        "display": {
-            "name": "Premium Plan",
-            "title": "MONTHLY @ $50",
-            "description": "5000 Credits + special access to make bespoke interactive video bots! ",
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Premium Plan",
-                },
-                "unit_amount": 1,  # in cents
-                "recurring": {
-                    "interval": "month",
-                },
-            },
-            "quantity": 5000,  # number of credits
-        },
-    },
     "addon": {
         "display": {
             "name": "Add-on",
-            "title": "Add-on",
-            "description": "Pay an additional $10 to get 1000 extra credits on any monthly plan.",
+            "title": "Add-on => Top up for $10",
+            "description": "Buy a one-time top up of 1000 Credits for $10. Good for ~200 runs, depending on which workflows you call.",
         },
         "stripe": {
             "price_data": {
@@ -78,6 +38,46 @@ available_subscriptions = {
                 "maximum": 10_000,
                 "minimum": 1_000,
             },
+        },
+    },
+    "basic": {
+        "display": {
+            "name": "Basic Plan",
+            "title": "MONTHLY @ $10",
+            "description": "Buy a monthly plan for $10 and get new 1500 credits (~300 runs) every month.",
+        },
+        "stripe": {
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": "Gooey.AI Basic Plan",
+                },
+                "unit_amount_decimal": 0.6666,  # in cents
+                "recurring": {
+                    "interval": "month",
+                },
+            },
+            "quantity": 1500,  # number of credits
+        },
+    },
+    "premium": {
+        "display": {
+            "name": "Premium Plan",
+            "title": "$50/month + Bots",
+            "description": '10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable <a href="/video-bots/">videobots</a>.',
+        },
+        "stripe": {
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": "Gooey.AI Premium Plan",
+                },
+                "unit_amount_decimal": 0.5,  # in cents
+                "recurring": {
+                    "interval": "month",
+                },
+            },
+            "quantity": 10000,  # number of credits
         },
     },
     #
