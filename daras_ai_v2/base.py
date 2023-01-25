@@ -122,12 +122,13 @@ class BasePage:
             )
 
         init_scripts()
-        if st.session_state.get("show_report_workflow"):
-            self.render_report_form()
-            return
 
         self._load_session_state()
         self._check_if_flagged()
+
+        if st.session_state.get("show_report_workflow"):
+            self.render_report_form()
+            return
 
         st.session_state.setdefault("__title", self.title)
         st.session_state.setdefault(
@@ -176,80 +177,80 @@ class BasePage:
         #
 
     def render_report_form(self):
-        current_user: UserRecord = st.session_state.get("_current_user")
-
-        query_params = st.experimental_get_query_params()
-        example_id, run_id, uid = self.extract_query_params(query_params)
-
-        if not (current_user and run_id and uid):
-            # ONLY RUNS CAN BE REPORTED
-            st.session_state["show_report_workflow"] = False
-            st.experimental_rerun()
-            return
         with st.form("report_form"):
-            st.write("<h2>Report a Workflow</h2>", unsafe_allow_html=True)
             st.write(
-                """Generative AI is powerful, but these technologies are also unmoderated. Sometimes the output of workflows can be inappropriate or incorrect. It might be broken or buggy. It might cause copyright issues. It might be inappropriate content.
-            Whatever the reason, please use this form to tell us when something is wrong with the output of a workflow you've run or seen on our site.
-            We'll investigate the reported workflow and its output and take appropriate action. We may flag this workflow or its author so they are aware too."""
+                """
+                ## Report a Workflow
+                Generative AI is powerful, but these technologies are also unmoderated. Sometimes the output of workflows can be inappropriate or incorrect. It might be broken or buggy. It might cause copyright issues. It might be inappropriate content.
+                Whatever the reason, please use this form to tell us when something is wrong with the output of a workflow you've run or seen on our site.
+                We'll investigate the reported workflow and its output and take appropriate action. We may flag this workflow or its author so they are aware too.
+                """
             )
-            st.write("<h4>Your Report</h4>", unsafe_allow_html=True)
+
+            st.write("#### Your Report")
+
             st.text_input(
                 "Workflow",
                 disabled=True,
                 value=self.title,
             )
+
             current_url = self._get_current_app_url()
             st.text_input(
                 "Run URL",
                 disabled=True,
                 value=current_url,
             )
-            inappropriate_radio_text = "Inappropriate content"
+
             st.write("Output")
             self.render_output()
+
+            inappropriate_radio_text = "Inappropriate content"
             report_type = st.radio(
                 "Report Type", ("Buggy Output", inappropriate_radio_text, "Other")
             )
             reason_for_report = st.text_area(
                 "Reason for report",
                 placeholder="Tell us why you are reporting this workflow e.g. an error, inappropriate content, very poor output, etc. Please let know what you expected as well. ",
-                key="Reason for report",
             )
+
             col1, col2 = st.columns(2)
             with col1:
                 submitted = st.form_submit_button("Submit Report")
             with col2:
                 cancelled = st.form_submit_button("Cancel")
 
-            if cancelled:
-                st.session_state["show_report_workflow"] = False
-                st.experimental_rerun()
-            if submitted:
-                if reason_for_report == "":
-                    st.error("Reason for report cannot be empty")
-                    return
-                with st.spinner("Reporting..."):
-                    if report_type == inappropriate_radio_text:
-                        self.update_flag_for_run(
-                            run_id=run_id, uid=uid, is_flagged=True
-                        )
-                    email_support_about_reported_run(
-                        uid=uid,
-                        url=self._get_current_app_url(),
-                        email=current_user.email,
-                        recipe_name=self.title,
-                        report_type=report_type,
-                        reason_for_report=reason_for_report,
-                    )
-                    if report_type == inappropriate_radio_text:
-                        st.session_state["show_report_workflow"] = False
-                        html("<script> parent.location.reload(); </script>")
-                    else:
-                        st.success("Reported.")
-                        sleep(2)
-                        st.session_state["show_report_workflow"] = False
-                        st.experimental_rerun()
+        if cancelled:
+            st.session_state["show_report_workflow"] = False
+            st.experimental_rerun()
+
+        if submitted:
+            if reason_for_report == "":
+                st.error("Reason for report cannot be empty")
+                return
+
+            with st.spinner("Reporting..."):
+                current_user: UserRecord = st.session_state.get("_current_user")
+
+                query_params = st.experimental_get_query_params()
+                example_id, run_id, uid = self.extract_query_params(query_params)
+
+                email_support_about_reported_run(
+                    uid=uid,
+                    url=self._get_current_app_url(),
+                    email=current_user.email,
+                    recipe_name=self.title,
+                    report_type=report_type,
+                    reason_for_report=reason_for_report,
+                )
+
+                if report_type == inappropriate_radio_text:
+                    self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
+
+            st.success("Reported.", icon="✅")
+            sleep(2)
+            st.session_state["show_report_workflow"] = False
+            st.experimental_rerun()
 
     def _load_session_state(self):
         placeholder = st.empty()
@@ -287,7 +288,9 @@ class BasePage:
                 example_id, run_id, uid = self.extract_query_params(query_params)
                 if run_id and uid:
                     self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=False)
-            st.success("Removed flag. Reload the page to see changes")
+            st.success("Removed flag.", icon="✅")
+            sleep(2)
+            st.experimental_rerun()
         else:
             st.write(
                 "Our support team is reviewing this run. Please come back after some time."
@@ -431,9 +434,19 @@ class BasePage:
         raise NotImplementedError
 
     def _render_report_button(self):
+        current_user: UserRecord = st.session_state.get("_current_user")
+
+        query_params = st.experimental_get_query_params()
+        example_id, run_id, uid = self.extract_query_params(query_params)
+
+        if not (current_user and run_id and uid):
+            # ONLY RUNS CAN BE REPORTED
+            return
+
         reported = st.button("❗Report")
         if not reported:
             return
+
         st.session_state["show_report_workflow"] = reported
         st.experimental_rerun()
 
@@ -477,7 +490,9 @@ class BasePage:
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self.run_doc_ref(uid=uid, run_id=run_id)
-        ref.update({"is_flagged": is_flagged})
+        updates = {"is_flagged": is_flagged}
+        ref.update(updates)
+        st.session_state.update(updates)
 
     def save_run(self, new_run: bool = False):
         current_user: auth.UserRecord = st.session_state.get("_current_user")
