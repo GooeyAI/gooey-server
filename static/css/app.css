@@ -4,7 +4,9 @@
     --default-top-padding: 20px
 }
 
-html, body, .align-header {
+html,
+body,
+.align-header {
     background-color: black;
     color: white;
     margin: 0;
@@ -13,7 +15,9 @@ html, body, .align-header {
     font-family: 'Source Sans Pro', 'Arial', sans-serif !important;
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
     margin: 0;
 }
 
@@ -92,7 +96,8 @@ button {
     transition: color .15s ease-in-out, background-color .15s ease-in-out, border-color .15s ease-in-out, box-shadow .15s ease-in-out;
 }
 
-.btn-outline-dark, .btn-outline-cancel {
+.btn-outline-dark,
+.btn-outline-cancel {
     color: white;
     background-color: transparent;
     background-image: none;
@@ -190,7 +195,7 @@ iframe {
     font-size: .8rem;
 }
 
-.admin-div  {
+.admin-div {
     padding: var(--default-top-padding) 0;
 }
 
@@ -218,4 +223,25 @@ iframe {
     width: 100vw;
     height: 70vh;
     text-align: center;
+}
+
+/* https://css-tricks.com/couple-takes-sticky-footer/#aa-there-is-flexbox */
+html,
+body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+.content {
+    flex: 1 0 auto;
+}
+
+.footer {
+    flex-shrink: 0;
+    text-align: center;
+    padding-bottom: 30px;
 }
