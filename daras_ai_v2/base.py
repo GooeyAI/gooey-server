@@ -43,8 +43,9 @@ USER_RUNS_COLLECTION = "user_runs"
 EXAMPLE_ID_QUERY_PARAM = "example_id"
 RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
-GOOEY_LOGO = (
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"
+DEFAULT_META_IMG = (
+    # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
 )
 
 O = typing.TypeVar("O")
@@ -125,11 +126,16 @@ class BasePage:
             self.render_report_form()
             return
 
-        st.write("## " + (st.session_state.get("__title") or self.title))
-        st.write(
-            st.session_state.get("__notes")
-            or self.preview_description(st.session_state)
+        self._load_session_state()
+        self._check_if_flagged()
+
+        st.session_state.setdefault("__title", self.title)
+        st.session_state.setdefault(
+            "__notes", self.preview_description(st.session_state)
         )
+
+        st.write("## " + st.session_state.get("__title"))
+        st.write(st.session_state.get("__notes"))
 
         left_col, output_col = st.columns([3, 2], gap="medium")
 
@@ -139,8 +145,6 @@ class BasePage:
             )
 
             with run_tab:
-                self._load_session_state()
-                self._check_if_flagged()
                 submitted = self.render_form()
 
             with settings_tab:
@@ -148,12 +152,8 @@ class BasePage:
 
                 st.write("---")
                 st.write("##### 🖌️ Personalize")
-                st.text_input("Title", key="__title", value=self.title)
-                st.text_area(
-                    "Notes",
-                    key="__notes",
-                    value=self.preview_description(st.session_state),
-                )
+                st.text_input("Title", key="__title")
+                st.text_area("Notes", key="__notes")
                 st.write("---")
 
                 submitted = submitted or self.render_submit_button(key="2")
@@ -252,10 +252,12 @@ class BasePage:
                         st.experimental_rerun()
 
     def _load_session_state(self):
+        placeholder = st.empty()
+
         if st.session_state.get("__loaded__"):
             return
 
-        with st.spinner("Loading Settings..."):
+        with placeholder.container(), st.spinner("Loading Settings..."):
             query_params = st.experimental_get_query_params()
             state = self.get_doc_from_query_params(query_params)
 
@@ -634,9 +636,6 @@ class BasePage:
             self._render_report_button()
 
     def _render_save_options(self):
-        query_params = st.experimental_get_query_params()
-
-    def _render_admin_options(self):
         state_to_save = st.session_state.get("__state_to_save")
         # st.write("state_to_save " + str(state_to_save))
         if not state_to_save:
@@ -697,6 +696,9 @@ class BasePage:
             field_name
             for model in (self.RequestModel, self.ResponseModel)
             for field_name in model.__fields__
+        ] + [
+            "__title",
+            "__notes",
         ]
 
     def _examples_tab(self):
@@ -798,7 +800,7 @@ class BasePage:
             or state.get("output_image")
             or state.get("cutout_image")
         )
-        return extract_nested_str(out) or GOOEY_LOGO
+        return extract_nested_str(out) or DEFAULT_META_IMG
 
     def run_as_api_tab(self):
         api_docs_url = str(

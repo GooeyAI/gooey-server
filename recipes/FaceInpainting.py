@@ -210,20 +210,16 @@ class FaceInpaintingPage(BasePage):
         input_image_or_file = input_image or input_file
         output_images = st.session_state.get("output_images")
 
-        col1, col2 = st.columns(2)
+        if output_images:
+            for url in output_images:
+                st.image(url, caption=f"{text_prompt}")
+        else:
+            st.empty()
 
-        with col1:
-            if input_image_or_file:
-                st.image(input_image_or_file, caption="Face Photo")
-            else:
-                st.empty()
-
-        with col2:
-            if output_images:
-                for url in output_images:
-                    st.image(url, caption=f"{text_prompt}")
-            else:
-                st.empty()
+        if input_image_or_file:
+            st.image(input_image_or_file, caption="Face Photo")
+        else:
+            st.empty()
 
     def render_steps(self):
         input_file = st.session_state.get("input_file")

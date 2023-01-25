@@ -155,12 +155,22 @@ def safe_filename(filename: str):
     matches = FILENAME_WHITELIST.finditer(filename)
     filename = "".join(match.group(0) for match in matches)
     p = Path(filename)
-    out = truncate_text(p.stem) + p.suffix
+    out = truncate_filename(p.stem) + p.suffix
     return out
 
 
-def truncate_text(text: str, maxlen: int = 100) -> str:
+def truncate_filename(text: str, maxlen: int = 100, sep: str = "...") -> str:
     if len(text) < maxlen:
         return text
-    mid = maxlen // 2
-    return text[: mid - 3] + "..." + text[-mid:]
+    assert len(sep) <= maxlen
+    mid = (maxlen - len(sep)) // 2
+    return text[:mid] + sep + text[-mid:]
+
+
+def truncate_text_words(text: str, maxlen: int, sep: str = " …") -> str:
+    match = re.match(r"^(.{0,%d}\S)(\s)" % (maxlen - len(sep) - 1), text, flags=re.S)
+    if match:
+        trunc = match.group(1)
+    else:
+        trunc = ""
+    return trunc + sep
