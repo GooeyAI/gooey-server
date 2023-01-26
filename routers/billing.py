@@ -156,7 +156,7 @@ async def create_checkout_session(request: Request):
     checkout_session = stripe.checkout.Session.create(
         line_items=[line_item],
         mode=mode,
-        success_url=account_url,
+        success_url=payment_success_url,
         cancel_url=account_url,
         customer=get_or_create_stripe_customer(request.user),
         metadata=metadata,
@@ -178,6 +178,15 @@ async def customer_portal(request: Request):
     return RedirectResponse(portal_session.url, status_code=303)
 
 
+@router.get("/payment-success/")
+def payment_success(request: Request):
+    context = {"request": request, "settings": settings}
+    return templates.TemplateResponse("payment_success.html", context)
+
+
+payment_success_url = str(
+    furl(settings.APP_BASE_URL) / router.url_path_for(payment_success.__name__)
+)
 account_url = str(furl(settings.APP_BASE_URL) / router.url_path_for(account.__name__))
 
 
