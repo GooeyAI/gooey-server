@@ -156,8 +156,8 @@ async def create_checkout_session(request: Request):
     checkout_session = stripe.checkout.Session.create(
         line_items=[line_item],
         mode=mode,
-        success_url=str(furl(settings.APP_BASE_URL) / "account/"),
-        cancel_url=str(furl(settings.APP_BASE_URL) / "account/"),
+        success_url=account_url,
+        cancel_url=account_url,
         customer=get_or_create_stripe_customer(request.user),
         metadata=metadata,
         subscription_data=subscription_data,
@@ -173,9 +173,12 @@ async def customer_portal(request: Request):
     customer = get_or_create_stripe_customer(request.user)
     portal_session = stripe.billing_portal.Session.create(
         customer=customer,
-        return_url=str(furl(settings.APP_BASE_URL) / "account/"),
+        return_url=account_url,
     )
     return RedirectResponse(portal_session.url, status_code=303)
+
+
+account_url = str(furl(settings.APP_BASE_URL) / router.url_path_for(account.__name__))
 
 
 @router.post("/__/stripe/webhook")
