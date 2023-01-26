@@ -23,15 +23,15 @@ def patch_all():
 
 def patch_selectbox():
     def new_func(label, options, *args, **kwargs):
-        # if selected option not in options, fallback to first choice
+        # if selected option not in options, fallback to default choice
         if "key" in kwargs:
             key = kwargs["key"]
             if key in st.session_state:
                 value = st.session_state[key]
                 if value not in options:
-                    st.session_state[key] = next(iter(options))
+                    st.session_state.pop(key)
 
-        old_func(label, options, *args, **kwargs)
+        return old_func(label, options, *args, **kwargs)
 
     old_func = _patcher(st.selectbox.__name__, new_func)
 
