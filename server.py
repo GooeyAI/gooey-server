@@ -143,6 +143,7 @@ async def custom_404_handler(request: Request, exc):
         context={
             "request": request,
             "wix_site_html": d.outer_html(),
+            "settings": settings,
         },
     )
 
@@ -155,6 +156,7 @@ def authentication(request: Request):
         "login_options.html",
         context={
             "request": request,
+            "settings": settings,
         },
     )
 

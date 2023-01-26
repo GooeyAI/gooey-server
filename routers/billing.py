@@ -118,6 +118,7 @@ def account(request: Request):
 
     context = {
         "request": request,
+        "settings": settings,
         "available_subscriptions": available_subscriptions,
         "user_credits": user_data.get(db.USER_BALANCE_FIELD, 0),
         "subscription": get_user_subscription(request.user),

@@ -284,9 +284,9 @@ class BasePage:
     def get_credits_click_url(self):
         current_user: UserRecord = st.session_state.get("_current_user")
         if hasattr(current_user, "_is_anonymous"):
-            return "/pricing"
+            return "/pricing/"
         else:
-            return "/account"
+            return "/account/"
 
     def render_submit_button(self, key=None):
         col1, col2 = st.columns([2, 1])
@@ -339,7 +339,7 @@ class BasePage:
                     )
 
             with st.expander(
-                "**🙋🏽‍♀️ Need more help? [Join our Discord](https://discord.gg/7C84UyzVDg)**",
+                f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**",
                 expanded=False,
             ):
                 st.markdown(
@@ -787,20 +787,17 @@ class BasePage:
 
         if balance < self.get_price():
             account_url = furl(settings.APP_BASE_URL) / "account"
-            pricing_url = furl(settings.APP_BASE_URL) / "pricing"
             if getattr(user, "_is_anonymous", False):
                 account_url.query.params["next"] = self._get_current_app_url()
                 error = f"""Doh! [Please login]({account_url}) to run more Gooey.AI workflows.
                 
-You’ll receive 1000 Gooey.AI credits (for ~200 Runs) but after then will need to [purchase more]({pricing_url})."""
+You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs). You can [purchase more](/pricing/) if you run out of credits."""
             else:
-                apply_for_grant_link = "https://forms.gle/asc3SAzvh1nMj5fq5"
-                discord_link = "https://discord.gg/7C84UyzVDg"
                 error = f"""Doh! You’re out of Gooey.AI credits.
                 
-Please [apply for a grant]({apply_for_grant_link}) or [buy more]({account_url}) to run more workflows.
+Please [apply for a grant]({settings.GRANT_URL}) or [buy more]({account_url}) to run more workflows.
                 
-We’re always on [discord]({discord_link}) if you’ve questions too."""
+We’re always on [discord]({settings.DISCORD_INVITE_URL}) if you’ve got any questions."""
             st.error(error, icon="⚠️")
             return False
 
