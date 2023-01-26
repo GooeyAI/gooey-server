@@ -283,17 +283,17 @@ class BasePage:
 
     def get_credits_click_url(self):
         current_user: UserRecord = st.session_state.get("_current_user")
-        account_url = furl(settings.APP_BASE_URL) / "account"
-        pricing_url = furl(settings.APP_BASE_URL) / "pricing"
         if hasattr(current_user, "_is_anonymous"):
-            return pricing_url
-        return account_url
+            return "/pricing"
+        else:
+            return "/account"
 
     def render_submit_button(self, key=None):
         col1, col2 = st.columns([2, 1])
         with col1:
             st.caption(
-                f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ Run cost: [{self.get_price()} credits]({self.get_credits_click_url()})",
+                f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ \\\n"
+                f"Run cost: [{self.get_price()} credits]({self.get_credits_click_url()})",
             )
         with col2:
             submitted = st.button("🏃 Submit", key=key, type="primary")

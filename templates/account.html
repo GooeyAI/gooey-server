@@ -37,10 +37,15 @@
         <hr>
         <div class="credits-container">
             <h2>Remaining Credits: {{ user_credits }} </h2>
-            <h4>Each new account receives 1000 Gooey.AI credits. Every time you submit a workflow or make an API call,
-                we deduct credits from your account. Most workflows cost around 5 credits. You can buy more credits
+            <p>
+                Each new account receives 1000 Gooey.AI credits.
+                <br>
+                Every time you submit a workflow or make an API call,
+                we deduct credits from your account.
+                <br>
+                Most workflows cost around 5 credits. You can buy more credits
                 below or <a href="https://forms.gle/asc3SAzvh1nMj5fq5" target="_blank">apply for a grant</a>.
-            </h4>
+            </p>
         </div>
         {% if not subscription %}
             <hr>
@@ -53,7 +58,7 @@
                                 <h3>{{ subscription["display"]["title"] }}</h3>
                             </li>
                             <li>
-                                <h4>{{ subscription["display"]["description"] |safe}}</h4>
+                                <h4>{{ subscription["display"]["description"] |safe }}</h4>
                             </li>
                             <li>
                                 <form action="/__/stripe/create-checkout-session" method="POST">
