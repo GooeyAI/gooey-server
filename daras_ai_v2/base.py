@@ -118,8 +118,7 @@ class BasePage:
         except Exception as e:
             sentry_sdk.capture_exception(e)
             raise
-        finally:
-            st.session_state["__prev_state"] = st.session_state
+        st.session_state["__prev_state"] = st.session_state
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
@@ -632,7 +631,7 @@ class BasePage:
                 sentry_sdk.capture_exception(e)
                 traceback.print_exc()
                 with status_area:
-                    st.error(f"{type(e).__name__} - {err_msg_for_exc(e)}", icon="⚠️")
+                    st.error(err_msg_for_exc(e), icon="⚠️")
                 # cleanup is important!
                 st.session_state.pop("__status", None)
                 st.session_state.pop("__gen", None)
