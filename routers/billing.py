@@ -109,7 +109,7 @@ available_subscriptions = {
 @router.get("/account/", include_in_schema=False)
 def account(request: Request):
     if not request.user:
-        next_url = request.query_params.get("next", "/account")
+        next_url = request.query_params.get("next", "/account/")
         redirect_url = furl("/login", query_params={"next": next_url})
         return RedirectResponse(str(redirect_url))
 
@@ -156,8 +156,8 @@ async def create_checkout_session(request: Request):
     checkout_session = stripe.checkout.Session.create(
         line_items=[line_item],
         mode=mode,
-        success_url=str(furl(settings.APP_BASE_URL) / "payment-success"),
-        cancel_url=str(furl(settings.APP_BASE_URL) / "payment-cancel"),
+        success_url=str(furl(settings.APP_BASE_URL) / "account/"),
+        cancel_url=str(furl(settings.APP_BASE_URL) / "account/"),
         customer=get_or_create_stripe_customer(request.user),
         metadata=metadata,
         subscription_data=subscription_data,
@@ -168,24 +168,12 @@ async def create_checkout_session(request: Request):
     return RedirectResponse(checkout_session.url, status_code=303)
 
 
-@router.get("/payment-success")
-def payment_success(request: Request):
-    context = {"request": request}
-    return templates.TemplateResponse("payment_success.html", context)
-
-
-@router.get("/payment-cancel")
-def payment_cancel(request: Request):
-    context = {"request": request}
-    return templates.TemplateResponse("payment_cancel.html", context)
-
-
 @router.post("/__/stripe/create-portal-session")
 async def customer_portal(request: Request):
     customer = get_or_create_stripe_customer(request.user)
     portal_session = stripe.billing_portal.Session.create(
         customer=customer,
-        return_url=str(furl(settings.APP_BASE_URL) / "account"),
+        return_url=str(furl(settings.APP_BASE_URL) / "account/"),
     )
     return RedirectResponse(portal_session.url, status_code=303)
 
@@ -241,7 +229,7 @@ def cancel_subscription(request: Request):
     subscriptions = stripe.Subscription.list(customer=customer).data
     for sub in subscriptions:
         stripe.Subscription.delete(sub.id)
-    return RedirectResponse("/account", status_code=303)
+    return RedirectResponse("/account/", status_code=303)
 
 
 def get_user_subscription(user: UserRecord):
