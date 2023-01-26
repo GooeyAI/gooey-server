@@ -118,7 +118,10 @@ async def custom_404_handler(request: Request, exc):
     if resp.status_code == 404:
         return templates.TemplateResponse(
             "404.html",
-            {"request": request},
+            {
+                "request": request,
+                "settings": settings,
+            },
             status_code=404,
         )
     elif resp.status_code != 200 or "text/html" not in resp.headers["content-type"]:
