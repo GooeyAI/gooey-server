@@ -9,7 +9,6 @@ from time import time, sleep
 import requests
 import sentry_sdk
 import streamlit as st
-from streamlit.components.v1 import html
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from furl import furl
@@ -17,6 +16,7 @@ from google.cloud import firestore
 from pydantic import BaseModel
 from pydantic.generics import GenericModel
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
+from streamlit_option_menu import option_menu
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
@@ -107,11 +107,19 @@ class BasePage:
         return f"/v2/{self.slug_versions[0]}/"
 
     def render(self):
+        # dirty fix for https://github.com/streamlit/streamlit/issues/5620 & https://github.com/streamlit/streamlit/issues/5604
+        st.session_state.update(
+            self.state_to_doc(
+                st.session_state.pop("__prev_state", {}),
+            ),
+        )
         try:
             self._render()
         except Exception as e:
             sentry_sdk.capture_exception(e)
             raise
+        finally:
+            st.session_state["__prev_state"] = st.session_state
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
@@ -138,43 +146,69 @@ class BasePage:
         st.write("## " + st.session_state.get("__title"))
         st.write(st.session_state.get("__notes"))
 
-        left_col, output_col = st.columns([3, 2], gap="medium")
+        class MenuTabs:
+            run = "🏃‍♀️Run"
+            examples = "🔖 Examples"
+            run_as_api = "🚀 Run as API"
+            history = "📖 History"
 
-        with left_col:
-            run_tab, settings_tab, examples_tab, api_tab = st.tabs(
-                ["🏃‍♀️Run", "⚙️ Settings", "🔖 Examples", "🚀 Run as API"]
-            )
+        menu_options = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
 
-            with run_tab:
+        current_user: UserRecord = st.session_state.get("_current_user")
+        if not hasattr(current_user, "_is_anonymous"):
+            menu_options.append(MenuTabs.history)
+
+        selected_menu = option_menu(
+            None,
+            options=menu_options,
+            icons=["-"] * len(menu_options),
+            orientation="horizontal",
+            styles={
+                "nav-link": {"white-space": "nowrap;"},
+                "nav-link-selected": {"font-weight": "normal;", "color": "black"},
+            },
+        )
+
+        if selected_menu == MenuTabs.run:
+            input_col, output_col = st.columns([3, 2], gap="medium")
+
+            self._render_step_row()
+
+            col1, col2 = st.columns(2)
+            with col1:
+                self._render_help()
+
+            with input_col:
                 submitted = self.render_form()
 
-            with settings_tab:
-                self.render_settings()
+                with st.expander("⚙️ Settings"):
+                    self.render_settings()
 
-                st.write("---")
-                st.write("##### 🖌️ Personalize")
-                st.text_input("Title", key="__title")
-                st.text_area("Notes", key="__notes")
-                st.write("---")
+                    st.write("---")
+                    st.write("##### 🖌️ Personalize")
+                    st.text_input("Title", key="__title")
+                    st.text_area("Notes", key="__notes")
+                    st.write("---")
 
-                submitted = submitted or self.render_submit_button(key="2")
+                    submitted = submitted or self.render_submit_button(key="--submit-2")
 
-            with examples_tab:
-                self._examples_tab()
+            with output_col:
+                self._runner(submitted)
 
-            with api_tab:
-                self.run_as_api_tab()
+            with col2:
+                self._render_save_options()
+            #
+            # NOTE: Beware of putting code here since runner will call experimental_rerun
+            #
 
-        self.render_step_row()
-        self.render_footer()
+        elif selected_menu == MenuTabs.examples:
+            self._examples_tab()
 
-        with output_col:
-            self._runner(submitted)
+        elif selected_menu == MenuTabs.history:
+            self._history_tab()
 
-        self._render_save_options()
-        #
-        # NOTE: Beware of putting code here since runner will call experimental_rerun
-        #
+        elif selected_menu == MenuTabs.run_as_api:
+            self.run_as_api_tab()
 
     def render_report_form(self):
         with st.form("report_form"):
@@ -372,7 +406,7 @@ class BasePage:
         else:
             return "/account/"
 
-    def render_submit_button(self, key=None):
+    def render_submit_button(self, key="--submit-1"):
         col1, col2 = st.columns([2, 1])
         with col1:
             st.caption(
@@ -391,7 +425,7 @@ class BasePage:
         else:
             return True
 
-    def render_step_row(self):
+    def _render_step_row(self):
         with st.expander("**ℹ️ Details**"):
             col1, col2 = st.columns([1, 2])
             with col1:
@@ -406,34 +440,32 @@ class BasePage:
                     with placeholder:
                         st.write("##### 👣 Steps")
 
-    def render_footer(self):
-        col1, col2 = st.columns(2)
-        with col1:
-            placeholder = st.empty()
-            try:
-                self.render_usage_guide()
-            except NotImplementedError:
-                pass
-            else:
-                with placeholder:
-                    st.write(
-                        """
-                        ## How to Use This Recipe
-                        """
-                    )
-
-            with st.expander(
-                f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**",
-                expanded=False,
-            ):
-                st.markdown(
+    def _render_help(self):
+        placeholder = st.empty()
+        try:
+            self.render_usage_guide()
+        except NotImplementedError:
+            pass
+        else:
+            with placeholder:
+                st.write(
                     """
-                    <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
-                    <iframe src="https://e.widgetbot.io/channels/643360566970155029/1046049067337273444" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+                    ## How to Use This Recipe
+                    """
                 )
+
+        with st.expander(
+            f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**",
+            expanded=False,
+        ):
+            st.markdown(
+                """
+                <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
+                <iframe src="https://e.widgetbot.io/channels/643360566970155029/1046049067337273444" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     def render_usage_guide(self):
         raise NotImplementedError
@@ -781,11 +813,65 @@ class BasePage:
 
             st.write("---")
 
+    def _history_tab(self):
+        current_user = st.session_state.get("_current_user")
+        uid = current_user.uid
+        run_history = st.session_state.setdefault("run___history", [])
+
+        for snapshot in run_history:
+            run_id = snapshot.id
+            doc = snapshot.to_dict()
+
+            url = str(
+                furl(
+                    self.app_url(),
+                    query_params={
+                        RUN_ID_QUERY_PARAM: run_id,
+                        USER_ID_QUERY_PARAM: uid,
+                    },
+                )
+            )
+
+            col1, col2 = st.columns([2, 6])
+
+            with col1:
+                st.markdown(
+                    f"""
+                        <div style="height: 50px;">
+                            <a target="_top" class="streamlit-like-btn" href="{url}">
+                              ✏️ Tweak 
+                            </a>
+                        </div>
+                        """,
+                    unsafe_allow_html=True,
+                )
+
+                copy_to_clipboard_button("🔗 Copy URL", value=url)
+
+            with col2:
+                self.render_example(doc)
+
+            st.write("---")
+
+        if not run_history or st.button("Load More"):
+            with st.spinner("Loading History..."):
+                run_history.extend(
+                    db.get_collection_ref(
+                        collection_id=USER_RUNS_COLLECTION,
+                        document_id=uid,
+                        sub_collection_id=self.doc_name,
+                    )
+                    .order_by("updated_at", direction="DESCENDING")
+                    .offset(len(run_history))
+                    .limit(20)
+                    .get()
+                )
+            st.experimental_rerun()
+
     def _example_delete_button(self, example_id):
         pressed_delete = st.button(
             "🗑️ Delete",
-            help=f"Delete example",
-            key=f"delete-{example_id}",
+            help=f"Delete example {example_id}",
         )
         if not pressed_delete:
             return

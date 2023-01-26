@@ -96,7 +96,7 @@ def guidance_scale_setting(selected_model: str = None):
 
     st.number_input(
         label="""
-        ##### Artistic Pressure
+        ##### 🎨️ Artistic Pressure
         ([*Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter))
         
         How pressurized should the AI feel to produce what you want?
@@ -138,7 +138,7 @@ def negative_prompt_setting(selected_model: str = None):
 
     st.text_area(
         """
-        ##### Negative Prompt
+        ##### 🧽 Negative Prompt
         This allows you to specify what you DON'T want to see. 
         Useful negative prompts can be found [here](https://www.youtube.com/watch?v=cWZsizoAwT4).
         """,

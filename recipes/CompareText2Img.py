@@ -53,7 +53,7 @@ class CompareText2ImgPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            ### 👩‍💻 Prompt
             Describe the scene that you'd like to generate. 
             """,
             key="text_prompt",
@@ -61,7 +61,7 @@ class CompareText2ImgPage(BasePage):
         )
         enum_multiselect(
             Text2ImgModels,
-            label="#### Selected Models",
+            label="#### 🧨 Selected Models",
             key="selected_models",
         )
 

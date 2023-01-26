@@ -1,14 +1,17 @@
+import os.path
 from functools import wraps
 
 import numpy as np
 import streamlit as st
 from furl import furl
+from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 
 def patch_all():
     patch_image()
     patch_video()
     patch_file_uploader()
+    patch_selectbox()
     for fn in [
         st.number_input,
         st.slider,
@@ -16,6 +19,21 @@ def patch_all():
         st.text_input,
     ]:
         patch_input_func(fn.__name__)
+
+
+def patch_selectbox():
+    def new_func(label, options, *args, **kwargs):
+        # if selected option not in options, fallback to first choice
+        if "key" in kwargs:
+            key = kwargs["key"]
+            if key in st.session_state:
+                value = st.session_state[key]
+                if value not in options:
+                    st.session_state[key] = next(iter(options))
+
+        old_func(label, options, *args, **kwargs)
+
+    old_func = _patcher(st.selectbox.__name__, new_func)
 
 
 def patch_image():
@@ -32,16 +50,20 @@ def patch_image():
 
 def patch_video():
     def new_func(url, caption=None):
+        if not url:
+            st.empty()
+            return
+
         if caption:
             st.write(f"**{caption.strip()}**")
-        if url:
+
+        if isinstance(url, str):
             # https://muffinman.io/blog/hack-for-ios-safari-to-display-html-video-thumbnail/
             f = furl(url)
             f.fragment.args["t"] = "0.001"
             url = f.url
-            old_func(url)
-        else:
-            st.empty()
+
+        old_func(url)
 
     old_func = _patcher(st.video.__name__, new_func)
 
@@ -52,13 +74,28 @@ def patch_file_uploader():
             st.write(label)
             label_visibility = "collapsed"
 
-        value = old_func(label, label_visibility=label_visibility, **kwargs)
+        if "key" in kwargs:
+            key = kwargs.pop("key")
+            # kwargs["value"] = st.session_state.get(key) or kwargs.get("value")
+            value = old_func(label, label_visibility=label_visibility, **kwargs)
+            st.session_state[key] = value
 
-        # st.caption(
-        #    "_By uploading, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)_",
-        # )
+            if value:
+                _, mid_col, _ = st.columns([1, 2, 1])
+                with mid_col:
+                    if isinstance(value, UploadedFile):
+                        filename = value.name
+                    else:
+                        filename = value
+                    ext = os.path.splitext(filename)[-1].lower()
+                    if ext in [".mp4", ".mov"]:
+                        st.video(value)
+                    elif ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+                        st.image(value)
 
-        return value
+            return value
+
+        return old_func(label, label_visibility=label_visibility, **kwargs)
 
     old_func = _patcher(st.file_uploader.__name__, new_func)
 
@@ -81,28 +118,12 @@ def patch_input_func(func_name: str):
             elif key and key in st.session_state:
                 st.session_state[key] = st.session_state[key] or ""
 
-        if "value" in kwargs or not key or not func_name.startswith("text_"):
-            return old_func(
-                label,
-                key=key,
-                label_visibility=label_visibility,
-                **kwargs,
-            )
-
-        # fixes https://github.com/streamlit/streamlit/issues/5620
-        shadow_key = f"__st_shadow_{key}"
-        if key in st.session_state and shadow_key not in st.session_state:
-            st.session_state[shadow_key] = st.session_state[key]
-
-        new_value = old_func(
+        return old_func(
             label,
-            key=shadow_key,
+            key=key,
             label_visibility=label_visibility,
             **kwargs,
         )
-        st.session_state[key] = new_value
-
-        return new_value
 
     old_func = _patcher(func_name, new_func)
 
