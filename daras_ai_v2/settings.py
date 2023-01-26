@@ -72,3 +72,6 @@ stripe.api_key = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
 
 WIX_SITE_URL = config("WIX_SITE_URL", "https://archanaprasad.wixsite.com/daras-ai")
+
+DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
+GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
