@@ -1,4 +1,5 @@
 import io
+import typing
 from enum import Enum
 
 import openai
@@ -14,13 +15,18 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.extract_face import rgb_img_to_rgba
-from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints, b64_img_decode
+from daras_ai_v2.gpu_server import (
+    call_gpu_server_b64,
+    GpuEndpoints,
+    b64_img_decode,
+    call_sd_multi,
+)
 
 SD_MAX_SIZE = (768, 768)
 
 
 class InpaintingModels(Enum):
-    sd_2 = "Stable Diffusion 2 (stability.ai)"
+    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     runway_ml = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
@@ -28,6 +34,7 @@ class InpaintingModels(Enum):
 
 class Img2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
+    instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
@@ -51,6 +58,66 @@ class Text2ImgModels(Enum):
     dall_e = "Dall-E (OpenAI)"
 
 
+def sd_upscale(
+    *,
+    prompt: str,
+    num_outputs: int,
+    image: str,
+    num_inference_steps: int,
+    negative_prompt: str = None,
+    guidance_scale: float = None,
+    seed: int = 42,
+):
+    return call_sd_multi(
+        "upscale",
+        pipeline={
+            "model_id": "stabilityai/stable-diffusion-x4-upscaler",
+            # "scheduler": None,
+            "seed": seed,
+        },
+        inputs={
+            "prompt": [prompt],
+            "negative_prompt": [negative_prompt] if negative_prompt else None,
+            "num_images_per_prompt": num_outputs,
+            "num_inference_steps": num_inference_steps,
+            "guidance_scale": guidance_scale,
+            "image": [image],
+        },
+    )
+
+
+def instruct_pix2pix(
+    *,
+    prompt: str,
+    num_outputs: int,
+    images: typing.List[str],
+    num_inference_steps: int,
+    negative_prompt: str = None,
+    guidance_scale: float = None,
+    image_guidance_scale: float,
+    seed: int = 42,
+):
+    return call_sd_multi(
+        "instruct_pix2pix",
+        pipeline={
+            "model_id": "timbrooks/instruct-pix2pix",
+            # "scheduler": None,
+            "seed": seed,
+        },
+        inputs={
+            "prompt": [prompt] * len(images),
+            "negative_prompt": [negative_prompt] * len(images)
+            if negative_prompt
+            else None,
+            "num_images_per_prompt": num_outputs,
+            "num_inference_steps": num_inference_steps,
+            "guidance_scale": guidance_scale,
+            "image": images,
+            "image_guidance_scale": image_guidance_scale,
+        },
+    )
+
+
 def text2img(
     *,
     selected_model: str,
@@ -61,29 +128,11 @@ def text2img(
     height: int,
     seed: int = 42,
     guidance_scale: float = None,
-    sd_2_upscaling: bool = False,
     negative_prompt: str = None,
 ):
     _resolution_check(width, height)
 
     match selected_model:
-        case Text2ImgModels.sd_2.name:
-            if num_inference_steps == 110:
-                num_inference_steps = 100
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.sd_2,
-                input_data={
-                    "prompt": prompt,
-                    "width": width,
-                    "height": height,
-                    "num_outputs": num_outputs,
-                    "num_inference_steps": num_inference_steps,
-                    "guidance_scale": guidance_scale,
-                    "seed": seed,
-                    "upscaling_inference_steps": 10 if sd_2_upscaling else 0,
-                    "negative_prompt": negative_prompt or "",
-                },
-            )
         case Text2ImgModels.jack_qiao.name:
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.glid_3_xl_stable,
@@ -112,6 +161,8 @@ def text2img(
             match selected_model:
                 case Text2ImgModels.sd_1_5.name:
                     hf_model_id = "runwayml/stable-diffusion-v1-5"
+                case Text2ImgModels.sd_2.name:
+                    hf_model_id = "stabilityai/stable-diffusion-2-1"
                 case Text2ImgModels.openjourney.name:
                     prompt = "mdjrny-v4 style " + prompt
                     hf_model_id = "prompthero/openjourney"
@@ -128,20 +179,24 @@ def text2img(
                     hf_model_id = "dreamlike-art/dreamlike-photoreal-2.0"
                 case _:
                     return []
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.sd_multi,
-                input_data={
-                    "hf_model_id": hf_model_id,
-                    "prompt": prompt,
-                    "width": width,
-                    "height": height,
-                    "num_outputs": num_outputs,
+            return call_sd_multi(
+                "text2img",
+                pipeline={
+                    "model_id": hf_model_id,
+                    # "scheduler": None,
+                    "seed": seed,
+                },
+                inputs={
+                    "prompt": [prompt],
+                    "negative_prompt": [negative_prompt] if negative_prompt else None,
+                    "num_images_per_prompt": num_outputs,
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": guidance_scale,
-                    "seed": seed,
-                    "negative_prompt": negative_prompt or "",
+                    "width": width,
+                    "height": height,
                 },
             )
+
     return [
         upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
@@ -180,25 +235,6 @@ def img2img(
     _resolution_check(width, height)
 
     match selected_model:
-        case Img2ImgModels.sd_2.name:
-            if num_inference_steps == 110:
-                num_inference_steps = 100
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.sd_2,
-                input_data={
-                    "prompt": prompt,
-                    "width": width,
-                    "height": height,
-                    "num_outputs": num_outputs,
-                    "num_inference_steps": num_inference_steps,
-                    "init_image": init_image,
-                    "strength": prompt_strength,
-                    "guidance_scale": guidance_scale,
-                    "negative_prompt": negative_prompt or "",
-                    "upscaling_inference_steps": 10 if sd_2_upscaling else 0,
-                    "seed": seed,
-                },
-            )
         case Img2ImgModels.jack_qiao.name:
             out_imgs = call_gpu_server_b64(
                 endpoint=GpuEndpoints.glid_3_xl_stable,
@@ -239,6 +275,8 @@ def img2img(
             match selected_model:
                 case Img2ImgModels.sd_1_5.name:
                     hf_model_id = "runwayml/stable-diffusion-v1-5"
+                case Img2ImgModels.sd_2.name:
+                    hf_model_id = "stabilityai/stable-diffusion-2-1"
                 case Img2ImgModels.openjourney.name:
                     prompt = "mdjrny-v4 style " + prompt
                     hf_model_id = "prompthero/openjourney"
@@ -252,19 +290,20 @@ def img2img(
                     hf_model_id = "darkstorm2150/Protogen_v5.3_Official_Release"
                 case _:
                     return []
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.sd_multi,
-                input_data={
-                    "hf_model_id": hf_model_id,
-                    "prompt": prompt,
-                    "width": width,
-                    "height": height,
-                    "num_outputs": num_outputs,
+            return call_sd_multi(
+                "img2img",
+                pipeline={
+                    "model_id": hf_model_id,
+                    # "scheduler": None,
+                    "seed": seed,
+                },
+                inputs={
+                    "prompt": [prompt],
+                    "negative_prompt": [negative_prompt] if negative_prompt else None,
+                    "num_images_per_prompt": num_outputs,
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": guidance_scale,
-                    "seed": seed,
-                    "negative_prompt": negative_prompt or "",
-                    "init_image": init_image,
+                    "image": [init_image],
                     "strength": prompt_strength,
                 },
             )

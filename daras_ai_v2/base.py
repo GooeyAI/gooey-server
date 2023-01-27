@@ -178,7 +178,7 @@ class BasePage:
                 self._render_help()
 
             with input_col:
-                submitted = self.render_form()
+                submitted1 = self.render_form()
 
                 with st.expander("⚙️ Settings"):
                     self.render_settings()
@@ -189,7 +189,9 @@ class BasePage:
                     st.text_area("Notes", key="__notes")
                     st.write("---")
 
-                    submitted = submitted or self.render_submit_button(key="--submit-2")
+                    submitted2 = self.render_submit_button(key="--submit-2")
+
+                submitted = submitted1 or submitted2
 
             with output_col:
                 self._runner(submitted)
@@ -730,7 +732,7 @@ class BasePage:
                 doc_ref.set(state_to_save)
 
                 if new_example_id:
-                    st.session_state["__example_docs"].insert(0, doc_ref.get())
+                    st.session_state.get("__example_docs", []).insert(0, doc_ref.get())
                     st.experimental_rerun()
 
             st.success("Saved", icon="✅")
@@ -756,21 +758,20 @@ class BasePage:
         ]
 
     def _examples_tab(self):
-        example_docs = st.session_state.setdefault("__example_docs", [])
-        if not example_docs:
+        if "__example_docs" not in st.session_state:
             with st.spinner("Loading Examples..."):
-                example_docs.extend(
-                    db.get_collection_ref(
-                        document_id=self.doc_name,
-                        sub_collection_id=EXAMPLES_COLLECTION,
-                    ).get()
-                )
+                example_docs = db.get_collection_ref(
+                    document_id=self.doc_name,
+                    sub_collection_id=EXAMPLES_COLLECTION,
+                ).get()
                 example_docs.sort(
                     key=lambda s: s.to_dict()
                     .get("updated_at", datetime.datetime.fromtimestamp(0))
                     .timestamp(),
                     reverse=True,
                 )
+            st.session_state["__example_docs"] = example_docs
+        example_docs = st.session_state.get("__example_docs")
 
         allow_delete = is_admin()
 
@@ -815,7 +816,7 @@ class BasePage:
     def _history_tab(self):
         current_user = st.session_state.get("_current_user")
         uid = current_user.uid
-        run_history = st.session_state.setdefault("run___history", [])
+        run_history = st.session_state.get("__run_history", [])
 
         for snapshot in run_history:
             run_id = snapshot.id
@@ -852,9 +853,9 @@ class BasePage:
 
             st.write("---")
 
-        if not run_history or st.button("Load More"):
+        if "__run_history" not in st.session_state or st.button("Load More"):
             with st.spinner("Loading History..."):
-                run_history.extend(
+                run_history = (
                     db.get_collection_ref(
                         collection_id=USER_RUNS_COLLECTION,
                         document_id=uid,
@@ -865,6 +866,7 @@ class BasePage:
                     .limit(20)
                     .get()
                 )
+            st.session_state["__run_history"] = run_history
             st.experimental_rerun()
 
     def _example_delete_button(self, example_id):
@@ -880,7 +882,7 @@ class BasePage:
         with st.spinner("deleting..."):
             example.update({"__hidden": True})
 
-        example_docs = st.session_state["__example_docs"]
+        example_docs = st.session_state.get("__example_docs", [])
         for idx, snapshot in enumerate(example_docs):
             if snapshot.id == example_id:
                 example_docs.pop(idx)

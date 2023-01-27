@@ -69,33 +69,35 @@ def patch_video():
 
 
 def patch_file_uploader():
-    def new_func(label, label_visibility="markdown", **kwargs):
+    def new_func(label, label_visibility="markdown", upload_key=None, **kwargs):
         if label_visibility == "markdown":
             st.write(label)
             label_visibility = "collapsed"
 
-        if "key" in kwargs:
-            key = kwargs.pop("key")
-            # kwargs["value"] = st.session_state.get(key) or kwargs.get("value")
-            value = old_func(label, label_visibility=label_visibility, **kwargs)
-            st.session_state[key] = value
+        value = old_func(label, label_visibility=label_visibility, **kwargs)
 
-            if value:
-                _, mid_col, _ = st.columns([1, 2, 1])
-                with mid_col:
-                    if isinstance(value, UploadedFile):
-                        filename = value.name
-                    else:
-                        filename = value
-                    ext = os.path.splitext(filename)[-1].lower()
-                    if ext in [".mp4", ".mov"]:
-                        st.video(value)
-                    elif ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
-                        st.image(value)
+        # render preview from current value / uploaded value
+        if value:
+            preview = value
+        elif upload_key in st.session_state:
+            preview = st.session_state[upload_key]
+        else:
+            preview = None
+        if preview:
+            if isinstance(preview, UploadedFile):
+                filename = preview.name
+            else:
+                filename = preview
+            ext = os.path.splitext(filename)[-1].lower()
+            _, mid_col, _ = st.columns([1, 2, 1])
+            with mid_col:
+                # render preview as video/image
+                if ext in [".mp4", ".mov"]:
+                    st.video(preview)
+                elif ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+                    st.image(preview)
 
-            return value
-
-        return old_func(label, label_visibility=label_visibility, **kwargs)
+        return value
 
     old_func = _patcher(st.file_uploader.__name__, new_func)
 

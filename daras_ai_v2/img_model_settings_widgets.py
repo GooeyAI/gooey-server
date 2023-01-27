@@ -18,17 +18,19 @@ def img_model_settings(models_enum):
     if models_enum is not Img2ImgModels:
         output_resolution_setting()
 
-    if models_enum is not InpaintingModels:
-        sd_2_upscaling_setting(selected_model)
+    if models_enum is Text2ImgModels:
+        sd_2_upscaling_setting()
 
     col1, col2 = st.columns(2)
 
     with col1:
         guidance_scale_setting(selected_model)
 
-    if models_enum is Img2ImgModels:
-        with col2:
+    with col2:
+        if models_enum is Img2ImgModels:
             prompt_strength_setting(selected_model)
+        if selected_model == Img2ImgModels.instruct_pix2pix.name:
+            instruct_pix2pix_settings()
 
     return selected_model
 
@@ -83,36 +85,52 @@ def output_resolution_setting():
     )
 
 
-def sd_2_upscaling_setting(selected_model: str = None):
-    if selected_model != Text2ImgModels.sd_2.name:
-        return
-
+def sd_2_upscaling_setting():
     st.checkbox("**4x Upscaling**", key="sd_2_upscaling")
 
 
 def guidance_scale_setting(selected_model: str = None):
-    if selected_model in [Text2ImgModels.dall_e.name, Text2ImgModels.jack_qiao]:
-        return
+    if selected_model not in [
+        Text2ImgModels.dall_e.name,
+        Text2ImgModels.jack_qiao,
+    ]:
+        st.number_input(
+            label="""
+##### 🎨️ Artistic Pressure
+([*Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter))
 
-    st.number_input(
+How pressurized should the AI feel to produce what you want?
+
+At lower values the image will effectively be random. \\
+Values that are too high can also distort the image by putting too much pressure on the AI.
+            """,
+            key="guidance_scale",
+            min_value=0.0,
+            max_value=25.0,
+            step=0.5,
+        )
+
+
+def instruct_pix2pix_settings():
+    st.slider(
         label="""
-        ##### 🎨️ Artistic Pressure
-        ([*Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter))
-        
-        How pressurized should the AI feel to produce what you want?
-        
-        At lower values the image will effectively be random. \\
-        Values that are too high can also distort the image by putting too much pressure on the AI.
-        """,
-        key="guidance_scale",
-        min_value=0.0,
-        max_value=50.0,
-        step=0.5,
+##### 🌠️ Image Strength
+(*Image Guidance Scale*)
+A higher value encourages to generate images that are closely linked to the source image, 
+usually at the expense of lower image quality
+""",
+        key="image_guidance_scale",
+        min_value=1.0,
+        max_value=2.0,
+        step=0.10,
     )
 
 
 def prompt_strength_setting(selected_model: str = None):
-    if selected_model == Text2ImgModels.dall_e.name:
+    if selected_model in [
+        Img2ImgModels.dall_e.name,
+        Img2ImgModels.instruct_pix2pix.name,
+    ]:
         return
 
     st.slider(
