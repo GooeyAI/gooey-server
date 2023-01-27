@@ -211,6 +211,7 @@ class BasePage:
 
         elif selected_menu == MenuTabs.run_as_api:
             self.run_as_api_tab()
+
     def render_related_workflows(self):
         st.markdown(
             f"""

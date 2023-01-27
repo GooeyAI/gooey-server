@@ -208,7 +208,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             state
         )
 
-
         yield "Fetching profile..."
 
         photo_url = get_photo_for_email(request.email_address)
