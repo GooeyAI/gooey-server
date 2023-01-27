@@ -219,7 +219,13 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             state["email_sent"] = True
 
         if not photo_url:
-            raise ValueError("Photo not found")
+            raise self.ImageNotFound(
+                "This email has no photo with a face in it. Try [Face in an AI Image](/face-in-ai-generated-photo/) workflow instead."
+            )
+
+    class ImageNotFound(Exception):
+        "Raised when the image not found in email profile"
+        pass
 
     def _get_email_body(
         self,
