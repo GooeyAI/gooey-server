@@ -2,6 +2,12 @@ import typing
 
 import streamlit as st
 from pydantic import BaseModel
+from recipes import (
+    FaceInpainting,
+    ObjectInpainting,
+    GoogleImageGen,
+    TextToSpeech,
+)
 
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -48,6 +54,14 @@ class CompareText2ImgPage(BasePage):
     class ResponseModel(BaseModel):
         output_images: dict[
             typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
+        ]
+
+    def related_workflows(self) -> list:
+        return [
+            FaceInpainting.FaceInpaintingPage,
+            ObjectInpainting.ObjectInpaintingPage,
+            GoogleImageGen.GoogleImageGenPage,
+            TextToSpeech.TextToSpeechPage,
         ]
 
     def render_form_v2(self):

@@ -6,6 +6,12 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
+from recipes import (
+    VideoBots,
+    TextToSpeech,
+    DeforumSD,
+    CompareText2Img,
+)
 
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
@@ -34,6 +40,14 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     class ResponseModel(BaseModel):
         output_video: str
+
+    def related_workflows(self) -> list:
+        return [
+            VideoBots.VideoBotsPage,
+            TextToSpeech.TextToSpeechPage,
+            DeforumSD.DeforumSDPage,
+            CompareText2Img.CompareText2ImgPage,
+        ]
 
     def render_form(self) -> bool:
         with st.form("my_form"):

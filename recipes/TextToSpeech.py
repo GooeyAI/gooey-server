@@ -15,6 +15,12 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_settings,
     TextToSpeechProviders,
 )
+from recipes import (
+    VideoBots,
+    LipsyncTTS,
+    DeforumSD,
+    CompareText2Img,
+)
 
 
 class TextToSpeechPage(BasePage):
@@ -182,6 +188,14 @@ class TextToSpeechPage(BasePage):
             state["audio_url"] = upload_file_from_bytes(
                 "google_tts_gen.wav", response.audio_content
             )
+
+    def related_workflows(self) -> list:
+        return [
+            VideoBots.VideoBotsPage,
+            LipsyncTTS.LipsyncTTSPage,
+            DeforumSD.DeforumSDPage,
+            CompareText2Img.CompareText2ImgPage,
+        ]
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)

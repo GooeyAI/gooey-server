@@ -21,6 +21,12 @@ from daras_ai_v2.img_model_settings_widgets import (
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.repositioning import reposition_object, reposition_object_img_bytes
 from daras_ai_v2.stable_diffusion import InpaintingModels
+from recipes import (
+    ImageSegmentation,
+    GoogleImageGen,
+    CompareText2Img,
+    Img2Img,
+)
 
 
 class ObjectInpaintingPage(BasePage):
@@ -69,6 +75,14 @@ class ObjectInpaintingPage(BasePage):
         obj_mask: str
         # diffusion_images: list[str]
         output_images: list[str]
+
+    def related_workflows(self) -> list:
+        return [
+            ImageSegmentation.ImageSegmentationPage,
+            GoogleImageGen.GoogleImageGenPage,
+            CompareText2Img.CompareText2ImgPage,
+            Img2Img.Img2ImgPage,
+        ]
 
     def render_form_v2(self):
         st.text_area(

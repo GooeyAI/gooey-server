@@ -11,6 +11,10 @@ from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from recipes.FaceInpainting import FaceInpaintingPage
+from recipes import (
+    SEOSummary,
+    LipsyncTTS,
+)
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
@@ -140,6 +144,14 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             from_email and email_subject and email_body
         ), "Please provide a From Email, Subject & Body"
 
+    def related_workflows(self) -> list:
+        return [
+            # recipes.FaceInpainting.FaceInpaintingPage,
+            # recipes.SocialLookupEmail.SocialLookupEmailPage,
+            SEOSummary.SEOSummaryPage,
+            LipsyncTTS.LipsyncTTSPage,
+        ]
+
     def render_settings(self):
         super().render_settings()
         st.write(
@@ -195,6 +207,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         request: EmailFaceInpaintingPage.RequestModel = self.RequestModel.parse_obj(
             state
         )
+
 
         yield "Fetching profile..."
 

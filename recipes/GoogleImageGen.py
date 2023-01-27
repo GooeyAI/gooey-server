@@ -3,6 +3,12 @@ import typing
 import requests
 import streamlit as st
 from pydantic import BaseModel
+from recipes import (
+    SEOSummary,
+    ObjectInpainting,
+    ImageSegmentation,
+    CompareText2Img,
+)
 
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -53,6 +59,14 @@ class GoogleImageGenPage(BasePage):
 
         image_urls: list[str]
         selected_image: str
+
+    def related_workflows(self):
+        return [
+            ObjectInpainting.ObjectInpaintingPage,
+            ImageSegmentation.ImageSegmentationPage,
+            SEOSummary.SEOSummaryPage,
+            CompareText2Img.CompareText2ImgPage,
+        ]
 
     def render_description(self):
         st.write(

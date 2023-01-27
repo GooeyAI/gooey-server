@@ -5,6 +5,13 @@ from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
 
+from recipes import (
+    VideoBots,
+    LipsyncTTS,
+    CompareText2Img,
+    FaceInpainting,
+)
+
 
 class DeforumSDPage(BasePage):
     title = "AI Animation Generator"
@@ -16,6 +23,14 @@ class DeforumSDPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_video: str
+
+    def related_workflows(self) -> list:
+        return [
+            VideoBots.VideoBotsPage,
+            LipsyncTTS.LipsyncTTSPage,
+            CompareText2Img.CompareText2ImgPage,
+            FaceInpainting.FaceInpaintingPage,
+        ]
 
     def render_form(self) -> bool:
         with st.form("my_form"):

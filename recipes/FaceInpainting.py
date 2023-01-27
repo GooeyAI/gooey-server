@@ -21,6 +21,10 @@ from daras_ai_v2.img_model_settings_widgets import (
 )
 from daras_ai_v2.loom_video_widget import loom_video, youtube_video
 from daras_ai_v2.stable_diffusion import InpaintingModels
+from recipes import (
+    LipsyncTTS,
+    SEOSummary,
+)
 
 
 class FaceInpaintingPage(BasePage):
@@ -319,6 +323,12 @@ class FaceInpaintingPage(BasePage):
                 # requests.get(url).content,
             )
             for img_bytes in output_images
+        ]
+
+    def related_workflows(self) -> list:
+        return [
+            LipsyncTTS.LipsyncTTSPage,
+            SEOSummary.SEOSummaryPage,
         ]
 
     def render_example(self, state: dict):

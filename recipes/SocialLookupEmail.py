@@ -8,6 +8,12 @@ import streamlit as st
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import run_language_model
+from recipes import (
+    # EmailFaceInpainting,
+    SEOSummary,
+    VideoBots,
+    GoogleImageGen,
+)
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
@@ -38,6 +44,14 @@ class SocialLookupEmailPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return "Look up any email's public social profile (from LinkedIn, Facebook, the web, etc) and then use the profile's name, employment history, city, etc in your GPT3-powered AI mail merge to create personalized emails that get through spam filters."
+
+    def related_workflows(self) -> list:
+        return [
+            # EmailFaceInpainting.EmailFaceInpaintingPage,
+            SEOSummary.SEOSummaryPage,
+            VideoBots.VideoBotsPage,
+            GoogleImageGen.GoogleImageGenPage,
+        ]
 
     def render_description(self):
         st.write(

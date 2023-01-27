@@ -24,8 +24,13 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
 )
+from recipes import (
+    LipsyncTTS,
+    DeforumSD,
+    CompareText2Img,
+    TextToSpeech,
+)
 from recipes.Lipsync import LipsyncPage
-from recipes.TextToSpeech import TextToSpeechPage
 
 BOT_SCRIPT_RE = re.compile(r"(\n)([\w\ ]+)(:)")
 
@@ -87,6 +92,14 @@ class VideoBotsPage(BasePage):
         output_audio: list[str]
         output_video: list[str]
         final_prompt: str
+
+    def related_workflows(self):
+        return [
+            LipsyncTTS.LipsyncTTSPage,
+            DeforumSD.DeforumSDPage,
+            TextToSpeech.TextToSpeechPage,
+            CompareText2Img.CompareText2ImgPage,
+        ]
 
     def preview_description(self, state: dict) -> str:
         return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
@@ -291,7 +304,7 @@ top.myLandbot = new top.Landbot.Livechat({
         state["output_audio"] = []
         for text in state["output_text"]:
             tts_state["text_prompt"] = text
-            yield from TextToSpeechPage().run(tts_state)
+            yield from TextToSpeech.TextToSpeechPage().run(tts_state)
             state["output_audio"].append(tts_state["audio_url"])
 
         lip_state = dict(state)

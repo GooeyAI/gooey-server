@@ -160,6 +160,7 @@ class BasePage:
                 self.run_as_api_tab()
 
         self.render_step_row()
+        self.render_related_workflows()
         self.render_footer()
 
         with output_col:
@@ -169,6 +170,33 @@ class BasePage:
         #
         # NOTE: Beware of putting code here since runner will call experimental_rerun
         #
+
+    def render_related_workflows(self):
+        st.markdown(
+            f"""
+            <a style="font-size: 24px" href="/explore" target = "_top">
+                <h2>Related Workflows</h2>
+            </a>
+            """,
+            unsafe_allow_html=True,
+        )
+        workflows = self.related_workflows()
+        cols = st.columns(len(workflows))
+        for workflow in workflows:
+            state = workflow().get_recipe_doc().to_dict()
+            cols[workflows.index(workflow)].markdown(
+                f"""
+        <a href="{workflow().app_url()}">
+        <img width=300px src="{workflow().preview_image(state)}" />
+        <h3>{workflow().title}</h3>
+        {workflow().preview_description(state)}
+        </a>
+        """,
+                unsafe_allow_html=True,
+            )
+
+    def related_workflows(self) -> list:
+        pass
 
     def _load_session_state(self):
         placeholder = st.empty()

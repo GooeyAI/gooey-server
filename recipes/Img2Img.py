@@ -16,6 +16,13 @@ from daras_ai_v2.stable_diffusion import (
     SD_MAX_SIZE,
 )
 
+from recipes import (
+    ImageSegmentation,
+    ObjectInpainting,
+    FaceInpainting,
+    CompareText2Img,
+)
+
 
 class Img2ImgPage(BasePage):
     title = "Edit An Image with AI prompt"
@@ -54,6 +61,14 @@ class Img2ImgPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_images: list[str]
+
+    def related_workflows(self) -> list:
+        return [
+            ImageSegmentation.ImageSegmentationPage,
+            ObjectInpainting.ObjectInpaintingPage,
+            FaceInpainting.FaceInpaintingPage,
+            CompareText2Img.CompareText2ImgPage,
+        ]
 
     def render_form_v2(self):
         if st.session_state["selected_model"] != InpaintingModels.dall_e.name:
