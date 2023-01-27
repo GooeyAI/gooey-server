@@ -172,6 +172,7 @@ class BasePage:
             input_col, output_col = st.columns([3, 2], gap="medium")
 
             self._render_step_row()
+            self.render_related_workflows()
 
             col1, col2 = st.columns(2)
             with col1:
@@ -210,6 +211,32 @@ class BasePage:
 
         elif selected_menu == MenuTabs.run_as_api:
             self.run_as_api_tab()
+    def render_related_workflows(self):
+        st.markdown(
+            f"""
+            <a style="font-size: 24px" href="/explore" target = "_top">
+                <h2>Related Workflows</h2>
+            </a>
+            """,
+            unsafe_allow_html=True,
+        )
+        workflows = self.related_workflows()
+        cols = st.columns(len(workflows))
+        for workflow in workflows:
+            state = workflow().get_recipe_doc().to_dict()
+            cols[workflows.index(workflow)].markdown(
+                f"""
+        <a href="{workflow().app_url()}">
+        <img width=300px src="{workflow().preview_image(state)}" />
+        <h3>{workflow().title}</h3>
+        {workflow().preview_description(state)}
+        </a>
+        """,
+                unsafe_allow_html=True,
+            )
+
+    def related_workflows(self) -> list:
+        pass
 
     def render_report_form(self):
         with st.form("report_form"):
