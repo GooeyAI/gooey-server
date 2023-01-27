@@ -19,7 +19,12 @@ from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
-from daras_ai_v2.stable_diffusion import img2img, Img2ImgModels, SD_MAX_SIZE
+from daras_ai_v2.stable_diffusion import (
+    img2img,
+    Img2ImgModels,
+    SD_MAX_SIZE,
+    instruct_pix2pix,
+)
 from daras_ai_v2.utils import random
 
 
@@ -34,6 +39,7 @@ class GoogleImageGenPage(BasePage):
         "prompt_strength": 0.5,
         "sd_2_upscaling": False,
         "seed": 42,
+        "image_guidance_scale": 1.2,
     }
 
     class RequestModel(BaseModel):
@@ -53,6 +59,8 @@ class GoogleImageGenPage(BasePage):
         sd_2_upscaling: bool | None
 
         seed: int | None
+
+        image_guidance_scale: float | None
 
     class ResponseModel(BaseModel):
         output_images: list[str]
@@ -126,20 +134,32 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
         yield "Generating Images..."
 
-        state["output_images"] = img2img(
-            prompt=request.text_prompt,
-            negative_prompt=request.negative_prompt,
-            init_image=selected_image_url,
-            init_image_bytes=selected_image_bytes,
-            ##
-            selected_model=request.selected_model,
-            num_inference_steps=request.quality,
-            prompt_strength=request.prompt_strength,
-            num_outputs=request.num_outputs,
-            guidance_scale=request.guidance_scale,
-            sd_2_upscaling=request.sd_2_upscaling,
-            seed=request.seed,
-        )
+        if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
+            state["output_images"] = instruct_pix2pix(
+                prompt=request.text_prompt,
+                num_outputs=request.num_outputs,
+                num_inference_steps=request.quality,
+                negative_prompt=request.negative_prompt,
+                guidance_scale=request.guidance_scale,
+                seed=request.seed,
+                images=[selected_image_url],
+                image_guidance_scale=request.image_guidance_scale,
+            )
+        else:
+            state["output_images"] = img2img(
+                prompt=request.text_prompt,
+                negative_prompt=request.negative_prompt,
+                init_image=selected_image_url,
+                init_image_bytes=selected_image_bytes,
+                ##
+                selected_model=request.selected_model,
+                num_inference_steps=request.quality,
+                prompt_strength=request.prompt_strength,
+                num_outputs=request.num_outputs,
+                guidance_scale=request.guidance_scale,
+                sd_2_upscaling=request.sd_2_upscaling,
+                seed=request.seed,
+            )
 
     def render_form_v2(self):
         st.text_input(

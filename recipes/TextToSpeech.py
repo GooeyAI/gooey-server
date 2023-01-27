@@ -32,7 +32,7 @@ class TextToSpeechPage(BasePage):
         "google_voice_name": "en-IN-Wavenet-A",
         "google_pitch": 0.0,
         "google_speaking_rate": 1.0,
-        "uberduck_voice_name": "kanye-west-rap",
+        "uberduck_voice_name": "hecko",
         "uberduck_speaking_rate": 1.0,
     }
 
@@ -117,7 +117,7 @@ class TextToSpeechPage(BasePage):
             voice_name = (
                 state["uberduck_voice_name"]
                 if "uberduck_voice_name" in state
-                else "kanye-west-rap"
+                else "hecko"
             ).strip()
             pace = (
                 state["uberduck_speaking_rate"]

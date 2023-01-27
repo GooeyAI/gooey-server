@@ -16,6 +16,7 @@ from recipes import (
 )
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/email%20ver%202.png"
 
 
 class SocialLookupEmailPage(BasePage):
@@ -52,6 +53,9 @@ class SocialLookupEmailPage(BasePage):
             VideoBots.VideoBotsPage,
             GoogleImageGen.GoogleImageGenPage,
         ]
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG
 
     def render_description(self):
         st.write(

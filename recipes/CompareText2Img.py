@@ -16,8 +16,15 @@ from daras_ai_v2.img_model_settings_widgets import (
     guidance_scale_setting,
     num_outputs_setting,
     output_resolution_setting,
+    instruct_pix2pix_settings,
+    sd_2_upscaling_setting,
 )
-from daras_ai_v2.stable_diffusion import Text2ImgModels, text2img
+from daras_ai_v2.stable_diffusion import (
+    Text2ImgModels,
+    text2img,
+    instruct_pix2pix,
+    sd_upscale,
+)
 
 
 class CompareText2ImgPage(BasePage):
@@ -31,6 +38,7 @@ class CompareText2ImgPage(BasePage):
         "guidance_scale": 10,
         "seed": 42,
         "sd_2_upscaling": False,
+        "image_guidance_scale": 1.2,
     }
 
     class RequestModel(BaseModel):
@@ -51,6 +59,9 @@ class CompareText2ImgPage(BasePage):
             typing.Literal[tuple(e.name for e in Text2ImgModels)]
         ] | None
 
+        edit_instruction: str | None
+        image_guidance_scale: float | None
+
     class ResponseModel(BaseModel):
         output_images: dict[
             typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
@@ -67,15 +78,31 @@ class CompareText2ImgPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            ### 👩‍💻 Prompt
             Describe the scene that you'd like to generate. 
             """,
             key="text_prompt",
             placeholder="Iron man",
         )
+
+        if st.checkbox(
+            "📝 Edit Instructions",
+            value=st.session_state.get("edit_instruction"),
+            key="__enable_instruct_pix2pix",
+        ):
+            st.text_area(
+                """
+                Describe how you want to change the generated image using [InstructPix2Pix](https://www.timothybrooks.com/instruct-pix2pix).
+                """,
+                key="edit_instruction",
+                placeholder="Give it sunglasses and a mustache",
+            )
+        else:
+            st.session_state["edit_instruction"] = None
+
         enum_multiselect(
             Text2ImgModels,
-            label="#### Selected Models",
+            label="#### 🧨 Selected Models",
             key="selected_models",
         )
 
@@ -96,8 +123,13 @@ class CompareText2ImgPage(BasePage):
         negative_prompt_setting()
         num_outputs_setting()
         output_resolution_setting()
-        st.checkbox("**4x Upscaling (SD v2 only)**", key="sd_2_upscaling")
-        guidance_scale_setting()
+        sd_2_upscaling_setting()
+        col1, col2 = st.columns(2)
+        with col1:
+            guidance_scale_setting()
+        with col2:
+            if st.session_state.get("edit_instruction"):
+                instruct_pix2pix_settings()
 
     def render_output(self):
         self._render_outputs(st.session_state)
@@ -119,9 +151,39 @@ class CompareText2ImgPage(BasePage):
                 height=request.output_height,
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
-                sd_2_upscaling=request.sd_2_upscaling,
                 negative_prompt=request.negative_prompt,
             )
+
+            if request.edit_instruction:
+                yield f"Running InstructPix2Pix..."
+
+                output_images[selected_model] = instruct_pix2pix(
+                    prompt=request.edit_instruction,
+                    num_outputs=1,
+                    num_inference_steps=request.quality,
+                    negative_prompt=request.negative_prompt,
+                    guidance_scale=request.guidance_scale,
+                    seed=request.seed,
+                    images=output_images[selected_model],
+                    image_guidance_scale=request.image_guidance_scale,
+                )
+
+            if request.sd_2_upscaling:
+                yield "Upscaling..."
+
+                output_images[selected_model] = [
+                    upscaled
+                    for image in output_images[selected_model]
+                    for upscaled in sd_upscale(
+                        prompt=request.text_prompt,
+                        num_outputs=1,
+                        num_inference_steps=10,
+                        negative_prompt=request.negative_prompt,
+                        guidance_scale=request.guidance_scale,
+                        seed=request.seed,
+                        image=image,
+                    )
+                ]
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)

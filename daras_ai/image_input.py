@@ -130,6 +130,13 @@ def upload_file_from_bytes(filename: str, img_bytes: bytes) -> str:
     return blob.public_url
 
 
+def storage_blob_for(filename: str) -> storage.storage.Blob:
+    filename = safe_filename(filename)
+    bucket = storage.bucket(settings.GS_BUCKET_NAME)
+    blob = bucket.blob(f"daras_ai/media/{uuid.uuid1()}/{filename}")
+    return blob
+
+
 def cv2_img_to_bytes(img):
     return cv2.imencode(".png", img)[1].tobytes()
 

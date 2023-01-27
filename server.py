@@ -34,6 +34,7 @@ from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
     ApiResponseModel,
+    DEFAULT_META_IMG,
 )
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import meta_title_for_page, meta_description_for_page
@@ -117,7 +118,10 @@ async def custom_404_handler(request: Request, exc):
     if resp.status_code == 404:
         return templates.TemplateResponse(
             "404.html",
-            {"request": request},
+            {
+                "request": request,
+                "settings": settings,
+            },
             status_code=404,
         )
     elif resp.status_code != 200 or "text/html" not in resp.headers["content-type"]:
@@ -143,6 +147,7 @@ async def custom_404_handler(request: Request, exc):
         context={
             "request": request,
             "wix_site_html": d.outer_html(),
+            "settings": settings,
         },
     )
 
@@ -155,6 +160,7 @@ def authentication(request: Request):
         "login_options.html",
         context={
             "request": request,
+            "settings": settings,
         },
     )
 
@@ -368,7 +374,10 @@ def st_home(request: Request):
     return _st_page(
         request,
         iframe_url,
-        context={"title": "Explore - Gooey.AI"},
+        context={
+            "title": "Explore - Gooey.AI",
+            "image": DEFAULT_META_IMG,
+        },
     )
 
 

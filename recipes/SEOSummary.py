@@ -34,6 +34,7 @@ from daras_ai_v2.utils import random
 KEYWORDS_SEP = re.compile(r"[\n,]")
 
 STOP_SEQ = "$" * 10
+SEO_SUMMARY_DEFAULT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/seo.png"
 
 BANNED_HOSTS = [
     # youtube generally returns garbage
@@ -54,6 +55,9 @@ sanitizer = Sanitizer(
 class SEOSummaryPage(BasePage):
     title = "Create a perfect SEO-optimized Title & Paragraph"
     slug_versions = ["SEOSummary", "seo-paragraph-generator"]
+
+    def preview_image(self, state: dict) -> str | None:
+        return SEO_SUMMARY_DEFAULT_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Input a Google search query + your website & keywords to get AI search engine optimized content. This workflow parses the current top ranked sites and generates the best page summary for your site using OpenAI’s GPT3."
