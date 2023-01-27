@@ -62,7 +62,7 @@ def text_to_speech_settings():
                     ###### Speaking rate 
                     *`1.0` is the normal native speed of the speaker*
                     """,
-                    min_value=0.25,
+                    min_value=0.3,
                     max_value=4.0,
                     step=0.1,
                     key="google_speaking_rate",
