@@ -45,7 +45,7 @@ class VideoBotsPage(BasePage):
         # gpt3
         "avoid_repetition": True,
         "num_outputs": 1,
-        "quality": 1,
+        "quality": 1.0,
         "max_tokens": 1500,
         "sampling_temperature": 0.5,
         # wav2lip
