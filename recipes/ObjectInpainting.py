@@ -86,6 +86,7 @@ class ObjectInpaintingPage(BasePage):
             Give us a photo of anything
             """,
             key="input_file",
+            upload_key="input_image",
         )
 
     def validate_form_v2(self):
@@ -197,25 +198,13 @@ class ObjectInpaintingPage(BasePage):
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
-        input_file = st.session_state.get("input_file")
-        input_image = st.session_state.get("input_image")
-        input_image_or_file = input_image or input_file
         output_images = st.session_state.get("output_images")
 
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if input_image_or_file:
-                st.image(input_image_or_file, caption="Object Photo")
-            else:
-                st.empty()
-
-        with col2:
-            if output_images:
-                for url in output_images:
-                    st.image(url, caption=f"{text_prompt}")
-            else:
-                st.empty()
+        if output_images:
+            for url in output_images:
+                st.image(url, caption=f"{text_prompt}")
+        else:
+            st.empty()
 
     def render_steps(self):
         input_file = st.session_state.get("input_file")
