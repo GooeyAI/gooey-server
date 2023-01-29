@@ -136,6 +136,7 @@ def patch_input_func(func_name: str):
                 options = np.arange(min_value, max_value + step, step)
                 if is_float:
                     options = np.round(options, 2)
+                options = options.astype("object")
                 return st.select_slider(
                     label,
                     key=key,

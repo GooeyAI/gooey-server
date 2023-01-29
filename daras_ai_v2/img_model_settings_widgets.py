@@ -144,7 +144,7 @@ def prompt_strength_setting(selected_model: str = None):
         key="prompt_strength",
         min_value=0.0,
         max_value=0.9,
-        step=0.1,
+        step=0.05,
     )
 
 

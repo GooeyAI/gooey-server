@@ -210,7 +210,10 @@ class FaceInpaintingPage(BasePage):
 
         if output_images:
             for url in output_images:
-                st.image(url, caption=f"{text_prompt}")
+                st.image(
+                    url,
+                    caption="```" + text_prompt.replace("\n", "") + "```",
+                )
         else:
             st.empty()
 
