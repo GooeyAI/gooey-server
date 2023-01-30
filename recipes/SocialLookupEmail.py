@@ -9,7 +9,7 @@ from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import run_language_model
 from recipes import (
-    # EmailFaceInpainting,
+    EmailFaceInpainting,
     SEOSummary,
     VideoBots,
     GoogleImageGen,
@@ -48,7 +48,7 @@ class SocialLookupEmailPage(BasePage):
 
     def related_workflows(self) -> list:
         return [
-            # EmailFaceInpainting.EmailFaceInpaintingPage,
+            EmailFaceInpainting.EmailFaceInpaintingPage,
             SEOSummary.SEOSummaryPage,
             VideoBots.VideoBotsPage,
             GoogleImageGen.GoogleImageGenPage,

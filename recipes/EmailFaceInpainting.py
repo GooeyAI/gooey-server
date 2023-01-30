@@ -7,19 +7,20 @@ from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import db
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
-from recipes.FaceInpainting import FaceInpaintingPage
 from recipes import (
     SEOSummary,
-    LipsyncTTS,
+FaceInpainting,
+    LipsyncTTS, SocialLookupEmail,
 )
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
 
-class EmailFaceInpaintingPage(FaceInpaintingPage):
+class EmailFaceInpaintingPage(BasePage):
     title = "AI Generated Photo from Email Profile Lookup"
     slug_versions = ["EmailFaceInpainting", "ai-image-from-email-lookup"]
     version = 2
@@ -143,14 +144,14 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
     def related_workflows(self) -> list:
         return [
-            # recipes.FaceInpainting.FaceInpaintingPage,
-            # recipes.SocialLookupEmail.SocialLookupEmailPage,
+            FaceInpainting.FaceInpaintingPage,
+            SocialLookupEmail.SocialLookupEmailPage,
             SEOSummary.SEOSummaryPage,
             LipsyncTTS.LipsyncTTSPage,
         ]
 
     def render_settings(self):
-        super().render_settings()
+        FaceInpainting.FaceInpaintingPage().render_settings()
         st.write(
             """
             ### Email settings
@@ -193,7 +194,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         )
 
     def render_output(self):
-        super().render_output()
+        FaceInpainting.FaceInpaintingPage().render_output()
 
         if st.session_state.get("email_sent"):
             st.write(f"✅ Email sent to {st.session_state.get('email_address')}")
@@ -210,7 +211,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         photo_url = get_photo_for_email(request.email_address)
         if photo_url:
             state["input_image"] = photo_url
-            yield from super().run(state)
+            yield from FaceInpainting.FaceInpaintingPage().run(state)
 
         output_images = state.get("output_images")
 
