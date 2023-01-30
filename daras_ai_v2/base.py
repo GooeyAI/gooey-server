@@ -952,7 +952,7 @@ class BasePage:
             db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
         )
 
-        if balance > self.get_price():
+        if balance < self.get_price():
             account_url = furl(settings.APP_BASE_URL) / "account/"
 
             if getattr(user, "_is_anonymous", False):
