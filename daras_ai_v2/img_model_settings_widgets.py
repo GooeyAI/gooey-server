@@ -97,12 +97,10 @@ def guidance_scale_setting(selected_model: str = None):
         st.number_input(
             label="""
 ##### 🎨️ Artistic Pressure
-([*Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter))
-
-How pressurized should the AI feel to produce what you want?
-
-At lower values the image will effectively be random. \\
-Values that are too high can also distort the image by putting too much pressure on the AI.
+([*Text Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter)) \\
+How pressurized should the AI feel to produce what you want? \\
+At lower values the image will effectively be random.
+Values that are too high can also distort the image.
             """,
             key="guidance_scale",
             min_value=0.0,
@@ -115,7 +113,7 @@ def instruct_pix2pix_settings():
     st.slider(
         label="""
 ##### 🌠️ Image Strength
-(*Image Guidance Scale*)
+([*Image Guidance Scale*](https://github.com/timothybrooks/instruct-pix2pix#tips)) \\
 A higher value encourages to generate images that are closely linked to the source image, 
 usually at the expense of lower image quality
 """,
@@ -146,7 +144,7 @@ def prompt_strength_setting(selected_model: str = None):
         key="prompt_strength",
         min_value=0.0,
         max_value=0.9,
-        step=0.1,
+        step=0.05,
     )
 
 

@@ -122,9 +122,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             key="email_address",
             placeholder="john@appleseed.com",
         )
-        st.caption(
-            "By providing your email address, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)"
-        )
 
     def validate_form_v2(self):
         text_prompt = st.session_state.get("text_prompt")

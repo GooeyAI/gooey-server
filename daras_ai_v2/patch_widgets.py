@@ -15,6 +15,7 @@ def patch_all():
     for fn in [
         st.number_input,
         st.slider,
+        st.select_slider,
         st.text_area,
         st.text_input,
     ]:
@@ -119,6 +120,30 @@ def patch_input_func(func_name: str):
                 kwargs["value"] = kwargs["value"] or ""
             elif key and key in st.session_state:
                 st.session_state[key] = st.session_state[key] or ""
+
+        # this weird hack to make slider scrubbing smooth
+        elif func_name == "slider":
+            min_value = kwargs.pop("min_value", 0.0)
+            max_value = kwargs.pop("max_value", 1.0)
+            is_float = isinstance(min_value, float)
+            is_int = isinstance(min_value, int)
+            if is_float or is_int:
+                if is_float:
+                    default = 0.01
+                else:
+                    default = 1
+                step = kwargs.pop("step", default)
+                options = np.arange(min_value, max_value + step, step)
+                if is_float:
+                    options = np.round(options, 2)
+                options = options.astype("object")
+                return st.select_slider(
+                    label,
+                    key=key,
+                    label_visibility=label_visibility,
+                    options=options,
+                    **kwargs,
+                )
 
         return old_func(
             label,
