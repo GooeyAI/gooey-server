@@ -22,8 +22,8 @@ from daras_ai_v2.img_model_settings_widgets import (
 from daras_ai_v2.loom_video_widget import loom_video, youtube_video
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from recipes import (
-SocialLookupEmail,
-EmailFaceInpainting,
+    SocialLookupEmail,
+    EmailFaceInpainting,
     LipsyncTTS,
     SEOSummary,
 )

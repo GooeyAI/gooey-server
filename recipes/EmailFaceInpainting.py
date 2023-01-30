@@ -13,8 +13,9 @@ from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
 from recipes import (
     SEOSummary,
-FaceInpainting,
-    LipsyncTTS, SocialLookupEmail,
+    FaceInpainting,
+    LipsyncTTS,
+    SocialLookupEmail,
 )
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
