@@ -40,6 +40,7 @@ from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import meta_title_for_page, meta_description_for_page
 from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
+from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
 from recipes.DeforumSD import DeforumSDPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
@@ -465,7 +466,7 @@ all_pages: list[typing.Type[BasePage]] = [
     EmailFaceInpaintingPage,
     LetterWriterPage,
     LipsyncPage,
-    # CompareLMPage,
+    CompareLLMPage,
     ImageSegmentationPage,
     TextToSpeechPage,
     LipsyncTTSPage,

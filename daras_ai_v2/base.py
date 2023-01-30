@@ -810,6 +810,12 @@ class BasePage:
                     self._example_delete_button(example_id)
 
             with col2:
+                title = doc.get("__title")
+                if title:
+                    st.write("#### " + title)
+                notes = doc.get("__notes")
+                if notes:
+                    st.write(notes)
                 self.render_example(doc)
 
             st.write("---")
