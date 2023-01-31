@@ -18,7 +18,7 @@ def meta_preview_url(file_url: str | None) -> str | None:
     dir_segments = f.path.segments[:-1]
     basename = f.path.segments[-1]
     base, ext = os.path.splitext(basename)
-    content_type = mimetypes.guess_type(basename)[0]
+    content_type = mimetypes.guess_type(basename)[0] or ""
 
     if content_type.startswith("video/"):
         f.path.segments = dir_segments + ["thumbs", f"{base}.gif"]
