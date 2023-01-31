@@ -29,6 +29,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
+from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.query_params import gooey_reset_query_parm
@@ -837,6 +838,12 @@ class BasePage:
                     self._example_delete_button(example_id)
 
             with col2:
+                title = doc.get("__title")
+                if title:
+                    st.write("#### " + title)
+                notes = doc.get("__notes")
+                if notes:
+                    st.write(notes)
                 self.render_example(doc)
 
             st.write("---")
@@ -980,19 +987,33 @@ class BasePage:
         )
 
         if balance < self.get_price():
-            account_url = furl(settings.APP_BASE_URL) / "account"
+            account_url = furl(settings.APP_BASE_URL) / "account/"
+
             if getattr(user, "_is_anonymous", False):
                 account_url.query.params["next"] = self._get_current_app_url()
-                error = f"""Doh! [Please login]({account_url}) to run more Gooey.AI workflows.
-                
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs). You can [purchase more](/pricing/) if you run out of credits."""
+                error = f"""
+                <p>
+                Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
+                </p>
+                                
+                You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs). 
+                You can <a href="/pricing/" target="_blank">purchase more</a> if you run out of credits.
+                """
             else:
-                error = f"""Doh! You’re out of Gooey.AI credits.
-                
-Please [apply for a grant]({settings.GRANT_URL}) or [buy more]({account_url}) to run more workflows.
-                
-We’re always on [discord]({settings.DISCORD_INVITE_URL}) if you’ve got any questions."""
-            st.error(error, icon="⚠️")
+                error = f"""
+                <p>
+                Doh! You’re out of Gooey.AI credits.
+                </p>
+                                
+                <p>
+                Please <a href="{settings.GRANT_URL}" target="_blank">apply for a grant</a> or 
+                <a href="{account_url}" target="_blank">buy more</a> to run more workflows.
+                </p>
+                                
+                We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discord</a> if you’ve got any questions.
+                """
+
+            html_error(error)
             return False
 
         return True

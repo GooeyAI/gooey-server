@@ -10,6 +10,7 @@ from daras_ai_v2.base import (
     get_example_request_body,
 )
 from recipes.ChyronPlant import ChyronPlantPage
+from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
 from recipes.FaceInpainting import FaceInpaintingPage
@@ -32,7 +33,7 @@ pages_to_test = [
     EmailFaceInpaintingPage,
     # LetterWriterPage,
     LipsyncPage,
-    # CompareLMPage,
+    CompareLLMPage,
     ImageSegmentationPage,
     TextToSpeechPage,
     LipsyncTTSPage,

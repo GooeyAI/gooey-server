@@ -65,7 +65,7 @@ def output_resolution_setting():
             "##### Width",
             key="output_width",
             min_value=512,
-            max_value=768,
+            max_value=1152,
             step=64,
         )
     with col2:
@@ -75,7 +75,7 @@ def output_resolution_setting():
             "##### Height",
             key="output_height",
             min_value=512,
-            max_value=768,
+            max_value=1152,
             step=64,
         )
     st.write(

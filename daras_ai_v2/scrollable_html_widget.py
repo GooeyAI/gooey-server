@@ -1,7 +1,16 @@
 from streamlit.components.v1 import html
 
 
-def scrollable_html(text: str, *, height=500):
+def scrollable_html(
+    text: str,
+    *,
+    height=500,
+    css="""
+    background-color: white;
+    color: black;
+    font-family: 'Arial', sans-serif;
+    """
+):
     html(
         """
         <head>
@@ -10,11 +19,10 @@ def scrollable_html(text: str, *, height=500):
             margin: 0;
         }
         .content {
-            background-color: white;
-            font-family: 'Arial', sans-serif;
+            %s
             font-size: 15px;
-            height: 500px;
-            overflow: scroll;
+            max-height: %ipx;
+            overflow-y: scroll;
             padding: 0 10px;
             border-radius: 5px;
         }
@@ -36,6 +44,6 @@ def scrollable_html(text: str, *, height=500):
         %s
         </div>
         """
-        % text,
+        % (css, height, text),
         height=height,
     )
