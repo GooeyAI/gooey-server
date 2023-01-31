@@ -26,6 +26,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
 )
+from daras_ai_v2.utils import get_gif_as_meta_img
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 
@@ -91,12 +92,7 @@ class VideoBotsPage(BasePage):
         final_prompt: str
 
     def preview_image(self, state: dict) -> str | None:
-        output_video = state.get("output_video")[0]
-        filename_with_ext = os.path.basename(output_video)
-        filename_without_ext = Path(output_video).resolve().stem
-        return output_video.replace(
-            filename_with_ext, f"thumbs/{filename_without_ext}.gif"
-        )
+        return get_gif_as_meta_img(state=state)
 
     def preview_description(self, state: dict) -> str:
         return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
