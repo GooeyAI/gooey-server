@@ -40,6 +40,7 @@ from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import meta_title_for_page, meta_description_for_page
 from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
+from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
 from recipes.DeforumSD import DeforumSDPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
@@ -118,7 +119,10 @@ async def custom_404_handler(request: Request, exc):
     if resp.status_code == 404:
         return templates.TemplateResponse(
             "404.html",
-            {"request": request},
+            {
+                "request": request,
+                "settings": settings,
+            },
             status_code=404,
         )
     elif resp.status_code != 200 or "text/html" not in resp.headers["content-type"]:
@@ -144,6 +148,7 @@ async def custom_404_handler(request: Request, exc):
         context={
             "request": request,
             "wix_site_html": d.outer_html(),
+            "settings": settings,
         },
     )
 
@@ -156,6 +161,7 @@ def authentication(request: Request):
         "login_options.html",
         context={
             "request": request,
+            "settings": settings,
         },
     )
 
@@ -460,7 +466,7 @@ all_pages: list[typing.Type[BasePage]] = [
     EmailFaceInpaintingPage,
     LetterWriterPage,
     LipsyncPage,
-    # CompareLMPage,
+    CompareLLMPage,
     ImageSegmentationPage,
     TextToSpeechPage,
     LipsyncTTSPage,

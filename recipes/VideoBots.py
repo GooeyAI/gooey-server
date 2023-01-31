@@ -42,12 +42,12 @@ class VideoBotsPage(BasePage):
         "google_voice_name": "en-IN-Wavenet-A",
         "google_pitch": 0.0,
         "google_speaking_rate": 1.0,
-        "uberduck_voice_name": "kanye-west-rap",
+        "uberduck_voice_name": "hecko",
         "uberduck_speaking_rate": 1.0,
         # gpt3
         "avoid_repetition": True,
         "num_outputs": 1,
-        "quality": 1,
+        "quality": 1.0,
         "max_tokens": 1500,
         "sampling_temperature": 0.5,
         # wav2lip
@@ -150,7 +150,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         st.write("#### 📝 Script")
         st.text_area(
             """
-            An example conversation with this bot
+            An example conversation with this bot (~1000 words)
             """,
             key="bot_script",
             height=300,
@@ -286,6 +286,9 @@ top.myLandbot = new top.Landbot.Livechat({
 
         max_allowed_tokens = GPT3_MAX_ALLOED_TOKENS - calc_gpt_tokens(prompt)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
+
+        if max_allowed_tokens < 0:
+            raise ValueError("Input Script is too long! Please reduce the script size.")
 
         state["output_text"] = run_language_model(
             api_provider="openai",

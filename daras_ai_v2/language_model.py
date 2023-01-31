@@ -1,3 +1,4 @@
+from enum import Enum
 from functools import wraps
 from time import sleep
 
@@ -12,6 +13,14 @@ from daras_ai_v2.gpu_server import call_gpu_server, GpuEndpoints
 GPT3_MAX_ALLOED_TOKENS = 4000
 
 _gpt2_tokenizer = None
+
+
+class LargeLanguageModels(Enum):
+    text_davinci_003 = "Davinci (GPT-3.5)"
+    code_davinci_002 = "Code Davinci (Codex)"
+    text_curie_001 = "Curie"
+    text_babbage_001 = "Babbage"
+    text_ada_001 = "Ada"
 
 
 def calc_gpt_tokens(text: str) -> int:
