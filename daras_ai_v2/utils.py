@@ -1,6 +1,6 @@
-from daras_ai_v2.send_email import send_email_via_postmark
-
 from random import Random
+
+from daras_ai_v2.send_email import send_email_via_postmark
 
 random = Random()
 

@@ -1,5 +1,6 @@
 import datetime
 import inspect
+import os
 import traceback
 import typing
 import uuid
@@ -913,9 +914,10 @@ class BasePage:
 
     def preview_image(self, state: dict) -> str | None:
         out = (
-            state.get("output_images")
+            state.get("cutout_image")
+            or state.get("output_images")
             or state.get("output_image")
-            or state.get("cutout_image")
+            or state.get("output_video")
         )
         return extract_nested_str(out) or DEFAULT_META_IMG
 
