@@ -68,7 +68,7 @@ class Img2ImgPage(BasePage):
             upload_key="input_image",
         )
 
-        if st.session_state["selected_model"] != InpaintingModels.dall_e.name:
+        if st.session_state.get("selected_model") != InpaintingModels.dall_e.name:
             st.text_area(
                 """
                 ### Prompt
