@@ -1,13 +1,12 @@
 import collections
-import os.path
 import os
+import os.path
 import re
 import typing
 
 import streamlit as st
 from furl import furl
 from pydantic import BaseModel
-from pathlib import Path
 
 from daras_ai.image_input import (
     upload_file_from_bytes,

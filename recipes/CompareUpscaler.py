@@ -1,15 +1,13 @@
 import typing
 
-import replicate
-import requests
 import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_hq, upload_file_from_bytes
+from daras_ai.image_input import upload_file_hq
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.face_restoration import UpscalerModels, run_upscaler_model
-from daras_ai_v2.stable_diffusion import IMG_MAX_SIZE, sd_upscale
+from daras_ai_v2.stable_diffusion import IMG_MAX_SIZE
 
 
 class CompareUpscalerPage(BasePage):
@@ -85,6 +83,13 @@ class CompareUpscalerPage(BasePage):
     def render_output(self):
         self._render_outputs(st.session_state)
 
+    def render_example(self, state: dict):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(state.get("input_image"), caption="Input Image")
+        with col2:
+            self._render_outputs(state)
+
     def _render_outputs(self, state):
         selected_models = state.get("selected_models", [])
         for key in selected_models:
@@ -92,3 +97,8 @@ class CompareUpscalerPage(BasePage):
             if not img:
                 continue
             st.image(img, caption=UpscalerModels[key].value)
+
+    def get_price(self) -> int:
+        selected_models = st.session_state.get("selected_models", [])
+        total = 5 * len(selected_models)
+        return total

@@ -188,6 +188,17 @@ class CompareText2ImgPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Create multiple AI photos from Stable Diffusion (1.5 -> 2.1, Open/Midjourney) DallE from one prompt. Determine which AI image generator from OpenAI, Stability.AI works best for your text."
 
+    def get_price(self) -> int:
+        selected_models = st.session_state.get("selected_models", [])
+        total = 0
+        for name in selected_models:
+            match name:
+                case Text2ImgModels.dall_e.name:
+                    total += 20
+                case _:
+                    total += 5
+        return total
+
 
 if __name__ == "__main__":
     CompareText2ImgPage().render()

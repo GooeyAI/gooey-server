@@ -292,8 +292,28 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         user: auth.UserRecord = Depends(api_auth_header),
         page_request: page_cls.RequestModel = body_spec,
     ):
+        created_at = datetime.datetime.utcnow().isoformat()
         # init a new page for every request
         page = page_cls()
+
+        # get saved state from db
+        state = page.get_doc_from_query_params(request.query_params)
+        if state is None:
+            raise HTTPException(status_code=404)
+
+        # set sane defaults
+        for k, v in page.sane_defaults.items():
+            state.setdefault(k, v)
+        # only use the request values, discard outputs
+        state = page.RequestModel.parse_obj(state).dict()
+        # remove None values & insert request data
+        request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
+        state.update(request_dict)
+        # set the current user
+        state["_current_user"] = user
+
+        # set streamlit session state
+        streamlit.session_state = state
 
         # check the balance
         balance = db.get_doc_field(
@@ -307,28 +327,6 @@ def script_to_api(page_cls: typing.Type[BasePage]):
                     "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
                 },
             )
-
-        created_at = datetime.datetime.utcnow().isoformat()
-
-        # get saved state from db
-        state = page.get_doc_from_query_params(request.query_params)
-        if state is None:
-            raise HTTPException(status_code=404)
-
-        # set sane defaults
-        for k, v in page.sane_defaults.items():
-            state.setdefault(k, v)
-
-        # only use the request values, discard outputs
-        state = page.RequestModel.parse_obj(state).dict()
-
-        # remove None values & update state
-        request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
-        state.update(request_dict)
-
-        # set the current user
-        state["_current_user"] = user
-        streamlit.session_state = state
 
         # create the run
         run_id = get_random_doc_id()
@@ -362,7 +360,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
 
         # save the run
         run_doc_ref.set(page.state_to_doc(state))
-        # deuct credits
+        # deduct credits
         page.deduct_credits()
 
         # return updated state

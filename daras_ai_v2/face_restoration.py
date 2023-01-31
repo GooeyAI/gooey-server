@@ -11,7 +11,7 @@ from daras_ai_v2.stable_diffusion import sd_upscale
 
 
 class UpscalerModels(Enum):
-    sd_x4 = "SD x4 upscaler (stability.ai)"
+    sd_x4 = "SD x4 latent upscaler (stability.ai)"
     real_esrgan = "Real-ESRGAN (xinntao)"
     gfpgan = "GFPGAN face restoration (Tencent ARC)"
 
