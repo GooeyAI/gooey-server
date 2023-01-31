@@ -1,8 +1,10 @@
 import base64
+import datetime
 import typing
 
 import requests
 
+from daras_ai.image_input import storage_blob_for
 from daras_ai_v2 import settings
 
 
@@ -18,7 +20,6 @@ class GpuEndpoints:
     # sd_1_5 = f"{settings.GPU_SERVER_2}:5009"
     sd_2 = f"{settings.GPU_SERVER_1}:5011"
     sd_multi = f"{settings.GPU_SERVER_1}:5012"
-    # openjourney = f"{settings.GPU_SERVER_2}:5010"
 
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
@@ -41,3 +42,37 @@ def call_gpu_server(*, endpoint: str, input_data: dict) -> typing.Any:
     )
     r.raise_for_status()
     return r.json()["output"]
+
+
+def call_sd_multi(endpoint: str, pipeline: dict, inputs: dict) -> typing.List[str]:
+    prompt = inputs["prompt"]
+    num_images_per_prompt = inputs["num_images_per_prompt"]
+    num_outputs = len(prompt) * num_images_per_prompt
+
+    blobs = [
+        storage_blob_for(f"gooey.ai - {prompt} ({i + 1}).png")
+        for i in range(num_outputs)
+    ]
+
+    pipeline["upload_urls"] = [
+        blob.generate_signed_url(
+            version="v4",
+            # This URL is valid for 15 minutes
+            expiration=datetime.timedelta(minutes=30),
+            # Allow PUT requests using this URL.
+            method="PUT",
+            content_type="image/png",
+        )
+        for blob in blobs
+    ]
+
+    r = requests.post(
+        GpuEndpoints.sd_multi + f"/{endpoint}/",
+        json={
+            "pipeline": pipeline,
+            "inputs": inputs,
+        },
+    )
+    r.raise_for_status()
+
+    return [blob.public_url for blob in blobs]
