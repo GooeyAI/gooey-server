@@ -153,6 +153,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             *Recommended - mp4 / mov / png / jpg / gif* 
             """,
             key="face_file",
+            upload_key="input_face",
         )
 
         st.write("---")
