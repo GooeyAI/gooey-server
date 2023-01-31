@@ -33,6 +33,7 @@ from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.query_params import gooey_reset_query_parm
+from daras_ai_v2.settings import APP_BASE_URL
 from daras_ai_v2.utils import email_support_about_reported_run
 from daras_ai_v2.utils import random
 
@@ -216,7 +217,7 @@ class BasePage:
     def render_related_workflows(self):
         st.markdown(
             f"""
-            <a style="font-size: 24px" href="/explore" target = "_top">
+            <a style="text-decoration:none" href="{APP_BASE_URL}explore" target = "_top">
                 <h2>Related Workflows</h2>
             </a>
             """,
@@ -228,7 +229,7 @@ class BasePage:
             state = workflow().get_recipe_doc().to_dict()
             cols[workflows.index(workflow)].markdown(
                 f"""
-        <a href="{workflow().app_url()}">
+        <a href="{workflow().app_url()}" style="text-decoration:none">
         <img width=300px src="{workflow().preview_image(state)}" />
         <h3>{workflow().title}</h3>
         {workflow().preview_description(state)}
