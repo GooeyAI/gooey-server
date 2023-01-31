@@ -117,16 +117,17 @@ class BasePage:
 
     def render(self):
         # dirty fix for https://github.com/streamlit/streamlit/issues/5620 & https://github.com/streamlit/streamlit/issues/5604
-        prev_state = self.state_to_doc(st.session_state.pop("__prev_state", {}))
-        prev_state = {k: v for k, v in prev_state.items() if k not in st.session_state}
-        st.session_state.update(prev_state)
+        st.session_state.update(
+            self.state_to_doc(
+                st.session_state.pop("__prev_state", {}),
+            ),
+        )
         try:
             self._render()
         except Exception as e:
             sentry_sdk.capture_exception(e)
             raise
-        finally:
-            st.session_state["__prev_state"] = st.session_state
+        st.session_state["__prev_state"] = st.session_state
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
