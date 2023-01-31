@@ -1,3 +1,4 @@
+import mimetypes
 import os
 
 import requests
@@ -17,8 +18,9 @@ def meta_preview_url(file_url: str | None) -> str | None:
     dir_segments = f.path.segments[:-1]
     basename = f.path.segments[-1]
     base, ext = os.path.splitext(basename)
+    content_type = mimetypes.guess_type(basename)[0]
 
-    if ext == ".mp4":
+    if content_type.startswith("video/"):
         f.path.segments = dir_segments + ["thumbs", f"{base}.gif"]
     else:
         # sizes:  400x400,1170x1560,40x40,72x72,80x80,96x96
