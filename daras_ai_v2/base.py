@@ -229,9 +229,9 @@ class BasePage:
             state = workflow().get_recipe_doc().to_dict()
             cols[workflows.index(workflow)].markdown(
                 f"""
-        <a href="{workflow().app_url()}" style="text-decoration:none">
+        <a href="{workflow().app_url()}" style="text-decoration:none;color:white">
         <img width=300px src="{workflow().preview_image(state)}" />
-        <h3>{workflow().title}</h3>
+        <h4>{workflow().title}</h4>
         {workflow().preview_description(state)}
         </a>
         """,
