@@ -23,11 +23,11 @@ def patch_all():
 
 
 def patch_image():
-    def new_func(image, caption=None, **kwargs):
+    def new_func(image, *args, caption=None, **kwargs):
         if caption:
             st.write(f"**{caption.strip()}**")
         if isinstance(image, np.ndarray) or image:
-            old_func(image)
+            old_func(image, *args, **kwargs)
         else:
             st.empty()
 
@@ -35,7 +35,7 @@ def patch_image():
 
 
 def patch_video():
-    def new_func(url, caption=None):
+    def new_func(url, *args, caption=None, **kwargs):
         if not url:
             st.empty()
             return
@@ -49,18 +49,18 @@ def patch_video():
             f.fragment.args["t"] = "0.001"
             url = f.url
 
-        old_func(url)
+        old_func(url, *args, **kwargs)
 
     old_func = _patcher(st.video.__name__, new_func)
 
 
 def patch_file_uploader():
-    def new_func(label, label_visibility="markdown", upload_key=None, **kwargs):
+    def new_func(label, *args, label_visibility="markdown", upload_key=None, **kwargs):
         if label_visibility == "markdown":
             st.write(label)
             label_visibility = "collapsed"
 
-        value = old_func(label, label_visibility=label_visibility, **kwargs)
+        value = old_func(label, *args, label_visibility=label_visibility, **kwargs)
 
         # render preview from current value / uploaded value
         if value:
@@ -91,6 +91,7 @@ def patch_file_uploader():
 def patch_input_func(func_name: str):
     def new_func(
         label,
+        *args,
         key=None,
         label_visibility="markdown",
         **kwargs,
@@ -141,6 +142,7 @@ def patch_input_func(func_name: str):
 
         return old_func(
             label,
+            *args,
             key=key,
             label_visibility=label_visibility,
             **kwargs,
