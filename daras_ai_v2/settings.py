@@ -72,3 +72,5 @@ WIX_SITE_URL = config("WIX_SITE_URL", "https://archanaprasad.wixsite.com/daras-a
 
 DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
+
+SEON_API_KEY = config("SEON_API_KEY", None)
