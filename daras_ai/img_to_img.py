@@ -93,15 +93,11 @@ def img_to_img(idx, variables, state):
 
     if init_img:
         init_img = upload_file_from_bytes(
-            "init_img.png",
-            resize_img_pad(requests.get(init_img).content, (512, 512)),
-            content_type="image/png",
+            "init_img.png", resize_img_pad(requests.get(init_img).content, (512, 512))
         )
     if mask_img:
         mask_img = upload_file_from_bytes(
-            "mask_img.png",
-            resize_img_pad(requests.get(mask_img).content, (512, 512)),
-            content_type="image/png",
+            "mask_img.png", resize_img_pad(requests.get(mask_img).content, (512, 512))
         )
 
     match selected_model:

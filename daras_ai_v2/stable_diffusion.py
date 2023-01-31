@@ -198,11 +198,7 @@ def text2img(
             )
 
     return [
-        upload_file_from_bytes(
-            f"gooey.ai - {prompt}.png",
-            sd_img_bytes,
-            content_type="image/png",
-        )
+        upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
 
@@ -312,11 +308,7 @@ def img2img(
                 },
             )
     return [
-        upload_file_from_bytes(
-            f"gooey.ai - {prompt}.png",
-            sd_img_bytes,
-            content_type="image/png",
-        )
+        upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
 
@@ -417,11 +409,7 @@ def inpainting(
     out_imgs = _recomposite_inpainting_outputs(out_imgs, edit_image_bytes, mask_bytes)
 
     return [
-        upload_file_from_bytes(
-            f"gooey.ai - {prompt}.png",
-            sd_img_bytes,
-            content_type="image/png",
-        )
+        upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
 

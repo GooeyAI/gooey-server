@@ -1,3 +1,4 @@
+import mimetypes
 import re
 import uuid
 from pathlib import Path
@@ -124,13 +125,13 @@ def resize_img_fit(img_bytes: bytes, size: (int, int)) -> bytes:
     return cv2_img_to_bytes(img_cv2)
 
 
-def upload_file_from_bytes(
-    filename: str, img_bytes: bytes, content_type="text/plain"
-) -> str:
+def upload_file_from_bytes(filename: str, data: bytes, content_type: str = None) -> str:
+    if not content_type:
+        content_type = mimetypes.guess_type(filename)[0]
     filename = safe_filename(filename)
     bucket = storage.bucket(settings.GS_BUCKET_NAME)
     blob = bucket.blob(f"daras_ai/media/{uuid.uuid1()}/{filename}")
-    blob.upload_from_string(img_bytes, content_type=content_type)
+    blob.upload_from_string(data, content_type=content_type)
     return blob.public_url
 
 

@@ -76,9 +76,7 @@ class DeforumSDPage(BasePage):
             },
         )[0]
         state["output_video"] = upload_file_from_bytes(
-            f"gooey.ai text to animation - {request.input_prompt}.mp4",
-            out_video_bytes,
-            content_type="video/mp4",
+            f"gooey.ai text to animation - {request.input_prompt}.mp4", out_video_bytes
         )
 
 

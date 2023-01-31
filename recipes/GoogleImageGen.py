@@ -113,9 +113,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             raise ValueError("Could not find an image! Please try another query?")
 
         selected_image_url = upload_file_from_bytes(
-            "selected_img.png",
-            selected_image_bytes,
-            content_type="image/png",
+            "selected_img.png", selected_image_bytes
         )
 
         state["selected_image"] = selected_image_url

@@ -48,7 +48,7 @@ def send_smtp_message(
     for f in files or []:
         if f.name.lower().endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
             url = upload_file_from_bytes(
-                filename=f.name, img_bytes=f.getvalue(), content_type=f.type
+                filename=f.name, data=f.getvalue(), content_type=f.type
             )
             html_message += f"<img width='300px', src='{url}'/><br>"
             # st.write(url)

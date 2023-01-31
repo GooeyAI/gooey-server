@@ -229,7 +229,6 @@ class ImageSegmentationPage(BasePage):
         state["output_image"] = upload_file_from_bytes(
             f"gooey.ai Segmentation Mask - {Path(request.input_image).stem}.png",
             cv2_img_to_bytes(mask_cv2),
-            content_type="image/png",
         )
 
         if request.rect_persepective_transform:
@@ -255,14 +254,10 @@ class ImageSegmentationPage(BasePage):
             out_pos_y=request.obj_pos_y,
         )
         state["resized_image"] = upload_file_from_bytes(
-            "re_image.png",
-            cv2_img_to_bytes(img_cv2),
-            content_type="image/png",
+            "re_image.png", cv2_img_to_bytes(img_cv2)
         )
         state["resized_mask"] = upload_file_from_bytes(
-            "re_mask.png",
-            cv2_img_to_bytes(mask_cv2),
-            content_type="image/png",
+            "re_mask.png", cv2_img_to_bytes(mask_cv2)
         )
 
         bg_color = (255, 255, 255)
@@ -306,7 +301,6 @@ class ImageSegmentationPage(BasePage):
         state["cutout_image"] = upload_file_from_bytes(
             f"gooey.ai Cutout - {Path(request.input_image).stem}.png",
             pil_to_bytes(cutout_pil),
-            content_type="image/png",
         )
         yield
 

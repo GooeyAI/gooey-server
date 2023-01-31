@@ -277,16 +277,8 @@ class FaceInpaintingPage(BasePage):
             pos_y=state["face_pos_y"],
         )
 
-        state["resized_image"] = upload_file_from_bytes(
-            "re_img.png",
-            re_img_bytes,
-            content_type="image/png",
-        )
-        state["face_mask"] = upload_file_from_bytes(
-            "face_mask.png",
-            face_mask_bytes,
-            content_type="image/png",
-        )
+        state["resized_image"] = upload_file_from_bytes("re_img.png", re_img_bytes)
+        state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)
 
         yield f"Generating Image..."
 
@@ -320,7 +312,6 @@ class FaceInpaintingPage(BasePage):
             upload_file_from_bytes(
                 safe_filename(f"gooey.ai inpainting - {prompt.strip()}.png"),
                 img_bytes,
-                content_type="image/png",
                 # requests.get(url).content,
             )
             for img_bytes in output_images
