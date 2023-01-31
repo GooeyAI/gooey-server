@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from daras_ai.image_input import (
     upload_file_from_bytes,
-    resize_img_contain,
+    resize_img_scale,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.google_search import call_scaleserp
@@ -16,7 +16,7 @@ from daras_ai_v2.img_model_settings_widgets import (
 from daras_ai_v2.stable_diffusion import (
     img2img,
     Img2ImgModels,
-    SD_MAX_SIZE,
+    IMG_MAX_SIZE,
     instruct_pix2pix,
 )
 from daras_ai_v2.utils import random
@@ -102,8 +102,8 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             print(selected_image_url)
             selected_image_bytes = requests.get(selected_image_url).content
             try:
-                selected_image_bytes = resize_img_contain(
-                    selected_image_bytes, SD_MAX_SIZE
+                selected_image_bytes = resize_img_scale(
+                    selected_image_bytes, IMG_MAX_SIZE
                 )
             except ValueError:
                 continue

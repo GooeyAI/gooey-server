@@ -60,6 +60,13 @@ class ApiResponseModel(GenericModel, typing.Generic[O]):
     output: O
 
 
+class MenuTabs:
+    run = "🏃‍♀️Run"
+    examples = "🔖 Examples"
+    run_as_api = "🚀 Run as API"
+    history = "📖 History"
+
+
 class BasePage:
     title: str
     slug_versions: list[str]
@@ -147,12 +154,6 @@ class BasePage:
         st.write("## " + st.session_state.get("__title"))
         st.write(st.session_state.get("__notes"))
 
-        class MenuTabs:
-            run = "🏃‍♀️Run"
-            examples = "🔖 Examples"
-            run_as_api = "🚀 Run as API"
-            history = "📖 History"
-
         menu_options = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
 
         current_user: UserRecord = st.session_state.get("_current_user")
@@ -164,6 +165,7 @@ class BasePage:
             options=menu_options,
             icons=["-"] * len(menu_options),
             orientation="horizontal",
+            key=st.session_state.get("__option_menu_key"),
             styles={
                 "nav-link": {"white-space": "nowrap;"},
                 "nav-link-selected": {"font-weight": "normal;", "color": "black"},
@@ -740,13 +742,23 @@ class BasePage:
             st.success("Saved", icon="✅")
 
     def state_to_doc(self, state: dict):
-        return {
+        ret = {
             field_name: deepcopy(state[field_name])
             for field_name in self.fields_to_save()
             if field_name in state
-        } | {
+        }
+        ret |= {
             "updated_at": datetime.datetime.utcnow(),
         }
+
+        title = state.get("__title")
+        notes = state.get("__notes")
+        if title and title.strip() != self.title.strip():
+            ret["__title"] = title
+        if notes and notes.strip() != self.preview_description(state).strip():
+            ret["__notes"] = notes
+
+        return ret
 
     def fields_to_save(self) -> [str]:
         # only save the fields in request/response
@@ -754,9 +766,6 @@ class BasePage:
             field_name
             for model in (self.RequestModel, self.ResponseModel)
             for field_name in model.__fields__
-        ] + [
-            "__title",
-            "__notes",
         ]
 
     def _examples_tab(self):
@@ -791,35 +800,12 @@ class BasePage:
                 )
             )
 
-            col1, col2 = st.columns([2, 6])
-
-            with col1:
-                st.markdown(
-                    f"""
-                    <div style="height: 50px;">
-                        <a target="_top" class="streamlit-like-btn" href="{url}">
-                          ✏️ Tweak 
-                        </a>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-                copy_to_clipboard_button("🔗 Copy URL", value=url)
-
-                if allow_delete:
-                    self._example_delete_button(example_id)
-
-            with col2:
-                title = doc.get("__title")
-                if title:
-                    st.write("#### " + title)
-                notes = doc.get("__notes")
-                if notes:
-                    st.write(notes)
-                self.render_example(doc)
-
-            st.write("---")
+            self._render_doc_example(
+                allow_delete=allow_delete,
+                doc=doc,
+                url=url,
+                query_params=dict(example_id=example_id),
+            )
 
     def _history_tab(self):
         current_user = st.session_state.get("_current_user")
@@ -840,26 +826,12 @@ class BasePage:
                 )
             )
 
-            col1, col2 = st.columns([2, 6])
-
-            with col1:
-                st.markdown(
-                    f"""
-                        <div style="height: 50px;">
-                            <a target="_top" class="streamlit-like-btn" href="{url}">
-                              ✏️ Tweak 
-                            </a>
-                        </div>
-                        """,
-                    unsafe_allow_html=True,
-                )
-
-                copy_to_clipboard_button("🔗 Copy URL", value=url)
-
-            with col2:
-                self.render_example(doc)
-
-            st.write("---")
+            self._render_doc_example(
+                allow_delete=False,
+                doc=doc,
+                url=url,
+                query_params=dict(run_id=run_id, uid=uid),
+            )
 
         if "__run_history" not in st.session_state or st.button("Load More"):
             with st.spinner("Loading History..."):
@@ -876,6 +848,39 @@ class BasePage:
                 )
             st.session_state["__run_history"] = run_history
             st.experimental_rerun()
+
+    def _render_doc_example(
+        self, *, allow_delete: bool, doc: dict, url: str, query_params: dict
+    ):
+        col1, col2 = st.columns([2, 6])
+
+        with col1:
+            if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
+                st.session_state.clear()
+                gooey_reset_query_parm(**query_params)
+                st.session_state["__option_menu_key"] = get_random_doc_id()
+                st.experimental_rerun()
+
+            copy_to_clipboard_button("🔗 Copy URL", value=url)
+
+            if allow_delete:
+                self._example_delete_button(**query_params)
+
+        with col2:
+            title = doc.get("__title")
+            if title and title.strip() != self.title.strip():
+                st.write("#### " + title)
+
+            notes = doc.get("__notes")
+            if (
+                notes
+                and notes.strip() != self.preview_description(st.session_state).strip()
+            ):
+                st.write(notes)
+
+            self.render_example(doc)
+
+        st.write("---")
 
     def _example_delete_button(self, example_id):
         pressed_delete = st.button(
@@ -909,8 +914,8 @@ class BasePage:
             or state.get("search_query")
         )
 
-    def preview_description(self, state: dict) -> str | None:
-        pass
+    def preview_description(self, state: dict) -> str:
+        return ""
 
     def preview_image(self, state: dict) -> str | None:
         out = (

@@ -46,6 +46,7 @@ from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
+from recipes.CompareUpscaler import CompareUpscalerPage
 from recipes.DeforumSD import DeforumSDPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
 from recipes.FaceInpainting import FaceInpaintingPage
@@ -482,6 +483,7 @@ all_pages: list[typing.Type[BasePage]] = [
     SEOSummaryPage,
     GoogleImageGenPage,
     VideoBotsPage,
+    CompareUpscalerPage,
 ]
 
 

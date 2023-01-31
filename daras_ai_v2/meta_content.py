@@ -83,7 +83,7 @@ def meta_description_for_page(
     uid: str,
     example_id: str,
 ) -> str:
-    description = page.preview_description(state) or ""
+    description = page.preview_description(state)
 
     updated_at = state.get("updated_at")
     if updated_at:

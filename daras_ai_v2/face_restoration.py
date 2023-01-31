@@ -1,6 +1,70 @@
 from concurrent.futures import ThreadPoolExecutor
+from enum import Enum
+from pathlib import Path
 
+import replicate
+import requests
+
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
+from daras_ai_v2.stable_diffusion import sd_upscale
+
+
+class UpscalerModels(Enum):
+    sd_x4 = "SD x4 upscaler (stability.ai)"
+    real_esrgan = "Real-ESRGAN (xinntao)"
+    gfpgan = "GFPGAN face restoration (Tencent ARC)"
+
+
+def run_upscaler_model(
+    *,
+    image: str,
+    scale: int,
+    selected_model: str,
+    filename: str = None,
+) -> str:
+    if not filename:
+        filename = f"gooey.ai upscaled - {Path(image).stem}.png"
+
+    match selected_model:
+        case UpscalerModels.sd_x4.name:
+            img = sd_upscale(
+                num_outputs=1,
+                num_inference_steps=10,
+                prompt="",
+                # negative_prompt=None,
+                guidance_scale=7.5,
+                # seed=42,
+                # prompt=request.text_prompt,
+                # negative_prompt=request.negative_prompt,
+                # guidance_scale=request.guidance_scale,
+                # seed=request.seed,
+                image=image,
+            )[0]
+        case UpscalerModels.real_esrgan.name:
+            img_bytes = _real_esrgan(image, scale, face_enhance=False)
+            img = upload_file_from_bytes(filename, img_bytes)
+        case UpscalerModels.gfpgan.name:
+            img_bytes = _real_esrgan(image, scale, face_enhance=True)
+            img = upload_file_from_bytes(filename, img_bytes)
+        case _:
+            raise ValueError(f"Unkown upscaler: {selected_model}")
+
+    return img
+
+
+def _real_esrgan(img: str, scale: int, face_enhance: bool) -> bytes:
+    # https://replicate.com/nightmareai/real-esrgan/versions/42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b#output-schema
+    model = replicate.models.get("nightmareai/real-esrgan")
+    version = model.versions.get(
+        "42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b"
+    )
+    img = version.predict(
+        image=img,
+        scale=scale,
+        face_enhance=face_enhance,
+    )
+    return requests.get(img).content
 
 
 def gfpgan(img: str, scale: int = 1) -> bytes:

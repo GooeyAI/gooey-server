@@ -85,7 +85,7 @@ def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
 @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
     img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
-    img_bytes = resize_img_contain(img_bytes, resize)
+    img_bytes = resize_img_scale(img_bytes, resize)
     return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
 
 
@@ -109,10 +109,12 @@ def _heic_to_png(img_bytes: bytes) -> bytes:
     return img_bytes
 
 
-def resize_img_contain(img_bytes: bytes, size: (int, int)) -> bytes:
+def resize_img_scale(img_bytes: bytes, size: (int, int)) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
-    img_pil = ImageOps.contain(img_pil, size)
+    factor = (size[0] * size[1]) / (img_pil.size[0] * img_pil.size[1])
+    if 1 - factor > 1e-2:
+        img_pil = ImageOps.scale(img_pil, factor)
     img_cv2 = np.array(img_pil)
     return cv2_img_to_bytes(img_cv2)
 

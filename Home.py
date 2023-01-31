@@ -1,6 +1,7 @@
 import streamlit as st
 
 from recipes.CompareLLM import CompareLLMPage
+from recipes.CompareUpscaler import CompareUpscalerPage
 from recipes.VideoBots import VideoBotsPage
 from server import normalize_slug, page_map
 
@@ -59,6 +60,7 @@ page_classes = [
     ImageSegmentationPage,
     Img2ImgPage,
     DeforumSDPage,
+    CompareUpscalerPage,
     # LipsyncPage,
     # ChyronPlantPage,
 ]
