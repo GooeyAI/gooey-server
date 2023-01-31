@@ -4,7 +4,6 @@ from pydantic import BaseModel
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
-from daras_ai_v2.utils import get_gif_as_meta_img
 
 
 class DeforumSDPage(BasePage):
@@ -35,9 +34,6 @@ class DeforumSDPage(BasePage):
             submitted = st.form_submit_button("🏃‍ Submit")
 
         return submitted
-
-    def preview_image(self, state: dict) -> str | None:
-        return get_gif_as_meta_img(state=state)
 
     def preview_description(self, state: dict) -> str:
         return "Input your text (including keyframes!) and animate using Stable Diffusion's Deforum. Create AI generated animation for free and easier than CoLab notebooks. Inspired by deforum.art."

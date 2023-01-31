@@ -4,7 +4,6 @@ import streamlit as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.utils import get_gif_as_meta_img
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 
@@ -75,9 +74,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
                     )
 
         return submitted
-
-    def preview_image(self, state: dict) -> str | None:
-        return get_gif_as_meta_img(state=state)
 
     def preview_description(self, state: dict) -> str:
         return "Add your text prompt, pick a voice & upload a sample video to quickly create realistic lipsync videos. Discover the ease of text-to-video AI."

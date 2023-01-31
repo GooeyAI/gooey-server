@@ -1,8 +1,6 @@
-import os
-from pathlib import Path
-from daras_ai_v2.send_email import send_email_via_postmark
-
 from random import Random
+
+from daras_ai_v2.send_email import send_email_via_postmark
 
 random = Random()
 
@@ -36,15 +34,3 @@ def email_support_about_reported_run(
         </p>
         """,
     )
-
-
-def get_gif_as_meta_img(state: dict):
-    output_videos = state.get("output_video")
-    if isinstance(output_videos, list):
-        output_video = output_videos[0]
-    else:
-        output_video = output_videos
-
-    filename_with_ext = os.path.basename(output_video)
-    filename_without_ext = Path(output_video).resolve().stem
-    return output_video.replace(filename_with_ext, f"thumbs/{filename_without_ext}.gif")
