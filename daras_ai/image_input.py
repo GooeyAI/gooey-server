@@ -125,9 +125,15 @@ def resize_img_fit(img_bytes: bytes, size: (int, int)) -> bytes:
     return cv2_img_to_bytes(img_cv2)
 
 
-def upload_file_from_bytes(filename: str, data: bytes, content_type: str = None) -> str:
+def upload_file_from_bytes(
+    filename: str,
+    data: bytes,
+    content_type: str = None,
+) -> str:
     if not content_type:
         content_type = mimetypes.guess_type(filename)[0]
+    content_type = content_type or "application/octet-stream"
+
     filename = safe_filename(filename)
     bucket = storage.bucket(settings.GS_BUCKET_NAME)
     blob = bucket.blob(f"daras_ai/media/{uuid.uuid1()}/{filename}")
