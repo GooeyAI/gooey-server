@@ -216,7 +216,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             state["email_sent"] = True
 
         if not photo_url:
-            raise ValueError("Photo not found")
+            raise ImageNotFound(
+                "This email has no photo with a face in it. Try [Face in an AI Image](/face-in-ai-generated-photo/) workflow instead."
+            )
 
     def _get_email_body(
         self,
@@ -266,6 +268,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
     def render_usage_guide(self):
         youtube_video("bffH8X3YBCQ")
+
+
+class ImageNotFound(Exception):
+    "Raised when the image not found in email profile"
+    pass
 
 
 @st.cache()
