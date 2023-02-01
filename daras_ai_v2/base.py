@@ -33,6 +33,7 @@ from daras_ai_v2.crypto import (
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
+from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.utils import email_support_about_reported_run
 from daras_ai_v2.utils import random
@@ -117,10 +118,13 @@ class BasePage:
 
     def render(self):
         try:
+            ensure_hidden_widgets_loaded(st.session_state.pop("__prev_state", {}))
             self._render()
         except Exception as e:
             sentry_sdk.capture_exception(e)
             raise
+        finally:
+            st.session_state["__prev_state"] = dict(st.session_state)
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:

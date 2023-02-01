@@ -4,6 +4,7 @@ from functools import wraps
 import numpy as np
 import streamlit as st
 from furl import furl
+from streamlit.runtime.state import get_session_state
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 
@@ -17,7 +18,9 @@ def patch(*targets):
 
 
 def _patcher(fn_name, patch_fn):
-    if hasattr(st, "__patched__"):
+    # flag to prevent multiple patch
+    flag = f"__patched_{fn_name}_{patch_fn.__name__}"
+    if hasattr(st, flag):
         return
 
     old_func = getattr(st, fn_name)
@@ -27,6 +30,7 @@ def _patcher(fn_name, patch_fn):
         return patch_fn(old_func, *args, **kwargs)
 
     setattr(st, fn_name, wrapper)
+    setattr(st, flag, True)
 
 
 @patch(st.image)
@@ -88,6 +92,7 @@ def _render_preview(value: UploadedFile | None, upload_key: str):
                 st.image(preview)
 
 
+# convert slider to select_slider to make it smooth
 @patch(st.slider)
 def slider_patch(self, *args, min_value=0.0, max_value=1.0, **kwargs):
     is_float = isinstance(min_value, float)
@@ -132,7 +137,7 @@ def text_patch(self, *args, key=None, **kwargs):
     return self(*args, key=key, **kwargs)
 
 
-common_inputs = [
+@patch(
     st.number_input,
     st.slider,
     st.select_slider,
@@ -141,10 +146,8 @@ common_inputs = [
     st.selectbox,
     st.multiselect,
     st.radio,
-]
-
-
-@patch(*common_inputs, st.file_uploader)
+    st.file_uploader,
+)
 def markdown_label_patch(self, label, *args, label_visibility="markdown", **kwargs):
     # allow full markdown labels
     if label_visibility == "markdown":
@@ -155,21 +158,37 @@ def markdown_label_patch(self, label, *args, label_visibility="markdown", **kwar
 
 
 # fixes https://github.com/streamlit/streamlit/issues/5620 & https://github.com/streamlit/streamlit/issues/5604
-@patch(*common_inputs, st.checkbox)
-def shadow_keys_patch(self, *args, key=None, **kwargs):
-    if key:
-        underlying_key = "__shadow_" + key
-        if key in st.session_state and underlying_key not in st.session_state:
-            st.session_state[underlying_key] = st.session_state[key]
-    else:
-        underlying_key = key
+def ensure_hidden_widgets_loaded(prev_state):
+    state = get_session_state()._state
+    user_keys = {*st.session_state, *state._key_id_mapping}
 
-    ret = self(*args, key=underlying_key, **kwargs)
+    for key in user_keys:
+        # get value from current state or previous state
+        try:
+            value = st.session_state[key]
+        except KeyError:
+            try:
+                value = prev_state[key]
+            except KeyError:
+                continue
 
-    if key and underlying_key in st.session_state:
-        st.session_state[key] = st.session_state[underlying_key]
+        try:
+            widget_key = state._key_id_mapping.get(key)
 
-    return ret
+            # widget state already present, skip
+            if widget_key in state._new_widget_state:
+                continue
 
+            # avoid updating form, checkbox, button etc.
+            widget_metadata = state._new_widget_state.widget_metadata
+            try:
+                value_type = widget_metadata[widget_key].value_type
+            except KeyError:
+                pass
+            else:
+                if value_type in ["trigger_value", "file_uploader_state_value"]:
+                    continue
+        except KeyError:
+            pass
 
-st.__patched__ = True
+        state._new_session_state[key] = value
