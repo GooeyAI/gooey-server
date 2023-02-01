@@ -199,9 +199,9 @@ class CompareText2ImgPage(BasePage):
         for name in selected_models:
             match name:
                 case Text2ImgModels.dall_e.name:
-                    total += 20
+                    total += 15
                 case _:
-                    total += 5
+                    total += 2
         return total
 
 
