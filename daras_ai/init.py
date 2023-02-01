@@ -24,7 +24,11 @@ def init_scripts():
             text-shadow: 0 0 0 black;
             color: transparent;  
         }
-
+        
+        .element-container {
+            opacity:1 !important
+        }
+        
         .row-widget:has(button[kind="primary"]) {
             text-align: right;
         }
