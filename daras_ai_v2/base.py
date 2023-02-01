@@ -853,9 +853,10 @@ class BasePage:
 
         with col1:
             if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
-                st.session_state.clear()
                 gooey_reset_query_parm(**query_params)
+                st.session_state.clear()
                 st.session_state["__option_menu_key"] = get_random_doc_id()
+                sleep(0.01)
                 st.experimental_rerun()
 
             copy_to_clipboard_button("🔗 Copy URL", value=url)
