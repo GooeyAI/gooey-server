@@ -17,6 +17,9 @@ def patch(*targets):
 
 
 def _patcher(fn_name, patch_fn):
+    if hasattr(st, "__patched__"):
+        return
+
     old_func = getattr(st, fn_name)
 
     @wraps(old_func)
@@ -167,3 +170,6 @@ def shadow_keys_patch(self, *args, key=None, **kwargs):
         st.session_state[key] = st.session_state[underlying_key]
 
     return ret
+
+
+st.__patched__ = True
