@@ -28,4 +28,3 @@ def meta_preview_url(file_url: str | None) -> str | None:
         return new_url
     else:
         return file_url
-
