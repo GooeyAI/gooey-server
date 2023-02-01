@@ -332,6 +332,14 @@ class FaceInpaintingPage(BasePage):
         if input_image:
             st.image(input_image, caption="Input Image")
 
+    def get_price(self) -> int:
+        selected_model = st.session_state.get("selected_model")
+        match selected_model:
+            case InpaintingModels.dall_e.name:
+                return 20
+            case _:
+                return 5
+
 
 if __name__ == "__main__":
     FaceInpaintingPage().render()
