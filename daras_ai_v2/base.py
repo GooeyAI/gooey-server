@@ -38,6 +38,7 @@ from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.utils import email_support_about_reported_run
 from daras_ai_v2.utils import random
 
+
 DEFAULT_STATUS = "Running..."
 
 EXAMPLES_COLLECTION = "examples"
@@ -832,7 +833,7 @@ class BasePage:
 
         if "__run_history" not in st.session_state or st.button("Load More"):
             with st.spinner("Loading History..."):
-                run_history = (
+                run_history.extend(
                     db.get_collection_ref(
                         collection_id=USER_RUNS_COLLECTION,
                         document_id=uid,
