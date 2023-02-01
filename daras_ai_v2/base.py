@@ -30,6 +30,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
+from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -784,12 +785,12 @@ class BasePage:
 
         allow_delete = is_admin()
 
-        for snapshot in example_docs:
+        def _render(snapshot):
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
             if doc.get("__hidden"):
-                continue
+                raise SkipIteration()
 
             url = str(
                 furl(
@@ -797,7 +798,6 @@ class BasePage:
                     query_params={EXAMPLE_ID_QUERY_PARAM: example_id},
                 )
             )
-
             self._render_doc_example(
                 allow_delete=allow_delete,
                 doc=doc,
@@ -805,12 +805,14 @@ class BasePage:
                 query_params=dict(example_id=example_id),
             )
 
+        grid_layout(2, example_docs, _render)
+
     def _history_tab(self):
         current_user = st.session_state.get("_current_user")
         uid = current_user.uid
         run_history = st.session_state.get("__run_history", [])
 
-        for snapshot in run_history:
+        def _render(snapshot):
             run_id = snapshot.id
             doc = snapshot.to_dict()
 
@@ -830,6 +832,8 @@ class BasePage:
                 url=url,
                 query_params=dict(run_id=run_id, uid=uid),
             )
+
+        grid_layout(2, run_history, _render)
 
         if "__run_history" not in st.session_state or st.button("Load More"):
             with st.spinner("Loading History..."):

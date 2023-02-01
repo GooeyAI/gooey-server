@@ -3,6 +3,8 @@ from typing import TypeVar, Type
 
 import streamlit as st
 
+from daras_ai_v2.grid_layout_widget import grid_layout
+
 E = TypeVar("E", bound=Type[enum.Enum])
 
 
@@ -21,24 +23,20 @@ def enum_multiselect(
 
     st.write(label)
     selected = set(st.session_state.get(key, []))
-    col1, col2 = st.columns(2)
-    for idx, e in enumerate(enum_cls):
-        indiv_key = f"__{key}_{e.name}"
-        if indiv_key not in st.session_state:
-            st.session_state[indiv_key] = e.name in selected
-        if idx % 2 == 0:
-            col = col1
-        else:
-            col = col2
-        with col:
-            st.checkbox(e.value, key=indiv_key)
-        if st.session_state.get(indiv_key):
+
+    def render(e):
+        inner_key = f"__{key}_{e.name}"
+        if inner_key not in st.session_state:
+            st.session_state[inner_key] = e.name in selected
+
+        st.checkbox(e.value, key=inner_key)
+
+        if st.session_state.get(inner_key):
             selected.add(e.name)
         else:
-            try:
-                selected.remove(e.name)
-            except KeyError:
-                pass
+            selected.discard(e.name)
+
+    grid_layout(2, enum_cls, render)
     st.session_state[key] = list(selected)
 
 
