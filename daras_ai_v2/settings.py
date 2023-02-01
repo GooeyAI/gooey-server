@@ -42,9 +42,6 @@ GS_BUCKET_NAME = config("GS_BUCKET_NAME")
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
 UBERDUCK_KEY = config("UBERDUCK_KEY")
 UBERDUCK_SECRET = config("UBERDUCK_SECRET")
-google_service_account_credentials = (
-    service_account.Credentials.from_service_account_file("serviceAccountKey.json")
-)
 
 OPENAI_API_KEY = config("OPENAI_API_KEY")
 
@@ -75,3 +72,5 @@ WIX_SITE_URL = config("WIX_SITE_URL", "https://archanaprasad.wixsite.com/daras-a
 
 DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
+
+SEON_API_KEY = config("SEON_API_KEY", None)

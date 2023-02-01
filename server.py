@@ -37,11 +37,16 @@ from daras_ai_v2.base import (
     DEFAULT_META_IMG,
 )
 from daras_ai_v2.crypto import get_random_doc_id
-from daras_ai_v2.meta_content import meta_title_for_page, meta_description_for_page
+from daras_ai_v2.meta_content import (
+    meta_title_for_page,
+    meta_description_for_page,
+    meta_preview_url,
+)
 from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
+from recipes.CompareUpscaler import CompareUpscalerPage
 from recipes.DeforumSD import DeforumSDPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
 from recipes.FaceInpainting import FaceInpaintingPage
@@ -287,8 +292,28 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         user: auth.UserRecord = Depends(api_auth_header),
         page_request: page_cls.RequestModel = body_spec,
     ):
+        created_at = datetime.datetime.utcnow().isoformat()
         # init a new page for every request
         page = page_cls()
+
+        # get saved state from db
+        state = page.get_doc_from_query_params(request.query_params)
+        if state is None:
+            raise HTTPException(status_code=404)
+
+        # set sane defaults
+        for k, v in page.sane_defaults.items():
+            state.setdefault(k, v)
+        # only use the request values, discard outputs
+        state = page.RequestModel.parse_obj(state).dict()
+        # remove None values & insert request data
+        request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
+        state.update(request_dict)
+        # set the current user
+        state["_current_user"] = user
+
+        # set streamlit session state
+        streamlit.session_state = state
 
         # check the balance
         balance = db.get_doc_field(
@@ -302,28 +327,6 @@ def script_to_api(page_cls: typing.Type[BasePage]):
                     "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
                 },
             )
-
-        created_at = datetime.datetime.utcnow().isoformat()
-
-        # get saved state from db
-        state = page.get_doc_from_query_params(request.query_params)
-        if state is None:
-            raise HTTPException(status_code=404)
-
-        # set sane defaults
-        for k, v in page.sane_defaults.items():
-            state.setdefault(k, v)
-
-        # only use the request values, discard outputs
-        state = page.RequestModel.parse_obj(state).dict()
-
-        # remove None values & update state
-        request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
-        state.update(request_dict)
-
-        # set the current user
-        state["_current_user"] = user
-        streamlit.session_state = state
 
         # create the run
         run_id = get_random_doc_id()
@@ -357,7 +360,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
 
         # save the run
         run_doc_ref.set(page.state_to_doc(state))
-        # deuct credits
+        # deduct credits
         page.deduct_credits()
 
         # return updated state
@@ -430,7 +433,7 @@ def st_page(request: Request, page_slug):
                 uid=uid,
                 example_id=example_id,
             ),
-            "image": page.preview_image(state),
+            "image": meta_preview_url(page.preview_image(state)),
         },
     )
 
@@ -478,6 +481,7 @@ all_pages: list[typing.Type[BasePage]] = [
     SEOSummaryPage,
     GoogleImageGenPage,
     VideoBotsPage,
+    CompareUpscalerPage,
 ]
 
 

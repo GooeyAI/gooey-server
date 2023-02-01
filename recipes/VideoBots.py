@@ -1,4 +1,5 @@
 import collections
+import os
 import os.path
 import re
 import typing
@@ -144,14 +145,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # upload input file
         if face_file:
             st.session_state["input_face"] = upload_file_from_bytes(
-                face_file.name, face_file.getvalue()
+                face_file.name,
+                face_file.getvalue(),
+                content_type=face_file.type,
             )
 
     def render_settings(self):
         st.write("#### 📝 Script")
         st.text_area(
             """
-            An example conversation with this bot
+            An example conversation with this bot (~1000 words)
             """,
             key="bot_script",
             height=300,
@@ -163,6 +166,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             *Recommended - mp4 / mov / png / jpg / gif* 
             """,
             key="face_file",
+            upload_key="input_face",
         )
 
         st.write("---")
@@ -287,6 +291,9 @@ top.myLandbot = new top.Landbot.Livechat({
 
         max_allowed_tokens = GPT3_MAX_ALLOED_TOKENS - calc_gpt_tokens(prompt)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
+
+        if max_allowed_tokens < 0:
+            raise ValueError("Input Script is too long! Please reduce the script size.")
 
         state["output_text"] = run_language_model(
             api_provider="openai",

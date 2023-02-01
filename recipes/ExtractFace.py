@@ -5,7 +5,7 @@ from daras_ai.extract_face import extract_face_cv2, extract_and_reposition_face_
 from daras_ai.image_input import (
     cv2_img_to_bytes,
     bytes_to_cv2_img,
-    resize_img_contain,
+    resize_img_scale,
 )
 from daras_ai_v2.extract_face import rgb_mask_to_rgba
 
@@ -25,7 +25,7 @@ def main():
 
     img_bytes = file.getvalue()
 
-    resized_img_bytes = resize_img_contain(img_bytes, (1024, 1024))
+    resized_img_bytes = resize_img_scale(img_bytes, (1024, 1024))
 
     image_cv2 = bytes_to_cv2_img(resized_img_bytes)
     if reposition:

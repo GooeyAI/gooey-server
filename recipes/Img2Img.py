@@ -13,7 +13,7 @@ from daras_ai_v2.stable_diffusion import (
     InpaintingModels,
     Img2ImgModels,
     img2img,
-    SD_MAX_SIZE,
+    IMG_MAX_SIZE,
     instruct_pix2pix,
 )
 
@@ -83,7 +83,7 @@ class Img2ImgPage(BasePage):
             upload_key="input_image",
         )
 
-        if st.session_state["selected_model"] != InpaintingModels.dall_e.name:
+        if st.session_state.get("selected_model") != InpaintingModels.dall_e.name:
             st.text_area(
                 """
                 ### Prompt
@@ -104,7 +104,7 @@ class Img2ImgPage(BasePage):
         # upload input file
         if input_file:
             st.session_state["input_image"] = upload_file_hq(
-                input_file, resize=SD_MAX_SIZE
+                input_file, resize=IMG_MAX_SIZE
             )
 
     def render_description(self):

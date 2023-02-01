@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import (
     upload_file_from_bytes,
     upload_file_hq,
-    resize_img_contain,
+    resize_img_scale,
     bytes_to_cv2_img,
     cv2_img_to_bytes,
 )
@@ -260,7 +260,7 @@ class ObjectInpaintingPage(BasePage):
 
         img_bytes = requests.get(request.input_image).content
 
-        padded_img_bytes = resize_img_contain(
+        padded_img_bytes = resize_img_scale(
             img_bytes,
             (request.output_width, request.output_height),
         )

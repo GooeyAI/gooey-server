@@ -34,7 +34,7 @@ def calc_gpt_tokens(text: str) -> int:
 
 def do_retry(
     max_retries: int = 5,
-    retry_delay: float = 1.0,
+    retry_delay: float = 5,
     error_cls=(ServiceUnavailableError, RateLimitError),
 ):
     def decorator(fn):

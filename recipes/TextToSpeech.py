@@ -164,11 +164,8 @@ class TextToSpeechPage(BasePage):
                 else 1.0
             )
 
-            client = texttospeech.TextToSpeechClient(
-                credentials=settings.google_service_account_credentials
-            )
-
             synthesis_input = texttospeech.SynthesisInput(text=text)
+
             voice = texttospeech.VoiceSelectionParams()
             voice.language_code = "-".join(voice_name.split("-")[:2])
             voice.name = voice_name  # optional
@@ -181,9 +178,11 @@ class TextToSpeechPage(BasePage):
 
             # Perform the text-to-speech request on the text input with the selected
             # voice parameters and audio file type
+            client = texttospeech.TextToSpeechClient()
             response = client.synthesize_speech(
                 input=synthesis_input, voice=voice, audio_config=audio_config
             )
+
             yield "Uploading Audio file..."
             state["audio_url"] = upload_file_from_bytes(
                 "google_tts_gen.wav", response.audio_content

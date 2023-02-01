@@ -82,7 +82,9 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             with st.spinner("Uploading..."):
                 if face_file:
                     st.session_state["input_face"] = upload_file_from_bytes(
-                        face_file.name, face_file.getvalue()
+                        face_file.name,
+                        face_file.getvalue(),
+                        content_type=face_file.type,
                     )
 
         return submitted

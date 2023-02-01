@@ -22,7 +22,7 @@ from daras_ai_v2.gpu_server import (
     call_sd_multi,
 )
 
-SD_MAX_SIZE = (768, 768)
+IMG_MAX_SIZE = (768, 768)
 
 
 class InpaintingModels(Enum):
@@ -455,8 +455,8 @@ def _recomposite_inpainting_outputs(
 
 
 def _resolution_check(width, height):
-    if width * height > SD_MAX_SIZE[0] * SD_MAX_SIZE[1]:
+    if width * height > IMG_MAX_SIZE[0] * IMG_MAX_SIZE[1]:
         raise ValueError(
-            f"Maximum size is {SD_MAX_SIZE[0]}x{SD_MAX_SIZE[1]} pixels, because of memory limits. "
+            f"Maximum size is {IMG_MAX_SIZE[0]}x{IMG_MAX_SIZE[1]} pixels, because of memory limits. "
             f"Please select a lower width or height."
         )

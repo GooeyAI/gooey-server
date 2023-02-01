@@ -1,6 +1,7 @@
 from enum import Enum
 
 import streamlit as st
+from google.cloud import texttospeech
 
 from daras_ai_v2.enum_selector_widget import enum_selector
 
@@ -45,11 +46,14 @@ def text_to_speech_settings():
     match tts_provider:
         case TextToSpeechProviders.GOOGLE_TTS.name:
             with col2:
-                st.text_input(
+                voices = google_tts_voices()
+                st.selectbox(
                     label="""
                     ###### Voice name (Google TTS)
                     """,
                     key="google_voice_name",
+                    format_func=voices.__getitem__,
+                    options=voices.keys(),
                 )
                 st.caption(
                     "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*"
@@ -81,14 +85,10 @@ def text_to_speech_settings():
 
         case TextToSpeechProviders.UBERDUCK.name:
             with col2:
-                st.write(
-                    """
+                st.selectbox(
+                    label="""
                     ###### Voice name (Uberduck)
                     """,
-                )
-                st.selectbox(
-                    label="",
-                    label_visibility="collapsed",
                     key="uberduck_voice_name",
                     format_func=lambda option: f"{UBERDUCK_VOICES[option]} | {option}",
                     options=UBERDUCK_VOICES.keys(),
@@ -106,3 +106,34 @@ def text_to_speech_settings():
                     step=0.25,
                     key="uberduck_speaking_rate",
                 )
+
+
+@st.cache
+def google_tts_voices() -> dict[texttospeech.Voice, str]:
+    voices: list[texttospeech.Voice] = (
+        texttospeech.TextToSpeechClient().list_voices().voices
+    )
+    voices.sort(key=_voice_sort_key)
+    return {voice.name: _pretty_voice(voice) for voice in voices}
+
+
+def _pretty_voice(voice) -> str:
+    return f"{voice.name} ({voice.ssml_gender.name.capitalize()})"
+
+
+_lang_code_sort = ["en-US", "en-IN", "en-GB", "en-AU"]
+
+
+def _voice_sort_key(voice: texttospeech.Voice):
+    try:
+        lang_index = _lang_code_sort.index(voice.language_codes[0])
+    except ValueError:
+        lang_index = len(_lang_code_sort)
+    return (
+        # sort by lang code
+        lang_index,
+        # put wavenet first
+        1 - ("Wavenet" in voice.name),
+        # sort alphabetically
+        voice.name,
+    )

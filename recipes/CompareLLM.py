@@ -134,6 +134,21 @@ class CompareLLMPage(BasePage):
                     height=height,
                 )
 
+    def get_price(self) -> int:
+        selected_models = st.session_state.get("selected_models", [])
+        total = 0
+        for name in selected_models:
+            match name:
+                case LargeLanguageModels.text_davinci_003.name | LargeLanguageModels.code_davinci_002.name:
+                    total += 10
+                case LargeLanguageModels.text_curie_001.name:
+                    total += 5
+                case LargeLanguageModels.text_babbage_001.name:
+                    total += 2
+                case LargeLanguageModels.text_ada_001.name:
+                    total += 1
+        return total
+
 
 if __name__ == "__main__":
     CompareLLMPage().render()

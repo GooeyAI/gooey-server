@@ -301,7 +301,7 @@ class FaceInpaintingPage(BasePage):
             num_inference_steps=state.get("quality", 50),
             width=state["output_width"],
             height=state["output_height"],
-            negative_prompt=state["negative_prompt"],
+            negative_prompt=state.get("negative_prompt"),
             guidance_scale=state.get("guidance_scale"),
             seed=state["seed"],
         )

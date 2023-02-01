@@ -1,13 +1,14 @@
 import re
 import typing
 
+import glom
 import requests
 import streamlit as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2 import db
 from daras_ai_v2.base import BasePage
+from daras_ai_v2 import db, settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
@@ -230,7 +231,9 @@ class EmailFaceInpaintingPage(BasePage):
             state["email_sent"] = True
 
         if not photo_url:
-            raise ValueError("Photo not found")
+            raise ImageNotFound(
+                "This email has no photo with a face in it. Try [Face in an AI Image](/face-in-ai-generated-photo/) workflow instead."
+            )
 
     def _get_email_body(
         self,
@@ -282,39 +285,44 @@ class EmailFaceInpaintingPage(BasePage):
         youtube_video("bffH8X3YBCQ")
 
 
+class ImageNotFound(Exception):
+    "Raised when the image not found in email profile"
+    pass
+
+
 @st.cache()
 def get_photo_for_email(email_address):
-    state = db.get_or_create_doc(
-        db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
-    ).to_dict()
+    doc_ref = db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
 
-    photo_url = state.get("photo_url")
+    doc = db.get_or_create_doc(doc_ref).to_dict()
+    photo_url = doc.get("photo_url")
     if photo_url:
         return photo_url
 
-    r = requests.post(
-        "https://api.apollo.io/v1/people/match",
-        json={
-            "api_key": "BOlC1SGQWNuP3D70WA_-yw",
-            "email": email_address,
-        },
+    r = requests.get(
+        f"https://api.seon.io/SeonRestService/email-api/v2.2/{email_address}",
+        headers={"X-API-KEY": settings.SEON_API_KEY},
     )
     r.raise_for_status()
 
-    photo_url = r.json()["person"]["photo_url"]
-    if not photo_url:
-        return
+    account_details = glom.glom(r.json(), "data.account_details", default={})
+    for spec in [
+        "linkedin.photo",
+        "facebook.photo",
+        "google.photo",
+        "skype.photo",
+        "foursquare.photo",
+    ]:
+        photo = glom.glom(account_details, spec, default=None)
+        if not photo:
+            continue
 
-    photo_url = upload_file_from_bytes(
-        "face_photo.png", requests.get(photo_url).content
-    )
+        photo_url = upload_file_from_bytes(
+            "face_photo.png", requests.get(photo).content
+        )
+        doc_ref.set({"photo_url": photo_url})
 
-    db.get_doc_ref(
-        email_address,
-        collection_id="apollo_io_photo_cache",
-    ).set({"photo_url": photo_url})
-
-    return photo_url
+        return photo_url
 
 
 if __name__ == "__main__":
