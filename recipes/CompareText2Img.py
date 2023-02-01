@@ -196,7 +196,7 @@ class CompareText2ImgPage(BasePage):
                 case Text2ImgModels.dall_e.name:
                     total += 15
                 case _:
-                    total += 2.5
+                    total += 2
         return total
 
 
