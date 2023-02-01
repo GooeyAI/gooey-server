@@ -135,7 +135,7 @@ runs_df = runs_df.set_index("Time")
 
 now = datetime.datetime.now(pytz.timezone(timezone))
 today = datetime.datetime.date(now)
-runs_df = runs_df[today - pd.offsets.Day(last_n_days) :]
+runs_df = runs_df[today - pd.offsets.Day(last_n_days - 1) :]
 
 filtered_users = set(runs_df["ID"])
 df = pd.DataFrame.from_records(
