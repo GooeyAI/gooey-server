@@ -298,17 +298,18 @@ class BasePage:
 
         with placeholder.container(), st.spinner("Loading Settings..."):
             query_params = st.experimental_get_query_params()
-            state = self.get_doc_from_query_params(query_params)
+            doc = self.get_doc_from_query_params(query_params)
 
-            if state is None:
+            if doc is None:
                 st.write("### 404: We can't find this page!")
                 st.stop()
 
-            st.session_state.update(state)
+            self._update_session_state(doc)
 
+    def _update_session_state(self, doc):
+        st.session_state.update(doc)
         for k, v in self.sane_defaults.items():
             st.session_state.setdefault(k, v)
-
         st.session_state["__loaded__"] = True
 
     def _check_if_flagged(self):
@@ -859,8 +860,13 @@ class BasePage:
         with col1:
             if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
                 gooey_reset_query_parm(**query_params)
+
                 st.session_state.clear()
+                self._update_session_state(doc)
+
+                # jump to run tab
                 st.session_state["__option_menu_key"] = get_random_doc_id()
+
                 sleep(0.01)
                 st.experimental_rerun()
 
