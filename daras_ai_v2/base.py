@@ -29,14 +29,18 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
+from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
+from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
+from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.settings import APP_BASE_URL
 from daras_ai_v2.utils import email_support_about_reported_run
 from daras_ai_v2.utils import random
+
 
 DEFAULT_STATUS = "Running..."
 
@@ -117,18 +121,14 @@ class BasePage:
         return f"/v2/{self.slug_versions[0]}/"
 
     def render(self):
-        # dirty fix for https://github.com/streamlit/streamlit/issues/5620 & https://github.com/streamlit/streamlit/issues/5604
-        st.session_state.update(
-            self.state_to_doc(
-                st.session_state.pop("__prev_state", {}),
-            ),
-        )
         try:
+            ensure_hidden_widgets_loaded(st.session_state.pop("__prev_state", {}))
             self._render()
         except Exception as e:
             sentry_sdk.capture_exception(e)
             raise
-        st.session_state["__prev_state"] = st.session_state
+        finally:
+            st.session_state["__prev_state"] = dict(st.session_state)
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
@@ -329,17 +329,18 @@ class BasePage:
 
         with placeholder.container(), st.spinner("Loading Settings..."):
             query_params = st.experimental_get_query_params()
-            state = self.get_doc_from_query_params(query_params)
+            doc = self.get_doc_from_query_params(query_params)
 
-            if state is None:
+            if doc is None:
                 st.write("### 404: We can't find this page!")
                 st.stop()
 
-            st.session_state.update(state)
+            self._update_session_state(doc)
 
+    def _update_session_state(self, doc):
+        st.session_state.update(doc)
         for k, v in self.sane_defaults.items():
             st.session_state.setdefault(k, v)
-
         st.session_state["__loaded__"] = True
 
     def _check_if_flagged(self):
@@ -816,12 +817,12 @@ class BasePage:
 
         allow_delete = is_admin()
 
-        for snapshot in example_docs:
+        def _render(snapshot):
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
             if doc.get("__hidden"):
-                continue
+                raise SkipIteration()
 
             url = str(
                 furl(
@@ -829,7 +830,6 @@ class BasePage:
                     query_params={EXAMPLE_ID_QUERY_PARAM: example_id},
                 )
             )
-
             self._render_doc_example(
                 allow_delete=allow_delete,
                 doc=doc,
@@ -837,12 +837,14 @@ class BasePage:
                 query_params=dict(example_id=example_id),
             )
 
+        grid_layout(2, example_docs, _render)
+
     def _history_tab(self):
         current_user = st.session_state.get("_current_user")
         uid = current_user.uid
         run_history = st.session_state.get("__run_history", [])
 
-        for snapshot in run_history:
+        def _render(snapshot):
             run_id = snapshot.id
             doc = snapshot.to_dict()
 
@@ -863,9 +865,11 @@ class BasePage:
                 query_params=dict(run_id=run_id, uid=uid),
             )
 
+        grid_layout(2, run_history, _render)
+
         if "__run_history" not in st.session_state or st.button("Load More"):
             with st.spinner("Loading History..."):
-                run_history = (
+                run_history.extend(
                     db.get_collection_ref(
                         collection_id=USER_RUNS_COLLECTION,
                         document_id=uid,
@@ -886,9 +890,28 @@ class BasePage:
 
         with col1:
             if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
-                st.session_state.clear()
+                # change url
                 gooey_reset_query_parm(**query_params)
+
+                # scroll to top
+                hidden_html_js(
+                    """
+                    <script>
+                      top.document.body.scrollTop = 0; // For Safari
+                      top.document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+                    </script>
+                    """
+                )
+
+                # update state
+                st.session_state.clear()
+                self._update_session_state(doc)
+
+                # jump to run tab
                 st.session_state["__option_menu_key"] = get_random_doc_id()
+
+                # rerun
+                sleep(0.01)
                 st.experimental_rerun()
 
             copy_to_clipboard_button("🔗 Copy URL", value=url)
@@ -909,8 +932,6 @@ class BasePage:
                 st.write(notes)
 
             self.render_example(doc)
-
-        st.write("---")
 
     def _example_delete_button(self, example_id):
         pressed_delete = st.button(
