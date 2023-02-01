@@ -1,6 +1,5 @@
 import datetime
 import inspect
-import os
 import traceback
 import typing
 import uuid
@@ -33,6 +32,7 @@ from daras_ai_v2.crypto import (
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
+from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.settings import APP_BASE_URL
 from daras_ai_v2.utils import email_support_about_reported_run
@@ -177,11 +177,12 @@ class BasePage:
             input_col, output_col = st.columns([3, 2], gap="medium")
 
             self._render_step_row()
-            self.render_related_workflows()
 
             col1, col2 = st.columns(2)
             with col1:
                 self._render_help()
+
+            self.render_related_workflows()
 
             with input_col:
                 submitted1 = self.render_form()
@@ -233,7 +234,7 @@ class BasePage:
             cols[workflows.index(workflow)].markdown(
                 f"""
         <a href="{workflow().app_url()}" style="text-decoration:none;color:white">
-        <img width=300px src="{workflow().preview_image(state)}" />
+        <img width=300px src="{meta_preview_url(workflow().preview_image(state))}" />
         <h4>{workflow().title}</h4>
         {workflow().preview_description(state)}
         </a>
