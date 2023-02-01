@@ -883,8 +883,6 @@ class BasePage:
 
             self.render_example(doc)
 
-        st.write("---")
-
     def _example_delete_button(self, example_id):
         pressed_delete = st.button(
             "🗑️ Delete",
