@@ -31,6 +31,7 @@ from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
+from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -859,14 +860,27 @@ class BasePage:
 
         with col1:
             if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
+                # change url
                 gooey_reset_query_parm(**query_params)
 
+                # scroll to top
+                hidden_html_js(
+                    """
+                    <script>
+                      top.document.body.scrollTop = 0; // For Safari
+                      top.document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+                    </script>
+                    """
+                )
+
+                # update state
                 st.session_state.clear()
                 self._update_session_state(doc)
 
                 # jump to run tab
                 st.session_state["__option_menu_key"] = get_random_doc_id()
 
+                # rerun
                 sleep(0.01)
                 st.experimental_rerun()
 
