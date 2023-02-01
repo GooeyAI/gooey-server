@@ -152,7 +152,7 @@ Pro Tip: double click on any user to drill-down
 
 col1, col2 = st.columns(2)
 with col2:
-    time_axis = st.selectbox("Frequency", ["1D", "1W"])
+    time_axis = st.selectbox("Frequency", options=["1D", "1W"])
 
 df = pd.DataFrame.from_records(
     [
