@@ -70,22 +70,6 @@ class CompareText2ImgPage(BasePage):
             key="text_prompt",
             placeholder="Iron man",
         )
-
-        if st.checkbox(
-            "📝 Edit Instructions",
-            value=st.session_state.get("edit_instruction"),
-            key="__enable_instruct_pix2pix",
-        ):
-            st.text_area(
-                """
-                Describe how you want to change the generated image using [InstructPix2Pix](https://www.timothybrooks.com/instruct-pix2pix).
-                """,
-                key="edit_instruction",
-                placeholder="Give it sunglasses and a mustache",
-            )
-        else:
-            st.session_state["edit_instruction"] = None
-
         enum_multiselect(
             Text2ImgModels,
             label="#### 🧨 Selected Models",
@@ -106,6 +90,21 @@ class CompareText2ImgPage(BasePage):
         )
 
     def render_settings(self):
+        st.session_state.setdefault(
+            "__enable_instruct_pix2pix",
+            bool(st.session_state.get("edit_instruction")),
+        )
+        if st.checkbox("📝 Edit Instructions", key="__enable_instruct_pix2pix"):
+            st.text_area(
+                """
+                Describe how you want to change the generated image using [InstructPix2Pix](https://www.timothybrooks.com/instruct-pix2pix).
+                """,
+                key="edit_instruction",
+                placeholder="Give it sunglasses and a mustache",
+            )
+        else:
+            st.session_state["edit_instruction"] = None
+
         negative_prompt_setting()
         num_outputs_setting()
         output_resolution_setting()
