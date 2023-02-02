@@ -65,8 +65,8 @@ from routers import billing, facebook, talkjs
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
-app.include_router(talkjs.router, include_in_schema=False)
 app.include_router(billing.router, include_in_schema=False)
+app.include_router(talkjs.router, include_in_schema=False)
 app.include_router(facebook.router, include_in_schema=False)
 
 app.add_middleware(
@@ -204,7 +204,7 @@ def authentication(request: Request, id_token: bytes = Depends(request_body)):
 
 
 @app.get("/logout", include_in_schema=False)
-def logout(request: Request):
+async def logout(request: Request):
     request.session.pop(FIREBASE_SESSION_COOKIE, None)
     return RedirectResponse(url=request.query_params.get("next", "/"))
 
@@ -315,7 +315,7 @@ def call_api(
     # init a new page for every request
     page = page_cls()
 
-    #  get saved state from db
+    # get saved state from db
     state = page.get_doc_from_query_params(query_params)
     if state is None:
         raise HTTPException(status_code=404)
@@ -330,15 +330,14 @@ def call_api(
     # remove None values & insert request data
     request_dict = {k: v for k, v in request_body.items() if v is not None}
     state.update(request_dict)
-
     # set the current user
-    state["_current_user"] = user# set streamlit session state
+    state["_current_user"] = user
+
+    # set streamlit session state
     streamlit.session_state = state
 
     # check the balance
-    balance = db.get_doc_field(
-        db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
-    )
+    balance = db.get_doc_field(db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0)
     if balance < page.get_price():
         account_url = furl(settings.APP_BASE_URL) / "account"
         return JSONResponse(
