@@ -154,6 +154,6 @@ def update_pages_for_user(page_docs: list[(str, dict)], uid: str):
 
     # create incoming pages
     for page_id, page_doc in page_docs:
-        batch.create(get_fb_page_ref(page_id), page_doc)
+        batch.set(get_fb_page_ref(page_id), page_doc, merge=True)
 
     batch.commit()
