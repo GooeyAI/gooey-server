@@ -334,16 +334,19 @@ top.myLandbot = new top.Landbot.Livechat({
             unsafe_allow_html=True,
         )
 
-        fb_pages = st.session_state.get("__fb_pages#3")
-        if fb_pages is None:
+        fb_pages = st.session_state.get("__fb_pages")
+        if "__fb_pages" not in st.session_state:
             with st.spinner("Loading Facebook Pages..."):
                 fb_pages = (
                     db.get_collection_ref(db.FB_PAGES_COLLECTION)
                     .where("uid", "==", user.uid)
                     .get()
                 )
-            st.session_state["__fb_pages#3"] = fb_pages
-        st.caption("Please reload this page after logging in.")
+            st.session_state["__fb_pages"] = fb_pages
+        st.write("Please reload this page after logging in.")
+
+        if not fb_pages:
+            return
 
         st.write("##### Select Pages to Connect")
         selected_pages = {}

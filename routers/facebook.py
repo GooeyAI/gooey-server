@@ -275,7 +275,6 @@ fb_connect_url = str(
                     "pages_messaging",
                     "pages_manage_metadata",
                     "pages_show_list",
-                    "pages_read_engagement",
                 ]
             ),
         },
@@ -298,7 +297,6 @@ ig_connect_url = str(
                     "pages_messaging",
                     "pages_manage_metadata",
                     "pages_show_list",
-                    "pages_read_engagement",
                 ]
             ),
         },
