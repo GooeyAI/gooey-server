@@ -50,10 +50,6 @@ USER_RUNS_COLLECTION = "user_runs"
 EXAMPLE_ID_QUERY_PARAM = "example_id"
 RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
-DEFAULT_META_IMG = (
-    # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
-)
 
 O = typing.TypeVar("O")
 
@@ -975,7 +971,7 @@ class BasePage:
             or state.get("output_image")
             or state.get("output_video")
         )
-        return extract_nested_str(out) or DEFAULT_META_IMG
+        return extract_nested_str(out)
 
     def run_as_api_tab(self):
         api_docs_url = str(

@@ -34,14 +34,13 @@ from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
     ApiResponseModel,
-    DEFAULT_META_IMG,
 )
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import (
     meta_title_for_page,
     meta_description_for_page,
 )
-from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.meta_preview_url import meta_preview_url, DEFAULT_META_IMG
 from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
