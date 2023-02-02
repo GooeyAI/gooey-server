@@ -1,10 +1,10 @@
 import datetime
 import inspect
-import os
 import traceback
 import typing
 import uuid
 from copy import deepcopy
+from random import Random
 from time import time, sleep
 
 import requests
@@ -37,9 +37,7 @@ from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import gooey_reset_query_parm
-from daras_ai_v2.utils import email_support_about_reported_run
-from daras_ai_v2.utils import random
-
+from daras_ai_v2.send_email import send_reported_run_email
 
 DEFAULT_STATUS = "Running..."
 
@@ -53,6 +51,9 @@ DEFAULT_META_IMG = (
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
 )
+MAX_SEED = 4294967294
+gooey_rng = Random()
+
 
 O = typing.TypeVar("O")
 
@@ -69,6 +70,16 @@ class MenuTabs:
     examples = "🔖 Examples"
     run_as_api = "🚀 Run as API"
     history = "📖 History"
+
+
+class StateKeys:
+    page_title = "__title"
+    page_notes = "__notes"
+
+    option_menu_key = "__option_menu_key"
+
+    updated_at = "updated_at"
+    error_msg = "__error_msg"
 
 
 class BasePage:
@@ -120,14 +131,15 @@ class BasePage:
         return f"/v2/{self.slug_versions[0]}/"
 
     def render(self):
+        prev_state_key = "__prev_state"
         try:
-            ensure_hidden_widgets_loaded(st.session_state.pop("__prev_state", {}))
+            ensure_hidden_widgets_loaded(st.session_state.pop(prev_state_key, {}))
             self._render()
         except Exception as e:
             sentry_sdk.capture_exception(e)
             raise
         finally:
-            st.session_state["__prev_state"] = dict(st.session_state)
+            st.session_state[prev_state_key] = dict(st.session_state)
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
@@ -146,13 +158,13 @@ class BasePage:
             self.render_report_form()
             return
 
-        st.session_state.setdefault("__title", self.title)
+        st.session_state.setdefault(StateKeys.page_title, self.title)
         st.session_state.setdefault(
-            "__notes", self.preview_description(st.session_state)
+            StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
-        st.write("## " + st.session_state.get("__title"))
-        st.write(st.session_state.get("__notes"))
+        st.write("## " + st.session_state.get(StateKeys.page_title))
+        st.write(st.session_state.get(StateKeys.page_notes))
 
         menu_options = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
 
@@ -165,7 +177,7 @@ class BasePage:
             options=menu_options,
             icons=["-"] * len(menu_options),
             orientation="horizontal",
-            key=st.session_state.get("__option_menu_key"),
+            key=st.session_state.get(StateKeys.option_menu_key),
             styles={
                 "nav-link": {"white-space": "nowrap;"},
                 "nav-link-selected": {"font-weight": "normal;", "color": "black"},
@@ -189,8 +201,8 @@ class BasePage:
 
                     st.write("---")
                     st.write("##### 🖌️ Personalize")
-                    st.text_input("Title", key="__title")
-                    st.text_area("Notes", key="__notes")
+                    st.text_input("Title", key=StateKeys.page_title)
+                    st.text_area("Notes", key=StateKeys.page_notes)
                     st.write("---")
 
                     submitted2 = self.render_submit_button(key="--submit-2")
@@ -255,9 +267,9 @@ class BasePage:
 
             col1, col2 = st.columns(2)
             with col1:
-                submitted = st.form_submit_button("Submit Report")
+                submitted = st.form_submit_button("✅ Submit Report")
             with col2:
-                cancelled = st.form_submit_button("Cancel")
+                cancelled = st.form_submit_button("❌ Cancel")
 
         if cancelled:
             st.session_state["show_report_workflow"] = False
@@ -274,13 +286,14 @@ class BasePage:
                 query_params = st.experimental_get_query_params()
                 example_id, run_id, uid = self.extract_query_params(query_params)
 
-                email_support_about_reported_run(
-                    uid=uid,
+                send_reported_run_email(
+                    user=current_user,
+                    run_uid=uid,
                     url=self._get_current_app_url(),
-                    email=current_user.email,
                     recipe_name=self.title,
                     report_type=report_type,
                     reason_for_report=reason_for_report,
+                    error_msg=st.session_state.get(StateKeys.error_msg),
                 )
 
                 if report_type == inappropriate_radio_text:
@@ -562,19 +575,21 @@ class BasePage:
     def _runner(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
 
-        # The area for displaying status messages streamed from run()
-        status_area = st.empty()
-        # output area
         before_output = st.empty()
+        status_area = st.empty()
         output_area = st.empty()
         after_output = st.empty()
+
+        if StateKeys.error_msg in st.session_state:
+            with status_area:
+                st.error(st.session_state[StateKeys.error_msg], icon="⚠️")
 
         if "__status" in st.session_state:
             with status_area:
                 html_spinner(st.session_state["__status"])
 
         if st.session_state.get("__randomize"):
-            st.session_state["seed"] = int(random.randrange(4294967294))
+            st.session_state["seed"] = int(gooey_rng.randrange(MAX_SEED))
             st.session_state.pop("__randomize", None)
             submitted = True
 
@@ -635,15 +650,14 @@ class BasePage:
 
             # render errors nicely
             except Exception as e:
+                st.session_state[StateKeys.error_msg] = err_msg_for_exc(e)
                 sentry_sdk.capture_exception(e)
                 traceback.print_exc()
-                with status_area:
-                    st.error(err_msg_for_exc(e), icon="⚠️")
+
                 # cleanup is important!
                 st.session_state.pop("__status", None)
                 st.session_state.pop("__gen", None)
                 st.session_state.pop("__time_taken", None)
-                return
 
             # save after every step
             self.save_run()
@@ -670,14 +684,14 @@ class BasePage:
         seed = st.session_state.get("seed")
         if not seed:
             return
-        random.seed(seed)
+        gooey_rng.seed(seed)
 
     def clear_outputs(self):
+        # clear error msg
+        st.session_state.pop(StateKeys.error_msg, None)
+        # clear outputs
         for field_name in self.ResponseModel.__fields__:
-            try:
-                del st.session_state[field_name]
-            except KeyError:
-                pass
+            st.session_state.pop(field_name, None)
 
     def _render_after_output(self):
         if "seed" in self.RequestModel.schema_json():
@@ -749,15 +763,15 @@ class BasePage:
             if field_name in state
         }
         ret |= {
-            "updated_at": datetime.datetime.utcnow(),
+            StateKeys.updated_at: datetime.datetime.utcnow(),
         }
 
-        title = state.get("__title")
-        notes = state.get("__notes")
+        title = state.get(StateKeys.page_title)
+        notes = state.get(StateKeys.page_notes)
         if title and title.strip() != self.title.strip():
-            ret["__title"] = title
+            ret[StateKeys.page_title] = title
         if notes and notes.strip() != self.preview_description(state).strip():
-            ret["__notes"] = notes
+            ret[StateKeys.page_notes] = notes
 
         return ret
 
@@ -767,6 +781,8 @@ class BasePage:
             field_name
             for model in (self.RequestModel, self.ResponseModel)
             for field_name in model.__fields__
+        ] + [
+            StateKeys.error_msg,
         ]
 
     def _examples_tab(self):
@@ -778,7 +794,7 @@ class BasePage:
                 ).get()
                 example_docs.sort(
                     key=lambda s: s.to_dict()
-                    .get("updated_at", datetime.datetime.fromtimestamp(0))
+                    .get(StateKeys.updated_at, datetime.datetime.fromtimestamp(0))
                     .timestamp(),
                     reverse=True,
                 )
@@ -845,7 +861,7 @@ class BasePage:
                         document_id=uid,
                         sub_collection_id=self.doc_name,
                     )
-                    .order_by("updated_at", direction="DESCENDING")
+                    .order_by(StateKeys.updated_at, direction="DESCENDING")
                     .offset(len(run_history))
                     .limit(20)
                     .get()
@@ -878,7 +894,7 @@ class BasePage:
                 self._update_session_state(doc)
 
                 # jump to run tab
-                st.session_state["__option_menu_key"] = get_random_doc_id()
+                st.session_state[StateKeys.option_menu_key] = get_random_doc_id()
 
                 # rerun
                 sleep(0.01)
@@ -890,11 +906,11 @@ class BasePage:
                 self._example_delete_button(**query_params)
 
         with col2:
-            title = doc.get("__title")
+            title = doc.get(StateKeys.page_title)
             if title and title.strip() != self.title.strip():
                 st.write("#### " + title)
 
-            notes = doc.get("__notes")
+            notes = doc.get(StateKeys.page_notes)
             if (
                 notes
                 and notes.strip() != self.preview_description(st.session_state).strip()

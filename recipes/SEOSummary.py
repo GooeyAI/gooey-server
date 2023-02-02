@@ -1,3 +1,4 @@
+import random
 import re
 import typing
 from functools import partial
@@ -11,7 +12,7 @@ from html_sanitizer import Sanitizer
 from lxml import etree
 from pydantic import BaseModel
 
-from daras_ai_v2.base import BasePage
+from daras_ai_v2.base import BasePage, gooey_rng
 from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.google_search import call_scaleserp
@@ -23,7 +24,6 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
-from daras_ai_v2.utils import random
 
 KEYWORDS_SEP = re.compile(r"[\n,]")
 
@@ -447,12 +447,18 @@ def _call_summarize_url(url: str) -> (str, str):
 def _extract_search_urls(
     request: SEOSummaryPage.RequestModel, scaleserp_results: dict
 ) -> list[str]:
+    try:
+        results = scaleserp_results[request.scaleserp_search_field]
+    except KeyError:
+        raise ValueError(f"No results returned for query {request.search_query!r}")
+
     search_urls = [
         result["link"]
-        for result in scaleserp_results[request.scaleserp_search_field]
-        if furl(result["link"]).host not in BANNED_HOSTS
+        for result in results
+        if "link" in result and furl(result["link"]).host not in BANNED_HOSTS
     ]
-    random.shuffle(search_urls)
+    gooey_rng.shuffle(search_urls)
+
     return search_urls
 
 

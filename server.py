@@ -11,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from firebase_admin import auth, exceptions
 from furl import furl
 from google.cloud import firestore
@@ -42,6 +41,7 @@ from daras_ai_v2.meta_content import (
     meta_description_for_page,
     meta_preview_url,
 )
+from daras_ai_v2.settings import templates
 from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
@@ -76,8 +76,6 @@ app.add_middleware(
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-templates = Jinja2Templates(directory="templates")
 
 
 @app.get("/sitemap.xml/", include_in_schema=False)
