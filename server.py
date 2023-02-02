@@ -106,18 +106,15 @@ async def favicon():
     return FileResponse("static/favicon.ico")
 
 
-_proxy_client = httpx.AsyncClient(base_url=settings.WIX_SITE_URL)
-
-
 @app.exception_handler(404)
 async def custom_404_handler(request: Request, exc):
     url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
-    req = _proxy_client.build_request(
-        request.method,
-        url,
-        headers={"user-agent": request.headers.get("user-agent", "")},
-    )
-    resp = await _proxy_client.send(req)
+    async with httpx.AsyncClient(base_url=settings.WIX_SITE_URL) as client:
+        resp = await client.request(
+            request.method,
+            url,
+            headers={"user-agent": request.headers.get("user-agent", "")},
+        )
 
     if resp.status_code == 404:
         return templates.TemplateResponse(
@@ -128,6 +125,7 @@ async def custom_404_handler(request: Request, exc):
             },
             status_code=404,
         )
+
     elif resp.status_code != 200 or "text/html" not in resp.headers["content-type"]:
         return Response(content=resp.content, status_code=resp.status_code)
 
