@@ -13,9 +13,10 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-ENV FORWARDED_ALLOW_IPS '*'
-
 RUN python scripts/fix_st_timeout.py
+
+ENV FORWARDED_ALLOW_IPS='*'
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8501
 

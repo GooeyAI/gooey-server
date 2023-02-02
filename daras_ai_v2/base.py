@@ -81,6 +81,9 @@ class StateKeys:
     updated_at = "updated_at"
     error_msg = "__error_msg"
 
+    examples_cache = "__examples_cache"
+    history_cache = "__history_cache"
+
 
 class BasePage:
     title: str
@@ -751,7 +754,9 @@ class BasePage:
                 doc_ref.set(state_to_save)
 
                 if new_example_id:
-                    st.session_state.get("__example_docs", []).insert(0, doc_ref.get())
+                    st.session_state.get(StateKeys.examples_cache, []).insert(
+                        0, doc_ref.get()
+                    )
                     st.experimental_rerun()
 
             st.success("Saved", icon="✅")
@@ -786,7 +791,7 @@ class BasePage:
         ]
 
     def _examples_tab(self):
-        if "__example_docs" not in st.session_state:
+        if StateKeys.examples_cache not in st.session_state:
             with st.spinner("Loading Examples..."):
                 example_docs = db.get_collection_ref(
                     document_id=self.doc_name,
@@ -798,8 +803,8 @@ class BasePage:
                     .timestamp(),
                     reverse=True,
                 )
-            st.session_state["__example_docs"] = example_docs
-        example_docs = st.session_state.get("__example_docs")
+            st.session_state[StateKeys.examples_cache] = example_docs
+        example_docs = st.session_state.get(StateKeys.examples_cache)
 
         allow_delete = is_admin()
 
@@ -828,7 +833,7 @@ class BasePage:
     def _history_tab(self):
         current_user = st.session_state.get("_current_user")
         uid = current_user.uid
-        run_history = st.session_state.get("__run_history", [])
+        run_history = st.session_state.get(StateKeys.history_cache, [])
 
         def _render(snapshot):
             run_id = snapshot.id
@@ -853,7 +858,7 @@ class BasePage:
 
         grid_layout(2, run_history, _render)
 
-        if "__run_history" not in st.session_state or st.button("Load More"):
+        if StateKeys.history_cache not in st.session_state or st.button("Load More"):
             with st.spinner("Loading History..."):
                 run_history.extend(
                     db.get_collection_ref(
@@ -866,7 +871,7 @@ class BasePage:
                     .limit(20)
                     .get()
                 )
-            st.session_state["__run_history"] = run_history
+            st.session_state[StateKeys.history_cache] = run_history
             st.experimental_rerun()
 
     def _render_doc_example(
@@ -889,15 +894,24 @@ class BasePage:
                     """
                 )
 
-                # update state
+                # preserve cache
+                cache = {
+                    k: st.session_state[k]
+                    for k in [StateKeys.examples_cache, StateKeys.history_cache]
+                    if k in st.session_state
+                }
+                # clear state
                 st.session_state.clear()
+                # restore cache
+                st.session_state.update(cache)
+                # load example doc
                 self._update_session_state(doc)
 
                 # jump to run tab
                 st.session_state[StateKeys.option_menu_key] = get_random_doc_id()
 
                 # rerun
-                sleep(0.01)
+                sleep(0.1)
                 st.experimental_rerun()
 
             copy_to_clipboard_button("🔗 Copy URL", value=url)
@@ -932,7 +946,7 @@ class BasePage:
         with st.spinner("deleting..."):
             example.update({"__hidden": True})
 
-        example_docs = st.session_state.get("__example_docs", [])
+        example_docs = st.session_state.get(StateKeys.examples_cache, [])
         for idx, snapshot in enumerate(example_docs):
             if snapshot.id == example_id:
                 example_docs.pop(idx)
