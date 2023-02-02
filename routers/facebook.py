@@ -15,6 +15,12 @@ from daras_ai_v2 import settings, db
 router = APIRouter()
 
 
+PAGE_NOT_CONNECTED_ERROR = (
+    "Looks like you haven't connected this page to a gooey.ai workflow. "
+    "Please go to the Integrations Tab and connect this page."
+)
+
+
 @router.post("/__/fb/webhook/")
 async def fb_webhook(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
@@ -80,7 +86,18 @@ def _on_message(object_: str, messaging: dict):
 
     page_slug = fb_page.get("connected_page_slug")
     if not page_slug:
-        return
+        _send_messages(
+            page_id=page_id,
+            access_token=access_token,
+            recipient_id=sender_id,
+            messages=[
+                {
+                    "messaging_type": "RESPONSE",
+                    "message": {"text": PAGE_NOT_CONNECTED_ERROR},
+                },
+            ],
+        )
+
     page_slug = normalize_slug(page_slug)
     try:
         page_cls = page_map[page_slug]
@@ -244,7 +261,6 @@ def _subscribe_to_page(request: Request, fb_page: dict) -> (str, dict):
 fb_connect_redirect_url = str(
     furl(settings.APP_BASE_URL) / router.url_path_for(fb_connect_redirect.__name__)
 )
-
 
 fb_connect_url = str(
     furl(
