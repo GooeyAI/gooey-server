@@ -141,21 +141,26 @@ def get_page_access_token(page_id: str) -> str | None:
     return get_doc_field(doc_ref, "access_token")
 
 
-def get_fb_page_ref(page_id):
-    return _db.collection(FB_PAGES_COLLECTION).document(page_id)
-
-
 def update_pages_for_user(page_docs: dict[str, dict], uid: str):
     batch = _db.batch()
 
-    # delete pages that are not longer connected
-    for snapshot in _db.collection(FB_PAGES_COLLECTION).where("uid", "==", uid).get():
+    existing_user_pages = (
+        _db.collection(FB_PAGES_COLLECTION).where("uid", "==", uid).get()
+    )
+    for snapshot in existing_user_pages:
         if snapshot.id in page_docs:
-            continue
-        batch.delete(snapshot.reference)
+            # update page data because it belongs to same user
+            batch.update(snapshot.reference, page_docs.pop(snapshot.id))
+        else:
+            # delete pages that are not longer connected
+            batch.delete(snapshot.reference)
 
-    # create incoming pages
     for page_id, page_doc in page_docs.items():
-        batch.set(get_fb_page_ref(page_id), page_doc, merge=True)
+        # create / overwrite data for new pages
+        batch.set(get_fb_page_ref(page_id), page_doc)
 
     batch.commit()
+
+
+def get_fb_page_ref(page_id):
+    return _db.collection(FB_PAGES_COLLECTION).document(page_id)
