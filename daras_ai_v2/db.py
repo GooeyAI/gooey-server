@@ -145,15 +145,17 @@ def get_fb_page_ref(page_id):
     return _db.collection(FB_PAGES_COLLECTION).document(page_id)
 
 
-def update_pages_for_user(page_docs: list[(str, dict)], uid: str):
+def update_pages_for_user(page_docs: dict[str, dict], uid: str):
     batch = _db.batch()
 
-    # delete existing pages
+    # delete pages that are not longer connected
     for snapshot in _db.collection(FB_PAGES_COLLECTION).where("uid", "==", uid).get():
+        if snapshot.id in page_docs:
+            continue
         batch.delete(snapshot.reference)
 
     # create incoming pages
-    for page_id, page_doc in page_docs:
+    for page_id, page_doc in page_docs.items():
         batch.set(get_fb_page_ref(page_id), page_doc, merge=True)
 
     batch.commit()

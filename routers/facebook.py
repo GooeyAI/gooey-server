@@ -207,10 +207,10 @@ def fb_connect_redirect(request: Request):
             status_code=400,
         )
 
-    page_docs = map_parallel(partial(_subscribe_to_page, request), fb_pages)
+    page_docs = dict(map_parallel(partial(_subscribe_to_page, request), fb_pages))
     db.update_pages_for_user(page_docs, request.user.uid)
 
-    page_names = ", ".join(get_page_display_name(page) for _, page in page_docs)
+    page_names = ", ".join(get_page_display_name(page) for page in page_docs.values())
     return HTMLResponse(
         f"Sucessfully Connected to {page_names}! You may now close this page."
     )
