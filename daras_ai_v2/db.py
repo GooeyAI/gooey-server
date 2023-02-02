@@ -142,7 +142,8 @@ def get_page_access_token(page_id: str) -> str | None:
     return get_doc_field(doc_ref, "access_token")
 
 
-def update_pages_for_user(page_docs: dict[str, dict], uid: str):
+def update_pages_for_user(page_docs_list: list[(str, dict)], uid: str):
+    page_docs = dict(page_docs_list)
     batch = _db.batch()
 
     existing_user_pages = (
