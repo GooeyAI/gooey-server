@@ -99,4 +99,4 @@ def run_language_model(
         presence_penalty=0.25 if avoid_repetition else 0,
     )
 
-    return [choice["text"] for choice in r["choices"]]
+    return [choice["text"].strip() for choice in r["choices"]]
