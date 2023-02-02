@@ -87,7 +87,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         )
         image_urls = [
             result["image"]
-            for result in scaleserp_results["image_results"]
+            for result in scaleserp_results.get("image_results", [])
             if "image" in result
         ][:10]
         gooey_rng.shuffle(image_urls)
