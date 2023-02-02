@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import (
     upload_file_from_bytes,
     upload_file_hq,
-    resize_img_contain,
+    resize_img_scale,
     bytes_to_cv2_img,
     cv2_img_to_bytes,
 )
@@ -86,6 +86,7 @@ class ObjectInpaintingPage(BasePage):
             Give us a photo of anything
             """,
             key="input_file",
+            upload_key="input_image",
         )
 
     def validate_form_v2(self):
@@ -197,25 +198,13 @@ class ObjectInpaintingPage(BasePage):
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
-        input_file = st.session_state.get("input_file")
-        input_image = st.session_state.get("input_image")
-        input_image_or_file = input_image or input_file
         output_images = st.session_state.get("output_images")
 
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if input_image_or_file:
-                st.image(input_image_or_file, caption="Object Photo")
-            else:
-                st.empty()
-
-        with col2:
-            if output_images:
-                for url in output_images:
-                    st.image(url, caption=f"{text_prompt}")
-            else:
-                st.empty()
+        if output_images:
+            for url in output_images:
+                st.image(url, caption=f"{text_prompt}")
+        else:
+            st.empty()
 
     def render_steps(self):
         input_file = st.session_state.get("input_file")
@@ -257,7 +246,7 @@ class ObjectInpaintingPage(BasePage):
 
         img_bytes = requests.get(request.input_image).content
 
-        padded_img_bytes = resize_img_contain(
+        padded_img_bytes = resize_img_scale(
             img_bytes,
             (request.output_width, request.output_height),
         )
@@ -323,6 +312,14 @@ class ObjectInpaintingPage(BasePage):
 
     def render_usage_guide(self):
         youtube_video("to6_17XJeck")
+
+    def get_price(self) -> int:
+        selected_model = st.session_state.get("selected_model")
+        match selected_model:
+            case InpaintingModels.dall_e.name:
+                return 20
+            case _:
+                return 5
 
 
 if __name__ == "__main__":

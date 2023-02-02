@@ -19,51 +19,11 @@ templates = Jinja2Templates(directory="templates")
 
 
 available_subscriptions = {
-    "basic": {
-        "display": {
-            "name": "Basic Plan",
-            "title": "MONTHLY @ $10",
-            "description": "1000 Credits to get you up, up and away. Cancel your plan anytime.",
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Basic Plan",
-                },
-                "unit_amount": 1,  # in cents
-                "recurring": {
-                    "interval": "month",
-                },
-            },
-            "quantity": 1000,  # number of credits
-        },
-    },
-    "premium": {
-        "display": {
-            "name": "Premium Plan",
-            "title": "MONTHLY @ $50",
-            "description": "5000 Credits + special access to make bespoke interactive video bots! ",
-        },
-        "stripe": {
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": "Gooey.AI Premium Plan",
-                },
-                "unit_amount": 1,  # in cents
-                "recurring": {
-                    "interval": "month",
-                },
-            },
-            "quantity": 5000,  # number of credits
-        },
-    },
     "addon": {
         "display": {
             "name": "Add-on",
-            "title": "Add-on",
-            "description": "Pay an additional $10 to get 1000 extra credits on any monthly plan.",
+            "title": "Add-on => Top up for $10",
+            "description": "Buy a one-time top up of 1000 Credits for $10. Good for ~200 runs, depending on which workflows you call.",
         },
         "stripe": {
             "price_data": {
@@ -79,6 +39,46 @@ available_subscriptions = {
                 "maximum": 10_000,
                 "minimum": 1_000,
             },
+        },
+    },
+    "basic": {
+        "display": {
+            "name": "Basic Plan",
+            "title": "MONTHLY @ $10",
+            "description": "Buy a monthly plan for $10 and get new 1500 credits (~300 runs) every month.",
+        },
+        "stripe": {
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": "Gooey.AI Basic Plan",
+                },
+                "unit_amount_decimal": 0.6666,  # in cents
+                "recurring": {
+                    "interval": "month",
+                },
+            },
+            "quantity": 1500,  # number of credits
+        },
+    },
+    "premium": {
+        "display": {
+            "name": "Premium Plan",
+            "title": "$50/month + Bots",
+            "description": '10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable <a href="/video-bots/">videobots</a>.',
+        },
+        "stripe": {
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": "Gooey.AI Premium Plan",
+                },
+                "unit_amount_decimal": 0.5,  # in cents
+                "recurring": {
+                    "interval": "month",
+                },
+            },
+            "quantity": 10000,  # number of credits
         },
     },
     #
@@ -107,10 +107,10 @@ available_subscriptions = {
 }
 
 
-@router.get("/account", include_in_schema=False)
+@router.get("/account/", include_in_schema=False)
 def account(request: Request):
     if not request.user:
-        next_url = request.query_params.get("next", "/account")
+        next_url = request.query_params.get("next", "/account/")
         redirect_url = furl("/login", query_params={"next": next_url})
         return RedirectResponse(str(redirect_url))
 
@@ -119,6 +119,7 @@ def account(request: Request):
 
     context = {
         "request": request,
+        "settings": settings,
         "available_subscriptions": available_subscriptions,
         "user_credits": user_data.get(db.USER_BALANCE_FIELD, 0),
         "subscription": get_user_subscription(request.user),
@@ -161,8 +162,8 @@ def create_checkout_session(
     checkout_session = stripe.checkout.Session.create(
         line_items=[line_item],
         mode=mode,
-        success_url=str(furl(settings.APP_BASE_URL) / "payment-success"),
-        cancel_url=str(furl(settings.APP_BASE_URL) / "payment-cancel"),
+        success_url=payment_success_url,
+        cancel_url=account_url,
         customer=get_or_create_stripe_customer(request.user),
         metadata=metadata,
         subscription_data=subscription_data,
@@ -173,26 +174,26 @@ def create_checkout_session(
     return RedirectResponse(checkout_session.url, status_code=303)
 
 
-@router.get("/payment-success")
-def payment_success(request: Request):
-    context = {"request": request}
-    return templates.TemplateResponse("payment_success.html", context)
-
-
-@router.get("/payment-cancel")
-def payment_cancel(request: Request):
-    context = {"request": request}
-    return templates.TemplateResponse("payment_cancel.html", context)
-
-
 @router.post("/__/stripe/create-portal-session")
-def customer_portal(request: Request):
+async def customer_portal(request: Request):
     customer = get_or_create_stripe_customer(request.user)
     portal_session = stripe.billing_portal.Session.create(
         customer=customer,
-        return_url=str(furl(settings.APP_BASE_URL) / "account"),
+        return_url=account_url,
     )
     return RedirectResponse(portal_session.url, status_code=303)
+
+
+@router.get("/payment-success/")
+def payment_success(request: Request):
+    context = {"request": request, "settings": settings}
+    return templates.TemplateResponse("payment_success.html", context)
+
+
+payment_success_url = str(
+    furl(settings.APP_BASE_URL) / router.url_path_for(payment_success.__name__)
+)
+account_url = str(furl(settings.APP_BASE_URL) / router.url_path_for(account.__name__))
 
 
 async def request_body(request: Request):
@@ -249,7 +250,7 @@ def cancel_subscription(request: Request):
     subscriptions = stripe.Subscription.list(customer=customer).data
     for sub in subscriptions:
         stripe.Subscription.delete(sub.id)
-    return RedirectResponse("/account", status_code=303)
+    return RedirectResponse("/account/", status_code=303)
 
 
 def get_user_subscription(user: UserRecord):

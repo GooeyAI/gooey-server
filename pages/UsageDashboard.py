@@ -99,12 +99,39 @@ if not user_run_counts:
 
 # user_runs.sort(key=lambda x: sum(x[1].values()), reverse=True)
 
+col1, col2 = st.columns(2)
+with col1:
+    last_n_days = st.number_input("Last n Days", min_value=1, value=30)
+with col2:
+    time_axis = st.selectbox("Frequency", options=["1D", "1W"])
+
 """
 ## Top Users
 Pro Tip: Click on the table, then Press Ctrl/Cmd + F to search. 
 Press Ctrl/Cmd + A to copy all and paste into a excel.
 """
 
+runs_df = pd.DataFrame.from_records(
+    [
+        {
+            "Time": updated_at,
+            "ID": user.uid,
+            "Name": user.display_name or "",
+            "User": user.email or user.phone_number or user.uid or "",
+            "Recipe": recipe,
+        }
+        for updated_at, user, recipe in user_runs_by_time
+    ],
+).convert_dtypes()
+
+
+runs_df["Time"] = pd.to_datetime(runs_df["Time"])
+runs_df = runs_df.sort_values("Time")
+runs_df = runs_df.set_index("Time")
+
+runs_df = runs_df.last(f"{last_n_days}D")
+
+filtered_users = set(runs_df["ID"])
 df = pd.DataFrame.from_records(
     [
         {
@@ -116,6 +143,7 @@ df = pd.DataFrame.from_records(
             **run_counts,
         }
         for user, profile, run_counts in user_run_counts
+        if user.uid in filtered_users
     ],
 ).convert_dtypes()
 df = df.sort_values("All", ascending=False)
@@ -150,26 +178,21 @@ with col2:
 Pro Tip: double click on any user to drill-down
 """
 
-time_axis = "1D"
+df_bar = runs_df[["User"]].resample(time_axis).nunique()
+df_bar = df_bar.reset_index()
+df_bar.columns = ["Time", "Unique Users"]
 
-df = pd.DataFrame.from_records(
-    [
-        {
-            "Time": updated_at,
-            "ID": user.uid,
-            "Name": user.display_name or "",
-            "User": user.email or user.phone_number or user.uid or "",
-            "Recipe": recipe,
-        }
-        for updated_at, user, recipe in user_runs_by_time
-    ],
-).convert_dtypes()
+st.plotly_chart(
+    px.bar(
+        df_bar,
+        x="Time",
+        y="Unique Users",
+        color_discrete_sequence=px.colors.qualitative.Light24,
+    ),
+    use_container_width=True,
+)
 
-df["Time"] = pd.to_datetime(df["Time"])
-df = df.sort_values("Time")
-df = df.set_index("Time")
-
-df_area = df[["User"]].groupby("User").resample(time_axis).count()
+df_area = runs_df[["User"]].groupby("User").resample(time_axis).count()
 df_area = df_area.reset_index(1)
 df_area.columns = ["Time", "Total Runs"]
 df_area = df_area[df_area["Total Runs"] > 0]
@@ -191,7 +214,7 @@ st.plotly_chart(
 Pro Tip: double click on any recipe to drill-down
 """
 
-df_area = df[["Recipe"]].groupby("Recipe").resample(time_axis).count()
+df_area = runs_df[["Recipe"]].groupby("Recipe").resample(time_axis).count()
 df_area = df_area.reset_index(1)
 df_area.columns = ["Time", "Total Runs"]
 df_area = df_area[df_area["Total Runs"] > 0]

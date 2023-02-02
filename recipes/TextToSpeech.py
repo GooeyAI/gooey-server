@@ -26,7 +26,7 @@ class TextToSpeechPage(BasePage):
         "google_voice_name": "en-IN-Wavenet-A",
         "google_pitch": 0.0,
         "google_speaking_rate": 1.0,
-        "uberduck_voice_name": "kanye-west-rap",
+        "uberduck_voice_name": "hecko",
         "uberduck_speaking_rate": 1.0,
     }
 
@@ -111,7 +111,7 @@ class TextToSpeechPage(BasePage):
             voice_name = (
                 state["uberduck_voice_name"]
                 if "uberduck_voice_name" in state
-                else "kanye-west-rap"
+                else "hecko"
             ).strip()
             pace = (
                 state["uberduck_speaking_rate"]
@@ -158,11 +158,8 @@ class TextToSpeechPage(BasePage):
                 else 1.0
             )
 
-            client = texttospeech.TextToSpeechClient(
-                credentials=settings.google_service_account_credentials
-            )
-
             synthesis_input = texttospeech.SynthesisInput(text=text)
+
             voice = texttospeech.VoiceSelectionParams()
             voice.language_code = "-".join(voice_name.split("-")[:2])
             voice.name = voice_name  # optional
@@ -175,9 +172,11 @@ class TextToSpeechPage(BasePage):
 
             # Perform the text-to-speech request on the text input with the selected
             # voice parameters and audio file type
+            client = texttospeech.TextToSpeechClient()
             response = client.synthesize_speech(
                 input=synthesis_input, voice=voice, audio_config=audio_config
             )
+
             yield "Uploading Audio file..."
             state["audio_url"] = upload_file_from_bytes(
                 "google_tts_gen.wav", response.audio_content

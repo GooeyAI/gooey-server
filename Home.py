@@ -1,5 +1,8 @@
 import streamlit as st
 
+from daras_ai_v2.grid_layout_widget import grid_layout
+from recipes.CompareLLM import CompareLLMPage
+from recipes.CompareUpscaler import CompareUpscalerPage
 from recipes.VideoBots import VideoBotsPage
 from server import normalize_slug, page_map
 
@@ -47,6 +50,7 @@ page_classes = [
     VideoBotsPage,
     SEOSummaryPage,
     GoogleImageGenPage,
+    CompareLLMPage,
     CompareText2ImgPage,
     FaceInpaintingPage,
     EmailFaceInpaintingPage,
@@ -57,7 +61,7 @@ page_classes = [
     ImageSegmentationPage,
     Img2ImgPage,
     DeforumSDPage,
-    # CompareLMPage,
+    CompareUpscalerPage,
     # LipsyncPage,
     # ChyronPlantPage,
 ]
@@ -67,30 +71,30 @@ pages = [page_cls() for page_cls in page_classes]
 with st.spinner():
     all_examples = map_parallel(lambda page: page.get_recipe_doc().to_dict(), pages)
 
-for page, example_doc in zip(pages, all_examples):
-    col1, col2 = st.columns(2)
 
-    with col1:
-        st.markdown(
-            f"""
-            <a style="font-size: 24px" href="{page.app_url()}" target = "_top">
-                <h2>{page.title}</h2>
-            </a>
-            """,
-            unsafe_allow_html=True,
-        )
-        # render preview if available
-        preview = page.preview_description(example_doc)
-        if preview:
-            st.write(preview)
-        else:
-            page.render_description()
+def _render(args):
+    page, example_doc = args
 
-    with col2:
-        page.render_example(example_doc)
-    st.write("---")
+    st.markdown(
+        f"""
+        <a style="font-size: 24px" href="{page.app_url()}" target = "_top">
+            <h2>{page.title}</h2>
+        </a>
+        """,
+        unsafe_allow_html=True,
+    )
 
-st.write("")
+    preview = page.preview_description(example_doc)
+    if preview:
+        st.write(preview)
+    else:
+        page.render_description()
+
+    page.render_example(example_doc)
+
+
+grid_layout(2, zip(pages, all_examples), _render)
+
 
 with st.expander("Early Recipes"):
     for snapshot in list_all_docs():

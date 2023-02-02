@@ -34,12 +34,19 @@ from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
     ApiResponseModel,
+    DEFAULT_META_IMG,
 )
 from daras_ai_v2.crypto import get_random_doc_id
-from daras_ai_v2.meta_content import meta_title_for_page, meta_description_for_page
+from daras_ai_v2.meta_content import (
+    meta_title_for_page,
+    meta_description_for_page,
+    meta_preview_url,
+)
 from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
+from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
+from recipes.CompareUpscaler import CompareUpscalerPage
 from recipes.DeforumSD import DeforumSDPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
 from recipes.FaceInpainting import FaceInpaintingPage
@@ -120,7 +127,10 @@ async def custom_404_handler(request: Request, exc):
     if resp.status_code == 404:
         return templates.TemplateResponse(
             "404.html",
-            {"request": request},
+            {
+                "request": request,
+                "settings": settings,
+            },
             status_code=404,
         )
     elif resp.status_code != 200 or "text/html" not in resp.headers["content-type"]:
@@ -146,6 +156,7 @@ async def custom_404_handler(request: Request, exc):
         context={
             "request": request,
             "wix_site_html": d.outer_html(),
+            "settings": settings,
         },
     )
 
@@ -158,6 +169,7 @@ def authentication(request: Request):
         "login_options.html",
         context={
             "request": request,
+            "settings": settings,
         },
     )
 
@@ -299,23 +311,11 @@ def call_api(
     request_body: dict,
     query_params,
 ):
+    created_at = datetime.datetime.utcnow().isoformat()
     # init a new page for every request
     page = page_cls()
 
-    # check the balance
-    balance = db.get_doc_field(db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0)
-    if balance < page.get_price():
-        account_url = furl(settings.APP_BASE_URL) / "account"
-        return JSONResponse(
-            status_code=402,
-            content={
-                "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
-            },
-        )
-
-    created_at = datetime.datetime.utcnow().isoformat()
-
-    # get saved state from db
+    #  get saved state from db
     state = page.get_doc_from_query_params(query_params)
     if state is None:
         raise HTTPException(status_code=404)
@@ -327,13 +327,26 @@ def call_api(
     # only use the request values, discard outputs
     state = page.RequestModel.parse_obj(state).dict()
 
-    # remove None values & update state
+    # remove None values & insert request data
     request_dict = {k: v for k, v in request_body.items() if v is not None}
     state.update(request_dict)
 
     # set the current user
-    state["_current_user"] = user
+    state["_current_user"] = user# set streamlit session state
     streamlit.session_state = state
+
+    # check the balance
+    balance = db.get_doc_field(
+        db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
+    )
+    if balance < page.get_price():
+        account_url = furl(settings.APP_BASE_URL) / "account"
+        return JSONResponse(
+            status_code=402,
+            content={
+                "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
+            },
+        )
 
     # create the run
     run_id = get_random_doc_id()
@@ -365,7 +378,7 @@ def call_api(
 
     # save the run
     run_doc_ref.set(page.state_to_doc(state))
-    # deuct credits
+    # deduct credits
     page.deduct_credits()
 
     # return updated state
@@ -383,7 +396,10 @@ def st_home(request: Request):
     return _st_page(
         request,
         iframe_url,
-        context={"title": "Explore - Gooey.AI"},
+        context={
+            "title": "Explore - Gooey.AI",
+            "image": DEFAULT_META_IMG,
+        },
     )
 
 
@@ -435,7 +451,7 @@ def st_page(request: Request, page_slug):
                 uid=uid,
                 example_id=example_id,
             ),
-            "image": page.preview_image(state),
+            "image": meta_preview_url(page.preview_image(state)),
         },
     )
 
@@ -471,7 +487,7 @@ all_pages: list[typing.Type[BasePage]] = [
     EmailFaceInpaintingPage,
     LetterWriterPage,
     LipsyncPage,
-    # CompareLMPage,
+    CompareLLMPage,
     ImageSegmentationPage,
     TextToSpeechPage,
     LipsyncTTSPage,
@@ -483,6 +499,7 @@ all_pages: list[typing.Type[BasePage]] = [
     SEOSummaryPage,
     GoogleImageGenPage,
     VideoBotsPage,
+    CompareUpscalerPage,
 ]
 
 

@@ -28,7 +28,7 @@ def get_doc_field(doc_ref: firestore.DocumentReference, field: str, default=None
         return default
 
 
-def update_user_balance(uid: str, amount: int, invoice_id: str):
+def update_user_balance(uid: str, amount: int, invoice_id: str, **invoice_items):
     @firestore.transactional
     def _update_user_balance_in_txn(transaction: Transaction):
         user_doc_ref = get_user_doc_ref(uid)
@@ -61,6 +61,7 @@ def update_user_balance(uid: str, amount: int, invoice_id: str):
                 "amount": amount,
                 "end_balance": balance,
                 "timestamp": datetime.datetime.utcnow(),
+                **invoice_items,
             },
         )
 

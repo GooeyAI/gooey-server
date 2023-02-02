@@ -1,3 +1,4 @@
+from enum import Enum
 from functools import wraps
 from time import sleep
 
@@ -14,6 +15,14 @@ GPT3_MAX_ALLOED_TOKENS = 4000
 _gpt2_tokenizer = None
 
 
+class LargeLanguageModels(Enum):
+    text_davinci_003 = "Davinci (GPT-3.5)"
+    code_davinci_002 = "Code Davinci (Codex)"
+    text_curie_001 = "Curie"
+    text_babbage_001 = "Babbage"
+    text_ada_001 = "Ada"
+
+
 def calc_gpt_tokens(text: str) -> int:
     global _gpt2_tokenizer
 
@@ -25,7 +34,7 @@ def calc_gpt_tokens(text: str) -> int:
 
 def do_retry(
     max_retries: int = 5,
-    retry_delay: float = 1.0,
+    retry_delay: float = 5,
     error_cls=(ServiceUnavailableError, RateLimitError),
 ):
     def decorator(fn):

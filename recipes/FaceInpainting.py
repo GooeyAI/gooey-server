@@ -110,6 +110,7 @@ class FaceInpaintingPage(BasePage):
             Give us a photo of yourself, or anyone else
             """,
             key="input_file",
+            upload_key="input_image",
         )
 
     def validate_form_v2(self):
@@ -205,19 +206,14 @@ class FaceInpaintingPage(BasePage):
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
-        input_file = st.session_state.get("input_file")
-        input_image = st.session_state.get("input_image")
-        input_image_or_file = input_image or input_file
         output_images = st.session_state.get("output_images")
 
         if output_images:
             for url in output_images:
-                st.image(url, caption=f"{text_prompt}")
-        else:
-            st.empty()
-
-        if input_image_or_file:
-            st.image(input_image_or_file, caption="Face Photo")
+                st.image(
+                    url,
+                    caption="```" + text_prompt.replace("\n", "") + "```",
+                )
         else:
             st.empty()
 
@@ -299,7 +295,7 @@ class FaceInpaintingPage(BasePage):
             num_inference_steps=state.get("quality", 50),
             width=state["output_width"],
             height=state["output_height"],
-            negative_prompt=state["negative_prompt"],
+            negative_prompt=state.get("negative_prompt"),
             guidance_scale=state.get("guidance_scale"),
             seed=state["seed"],
         )
@@ -335,6 +331,14 @@ class FaceInpaintingPage(BasePage):
         input_image = state.get("input_image")
         if input_image:
             st.image(input_image, caption="Input Image")
+
+    def get_price(self) -> int:
+        selected_model = st.session_state.get("selected_model")
+        match selected_model:
+            case InpaintingModels.dall_e.name:
+                return 20
+            case _:
+                return 5
 
 
 if __name__ == "__main__":

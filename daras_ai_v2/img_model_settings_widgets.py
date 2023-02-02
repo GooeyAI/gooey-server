@@ -18,17 +18,19 @@ def img_model_settings(models_enum):
     if models_enum is not Img2ImgModels:
         output_resolution_setting()
 
-    if models_enum is not InpaintingModels:
-        sd_2_upscaling_setting(selected_model)
+    if models_enum is Text2ImgModels:
+        sd_2_upscaling_setting()
 
     col1, col2 = st.columns(2)
 
     with col1:
         guidance_scale_setting(selected_model)
 
-    if models_enum is Img2ImgModels:
-        with col2:
+    with col2:
+        if models_enum is Img2ImgModels:
             prompt_strength_setting(selected_model)
+        if selected_model == Img2ImgModels.instruct_pix2pix.name:
+            instruct_pix2pix_settings()
 
     return selected_model
 
@@ -63,7 +65,7 @@ def output_resolution_setting():
             "##### Width",
             key="output_width",
             min_value=512,
-            max_value=768,
+            max_value=1152,
             step=64,
         )
     with col2:
@@ -73,7 +75,7 @@ def output_resolution_setting():
             "##### Height",
             key="output_height",
             min_value=512,
-            max_value=768,
+            max_value=1152,
             step=64,
         )
     st.write(
@@ -83,36 +85,50 @@ def output_resolution_setting():
     )
 
 
-def sd_2_upscaling_setting(selected_model: str = None):
-    if selected_model != Text2ImgModels.sd_2.name:
-        return
-
+def sd_2_upscaling_setting():
     st.checkbox("**4x Upscaling**", key="sd_2_upscaling")
 
 
 def guidance_scale_setting(selected_model: str = None):
-    if selected_model in [Text2ImgModels.dall_e.name, Text2ImgModels.jack_qiao]:
-        return
+    if selected_model not in [
+        Text2ImgModels.dall_e.name,
+        Text2ImgModels.jack_qiao,
+    ]:
+        st.number_input(
+            label="""
+##### 🎨️ Artistic Pressure
+([*Text Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter)) \\
+How pressurized should the AI feel to produce what you want? \\
+At lower values the image will effectively be random.
+Values that are too high can also distort the image.
+            """,
+            key="guidance_scale",
+            min_value=0.0,
+            max_value=25.0,
+            step=0.5,
+        )
 
-    st.number_input(
+
+def instruct_pix2pix_settings():
+    st.slider(
         label="""
-        ##### Artistic Pressure
-        ([*Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter))
-        
-        How pressurized should the AI feel to produce what you want?
-        
-        At lower values the image will effectively be random. \\
-        Values that are too high can also distort the image by putting too much pressure on the AI.
-        """,
-        key="guidance_scale",
-        min_value=0.0,
-        max_value=50.0,
-        step=0.5,
+##### 🌠️ Image Strength
+([*Image Guidance Scale*](https://github.com/timothybrooks/instruct-pix2pix#tips)) \\
+A higher value encourages to generate images that are closely linked to the source image, 
+usually at the expense of lower image quality
+""",
+        key="image_guidance_scale",
+        min_value=1.0,
+        max_value=2.0,
+        step=0.10,
     )
 
 
 def prompt_strength_setting(selected_model: str = None):
-    if selected_model == Text2ImgModels.dall_e.name:
+    if selected_model in [
+        Img2ImgModels.dall_e.name,
+        Img2ImgModels.instruct_pix2pix.name,
+    ]:
         return
 
     st.slider(
@@ -128,7 +144,7 @@ def prompt_strength_setting(selected_model: str = None):
         key="prompt_strength",
         min_value=0.0,
         max_value=0.9,
-        step=0.1,
+        step=0.05,
     )
 
 
@@ -138,7 +154,7 @@ def negative_prompt_setting(selected_model: str = None):
 
     st.text_area(
         """
-        ##### Negative Prompt
+        ##### 🧽 Negative Prompt
         This allows you to specify what you DON'T want to see. 
         Useful negative prompts can be found [here](https://www.youtube.com/watch?v=cWZsizoAwT4).
         """,

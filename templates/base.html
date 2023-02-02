@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     {% include 'gtag.html' %}
 
@@ -11,7 +12,7 @@
     <!-- Primary Meta Tags -->
     <meta name="title" content="{{ title }}">
     {% if description %}
-        <meta name="description" content="{{ description }}">
+    <meta name="description" content="{{ description }}">
     {% endif %}
 
     <!-- Open Graph / Facebook -->
@@ -19,10 +20,10 @@
     <meta property="og:url" content="{{ request.url }}">
     <meta property="og:title" content="{{ title }}">
     {% if description %}
-        <meta property="og:description" content="{{ description }}">
+    <meta property="og:description" content="{{ description }}">
     {% endif %}
     {% if image %}
-        <meta property="og:image" content="{{ image }}">
+    <meta property="og:image" content="{{ image }}">
     {% endif %}
 
     <!-- Twitter -->
@@ -30,21 +31,38 @@
     <meta property="twitter:url" content="{{ request.url }}">
     <meta property="twitter:title" content="{{ title }}">
     {% if description %}
-        <meta property="twitter:description" content="{{ description }}">
+    <meta property="twitter:description" content="{{ description }}">
     {% endif %}
     {% if image %}
-        <meta property="twitter:image" content="{{ image }}">
+    <meta property="twitter:image" content="{{ image }}">
     {% endif %}
 
     <link rel="stylesheet" href="/static/css/app.css">
 </head>
+
 <body>
+    <div class="content">
+        {% include 'header.html' %}
+        {% include 'login_scripts.html' %}
 
-{% include 'header.html' %}
-{% include 'login_scripts.html' %}
+        {% block content %}
+        {% endblock content %}
+    </div>
 
-{% block content %}
-{% endblock content %}
-
+    <div class="footer">
+        <p>
+            <a href="/" target="_self">Home</a>&nbsp;|
+            <a href="/faq" target="_blank">FAQ</a>&nbsp;|
+            <a href="/team" target="_self">Team</a> |
+            <a href="/projects-7" target="_self">Gooey Gallery</a> |&nbsp;
+            <a href="/privacy" target="_self">Privacy</a>&nbsp;&amp;
+            <a href="/terms" target="_self">Terms</a>
+        </p>
+        <p>
+            <a href="mailto:support@gooey.ai">support@gooey.ai</a>&nbsp;|&nbsp;
+            ©2023 by Gooey.AI / Dara.network Inc
+        </p>
+    </div>
 </body>
+
 </html>

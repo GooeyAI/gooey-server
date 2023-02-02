@@ -1,10 +1,11 @@
 import datetime
 import inspect
+import os
 import traceback
 import typing
 import uuid
 from copy import deepcopy
-from time import time
+from time import time, sleep
 
 import requests
 import sentry_sdk
@@ -16,6 +17,7 @@ from google.cloud import firestore
 from pydantic import BaseModel
 from pydantic.generics import GenericModel
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
+from streamlit_option_menu import option_menu
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
@@ -28,11 +30,16 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
+from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
+from daras_ai_v2.hidden_html_widget import hidden_html_js
+from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
+from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.utils import email_support_about_reported_run
 from daras_ai_v2.utils import random
+
 
 DEFAULT_STATUS = "Running..."
 
@@ -42,8 +49,9 @@ USER_RUNS_COLLECTION = "user_runs"
 EXAMPLE_ID_QUERY_PARAM = "example_id"
 RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
-GOOEY_LOGO = (
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/gooey/gooey_logo_300x142.png"
+DEFAULT_META_IMG = (
+    # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
 )
 
 O = typing.TypeVar("O")
@@ -54,6 +62,14 @@ class ApiResponseModel(GenericModel, typing.Generic[O]):
     url: str
     created_at: str
     output: O
+
+
+class MenuTabs:
+    run = "🏃‍♀️Run"
+    examples = "🔖 Examples"
+    run_as_api = "🚀 Run as API"
+    history = "📖 History"
+    integrations = "🔌 Integrations"
 
 
 class BasePage:
@@ -104,10 +120,13 @@ class BasePage:
 
     def render(self):
         try:
+            ensure_hidden_widgets_loaded(st.session_state.pop("__prev_state", {}))
             self._render()
         except Exception as e:
             sentry_sdk.capture_exception(e)
             raise
+        finally:
+            st.session_state["__prev_state"] = dict(st.session_state)
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
@@ -119,88 +138,184 @@ class BasePage:
 
         init_scripts()
 
-        title_area = st.empty()
+        self._load_session_state()
+        self._check_if_flagged()
 
-        left_col, output_col = st.columns([3, 2], gap="medium")
+        if st.session_state.get("show_report_workflow"):
+            self.render_report_form()
+            return
 
-        with left_col:
-            run_tab, settings_tab, examples_tab, api_tab, integrations_tab = st.tabs(
-                [
-                    "🏃‍♀️Run",
-                    "⚙️ Settings",
-                    "🔖 Examples",
-                    "🚀 Run as API",
-                    "🔌 Integrations",
-                ]
+        st.session_state.setdefault("__title", self.title)
+        st.session_state.setdefault(
+            "__notes", self.preview_description(st.session_state)
+        )
+
+        st.write("## " + st.session_state.get("__title"))
+        st.write(st.session_state.get("__notes"))
+
+        menu_options = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
+
+        current_user: UserRecord = st.session_state.get("_current_user")
+        if not hasattr(current_user, "_is_anonymous"):
+            menu_options.extend([MenuTabs.history, MenuTabs.integrations])
+
+        selected_menu = option_menu(
+            None,
+            options=menu_options,
+            icons=["-"] * len(menu_options),
+            orientation="horizontal",
+            key=st.session_state.get("__option_menu_key"),
+            styles={
+                "nav-link": {"white-space": "nowrap;"},
+                "nav-link-selected": {"font-weight": "normal;", "color": "black"},
+            },
+        )
+
+        if selected_menu == MenuTabs.run:
+            input_col, output_col = st.columns([3, 2], gap="medium")
+
+            self._render_step_row()
+
+            col1, col2 = st.columns(2)
+            with col1:
+                self._render_help()
+
+            with input_col:
+                submitted1 = self.render_form()
+
+                with st.expander("⚙️ Settings"):
+                    self.render_settings()
+
+                    st.write("---")
+                    st.write("##### 🖌️ Personalize")
+                    st.text_input("Title", key="__title")
+                    st.text_area("Notes", key="__notes")
+                    st.write("---")
+
+                    submitted2 = self.render_submit_button(key="--submit-2")
+
+                submitted = submitted1 or submitted2
+
+            with output_col:
+                self._runner(submitted)
+
+            with col2:
+                self._render_save_options()
+            #
+            # NOTE: Beware of putting code here since runner will call experimental_rerun
+            #
+
+        elif selected_menu == MenuTabs.examples:
+            self._examples_tab()
+
+        elif selected_menu == MenuTabs.history:
+            self._history_tab()
+
+        elif selected_menu == MenuTabs.run_as_api:
+            self.run_as_api_tab()
+
+        elif selected_menu == MenuTabs.integrations:
+            self.integrations_tab()
+
+    def render_report_form(self):
+        with st.form("report_form"):
+            st.write(
+                """
+                ## Report a Workflow
+                Generative AI is powerful, but these technologies are also unmoderated. Sometimes the output of workflows can be inappropriate or incorrect. It might be broken or buggy. It might cause copyright issues. It might be inappropriate content.
+                Whatever the reason, please use this form to tell us when something is wrong with the output of a workflow you've run or seen on our site.
+                We'll investigate the reported workflow and its output and take appropriate action. We may flag this workflow or its author so they are aware too.
+                """
             )
 
-            with run_tab:
-                self._load_session_state()
-                self._check_if_flagged()
-                submitted = self.render_form()
+            st.write("#### Your Report")
 
-            with title_area.container():
-                st.session_state.setdefault("__title", self.title)
-                st.session_state.setdefault(
-                    "__notes", self.preview_description(st.session_state)
+            st.text_input(
+                "Workflow",
+                disabled=True,
+                value=self.title,
+            )
+
+            current_url = self._get_current_app_url()
+            st.text_input(
+                "Run URL",
+                disabled=True,
+                value=current_url,
+            )
+
+            st.write("Output")
+            self.render_output()
+
+            inappropriate_radio_text = "Inappropriate content"
+            report_type = st.radio(
+                "Report Type", ("Buggy Output", inappropriate_radio_text, "Other")
+            )
+            reason_for_report = st.text_area(
+                "Reason for report",
+                placeholder="Tell us why you are reporting this workflow e.g. an error, inappropriate content, very poor output, etc. Please let know what you expected as well. ",
+            )
+
+            col1, col2 = st.columns(2)
+            with col1:
+                submitted = st.form_submit_button("Submit Report")
+            with col2:
+                cancelled = st.form_submit_button("Cancel")
+
+        if cancelled:
+            st.session_state["show_report_workflow"] = False
+            st.experimental_rerun()
+
+        if submitted:
+            if reason_for_report == "":
+                st.error("Reason for report cannot be empty")
+                return
+
+            with st.spinner("Reporting..."):
+                current_user: UserRecord = st.session_state.get("_current_user")
+
+                query_params = st.experimental_get_query_params()
+                example_id, run_id, uid = self.extract_query_params(query_params)
+
+                email_support_about_reported_run(
+                    uid=uid,
+                    url=self._get_current_app_url(),
+                    email=current_user.email,
+                    recipe_name=self.title,
+                    report_type=report_type,
+                    reason_for_report=reason_for_report,
                 )
 
-                st.write("## " + st.session_state.get("__title"))
-                st.write(st.session_state.get("__notes"))
+                if report_type == inappropriate_radio_text:
+                    self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
 
-            with settings_tab:
-                self.render_settings()
-
-                st.write("---")
-                st.write("##### 🖌️ Personalize")
-                st.text_input("Title", key="__title")
-                st.text_area("Notes", key="__notes")
-                st.write("---")
-
-                submitted = submitted or self.render_submit_button(key="2")
-
-            with examples_tab:
-                self._examples_tab()
-
-            with api_tab:
-                self.run_as_api_tab()
-
-            with integrations_tab:
-                self.integrations_tab()
-
-            st.write("---")
-
-        self.render_step_row()
-        self.render_footer()
-
-        with output_col:
-            self._runner(submitted)
-
-        self._render_save_options()
-        #
-        # NOTE: Beware of putting code here since runner will call experimental_rerun
-        #
+            st.success("Reported.", icon="✅")
+            sleep(2)
+            st.session_state["show_report_workflow"] = False
+            st.experimental_rerun()
 
     def integrations_tab(self):
         st.write("Sorry! No integrations available for this workflow.")
 
     def _load_session_state(self):
+        placeholder = st.empty()
+
         if st.session_state.get("__loaded__"):
             return
 
-        with st.spinner("Loading Settings..."):
+        with placeholder.container(), st.spinner("Loading Settings..."):
             query_params = st.experimental_get_query_params()
-            state = self.get_doc_from_query_params(query_params)
+            doc = self.get_doc_from_query_params(query_params)
 
-            if state is None:
+            if doc is None:
                 st.write("### 404: We can't find this page!")
                 st.stop()
 
-            st.session_state.update(state)
+            self._update_session_state(doc)
 
+    def _update_session_state(self, doc):
+        st.session_state.update(doc)
         for k, v in self.sane_defaults.items():
             st.session_state.setdefault(k, v)
-
         st.session_state["__loaded__"] = True
 
     def _check_if_flagged(self):
@@ -218,7 +333,9 @@ class BasePage:
                 example_id, run_id, uid = self.extract_query_params(query_params)
                 if run_id and uid:
                     self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=False)
-            st.success("Removed flag. Reload the page to see changes")
+            st.success("Removed flag.", icon="✅")
+            sleep(2)
+            st.experimental_rerun()
         else:
             st.write(
                 "Our support team is reviewing this run. Please come back after some time."
@@ -293,11 +410,19 @@ class BasePage:
         self.render_form_v2()
         return self.render_submit_button()
 
-    def render_submit_button(self, key=None):
+    def get_credits_click_url(self):
+        current_user: UserRecord = st.session_state.get("_current_user")
+        if hasattr(current_user, "_is_anonymous"):
+            return "/pricing/"
+        else:
+            return "/account/"
+
+    def render_submit_button(self, key="--submit-1"):
         col1, col2 = st.columns([2, 1])
         with col1:
             st.caption(
-                "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)_",
+                f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ \\\n"
+                f"Run cost: [{self.get_price()} credits]({self.get_credits_click_url()})",
             )
         with col2:
             submitted = st.button("🏃 Submit", key=key, type="primary")
@@ -311,7 +436,7 @@ class BasePage:
         else:
             return True
 
-    def render_step_row(self):
+    def _render_step_row(self):
         with st.expander("**ℹ️ Details**"):
             col1, col2 = st.columns([1, 2])
             with col1:
@@ -326,34 +451,32 @@ class BasePage:
                     with placeholder:
                         st.write("##### 👣 Steps")
 
-    def render_footer(self):
-        col1, col2 = st.columns(2)
-        with col1:
-            placeholder = st.empty()
-            try:
-                self.render_usage_guide()
-            except NotImplementedError:
-                pass
-            else:
-                with placeholder:
-                    st.write(
-                        """
-                        ## How to Use This Recipe
-                        """
-                    )
-
-            with st.expander(
-                "**🙋🏽‍♀️ Need more help? [Join our Discord](https://discord.gg/7C84UyzVDg)**",
-                expanded=False,
-            ):
-                st.markdown(
+    def _render_help(self):
+        placeholder = st.empty()
+        try:
+            self.render_usage_guide()
+        except NotImplementedError:
+            pass
+        else:
+            with placeholder:
+                st.write(
                     """
-                    <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
-                    <iframe src="https://e.widgetbot.io/channels/643360566970155029/1046049067337273444" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+                    ## How to Use This Recipe
+                    """
                 )
+
+        with st.expander(
+            f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**",
+            expanded=False,
+        ):
+            st.markdown(
+                """
+                <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
+                <iframe src="https://e.widgetbot.io/channels/643360566970155029/1046049067337273444" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     def render_usage_guide(self):
         raise NotImplementedError
@@ -375,15 +498,8 @@ class BasePage:
         if not reported:
             return
 
-        with st.spinner("Reporting..."):
-            self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
-            email_support_about_reported_run(
-                run_id=run_id,
-                uid=uid,
-                url=self._get_current_app_url(),
-                email=current_user.email,
-            )
-            st.success("Reported. Reload the page to see changes")
+        st.session_state["show_report_workflow"] = reported
+        st.experimental_rerun()
 
     def _render_before_output(self):
         query_params = st.experimental_get_query_params()
@@ -425,7 +541,9 @@ class BasePage:
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self.run_doc_ref(uid=uid, run_id=run_id)
-        ref.update({"is_flagged": is_flagged})
+        updates = {"is_flagged": is_flagged}
+        ref.update(updates)
+        st.session_state.update(updates)
 
     def save_run(self, new_run: bool = False):
         current_user: auth.UserRecord = st.session_state.get("_current_user")
@@ -525,7 +643,7 @@ class BasePage:
                 sentry_sdk.capture_exception(e)
                 traceback.print_exc()
                 with status_area:
-                    st.error(f"{type(e).__name__} - {err_msg_for_exc(e)}", icon="⚠️")
+                    st.error(err_msg_for_exc(e), icon="⚠️")
                 # cleanup is important!
                 st.session_state.pop("__status", None)
                 st.session_state.pop("__gen", None)
@@ -624,19 +742,29 @@ class BasePage:
                 doc_ref.set(state_to_save)
 
                 if new_example_id:
-                    st.session_state["__example_docs"].insert(0, doc_ref.get())
+                    st.session_state.get("__example_docs", []).insert(0, doc_ref.get())
                     st.experimental_rerun()
 
             st.success("Saved", icon="✅")
 
     def state_to_doc(self, state: dict):
-        return {
+        ret = {
             field_name: deepcopy(state[field_name])
             for field_name in self.fields_to_save()
             if field_name in state
-        } | {
+        }
+        ret |= {
             "updated_at": datetime.datetime.utcnow(),
         }
+
+        title = state.get("__title")
+        notes = state.get("__notes")
+        if title and title.strip() != self.title.strip():
+            ret["__title"] = title
+        if notes and notes.strip() != self.preview_description(state).strip():
+            ret["__notes"] = notes
+
+        return ret
 
     def fields_to_save(self) -> [str]:
         # only save the fields in request/response
@@ -644,35 +772,32 @@ class BasePage:
             field_name
             for model in (self.RequestModel, self.ResponseModel)
             for field_name in model.__fields__
-        ] + [
-            "__title",
-            "__notes",
         ]
 
     def _examples_tab(self):
-        example_docs = st.session_state.get("__example_docs")
-        if example_docs is None:
+        if "__example_docs" not in st.session_state:
             with st.spinner("Loading Examples..."):
                 example_docs = db.get_collection_ref(
                     document_id=self.doc_name,
                     sub_collection_id=EXAMPLES_COLLECTION,
                 ).get()
-            example_docs.sort(
-                key=lambda s: s.to_dict()
-                .get("updated_at", datetime.datetime.fromtimestamp(0))
-                .timestamp(),
-                reverse=True,
-            )
+                example_docs.sort(
+                    key=lambda s: s.to_dict()
+                    .get("updated_at", datetime.datetime.fromtimestamp(0))
+                    .timestamp(),
+                    reverse=True,
+                )
             st.session_state["__example_docs"] = example_docs
+        example_docs = st.session_state.get("__example_docs")
 
         allow_delete = is_admin()
 
-        for snapshot in example_docs:
+        def _render(snapshot):
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
             if doc.get("__hidden"):
-                continue
+                raise SkipIteration()
 
             url = str(
                 furl(
@@ -680,36 +805,113 @@ class BasePage:
                     query_params={EXAMPLE_ID_QUERY_PARAM: example_id},
                 )
             )
+            self._render_doc_example(
+                allow_delete=allow_delete,
+                doc=doc,
+                url=url,
+                query_params=dict(example_id=example_id),
+            )
 
-            col1, col2 = st.columns([2, 6])
+        grid_layout(2, example_docs, _render)
 
-            with col1:
-                st.markdown(
-                    f"""
-                    <div style="height: 50px;">
-                        <a target="_top" class="streamlit-like-btn" href="{url}">
-                          ✏️ Tweak 
-                        </a>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+    def _history_tab(self):
+        current_user = st.session_state.get("_current_user")
+        uid = current_user.uid
+        run_history = st.session_state.get("__run_history", [])
+
+        def _render(snapshot):
+            run_id = snapshot.id
+            doc = snapshot.to_dict()
+
+            url = str(
+                furl(
+                    self.app_url(),
+                    query_params={
+                        RUN_ID_QUERY_PARAM: run_id,
+                        USER_ID_QUERY_PARAM: uid,
+                    },
+                )
+            )
+
+            self._render_doc_example(
+                allow_delete=False,
+                doc=doc,
+                url=url,
+                query_params=dict(run_id=run_id, uid=uid),
+            )
+
+        grid_layout(2, run_history, _render)
+
+        if "__run_history" not in st.session_state or st.button("Load More"):
+            with st.spinner("Loading History..."):
+                run_history.extend(
+                    db.get_collection_ref(
+                        collection_id=USER_RUNS_COLLECTION,
+                        document_id=uid,
+                        sub_collection_id=self.doc_name,
+                    )
+                    .order_by("updated_at", direction="DESCENDING")
+                    .offset(len(run_history))
+                    .limit(20)
+                    .get()
+                )
+            st.session_state["__run_history"] = run_history
+            st.experimental_rerun()
+
+    def _render_doc_example(
+        self, *, allow_delete: bool, doc: dict, url: str, query_params: dict
+    ):
+        col1, col2 = st.columns([2, 6])
+
+        with col1:
+            if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
+                # change url
+                gooey_reset_query_parm(**query_params)
+
+                # scroll to top
+                hidden_html_js(
+                    """
+                    <script>
+                      top.document.body.scrollTop = 0; // For Safari
+                      top.document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+                    </script>
+                    """
                 )
 
-                copy_to_clipboard_button("🔗 Copy URL", value=url)
+                # update state
+                st.session_state.clear()
+                self._update_session_state(doc)
 
-                if allow_delete:
-                    self._example_delete_button(example_id)
+                # jump to run tab
+                st.session_state["__option_menu_key"] = get_random_doc_id()
 
-            with col2:
-                self.render_example(doc)
+                # rerun
+                sleep(0.01)
+                st.experimental_rerun()
 
-            st.write("---")
+            copy_to_clipboard_button("🔗 Copy URL", value=url)
+
+            if allow_delete:
+                self._example_delete_button(**query_params)
+
+        with col2:
+            title = doc.get("__title")
+            if title and title.strip() != self.title.strip():
+                st.write("#### " + title)
+
+            notes = doc.get("__notes")
+            if (
+                notes
+                and notes.strip() != self.preview_description(st.session_state).strip()
+            ):
+                st.write(notes)
+
+            self.render_example(doc)
 
     def _example_delete_button(self, example_id):
         pressed_delete = st.button(
             "🗑️ Delete",
-            help=f"Delete example",
-            key=f"delete-{example_id}",
+            help=f"Delete example {example_id}",
         )
         if not pressed_delete:
             return
@@ -719,7 +921,7 @@ class BasePage:
         with st.spinner("deleting..."):
             example.update({"__hidden": True})
 
-        example_docs = st.session_state["__example_docs"]
+        example_docs = st.session_state.get("__example_docs", [])
         for idx, snapshot in enumerate(example_docs):
             if snapshot.id == example_id:
                 example_docs.pop(idx)
@@ -738,16 +940,17 @@ class BasePage:
             or state.get("search_query")
         )
 
-    def preview_description(self, state: dict) -> str | None:
-        pass
+    def preview_description(self, state: dict) -> str:
+        return ""
 
     def preview_image(self, state: dict) -> str | None:
         out = (
-            state.get("output_images")
+            state.get("cutout_image")
+            or state.get("output_images")
             or state.get("output_image")
-            or state.get("cutout_image")
+            or state.get("output_video")
         )
-        return extract_nested_str(out) or GOOEY_LOGO
+        return extract_nested_str(out) or DEFAULT_META_IMG
 
     def run_as_api_tab(self):
         api_docs_url = str(
@@ -789,13 +992,33 @@ class BasePage:
         )
 
         if balance < self.get_price():
-            account_url = furl(settings.APP_BASE_URL) / "account"
+            account_url = furl(settings.APP_BASE_URL) / "account/"
+
             if getattr(user, "_is_anonymous", False):
                 account_url.query.params["next"] = self._get_current_app_url()
-                error = f"Doh! You need to login to run more Gooey.AI recipes. [Login]({account_url})"
+                error = f"""
+                <p>
+                Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
+                </p>
+                                
+                You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs). 
+                You can <a href="/pricing/" target="_blank">purchase more</a> if you run out of credits.
+                """
             else:
-                error = f"Doh! You need to purchase additional credits to run more Gooey.AI recipes. [Buy Credits]({account_url})"
-            st.error(error, icon="⚠️")
+                error = f"""
+                <p>
+                Doh! You’re out of Gooey.AI credits.
+                </p>
+                                
+                <p>
+                Please <a href="{settings.GRANT_URL}" target="_blank">apply for a grant</a> or 
+                <a href="{account_url}" target="_blank">buy more</a> to run more workflows.
+                </p>
+                                
+                We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discord</a> if you’ve got any questions.
+                """
+
+            html_error(error)
             return False
 
         return True
