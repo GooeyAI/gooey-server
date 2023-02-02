@@ -79,6 +79,8 @@ def _on_message(object_: str, messaging: dict):
     from server import call_api, page_map, normalize_slug
 
     page_slug = fb_page.get("connected_page_slug")
+    if not page_slug:
+        return
     page_slug = normalize_slug(page_slug)
     try:
         page_cls = page_map[page_slug]
