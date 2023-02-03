@@ -433,8 +433,11 @@ class BasePage:
         with col1:
             st.caption(
                 f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ \\\n"
-                f"Run cost: [{self.get_price()} credits]({self.get_credits_click_url()})",
+                f"Run cost = [{self.get_price()} credits]({self.get_credits_click_url()})",
             )
+            additional_notes = self.additional_notes()
+            if additional_notes:
+                st.caption(additional_notes)
         with col2:
             submitted = st.button("🏃 Submit", key=key, type="primary")
         if not submitted:
@@ -1069,6 +1072,9 @@ class BasePage:
             created_at=datetime.datetime.utcnow().isoformat(),
             output=get_example_request_body(self.ResponseModel, state),
         )
+
+    def additional_notes(self) -> str | None:
+        pass
 
 
 def get_example_request_body(

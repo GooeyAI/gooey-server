@@ -204,6 +204,9 @@ class CompareText2ImgPage(BasePage):
                     total += 2
         return total
 
+    def additional_notes(self) -> str | None:
+        return "Each selected model costs 2 credits to run except for Dalle2 which is 15 credits per rendered image."
+
 
 if __name__ == "__main__":
     CompareText2ImgPage().render()
