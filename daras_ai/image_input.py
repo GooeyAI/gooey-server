@@ -188,6 +188,8 @@ def truncate_filename(text: str, maxlen: int = 100, sep: str = "...") -> str:
 
 
 def truncate_text_words(text: str, maxlen: int, sep: str = " …") -> str:
+    if len(text) <= maxlen:
+        return text
     match = re.match(r"^(.{0,%d}\S)(\s)" % (maxlen - len(sep) - 1), text, flags=re.S)
     if match:
         trunc = match.group(1)
