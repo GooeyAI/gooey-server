@@ -656,9 +656,9 @@ class BasePage:
 
             # render errors nicely
             except Exception as e:
-                st.session_state[StateKeys.error_msg] = err_msg_for_exc(e)
-                sentry_sdk.capture_exception(e)
                 traceback.print_exc()
+                sentry_sdk.capture_exception(e)
+                st.session_state[StateKeys.error_msg] = err_msg_for_exc(e)
 
                 # cleanup is important!
                 st.session_state.pop("__status", None)
@@ -1110,7 +1110,14 @@ def err_msg_for_exc(e):
             err_body = response.json()
         except requests.JSONDecodeError:
             err_body = response.text
-        err_msg = f"(HTTP {response.status_code}) {err_body}"
+        else:
+            format_exc = err_body.get("format_exc")
+            if format_exc:
+                print("⚡️ " + format_exc)
+            err_type = err_body.get("type")
+            err_str = err_body.get("str")
+            if err_type and err_str:
+                return f"(GPU) {err_type}: {err_str}"
+        return f"(HTTP {response.status_code}) {err_body}"
     else:
-        err_msg = f"{type(e).__name__} - {e}"
-    return err_msg
+        return f"{type(e).__name__}: {e}"
