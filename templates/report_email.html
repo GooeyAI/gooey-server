@@ -1,0 +1,46 @@
+<p>
+    Hey {{ user.display_name }}!
+</p>
+
+<p>
+    We've successfully captured your report on {{ recipe_name }}.
+    <br>
+    Our support team will get back to you shortly.
+</p>
+
+<p>
+    <a href="{{ url }}">🔗 Open in Gooey.AI</a>
+</p>
+
+<p style="color: darkgray">
+    Recipe Name: {{ recipe_name }}
+    <br>
+    Report Type: {{ report_type }}
+    <br>
+    Reason for Report: {{ reason_for_report }}
+    <br><br>
+    {% if run_uid != user.uid %}
+        Creator User ID: {{ run_uid }}
+        <br>
+    {% endif %}
+    Your User ID: {{ user.uid }}
+    <br>
+    {% if user.email %}
+        Your Email: {{ user.email }}
+        <br>
+    {% endif %}
+    {% if user.phone_number %}
+        Your Phone: {{ user.phone_number }}
+        <br>
+    {% endif %}
+    {% if error_msg %}
+        Error: {{ error_msg }}
+        <br>
+    {% endif %}
+</p>
+
+<p>
+    Best Wishes
+    <br>
+    Gooey.AI Team
+</p>

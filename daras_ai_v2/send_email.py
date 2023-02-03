@@ -6,9 +6,40 @@ from os.path import basename
 
 import requests
 from decouple import config
+from firebase_admin.auth import UserRecord
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai_v2 import settings
+from daras_ai_v2.settings import templates
+
+
+def send_reported_run_email(
+    *,
+    user: UserRecord,
+    run_uid: str,
+    url: str,
+    recipe_name: str,
+    report_type: str,
+    reason_for_report: str,
+    error_msg: str,
+):
+    recipeints = "support@gooey.ai, devs@gooey.ai"
+    html_body = templates.get_template("report_email.html").render(
+        user=user,
+        run_uid=run_uid,
+        url=url,
+        recipe_name=recipe_name,
+        report_type=report_type,
+        reason_for_report=reason_for_report,
+        error_msg=error_msg,
+    )
+    send_email_via_postmark(
+        from_address=settings.SUPPORT_EMAIL,
+        to_address=user.email or recipeints,
+        bcc=recipeints,
+        subject=f"Thanks for reporting {recipe_name} on Gooey.AI",
+        html_body=html_body,
+    )
 
 
 def send_email_via_postmark(

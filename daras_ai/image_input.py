@@ -180,7 +180,7 @@ def safe_filename(filename: str):
 
 
 def truncate_filename(text: str, maxlen: int = 100, sep: str = "...") -> str:
-    if len(text) < maxlen:
+    if len(text) <= maxlen:
         return text
     assert len(sep) <= maxlen
     mid = (maxlen - len(sep)) // 2
@@ -190,9 +190,10 @@ def truncate_filename(text: str, maxlen: int = 100, sep: str = "...") -> str:
 def truncate_text_words(text: str, maxlen: int, sep: str = " …") -> str:
     if len(text) <= maxlen:
         return text
+    assert len(sep) <= maxlen
     match = re.match(r"^(.{0,%d}\S)(\s)" % (maxlen - len(sep) - 1), text, flags=re.S)
     if match:
         trunc = match.group(1)
     else:
-        trunc = ""
+        trunc = text[: maxlen - len(sep)]
     return trunc + sep

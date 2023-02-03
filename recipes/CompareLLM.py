@@ -58,7 +58,7 @@ class CompareLLMPage(BasePage):
         )
         enum_multiselect(
             LargeLanguageModels,
-            label="#### 🤗 Selected Models",
+            label="#### 🤗 Compare Langugage Models",
             key="selected_models",
         )
 
