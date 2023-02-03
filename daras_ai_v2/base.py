@@ -215,6 +215,9 @@ class BasePage:
             self.run_as_api_tab()
 
     def render_related_workflows(self):
+        workflows = self.related_workflows()
+        if not workflows:
+            return
         st.markdown(
             f"""
             <a style="text-decoration:none" href="{EXPLORE_URL}" target = "_top">
@@ -223,7 +226,6 @@ class BasePage:
             """,
             unsafe_allow_html=True,
         )
-        workflows = self.related_workflows()
 
         if "__related_recipe_docs" not in st.session_state:
             with st.spinner("Loading Related Recipes..."):
@@ -255,7 +257,7 @@ class BasePage:
         grid_layout(4, workflows, _render)
 
     def related_workflows(self) -> list:
-        pass
+        return []
 
     def render_report_form(self):
         with st.form("report_form"):
