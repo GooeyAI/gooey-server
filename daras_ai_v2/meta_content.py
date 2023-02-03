@@ -85,9 +85,11 @@ def meta_description_for_page(
 ) -> str:
     description = page.preview_description(state)
 
-    updated_at = state.get("updated_at")
-    if updated_at:
-        description = updated_at.strftime("%d-%b-%Y") + " — " + description
+
+
+    # updated_at = state.get("updated_at")
+    # if updated_at:
+    #     description = updated_at.strftime("%d-%b-%Y") + " — " + description
 
     if (run_id and uid) or example_id or not description:
         description += " AI API, workflow & prompt shared on Gooey.AI."
