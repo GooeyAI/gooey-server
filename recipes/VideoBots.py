@@ -93,6 +93,7 @@ class VideoBotsPage(BasePage):
         from recipes.LipsyncTTS import LipsyncTTSPage
         from recipes.CompareText2Img import CompareText2ImgPage
         from recipes.DeforumSD import DeforumSDPage
+
         return [
             LipsyncTTSPage,
             DeforumSDPage,

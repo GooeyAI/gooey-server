@@ -67,6 +67,7 @@ class GoogleImageGenPage(BasePage):
         from recipes.ImageSegmentation import ImageSegmentationPage
         from recipes.SEOSummary import SEOSummaryPage
         from recipes.CompareText2Img import CompareText2ImgPage
+
         return [
             ObjectInpaintingPage,
             ImageSegmentationPage,

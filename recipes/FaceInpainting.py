@@ -322,6 +322,7 @@ class FaceInpaintingPage(BasePage):
         from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
         from recipes.LipsyncTTS import LipsyncTTSPage
         from recipes.SEOSummary import SEOSummaryPage
+
         return [
             SocialLookupEmailPage,
             EmailFaceInpaintingPage,

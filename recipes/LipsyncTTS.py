@@ -39,6 +39,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         from recipes.VideoBots import VideoBotsPage
         from recipes.DeforumSD import DeforumSDPage
         from recipes.CompareText2Img import CompareText2ImgPage
+
         return [
             VideoBotsPage,
             TextToSpeechPage,

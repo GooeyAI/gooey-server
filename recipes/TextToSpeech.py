@@ -192,6 +192,7 @@ class TextToSpeechPage(BasePage):
         from recipes.LipsyncTTS import LipsyncTTSPage
         from recipes.DeforumSD import DeforumSDPage
         from recipes.CompareText2Img import CompareText2ImgPage
+
         return [
             VideoBotsPage,
             LipsyncTTSPage,

@@ -18,7 +18,6 @@ from daras_ai_v2.stable_diffusion import (
 )
 
 
-
 class Img2ImgPage(BasePage):
     title = "Edit An Image with AI prompt"
     slug_versions = ["Img2Img", "ai-photo-editor"]
@@ -65,6 +64,7 @@ class Img2ImgPage(BasePage):
         from recipes.ObjectInpainting import ObjectInpaintingPage
         from recipes.FaceInpainting import FaceInpaintingPage
         from recipes.CompareText2Img import CompareText2ImgPage
+
         return [
             ImageSegmentationPage,
             ObjectInpaintingPage,

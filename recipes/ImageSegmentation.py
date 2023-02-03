@@ -69,6 +69,7 @@ class ImageSegmentationPage(BasePage):
         from recipes.Img2Img import Img2ImgPage
         from recipes.FaceInpainting import FaceInpaintingPage
         from recipes.CompareText2Img import CompareText2ImgPage
+
         return [
             ObjectInpaintingPage,
             Img2ImgPage,

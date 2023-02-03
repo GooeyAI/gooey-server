@@ -45,6 +45,7 @@ class SocialLookupEmailPage(BasePage):
         from recipes.SEOSummary import SEOSummaryPage
         from recipes.VideoBots import VideoBotsPage
         from recipes.GoogleImageGen import GoogleImageGenPage
+
         return [
             EmailFaceInpaintingPage,
             SEOSummaryPage,

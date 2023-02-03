@@ -66,6 +66,7 @@ class CompareText2ImgPage(BasePage):
         from recipes.ObjectInpainting import ObjectInpaintingPage
         from recipes.GoogleImageGen import GoogleImageGenPage
         from recipes.TextToSpeech import TextToSpeechPage
+
         return [
             FaceInpaintingPage,
             ObjectInpaintingPage,

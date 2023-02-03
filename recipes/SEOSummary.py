@@ -113,6 +113,7 @@ class SEOSummaryPage(BasePage):
         from recipes.GoogleImageGen import GoogleImageGenPage
         from recipes.ObjectInpainting import ObjectInpaintingPage
         from recipes.Img2Img import Img2ImgPage
+
         return [
             SocialLookupEmailPage,
             GoogleImageGenPage,

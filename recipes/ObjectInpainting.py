@@ -75,6 +75,7 @@ class ObjectInpaintingPage(BasePage):
         from recipes.GoogleImageGen import GoogleImageGenPage
         from recipes.CompareText2Img import CompareText2ImgPage
         from recipes.Img2Img import Img2ImgPage
+
         return [
             ImageSegmentationPage,
             GoogleImageGenPage,
