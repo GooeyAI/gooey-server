@@ -223,19 +223,29 @@ class BasePage:
             unsafe_allow_html=True,
         )
         workflows = self.related_workflows()
-        cols = st.columns(len(workflows))
-        for workflow in workflows:
-            state = workflow().get_recipe_doc().to_dict()
-            cols[workflows.index(workflow)].markdown(
+
+        if "__related_recipe_docs" not in st.session_state:
+            with st.spinner("Loading Related Recipes..."):
+                docs = {}
+                for workflow in workflows:
+                    docs[workflow().doc_name] = (workflow().get_recipe_doc().to_dict(),)
+            st.session_state["__related_recipe_docs"] = docs
+        related_recipe_docs = st.session_state.get("__related_recipe_docs")
+
+        def _render(recipe):
+            recipe_state = related_recipe_docs[recipe().doc_name][0]
+            st.markdown(
                 f"""
-        <a href="{workflow().app_url()}" style="text-decoration:none;color:white">
-        <img width="100%" src="{meta_preview_url(workflow().preview_image(state))}" />
-        <h4>{workflow().title}</h4>
-        {workflow().preview_description(state)}
-        </a>
-        """,
+                    <a href="{recipe().app_url()}" style="text-decoration:none;color:white">
+                        <img width="100%" src="{meta_preview_url(recipe().preview_image(recipe_state))}" />
+                        <h4>{recipe().title}</h4>
+                        {recipe().preview_description(recipe_state)}
+                    </a>
+                """,
                 unsafe_allow_html=True,
             )
+
+        grid_layout(4, workflows, _render)
 
     def related_workflows(self) -> list:
         pass
