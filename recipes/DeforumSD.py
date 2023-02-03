@@ -12,6 +12,8 @@ from recipes import (
     FaceInpainting,
 )
 
+DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/meta%20tags%20-%20animation.jpg"
+
 
 class DeforumSDPage(BasePage):
     title = "AI Animation Generator"
@@ -50,6 +52,8 @@ class DeforumSDPage(BasePage):
 
         return submitted
 
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_ANIMATION_META_IMG
     def preview_description(self, state: dict) -> str:
         return "Input your text (including keyframes!) and animate using Stable Diffusion's Deforum. Create AI generated animation for free and easier than CoLab notebooks. Inspired by deforum.art."
 
