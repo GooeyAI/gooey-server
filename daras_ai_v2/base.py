@@ -227,34 +227,34 @@ class BasePage:
             unsafe_allow_html=True,
         )
 
+        def _build_page_tuple(page):
+            state = page().get_recipe_doc().to_dict()
+            preview_image = meta_preview_url(page().preview_image(state))
+            return page, state, preview_image
+
         if "__related_recipe_docs" not in st.session_state:
             with st.spinner("Loading Related Recipes..."):
-                docs = {}
-                map_parallel(
-                    lambda page: docs.update(
-                        {
-                            page().doc_name: page().get_recipe_doc().to_dict(),
-                        },
-                    ),
+                docs = map_parallel(
+                    _build_page_tuple,
                     workflows,
                 )
             st.session_state["__related_recipe_docs"] = docs
         related_recipe_docs = st.session_state.get("__related_recipe_docs")
 
-        def _render(recipe):
-            recipe_state = related_recipe_docs[recipe().doc_name]
+        def _render(page_tuple):
+            page, state, preview_image = page_tuple
             st.markdown(
                 f"""
-                    <a href="{recipe().app_url()}" style="text-decoration:none;color:white">
-                        <img width="100%" src="{meta_preview_url(recipe().preview_image(recipe_state))}" />
-                        <h4>{recipe().title}</h4>
-                        {recipe().preview_description(recipe_state)}
+                    <a href="{page().app_url()}" style="text-decoration:none;color:white">
+                        <img width="100%" src="{preview_image}" />
+                        <h4>{page().title}</h4>
+                        {page().preview_description(state)}
                     </a>
                 """,
                 unsafe_allow_html=True,
             )
 
-        grid_layout(4, workflows, _render)
+        grid_layout(4, related_recipe_docs, _render)
 
     def related_workflows(self) -> list:
         return []
