@@ -52,6 +52,10 @@ RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
 
 O = typing.TypeVar("O")
+DEFAULT_META_IMG = (
+    # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
+)
 
 
 class ApiResponseModel(GenericModel, typing.Generic[O]):
@@ -227,9 +231,11 @@ class BasePage:
             unsafe_allow_html=True,
         )
 
-        def _build_page_tuple(page):
+        def _build_page_tuple(page: typing.Type[BasePage]):
             state = page().get_recipe_doc().to_dict()
-            preview_image = meta_preview_url(page().preview_image(state))
+            preview_image = meta_preview_url(
+                page().preview_image(state), page().fallback_preivew_image()
+            )
             return page, state, preview_image
 
         if "__related_recipe_docs" not in st.session_state:
@@ -992,7 +998,7 @@ class BasePage:
         return extract_nested_str(out)
 
     def fallback_preivew_image(self) -> str:
-        return ""
+        return DEFAULT_META_IMG
 
     def run_as_api_tab(self):
         api_docs_url = str(
