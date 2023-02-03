@@ -46,10 +46,8 @@ def meta_title_for_page(
     parts = []
 
     prompt = truncate_text_words(page.preview_input(state) or "", maxlen=100)
-    end_suffix = f"{page.title} on Gooey.AI"
-    if "__title" in state:
-        personalized_title = state.get("__title")
-        end_suffix = f"{personalized_title} on Gooey.AI"
+    title = state.get("__title") or page.title
+    end_suffix = f"{title} on Gooey.AI"
 
     if run_id and uid:
         parts.append(prompt)
@@ -86,10 +84,7 @@ def meta_description_for_page(
     uid: str,
     example_id: str,
 ) -> str:
-    description = page.preview_description(state)
-    if "__notes" in state:
-        description = state.get("__notes")
-
+    description = state.get("__notes") or page.preview_description(state)
     # updated_at = state.get("updated_at")
     # if updated_at:
     #     description = updated_at.strftime("%d-%b-%Y") + " — " + description
