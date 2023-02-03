@@ -3,6 +3,7 @@ import os
 import firebase_admin
 import stripe
 from decouple import config, UndefinedValueError, Csv
+from furl import furl
 from google.oauth2 import service_account
 import sentry_sdk
 
@@ -49,6 +50,7 @@ POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN")
 
 APP_BASE_URL = config("APP_BASE_URL", "/")
 API_BASE_URL = config("API_BASE_URL", "/")
+EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 IFRAME_BASE_URL = config("IFRAME_BASE_URL", "/__/st/")
 
 GPU_SERVER_1 = config("GPU_SERVER_1", "http://gpu-1.gooey.ai")

@@ -37,10 +37,9 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params import gooey_reset_query_parm
-from daras_ai_v2.settings import APP_BASE_URL
+from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.utils import email_support_about_reported_run
 from daras_ai_v2.utils import random
-
 
 DEFAULT_STATUS = "Running..."
 
@@ -217,7 +216,7 @@ class BasePage:
     def render_related_workflows(self):
         st.markdown(
             f"""
-            <a style="text-decoration:none" href="{APP_BASE_URL}explore" target = "_top">
+            <a style="text-decoration:none" href="{EXPLORE_URL}" target = "_top">
                 <h2>Related Workflows</h2>
             </a>
             """,
@@ -230,7 +229,7 @@ class BasePage:
             cols[workflows.index(workflow)].markdown(
                 f"""
         <a href="{workflow().app_url()}" style="text-decoration:none;color:white">
-        <img width=300px src="{meta_preview_url(workflow().preview_image(state))}" />
+        <img width="100%" src="{meta_preview_url(workflow().preview_image(state))}" />
         <h4>{workflow().title}</h4>
         {workflow().preview_description(state)}
         </a>
