@@ -37,7 +37,7 @@ class CompareUpscalerPage(BasePage):
 
         enum_multiselect(
             UpscalerModels,
-            label="#### 🤗 Selected Models",
+            label="#### 🤗 Compare Upscalers",
             key="selected_models",
         )
 

@@ -72,7 +72,7 @@ class CompareText2ImgPage(BasePage):
         )
         enum_multiselect(
             Text2ImgModels,
-            label="#### 🧨 Selected Models",
+            label="#### 🧨 Compare Image Models",
             key="selected_models",
         )
 
