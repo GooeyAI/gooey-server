@@ -1,7 +1,9 @@
+import datetime
 import math
 
 import pandas as pd
 import plotly.express as px
+import pytz
 import streamlit as st
 from firebase_admin import auth
 from google.cloud import firestore
@@ -99,11 +101,13 @@ if not user_run_counts:
 
 # user_runs.sort(key=lambda x: sum(x[1].values()), reverse=True)
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
     last_n_days = st.number_input("Last n Days", min_value=1, value=30)
 with col2:
     time_axis = st.selectbox("Frequency", options=["1D", "1W"])
+with col3:
+    timezone = st.text_input("Timezone", value="Asia/Kolkata")
 
 """
 ## Top Users
@@ -125,11 +129,13 @@ runs_df = pd.DataFrame.from_records(
 ).convert_dtypes()
 
 
-runs_df["Time"] = pd.to_datetime(runs_df["Time"])
+runs_df["Time"] = pd.to_datetime(runs_df["Time"]).dt.tz_convert(timezone)
 runs_df = runs_df.sort_values("Time")
 runs_df = runs_df.set_index("Time")
 
-runs_df = runs_df.last(f"{last_n_days}D")
+now = datetime.datetime.now(pytz.timezone(timezone))
+today = datetime.datetime.date(now)
+runs_df = runs_df[today - pd.offsets.Day(last_n_days - 1) :]
 
 filtered_users = set(runs_df["ID"])
 df = pd.DataFrame.from_records(

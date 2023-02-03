@@ -126,9 +126,10 @@ class CompareLLMPage(BasePage):
         selected_models = state.get("selected_models", [])
         for key in selected_models:
             output_text: dict = state.get("output_text", {}).get(key, [])
-            for text in output_text:
+            for idx, text in enumerate(output_text):
                 st.text_area(
                     f"**{LargeLanguageModels[key].value}**",
+                    help=f"output {key} {idx}",
                     disabled=True,
                     value=text,
                     height=height,

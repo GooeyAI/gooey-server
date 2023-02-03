@@ -99,10 +99,4 @@ def run_language_model(
         presence_penalty=0.25 if avoid_repetition else 0,
     )
 
-    # choose the completions that aren't empty
-    outputs = []
-    for choice in r["choices"]:
-        text = choice["text"].strip()
-        if text:
-            outputs.append(text)
-    return outputs
+    return [choice["text"].strip() for choice in r["choices"]]
