@@ -97,6 +97,7 @@ def _on_message(object_: str, messaging: dict):
                 },
             ],
         )
+        return
 
     page_slug = normalize_slug(page_slug)
     try:
