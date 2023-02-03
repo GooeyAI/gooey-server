@@ -54,6 +54,7 @@ class DeforumSDPage(BasePage):
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_ANIMATION_META_IMG
+
     def preview_description(self, state: dict) -> str:
         return "Input your text (including keyframes!) and animate using Stable Diffusion's Deforum. Create AI generated animation for free and easier than CoLab notebooks. Inspired by deforum.art."
 
