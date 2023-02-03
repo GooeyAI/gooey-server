@@ -10,7 +10,7 @@ DEFAULT_META_IMG = (
 )
 
 
-def meta_preview_url(file_url: str | None) -> str | None:
+def meta_preview_url(file_url: str | None, fallback_img: str | None) -> str | None:
     if not file_url:
         return DEFAULT_META_IMG
 
@@ -23,7 +23,7 @@ def meta_preview_url(file_url: str | None) -> str | None:
     if content_type.startswith("video/"):
         f.path.segments = dir_segments + ["thumbs", f"{base}.gif"]
         # fallback to default image if video gif not present
-        file_url = DEFAULT_META_IMG
+        file_url = fallback_img or DEFAULT_META_IMG
     else:
         # sizes:  400x400,1170x1560,40x40,72x72,80x80,96x96
         size = "400x400"

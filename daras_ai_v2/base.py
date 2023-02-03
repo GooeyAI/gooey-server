@@ -991,6 +991,9 @@ class BasePage:
         )
         return extract_nested_str(out)
 
+    def fallback_preivew_image(self) -> str:
+        return ""
+
     def run_as_api_tab(self):
         api_docs_url = str(
             furl(

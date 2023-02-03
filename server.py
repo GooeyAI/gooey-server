@@ -432,7 +432,9 @@ def st_page(request: Request, page_slug):
                 uid=uid,
                 example_id=example_id,
             ),
-            "image": meta_preview_url(page.preview_image(state)),
+            "image": meta_preview_url(
+                page.preview_image(state), page.fallback_preivew_image()
+            ),
         },
     )
 

@@ -51,7 +51,7 @@ class DeforumSDPage(BasePage):
 
         return submitted
 
-    def preview_image(self, state: dict) -> str | None:
+    def fallback_preivew_image(self) -> str:
         return DEFAULT_ANIMATION_META_IMG
 
     def preview_description(self, state: dict) -> str:
