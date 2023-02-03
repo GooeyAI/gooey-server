@@ -21,12 +21,6 @@ from daras_ai_v2.img_model_settings_widgets import (
 )
 from daras_ai_v2.loom_video_widget import loom_video, youtube_video
 from daras_ai_v2.stable_diffusion import InpaintingModels
-from recipes import (
-    SocialLookupEmail,
-    EmailFaceInpainting,
-    LipsyncTTS,
-    SEOSummary,
-)
 
 
 class FaceInpaintingPage(BasePage):
@@ -324,11 +318,15 @@ class FaceInpaintingPage(BasePage):
         ]
 
     def related_workflows(self) -> list:
+        from recipes.SocialLookupEmail import SocialLookupEmailPage
+        from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+        from recipes.SEOSummary import SEOSummaryPage
         return [
-            SocialLookupEmail.SocialLookupEmailPage,
-            EmailFaceInpainting.EmailFaceInpaintingPage,
-            LipsyncTTS.LipsyncTTSPage,
-            SEOSummary.SEOSummaryPage,
+            SocialLookupEmailPage,
+            EmailFaceInpaintingPage,
+            LipsyncTTSPage,
+            SEOSummaryPage,
         ]
 
     def render_example(self, state: dict):

@@ -17,12 +17,6 @@ from daras_ai_v2.stable_diffusion import (
     instruct_pix2pix,
 )
 
-from recipes import (
-    ImageSegmentation,
-    ObjectInpainting,
-    FaceInpainting,
-    CompareText2Img,
-)
 
 
 class Img2ImgPage(BasePage):
@@ -67,11 +61,15 @@ class Img2ImgPage(BasePage):
         output_images: list[str]
 
     def related_workflows(self) -> list:
+        from recipes.ImageSegmentation import ImageSegmentationPage
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.FaceInpainting import FaceInpaintingPage
+        from recipes.CompareText2Img import CompareText2ImgPage
         return [
-            ImageSegmentation.ImageSegmentationPage,
-            ObjectInpainting.ObjectInpaintingPage,
-            FaceInpainting.FaceInpaintingPage,
-            CompareText2Img.CompareText2ImgPage,
+            ImageSegmentationPage,
+            ObjectInpaintingPage,
+            FaceInpaintingPage,
+            CompareText2ImgPage,
         ]
 
     def render_form_v2(self):

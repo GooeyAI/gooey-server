@@ -15,12 +15,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_settings,
     TextToSpeechProviders,
 )
-from recipes import (
-    VideoBots,
-    LipsyncTTS,
-    DeforumSD,
-    CompareText2Img,
-)
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/meta%20tags%20-%20voic%20generators.jpg"
 
@@ -194,11 +188,15 @@ class TextToSpeechPage(BasePage):
             )
 
     def related_workflows(self) -> list:
+        from recipes.VideoBots import VideoBotsPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+        from recipes.DeforumSD import DeforumSDPage
+        from recipes.CompareText2Img import CompareText2ImgPage
         return [
-            VideoBots.VideoBotsPage,
-            LipsyncTTS.LipsyncTTSPage,
-            DeforumSD.DeforumSDPage,
-            CompareText2Img.CompareText2ImgPage,
+            VideoBotsPage,
+            LipsyncTTSPage,
+            DeforumSDPage,
+            CompareText2ImgPage,
         ]
 
     def render_example(self, state: dict):

@@ -11,12 +11,6 @@ from html_sanitizer import Sanitizer
 from lxml import etree
 from pydantic import BaseModel
 
-from recipes import (
-    GoogleImageGen,
-    SocialLookupEmail,
-    ObjectInpainting,
-    Img2Img,
-)
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
@@ -115,11 +109,15 @@ class SEOSummaryPage(BasePage):
         final_prompt: str
 
     def related_workflows(self):
+        from recipes.SocialLookupEmail import SocialLookupEmailPage
+        from recipes.GoogleImageGen import GoogleImageGenPage
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.Img2Img import Img2ImgPage
         return [
-            SocialLookupEmail.SocialLookupEmailPage,
-            GoogleImageGen.GoogleImageGenPage,
-            ObjectInpainting.ObjectInpaintingPage,
-            Img2Img.Img2ImgPage,
+            SocialLookupEmailPage,
+            GoogleImageGenPage,
+            ObjectInpaintingPage,
+            Img2ImgPage,
         ]
 
     def render_description(self):

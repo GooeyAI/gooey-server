@@ -5,12 +5,6 @@ from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
 
-from recipes import (
-    VideoBots,
-    LipsyncTTS,
-    CompareText2Img,
-    FaceInpainting,
-)
 
 DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/meta%20tags%20-%20animation.jpg"
 
@@ -27,11 +21,15 @@ class DeforumSDPage(BasePage):
         output_video: str
 
     def related_workflows(self) -> list:
+        from recipes.VideoBots import VideoBotsPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+        from recipes.FaceInpainting import FaceInpaintingPage
         return [
-            VideoBots.VideoBotsPage,
-            LipsyncTTS.LipsyncTTSPage,
-            CompareText2Img.CompareText2ImgPage,
-            FaceInpainting.FaceInpaintingPage,
+            VideoBotsPage,
+            LipsyncTTSPage,
+            CompareText2ImgPage,
+            FaceInpaintingPage,
         ]
 
     def render_form(self) -> bool:

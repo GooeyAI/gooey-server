@@ -27,12 +27,6 @@ from daras_ai_v2.repositioning import (
     reposition_object,
     get_mask_bounds,
 )
-from recipes import (
-    ObjectInpainting,
-    Img2Img,
-    FaceInpainting,
-    CompareText2Img,
-)
 
 
 class ImageSegmentationPage(BasePage):
@@ -71,11 +65,15 @@ class ImageSegmentationPage(BasePage):
         resized_mask: str
 
     def related_workflows(self) -> list:
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.Img2Img import Img2ImgPage
+        from recipes.FaceInpainting import FaceInpaintingPage
+        from recipes.CompareText2Img import CompareText2ImgPage
         return [
-            ObjectInpainting.ObjectInpaintingPage,
-            Img2Img.Img2ImgPage,
-            FaceInpainting.FaceInpaintingPage,
-            CompareText2Img.CompareText2ImgPage,
+            ObjectInpaintingPage,
+            Img2ImgPage,
+            FaceInpaintingPage,
+            CompareText2ImgPage,
         ]
 
     def render_form(self) -> bool:

@@ -7,22 +7,16 @@ import streamlit as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.base import BasePage
 from daras_ai_v2 import db, settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
-from recipes import (
-    SEOSummary,
-    FaceInpainting,
-    LipsyncTTS,
-    SocialLookupEmail,
-)
+from recipes.FaceInpainting import FaceInpaintingPage
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
 
-class EmailFaceInpaintingPage(BasePage):
+class EmailFaceInpaintingPage(FaceInpaintingPage):
     title = "AI Generated Photo from Email Profile Lookup"
     slug_versions = ["EmailFaceInpainting", "ai-image-from-email-lookup"]
     version = 2
@@ -145,15 +139,19 @@ class EmailFaceInpaintingPage(BasePage):
         ), "Please provide a From Email, Subject & Body"
 
     def related_workflows(self) -> list:
+        from recipes.FaceInpainting import FaceInpaintingPage
+        from recipes.SocialLookupEmail import SocialLookupEmailPage
+        from recipes.SEOSummary import SEOSummaryPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
         return [
-            FaceInpainting.FaceInpaintingPage,
-            SocialLookupEmail.SocialLookupEmailPage,
-            SEOSummary.SEOSummaryPage,
-            LipsyncTTS.LipsyncTTSPage,
+            FaceInpaintingPage,
+            SocialLookupEmailPage,
+            SEOSummaryPage,
+            LipsyncTTSPage,
         ]
 
     def render_settings(self):
-        FaceInpainting.FaceInpaintingPage().render_settings()
+        super().render_settings()
         st.write(
             """
             ### Email settings
@@ -196,7 +194,7 @@ class EmailFaceInpaintingPage(BasePage):
         )
 
     def render_output(self):
-        FaceInpainting.FaceInpaintingPage().render_output()
+        super().render_output()
 
         if st.session_state.get("email_sent"):
             st.write(f"✅ Email sent to {st.session_state.get('email_address')}")
@@ -213,7 +211,7 @@ class EmailFaceInpaintingPage(BasePage):
         photo_url = get_photo_for_email(request.email_address)
         if photo_url:
             state["input_image"] = photo_url
-            yield from FaceInpainting.FaceInpaintingPage().run(state)
+            yield from super().run(state)
 
         output_images = state.get("output_images")
 
