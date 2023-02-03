@@ -29,6 +29,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
+from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.html_error_widget import html_error
@@ -227,13 +228,19 @@ class BasePage:
         if "__related_recipe_docs" not in st.session_state:
             with st.spinner("Loading Related Recipes..."):
                 docs = {}
-                for workflow in workflows:
-                    docs[workflow().doc_name] = (workflow().get_recipe_doc().to_dict(),)
+                map_parallel(
+                    lambda page: docs.update(
+                        {
+                            page().doc_name: page().get_recipe_doc().to_dict(),
+                        },
+                    ),
+                    workflows,
+                )
             st.session_state["__related_recipe_docs"] = docs
         related_recipe_docs = st.session_state.get("__related_recipe_docs")
 
         def _render(recipe):
-            recipe_state = related_recipe_docs[recipe().doc_name][0]
+            recipe_state = related_recipe_docs[recipe().doc_name]
             st.markdown(
                 f"""
                     <a href="{recipe().app_url()}" style="text-decoration:none;color:white">
