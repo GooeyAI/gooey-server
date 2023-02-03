@@ -85,8 +85,6 @@ def meta_description_for_page(
 ) -> str:
     description = page.preview_description(state)
 
-
-
     # updated_at = state.get("updated_at")
     # if updated_at:
     #     description = updated_at.strftime("%d-%b-%Y") + " — " + description
