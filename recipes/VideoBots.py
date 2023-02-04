@@ -13,7 +13,7 @@ from daras_ai.image_input import (
     truncate_text_words,
 )
 from daras_ai_v2 import db
-from daras_ai_v2.base import BasePage
+from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -321,6 +321,11 @@ top.myLandbot = new top.Landbot.Livechat({
             lip_state["input_audio"] = audio_url
             yield from LipsyncPage().run(lip_state)
             state["output_video"].append(lip_state["output_video"])
+
+    def get_tabs(self):
+        tabs = super().get_tabs()
+        tabs.extend([MenuTabs.integrations])
+        return tabs
 
     def integrations_tab(self):
         user = st.session_state.get("_current_user")
