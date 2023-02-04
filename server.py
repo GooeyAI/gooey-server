@@ -32,7 +32,7 @@ from daras_ai_v2 import settings, db
 from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
-    ApiResponseModel,
+    ApiResponseModel, DEFAULT_META_IMG,
 )
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import (
