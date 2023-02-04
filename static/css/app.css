@@ -219,12 +219,6 @@ iframe {
     }
 }
 
-.error-404-div {
-    width: 100vw;
-    height: 70vh;
-    text-align: center;
-}
-
 /* https://css-tricks.com/couple-takes-sticky-footer/#aa-there-is-flexbox */
 html,
 body {

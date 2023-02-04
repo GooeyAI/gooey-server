@@ -1,8 +1,10 @@
 import os
 
 import firebase_admin
+import sentry_sdk
 import stripe
 from decouple import config, UndefinedValueError, Csv
+from starlette.templating import Jinja2Templates
 from furl import furl
 from google.oauth2 import service_account
 import sentry_sdk
@@ -63,6 +65,8 @@ EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="sean@dara.network")
 
+SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
+
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
 LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 1000, cast=int)
@@ -76,3 +80,5 @@ DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
 
 SEON_API_KEY = config("SEON_API_KEY", None)
+
+templates = Jinja2Templates(directory="templates")
