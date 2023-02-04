@@ -41,6 +41,7 @@ from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.send_email import send_reported_run_email
+
 DEFAULT_STATUS = "Running..."
 
 EXAMPLES_COLLECTION = "examples"
@@ -57,7 +58,6 @@ DEFAULT_META_IMG = (
 )
 MAX_SEED = 4294967294
 gooey_rng = Random()
-
 
 
 class ApiResponseModel(GenericModel, typing.Generic[O]):
