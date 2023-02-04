@@ -40,7 +40,7 @@ from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
-from daras_ai_v2.tabs_widget import page_tabs
+from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
 
 DEFAULT_STATUS = "Running..."
 
@@ -65,14 +65,6 @@ class ApiResponseModel(GenericModel, typing.Generic[O]):
     url: str
     created_at: str
     output: O
-
-
-class MenuTabs:
-    run = "🏃‍♀️Run"
-    examples = "🔖 Examples"
-    run_as_api = "🚀 Run as API"
-    history = "📖 History"
-    integrations = "🔌 Integrations"
 
 
 class StateKeys:
