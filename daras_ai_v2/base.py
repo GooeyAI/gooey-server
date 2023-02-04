@@ -17,7 +17,6 @@ from google.cloud import firestore
 from pydantic import BaseModel
 from pydantic.generics import GenericModel
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
-from streamlit_option_menu import option_menu
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
@@ -36,11 +35,12 @@ from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
-from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import gooey_reset_query_parm
-from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.send_email import send_reported_run_email
+from daras_ai_v2.settings import EXPLORE_URL
+from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
 
 DEFAULT_STATUS = "Running..."
 
@@ -65,13 +65,6 @@ class ApiResponseModel(GenericModel, typing.Generic[O]):
     url: str
     created_at: str
     output: O
-
-
-class MenuTabs:
-    run = "🏃‍♀️Run"
-    examples = "🔖 Examples"
-    run_as_api = "🚀 Run as API"
-    history = "📖 History"
 
 
 class StateKeys:
@@ -121,15 +114,13 @@ class BasePage:
             query_params |= dict(example_id=example_id)
         return query_params
 
-    def api_url(self, example_id=None, run_id=None, uid=None) -> str:
+    def api_url(self, example_id=None, run_id=None, uid=None) -> furl:
         query_params = {}
         if run_id and uid:
             query_params = dict(run_id=run_id, uid=uid)
         elif example_id:
             query_params = dict(example_id=example_id)
-        return str(
-            furl(settings.API_BASE_URL, query_params=query_params) / self.endpoint
-        )
+        return furl(settings.API_BASE_URL, query_params=query_params) / self.endpoint
 
     @property
     def endpoint(self) -> str:
@@ -171,68 +162,65 @@ class BasePage:
         st.write("## " + st.session_state.get(StateKeys.page_title))
         st.write(st.session_state.get(StateKeys.page_notes))
 
-        menu_options = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
+        selected_tab = page_tabs(
+            tabs=self.get_tabs(),
+            key=StateKeys.option_menu_key,
+        )
+        self.render_selected_tab(selected_tab)
 
+    def get_tabs(self):
+        tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
         current_user: UserRecord = st.session_state.get("_current_user")
         if not hasattr(current_user, "_is_anonymous"):
-            menu_options.append(MenuTabs.history)
+            tabs.extend([MenuTabs.history])
+        return tabs
 
-        selected_menu = option_menu(
-            None,
-            options=menu_options,
-            icons=["-"] * len(menu_options),
-            orientation="horizontal",
-            key=st.session_state.get(StateKeys.option_menu_key),
-            styles={
-                "nav-link": {"white-space": "nowrap;"},
-                "nav-link-selected": {"font-weight": "normal;", "color": "black"},
-            },
-        )
+    def render_selected_tab(self, selected_tab: str):
+        match selected_tab:
+            case MenuTabs.run:
+                input_col, output_col = st.columns([3, 2], gap="medium")
 
-        if selected_menu == MenuTabs.run:
-            input_col, output_col = st.columns([3, 2], gap="medium")
+                self._render_step_row()
 
-            self._render_step_row()
+                col1, col2 = st.columns(2)
+                with col1:
+                    self._render_help()
 
-            col1, col2 = st.columns(2)
-            with col1:
-                self._render_help()
+                self.render_related_workflows()
 
-            self.render_related_workflows()
+                with input_col:
+                    submitted1 = self.render_form()
 
-            with input_col:
-                submitted1 = self.render_form()
+                    with st.expander("⚙️ Settings"):
+                        self.render_settings()
 
-                with st.expander("⚙️ Settings"):
-                    self.render_settings()
+                        st.write("---")
+                        st.write("##### 🖌️ Personalize")
+                        st.text_input("Title", key=StateKeys.page_title)
+                        st.text_area("Notes", key=StateKeys.page_notes)
+                        st.write("---")
 
-                    st.write("---")
-                    st.write("##### 🖌️ Personalize")
-                    st.text_input("Title", key=StateKeys.page_title)
-                    st.text_area("Notes", key=StateKeys.page_notes)
-                    st.write("---")
+                        submitted2 = self.render_submit_button(key="--submit-2")
 
-                    submitted2 = self.render_submit_button(key="--submit-2")
+                    submitted = submitted1 or submitted2
 
-                submitted = submitted1 or submitted2
+                with output_col:
+                    self._runner(submitted)
 
-            with output_col:
-                self._runner(submitted)
+                with col2:
+                    self._render_save_options()
+                #
+                # NOTE: Beware of putting code here since runner will call experimental_rerun
+                #
 
-            with col2:
-                self._render_save_options()
-            #
-            # NOTE: Beware of putting code here since runner will call experimental_rerun
-            #
+            case MenuTabs.examples:
+                self._examples_tab()
 
-        elif selected_menu == MenuTabs.examples:
-            self._examples_tab()
+            case MenuTabs.history:
+                self._history_tab()
 
-        elif selected_menu == MenuTabs.history:
-            self._history_tab()
-
-        elif selected_menu == MenuTabs.run_as_api:
-            self.run_as_api_tab()
+            case MenuTabs.run_as_api:
+                self.run_as_api_tab()
 
     def render_related_workflows(self):
         workflows = self.related_workflows()
@@ -599,7 +587,7 @@ class BasePage:
         example_id, run_id, uid = self.extract_query_params(query_params)
         return self.app_url(example_id, run_id, uid)
 
-    def _get_current_api_url(self) -> str | None:
+    def _get_current_api_url(self) -> furl | None:
         query_params = st.experimental_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
         return self.api_url(example_id, run_id, uid)
@@ -1044,7 +1032,7 @@ class BasePage:
         )
         st.markdown(f"### [📖 API Docs]({api_docs_url})")
 
-        api_url = self._get_current_api_url()
+        api_url = str(self._get_current_api_url())
         request_body = get_example_request_body(self.RequestModel, st.session_state)
         response_body = self.get_example_response_body(st.session_state)
 

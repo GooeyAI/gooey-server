@@ -61,11 +61,14 @@ from recipes.SEOSummary import SEOSummaryPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
-from routers import billing
+from routers import billing, facebook, talkjs
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
-app.include_router(billing.router)
+app.include_router(billing.router, include_in_schema=False)
+app.include_router(talkjs.router, include_in_schema=False)
+app.include_router(facebook.router, include_in_schema=False)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -167,12 +170,13 @@ def authentication(request: Request):
     )
 
 
-@app.post("/sessionLogin", include_in_schema=False)
-async def authentication(request: Request):
-    ## Taken from https://firebase.google.com/docs/auth/admin/manage-cookies#create_session_cookie
+async def request_body(request: Request):
+    return await request.body()
 
-    # Get the ID token sent by the client
-    id_token = await request.body()
+
+@app.post("/sessionLogin", include_in_schema=False)
+def authentication(request: Request, id_token: bytes = Depends(request_body)):
+    ## Taken from https://firebase.google.com/docs/auth/admin/manage-cookies#create_session_cookie
 
     # To ensure that cookies are set only on recently signed in users, check auth_time in
     # ID token before creating a cookie.
@@ -288,84 +292,97 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         user: auth.UserRecord = Depends(api_auth_header),
         page_request: page_cls.RequestModel = body_spec,
     ):
-        created_at = datetime.datetime.utcnow().isoformat()
-        # init a new page for every request
-        page = page_cls()
-
-        # get saved state from db
-        state = page.get_doc_from_query_params(request.query_params)
-        if state is None:
-            raise HTTPException(status_code=404)
-
-        # set sane defaults
-        for k, v in page.sane_defaults.items():
-            state.setdefault(k, v)
-        # only use the request values, discard outputs
-        state = page.RequestModel.parse_obj(state).dict()
-        # remove None values & insert request data
-        request_dict = {k: v for k, v in page_request.dict().items() if v is not None}
-        state.update(request_dict)
-        # set the current user
-        state["_current_user"] = user
-
-        # set streamlit session state
-        streamlit.session_state = state
-
-        # check the balance
-        balance = db.get_doc_field(
-            db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
+        return call_api(
+            page_cls=page_cls,
+            user=user,
+            request_body=page_request.dict(),
+            query_params=request.query_params,
         )
-        if balance < page.get_price():
-            account_url = furl(settings.APP_BASE_URL) / "account"
-            return JSONResponse(
-                status_code=402,
-                content={
-                    "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
-                },
-            )
 
-        # create the run
-        run_id = get_random_doc_id()
-        run_url = str(
-            furl(page.app_url(), query_params=dict(run_id=run_id, uid=user.uid))
+
+def call_api(
+    *,
+    page_cls: typing.Type[BasePage],
+    user: auth.UserRecord,
+    request_body: dict,
+    query_params,
+):
+    created_at = datetime.datetime.utcnow().isoformat()
+    # init a new page for every request
+    page = page_cls()
+
+    # get saved state from db
+    state = page.get_doc_from_query_params(query_params)
+    if state is None:
+        raise HTTPException(status_code=404)
+
+    # set sane defaults
+    for k, v in page.sane_defaults.items():
+        state.setdefault(k, v)
+
+    # only use the request values, discard outputs
+    state = page.RequestModel.parse_obj(state).dict()
+
+    # remove None values & insert request data
+    request_dict = {k: v for k, v in request_body.items() if v is not None}
+    state.update(request_dict)
+    # set the current user
+    state["_current_user"] = user
+
+    # set streamlit session state
+    streamlit.session_state = state
+
+    # check the balance
+    balance = db.get_doc_field(db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0)
+    if balance < page.get_price():
+        account_url = furl(settings.APP_BASE_URL) / "account"
+        return JSONResponse(
+            status_code=402,
+            content={
+                "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
+            },
         )
-        run_doc_ref = page.run_doc_ref(run_id, user.uid)
 
-        # save the run
-        run_doc_ref.set(page.state_to_doc(state))
+    # create the run
+    run_id = get_random_doc_id()
+    run_url = str(furl(page.app_url(), query_params=dict(run_id=run_id, uid=user.uid)))
+    run_doc_ref = page.run_doc_ref(run_id, user.uid)
 
-        # run the script
+    # save the run
+    run_doc_ref.set(page.state_to_doc(state))
+
+    # run the script
+    try:
+        gen = page.run(state)
         try:
-            gen = page.run(state)
-            try:
-                while True:
-                    next(gen)
-            except StopIteration:
-                pass
-        except Exception as e:
-            capture_exception(e)
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "id": run_id,
-                    "url": run_url,
-                    "created_at": created_at,
-                    "error": err_msg_for_exc(e),
-                },
-            )
+            while True:
+                next(gen)
+        except StopIteration:
+            pass
+    except Exception as e:
+        capture_exception(e)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "id": run_id,
+                "url": run_url,
+                "created_at": created_at,
+                "error": err_msg_for_exc(e),
+            },
+        )
 
-        # save the run
-        run_doc_ref.set(page.state_to_doc(state))
-        # deduct credits
-        page.deduct_credits()
+    # save the run
+    run_doc_ref.set(page.state_to_doc(state))
+    # deduct credits
+    page.deduct_credits()
 
-        # return updated state
-        return {
-            "id": run_id,
-            "url": run_url,
-            "created_at": created_at,
-            "output": state,
-        }
+    # return updated state
+    return {
+        "id": run_id,
+        "url": run_url,
+        "created_at": created_at,
+        "output": state,
+    }
 
 
 @app.get("/explore/", include_in_schema=False)

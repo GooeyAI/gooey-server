@@ -12,7 +12,8 @@ from daras_ai.image_input import (
     upload_file_from_bytes,
     truncate_text_words,
 )
-from daras_ai_v2.base import BasePage
+from daras_ai_v2 import db
+from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -27,6 +28,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
 )
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
+from routers.facebook import get_page_display_name, ig_connect_url, fb_connect_url
 
 BOT_SCRIPT_RE = re.compile(r"(\n)([\w\ ]+)(:)")
 
@@ -319,3 +321,90 @@ top.myLandbot = new top.Landbot.Livechat({
             lip_state["input_audio"] = audio_url
             yield from LipsyncPage().run(lip_state)
             state["output_video"].append(lip_state["output_video"])
+
+    def get_tabs(self):
+        tabs = super().get_tabs()
+        tabs.extend([MenuTabs.integrations])
+        return tabs
+
+    def render_selected_tab(self, selected_tab):
+        super().render_selected_tab(selected_tab)
+
+        if selected_tab != MenuTabs.integrations:
+            return
+
+        user = st.session_state.get("_current_user")
+        if not user or hasattr(user, "_is_anonymous"):
+            st.write(
+                "**Please Login to connect this workflow to Your Website, Instagram, Whatsapp & More**"
+            )
+            return
+
+        st.write("### Messenger Bot")
+
+        st.markdown(
+            f"""
+            <!--
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
+                  <img height="20" src="https://www.instagram.com/favicon.ico">️
+                  &nbsp; 
+                  Add Your Instagram Page
+                </a>
+            </div>
+            -->
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
+                  <img height="20" src="https://www.facebook.com/favicon.ico">️             
+                  &nbsp; 
+                  Add Your Facebook Page
+                </a>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        fb_pages = st.session_state.get("__fb_pages")
+        if "__fb_pages" not in st.session_state:
+            with st.spinner("Loading Facebook Pages..."):
+                fb_pages = (
+                    db.get_collection_ref(db.FB_PAGES_COLLECTION)
+                    .where("uid", "==", user.uid)
+                    .get()
+                )
+            st.session_state["__fb_pages"] = fb_pages
+        st.write("Please reload this page after logging in.")
+
+        if not fb_pages:
+            return
+
+        st.write("##### Select Pages to Connect")
+        selected_pages = {}
+
+        page_slug = self.slug_versions[0]
+        query_params = dict(self._get_current_api_url().query.params)
+
+        for snapshot in fb_pages:
+            fb_page = snapshot.to_dict()
+            is_connected = (
+                fb_page.get("connected_page_slug") == self.slug_versions[0]
+                and fb_page.get("connected_query_params") == query_params
+            )
+            selected = st.checkbox(get_page_display_name(fb_page), value=is_connected)
+            selected_pages[snapshot.id] = (snapshot, selected)
+
+        if selected_pages and st.button("🖇️ Connect"):
+            with st.spinner("Connecting..."):
+                for snapshot, selected in selected_pages.values():
+                    if selected:
+                        update = {
+                            "connected_page_slug": page_slug,
+                            "connected_query_params": query_params,
+                        }
+                    else:
+                        update = {
+                            "connected_page_slug": None,
+                            "connected_query_params": {},
+                        }
+                    snapshot.reference.update(update)
+            st.success("Done ✅")
