@@ -327,7 +327,12 @@ top.myLandbot = new top.Landbot.Livechat({
         tabs.extend([MenuTabs.integrations])
         return tabs
 
-    def integrations_tab(self):
+    def render_selected_tab(self, selected_tab):
+        super().render_selected_tab(selected_tab)
+
+        if selected_tab != MenuTabs.integrations:
+            return
+
         user = st.session_state.get("_current_user")
         if not user or hasattr(user, "_is_anonymous"):
             st.write(

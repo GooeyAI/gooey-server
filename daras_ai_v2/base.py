@@ -174,7 +174,7 @@ class BasePage:
             tabs=self.get_tabs(),
             key=StateKeys.option_menu_key,
         )
-        self._render_selected_tab(selected_tab)
+        self.render_selected_tab(selected_tab)
 
     def get_tabs(self):
         tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
@@ -183,8 +183,8 @@ class BasePage:
             tabs.extend([MenuTabs.history])
         return tabs
 
-    def _render_selected_tab(self, selected_menu):
-        match selected_menu:
+    def render_selected_tab(self, selected_tab: str):
+        match selected_tab:
             case MenuTabs.run:
                 input_col, output_col = st.columns([3, 2], gap="medium")
 
@@ -229,9 +229,6 @@ class BasePage:
 
             case MenuTabs.run_as_api:
                 self.run_as_api_tab()
-
-            case MenuTabs.integrations:
-                self.integrations_tab()
 
     def render_related_workflows(self):
         workflows = self.related_workflows()
@@ -356,9 +353,6 @@ class BasePage:
             sleep(2)
             st.session_state["show_report_workflow"] = False
             st.experimental_rerun()
-
-    def integrations_tab(self):
-        st.write("Sorry! No integrations available for this workflow.")
 
     def _load_session_state(self):
         placeholder = st.empty()
