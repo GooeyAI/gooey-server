@@ -8,7 +8,7 @@ from daras_ai.image_input import (
     upload_file_from_bytes,
     resize_img_scale,
 )
-from daras_ai_v2.base import BasePage
+from daras_ai_v2.base import BasePage, gooey_rng
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
@@ -19,7 +19,6 @@ from daras_ai_v2.stable_diffusion import (
     IMG_MAX_SIZE,
     instruct_pix2pix,
 )
-from daras_ai_v2.utils import random
 
 
 class GoogleImageGenPage(BasePage):
@@ -62,6 +61,19 @@ class GoogleImageGenPage(BasePage):
         image_urls: list[str]
         selected_image: str
 
+    def related_workflows(self):
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.ImageSegmentation import ImageSegmentationPage
+        from recipes.SEOSummary import SEOSummaryPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+
+        return [
+            ObjectInpaintingPage,
+            ImageSegmentationPage,
+            SEOSummaryPage,
+            CompareText2ImgPage,
+        ]
+
     def render_description(self):
         st.write(
             """
@@ -88,10 +100,10 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         )
         image_urls = [
             result["image"]
-            for result in scaleserp_results["image_results"]
+            for result in scaleserp_results.get("image_results", [])
             if "image" in result
         ][:10]
-        random.shuffle(image_urls)
+        gooey_rng.shuffle(image_urls)
 
         state["image_urls"] = image_urls
 

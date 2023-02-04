@@ -16,6 +16,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
 )
 
+DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/meta%20tags%20-%20voic%20generators.jpg"
+
 
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"
@@ -46,6 +48,9 @@ class TextToSpeechPage(BasePage):
 
     class ResponseModel(BaseModel):
         audio_url: str
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_TTS_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
@@ -181,6 +186,19 @@ class TextToSpeechPage(BasePage):
             state["audio_url"] = upload_file_from_bytes(
                 "google_tts_gen.wav", response.audio_content
             )
+
+    def related_workflows(self) -> list:
+        from recipes.VideoBots import VideoBotsPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+        from recipes.DeforumSD import DeforumSDPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+
+        return [
+            VideoBotsPage,
+            LipsyncTTSPage,
+            DeforumSDPage,
+            CompareText2ImgPage,
+        ]
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)

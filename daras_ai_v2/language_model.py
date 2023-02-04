@@ -47,7 +47,9 @@ def do_retry(
                 except error_cls as e:
                     if n < max_retries:
                         n += 1
-                        print(f"({n}/5) captured error, retry in 1s:", repr(e))
+                        print(
+                            f"({n}/5) captured error, retry in {retry_delay}s:", repr(e)
+                        )
                         sleep(retry_delay)
                     else:
                         raise
@@ -99,10 +101,4 @@ def run_language_model(
         presence_penalty=0.25 if avoid_repetition else 0,
     )
 
-    # choose the completions that aren't empty
-    outputs = []
-    for choice in r["choices"]:
-        text = choice["text"].strip()
-        if text:
-            outputs.append(text)
-    return outputs
+    return [choice["text"].strip() for choice in r["choices"]]

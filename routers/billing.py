@@ -4,18 +4,17 @@ import stripe
 from fastapi import APIRouter, Depends
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from firebase_admin.auth import UserRecord
 from furl import furl
 from starlette.datastructures import FormData
 
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
+from daras_ai_v2.settings import templates
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
 router = APIRouter()
-templates = Jinja2Templates(directory="templates")
 
 
 available_subscriptions = {

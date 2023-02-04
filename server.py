@@ -11,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from firebase_admin import auth, exceptions
 from furl import furl
 from google.cloud import firestore
@@ -40,8 +39,9 @@ from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import (
     meta_title_for_page,
     meta_description_for_page,
-    meta_preview_url,
 )
+from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.settings import templates
 from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
@@ -80,8 +80,6 @@ app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-templates = Jinja2Templates(directory="templates")
-
 
 @app.get("/sitemap.xml/", include_in_schema=False)
 async def get_sitemap():
@@ -111,18 +109,15 @@ async def favicon():
     return FileResponse("static/favicon.ico")
 
 
-_proxy_client = httpx.AsyncClient(base_url=settings.WIX_SITE_URL)
-
-
 @app.exception_handler(404)
 async def custom_404_handler(request: Request, exc):
     url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
-    req = _proxy_client.build_request(
-        request.method,
-        url,
-        headers={"user-agent": request.headers.get("user-agent", "")},
-    )
-    resp = await _proxy_client.send(req)
+    async with httpx.AsyncClient(base_url=settings.WIX_SITE_URL) as client:
+        resp = await client.request(
+            request.method,
+            url,
+            headers={"user-agent": request.headers.get("user-agent", "")},
+        )
 
     if resp.status_code == 404:
         return templates.TemplateResponse(
@@ -133,6 +128,7 @@ async def custom_404_handler(request: Request, exc):
             },
             status_code=404,
         )
+
     elif resp.status_code != 200 or "text/html" not in resp.headers["content-type"]:
         return Response(content=resp.content, status_code=resp.status_code)
 
@@ -450,7 +446,9 @@ def st_page(request: Request, page_slug):
                 uid=uid,
                 example_id=example_id,
             ),
-            "image": meta_preview_url(page.preview_image(state)),
+            "image": meta_preview_url(
+                page.preview_image(state), page.fallback_preivew_image()
+            ),
         },
     )
 

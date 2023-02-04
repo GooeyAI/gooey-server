@@ -64,6 +64,19 @@ class ImageSegmentationPage(BasePage):
         resized_image: str
         resized_mask: str
 
+    def related_workflows(self) -> list:
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.Img2Img import Img2ImgPage
+        from recipes.FaceInpainting import FaceInpaintingPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+
+        return [
+            ObjectInpaintingPage,
+            Img2ImgPage,
+            FaceInpaintingPage,
+            CompareText2ImgPage,
+        ]
+
     def render_form(self) -> bool:
         with st.form("my_form"):
             st.file_uploader(

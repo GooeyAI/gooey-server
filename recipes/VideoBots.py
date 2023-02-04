@@ -91,6 +91,18 @@ class VideoBotsPage(BasePage):
         output_video: list[str]
         final_prompt: str
 
+    def related_workflows(self):
+        from recipes.LipsyncTTS import LipsyncTTSPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+        from recipes.DeforumSD import DeforumSDPage
+
+        return [
+            LipsyncTTSPage,
+            DeforumSDPage,
+            TextToSpeechPage,
+            CompareText2ImgPage,
+        ]
+
     def preview_description(self, state: dict) -> str:
         return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
 

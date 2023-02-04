@@ -61,6 +61,19 @@ class CompareText2ImgPage(BasePage):
             typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
         ]
 
+    def related_workflows(self) -> list:
+        from recipes.FaceInpainting import FaceInpaintingPage
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.GoogleImageGen import GoogleImageGenPage
+        from recipes.TextToSpeech import TextToSpeechPage
+
+        return [
+            FaceInpaintingPage,
+            ObjectInpaintingPage,
+            GoogleImageGenPage,
+            TextToSpeechPage,
+        ]
+
     def render_form_v2(self):
         st.text_area(
             """
@@ -72,7 +85,7 @@ class CompareText2ImgPage(BasePage):
         )
         enum_multiselect(
             Text2ImgModels,
-            label="#### 🧨 Selected Models",
+            label="#### 🧨 Compare Image Models",
             key="selected_models",
         )
 
@@ -203,6 +216,9 @@ class CompareText2ImgPage(BasePage):
                 case _:
                     total += 2
         return total
+
+    def additional_notes(self) -> str | None:
+        return "Each selected model costs 2 credits to run except for Dalle2 which is 15 credits per rendered image."
 
 
 if __name__ == "__main__":

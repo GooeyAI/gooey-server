@@ -2,12 +2,10 @@
 
 {% block content %}
     {% include 'login_container.html' %}
-    <div class="error-404-div">
-            <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
-            <lottie-player src="/static/lottie_animations/404_error.json" background="transparent" speed="1"
-                           style="width: 100%; height: 100%;" loop autoplay></lottie-player>
-            <h1>
-                Oops: We can't find this page!
-            </h1>
+    <div style="text-align: center;">
+        <h1>
+            Oops, we can't find this page!
+        </h1>
+        <img src="https://media.tenor.com/IHdlTRsmcS4AAAAC/404.gif" height="404" alt="404">
     </div>
 {% endblock content %}

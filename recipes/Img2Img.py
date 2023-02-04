@@ -59,6 +59,19 @@ class Img2ImgPage(BasePage):
     class ResponseModel(BaseModel):
         output_images: list[str]
 
+    def related_workflows(self) -> list:
+        from recipes.ImageSegmentation import ImageSegmentationPage
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.FaceInpainting import FaceInpaintingPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+
+        return [
+            ImageSegmentationPage,
+            ObjectInpaintingPage,
+            FaceInpaintingPage,
+            CompareText2ImgPage,
+        ]
+
     def render_form_v2(self):
         st.file_uploader(
             """

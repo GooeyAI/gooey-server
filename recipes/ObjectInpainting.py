@@ -70,6 +70,19 @@ class ObjectInpaintingPage(BasePage):
         # diffusion_images: list[str]
         output_images: list[str]
 
+    def related_workflows(self) -> list:
+        from recipes.ImageSegmentation import ImageSegmentationPage
+        from recipes.GoogleImageGen import GoogleImageGenPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+        from recipes.Img2Img import Img2ImgPage
+
+        return [
+            ImageSegmentationPage,
+            GoogleImageGenPage,
+            CompareText2ImgPage,
+            Img2ImgPage,
+        ]
+
     def render_form_v2(self):
         st.text_area(
             """
