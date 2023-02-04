@@ -5,6 +5,9 @@ import sentry_sdk
 import stripe
 from decouple import config, UndefinedValueError, Csv
 from starlette.templating import Jinja2Templates
+from furl import furl
+from google.oauth2 import service_account
+import sentry_sdk
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -49,6 +52,7 @@ POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN")
 
 APP_BASE_URL = config("APP_BASE_URL", "/")
 API_BASE_URL = config("API_BASE_URL", "/")
+EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 IFRAME_BASE_URL = config("IFRAME_BASE_URL", "/__/st/")
 
 GPU_SERVER_1 = config("GPU_SERVER_1", "http://gpu-1.gooey.ai")

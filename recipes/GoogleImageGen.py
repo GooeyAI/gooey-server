@@ -61,6 +61,19 @@ class GoogleImageGenPage(BasePage):
         image_urls: list[str]
         selected_image: str
 
+    def related_workflows(self):
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.ImageSegmentation import ImageSegmentationPage
+        from recipes.SEOSummary import SEOSummaryPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+
+        return [
+            ObjectInpaintingPage,
+            ImageSegmentationPage,
+            SEOSummaryPage,
+            CompareText2ImgPage,
+        ]
+
     def render_description(self):
         st.write(
             """

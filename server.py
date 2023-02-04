@@ -33,14 +33,13 @@ from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
     ApiResponseModel,
-    DEFAULT_META_IMG,
 )
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import (
     meta_title_for_page,
     meta_description_for_page,
-    meta_preview_url,
 )
+from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.settings import templates
 from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
@@ -429,7 +428,9 @@ def st_page(request: Request, page_slug):
                 uid=uid,
                 example_id=example_id,
             ),
-            "image": meta_preview_url(page.preview_image(state)),
+            "image": meta_preview_url(
+                page.preview_image(state), page.fallback_preivew_image()
+            ),
         },
     )
 

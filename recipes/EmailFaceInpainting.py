@@ -138,6 +138,19 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             from_email and email_subject and email_body
         ), "Please provide a From Email, Subject & Body"
 
+    def related_workflows(self) -> list:
+        from recipes.FaceInpainting import FaceInpaintingPage
+        from recipes.SocialLookupEmail import SocialLookupEmailPage
+        from recipes.SEOSummary import SEOSummaryPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+
+        return [
+            FaceInpaintingPage,
+            SocialLookupEmailPage,
+            SEOSummaryPage,
+            LipsyncTTSPage,
+        ]
+
     def render_settings(self):
         super().render_settings()
         st.write(

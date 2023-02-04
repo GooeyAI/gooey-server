@@ -30,13 +30,16 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
+from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
+from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params import gooey_reset_query_parm
+from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.send_email import send_reported_run_email
 
 DEFAULT_STATUS = "Running..."
@@ -47,15 +50,14 @@ USER_RUNS_COLLECTION = "user_runs"
 EXAMPLE_ID_QUERY_PARAM = "example_id"
 RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
+
+O = typing.TypeVar("O")
 DEFAULT_META_IMG = (
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
 )
 MAX_SEED = 4294967294
 gooey_rng = Random()
-
-
-O = typing.TypeVar("O")
 
 
 class ApiResponseModel(GenericModel, typing.Generic[O]):
@@ -196,6 +198,8 @@ class BasePage:
             with col1:
                 self._render_help()
 
+            self.render_related_workflows()
+
             with input_col:
                 submitted1 = self.render_form()
 
@@ -229,6 +233,53 @@ class BasePage:
 
         elif selected_menu == MenuTabs.run_as_api:
             self.run_as_api_tab()
+
+    def render_related_workflows(self):
+        workflows = self.related_workflows()
+        if not workflows:
+            return
+        st.markdown(
+            f"""
+            <a style="text-decoration:none" href="{EXPLORE_URL}" target = "_top">
+                <h2>Related Workflows</h2>
+            </a>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        def _build_page_tuple(page: typing.Type[BasePage]):
+            state = page().get_recipe_doc().to_dict()
+            preview_image = meta_preview_url(
+                page().preview_image(state), page().fallback_preivew_image()
+            )
+            return page, state, preview_image
+
+        if "__related_recipe_docs" not in st.session_state:
+            with st.spinner("Loading Related Recipes..."):
+                docs = map_parallel(
+                    _build_page_tuple,
+                    workflows,
+                )
+            st.session_state["__related_recipe_docs"] = docs
+        related_recipe_docs = st.session_state.get("__related_recipe_docs")
+
+        def _render(page_tuple):
+            page, state, preview_image = page_tuple
+            st.markdown(
+                f"""
+                    <a href="{page().app_url()}" style="text-decoration:none;color:white">
+                        <img width="100%" src="{preview_image}" />
+                        <h4>{page().title}</h4>
+                        {page().preview_description(state)}
+                    </a>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        grid_layout(4, related_recipe_docs, _render)
+
+    def related_workflows(self) -> list:
+        return []
 
     def render_report_form(self):
         with st.form("report_form"):
@@ -978,7 +1029,10 @@ class BasePage:
             or state.get("output_image")
             or state.get("output_video")
         )
-        return extract_nested_str(out) or DEFAULT_META_IMG
+        return extract_nested_str(out)
+
+    def fallback_preivew_image(self) -> str:
+        return DEFAULT_META_IMG
 
     def run_as_api_tab(self):
         api_docs_url = str(

@@ -35,6 +35,18 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     class ResponseModel(BaseModel):
         output_video: str
 
+    def related_workflows(self) -> list:
+        from recipes.VideoBots import VideoBotsPage
+        from recipes.DeforumSD import DeforumSDPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+
+        return [
+            VideoBotsPage,
+            TextToSpeechPage,
+            DeforumSDPage,
+            CompareText2ImgPage,
+        ]
+
     def render_form(self) -> bool:
         with st.form("my_form"):
             face_file = st.file_uploader(

@@ -317,6 +317,19 @@ class FaceInpaintingPage(BasePage):
             for img_bytes in output_images
         ]
 
+    def related_workflows(self) -> list:
+        from recipes.SocialLookupEmail import SocialLookupEmailPage
+        from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+        from recipes.SEOSummary import SEOSummaryPage
+
+        return [
+            SocialLookupEmailPage,
+            EmailFaceInpaintingPage,
+            LipsyncTTSPage,
+            SEOSummaryPage,
+        ]
+
     def render_example(self, state: dict):
         output_images = state.get("output_images")
         if output_images:
