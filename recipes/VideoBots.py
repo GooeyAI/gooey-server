@@ -334,6 +334,7 @@ top.myLandbot = new top.Landbot.Livechat({
 
         st.markdown(
             f"""
+            <!--
             <div style='height: 50px'>
                 <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
                   <img height="20" src="https://www.instagram.com/favicon.ico">️
@@ -341,6 +342,7 @@ top.myLandbot = new top.Landbot.Livechat({
                   Add Your Instagram Page
                 </a>
             </div>
+            -->
             <div style='height: 50px'>
                 <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
                   <img height="20" src="https://www.facebook.com/favicon.ico">️             
