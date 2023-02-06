@@ -136,7 +136,7 @@ async def custom_404_handler(request: Request, exc):
     d = pq(resp.content)
     for el in d("a"):
         el: HtmlElement
-        href = el.attrib["href"]
+        href = el.attrib.get("href", "")
         if href == "https://app.gooey.ai":
             href = "/explore/"
         elif href.startswith(settings.WIX_SITE_URL):
