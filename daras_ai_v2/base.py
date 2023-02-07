@@ -257,7 +257,7 @@ class BasePage:
                 f"""
                 <a href="{page().app_url()}" style="text-decoration:none;color:white">
                     <p>
-                            <div style="width:100%;height:200px;background-image: url({preview_image}); background-size:cover; background-position-x:center; background-repeat:no-repeat;"></div>
+                            <div style="width:100%;height:150px;background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
                             <h4>{page().title}</h4>
                             {page().preview_description(state)}
                     </p>
