@@ -1,30 +1,20 @@
+<link rel="stylesheet" href="/static/css/app.css">
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600&display=swap');
-</style>
+    .align-header {
+        padding-bottom: 20px;
+    }
 
-<div>
-    <template shadowroot="open">
-        <link rel="stylesheet" href="/static/css/app.css">
-        <style>
-            .align-header {
-                padding-bottom: 20px;
-            }
-        </style>
-        {% include 'gtag.html' %}
-
-        {% include 'header.html' %}
-        {% include 'login_scripts.html' %}
-
-        {% with enable_onetap = "false" %}
-            {% include 'login_container.html' %}
-        {% endwith %}
-    </template>
-</div>
-
-<style>
     #SITE_HEADER_WRAPPER {
         display: none;
     }
 </style>
+{% include 'gtag.html' %}
+
+{% include 'header.html' %}
+{% include 'login_scripts.html' %}
+
+{% with enable_onetap = "false" %}
+    {% include 'login_container.html' %}
+{% endwith %}
 
 {{ wix_site_html | safe }}
