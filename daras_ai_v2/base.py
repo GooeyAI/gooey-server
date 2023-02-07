@@ -255,11 +255,14 @@ class BasePage:
             page, state, preview_image = page_tuple
             st.markdown(
                 f"""
-                    <a href="{page().app_url()}" style="text-decoration:none;color:white">
-                        <img width="100%" src="{preview_image}" style="pointer-events: none; cursor: default;"/>
-                        <h4>{page().title}</h4>
-                        {page().preview_description(state)}
-                    </a>
+                <a href="{page().app_url()}" style="text-decoration:none;color:white">
+                    <p>
+                            <div style="width:100%;height:200px;background-image: url({preview_image}); background-size:cover; background-position-x:center; background-repeat:no-repeat;"></div>
+                            <h4>{page().title}</h4>
+                            {page().preview_description(state)}
+                    </p>
+                </a>
+                <br/>
                 """,
                 unsafe_allow_html=True,
             )
