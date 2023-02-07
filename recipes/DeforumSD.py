@@ -317,7 +317,7 @@ What Stable Diffusion sampler should be used.
         blob = storage_blob_for(f"gooey.ai animation {request.animation_prompts}.mp4")
 
         r = requests.post(
-            GpuEndpoints.sd_multi + f"/deforum/",
+            GpuEndpoints.defourm_sd + f"/deforum/",
             json={
                 "pipeline": dict(
                     model_id="Protogen_V2.2.ckpt",

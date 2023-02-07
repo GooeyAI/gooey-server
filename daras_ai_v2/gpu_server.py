@@ -20,6 +20,7 @@ class GpuEndpoints:
     sd_2 = f"{settings.GPU_SERVER_1}:5011"
     sd_multi = f"{settings.GPU_SERVER_1}:5012"
     # real_esrgan = f"{settings.GPU_SERVER_1}:5013"
+    defourm_sd = f"{settings.GPU_SERVER_1}:5014"
 
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
