@@ -2,28 +2,24 @@
     @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600&display=swap');
 </style>
 
-<body>
-<template id="gooey-content">
-    <link rel="stylesheet" href="/static/css/app.css">
-    <style>
-        .align-header {
-            padding-bottom: 20px;
-        }
-    </style>
-    {% include 'gtag.html' %}
+<div>
+    <template shadowroot="open">
+        <link rel="stylesheet" href="/static/css/app.css">
+        <style>
+            .align-header {
+                padding-bottom: 20px;
+            }
+        </style>
+        {% include 'gtag.html' %}
 
-    {% include 'header.html' %}
-    {% include 'login_scripts.html' %}
+        {% include 'header.html' %}
+        {% include 'login_scripts.html' %}
 
-    {% with enable_onetap = "false" %}
-        {% include 'login_container.html' %}
-    {% endwith %}
-</template>
-<script>
-    let template = document.getElementById("gooey-content");
-    document.body.appendChild(template.content);
-</script>
-</body>
+        {% with enable_onetap = "false" %}
+            {% include 'login_container.html' %}
+        {% endwith %}
+    </template>
+</div>
 
 <style>
     #SITE_HEADER_WRAPPER {
