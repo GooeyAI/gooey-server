@@ -5,6 +5,9 @@ import sentry_sdk
 import stripe
 from decouple import config, UndefinedValueError, Csv
 from starlette.templating import Jinja2Templates
+from furl import furl
+from google.oauth2 import service_account
+import sentry_sdk
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -49,6 +52,7 @@ POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN")
 
 APP_BASE_URL = config("APP_BASE_URL", "/")
 API_BASE_URL = config("API_BASE_URL", "/")
+EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 IFRAME_BASE_URL = config("IFRAME_BASE_URL", "/__/st/")
 
 GPU_SERVER_1 = config("GPU_SERVER_1", "http://gpu-1.gooey.ai")
@@ -78,3 +82,10 @@ GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
 SEON_API_KEY = config("SEON_API_KEY", None)
 
 templates = Jinja2Templates(directory="templates")
+
+FB_APP_ID = config("FB_APP_ID", "")
+FB_APP_SECRET = config("FB_APP_SECRET", "")
+FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
+
+TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
+TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")

@@ -61,6 +61,19 @@ class CompareText2ImgPage(BasePage):
             typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
         ]
 
+    def related_workflows(self) -> list:
+        from recipes.FaceInpainting import FaceInpaintingPage
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.GoogleImageGen import GoogleImageGenPage
+        from recipes.TextToSpeech import TextToSpeechPage
+
+        return [
+            FaceInpaintingPage,
+            ObjectInpaintingPage,
+            GoogleImageGenPage,
+            TextToSpeechPage,
+        ]
+
     def render_form_v2(self):
         st.text_area(
             """

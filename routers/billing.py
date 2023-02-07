@@ -1,11 +1,12 @@
 from urllib.parse import quote_plus
 
 import stripe
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from firebase_admin.auth import UserRecord
 from furl import furl
+from starlette.datastructures import FormData
 
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
@@ -127,10 +128,15 @@ def account(request: Request):
     return templates.TemplateResponse("account.html", context)
 
 
+async def request_form(request: Request):
+    return await request.form()
+
+
 @router.post("/__/stripe/create-checkout-session")
-async def create_checkout_session(request: Request):
-    form = await request.form()
-    lookup_key = form["lookup_key"]
+def create_checkout_session(
+    request: Request, body_form: FormData = Depends(request_form)
+):
+    lookup_key = body_form["lookup_key"]
     subscription = available_subscriptions[lookup_key]
     line_item = subscription["stripe"]
 
@@ -189,13 +195,16 @@ payment_success_url = str(
 account_url = str(furl(settings.APP_BASE_URL) / router.url_path_for(account.__name__))
 
 
+async def request_body(request: Request):
+    return await request.body()
+
+
 @router.post("/__/stripe/webhook")
-async def webhook_received(request: Request):
-    request_data = await request.body()
+def webhook_received(request: Request, payload: bytes = Depends(request_body)):
 
     # Retrieve the event by verifying the signature using the raw body and secret if webhook signing is configured.
     event = stripe.Webhook.construct_event(
-        payload=request_data,
+        payload=payload,
         sig_header=request.headers["stripe-signature"],
         secret=settings.STRIPE_ENDPOINT_SECRET,
     )

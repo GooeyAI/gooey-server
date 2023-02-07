@@ -108,6 +108,19 @@ class SEOSummaryPage(BasePage):
         summarized_urls: list[dict]
         final_prompt: str
 
+    def related_workflows(self):
+        from recipes.SocialLookupEmail import SocialLookupEmailPage
+        from recipes.GoogleImageGen import GoogleImageGenPage
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.Img2Img import Img2ImgPage
+
+        return [
+            SocialLookupEmailPage,
+            GoogleImageGenPage,
+            ObjectInpaintingPage,
+            Img2ImgPage,
+        ]
+
     def render_description(self):
         st.write(
             """

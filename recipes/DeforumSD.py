@@ -132,6 +132,9 @@ def animation_prompts_editor(
     )
 
 
+DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/meta%20tags%20-%20animation.jpg"
+
+
 class DeforumSDPage(BasePage):
     title = "AI Animation Generator"
     slug_versions = ["DeforumSD", "animation-generator"]
@@ -164,6 +167,19 @@ class DeforumSDPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_video: str
+
+    def related_workflows(self) -> list:
+        from recipes.VideoBots import VideoBotsPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+        from recipes.FaceInpainting import FaceInpaintingPage
+
+        return [
+            VideoBotsPage,
+            LipsyncTTSPage,
+            CompareText2ImgPage,
+            FaceInpaintingPage,
+        ]
 
     def render_form_v2(self):
         animation_prompts_editor()
@@ -281,6 +297,9 @@ What Stable Diffusion sampler should be used.
                 "dpmpp_2m",
             ],
         )
+
+    def fallback_preivew_image(self) -> str:
+        return DEFAULT_ANIMATION_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Input your text (including keyframes!) and animate using Stable Diffusion's Deforum. Create AI generated animation for free and easier than CoLab notebooks. Inspired by deforum.art."

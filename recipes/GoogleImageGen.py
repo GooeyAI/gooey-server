@@ -61,6 +61,19 @@ class GoogleImageGenPage(BasePage):
         image_urls: list[str]
         selected_image: str
 
+    def related_workflows(self):
+        from recipes.ObjectInpainting import ObjectInpaintingPage
+        from recipes.ImageSegmentation import ImageSegmentationPage
+        from recipes.SEOSummary import SEOSummaryPage
+        from recipes.CompareText2Img import CompareText2ImgPage
+
+        return [
+            ObjectInpaintingPage,
+            ImageSegmentationPage,
+            SEOSummaryPage,
+            CompareText2ImgPage,
+        ]
+
     def render_description(self):
         st.write(
             """
@@ -98,13 +111,12 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
         selected_image_bytes = None
         for selected_image_url in image_urls:
-            print(selected_image_url)
-            selected_image_bytes = requests.get(selected_image_url).content
             try:
+                selected_image_bytes = requests.get(selected_image_url).content
                 selected_image_bytes = resize_img_scale(
                     selected_image_bytes, IMG_MAX_SIZE
                 )
-            except ValueError:
+            except (IOError, ConnectionError, ValueError):
                 continue
             else:
                 break

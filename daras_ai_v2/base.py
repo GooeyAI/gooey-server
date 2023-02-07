@@ -17,7 +17,6 @@ from google.cloud import firestore
 from pydantic import BaseModel
 from pydantic.generics import GenericModel
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
-from streamlit_option_menu import option_menu
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
@@ -30,14 +29,18 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
+from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
+from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import gooey_reset_query_parm
 from daras_ai_v2.send_email import send_reported_run_email
+from daras_ai_v2.settings import EXPLORE_URL
+from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
 
 DEFAULT_STATUS = "Running..."
 
@@ -47,6 +50,8 @@ USER_RUNS_COLLECTION = "user_runs"
 EXAMPLE_ID_QUERY_PARAM = "example_id"
 RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
+
+O = typing.TypeVar("O")
 DEFAULT_META_IMG = (
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
@@ -55,21 +60,11 @@ MAX_SEED = 4294967294
 gooey_rng = Random()
 
 
-O = typing.TypeVar("O")
-
-
 class ApiResponseModel(GenericModel, typing.Generic[O]):
     id: str
     url: str
     created_at: str
     output: O
-
-
-class MenuTabs:
-    run = "🏃‍♀️Run"
-    examples = "🔖 Examples"
-    run_as_api = "🚀 Run as API"
-    history = "📖 History"
 
 
 class StateKeys:
@@ -119,15 +114,13 @@ class BasePage:
             query_params |= dict(example_id=example_id)
         return query_params
 
-    def api_url(self, example_id=None, run_id=None, uid=None) -> str:
+    def api_url(self, example_id=None, run_id=None, uid=None) -> furl:
         query_params = {}
         if run_id and uid:
             query_params = dict(run_id=run_id, uid=uid)
         elif example_id:
             query_params = dict(example_id=example_id)
-        return str(
-            furl(settings.API_BASE_URL, query_params=query_params) / self.endpoint
-        )
+        return furl(settings.API_BASE_URL, query_params=query_params) / self.endpoint
 
     @property
     def endpoint(self) -> str:
@@ -169,66 +162,112 @@ class BasePage:
         st.write("## " + st.session_state.get(StateKeys.page_title))
         st.write(st.session_state.get(StateKeys.page_notes))
 
-        menu_options = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
+        selected_tab = page_tabs(
+            tabs=self.get_tabs(),
+            key=StateKeys.option_menu_key,
+        )
+        self.render_selected_tab(selected_tab)
 
+    def get_tabs(self):
+        tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
         current_user: UserRecord = st.session_state.get("_current_user")
         if not hasattr(current_user, "_is_anonymous"):
-            menu_options.append(MenuTabs.history)
+            tabs.extend([MenuTabs.history])
+        return tabs
 
-        selected_menu = option_menu(
-            None,
-            options=menu_options,
-            icons=["-"] * len(menu_options),
-            orientation="horizontal",
-            key=st.session_state.get(StateKeys.option_menu_key),
-            styles={
-                "nav-link": {"white-space": "nowrap;"},
-                "nav-link-selected": {"font-weight": "normal;", "color": "black"},
-            },
+    def render_selected_tab(self, selected_tab: str):
+        match selected_tab:
+            case MenuTabs.run:
+                input_col, output_col = st.columns([3, 2], gap="medium")
+
+                self._render_step_row()
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    self._render_help()
+
+                self.render_related_workflows()
+
+                with input_col:
+                    submitted1 = self.render_form()
+
+                    with st.expander("⚙️ Settings"):
+                        self.render_settings()
+
+                        st.write("---")
+                        st.write("##### 🖌️ Personalize")
+                        st.text_input("Title", key=StateKeys.page_title)
+                        st.text_area("Notes", key=StateKeys.page_notes)
+                        st.write("---")
+
+                        submitted2 = self.render_submit_button(key="--submit-2")
+
+                    submitted = submitted1 or submitted2
+
+                with output_col:
+                    self._runner(submitted)
+
+                with col2:
+                    self._render_save_options()
+                #
+                # NOTE: Beware of putting code here since runner will call experimental_rerun
+                #
+
+            case MenuTabs.examples:
+                self._examples_tab()
+
+            case MenuTabs.history:
+                self._history_tab()
+
+            case MenuTabs.run_as_api:
+                self.run_as_api_tab()
+
+    def render_related_workflows(self):
+        workflows = self.related_workflows()
+        if not workflows:
+            return
+        st.markdown(
+            f"""
+            <a style="text-decoration:none" href="{EXPLORE_URL}" target = "_top">
+                <h2>Related Workflows</h2>
+            </a>
+            """,
+            unsafe_allow_html=True,
         )
 
-        if selected_menu == MenuTabs.run:
-            input_col, output_col = st.columns([3, 2], gap="medium")
+        def _build_page_tuple(page: typing.Type[BasePage]):
+            state = page().get_recipe_doc().to_dict()
+            preview_image = meta_preview_url(
+                page().preview_image(state), page().fallback_preivew_image()
+            )
+            return page, state, preview_image
 
-            self._render_step_row()
+        if "__related_recipe_docs" not in st.session_state:
+            with st.spinner("Loading Related Recipes..."):
+                docs = map_parallel(
+                    _build_page_tuple,
+                    workflows,
+                )
+            st.session_state["__related_recipe_docs"] = docs
+        related_recipe_docs = st.session_state.get("__related_recipe_docs")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                self._render_help()
+        def _render(page_tuple):
+            page, state, preview_image = page_tuple
+            st.markdown(
+                f"""
+                    <a href="{page().app_url()}" style="text-decoration:none;color:white">
+                        <img width="100%" src="{preview_image}" />
+                        <h4>{page().title}</h4>
+                        {page().preview_description(state)}
+                    </a>
+                """,
+                unsafe_allow_html=True,
+            )
 
-            with input_col:
-                submitted1 = self.render_form()
+        grid_layout(4, related_recipe_docs, _render)
 
-                with st.expander("⚙️ Settings"):
-                    self.render_settings()
-
-                    st.write("---")
-                    st.write("##### 🖌️ Personalize")
-                    st.text_input("Title", key=StateKeys.page_title)
-                    st.text_area("Notes", key=StateKeys.page_notes)
-                    st.write("---")
-
-                    submitted2 = self.render_submit_button(key="--submit-2")
-
-                submitted = submitted1 or submitted2
-
-            with output_col:
-                self._runner(submitted)
-
-            with col2:
-                self._render_save_options()
-            #
-            # NOTE: Beware of putting code here since runner will call experimental_rerun
-            #
-
-        elif selected_menu == MenuTabs.examples:
-            self._examples_tab()
-
-        elif selected_menu == MenuTabs.history:
-            self._history_tab()
-
-        elif selected_menu == MenuTabs.run_as_api:
-            self.run_as_api_tab()
+    def related_workflows(self) -> list:
+        return []
 
     def render_report_form(self):
         with st.form("report_form"):
@@ -548,7 +587,7 @@ class BasePage:
         example_id, run_id, uid = self.extract_query_params(query_params)
         return self.app_url(example_id, run_id, uid)
 
-    def _get_current_api_url(self) -> str | None:
+    def _get_current_api_url(self) -> furl | None:
         query_params = st.experimental_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
         return self.api_url(example_id, run_id, uid)
@@ -978,7 +1017,10 @@ class BasePage:
             or state.get("output_image")
             or state.get("output_video")
         )
-        return extract_nested_str(out) or DEFAULT_META_IMG
+        return extract_nested_str(out)
+
+    def fallback_preivew_image(self) -> str:
+        return DEFAULT_META_IMG
 
     def run_as_api_tab(self):
         api_docs_url = str(
@@ -990,7 +1032,7 @@ class BasePage:
         )
         st.markdown(f"### [📖 API Docs]({api_docs_url})")
 
-        api_url = self._get_current_api_url()
+        api_url = str(self._get_current_api_url())
         request_body = get_example_request_body(self.RequestModel, st.session_state)
         response_body = self.get_example_response_body(st.session_state)
 

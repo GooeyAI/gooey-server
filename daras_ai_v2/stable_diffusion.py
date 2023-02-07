@@ -43,6 +43,8 @@ class Img2ImgModels(Enum):
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
     protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
+    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
+    rodent_diffusion_1_5 = "Rodent Diffusion 1.5 (NerdyRodent)"
 
 
 class Text2ImgModels(Enum):
@@ -55,6 +57,7 @@ class Text2ImgModels(Enum):
     analog_diffusion = "Analog Diffusion (wavymulder)"
     protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
     dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
+    rodent_diffusion_1_5 = "Rodent Diffusion 1.5 (NerdyRodent)"
     dall_e = "Dall-E (OpenAI)"
 
 
@@ -177,6 +180,8 @@ def text2img(
                 case Text2ImgModels.dreamlike_2.name:
                     prompt = "photo, " + prompt
                     hf_model_id = "dreamlike-art/dreamlike-photoreal-2.0"
+                case Text2ImgModels.rodent_diffusion_1_5.name:
+                    hf_model_id = "devxpy/rodent-diffusion-1-5"
                 case _:
                     return []
             return call_sd_multi(
@@ -288,6 +293,11 @@ def img2img(
                 case Img2ImgModels.protogen_5_3.name:
                     prompt = "modelshoot style " + prompt
                     hf_model_id = "darkstorm2150/Protogen_v5.3_Official_Release"
+                case Img2ImgModels.dreamlike_2.name:
+                    prompt = "photo, " + prompt
+                    hf_model_id = "dreamlike-art/dreamlike-photoreal-2.0"
+                case Img2ImgModels.rodent_diffusion_1_5.name:
+                    hf_model_id = "devxpy/rodent-diffusion-1-5"
                 case _:
                     return []
             return call_sd_multi(
