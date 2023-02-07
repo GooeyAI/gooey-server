@@ -7,7 +7,7 @@ from server import app
 
 client = TestClient(app)
 excluded_routes = [
-    "/__/fb/webhook/",
+    "/__/fb/webhook/", #gives 403
 ]
 
 
