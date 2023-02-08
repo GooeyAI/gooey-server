@@ -49,7 +49,7 @@ class TextToSpeechPage(BasePage):
     class ResponseModel(BaseModel):
         audio_url: str
 
-    def preview_image(self, state: dict) -> str | None:
+    def fallback_preivew_image(self) -> str | None:
         return DEFAULT_TTS_META_IMG
 
     def preview_description(self, state: dict) -> str:

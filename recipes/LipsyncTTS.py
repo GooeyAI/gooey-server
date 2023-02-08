@@ -7,6 +7,8 @@ from daras_ai.image_input import upload_file_from_bytes
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 
+DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/lipsync_meta_img.gif"
+
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lipsync Video with Any Text"
@@ -86,6 +88,9 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
                     )
 
         return submitted
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_LIPSYNC_TTS_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Add your text prompt, pick a voice & upload a sample video to quickly create realistic lipsync videos. Discover the ease of text-to-video AI."
