@@ -148,6 +148,7 @@ def fuck_keys(self, *args, key=None, **kwargs):
                 value = st.session_state[key]
                 st.session_state[INITIAL_VALUES][key] = value
                 kwargs["value"] = value
+        kwargs["help"] = f'{kwargs.get("help", "")} `{key}`'
 
     value = self(*args, **kwargs)
 
@@ -175,6 +176,7 @@ def fuck_keys(self, label, options, *args, key=None, **kwargs):
                 st.session_state[INITIAL_VALUES][key] = value
                 if value in options:
                     kwargs["index"] = list(options).index(value)
+        kwargs["help"] = f'{kwargs.get("help", "")} `{key}`'
 
     value = self(label, options, *args, **kwargs)
 

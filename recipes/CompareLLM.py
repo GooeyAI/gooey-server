@@ -111,14 +111,7 @@ class CompareLLMPage(BasePage):
         col1, col2 = st.columns(2)
         with col1:
             st.write("**Prompt**")
-            scrollable_html(
-                f"""<pre style="white-space: pre-wrap;">{state.get("input_prompt")}</pre>""",
-                height=300,
-                css="""
-                background-color: rgb(32, 32, 32);
-                color: rgb(9, 171, 59);
-                """,
-            )
+            st.write("```properties\n" + state.get("input_prompt", "") + "\n```")
         with col2:
             self._render_outputs(state, 300)
 

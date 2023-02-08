@@ -183,7 +183,7 @@ class CompareText2ImgPage(BasePage):
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("```" + state.get("text_prompt", "").replace("\n", "") + "```")
+            st.markdown("```properties\n" + state.get("text_prompt", "") + "\n```")
         with col2:
             self._render_outputs(state)
 

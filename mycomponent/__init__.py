@@ -26,6 +26,8 @@ def reloader_recv(key: str):
 
 
 def reloader_send(key: str, value=0):
+    if key not in st.session_state:
+        st.session_state[key] = f"__reloader_{uuid.uuid1()}"
     r = redis.Redis()
     redis_key = st.session_state[key]
     r.set(redis_key, json.dumps(value))

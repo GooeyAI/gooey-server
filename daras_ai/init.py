@@ -68,6 +68,23 @@ def init_scripts():
         video, img {
             max-width: 350px;
             max-height: 350px;
+            border-radius: 5px;
+        }
+        
+        .stSpinner * {
+            font-size: 1.1rem;
+        }
+        
+        .stCodeBlock * code {
+            white-space: pre-wrap !important;
+        }
+        .stCodeBlock pre {
+            padding: 0.75rem !important;
+        }
+        .stCodeBlock pre div {
+            max-height: 500px;
+            overflow-x: clip;
+            overflow-y: scroll;
         }
         </style>
         """

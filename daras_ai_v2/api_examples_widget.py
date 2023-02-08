@@ -12,13 +12,20 @@ def api_example_generator(api_url: str, request_body):
 
     with curl:
         st.write(
+            """
+```bash
+export GOOEY_API_KEY=sk-xxx	
+```
+            """
+        )
+        st.write(
             r"""
 ```bash
 curl -X 'POST' \
   %s \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: %s $GOOEY_API_KEY' \
+  -H "Authorization: %s $GOOEY_API_KEY" \
   -d %s
 ```
             """
@@ -32,17 +39,20 @@ curl -X 'POST' \
     with python:
         st.write(
             r"""
-```
+```bash
 $ python3 -m pip install requests
+$ export GOOEY_API_KEY=sk-xxx	
 ```    
 
 ```python
+import os
 import requests
+
 
 response = requests.post(
     "%s",
     headers={
-        "Authorization": "%s $GOOEY_API_KEY",
+        "Authorization": "%s " + os.environ["GOOEY_API_KEY"],
     },
     json=%s,
 )

@@ -674,13 +674,14 @@ class BasePage:
             self._render_after_output()
 
     def _run_in_thread(self, run_id, uid):
+        # start from blank run status
+        st.session_state[StateKeys.run_status] = None
         t = Thread(target=self._run_thread, args=[run_id, uid])
         add_script_run_ctx(t)
         t.start()
 
     def _run_thread(self, run_id, uid):
         state = st.session_state
-        state[StateKeys.run_status] = None
         try:
             gen = self.run(state)
             run_time = 0
@@ -692,6 +693,7 @@ class BasePage:
                     state[StateKeys.run_status] = next(gen)
                     # increment total time taken after every iteration
                     run_time += time() - start_time
+                    continue
                 # run complete
                 except StopIteration:
                     run_time += time() - start_time
@@ -704,11 +706,12 @@ class BasePage:
                     sentry_sdk.capture_exception(e)
                     state[StateKeys.error_msg] = err_msg_for_exc(e)
                     break
-                # save the doc
-                self.run_doc_ref(run_id, uid).set(self.state_to_doc(state))
-                # send updates
-                state[StateKeys.run_time] = run_time
-                reloader_send(StateKeys.reloader)
+                finally:
+                    # save the doc
+                    self.run_doc_ref(run_id, uid).set(self.state_to_doc(state))
+                    # send updates
+                    state[StateKeys.run_time] = run_time
+                    reloader_send(StateKeys.reloader)
         finally:
             # clear run status
             state.pop(StateKeys.run_status, None)
