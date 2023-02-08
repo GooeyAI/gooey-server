@@ -493,7 +493,12 @@ class BasePage:
             if additional_notes:
                 st.caption(additional_notes)
         with col2:
-            submitted = st.button("🏃 Submit", key=key, type="primary")
+            submitted = st.button(
+                "🏃 Submit",
+                key=key,
+                type="primary",
+                disabled=StateKeys.run_status in st.session_state,
+            )
         if not submitted:
             return False
         try:
@@ -643,7 +648,6 @@ class BasePage:
                     return
                 run_id, uid = self._pre_run_checklist()
                 self._run_in_thread(run_id, uid)
-            st.experimental_rerun()
 
         is_running = StateKeys.run_status in st.session_state
 
