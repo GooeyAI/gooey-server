@@ -138,6 +138,7 @@ class DeforumSDPage(BasePage):
 
     sane_defaults = dict(
         zoom="0: (1.004)",
+        animation_mode="2D",
         translation_x="0:(10*sin(2*3.14*t/10))",
         translation_y="0:(0)",
         rotation_3d_x="0:(0)",
@@ -152,6 +153,7 @@ class DeforumSDPage(BasePage):
         animation_prompts: AnimationPrompts
         max_frames: int | None
 
+        animation_mode: str | None
         zoom: str | None
         translation_x: str | None
         translation_y: str | None
@@ -359,7 +361,7 @@ Choose fps for the video.
                     ],
                 ),
                 "inputs": dict(
-                    animation_mode="3D",
+                    animation_mode=request.animation_mode,
                     animation_prompts={
                         fp["frame"]: fp["prompt"] for fp in request.animation_prompts
                     },
