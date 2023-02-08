@@ -4,6 +4,7 @@ import time
 import typing
 
 import httpx
+import redis.asyncio as redis
 import streamlit
 from fastapi import FastAPI, Depends
 from fastapi import HTTPException, Body
@@ -21,7 +22,12 @@ from sentry_sdk import capture_exception
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response, FileResponse
+from starlette.responses import (
+    PlainTextResponse,
+    Response,
+    FileResponse,
+    StreamingResponse,
+)
 
 from auth_backend import (
     SessionAuthBackend,
@@ -79,6 +85,20 @@ app.add_middleware(
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/key-events/{key}", include_in_schema=False)
+async def key_events(key: str):
+    async def _():
+        r = redis.Redis()
+        async with r.pubsub() as pubsub:
+            await pubsub.subscribe(key)
+            async for _ in pubsub.listen():
+                value = await r.get(key)
+                if value:
+                    yield value
+
+    return StreamingResponse(_())
 
 
 @app.get("/sitemap.xml/", include_in_schema=False)

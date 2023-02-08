@@ -148,9 +148,11 @@ def text_patch(self, *args, key=None, **kwargs):
     st.radio,
     st.file_uploader,
 )
-def markdown_label_patch(self, label, *args, label_visibility="markdown", **kwargs):
+def markdown_label_patch(
+    self, label=None, *args, label_visibility="markdown", **kwargs
+):
     # allow full markdown labels
-    if label_visibility == "markdown":
+    if label_visibility == "markdown" and label:
         st.write(label)
         label_visibility = "collapsed"
 

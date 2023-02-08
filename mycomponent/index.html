@@ -1,0 +1,63 @@
+<script>
+    window.frameElement.parentElement.style.display = "none";
+    // ----------------------------------------------------
+    // Just copy/paste these functions as-is:
+
+    function sendMessageToStreamlitClient(type, data) {
+        var outData = Object.assign({
+            isStreamlitMessage: true,
+            type: type,
+        }, data);
+        window.parent.postMessage(outData, "*");
+    }
+
+    function init() {
+        sendMessageToStreamlitClient("streamlit:componentReady", {apiVersion: 1});
+        sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: 0});
+    }
+
+    // The `data` argument can be any JSON-serializable value.
+    function sendJsonToPython(value) {
+        let data = {value: value, dataType: 'json'};
+        sendMessageToStreamlitClient("streamlit:setComponentValue", data);
+    }
+
+    // ----------------------------------------------------
+    // Now modify this part of the code to fit your needs:
+
+    // data is any JSON-serializable value you sent from Python,
+    // and it's already deserialized for you.
+    let currentUrl = null;
+
+    async function onDataFromPython(event) {
+        if (event.data.type !== "streamlit:render") return;
+        // Access values sent from Python here!
+        let url = event.data.args.url;
+        if (url == currentUrl) return;
+        console.log(url);
+        /*const response = await fetch(url);
+        const value = await response.json();
+        console.log(value);
+        sendJsonToPython(value);*/
+        fetch(url).then(async res => {
+            currentUrl = url;
+            const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+            while (currentUrl == url) {
+                const {done, value} = await reader.read();
+                if (done) return;
+                console.log(value);
+                sendJsonToPython(value);
+                //output.append(value);
+            }
+        });
+    }
+
+    // Hook things up!
+    window.addEventListener("message", onDataFromPython);
+    init();
+
+    /*setInterval(() => {
+        sendJsonToPython(Math.random());
+    }, 1000)
+     */
+</script>

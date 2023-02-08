@@ -11,12 +11,13 @@ def hidden_html_nojs(raw_html: str):
 
 def hidden_html_js(raw_html: str):
     components.html(
-        """
-        <script>
-            window.frameElement.parentElement.style.display = "none";
-        </script>
-        """
-        + raw_html,
+        # """
+        # <script>
+        #     window.frameElement.parentElement.style.display = "none";
+        # </script>
+        # """
+        # +
+        raw_html,
         height=0,
         width=0,
     )
