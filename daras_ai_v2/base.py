@@ -843,12 +843,16 @@ class BasePage:
                     document_id=self.doc_name,
                     sub_collection_id=EXAMPLES_COLLECTION,
                 ).get()
-                example_docs.sort(
-                    key=lambda s: s.to_dict()
-                    .get(StateKeys.updated_at, datetime.datetime.fromtimestamp(0))
-                    .timestamp(),
-                    reverse=True,
-                )
+
+                def sort_key(s):
+                    updated_at = s.to_dict().get(
+                        StateKeys.updated_at, datetime.datetime.fromtimestamp(0)
+                    )
+                    if isinstance(updated_at, str):
+                        updated_at = datetime.datetime.fromisoformat(updated_at)
+                    return updated_at.timestamp()
+
+                example_docs.sort(key=sort_key, reverse=True)
             st.session_state[StateKeys.examples_cache] = example_docs
         example_docs = st.session_state.get(StateKeys.examples_cache)
 
