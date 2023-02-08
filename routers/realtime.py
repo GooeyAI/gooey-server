@@ -11,7 +11,7 @@ router = APIRouter()
 @router.get("/key-events", include_in_schema=False)
 async def key_events(topic: str):
     async def stream():
-        r = redis.Redis()
+        r = redis.Redis.from_url(settings.REDIS_URL)
         async with r.pubsub() as pubsub:
             await pubsub.subscribe(topic)
             async for _ in pubsub.listen():
