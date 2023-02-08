@@ -814,7 +814,7 @@ class BasePage:
             if field_name in state
         }
         ret |= {
-            StateKeys.updated_at: datetime.datetime.utcnow().isoformat(),
+            StateKeys.updated_at: datetime.datetime.utcnow(),
         }
 
         title = state.get(StateKeys.page_title)
