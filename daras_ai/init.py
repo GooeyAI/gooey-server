@@ -122,7 +122,8 @@ def init_scripts():
                 }
             });
         </script>
-        """
+        """,
+        is_static=True,
     )
 
     if "_current_user" not in st.session_state:

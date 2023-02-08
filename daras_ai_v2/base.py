@@ -43,7 +43,7 @@ from daras_ai_v2.query_params import gooey_reset_query_parm, gooey_get_query_par
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
-from mycomponent import reloader_recv, reloader_send
+from mycomponent import reloader_sub, reloader_pub
 
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
@@ -167,11 +167,10 @@ class BasePage:
             )
 
         init_scripts()
+        reloader_sub(StateKeys.reloader)
 
         self._load_session_state()
         self._check_if_flagged()
-
-        reloader_recv(StateKeys.reloader)
 
         if st.session_state.get("show_report_workflow"):
             self.render_report_form()
@@ -641,11 +640,12 @@ class BasePage:
                     return
                 run_id, uid = self._pre_run_checklist()
                 self._run_in_thread(run_id, uid)
+            st.experimental_rerun()
 
         is_running = StateKeys.run_status in st.session_state
 
         if is_running:
-            run_status = st.session_state[StateKeys.run_status]
+            run_status = st.session_state.get(StateKeys.run_status)
             html_spinner(run_status or "Running...")
         else:
             self._render_before_output()
@@ -711,11 +711,11 @@ class BasePage:
                     self.run_doc_ref(run_id, uid).set(self.state_to_doc(state))
                     # send updates
                     state[StateKeys.run_time] = run_time
-                    reloader_send(StateKeys.reloader)
+                    reloader_pub(StateKeys.reloader)
         finally:
             # clear run status
             state.pop(StateKeys.run_status, None)
-            reloader_send(StateKeys.reloader)
+            reloader_pub(StateKeys.reloader)
 
     def _pre_run_checklist(self):
         st.session_state.pop(StateKeys.run_status, None)

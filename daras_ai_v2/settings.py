@@ -89,3 +89,5 @@ FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
 
 TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
 TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")
+
+REDIS_URL = config("REDIS_URL", "redis://localhost:6379")

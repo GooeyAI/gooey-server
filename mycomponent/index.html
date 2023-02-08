@@ -27,30 +27,40 @@
 
     // data is any JSON-serializable value you sent from Python,
     // and it's already deserialized for you.
-    let currentUrl = null;
+    let evtSource = null;
+    const retryDelay = 300;
 
-    async function onDataFromPython(event) {
+    function onDataFromPython(event) {
         if (event.data.type !== "streamlit:render") return;
         // Access values sent from Python here!
         let url = event.data.args.url;
-        if (url == currentUrl) return;
-        console.log(url);
-        /*const response = await fetch(url);
-        const value = await response.json();
-        console.log(value);
-        sendJsonToPython(value);*/
-        fetch(url).then(async res => {
-            currentUrl = url;
-            const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-            while (currentUrl == url) {
-                const {done, value} = await reader.read();
-                if (done) return;
-                console.log(value);
-                sendJsonToPython(value);
-                //output.append(value);
+
+        // already connected, abort
+        if (evtSource && evtSource.url == url && evtSource.readyState != 2) return;
+
+        const fetchLoop = async () => {
+            if (evtSource) {
+                // already connected, abort
+                if (evtSource.url == url && evtSource.readyState != 2) return;
+                // close old connections
+                if (evtSource.url != url) {
+                    evtSource.close();
+                }
             }
-        });
+            console.log('EventSource connect:', url);
+            evtSource = new EventSource(url);
+            evtSource.onmessage = (event) => {
+                sendJsonToPython(event.data);
+            };
+            evtSource.onerror = (err) => {
+                console.log("EventSource error:", err)
+                let timeout = retryDelay + Math.random() * retryDelay;
+                setTimeout(fetchLoop, timeout);
+            }
+        }
+        fetchLoop();
     }
+
 
     // Hook things up!
     window.addEventListener("message", onDataFromPython);
