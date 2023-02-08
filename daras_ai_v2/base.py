@@ -459,7 +459,29 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
+    def _render_author(self, uid:str):
+        user: UserRecord = auth.get_user(uid)
+        if not user.photo_url and not user.display_name:
+            return
+        html = "<div style='display:flex; align-items:center'>"
+        if user.photo_url:
+            html += f"""
+                <img style="width:38px; height:38px;border-radius:50%;" src="{user.photo_url}">
+                <div style="width:8px;"></div>
+            """
+        if user.display_name:
+            html += f"<div>{user.display_name}</div>"
+        html += "</div>"
+        st.markdown(
+            html,
+            unsafe_allow_html=True,
+        )
+
     def render_form(self) -> bool:
+        query_params = st.experimental_get_query_params()
+        example_id, run_id, uid = self.extract_query_params(query_params)
+        if uid:
+            self._render_author(uid)
         self.render_form_v2()
         return self.render_submit_button()
 
