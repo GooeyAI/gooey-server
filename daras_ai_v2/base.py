@@ -459,7 +459,7 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
-    def _render_author(self, uid:str):
+    def _render_author(self, uid: str):
         user: UserRecord = auth.get_user(uid)
         if not user.photo_url and not user.display_name:
             return
