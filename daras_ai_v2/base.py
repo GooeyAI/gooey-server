@@ -150,15 +150,13 @@ class BasePage:
         return f"/v2/{self.slug_versions[0]}/"
 
     def render(self):
-        prev_state_key = "__prev_state"
         try:
-            ensure_hidden_widgets_loaded(st.session_state.pop(prev_state_key, {}))
             self._render()
         except Exception as e:
             sentry_sdk.capture_exception(e)
             raise
         finally:
-            st.session_state[prev_state_key] = dict(st.session_state)
+            ensure_hidden_widgets_loaded()
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
