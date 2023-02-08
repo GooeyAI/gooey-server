@@ -35,25 +35,17 @@
         // Access values sent from Python here!
         let url = event.data.args.url;
 
-        // already connected, abort
-        if (evtSource && evtSource.url == url && evtSource.readyState != 2) return;
-
         const fetchLoop = async () => {
-            if (evtSource) {
-                // already connected, abort
-                if (evtSource.url == url && evtSource.readyState != 2) return;
-                // close old connections
-                if (evtSource.url != url) {
-                    evtSource.close();
-                }
-            }
+            // already connected, abort
+            if (evtSource && evtSource.url == url && evtSource.readyState != 2) return;
+
             console.log('EventSource connect:', url);
             evtSource = new EventSource(url);
+
             evtSource.onmessage = (event) => {
                 sendJsonToPython(event.data);
             };
             evtSource.onerror = (err) => {
-                console.log("EventSource error:", err)
                 let timeout = retryDelay + Math.random() * retryDelay;
                 setTimeout(fetchLoop, timeout);
             }
