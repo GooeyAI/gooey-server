@@ -677,14 +677,14 @@ class BasePage:
             self._render_after_output()
 
     def _run_in_thread(self, run_id, uid):
-        # start from blank run status
-        st.session_state[StateKeys.run_status] = None
         t = Thread(target=self._run_thread, args=[run_id, uid])
         add_script_run_ctx(t)
         t.start()
 
     def _run_thread(self, run_id, uid):
         state = st.session_state
+        # start from blank run status
+        state[StateKeys.run_status] = None
         try:
             gen = self.run(state)
             run_time = 0
