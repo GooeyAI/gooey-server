@@ -1,22 +1,34 @@
+import pytest
 from furl import furl
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from daras_ai_v2.settings import APP_BASE_URL
+from routers import realtime, facebook
 from server import app
+from tests import test_apis
 
 client = TestClient(app)
-excluded_routes = [
-    "/__/fb/webhook/",  # gives 403
+
+excluded_endpoints = [
+    facebook.fb_webhook_verify,  # gives 403
+    realtime.key_events,
 ]
 
+route_paths = [
+    route.path
+    for route in app.routes
+    if (
+        isinstance(route, Route)
+        and "GET" in route.methods
+        and not route.param_convertors
+        and route.endpoint not in excluded_endpoints
+    )
+] + [slug for page_cls in test_apis.pages_to_test for slug in page_cls.slug_versions]
 
-def test_apis_basic():
-    for route in app.routes:
-        if isinstance(route, Route):
-            get_method_allowed = "GET" in route.methods
-            not_in_excluded_routes = route.path not in excluded_routes
-            if get_method_allowed and not_in_excluded_routes:
-                url = furl(APP_BASE_URL).add(path=route.path).url
-                r = client.get(url)
-                assert r.ok, r.content
+
+@pytest.mark.parametrize("path", route_paths)
+def test_public_endpoints(path):
+    url = furl(APP_BASE_URL).add(path=path).url
+    r = client.get(url, allow_redirects=True)
+    assert r.status_code == 200, r.content
