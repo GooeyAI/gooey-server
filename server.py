@@ -313,6 +313,7 @@ def call_api(
     query_params,
 ):
     created_at = datetime.datetime.utcnow().isoformat()
+    uid = user.uid
     # init a new page for every request
     page = page_cls()
 
@@ -338,7 +339,7 @@ def call_api(
     streamlit.session_state = state
 
     # check the balance
-    balance = db.get_doc_field(db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0)
+    balance = db.get_doc_field(db.get_user_doc_ref(uid), db.USER_BALANCE_FIELD, 0)
     if balance < page.get_price():
         account_url = furl(settings.APP_BASE_URL) / "account"
         return JSONResponse(
@@ -350,11 +351,11 @@ def call_api(
 
     # create the run
     run_id = get_random_doc_id()
-    run_url = str(furl(page.app_url(), query_params=dict(run_id=run_id, uid=user.uid)))
-    run_doc_ref = page.run_doc_ref(run_id, user.uid)
+    run_url = str(furl(page.app_url(), query_params=dict(run_id=run_id, uid=uid)))
+    run_doc_ref = page.run_doc_ref(run_id, uid)
 
     # save the run
-    run_doc_ref.set(page.state_to_doc(state))
+    run_doc_ref.set(page.get_run_doc(uid, run_id, state, created=True))
 
     # run the script
     try:
@@ -377,7 +378,7 @@ def call_api(
         )
 
     # save the run
-    run_doc_ref.set(page.state_to_doc(state))
+    run_doc_ref.set(page.get_run_doc(uid, run_id, state))
     # deduct credits
     page.deduct_credits()
 

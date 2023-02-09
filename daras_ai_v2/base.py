@@ -31,6 +31,7 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
+from daras_ai_v2.db import RunDoc
 from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
 from daras_ai_v2.hidden_html_widget import hidden_html_js
@@ -69,16 +70,19 @@ class ApiResponseModel(GenericModel, typing.Generic[O]):
 
 
 class StateKeys:
-    page_title = "__title"
-    page_notes = "__notes"
+    seed = "seed"
+
+    page_title = "__page_title"
+    page_description = "__page_description"
 
     option_menu_key = "__option_menu_key"
 
     updated_at = "updated_at"
-
+    created_at = "__created_at"
     error_msg = "__error_msg"
     run_time = "__run_time"
     run_status = "__run_status"
+
     reloader = "__reloader"
     pressed_randomize = "__randomize"
 
@@ -176,13 +180,8 @@ class BasePage:
             self.render_report_form()
             return
 
-        st.session_state.setdefault(StateKeys.page_title, self.title)
-        st.session_state.setdefault(
-            StateKeys.page_notes, self.preview_description(st.session_state)
-        )
-
-        st.write("## " + st.session_state.get(StateKeys.page_title))
-        st.write(st.session_state.get(StateKeys.page_notes))
+        st.write("## " + st.session_state.get(StateKeys.page_title, ""))
+        st.write(st.session_state.get(StateKeys.page_description, ""))
 
         selected_tab = page_tabs(
             tabs=self.get_tabs(),
@@ -208,7 +207,7 @@ class BasePage:
                         st.write("---")
                         st.write("##### 🖌️ Personalize")
                         st.text_input("Title", key=StateKeys.page_title)
-                        st.text_area("Notes", key=StateKeys.page_notes)
+                        st.text_area("Description", key=StateKeys.page_description)
                         st.write("---")
                         submitted2 = self.render_submit_button(key="--submit-2")
                     submitted = submitted1 or submitted2
@@ -377,10 +376,22 @@ class BasePage:
 
             self._update_session_state(doc)
 
-    def _update_session_state(self, doc):
-        st.session_state.update(doc)
+    def _update_session_state(self, run_doc):
+        run_doc: RunDoc = RunDoc.parse_obj(run_doc)
+        st.session_state.update(
+            {
+                **run_doc.state,
+                StateKeys.run_time: run_doc.run_time,
+                StateKeys.error_msg: run_doc.error_msg,
+                StateKeys.page_title: run_doc.title or self.title,
+                StateKeys.page_description: run_doc.description
+                or self.preview_description(st.session_state),
+            }
+        )
+
         for k, v in self.sane_defaults.items():
             st.session_state.setdefault(k, v)
+
         st.session_state["__loaded__"] = True
 
     def _check_if_flagged(self):
@@ -626,7 +637,9 @@ class BasePage:
         example_id, *_ = self.extract_query_params(query_params)
         uid = current_user.uid
 
-        self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
+        self.run_doc_ref(run_id, uid).set(
+            self.get_run_doc(uid, run_id, st.session_state, created=True)
+        )
         gooey_reset_query_parm(
             **self._clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
         )
@@ -637,7 +650,7 @@ class BasePage:
         assert inspect.isgeneratorfunction(self.run)
 
         if st.session_state.get(StateKeys.pressed_randomize):
-            st.session_state["seed"] = int(gooey_rng.randrange(MAX_SEED))
+            st.session_state[StateKeys.seed] = int(gooey_rng.randrange(MAX_SEED))
             st.session_state.pop(StateKeys.pressed_randomize, None)
             submitted = True
 
@@ -705,7 +718,9 @@ class BasePage:
                 except StopIteration:
                     run_time += time() - start_time
                     self.deduct_credits()
-                    state[StateKeys.run_doc_to_save] = self.state_to_doc(state)
+                    state[StateKeys.run_doc_to_save] = self.get_run_doc(
+                        uid, run_id, state
+                    )
                     break
                 # render errors nicely
                 except Exception as e:
@@ -715,7 +730,9 @@ class BasePage:
                     break
                 finally:
                     # save the doc
-                    self.run_doc_ref(run_id, uid).set(self.state_to_doc(state))
+                    self.run_doc_ref(run_id, uid).set(
+                        self.get_run_doc(uid, run_id, state)
+                    )
                     # send updates
                     state[StateKeys.run_time] = run_time
                     reloader_pub(StateKeys.reloader)
@@ -734,7 +751,7 @@ class BasePage:
         return self.create_new_run()
 
     def _setup_rng_seed(self):
-        seed = st.session_state.get("seed")
+        seed = st.session_state.get(StateKeys.seed)
         if not seed:
             return
         gooey_rng.seed(seed)
@@ -747,8 +764,8 @@ class BasePage:
             st.session_state.pop(field_name, None)
 
     def _render_after_output(self):
-        if "seed" in self.RequestModel.schema_json():
-            seed = st.session_state.get("seed")
+        if StateKeys.seed in self.RequestModel.schema_json():
+            seed = st.session_state.get(StateKeys.seed)
             # st.write("is_admin" + str(is_admin()))
             col1, col2, col3 = st.columns([1.5, 2, 1.5])
             with col1:
@@ -811,24 +828,36 @@ class BasePage:
 
             st.success("Saved", icon="✅")
 
-    def state_to_doc(self, state: dict):
-        ret = {
-            field_name: deepcopy(state[field_name])
-            for field_name in self.fields_to_save()
-            if field_name in state
-        }
-        ret |= {
-            StateKeys.updated_at: datetime.datetime.utcnow(),
-        }
-
-        title = state.get(StateKeys.page_title)
-        notes = state.get(StateKeys.page_notes)
-        if title and title.strip() != self.title.strip():
-            ret[StateKeys.page_title] = title
-        if notes and notes.strip() != self.preview_description(state).strip():
-            ret[StateKeys.page_notes] = notes
-
-        return ret
+    def get_run_doc(
+        self,
+        uid: str,
+        run_id: str,
+        state: dict,
+        *,
+        created: bool = False,
+    ) -> dict:
+        if created:
+            state[StateKeys.created_at] = datetime.datetime.utcnow()
+        title = state.get(StateKeys.page_title, "").strip()
+        description = state.get(StateKeys.page_description, "").strip()
+        if title == self.title.strip():
+            title = None
+        if description == self.preview_description(state).strip():
+            description = None
+        return RunDoc(
+            uid=uid,
+            page_id=self.doc_name,
+            run_id=run_id,
+            title=title or None,
+            description=description or None,
+            run_time=state.get(StateKeys.run_time, 0),
+            created_at=state.get(StateKeys.created_at, None),
+            updated_at=datetime.datetime.utcnow(),
+            error_msg=state.get(StateKeys.error_msg, None),
+            invoice_id=None,
+            api_key_id=None,
+            state={k: deepcopy(state[k]) for k in self.fields_to_save() if k in state},
+        ).dict()
 
     def fields_to_save(self) -> [str]:
         # only save the fields in request/response
@@ -836,8 +865,6 @@ class BasePage:
             field_name
             for model in (self.RequestModel, self.ResponseModel)
             for field_name in model.__fields__
-        ] + [
-            StateKeys.error_msg,
         ]
 
     def _examples_tab(self):
@@ -980,7 +1007,7 @@ class BasePage:
             if title and title.strip() != self.title.strip():
                 st.write("#### " + title)
 
-            notes = doc.get(StateKeys.page_notes)
+            notes = doc.get(StateKeys.page_description)
             if (
                 notes
                 and notes.strip() != self.preview_description(st.session_state).strip()

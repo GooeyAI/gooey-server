@@ -1,8 +1,10 @@
 import datetime
+from copy import deepcopy
 
 from firebase_admin import auth
 from google.cloud import firestore
 from google.cloud.firestore_v1.transaction import Transaction
+from pydantic import BaseModel
 from starlette.requests import Request
 
 from daras_ai_v2 import settings
@@ -166,3 +168,23 @@ def update_pages_for_user(page_docs_list: list[(str, dict)], uid: str):
 
 def get_fb_page_ref(page_id):
     return _db.collection(FB_PAGES_COLLECTION).document(page_id)
+
+
+class RunDoc(BaseModel):
+    uid: str
+    page_id: str
+    run_id: str
+    state: dict
+
+    title: str | None
+    description: str | None
+    notes: str | None
+    citations: str | None
+
+    run_time: float | None
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    error_msg: str | None
+
+    invoice_id: str | None
+    api_key_id: str | None
