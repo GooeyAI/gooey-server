@@ -62,4 +62,5 @@ def test_apis_basic(page_cls: typing.Type[BasePage], test_auth_user):
             headers={"Authorization": f"Token None"},
         )
 
-    assert r.ok, r.content
+    print(r.content)
+    assert r.ok

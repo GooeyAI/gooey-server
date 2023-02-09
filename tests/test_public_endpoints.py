@@ -31,4 +31,5 @@ route_paths = [
 def test_public_endpoints(path):
     url = furl(APP_BASE_URL).add(path=path).url
     r = client.get(url, allow_redirects=True)
-    assert r.status_code == 200, r.content
+    print(r.content)
+    assert r.status_code == 200
