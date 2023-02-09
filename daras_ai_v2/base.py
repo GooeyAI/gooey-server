@@ -171,7 +171,7 @@ class BasePage:
         _, run_id, uid = self.extract_query_params(query_params)
         redis_key = f"runs/{uid}/{run_id}"
         updates = realtime_subscribe(redis_key)
-        if updates and updates.get(StateKeys.run_status):
+        if updates:
             st.session_state.update(updates)
         else:
             st.session_state[StateKeys.run_status] = None
@@ -693,7 +693,6 @@ class BasePage:
             else:
                 # set run status to the yield value of generator
                 updates[StateKeys.run_status] = yield_val or "Running..."
-
             # extract outputs from local state
             output = {
                 k: v
