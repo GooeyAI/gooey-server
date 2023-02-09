@@ -25,7 +25,7 @@ def enum_multiselect(
     selected = set(st.session_state.get(key, []))
 
     def render(e):
-        inner_key = f"__{key}_{e.name}"
+        inner_key = f"{key} => {e.name}"
         if inner_key not in st.session_state:
             st.session_state[inner_key] = e.name in selected
 

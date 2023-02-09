@@ -50,7 +50,7 @@ def verify_session_cookie(firebase_cookie) -> UserRecord | None:
     # Verify the session cookie. In this case an additional check is added to detect
     # if the user's Firebase session was revoked, user deleted/disabled, etc.
     try:
-        user = auth.verify_session_cookie(firebase_cookie, check_revoked=True)
+        user = auth.verify_session_cookie(firebase_cookie)
         user = auth.get_user(user["uid"])
         return user
     except (auth.UserNotFoundError, auth.InvalidSessionCookieError):

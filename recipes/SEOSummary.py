@@ -257,7 +257,7 @@ SearchSEO > Page Parsing > GPT3
         output_content = state.get("output_content")
         if output_content:
             if state.get("enable_html"):
-                scrollable_html(output_content[0])
+                scrollable_html(output_content[0], height=300)
             else:
                 st.text_area(
                     "Generated Content",

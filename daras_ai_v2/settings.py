@@ -74,7 +74,7 @@ LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 1000, cast=int)
 stripe.api_key = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
 
-WIX_SITE_URL = config("WIX_SITE_URL", "https://archanaprasad.wixsite.com/daras-ai")
+WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 
 DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
@@ -89,3 +89,5 @@ FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
 
 TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
 TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")
+
+REDIS_URL = config("REDIS_URL", "redis://localhost:6379")

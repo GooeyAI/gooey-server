@@ -49,7 +49,7 @@ def animation_prompts_editor(
     animation_prompts_key: str = "animation_prompts",
     input_prompt_key: str = "input_prompt",
 ):
-    st_list_key = f"__{animation_prompts_key}_st_list"
+    st_list_key = f"{animation_prompts_key}/st_list"
     if st_list_key in st.session_state:
         prompt_st_list = st.session_state[st_list_key]
     else:
@@ -61,43 +61,34 @@ def animation_prompts_editor(
         prompt_st_list = animation_prompts_to_st_list(animation_prompts)
         st.session_state[st_list_key] = prompt_st_list
 
-    st.write("#### 💃 Animation Prompts")
-    col_spec = [1, 4]
-    col1, col2 = st.columns(col_spec)
-    with col1:
-        st.write("##### 🔢 Frame")
-    with col2:
-        st.write("##### 👩‍💻 Prompt")
-
+    st.write("#### 👩‍💻 Animation Prompts")
     updated_st_list = []
     for idx, fp in enumerate(prompt_st_list):
         fp_key = fp["key"]
-        frame_key = f"__{st_list_key}_frame_{fp_key}"
-        prompt_key = f"__{st_list_key}_prompt_{fp_key}"
+        frame_key = f"{st_list_key}/frame/{fp_key}"
+        prompt_key = f"{st_list_key}/prompt/{fp_key}"
         if frame_key not in st.session_state:
             st.session_state[frame_key] = fp["frame"]
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2 = st.columns(col_spec)
+        col1, col2 = st.columns([4, 1])
         with col1:
-            if st.button("🗑️", help=f"remove frame {idx}"):
-                prompt_st_list.pop(idx)
-                st.experimental_rerun()
+            st.text_area(
+                label="*Prompt*",
+                key=prompt_key,
+                height=100,
+            )
+        with col2:
             st.number_input(
-                label="frame",
-                label_visibility="collapsed",
+                label="*Frame*",
                 key=frame_key,
                 min_value=0,
                 step=1,
             )
-        with col2:
-            st.text_area(
-                label="prompt",
-                label_visibility="collapsed",
-                key=prompt_key,
-                height=100,
-            )
+            if st.button("🗑️", help=f"Remove Frame {idx + 1}"):
+                prompt_st_list.pop(idx)
+                st.experimental_rerun()
 
         updated_st_list.append(
             {
@@ -112,9 +103,11 @@ def animation_prompts_editor(
 
     if st.button("➕ Add a Prompt"):
         max_frames = st.session_state.get("max_frames", 100)
-        next_frame = max(fp["frame"] for fp in prompt_st_list)
-        next_frame += max(min(max_frames - next_frame, 10), 1)
-
+        if prompt_st_list:
+            next_frame = get_last_frame(prompt_st_list)
+            next_frame += max(min(max_frames - next_frame, 10), 1)
+        else:
+            next_frame = 0
         if next_frame > max_frames:
             st.error("Please increase Frame Count")
         else:
@@ -132,6 +125,10 @@ def animation_prompts_editor(
     )
 
 
+def get_last_frame(prompt_list: list) -> int:
+    return max(fp["frame"] for fp in prompt_list)
+
+
 DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/meta%20tags%20-%20animation.jpg"
 
 
@@ -141,6 +138,7 @@ class DeforumSDPage(BasePage):
 
     sane_defaults = dict(
         zoom="0: (1.004)",
+        animation_mode="2D",
         translation_x="0:(10*sin(2*3.14*t/10))",
         translation_y="0:(0)",
         rotation_3d_x="0:(0)",
@@ -155,15 +153,16 @@ class DeforumSDPage(BasePage):
         animation_prompts: AnimationPrompts
         max_frames: int | None
 
-        zoom: str
+        animation_mode: str | None
+        zoom: str | None
         translation_x: str | None
         translation_y: str | None
-        rotation_3d_x: str
-        rotation_3d_y: str
-        rotation_3d_z: str
-        fps: int
+        rotation_3d_x: str | None
+        rotation_3d_y: str | None
+        rotation_3d_z: str | None
+        fps: int | None
 
-        seed: int
+        seed: int | None
 
     class ResponseModel(BaseModel):
         output_video: str
@@ -199,8 +198,8 @@ Number of animation frames.
 
     def additional_notes(self) -> str | None:
         return """
-*Cost ~= 0.25 credits per frame* \\
-*Run Time ~= 5 seconds per frame*
+*Cost ≈ 0.25 credits per frame* \\
+*Run Time ≈ 5 seconds per frame*
         """
 
     def get_price(self) -> int:
@@ -212,7 +211,7 @@ Number of animation frames.
 
         max_frames = st.session_state["max_frames"]
         assert (
-            max(fp["frame"] for fp in prompt_list) <= max_frames
+            get_last_frame(prompt_list) <= max_frames
         ), "Please make sure that Frame Count matches the Animation Prompts"
 
     def render_settings(self):
@@ -274,29 +273,30 @@ Choose fps for the video.
             min_value=10,
             max_value=60,
             step=1,
+            key="fps",
         )
 
-        st.selectbox(
-            """
-###### Sampler
-What Stable Diffusion sampler should be used.
-            """,
-            key="sampler",
-            options=[
-                "euler_ancestral",
-                "klms",
-                "dpm2",
-                "dpm2_ancestral",
-                "heun",
-                "euler",
-                "plms",
-                "ddim",
-                "dpm_fast",
-                "dpm_adaptive",
-                "dpmpp_2s_a",
-                "dpmpp_2m",
-            ],
-        )
+    #         st.selectbox(
+    #             """
+    # ###### Sampler
+    # What Stable Diffusion sampler should be used.
+    #             """,
+    #             key="sampler",
+    #             options=[
+    #                 "euler_ancestral",
+    #                 "klms",
+    #                 "dpm2",
+    #                 "dpm2_ancestral",
+    #                 "heun",
+    #                 "euler",
+    #                 "plms",
+    #                 "ddim",
+    #                 "dpm_fast",
+    #                 "dpm_adaptive",
+    #                 "dpmpp_2s_a",
+    #                 "dpmpp_2m",
+    #             ],
+    #         )
 
     def fallback_preivew_image(self) -> str:
         return DEFAULT_ANIMATION_META_IMG
@@ -324,7 +324,15 @@ What Stable Diffusion sampler should be used.
     def render_example(self, state: dict):
         output_video = state.get("output_video")
         if output_video:
-            st.markdown("```" + state.get("input_prompt").replace("\n", "") + "```")
+            input_prompt = state.get("input_prompt")
+            if input_prompt:
+                animation_prompts = input_prompt_to_animation_prompts(input_prompt)
+            else:
+                animation_prompts = state.get("animation_prompts", [])
+            display = "\n\n".join(
+                [f"[{fp['frame']}] {fp['prompt']}" for fp in animation_prompts]
+            )
+            st.markdown("```lua\n" + display + "\n```")
             st.video(output_video)
         else:
             st.empty()
@@ -353,7 +361,7 @@ What Stable Diffusion sampler should be used.
                     ],
                 ),
                 "inputs": dict(
-                    animation_mode="3D",
+                    animation_mode=request.animation_mode,
                     animation_prompts={
                         fp["frame"]: fp["prompt"] for fp in request.animation_prompts
                     },

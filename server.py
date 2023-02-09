@@ -21,7 +21,11 @@ from sentry_sdk import capture_exception
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response, FileResponse
+from starlette.responses import (
+    PlainTextResponse,
+    Response,
+    FileResponse,
+)
 
 from auth_backend import (
     SessionAuthBackend,
@@ -61,10 +65,11 @@ from recipes.SEOSummary import SEOSummaryPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
-from routers import billing, facebook, talkjs
+from routers import billing, facebook, talkjs, realtime
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
+app.include_router(realtime.router, include_in_schema=False)
 app.include_router(billing.router, include_in_schema=False)
 app.include_router(talkjs.router, include_in_schema=False)
 app.include_router(facebook.router, include_in_schema=False)

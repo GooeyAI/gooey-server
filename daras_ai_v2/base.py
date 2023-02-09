@@ -5,6 +5,7 @@ import typing
 import uuid
 from copy import deepcopy
 from random import Random
+from threading import Thread
 from time import time, sleep
 
 import requests
@@ -17,6 +18,7 @@ from google.cloud import firestore
 from pydantic import BaseModel
 from pydantic.generics import GenericModel
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
+from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
@@ -37,12 +39,11 @@ from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
-from daras_ai_v2.query_params import gooey_reset_query_parm
+from daras_ai_v2.query_params import gooey_reset_query_parm, gooey_get_query_params
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
-
-DEFAULT_STATUS = "Running..."
+from mycomponent import reloader_sub, reloader_pub
 
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
@@ -74,10 +75,32 @@ class StateKeys:
     option_menu_key = "__option_menu_key"
 
     updated_at = "updated_at"
-    error_msg = "__error_msg"
 
+    error_msg = "__error_msg"
+    run_time = "__run_time"
+    run_status = "__run_status"
+    reloader = "__reloader"
+    pressed_randomize = "__randomize"
+
+    run_doc_to_save = "__state_to_save"
     examples_cache = "__examples_cache"
     history_cache = "__history_cache"
+
+
+def scroll_to_top():
+    hidden_html_js(
+        """
+<script>
+let elem = parent.document.querySelector(`iframe[title="streamlit_option_menu.option_menu"]`);
+if (elem) {
+    elem.scrollIntoView();
+} else {
+    top.document.body.scrollTop = 0; // For Safari
+    top.document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+}
+</script>
+        """
+    )
 
 
 class BasePage:
@@ -127,25 +150,24 @@ class BasePage:
         return f"/v2/{self.slug_versions[0]}/"
 
     def render(self):
-        prev_state_key = "__prev_state"
         try:
-            ensure_hidden_widgets_loaded(st.session_state.pop(prev_state_key, {}))
             self._render()
         except Exception as e:
             sentry_sdk.capture_exception(e)
             raise
         finally:
-            st.session_state[prev_state_key] = dict(st.session_state)
+            ensure_hidden_widgets_loaded()
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("url", self.app_url())
-            scope.set_extra("query_params", st.experimental_get_query_params())
+            scope.set_extra("query_params", gooey_get_query_params())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
         init_scripts()
+        reloader_sub(StateKeys.reloader)
 
         self._load_session_state()
         self._check_if_flagged()
@@ -179,39 +201,29 @@ class BasePage:
         match selected_tab:
             case MenuTabs.run:
                 input_col, output_col = st.columns([3, 2], gap="medium")
+                with input_col:
+                    submitted1 = self.render_form()
+                    with st.expander("⚙️ Settings"):
+                        self.render_settings()
+                        st.write("---")
+                        st.write("##### 🖌️ Personalize")
+                        st.text_input("Title", key=StateKeys.page_title)
+                        st.text_area("Notes", key=StateKeys.page_notes)
+                        st.write("---")
+                        submitted2 = self.render_submit_button(key="--submit-2")
+                    submitted = submitted1 or submitted2
+                with output_col:
+                    self._render_output_col(submitted)
 
                 self._render_step_row()
 
                 col1, col2 = st.columns(2)
                 with col1:
                     self._render_help()
-
-                self.render_related_workflows()
-
-                with input_col:
-                    submitted1 = self.render_form()
-
-                    with st.expander("⚙️ Settings"):
-                        self.render_settings()
-
-                        st.write("---")
-                        st.write("##### 🖌️ Personalize")
-                        st.text_input("Title", key=StateKeys.page_title)
-                        st.text_area("Notes", key=StateKeys.page_notes)
-                        st.write("---")
-
-                        submitted2 = self.render_submit_button(key="--submit-2")
-
-                    submitted = submitted1 or submitted2
-
-                with output_col:
-                    self._runner(submitted)
-
                 with col2:
                     self._render_save_options()
-                #
-                # NOTE: Beware of putting code here since runner will call experimental_rerun
-                #
+
+                self.render_related_workflows()
 
             case MenuTabs.examples:
                 self._examples_tab()
@@ -328,7 +340,7 @@ class BasePage:
             with st.spinner("Reporting..."):
                 current_user: UserRecord = st.session_state.get("_current_user")
 
-                query_params = st.experimental_get_query_params()
+                query_params = gooey_get_query_params()
                 example_id, run_id, uid = self.extract_query_params(query_params)
 
                 send_reported_run_email(
@@ -356,7 +368,7 @@ class BasePage:
             return
 
         with placeholder.container(), st.spinner("Loading Settings..."):
-            query_params = st.experimental_get_query_params()
+            query_params = gooey_get_query_params()
             doc = self.get_doc_from_query_params(query_params)
 
             if doc is None:
@@ -382,7 +394,7 @@ class BasePage:
             if not unflag_pressed:
                 return
             with st.spinner("Removing flag..."):
-                query_params = st.experimental_get_query_params()
+                query_params = gooey_get_query_params()
                 example_id, run_id, uid = self.extract_query_params(query_params)
                 if run_id and uid:
                     self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=False)
@@ -503,7 +515,12 @@ class BasePage:
             if additional_notes:
                 st.caption(additional_notes)
         with col2:
-            submitted = st.button("🏃 Submit", key=key, type="primary")
+            submitted = st.button(
+                "🏃 Submit",
+                key=key,
+                type="primary",
+                disabled=StateKeys.run_status in st.session_state,
+            )
         if not submitted:
             return False
         try:
@@ -565,7 +582,7 @@ class BasePage:
     def _render_report_button(self):
         current_user: UserRecord = st.session_state.get("_current_user")
 
-        query_params = st.experimental_get_query_params()
+        query_params = gooey_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
 
         if not (current_user and run_id and uid):
@@ -580,7 +597,7 @@ class BasePage:
         st.experimental_rerun()
 
     def _render_before_output(self):
-        query_params = st.experimental_get_query_params()
+        query_params = gooey_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
         if not (run_id or example_id):
             return
@@ -608,12 +625,12 @@ class BasePage:
             )
 
     def _get_current_app_url(self) -> str | None:
-        query_params = st.experimental_get_query_params()
+        query_params = gooey_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
         return self.app_url(example_id, run_id, uid)
 
     def _get_current_api_url(self) -> furl | None:
-        query_params = st.experimental_get_query_params()
+        query_params = gooey_get_query_params()
         example_id, run_id, uid = self.extract_query_params(query_params)
         return self.api_url(example_id, run_id, uid)
 
@@ -623,132 +640,120 @@ class BasePage:
         ref.update(updates)
         st.session_state.update(updates)
 
-    def save_run(self, new_run: bool = False):
-        current_user: auth.UserRecord = st.session_state.get("_current_user")
-        if not current_user:
-            return
+    def create_new_run(self):
+        current_user: auth.UserRecord = st.session_state["_current_user"]
+        query_params = gooey_get_query_params()
 
-        query_params = st.experimental_get_query_params()
-        example_id, run_id, _ = self.extract_query_params(query_params)
-        if new_run:
-            run_id = get_random_doc_id()
+        run_id = get_random_doc_id()
+        example_id, *_ = self.extract_query_params(query_params)
+        uid = current_user.uid
+
+        self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
         gooey_reset_query_parm(
-            **self._clean_query_params(
-                example_id=example_id, run_id=run_id, uid=current_user.uid
-            )
+            **self._clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
         )
 
-        run_doc_ref = self.run_doc_ref(run_id, current_user.uid)
-        state_to_save = self.state_to_doc(st.session_state)
-        run_doc_ref.set(state_to_save)
+        return run_id, uid
 
-    def _runner(self, submitted: bool):
+    def _render_output_col(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
 
-        before_output = st.empty()
-        status_area = st.empty()
-        output_area = st.empty()
-        after_output = st.empty()
-
-        if StateKeys.error_msg in st.session_state:
-            with status_area:
-                st.error(st.session_state[StateKeys.error_msg], icon="⚠️")
-
-        if "__status" in st.session_state:
-            with status_area:
-                html_spinner(st.session_state["__status"])
-
-        if st.session_state.get("__randomize"):
+        if st.session_state.get(StateKeys.pressed_randomize):
             st.session_state["seed"] = int(gooey_rng.randrange(MAX_SEED))
-            st.session_state.pop("__randomize", None)
+            st.session_state.pop(StateKeys.pressed_randomize, None)
             submitted = True
 
         if submitted:
-            with status_area:
-                html_spinner("Starting...")
+            scroll_to_top()
+            with st.spinner("Starting..."):
+                if not self.check_credits():
+                    return
+                run_id, uid = self._pre_run_checklist()
+                self._run_in_thread(run_id, uid)
 
-            self._pre_run_checklist()
-            if not self.check_credits():
-                status_area.empty()
+        is_running = StateKeys.run_status in st.session_state
+
+        if is_running:
+            run_status = st.session_state.get(StateKeys.run_status)
+            html_spinner(run_status or "Running...")
+        else:
+            self._render_before_output()
+
+            # render errors
+            err_msg = st.session_state.get(StateKeys.error_msg)
+            if err_msg is not None:
+                st.error(err_msg, icon="⚠️")
+                # don't render output
                 return
 
-            st.session_state["__status"] = DEFAULT_STATUS
-            st.session_state["__time_taken"] = 0
-            st.session_state["__gen"] = self.run(st.session_state)
-
-        gen = st.session_state.get("__gen")
-        start_time = None
+            # render run time
+            run_time = st.session_state.get(StateKeys.run_time, 0)
+            if run_time:
+                st.success(
+                    f"Success! Run Time: `{run_time:.2f}` seconds. ",
+                    icon="✅",
+                )
 
         # render outputs
-        with output_area.container():
-            self.render_output()
+        self.render_output()
 
-        # render before/after output blocks if not running
-        if not gen:
-            with before_output.container():
-                self._render_before_output()
-            with after_output.container():
-                self._render_after_output()
-
-        if gen:  # if running...
-            try:
-                start_time = time()
-                # advance the generator (to further progress of run())
-                st.session_state["__status"] = next(gen) or DEFAULT_STATUS
-                # increment total time taken after every iteration
-                st.session_state["__time_taken"] = (
-                    st.session_state.get("__time_taken", 0) + time() - start_time
-                )
-
-            except StopIteration:
-                # Weird but important! This measures the runtime of code after the last `yield` in `run()`
-                if start_time:
-                    st.session_state["__time_taken"] = (
-                        st.session_state.get("__time_taken", 0) + time() - start_time
-                    )
-
-                # save a snapshot of the params used to create this output
-                st.session_state["__state_to_save"] = self.state_to_doc(
-                    st.session_state
-                )
-
-                # cleanup is important!
-                st.session_state.pop("__status", None)
-                st.session_state.pop("__gen", None)
-
-                self.deduct_credits()
-
-            # render errors nicely
-            except Exception as e:
-                traceback.print_exc()
-                sentry_sdk.capture_exception(e)
-                st.session_state[StateKeys.error_msg] = err_msg_for_exc(e)
-
-                # cleanup is important!
-                st.session_state.pop("__status", None)
-                st.session_state.pop("__gen", None)
-                st.session_state.pop("__time_taken", None)
-
-            # save after every step
-            self.save_run()
-
-            # this bit of hack streams the outputs from run() in realtime
-            st.experimental_rerun()
-
+        if is_running:
+            pass
         else:
-            time_taken = st.session_state.get("__time_taken", 0)
-            if time_taken:
-                with status_area:
-                    st.success(
-                        f"Success! Run Time: `{time_taken:.2f}` seconds. ",
-                        icon="✅",
-                    )
-                    del st.session_state["__time_taken"]
+            self._render_after_output()
+
+    def _run_in_thread(self, run_id, uid):
+        t = Thread(target=self._run_thread, args=[run_id, uid])
+        add_script_run_ctx(t)
+        t.start()
+
+    def _run_thread(self, run_id, uid):
+        state = st.session_state
+        # start from blank run status
+        state[StateKeys.run_status] = None
+        try:
+            gen = self.run(state)
+            run_time = 0
+            while True:
+                # record time
+                start_time = time()
+                try:
+                    # advance the generator (to further progress of run())
+                    state[StateKeys.run_status] = next(gen)
+                    # increment total time taken after every iteration
+                    run_time += time() - start_time
+                    continue
+                # run complete
+                except StopIteration:
+                    run_time += time() - start_time
+                    self.deduct_credits()
+                    state[StateKeys.run_doc_to_save] = self.state_to_doc(state)
+                    break
+                # render errors nicely
+                except Exception as e:
+                    traceback.print_exc()
+                    sentry_sdk.capture_exception(e)
+                    state[StateKeys.error_msg] = err_msg_for_exc(e)
+                    break
+                finally:
+                    # save the doc
+                    self.run_doc_ref(run_id, uid).set(self.state_to_doc(state))
+                    # send updates
+                    state[StateKeys.run_time] = run_time
+                    reloader_pub(StateKeys.reloader)
+        finally:
+            # clear run status
+            state.pop(StateKeys.run_status, None)
+            reloader_pub(StateKeys.reloader)
 
     def _pre_run_checklist(self):
+        st.session_state.pop(StateKeys.run_status, None)
+        st.session_state.pop(StateKeys.error_msg, None)
+        st.session_state.pop(StateKeys.run_time, None)
+        st.session_state.pop(StateKeys.run_doc_to_save, None)
         self._setup_rng_seed()
         self.clear_outputs()
-        self.save_run(new_run=True)
+        return self.create_new_run()
 
     def _setup_rng_seed(self):
         seed = st.session_state.get("seed")
@@ -767,13 +772,13 @@ class BasePage:
         if "seed" in self.RequestModel.schema_json():
             seed = st.session_state.get("seed")
             # st.write("is_admin" + str(is_admin()))
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3 = st.columns([1.5, 2, 1.5])
             with col1:
-                st.caption(f"*Seed: `{seed}`*")
+                st.caption(f"*Seed\\\n`{seed}`*")
             with col2:
                 randomize = st.button("♻️ Regenerate")
                 if randomize:
-                    st.session_state["__randomize"] = True
+                    st.session_state[StateKeys.pressed_randomize] = True
                     st.experimental_rerun()
             with col3:
                 self._render_report_button()
@@ -781,7 +786,7 @@ class BasePage:
             self._render_report_button()
 
     def _render_save_options(self):
-        state_to_save = st.session_state.get("__state_to_save")
+        state_to_save = st.session_state.get(StateKeys.run_doc_to_save)
         # st.write("state_to_save " + str(state_to_save))
         if not state_to_save:
             return
@@ -791,7 +796,7 @@ class BasePage:
 
         new_example_id = None
         doc_ref = None
-        query_params = st.experimental_get_query_params()
+        query_params = gooey_get_query_params()
 
         with st.expander("🛠️ Admin Options"):
             col1, col2, col3 = st.columns(3)
@@ -864,12 +869,16 @@ class BasePage:
                     document_id=self.doc_name,
                     sub_collection_id=EXAMPLES_COLLECTION,
                 ).get()
-                example_docs.sort(
-                    key=lambda s: s.to_dict()
-                    .get(StateKeys.updated_at, datetime.datetime.fromtimestamp(0))
-                    .timestamp(),
-                    reverse=True,
-                )
+
+                def sort_key(s):
+                    updated_at = s.to_dict().get(
+                        StateKeys.updated_at, datetime.datetime.fromtimestamp(0)
+                    )
+                    if isinstance(updated_at, str):
+                        updated_at = datetime.datetime.fromisoformat(updated_at)
+                    return updated_at.timestamp()
+
+                example_docs.sort(key=sort_key, reverse=True)
             st.session_state[StateKeys.examples_cache] = example_docs
         example_docs = st.session_state.get(StateKeys.examples_cache)
 
@@ -947,39 +956,41 @@ class BasePage:
         col1, col2 = st.columns([2, 6])
 
         with col1:
-            if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
-                # change url
-                gooey_reset_query_parm(**query_params)
-
-                # scroll to top
-                hidden_html_js(
-                    """
-                    <script>
-                      top.document.body.scrollTop = 0; // For Safari
-                      top.document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
-                    </script>
-                    """
-                )
-
-                # preserve cache
-                cache = {
-                    k: st.session_state[k]
-                    for k in [StateKeys.examples_cache, StateKeys.history_cache]
-                    if k in st.session_state
-                }
-                # clear state
-                st.session_state.clear()
-                # restore cache
-                st.session_state.update(cache)
-                # load example doc
-                self._update_session_state(doc)
-
-                # jump to run tab
-                st.session_state[StateKeys.option_menu_key] = get_random_doc_id()
-
-                # rerun
-                sleep(0.1)
-                st.experimental_rerun()
+            st.markdown(
+                f"""
+                <div style="height: 50px;">
+                    <a target="_top" class="streamlit-like-btn" href="{url}">
+                      ✏️ Tweak
+                    </a>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            # if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
+            #     # change url
+            #     gooey_reset_query_parm(**query_params)
+            #     # scroll to top
+            #     scroll_to_top()
+            #
+            #     # preserve cache
+            #     cache = {
+            #         k: st.session_state[k]
+            #         for k in [StateKeys.examples_cache, StateKeys.history_cache]
+            #         if k in st.session_state
+            #     }
+            #     # clear state
+            #     st.session_state.clear()
+            #     # restore cache
+            #     st.session_state.update(cache)
+            #     # load example doc
+            #     self._update_session_state(doc)
+            #
+            #     # jump to run tab
+            #     st.session_state[StateKeys.option_menu_key] = get_random_doc_id()
+            #
+            #     # rerun
+            #     sleep(0.1)
+            #     st.experimental_rerun()
 
             copy_to_clipboard_button("🔗 Copy URL", value=url)
 
@@ -1130,9 +1141,7 @@ class BasePage:
         return self.price
 
     def get_example_response_body(self, state: dict) -> dict:
-        example_id, run_id, uid = self.extract_query_params(
-            st.experimental_get_query_params()
-        )
+        example_id, run_id, uid = self.extract_query_params(gooey_get_query_params())
         return dict(
             id=run_id or example_id or get_random_doc_id(),
             url=self._get_current_app_url(),
