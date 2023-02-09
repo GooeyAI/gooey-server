@@ -690,11 +690,10 @@ class BasePage:
             if done:
                 # clear run status
                 updates[StateKeys.run_status] = None
-                expire = datetime.timedelta(minutes=1)
             else:
                 # set run status to the yield value of generator
                 updates[StateKeys.run_status] = yield_val or "Running..."
-                expire = datetime.timedelta(hours=2)
+
             # extract outputs from local state
             output = {
                 k: v
@@ -702,7 +701,9 @@ class BasePage:
                 if k in self.ResponseModel.__fields__
             }
             # send updates to streamlit
-            realtime_set(redis_key, updates | output, expire=expire)
+            realtime_set(
+                redis_key, updates | output, expire=datetime.timedelta(hours=2)
+            )
             # save to db
             self.run_doc_ref(run_id, uid).set(self.state_to_doc(updates | local_state))
 
