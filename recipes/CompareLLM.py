@@ -148,6 +148,7 @@ class CompareLLMPage(BasePage):
         from recipes.SocialLookupEmail import SocialLookupEmailPage
         from recipes.VideoBots import VideoBotsPage
         from recipes.LipsyncTTS import LipsyncTTSPage
+
         return [
             SEOSummaryPage,
             SocialLookupEmailPage,

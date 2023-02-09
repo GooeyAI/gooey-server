@@ -108,6 +108,7 @@ class CompareUpscalerPage(BasePage):
         from recipes.GoogleImageGen import GoogleImageGenPage
         from recipes.ImageSegmentation import ImageSegmentationPage
         from recipes.Img2Img import Img2ImgPage
+
         return [
             CompareText2ImgPage,
             GoogleImageGenPage,
