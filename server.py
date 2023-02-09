@@ -1,10 +1,10 @@
 import datetime
 import re
-import time
 import typing
+from time import time
 
 import httpx
-import streamlit
+import streamlit as st
 from fastapi import FastAPI, Depends
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +16,7 @@ from furl import furl
 from google.cloud import firestore
 from lxml.html import HtmlElement
 from pydantic import BaseModel, create_model
+from pydantic.generics import GenericModel
 from pyquery import PyQuery as pq
 from sentry_sdk import capture_exception
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -25,6 +26,7 @@ from starlette.responses import (
     PlainTextResponse,
     Response,
     FileResponse,
+    StreamingResponse,
 )
 
 from auth_backend import (
@@ -36,8 +38,8 @@ from daras_ai_v2 import settings, db
 from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
-    ApiResponseModel,
     DEFAULT_META_IMG,
+    StateKeys,
 )
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import (
@@ -188,7 +190,7 @@ def authentication(request: Request, id_token: bytes = Depends(request_body)):
     try:
         decoded_claims = auth.verify_id_token(id_token)
         # Only process if the user signed in within the last 5 minutes.
-        if time.time() - decoded_claims["auth_time"] < 5 * 60:
+        if time() - decoded_claims["auth_time"] < 5 * 60:
             expires_in = datetime.timedelta(days=14)
             session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
             request.session[FIREBASE_SESSION_COOKIE] = session_cookie
@@ -277,6 +279,16 @@ class FailedReponseModel(BaseModel):
     error: str | None
 
 
+O = typing.TypeVar("O")
+
+
+class ApiResponseModel(GenericModel, typing.Generic[O]):
+    id: str
+    url: str
+    created_at: str
+    output: O
+
+
 def script_to_api(page_cls: typing.Type[BasePage]):
     body_spec = Body(examples=page_cls.RequestModel.Config.schema_extra.get("examples"))
 
@@ -335,7 +347,7 @@ def call_api(
     state["_current_user"] = user
 
     # set streamlit session state
-    streamlit.session_state = state
+    st.session_state = state
 
     # check the balance
     balance = db.get_doc_field(db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0)
