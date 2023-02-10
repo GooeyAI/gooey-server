@@ -1,3 +1,4 @@
+import streamlit as st
 import json
 from base64 import b64decode
 
@@ -32,7 +33,15 @@ def get_current_user() -> auth.UserRecord | None:
     firebase_cookie = session.get(FIREBASE_SESSION_COOKIE)
     if not firebase_cookie:
         return None
-    return verify_session_cookie(firebase_cookie)
+    user = verify_session_cookie(firebase_cookie)
+    if user.disabled:
+        msg = (
+            "Your Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
+            "Contact us at support@gooey.ai if you think this is a mistake."
+        )
+        st.error(msg, icon="😵")
+        st.stop()
+    return user
 
 
 #

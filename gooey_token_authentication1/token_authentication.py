@@ -55,4 +55,12 @@ def authenticate_credentials(token: str) -> auth.UserRecord:
         )
 
     uid = doc.get("uid")
-    return auth.get_user(uid)
+    user = auth.get_user(uid)
+    if user.disabled:
+        msg = (
+            "Your Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
+            "Contact us at support@gooey.ai if you think this is a mistake."
+        )
+        raise HTTPException(status_code=401, detail={"error": msg})
+
+    return user

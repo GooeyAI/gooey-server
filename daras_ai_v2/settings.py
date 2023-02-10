@@ -4,10 +4,9 @@ import firebase_admin
 import sentry_sdk
 import stripe
 from decouple import config, UndefinedValueError, Csv
-from starlette.templating import Jinja2Templates
 from furl import furl
-from google.oauth2 import service_account
-import sentry_sdk
+from sentry_sdk.integrations.threading import ThreadingIntegration
+from starlette.templating import Jinja2Templates
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -23,6 +22,9 @@ if not DEBUG:
         # We recommend adjusting this value in production.
         traces_sample_rate=1.0,
         send_default_pii=True,
+        integrations=[
+            ThreadingIntegration(propagate_hub=True),
+        ],
     )
 
 # load google app credentials from env var if available

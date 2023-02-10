@@ -27,6 +27,9 @@ def gooey_reset_query_parm(**query_params):
     st.experimental_set_query_params(**st_params)
     st.session_state[QUERY_PARAMS_KEY] = st.experimental_get_query_params()
 
+    with sentry_sdk.configure_scope() as scope:
+        scope.set_extra("query_params", st_params)
+
     hidden_html_js(
         """
         <script>
@@ -38,6 +41,3 @@ def gooey_reset_query_parm(**query_params):
         """
         % json.dumps(query_params)
     )
-
-    with sentry_sdk.configure_scope() as scope:
-        scope.set_extra("query_params", st_params)

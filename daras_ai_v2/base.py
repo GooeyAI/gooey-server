@@ -16,7 +16,9 @@ from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
-from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import (
+    TRANSACTION_SOURCE_ROUTE,
+)
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 from daras_ai.init import init_scripts
@@ -136,8 +138,7 @@ class BasePage:
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
-            scope.set_extra("url", self.app_url())
-            scope.set_extra("query_params", gooey_get_query_params())
+            scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
