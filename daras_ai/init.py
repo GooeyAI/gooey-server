@@ -86,6 +86,10 @@ def init_scripts():
             overflow-x: clip;
             overflow-y: scroll;
         }
+        
+        .stTooltipIcon * svg {
+            display: none !important;
+        }
         </style>
         """
         + st_like_btn_css_html
