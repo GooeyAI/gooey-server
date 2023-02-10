@@ -12,32 +12,35 @@ def enum_multiselect(
     enum_cls: E,
     key: str,
     label: str = "",
+    checkboxes=True,
 ):
-    label = label or enum_cls.name
-    # return st.multiselect(
-    #     **kwargs,
-    #     options=[e.name for e in enum_cls],
-    #     format_func=lambda k: enum_cls[k].value,
-    #     label=label,
-    # )
+    if checkboxes:
+        if label:
+            st.write(label)
+        selected = set(st.session_state.get(key, []))
 
-    st.write(label)
-    selected = set(st.session_state.get(key, []))
+        def render(e):
+            inner_key = f"{key} => {e.name}"
+            if inner_key not in st.session_state:
+                st.session_state[inner_key] = e.name in selected
 
-    def render(e):
-        inner_key = f"{key} => {e.name}"
-        if inner_key not in st.session_state:
-            st.session_state[inner_key] = e.name in selected
+            st.checkbox(e.value, key=inner_key)
 
-        st.checkbox(e.value, key=inner_key)
+            if st.session_state.get(inner_key):
+                selected.add(e.name)
+            else:
+                selected.discard(e.name)
 
-        if st.session_state.get(inner_key):
-            selected.add(e.name)
-        else:
-            selected.discard(e.name)
+        grid_layout(2, enum_cls, render, separator=None)
+        st.session_state[key] = list(selected)
 
-    grid_layout(2, enum_cls, render, separator=None)
-    st.session_state[key] = list(selected)
+        return selected
+    else:
+        return st.multiselect(
+            options=[e.name for e in enum_cls],
+            format_func=lambda k: enum_cls[k].value,
+            label=label,
+        )
 
 
 def enum_selector(

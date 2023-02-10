@@ -38,13 +38,15 @@
         const fetchLoop = async () => {
             // already connected, abort
             if (evtSource && evtSource.url == url && evtSource.readyState != 2) return;
-
+            // connect to url
             console.log('EventSource connect:', url);
+            evtSource?.close();
             evtSource = new EventSource(url);
-
+            // forward messages to python
             evtSource.onmessage = (event) => {
                 sendJsonToPython(event.data);
             };
+            // retry on error
             evtSource.onerror = (err) => {
                 let timeout = retryDelay + Math.random() * retryDelay;
                 setTimeout(fetchLoop, timeout);
