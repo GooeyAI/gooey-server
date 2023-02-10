@@ -191,6 +191,7 @@ class BasePage:
             case MenuTabs.run:
                 input_col, output_col = st.columns([3, 2], gap="medium")
                 with input_col:
+                    self.render_author()
                     submitted1 = self.render_form()
                     with st.expander("⚙️ Settings"):
                         self.render_settings()
@@ -446,10 +447,7 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
-    def _render_author(self, uid: str):
-        user: UserRecord = auth.get_user(uid)
-        if not user.photo_url and not user.display_name:
-            return
+    def _render_author(self, user):
         html = "<div style='display:flex; align-items:center'>"
         if user.photo_url:
             html += f"""
@@ -464,11 +462,15 @@ class BasePage:
             unsafe_allow_html=True,
         )
 
+    def render_author(self):
+        if "_run_user" not in st.session_state:
+            return
+        user = st.session_state.get("_run_user")
+        if not user.photo_url and not user.display_name:
+            return
+        self._render_author(user)
+
     def render_form(self) -> bool:
-        query_params = st.experimental_get_query_params()
-        example_id, run_id, uid = self.extract_query_params(query_params)
-        if uid:
-            self._render_author(uid)
         self.render_form_v2()
         return self.render_submit_button()
 

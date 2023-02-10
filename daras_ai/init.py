@@ -1,6 +1,7 @@
 import sentry_sdk
 import streamlit as st
 from firebase_admin import auth
+from firebase_admin.auth import UserRecord
 from furl import furl
 from streamlit import runtime
 from streamlit.runtime.scriptrunner import get_script_run_ctx
@@ -9,6 +10,8 @@ from streamlit.web.server.browser_websocket_handler import BrowserWebSocketHandl
 from daras_ai_v2.copy_to_clipboard_button_widget import st_like_btn_css_html
 from daras_ai_v2.hidden_html_widget import hidden_html_js, hidden_html_nojs
 from daras_ai_v2.html_spinner_widget import html_spinner_css
+from daras_ai_v2.query_params import gooey_get_query_params
+from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.st_session_cookie import get_current_user, get_anonymous_user
 
 
@@ -133,19 +136,29 @@ def init_scripts():
     if "_current_user" not in st.session_state:
         st.session_state["_current_user"] = get_current_user() or get_anonymous_user()
 
-    if not st.session_state.get("_current_user"):
+    current_user = st.session_state.get("_current_user")
+    if not current_user:
         st.error("Sorry, we can't let you do that! Please login to continue.")
         st.stop()
 
+    query_params = gooey_get_query_params()
+    _, _, uid = extract_query_params(query_params)
+    run_user: UserRecord = st.session_state.get("_run_user")
+    if uid and (not run_user or run_user.uid != uid):
+        if current_user.uid == uid:
+            user = current_user
+        else:
+            user: UserRecord = auth.get_user(uid)
+        st.session_state["_run_user"] = user
+
     with sentry_sdk.configure_scope() as scope:
-        user: auth.UserRecord = st.session_state["_current_user"]
         scope.set_user(
             {
-                "id": user.uid,
-                "username": user.display_name,
-                "email": user.email,
-                "phone_number": user.phone_number,
-                "photo_url": user.photo_url,
+                "id": current_user.uid,
+                "username": current_user.display_name,
+                "email": current_user.email,
+                "phone_number": current_user.phone_number,
+                "photo_url": current_user.photo_url,
             }
         )
         scope.add_event_processor(_event_processor)
