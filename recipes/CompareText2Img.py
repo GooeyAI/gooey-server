@@ -29,7 +29,7 @@ class CompareText2ImgPage(BasePage):
     ]
 
     sane_defaults = {
-        "guidance_scale": 10,
+        "guidance_scale": 7.5,
         "seed": 42,
         "sd_2_upscaling": False,
         "image_guidance_scale": 1.2,
@@ -83,9 +83,12 @@ class CompareText2ImgPage(BasePage):
             key="text_prompt",
             placeholder="Iron man",
         )
+        st.write("#### 🧨 Compare Image Models")
+        st.caption(
+            "Each selected model costs 2 credits to run except for Dall-E which is 15 credits per rendered image."
+        )
         enum_multiselect(
             Text2ImgModels,
-            label="#### 🧨 Compare Image Models",
             key="selected_models",
         )
 
@@ -207,9 +210,6 @@ class CompareText2ImgPage(BasePage):
                 case _:
                     total += 2
         return total
-
-    def additional_notes(self) -> str | None:
-        return "Each selected model costs 2 credits to run except for Dalle2 which is 15 credits per rendered image."
 
 
 if __name__ == "__main__":

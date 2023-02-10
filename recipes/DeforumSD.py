@@ -322,20 +322,17 @@ Choose fps for the video.
             st.empty()
 
     def render_example(self, state: dict):
-        output_video = state.get("output_video")
-        if output_video:
-            input_prompt = state.get("input_prompt")
-            if input_prompt:
-                animation_prompts = input_prompt_to_animation_prompts(input_prompt)
-            else:
-                animation_prompts = state.get("animation_prompts", [])
-            display = "\n\n".join(
-                [f"[{fp['frame']}] {fp['prompt']}" for fp in animation_prompts]
-            )
-            st.markdown("```lua\n" + display + "\n```")
-            st.video(output_video)
+        input_prompt = state.get("input_prompt")
+        if input_prompt:
+            animation_prompts = input_prompt_to_animation_prompts(input_prompt)
         else:
-            st.empty()
+            animation_prompts = state.get("animation_prompts", [])
+        display = "\n\n".join(
+            [f"[{fp['frame']}] {fp['prompt']}" for fp in animation_prompts]
+        )
+        st.markdown("```lua\n" + display + "\n```")
+
+        st.video(state.get("output_video"))
 
     def run(self, state: dict):
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)

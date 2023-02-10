@@ -1,3 +1,17 @@
+import streamlit as st
+
+
+def _dummy_deco(fn=None, *args, **kwargs):
+    if fn:
+        return fn
+    else:
+        return _dummy_deco
+
+
+# turn off streamlit cache for tests
+st.cache = _dummy_deco
+
+
 import pytest
 from decouple import config
 from firebase_admin import auth

@@ -15,4 +15,5 @@ def test_create_checkout_session(subscription: str, test_auth_user):
             "/__/stripe/create-checkout-session",
             data={"lookup_key": subscription},
         )
-    assert r.ok, r.content
+    print(r.content)
+    assert r.ok

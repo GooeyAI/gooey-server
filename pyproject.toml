@@ -43,6 +43,7 @@ httpx = "^0.23.1"
 pyquery = "^1.4.3"
 streamlit-option-menu = "^0.3.2"
 redis = "^4.5.1"
+pytest-xdist = "^3.2.0"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"
