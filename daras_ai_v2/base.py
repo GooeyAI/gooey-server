@@ -49,6 +49,7 @@ from daras_ai_v2.query_params import gooey_reset_query_parm, gooey_get_query_par
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
+from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
 from routers.realtime import realtime_subscribe, realtime_set
 
 EXAMPLES_COLLECTION = "examples"
@@ -169,33 +170,7 @@ class BasePage:
         )
         self.render_selected_tab(selected_tab)
 
-        hidden_html_js(
-            """
-<script>
-const dateOptions = {
-    weekday: "short",
-    day: "numeric",
-    month:  "short",
-};
-const timeOptions = {
-    hour: "numeric",
-    hour12: true,
-    minute: "numeric",
-};
-parent.document.querySelectorAll("[data-id-dynamic-date]").forEach(elem => {
-    let date = new Date(parseFloat(elem.getAttribute("data-id-dynamic-date")));
-    elem.innerHTML = `
-        <i>
-        ${date.toLocaleDateString("en-IN", dateOptions)} 
-        ${date.getFullYear() != new Date().getFullYear() ? date.getFullYear() : ""}
-        &nbsp;
-        ${date.toLocaleTimeString("en-IN", timeOptions).toUpperCase()}
-        </i> 
-    `;
-});
-</script>
-            """,
-        )
+        render_js_dynamic_dates()
 
     def _realtime_subscribe(self):
         query_params = gooey_get_query_params()
@@ -1005,11 +980,7 @@ parent.document.querySelectorAll("[data-id-dynamic-date]").forEach(elem => {
 
             updated_at = doc.get("updated_at")
             if updated_at:
-                timestamp_ms = updated_at.timestamp() * 1000
-                markdown(
-                    f"<span data-id-dynamic-date={timestamp_ms}></span>",
-                    unsafe_allow_html=True,
-                )
+                js_dynamic_date(updated_at)
 
         with col2:
             title = doc.get(StateKeys.page_title)
