@@ -979,7 +979,7 @@ class BasePage:
                 self._example_delete_button(**query_params)
 
             updated_at = doc.get("updated_at")
-            if updated_at:
+            if updated_at and isinstance(updated_at, datetime.datetime):
                 js_dynamic_date(updated_at)
 
         with col2:
