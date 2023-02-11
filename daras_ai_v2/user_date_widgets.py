@@ -32,10 +32,13 @@ const timeOptions = {
 
 parent.document.querySelectorAll("[data-id-dynamic-date]").forEach(elem => {
     let date = new Date(parseFloat(elem.getAttribute("data-id-dynamic-date")));
+    let yearToShow = "";
+    if (date.getFullYear() != new Date().getFullYear()) {
+        yearToShow = " " + date.getFullYear().toString();
+    } 
     elem.innerHTML = `
         <i>
-            ${date.toLocaleDateString("en-IN", dateOptions)}
-            ${date.getFullYear() != new Date().getFullYear() ? date.getFullYear() : ""},
+            ${date.toLocaleDateString("en-IN", dateOptions)}${yearToShow},
             ${date.toLocaleTimeString("en-IN", timeOptions).toUpperCase()}
         </i> 
     `;
