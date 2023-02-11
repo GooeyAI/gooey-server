@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
+from streamlit import markdown
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 from daras_ai.init import init_scripts
@@ -34,6 +35,7 @@ from daras_ai_v2.crypto import (
 )
 from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
+from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.html_spinner_widget import (
@@ -166,6 +168,34 @@ class BasePage:
             key=StateKeys.option_menu_key,
         )
         self.render_selected_tab(selected_tab)
+
+        hidden_html_js(
+            """
+<script>
+const dateOptions = {
+    weekday: "short",
+    day: "numeric",
+    month:  "short",
+};
+const timeOptions = {
+    hour: "numeric",
+    hour12: true,
+    minute: "numeric",
+};
+parent.document.querySelectorAll("[data-id-dynamic-date]").forEach(elem => {
+    let date = new Date(parseFloat(elem.getAttribute("data-id-dynamic-date")));
+    elem.innerHTML = `
+        <i>
+        ${date.toLocaleDateString("en-IN", dateOptions)} 
+        ${date.getFullYear() != new Date().getFullYear() ? date.getFullYear() : ""}
+        &nbsp;
+        ${date.toLocaleTimeString("en-IN", timeOptions).toUpperCase()}
+        </i> 
+    `;
+});
+</script>
+            """,
+        )
 
     def _realtime_subscribe(self):
         query_params = gooey_get_query_params()
@@ -972,6 +1002,14 @@ class BasePage:
 
             if allow_delete:
                 self._example_delete_button(**query_params)
+
+            updated_at = doc.get("updated_at")
+            if updated_at:
+                timestamp_ms = updated_at.timestamp() * 1000
+                markdown(
+                    f"<span data-id-dynamic-date={timestamp_ms}></span>",
+                    unsafe_allow_html=True,
+                )
 
         with col2:
             title = doc.get(StateKeys.page_title)
