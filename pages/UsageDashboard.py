@@ -115,7 +115,7 @@ st.dataframe(user_signups)
 # )
 
 user_run_counts, user_runs_by_time = st.session_state.setdefault(
-    f"user_runs#{exclude_anon}#{exclude_team}", ([], [])
+    f"user_runs#{exclude_anon}#{exclude_team}#{exclude_disabled}", ([], [])
 )
 if not user_run_counts:
     with st.spinner(f"fetching user runs..."):
