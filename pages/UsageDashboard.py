@@ -33,7 +33,7 @@ if not user_run_counts:
 all_user_ids = [doc.id for doc in user_run_counts]
 # st.json(all_user_ids, expanded=False)
 
-all_users = st.session_state.setdefault("all_users", [])
+all_users: list[auth.UserRecord] = st.session_state.setdefault("all_users", [])
 if not all_users:
     with st.spinner("fetching users..."):
         for i in range(math.ceil(len(all_user_ids) / batch_size)):
@@ -42,7 +42,9 @@ if not all_users:
             result = auth.get_users(doc_ids_batch)
             all_users.extend(result.users)
 
-exclude_anon = st.checkbox("Exclude Anonymous", value=True)
+col1, col2, col3 = st.columns(3)
+with col1:
+    exclude_anon = st.checkbox("Exclude Anonymous", value=True)
 if exclude_anon:
     all_users = [
         user
@@ -50,7 +52,8 @@ if exclude_anon:
         if (user.display_name or user.email or user.phone_number)
     ]
 
-exclude_team = st.checkbox("Exclude Team", value=True)
+with col2:
+    exclude_team = st.checkbox("Exclude Team", value=True)
 if exclude_team:
     all_users = [
         user
@@ -62,10 +65,54 @@ if exclude_team:
         and not (user.email in team_emails)
     ]
 
-st.json(
-    [f"{user.display_name} ({user.email or user.phone_number})" for user in all_users],
-    expanded=False,
+with col3:
+    exclude_disabled = st.checkbox("Exclude Banned", value=True)
+if exclude_disabled:
+    all_users = [user for user in all_users if not user.disabled]
+
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    last_n_days = st.number_input("Last n Days", min_value=1, value=14)
+with col2:
+    time_axis = st.selectbox("Frequency", options=["1D", "1W"])
+with col3:
+    timezone = st.text_input("Timezone", value="Asia/Kolkata")
+
+now = datetime.datetime.now(pytz.timezone(timezone))
+today = datetime.datetime.date(now)
+time_offset = today - pd.offsets.Day(last_n_days - 1)
+
+
+st.write("## Active Users")
+
+user_signups = pd.DataFrame.from_records(
+    [
+        {
+            "ID": user.uid,
+            "Name": user.display_name,
+            "Email": user.email or user.phone_number,
+            "Created": datetime.datetime.fromtimestamp(
+                user.user_metadata.creation_timestamp / 1000, pytz.timezone(timezone)
+            ),
+            "Last Active": datetime.datetime.fromtimestamp(
+                user.user_metadata.last_sign_in_timestamp / 1000,
+                pytz.timezone(timezone),
+            ),
+        }
+        for user in all_users
+        if (user.user_metadata.last_sign_in_timestamp / 1000) > time_offset.timestamp()
+    ]
 )
+user_signups["Created"] = pd.to_datetime(user_signups["Created"])
+user_signups["Last Active"] = pd.to_datetime(user_signups["Last Active"])
+user_signups = user_signups.sort_values("Last Active", ascending=False)
+
+st.dataframe(user_signups)
+# st.json(
+#     [f"{user.display_name} ({user.email or user.phone_number})" for user in all_users],
+#     expanded=False,
+# )
 
 user_run_counts, user_runs_by_time = st.session_state.setdefault(
     f"user_runs#{exclude_anon}#{exclude_team}", ([], [])
@@ -93,7 +140,7 @@ if not user_run_counts:
                     updated_at = snap.to_dict().get("updated_at")
                     if not updated_at:
                         continue
-                    user_runs_by_time.append((updated_at, user, recipe.id))
+                    user_runs_by_time.append((snap.id, updated_at, user, recipe.id))
 
             return user, profile, run_counts
 
@@ -101,19 +148,20 @@ if not user_run_counts:
 
 # user_runs.sort(key=lambda x: sum(x[1].values()), reverse=True)
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    last_n_days = st.number_input("Last n Days", min_value=1, value=30)
-with col2:
-    time_axis = st.selectbox("Frequency", options=["1D", "1W"])
-with col3:
-    timezone = st.text_input("Timezone", value="Asia/Kolkata")
-
 """
 ## Top Users
 Pro Tip: Click on the table, then Press Ctrl/Cmd + F to search. 
 Press Ctrl/Cmd + A to copy all and paste into a excel.
 """
+
+
+def user_repr(user: auth.UserRecord):
+    ret = user.email or user.phone_number or user.uid
+    if user.display_name:
+        first_name = user.display_name.split(" ")[0]
+        ret = f"{first_name} ({ret})"
+    return ret
+
 
 runs_df = pd.DataFrame.from_records(
     [
@@ -121,10 +169,11 @@ runs_df = pd.DataFrame.from_records(
             "Time": updated_at,
             "ID": user.uid,
             "Name": user.display_name or "",
-            "User": user.email or user.phone_number or user.uid or "",
+            "User": user_repr(user),
             "Recipe": recipe,
+            "Url": f"https://gooey.ai/{recipe}/?uid={user.uid}&run_id={run_id}",
         }
-        for updated_at, user, recipe in user_runs_by_time
+        for run_id, updated_at, user, recipe in user_runs_by_time
     ],
 ).convert_dtypes()
 
@@ -133,9 +182,7 @@ runs_df["Time"] = pd.to_datetime(runs_df["Time"]).dt.tz_convert(timezone)
 runs_df = runs_df.sort_values("Time")
 runs_df = runs_df.set_index("Time")
 
-now = datetime.datetime.now(pytz.timezone(timezone))
-today = datetime.datetime.date(now)
-runs_df = runs_df[today - pd.offsets.Day(last_n_days - 1) :]
+runs_df = runs_df[time_offset:]
 
 filtered_users = set(runs_df["ID"])
 df = pd.DataFrame.from_records(
@@ -143,7 +190,7 @@ df = pd.DataFrame.from_records(
         {
             "ID": user.uid,
             "Name": user.display_name or "",
-            "User": user.email or user.phone_number or user.uid or "",
+            "User": user_repr(user),
             "Balance": profile.get("balance"),
             "All": sum(run_counts.values()),
             **run_counts,
@@ -155,6 +202,17 @@ df = pd.DataFrame.from_records(
 df = df.sort_values("All", ascending=False)
 df = df.reset_index(drop=True)
 st.write(df)
+
+users = st.text_area("Filter users (User ID)")
+if users:
+    users = users.split()
+    if st.checkbox("Want to ban users?") and st.button("💀 Ban em all"):
+        with st.spinner("😁 Banning these ugly mofos..."):
+            for uid in users:
+                auth.update_user(uid, disabled=True)
+    df = df[df["ID"].isin(users)]
+    runs_df = runs_df[runs_df["ID"].isin(users)]
+    st.write(runs_df)
 
 """
 ## Top Recipes
