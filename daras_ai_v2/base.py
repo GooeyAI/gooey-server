@@ -457,7 +457,7 @@ class BasePage:
         html = "<div style='display:flex; align-items:center'>"
         if user.photo_url:
             html += f"""
-                <img style="width:38px; height:38px;border-radius:50%;" src="{user.photo_url}">
+                <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{user.photo_url}">
                 <div style="width:8px;"></div>
             """
         if user.display_name:
