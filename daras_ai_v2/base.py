@@ -150,6 +150,7 @@ class BasePage:
             )
 
         init_scripts()
+        self._user_disabled_check()
 
         self._realtime_subscribe()
         self._load_session_state()
@@ -174,6 +175,16 @@ class BasePage:
         self.render_selected_tab(selected_tab)
 
         render_js_dynamic_dates()
+
+    def _user_disabled_check(self):
+        run_user: UserRecord = st.session_state.get("_run_user")
+        if run_user and run_user.disabled:
+            msg = (
+                "This Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
+                "Contact us at support@gooey.ai if you think this is a mistake."
+            )
+            st.error(msg, icon="😵")
+            st.stop()
 
     def _realtime_subscribe(self):
         query_params = gooey_get_query_params()
