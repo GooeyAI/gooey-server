@@ -12,6 +12,7 @@ from daras_ai_v2.hidden_html_widget import hidden_html_js, hidden_html_nojs
 from daras_ai_v2.html_spinner_widget import html_spinner_css
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
+from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.st_session_cookie import get_current_user, get_anonymous_user
 
 
@@ -161,25 +162,26 @@ def init_scripts():
                 "photo_url": current_user.photo_url,
             }
         )
+        request = _st_session_client().request
+        scope.set_extra("ws_request", request)
+        scope.set_extra("query_params", gooey_get_query_params())
         scope.add_event_processor(_event_processor)
 
 
 def _event_processor(event, hint):
-    request = _st_session_client().request
-
-    extra = event.get("extra", {})
-    url = extra.get("url", "")
-    query_params = extra.get("query_params", {})
-    url = str(furl(url, query_params=query_params))
-
-    event["request"] = {
-        "url": url,
-        "method": request.method,
-        "headers": request.headers,
-        "env": {"REMOTE_ADDR": request.remote_ip},
-        "data": st.session_state.to_dict(),
-    }
-
+    extra = event.get("extra")
+    if extra:
+        request_data = {"data": st.session_state.to_dict()}
+        base_url = extra.get("base_url")
+        if base_url:
+            query_params = extra.get("query_params", {})
+            request_data["url"] = str(furl(base_url, query_params=query_params))
+        ws_request = extra.get("ws_request")
+        if ws_request:
+            request_data["method"] = ws_request.method
+            request_data["headers"] = ws_request.headers
+            request_data["env"] = {"REMOTE_ADDR": ws_request.remote_ip}
+        event["request"] = request_data
     return event
 
 
