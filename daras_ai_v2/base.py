@@ -16,7 +16,10 @@ from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
-from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import (
+    TRANSACTION_SOURCE_ROUTE,
+)
+from streamlit import markdown
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 from daras_ai.init import init_scripts
@@ -32,6 +35,7 @@ from daras_ai_v2.crypto import (
 )
 from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
+from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.html_spinner_widget import (
@@ -45,6 +49,7 @@ from daras_ai_v2.query_params import gooey_reset_query_parm, gooey_get_query_par
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
+from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
 from routers.realtime import realtime_subscribe, realtime_set
 
 EXAMPLES_COLLECTION = "examples"
@@ -136,8 +141,7 @@ class BasePage:
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
-            scope.set_extra("url", self.app_url())
-            scope.set_extra("query_params", gooey_get_query_params())
+            scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
@@ -165,6 +169,8 @@ class BasePage:
             key=StateKeys.option_menu_key,
         )
         self.render_selected_tab(selected_tab)
+
+        render_js_dynamic_dates()
 
     def _realtime_subscribe(self):
         query_params = gooey_get_query_params()
@@ -971,6 +977,10 @@ class BasePage:
 
             if allow_delete:
                 self._example_delete_button(**query_params)
+
+            updated_at = doc.get("updated_at")
+            if updated_at and isinstance(updated_at, datetime.datetime):
+                js_dynamic_date(updated_at)
 
         with col2:
             title = doc.get(StateKeys.page_title)
