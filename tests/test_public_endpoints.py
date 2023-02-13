@@ -29,7 +29,6 @@ route_paths = [
 
 @pytest.mark.parametrize("path", route_paths)
 def test_public_endpoints(path):
-    url = furl(APP_BASE_URL).add(path=path).url
-    r = client.get(url, allow_redirects=True)
+    r = client.get(path, allow_redirects=True)
     print(r.content)
     assert r.status_code == 200
