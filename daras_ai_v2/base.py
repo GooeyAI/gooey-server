@@ -46,6 +46,12 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import gooey_reset_query_parm, gooey_get_query_params
+from daras_ai_v2.query_params_util import (
+    extract_query_params,
+    EXAMPLE_ID_QUERY_PARAM,
+    RUN_ID_QUERY_PARAM,
+    USER_ID_QUERY_PARAM,
+)
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
@@ -55,9 +61,6 @@ from routers.realtime import realtime_subscribe, realtime_set
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
 
-EXAMPLE_ID_QUERY_PARAM = "example_id"
-RUN_ID_QUERY_PARAM = "run_id"
-USER_ID_QUERY_PARAM = "uid"
 
 DEFAULT_META_IMG = (
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
@@ -147,6 +150,7 @@ class BasePage:
             )
 
         init_scripts()
+        self._user_disabled_check()
 
         self._realtime_subscribe()
         self._load_session_state()
@@ -172,9 +176,19 @@ class BasePage:
 
         render_js_dynamic_dates()
 
+    def _user_disabled_check(self):
+        run_user: UserRecord = st.session_state.get("_run_user")
+        if run_user and run_user.disabled:
+            msg = (
+                "This Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
+                "Contact us at support@gooey.ai if you think this is a mistake."
+            )
+            st.error(msg, icon="😵")
+            st.stop()
+
     def _realtime_subscribe(self):
         query_params = gooey_get_query_params()
-        _, run_id, uid = self.extract_query_params(query_params)
+        _, run_id, uid = extract_query_params(query_params)
         redis_key = f"runs/{uid}/{run_id}"
         updates = realtime_subscribe(redis_key)
         if updates:
@@ -194,6 +208,7 @@ class BasePage:
             case MenuTabs.run:
                 input_col, output_col = st.columns([3, 2], gap="medium")
                 with input_col:
+                    self.render_author()
                     submitted1 = self.render_form()
                     with st.expander("⚙️ Settings"):
                         self.render_settings()
@@ -333,7 +348,7 @@ class BasePage:
                 current_user: UserRecord = st.session_state.get("_current_user")
 
                 query_params = gooey_get_query_params()
-                example_id, run_id, uid = self.extract_query_params(query_params)
+                example_id, run_id, uid = extract_query_params(query_params)
 
                 send_reported_run_email(
                     user=current_user,
@@ -387,7 +402,7 @@ class BasePage:
                 return
             with st.spinner("Removing flag..."):
                 query_params = gooey_get_query_params()
-                example_id, run_id, uid = self.extract_query_params(query_params)
+                example_id, run_id, uid = extract_query_params(query_params)
                 if run_id and uid:
                     self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=False)
             st.success("Removed flag.", icon="✅")
@@ -400,22 +415,8 @@ class BasePage:
             # Return and Don't render the run any further
             st.stop()
 
-    def extract_query_params(self, query_params):
-        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
-        run_id = query_params.get(RUN_ID_QUERY_PARAM)
-        uid = query_params.get(USER_ID_QUERY_PARAM)
-
-        if isinstance(example_id, list):
-            example_id = example_id[0]
-        if isinstance(run_id, list):
-            run_id = run_id[0]
-        if isinstance(uid, list):
-            uid = uid[0]
-
-        return example_id, run_id, uid
-
     def get_doc_from_query_params(self, query_params) -> dict | None:
-        example_id, run_id, uid = self.extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(query_params)
         return self.get_firestore_state(example_id, run_id, uid)
 
     def get_firestore_state(self, example_id, run_id, uid):
@@ -462,6 +463,29 @@ class BasePage:
 
     def validate_form_v2(self):
         pass
+
+    def _render_author(self, user):
+        html = "<div style='display:flex; align-items:center'>"
+        if user.photo_url:
+            html += f"""
+                <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{user.photo_url}">
+                <div style="width:8px;"></div>
+            """
+        if user.display_name:
+            html += f"<div>{user.display_name}</div>"
+        html += "</div>"
+        st.markdown(
+            html,
+            unsafe_allow_html=True,
+        )
+
+    def render_author(self):
+        if "_run_user" not in st.session_state:
+            return
+        user = st.session_state.get("_run_user")
+        if not user.photo_url and not user.display_name:
+            return
+        self._render_author(user)
 
     def render_form(self) -> bool:
         self.render_form_v2()
@@ -553,7 +577,7 @@ class BasePage:
         current_user: UserRecord = st.session_state.get("_current_user")
 
         query_params = gooey_get_query_params()
-        example_id, run_id, uid = self.extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(query_params)
 
         if not (current_user and run_id and uid):
             # ONLY RUNS CAN BE REPORTED
@@ -568,7 +592,7 @@ class BasePage:
 
     def _render_before_output(self):
         query_params = gooey_get_query_params()
-        example_id, run_id, uid = self.extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(query_params)
         if not (run_id or example_id):
             return
 
@@ -596,12 +620,12 @@ class BasePage:
 
     def _get_current_app_url(self) -> str | None:
         query_params = gooey_get_query_params()
-        example_id, run_id, uid = self.extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(query_params)
         return self.app_url(example_id, run_id, uid)
 
     def _get_current_api_url(self) -> furl | None:
         query_params = gooey_get_query_params()
-        example_id, run_id, uid = self.extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(query_params)
         return self.api_url(example_id, run_id, uid)
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
@@ -615,7 +639,7 @@ class BasePage:
         query_params = gooey_get_query_params()
 
         run_id = get_random_doc_id()
-        example_id, *_ = self.extract_query_params(query_params)
+        example_id, *_ = extract_query_params(query_params)
         uid = current_user.uid
 
         self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
@@ -1126,7 +1150,7 @@ class BasePage:
         return self.price
 
     def get_example_response_body(self, state: dict) -> dict:
-        example_id, run_id, uid = self.extract_query_params(gooey_get_query_params())
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         return dict(
             id=run_id or example_id or get_random_doc_id(),
             url=self._get_current_app_url(),

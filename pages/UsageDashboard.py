@@ -84,7 +84,22 @@ today = datetime.datetime.date(now)
 time_offset = today - pd.offsets.Day(last_n_days - 1)
 
 
-st.write("## Active Users")
+st.write("### Recently Signed In Users")
+
+
+def user_creation_time(user):
+    return firebase_timestamp_to_datetime(user.user_metadata.creation_timestamp)
+
+
+def user_sign_in_time(user):
+    return firebase_timestamp_to_datetime(user.user_metadata.last_sign_in_timestamp)
+
+
+def firebase_timestamp_to_datetime(timestamp):
+    if not timestamp:
+        return
+    return datetime.datetime.fromtimestamp(timestamp / 1000, pytz.timezone(timezone))
+
 
 user_signups = pd.DataFrame.from_records(
     [
@@ -92,21 +107,18 @@ user_signups = pd.DataFrame.from_records(
             "ID": user.uid,
             "Name": user.display_name,
             "Email": user.email or user.phone_number,
-            "Created": datetime.datetime.fromtimestamp(
-                user.user_metadata.creation_timestamp / 1000, pytz.timezone(timezone)
-            ),
-            "Last Active": datetime.datetime.fromtimestamp(
-                user.user_metadata.last_sign_in_timestamp / 1000,
-                pytz.timezone(timezone),
-            ),
+            "Created": user_creation_time(user),
+            "Last Sign In": user_sign_in_time(user),
         }
         for user in all_users
-        if (user.user_metadata.last_sign_in_timestamp / 1000) > time_offset.timestamp()
+        if (user.user_metadata.last_sign_in_timestamp or 0)
+        > (time_offset.timestamp() * 1000)
     ]
 )
 user_signups["Created"] = pd.to_datetime(user_signups["Created"])
-user_signups["Last Active"] = pd.to_datetime(user_signups["Last Active"])
-user_signups = user_signups.sort_values("Last Active", ascending=False)
+user_signups["Last Sign In"] = pd.to_datetime(user_signups["Last Sign In"])
+user_signups = user_signups.sort_values("Last Sign In", ascending=False)
+user_signups.reset_index()
 
 st.dataframe(user_signups)
 # st.json(
@@ -115,7 +127,7 @@ st.dataframe(user_signups)
 # )
 
 user_run_counts, user_runs_by_time = st.session_state.setdefault(
-    f"user_runs#{exclude_anon}#{exclude_team}", ([], [])
+    f"user_runs#{exclude_anon}#{exclude_team}#{exclude_disabled}", ([], [])
 )
 if not user_run_counts:
     with st.spinner(f"fetching user runs..."):

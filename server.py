@@ -47,6 +47,7 @@ from daras_ai_v2.meta_content import (
     meta_description_for_page,
 )
 from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from gooey_token_authentication1.token_authentication import api_auth_header
 from recipes.ChyronPlant import ChyronPlantPage
@@ -442,7 +443,7 @@ def st_page(request: Request, page_slug):
     iframe_url = furl(
         settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
     )
-    example_id, run_id, uid = page.extract_query_params(dict(request.query_params))
+    example_id, run_id, uid = extract_query_params(dict(request.query_params))
 
     return _st_page(
         request,
