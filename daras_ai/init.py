@@ -12,7 +12,6 @@ from daras_ai_v2.hidden_html_widget import hidden_html_js, hidden_html_nojs
 from daras_ai_v2.html_spinner_widget import html_spinner_css
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
-from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.st_session_cookie import get_current_user, get_anonymous_user
 
 
