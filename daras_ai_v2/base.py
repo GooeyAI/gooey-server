@@ -15,7 +15,7 @@ from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from pydantic.generics import GenericModel
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from streamlit.runtime.scriptrunner import add_script_run_ctx
@@ -48,6 +48,7 @@ from mycomponent import reloader_sub, reloader_pub
 
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
+COMBINED_COLLECTION = "user_runs_combined"
 
 EXAMPLE_ID_QUERY_PARAM = "example_id"
 RUN_ID_QUERY_PARAM = "run_id"
@@ -376,18 +377,21 @@ class BasePage:
 
             self._update_session_state(doc)
 
-    def _update_session_state(self, run_doc):
-        run_doc: RunDoc = RunDoc.parse_obj(run_doc)
-        st.session_state.update(
-            {
-                **run_doc.state,
-                StateKeys.run_time: run_doc.run_time,
-                StateKeys.error_msg: run_doc.error_msg,
-                StateKeys.page_title: run_doc.title or self.title,
-                StateKeys.page_description: run_doc.description
-                or self.preview_description(st.session_state),
-            }
-        )
+    def _update_session_state(self, doc):
+        try:
+            run_doc: RunDoc = RunDoc.parse_obj(doc)
+            st.session_state.update(
+                {
+                    **run_doc.state,
+                    StateKeys.run_time: run_doc.run_time,
+                    StateKeys.error_msg: run_doc.error_msg,
+                    StateKeys.page_title: run_doc.title or self.title,
+                    StateKeys.page_description: run_doc.description
+                                                or self.preview_description(st.session_state),
+                }
+            )
+        except ValidationError:
+            st.session_state.update(doc)
 
         for k, v in self.sane_defaults.items():
             st.session_state.setdefault(k, v)
@@ -454,10 +458,8 @@ class BasePage:
 
     def run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
         return db.get_doc_ref(
-            collection_id=USER_RUNS_COLLECTION,
-            document_id=uid,
-            sub_collection_id=self.doc_name,
-            sub_document_id=run_id,
+            collection_id=COMBINED_COLLECTION,
+            document_id=':'.join([self.slug_versions[0], uid, run_id]),
         )
 
     def _example_doc_ref(self, example_id: str) -> firestore.DocumentReference:

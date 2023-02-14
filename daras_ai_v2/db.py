@@ -182,7 +182,7 @@ class RunDoc(BaseModel):
     citations: str | None
 
     run_time: float | None
-    created_at: datetime.datetime
+    created_at: datetime.datetime | None
     updated_at: datetime.datetime
     error_msg: str | None
 
