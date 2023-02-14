@@ -465,7 +465,7 @@ class BasePage:
         pass
 
     def _render_author(self, user):
-        html = "<div style='display:flex; align-items:center'>"
+        html = "<div style='display:flex; align-items:center; padding-bottom:8px'>"
         if user.photo_url:
             html += f"""
                 <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{user.photo_url}">
