@@ -45,7 +45,7 @@ class LipsyncPage(BasePage):
             *Recommended - wav / mp3*
             """,
             key="audio_file",
-            upload_key="input_audio"
+            upload_key="input_audio",
         )
 
     def validate_form_v2(self):
@@ -69,7 +69,6 @@ class LipsyncPage(BasePage):
                 face_file.getvalue(),
                 content_type=face_file.type,
             )
-
 
     def render_settings(self):
         lipsync_settings()
