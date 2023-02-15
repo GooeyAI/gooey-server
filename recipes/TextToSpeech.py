@@ -69,8 +69,6 @@ class TextToSpeechPage(BasePage):
         )
 
     def render_form_v2(self):
-        st.write("TTS")
-        # with st.form("my_form"):
         st.text_area(
             """
             ### Prompt
