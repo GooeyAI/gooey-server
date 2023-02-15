@@ -129,7 +129,7 @@ def get_last_frame(prompt_list: list) -> int:
     return max(fp["frame"] for fp in prompt_list)
 
 
-DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/meta%20tags%20-%20animation.jpg"
+DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/cropped_animation_meta.gif"
 
 
 class DeforumSDPage(BasePage):
@@ -322,20 +322,17 @@ Choose fps for the video.
             st.empty()
 
     def render_example(self, state: dict):
-        output_video = state.get("output_video")
-        if output_video:
-            input_prompt = state.get("input_prompt")
-            if input_prompt:
-                animation_prompts = input_prompt_to_animation_prompts(input_prompt)
-            else:
-                animation_prompts = state.get("animation_prompts", [])
-            display = "\n\n".join(
-                [f"[{fp['frame']}] {fp['prompt']}" for fp in animation_prompts]
-            )
-            st.markdown("```lua\n" + display + "\n```")
-            st.video(output_video)
+        input_prompt = state.get("input_prompt")
+        if input_prompt:
+            animation_prompts = input_prompt_to_animation_prompts(input_prompt)
         else:
-            st.empty()
+            animation_prompts = state.get("animation_prompts", [])
+        display = "\n\n".join(
+            [f"[{fp['frame']}] {fp['prompt']}" for fp in animation_prompts]
+        )
+        st.markdown("```lua\n" + display + "\n```")
+
+        st.video(state.get("output_video"))
 
     def run(self, state: dict):
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)

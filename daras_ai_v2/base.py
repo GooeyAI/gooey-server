@@ -16,8 +16,10 @@ from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel, ValidationError
-from pydantic.generics import GenericModel
-from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import (
+    TRANSACTION_SOURCE_ROUTE,
+)
+from streamlit import markdown
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 from daras_ai.init import init_scripts
@@ -37,37 +39,37 @@ from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
+from daras_ai_v2.html_spinner_widget import (
+    scroll_to_spinner,
+    scroll_to_top,
+)
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import gooey_reset_query_parm, gooey_get_query_params
+from daras_ai_v2.query_params_util import (
+    extract_query_params,
+    EXAMPLE_ID_QUERY_PARAM,
+    RUN_ID_QUERY_PARAM,
+    USER_ID_QUERY_PARAM,
+)
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
-from mycomponent import reloader_sub, reloader_pub
+from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
+from routers.realtime import realtime_subscribe, realtime_set
 
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
 COMBINED_COLLECTION = "user_runs_combined"
 
-EXAMPLE_ID_QUERY_PARAM = "example_id"
-RUN_ID_QUERY_PARAM = "run_id"
-USER_ID_QUERY_PARAM = "uid"
 
-O = typing.TypeVar("O")
 DEFAULT_META_IMG = (
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
 )
 MAX_SEED = 4294967294
 gooey_rng = Random()
-
-
-class ApiResponseModel(GenericModel, typing.Generic[O]):
-    id: str
-    url: str
-    created_at: str
-    output: O
 
 
 class StateKeys:
@@ -87,25 +89,8 @@ class StateKeys:
     reloader = "__reloader"
     pressed_randomize = "__randomize"
 
-    run_doc_to_save = "__state_to_save"
     examples_cache = "__examples_cache"
     history_cache = "__history_cache"
-
-
-def scroll_to_top():
-    hidden_html_js(
-        """
-<script>
-let elem = parent.document.querySelector(`iframe[title="streamlit_option_menu.option_menu"]`);
-if (elem) {
-    elem.scrollIntoView();
-} else {
-    top.document.body.scrollTop = 0; // For Safari
-    top.document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
-}
-</script>
-        """
-    )
 
 
 class BasePage:
@@ -165,15 +150,15 @@ class BasePage:
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
-            scope.set_extra("url", self.app_url())
-            scope.set_extra("query_params", gooey_get_query_params())
+            scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
         init_scripts()
-        reloader_sub(StateKeys.reloader)
+        self._user_disabled_check()
 
+        self._realtime_subscribe()
         self._load_session_state()
         self._check_if_flagged()
 
@@ -190,6 +175,28 @@ class BasePage:
         )
         self.render_selected_tab(selected_tab)
 
+        render_js_dynamic_dates()
+
+    def _user_disabled_check(self):
+        run_user: UserRecord = st.session_state.get("_run_user")
+        if run_user and run_user.disabled:
+            msg = (
+                "This Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
+                "Contact us at support@gooey.ai if you think this is a mistake."
+            )
+            st.error(msg, icon="😵")
+            st.stop()
+
+    def _realtime_subscribe(self):
+        query_params = gooey_get_query_params()
+        _, run_id, uid = extract_query_params(query_params)
+        redis_key = f"runs/{uid}/{run_id}"
+        updates = realtime_subscribe(redis_key)
+        if updates:
+            st.session_state.update(updates)
+        else:
+            st.session_state[StateKeys.run_status] = None
+
     def get_tabs(self):
         tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
         current_user: UserRecord = st.session_state.get("_current_user")
@@ -202,6 +209,7 @@ class BasePage:
             case MenuTabs.run:
                 input_col, output_col = st.columns([3, 2], gap="medium")
                 with input_col:
+                    self.render_author()
                     submitted1 = self.render_form()
                     with st.expander("⚙️ Settings"):
                         self.render_settings()
@@ -341,7 +349,7 @@ class BasePage:
                 current_user: UserRecord = st.session_state.get("_current_user")
 
                 query_params = gooey_get_query_params()
-                example_id, run_id, uid = self.extract_query_params(query_params)
+                example_id, run_id, uid = extract_query_params(query_params)
 
                 send_reported_run_email(
                     user=current_user,
@@ -410,7 +418,7 @@ class BasePage:
                 return
             with st.spinner("Removing flag..."):
                 query_params = gooey_get_query_params()
-                example_id, run_id, uid = self.extract_query_params(query_params)
+                example_id, run_id, uid = extract_query_params(query_params)
                 if run_id and uid:
                     self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=False)
             st.success("Removed flag.", icon="✅")
@@ -423,22 +431,8 @@ class BasePage:
             # Return and Don't render the run any further
             st.stop()
 
-    def extract_query_params(self, query_params):
-        example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
-        run_id = query_params.get(RUN_ID_QUERY_PARAM)
-        uid = query_params.get(USER_ID_QUERY_PARAM)
-
-        if isinstance(example_id, list):
-            example_id = example_id[0]
-        if isinstance(run_id, list):
-            run_id = run_id[0]
-        if isinstance(uid, list):
-            uid = uid[0]
-
-        return example_id, run_id, uid
-
     def get_doc_from_query_params(self, query_params) -> dict | None:
-        example_id, run_id, uid = self.extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(query_params)
         return self.get_firestore_state(example_id, run_id, uid)
 
     def get_firestore_state(self, example_id, run_id, uid):
@@ -484,6 +478,29 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
+    def _render_author(self, user):
+        html = "<div style='display:flex; align-items:center; padding-bottom:8px'>"
+        if user.photo_url:
+            html += f"""
+                <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{user.photo_url}">
+                <div style="width:8px;"></div>
+            """
+        if user.display_name:
+            html += f"<div>{user.display_name}</div>"
+        html += "</div>"
+        st.markdown(
+            html,
+            unsafe_allow_html=True,
+        )
+
+    def render_author(self):
+        if "_run_user" not in st.session_state:
+            return
+        user = st.session_state.get("_run_user")
+        if not user.photo_url and not user.display_name:
+            return
+        self._render_author(user)
+
     def render_form(self) -> bool:
         self.render_form_v2()
         return self.render_submit_button()
@@ -510,7 +527,7 @@ class BasePage:
                 "🏃 Submit",
                 key=key,
                 type="primary",
-                disabled=StateKeys.run_status in st.session_state,
+                disabled=bool(st.session_state.get(StateKeys.run_status)),
             )
         if not submitted:
             return False
@@ -574,7 +591,7 @@ class BasePage:
         current_user: UserRecord = st.session_state.get("_current_user")
 
         query_params = gooey_get_query_params()
-        example_id, run_id, uid = self.extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(query_params)
 
         if not (current_user and run_id and uid):
             # ONLY RUNS CAN BE REPORTED
@@ -589,7 +606,7 @@ class BasePage:
 
     def _render_before_output(self):
         query_params = gooey_get_query_params()
-        example_id, run_id, uid = self.extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(query_params)
         if not (run_id or example_id):
             return
 
@@ -617,12 +634,12 @@ class BasePage:
 
     def _get_current_app_url(self) -> str | None:
         query_params = gooey_get_query_params()
-        example_id, run_id, uid = self.extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(query_params)
         return self.app_url(example_id, run_id, uid)
 
     def _get_current_api_url(self) -> furl | None:
         query_params = gooey_get_query_params()
-        example_id, run_id, uid = self.extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(query_params)
         return self.api_url(example_id, run_id, uid)
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
@@ -636,7 +653,7 @@ class BasePage:
         query_params = gooey_get_query_params()
 
         run_id = get_random_doc_id()
-        example_id, *_ = self.extract_query_params(query_params)
+        example_id, *_ = extract_query_params(query_params)
         uid = current_user.uid
 
         self.run_doc_ref(run_id, uid).set(
@@ -657,18 +674,18 @@ class BasePage:
             submitted = True
 
         if submitted:
-            scroll_to_top()
-            with st.spinner("Starting..."):
-                if not self.check_credits():
-                    return
-                run_id, uid = self._pre_run_checklist()
-                self._run_in_thread(run_id, uid)
+            html_spinner("Starting...")
+            scroll_to_spinner()
+            if not self.check_credits():
+                return
+            run_id, uid = self._pre_run_checklist()
+            self._run_in_thread(run_id, uid)
+            sleep(0.1)
+            st.experimental_rerun()
 
-        is_running = StateKeys.run_status in st.session_state
-
-        if is_running:
-            run_status = st.session_state.get(StateKeys.run_status)
-            html_spinner(run_status or "Running...")
+        run_status = st.session_state.get(StateKeys.run_status)
+        if run_status:
+            html_spinner(run_status)
         else:
             self._render_before_output()
 
@@ -690,64 +707,85 @@ class BasePage:
         # render outputs
         self.render_output()
 
-        if is_running:
+        if run_status:
             pass
         else:
             self._render_after_output()
 
     def _run_in_thread(self, run_id, uid):
+        if st.session_state.get(StateKeys.run_status):
+            st.error("Already running, please wait or open in a new tab...")
+            return
+
         t = Thread(target=self._run_thread, args=[run_id, uid])
         add_script_run_ctx(t)
         t.start()
 
     def _run_thread(self, run_id, uid):
-        state = st.session_state
-        # start from blank run status
-        state[StateKeys.run_status] = None
+        redis_key = f"runs/{uid}/{run_id}"
+        local_state = dict(st.session_state)
+        run_time = 0
+        yield_val = None
+        error_msg = None
+
+        def save(done=False):
+            updates = {
+                StateKeys.run_time: run_time,
+                StateKeys.error_msg: error_msg,
+            }
+            if done:
+                # clear run status
+                updates[StateKeys.run_status] = None
+            else:
+                # set run status to the yield value of generator
+                updates[StateKeys.run_status] = yield_val or "Running..."
+            # extract outputs from local state
+            output = {
+                k: v
+                for k, v in local_state.items()
+                if k in self.ResponseModel.__fields__
+            }
+            # send updates to streamlit
+            realtime_set(
+                redis_key, updates | output, expire=datetime.timedelta(hours=2)
+            )
+            # save to db
+            self.run_doc_ref(run_id, uid).set(self.state_to_doc(updates | local_state))
+
         try:
-            gen = self.run(state)
-            run_time = 0
+            save()
+            gen = self.run(local_state)
             while True:
                 # record time
                 start_time = time()
                 try:
                     # advance the generator (to further progress of run())
-                    state[StateKeys.run_status] = next(gen)
+                    yield_val = next(gen)
                     # increment total time taken after every iteration
                     run_time += time() - start_time
                     continue
-                # run complete
+                # run completed
                 except StopIteration:
                     run_time += time() - start_time
                     self.deduct_credits()
-                    state[StateKeys.run_doc_to_save] = self.get_run_doc(
-                        uid, run_id, state
-                    )
                     break
                 # render errors nicely
                 except Exception as e:
+                    run_time += time() - start_time
                     traceback.print_exc()
                     sentry_sdk.capture_exception(e)
-                    state[StateKeys.error_msg] = err_msg_for_exc(e)
+                    error_msg = err_msg_for_exc(e)
                     break
                 finally:
-                    # save the doc
-                    self.run_doc_ref(run_id, uid).set(
-                        self.get_run_doc(uid, run_id, state)
-                    )
-                    # send updates
-                    state[StateKeys.run_time] = run_time
-                    reloader_pub(StateKeys.reloader)
+                    save()
         finally:
-            # clear run status
-            state.pop(StateKeys.run_status, None)
-            reloader_pub(StateKeys.reloader)
+            save(done=True)
 
     def _pre_run_checklist(self):
         st.session_state.pop(StateKeys.run_status, None)
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
-        st.session_state.pop(StateKeys.run_doc_to_save, None)
+        # st.session_state.pop(StateKeys.run_doc_to_save, None)
         self._setup_rng_seed()
         self.clear_outputs()
         return self.create_new_run()
@@ -783,11 +821,6 @@ class BasePage:
             self._render_report_button()
 
     def _render_save_options(self):
-        state_to_save = st.session_state.get(StateKeys.run_doc_to_save)
-        # st.write("state_to_save " + str(state_to_save))
-        if not state_to_save:
-            return
-
         if not is_admin():
             return
 
@@ -820,7 +853,7 @@ class BasePage:
                 return
 
             with st.spinner("Saving..."):
-                doc_ref.set(state_to_save)
+                doc_ref.set(self.state_to_doc(st.session_state))
 
                 if new_example_id:
                     st.session_state.get(StateKeys.examples_cache, []).insert(
@@ -867,6 +900,9 @@ class BasePage:
             field_name
             for model in (self.RequestModel, self.ResponseModel)
             for field_name in model.__fields__
+        ] + [
+            StateKeys.error_msg,
+            StateKeys.run_status,
         ]
 
     def _examples_tab(self):
@@ -963,46 +999,40 @@ class BasePage:
         col1, col2 = st.columns([2, 6])
 
         with col1:
-            st.markdown(
-                f"""
-                <div style="height: 50px;">
-                    <a target="_top" class="streamlit-like-btn" href="{url}">
-                      ✏️ Tweak
-                    </a>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            # if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
-            #     # change url
-            #     gooey_reset_query_parm(**query_params)
-            #     # scroll to top
-            #     scroll_to_top()
-            #
-            #     # preserve cache
-            #     cache = {
-            #         k: st.session_state[k]
-            #         for k in [StateKeys.examples_cache, StateKeys.history_cache]
-            #         if k in st.session_state
-            #     }
-            #     # clear state
-            #     st.session_state.clear()
-            #     # restore cache
-            #     st.session_state.update(cache)
-            #     # load example doc
-            #     self._update_session_state(doc)
-            #
-            #     # jump to run tab
-            #     st.session_state[StateKeys.option_menu_key] = get_random_doc_id()
-            #
-            #     # rerun
-            #     sleep(0.1)
-            #     st.experimental_rerun()
+            if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
+                # change url
+                gooey_reset_query_parm(**query_params)
+                # scroll to top
+                scroll_to_top()
+
+                # preserve cache
+                cache = {
+                    k: st.session_state[k]
+                    for k in [StateKeys.examples_cache, StateKeys.history_cache]
+                    if k in st.session_state
+                }
+                # clear state
+                st.session_state.clear()
+                # restore cache
+                st.session_state.update(cache)
+                # load example doc
+                self._update_session_state(doc)
+
+                # jump to run tab
+                st.session_state[StateKeys.option_menu_key] = get_random_doc_id()
+
+                # rerun
+                sleep(0.1)
+                st.experimental_rerun()
 
             copy_to_clipboard_button("🔗 Copy URL", value=url)
 
             if allow_delete:
                 self._example_delete_button(**query_params)
+
+            updated_at = doc.get("updated_at")
+            if updated_at and isinstance(updated_at, datetime.datetime):
+                js_dynamic_date(updated_at)
 
         with col2:
             title = doc.get(StateKeys.page_title)
@@ -1148,7 +1178,7 @@ class BasePage:
         return self.price
 
     def get_example_response_body(self, state: dict) -> dict:
-        example_id, run_id, uid = self.extract_query_params(gooey_get_query_params())
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         return dict(
             id=run_id or example_id or get_random_doc_id(),
             url=self._get_current_app_url(),
