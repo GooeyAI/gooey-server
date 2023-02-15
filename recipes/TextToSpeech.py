@@ -68,26 +68,19 @@ class TextToSpeechPage(BasePage):
             """
         )
 
-    def render_form(self):
-        with st.form("my_form"):
-            st.text_area(
-                """
-                ### Prompt
-                Enter text you want to convert to speech
-                """,
-                key="text_prompt",
-                placeholder="This is a test",
-            )
+    def render_form_v2(self):
+        st.write("TTS")
+        # with st.form("my_form"):
+        st.text_area(
+            """
+            ### Prompt
+            Enter text you want to convert to speech
+            """,
+            key="text_prompt",
+        )
 
-            submitted = st.form_submit_button("🚀 Submit")
-
-        text_prompt = st.session_state.get("text_prompt")
-
-        # form validation
-        if submitted and not text_prompt:
-            st.error("Text input cannot be empty", icon="⚠️")
-            return False
-        return submitted
+    def validate_form_v2(self):
+        assert st.session_state["text_prompt"], "Text input cannot be empty"
 
     def render_settings(self):
         text_to_speech_settings()
