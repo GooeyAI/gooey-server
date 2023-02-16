@@ -63,7 +63,6 @@ EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
 COMBINED_COLLECTION = "user_runs_combined"
 
-
 DEFAULT_META_IMG = (
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
@@ -395,7 +394,7 @@ class BasePage:
                     StateKeys.error_msg: run_doc.error_msg,
                     StateKeys.page_title: run_doc.title or self.title,
                     StateKeys.page_description: run_doc.description
-                                                or self.preview_description(st.session_state),
+                    or self.preview_description(st.session_state),
                 }
             )
         except ValidationError:
@@ -453,7 +452,7 @@ class BasePage:
     def run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
         return db.get_doc_ref(
             collection_id=COMBINED_COLLECTION,
-            document_id=':'.join([self.slug_versions[0], uid, run_id]),
+            document_id=":".join([self.slug_versions[0], uid, run_id]),
         )
 
     def _example_doc_ref(self, example_id: str) -> firestore.DocumentReference:
@@ -750,7 +749,9 @@ class BasePage:
                 redis_key, updates | output, expire=datetime.timedelta(hours=2)
             )
             # save to db
-            self.run_doc_ref(run_id, uid).set(self.state_to_doc(updates | local_state))
+            self.run_doc_ref(run_id, uid).set(
+                self.get_run_doc(uid, run_id, updates | local_state)
+            )
 
         try:
             save()
@@ -853,7 +854,10 @@ class BasePage:
                 return
 
             with st.spinner("Saving..."):
-                doc_ref.set(self.state_to_doc(st.session_state))
+                _, run_id, uid = extract_query_params(query_params)
+                run_doc = self.get_run_doc(uid, run_id, st.session_state)
+                state_to_save = run_doc.get("state")
+                doc_ref.set(state_to_save)
 
                 if new_example_id:
                     st.session_state.get(StateKeys.examples_cache, []).insert(
