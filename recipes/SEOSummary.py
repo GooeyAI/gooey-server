@@ -62,6 +62,7 @@ class SEOSummaryPage(BasePage):
         title="Ruggable",
         company_url="https://ruggable.com",
         scaleserp_search_field="organic_results",
+        scaleserp_google_country="un",
         enable_html=False,
         sampling_temperature=0.8,
         max_tokens=1024,
@@ -84,6 +85,7 @@ class SEOSummaryPage(BasePage):
         task_instructions: str | None
 
         scaleserp_search_field: str | None
+        scaleserp_google_country: str | None
         enable_html: bool | None
 
         sampling_temperature: float | None
@@ -188,6 +190,13 @@ SearchSEO > Page Parsing > GPT3
                 max_value=10,
             )
 
+        col1, col2 = st.columns(2)
+        with col1:
+            st.text_input(
+                "**ScaleSERP [Country Code](https://www.scaleserp.com/docs/search-api/reference/google-countries)**",
+                key="scaleserp_google_country",
+            )
+
     def render_output(self):
         output_content = st.session_state.get("output_content")
         if output_content:
@@ -274,6 +283,7 @@ SearchSEO > Page Parsing > GPT3
         scaleserp_results = call_scaleserp(
             request.search_query,
             include_fields=request.scaleserp_search_field,
+            gl=request.scaleserp_google_country if request.scaleserp_google_country else "un"
         )
         search_urls = _extract_search_urls(request, scaleserp_results)[
             : request.max_search_urls
