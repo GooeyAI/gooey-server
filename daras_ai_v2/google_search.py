@@ -15,7 +15,6 @@ def call_scaleserp(search_query: str, **kwargs) -> dict:
             "location": "United States",
             "hl": "en",
             "google_domain": "google.com",
-            "gl": "us",
             **kwargs,
         },
     ).url
