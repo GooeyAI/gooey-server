@@ -222,7 +222,7 @@ class SocialLookupEmailPage(BasePage):
         st.write(state.get("output_email_body", ""))
 
 
-@st.cache()
+@st.cache_data()
 def get_profile_for_email(email_address):
     r = requests.post(
         "https://api.apollo.io/v1/people/match",

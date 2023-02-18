@@ -149,7 +149,6 @@ class BasePage:
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
-        init_scripts()
         self._user_disabled_check()
 
         self._realtime_subscribe()
@@ -659,7 +658,7 @@ class BasePage:
 
         if submitted:
             html_spinner("Starting...")
-            scroll_to_spinner()
+            # scroll_to_spinner()
             if not self.check_credits():
                 return
             run_id, uid = self._pre_run_checklist()
