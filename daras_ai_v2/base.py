@@ -1082,6 +1082,7 @@ class BasePage:
 
         st.write("#### 📤 Example Request")
         api_example_generator(api_url, request_body)
+        st.write("")
 
         user = st.session_state.get("_current_user")
         if hasattr(user, "_is_anonymous"):
