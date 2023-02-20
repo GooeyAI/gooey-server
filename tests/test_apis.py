@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from auth_backend import force_authentication
 from daras_ai_v2 import db
+from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.base import (
     BasePage,
     get_example_request_body,
@@ -47,6 +48,7 @@ pages_to_test = [
     GoogleImageGenPage,
     CompareLLMPage,
     CompareUpscalerPage,
+    GoogleGPTPage,
 ]
 
 
