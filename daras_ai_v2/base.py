@@ -149,7 +149,6 @@ class BasePage:
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
-        init_scripts()
         self._user_disabled_check()
 
         self._realtime_subscribe()
@@ -277,8 +276,8 @@ class BasePage:
                 <a href="{page().app_url()}" style="text-decoration:none;color:white">
                     <p>
                             <div style="width:100%;height:150px;background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
-                            <h4>{page().title}</h4>
-                            {page().preview_description(state)}
+                            <h5>{page().title}</h5>
+                            <p style="color:grey;font-size:16px">{page().preview_description(state)}</p>
                     </p>
                 </a>
                 <br/>
@@ -465,7 +464,7 @@ class BasePage:
         pass
 
     def _render_author(self, user):
-        html = "<div style='display:flex; align-items:center; padding-bottom:8px'>"
+        html = "<div style='display:flex; align-items:center; padding-bottom:16px'>"
         if user.photo_url:
             html += f"""
                 <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{user.photo_url}">
@@ -659,7 +658,7 @@ class BasePage:
 
         if submitted:
             html_spinner("Starting...")
-            scroll_to_spinner()
+            # scroll_to_spinner()
             if not self.check_credits():
                 return
             run_id, uid = self._pre_run_checklist()
@@ -1083,6 +1082,7 @@ class BasePage:
 
         st.write("#### 📤 Example Request")
         api_example_generator(api_url, request_body)
+        st.write("")
 
         user = st.session_state.get("_current_user")
         if hasattr(user, "_is_anonymous"):

@@ -1285,9 +1285,9 @@ streamlit-nested-layout==0.1.1 ; python_version >= "3.10" and python_version < "
 streamlit-option-menu==0.3.2 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:0b7eae3ffdb0276c81d15750465c72957d57d2f766cb027c586d053519731178 \
     --hash=sha256:69d1aef6f30f83f29eda3dc9667733bc2e28cd640eb17b4b6ca315f633484c52
-streamlit==1.15.2 ; python_version >= "3.10" and python_version < "4.0" \
-    --hash=sha256:31b2fa33848f8dbcf526e6c93017cf58c81a8479844c4f6ff553382e1bac6152 \
-    --hash=sha256:40933b64e7b3a1770d798918cbd2ae52a6671a52266ac069f62e1b66f38e0662
+streamlit==1.18.1 ; python_version >= "3.10" and python_version < "4.0" \
+    --hash=sha256:22d5fb09dea0b93c988763866203bdecfbc7690471fa9db71533d879877bca6d \
+    --hash=sha256:94ed907ccfc6fb8339e5ff09099070935d1290ca788176faf0a9dc1e6f7493b8
 stripe==5.0.0 ; python_version >= "3.10" and python_version < "4.0" \
     --hash=sha256:50f69a5fc9cd6f7629861b80ea70a3c6da0c76401ddc159474f2d45fab9215d6 \
     --hash=sha256:bdc8c5ee8e6b53c4767bbe720752cedb8af91db46ad96e511edd0fb74964ac5d

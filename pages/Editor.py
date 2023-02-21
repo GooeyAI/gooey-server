@@ -30,7 +30,7 @@ def new_doc_id():
     return secrets.token_urlsafe(8)
 
 
-@st.cache(allow_output_mutation=True)
+# @st.cache(allow_output_mutation=True)
 def get_firestore_doc(doc_id: str):
     db_collection = get_db_collection()
     doc_ref = db_collection.document(doc_id)

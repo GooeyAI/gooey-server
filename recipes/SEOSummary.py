@@ -455,7 +455,7 @@ def html_to_text(text):
     return BeautifulSoup(text, "html.parser").get_text(separator=" ", strip=True)
 
 
-@st.cache(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def _call_summarize_url(url: str) -> (str, str):
     r = requests.get(
         url,

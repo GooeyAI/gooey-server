@@ -108,7 +108,7 @@ def text_to_speech_settings():
                 )
 
 
-@st.cache
+@st.cache_data()
 def google_tts_voices() -> dict[texttospeech.Voice, str]:
     voices: list[texttospeech.Voice] = (
         texttospeech.TextToSpeechClient().list_voices().voices

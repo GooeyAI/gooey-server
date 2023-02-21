@@ -289,7 +289,7 @@ class ImageNotFound(Exception):
     pass
 
 
-@st.cache()
+@st.cache_data()
 def get_photo_for_email(email_address):
     doc_ref = db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
 

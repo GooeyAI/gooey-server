@@ -5,7 +5,7 @@ from furl import furl
 from daras_ai_v2 import settings
 
 
-@st.cache(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def call_scaleserp(search_query: str, **kwargs) -> dict:
     scaleserp_url = furl(
         "https://api.scaleserp.com/search",

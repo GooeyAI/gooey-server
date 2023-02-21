@@ -1,10 +1,15 @@
 import streamlit as st
 
+from daras_ai.init import init_scripts
+from daras_ai_v2.GoogleGPT import GoogleGPTPage
+
+init_scripts()
 from daras_ai_v2.grid_layout_widget import grid_layout
 from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareUpscaler import CompareUpscalerPage
 from recipes.VideoBots import VideoBotsPage
 from server import normalize_slug, page_map
+
 
 # try to load page from query params
 #
@@ -26,7 +31,6 @@ from furl import furl
 from google.cloud.firestore_v1 import DocumentSnapshot
 
 from daras_ai.db import list_all_docs
-from daras_ai.init import init_scripts
 from daras_ai_v2 import settings
 from daras_ai_v2.face_restoration import map_parallel
 from recipes.CompareText2Img import CompareText2ImgPage
@@ -44,7 +48,6 @@ from recipes.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
-init_scripts()
 
 page_classes = [
     VideoBotsPage,
@@ -62,6 +65,7 @@ page_classes = [
     Img2ImgPage,
     DeforumSDPage,
     CompareUpscalerPage,
+    GoogleGPTPage,
     # LipsyncPage,
     # ChyronPlantPage,
 ]

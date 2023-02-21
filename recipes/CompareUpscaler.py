@@ -102,3 +102,16 @@ class CompareUpscalerPage(BasePage):
         selected_models = st.session_state.get("selected_models", [])
         total = 5 * len(selected_models)
         return total
+
+    def related_workflows(self) -> list:
+        from recipes.CompareText2Img import CompareText2ImgPage
+        from recipes.GoogleImageGen import GoogleImageGenPage
+        from recipes.ImageSegmentation import ImageSegmentationPage
+        from recipes.Img2Img import Img2ImgPage
+
+        return [
+            CompareText2ImgPage,
+            GoogleImageGenPage,
+            ImageSegmentationPage,
+            Img2ImgPage,
+        ]

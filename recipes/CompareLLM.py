@@ -143,6 +143,19 @@ class CompareLLMPage(BasePage):
                     total += 1
         return total
 
+    def related_workflows(self) -> list:
+        from recipes.SEOSummary import SEOSummaryPage
+        from recipes.SocialLookupEmail import SocialLookupEmailPage
+        from recipes.VideoBots import VideoBotsPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+
+        return [
+            SEOSummaryPage,
+            SocialLookupEmailPage,
+            VideoBotsPage,
+            LipsyncTTSPage,
+        ]
+
 
 if __name__ == "__main__":
     CompareLLMPage().render()
