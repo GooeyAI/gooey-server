@@ -12,9 +12,6 @@ def call_scaleserp(search_query: str, **kwargs) -> dict:
         query_params={
             "api_key": settings.SCALESERP_API_KEY,
             "q": search_query,
-            "location": "United States",
-            "hl": "en",
-            "google_domain": "google.com",
             **kwargs,
         },
     ).url
