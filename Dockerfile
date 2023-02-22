@@ -6,7 +6,11 @@ ENV WORKDIR /usr/src/app
 RUN mkdir -p $WORKDIR
 WORKDIR $WORKDIR
 
-RUN apt-get update && apt-get install -y python3-opencv libmagickwand-dev libpoppler-cpp-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-opencv \
+    libmagickwand-dev \
+    build-essentiallibpoppler-cpp-dev \
+	&& rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
