@@ -24,7 +24,6 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scaleserp_location_picker_widget import (
     scaleserp_location_picker,
-    join_locations_to_str,
 )
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
@@ -281,9 +280,7 @@ SearchSEO > Page Parsing > GPT3
         scaleserp_results = call_scaleserp(
             request.search_query,
             include_fields=request.scaleserp_search_field,
-            location=join_locations_to_str(
-                scaleserp_locations=request.scaleserp_locations
-            ),
+            location=",".join(request.scaleserp_locations),
         )
         search_urls = _extract_search_urls(request, scaleserp_results)[
             : request.max_search_urls

@@ -15,7 +15,6 @@ from daras_ai_v2.img_model_settings_widgets import (
 )
 from daras_ai_v2.scaleserp_location_picker_widget import (
     scaleserp_location_picker,
-    join_locations_to_str,
 )
 from daras_ai_v2.stable_diffusion import (
     img2img,
@@ -104,9 +103,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             search_type="images",
             include_fields="image_results",
             images_size="medium",
-            location=join_locations_to_str(
-                scaleserp_locations=request.scaleserp_locations
-            ),
+            location=",".join(request.scaleserp_locations),
         )
         image_urls = [
             result["image"]
