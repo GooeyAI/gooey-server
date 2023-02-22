@@ -34,7 +34,7 @@ def get_current_user() -> auth.UserRecord | None:
     if not firebase_cookie:
         return None
     user = verify_session_cookie(firebase_cookie)
-    if user.disabled:
+    if user and user.disabled:
         msg = (
             "Your Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
             "Contact us at support@gooey.ai if you think this is a mistake."

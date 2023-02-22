@@ -118,9 +118,10 @@ def markdown_label_patch(
     self, label=None, *args, label_visibility="markdown", **kwargs
 ):
     # allow full markdown labels
-    if label_visibility == "markdown" and label:
-        st.write(label)
+    if label_visibility == "markdown":
         label_visibility = "collapsed"
+        if label:
+            st.write(label)
 
     return self(label, *args, label_visibility=label_visibility, **kwargs)
 

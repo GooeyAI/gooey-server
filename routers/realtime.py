@@ -14,7 +14,7 @@ from mycomponent import pubsub_component
 router = APIRouter()
 
 
-@router.get("/key-events", include_in_schema=False)
+@router.get("/__/realtime/key-events", include_in_schema=False)
 async def key_events(topic: str):
     async def stream():
         r = redis.asyncio.Redis.from_url(settings.REDIS_URL)
@@ -26,14 +26,14 @@ async def key_events(topic: str):
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
-@st.experimental_singleton
+@st.cache_resource
 def get_redis():
     return redis.Redis.from_url(settings.REDIS_URL)
 
 
 def get_key_events_url(redis_key: str) -> furl:
     return furl(
-        settings.API_BASE_URL, query_params={"topic": redis_key}
+        settings.APP_BASE_URL, query_params={"topic": redis_key}
     ) / router.url_path_for(key_events.__name__)
 
 

@@ -5,7 +5,7 @@ import streamlit as st
 
 
 def cache_and_refresh(fn):
-    @st.cache(allow_output_mutation=True)
+    # @st.cache(allow_output_mutation=True)
     def cached_fn(*args, **kwargs):
         return {"value": fn(*args, **kwargs)}
 

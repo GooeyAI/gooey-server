@@ -8,7 +8,7 @@ from gooey_token_authentication1.token_authentication import auth_keyword
 
 
 def api_example_generator(api_url: str, request_body):
-    curl, python, js = st.tabs(["`curl`", "`python`", "`node.js`"])
+    curl, python, js = st.tabs(["curl", "python", "node.js"])
 
     with curl:
         st.write(

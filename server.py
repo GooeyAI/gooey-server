@@ -35,6 +35,7 @@ from auth_backend import (
 )
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings, db
+from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
@@ -515,6 +516,7 @@ all_pages: list[typing.Type[BasePage]] = [
     GoogleImageGenPage,
     VideoBotsPage,
     CompareUpscalerPage,
+    GoogleGPTPage,
 ]
 
 
