@@ -13,8 +13,3 @@ def scaleserp_location_picker():
     )
 
 
-def join_locations_to_str(scaleserp_locations: list[str] | None) -> str:
-    if scaleserp_locations:
-        return ",".join(scaleserp_locations)
-    else:
-        return "United States"
