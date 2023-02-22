@@ -33,6 +33,8 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
     class RequestModel(BaseModel):
         email_address: str
+        twitter_handle: str | None
+        photo_source: str | None
 
         text_prompt: str
 
@@ -110,15 +112,31 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             key="text_prompt",
             placeholder="winter's day in paris",
         )
-
-        st.text_input(
+        source = st.radio(
             """
-            ### Email Address
-            Give us your email address and we'll try to get your photo 
-            """,
-            key="email_address",
-            placeholder="john@appleseed.com",
+            ### Photo Source
+            From where we should get the photo?""",
+            options=["Email Address", "Twitter Handle"],
+            key="photo_source",
         )
+        if source == "Email Address":
+            st.text_input(
+                """
+                #### Email Address
+                Give us your email address and we'll try to get your photo 
+                """,
+                key="email_address",
+                placeholder="john@appleseed.com",
+            )
+        else:
+            st.text_input(
+                """
+                #### Twitter Handle
+                Give us your twitter handle, we'll try to get your photo from there
+                """,
+                key="twitter_handle",
+                max_chars=15
+            )
 
     def validate_form_v2(self):
         text_prompt = st.session_state.get("text_prompt")
@@ -208,8 +226,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         )
 
         yield "Fetching profile..."
-
-        photo_url = get_photo_for_email(request.email_address)
+        if request.photo_source == "Email Address":
+            photo_url = get_photo_for_email(request.email_address)
+        else:
+            lower_case_handle = request.twitter_handle.lower()
+            photo_url = get_photo_for_twitter_handle(lower_case_handle)
         if photo_url:
             state["input_image"] = photo_url
             yield from super().run(state)
@@ -321,6 +342,32 @@ def get_photo_for_email(email_address):
         )
         doc_ref.set({"photo_url": photo_url})
 
+        return photo_url
+
+
+@st.cache_data()
+def get_photo_for_twitter_handle(twitter_handle):
+    doc_ref = db.get_doc_ref(twitter_handle, collection_id="twitter_photo_cache")
+
+    doc = db.get_or_create_doc(doc_ref).to_dict()
+    photo_url = doc.get("photo_url")
+    if photo_url:
+        return photo_url
+    r = requests.get(
+        f"https://api.twitter.com/2/users/by?usernames={twitter_handle}&user.fields=profile_image_url",
+        headers={"Authorization": f"Bearer {settings.TWITTER_BEARER_TOKEN}"},
+    )
+    r.raise_for_status()
+
+    twitter_photo_url_normal = glom.glom(
+        r.json(), "data.0.profile_image_url", default=None
+    )
+    if twitter_photo_url_normal:
+        original_photo_url = twitter_photo_url_normal.replace("_normal", "")
+        photo_url = upload_file_from_bytes(
+            "face_photo.png", requests.get(original_photo_url).content
+        )
+        doc_ref.set({"photo_url": photo_url})
         return photo_url
 
 
