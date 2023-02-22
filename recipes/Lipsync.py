@@ -57,7 +57,7 @@ class LipsyncPage(BasePage):
         assert face_file or input_face, "Please provide an Input Face"
 
         if audio_file:
-            st.session_state["audio_file"] = upload_file_from_bytes(
+            st.session_state["input_audio"] = upload_file_from_bytes(
                 audio_file.name,
                 audio_file.getvalue(),
                 content_type=audio_file.type,
