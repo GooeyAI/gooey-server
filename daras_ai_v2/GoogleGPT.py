@@ -69,7 +69,12 @@ class GoogleGPTPage(BasePage):
 
     def render_form_v2(self):
         st.text_input("##### Google Search Query", key="search_query")
-        st.text_input("Search for a specific site *(optional)*", key="site_filter")
+        st.text_input("Search on a specific site *(optional)*", key="site_filter")
+
+    def validate_form_v2(self):
+        assert st.session_state.get(
+            "search_query", ""
+        ).strip(), "Please enter a search query"
 
     def render_output(self):
         self._render_outputs(st.session_state, 300)
@@ -81,18 +86,24 @@ class GoogleGPTPage(BasePage):
                 )
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Search Query**")
-            st.write("```properties\n" + state.get("search_query", "") + "\n```")
-        with col2:
-            self._render_outputs(state, 300)
+        st.write("**Search Query**")
+        st.write("```properties\n" + state.get("search_query", "") + "\n```")
+        site_filter = state.get("site_filter")
+        if site_filter:
+            st.write(f"**Site** \\\n{site_filter}")
+        self._render_outputs(state, 200)
 
     def _render_outputs(self, state, height):
         output_text = state.get("output_text", [])
+        if output_text:
+            st.write("**Answer**")
         for text in output_text:
             html = render_html_with_refs(text, state.get("references", []))
-            st.write(html, unsafe_allow_html=True)
+            st.write(
+                # language=html
+                f"""<div style="max-height: {height}px;" class="gooey-output-text"><p>{html}</p></div>""",
+                unsafe_allow_html=True,
+            )
 
     def render_settings(self):
         st.text_area(
@@ -243,7 +254,7 @@ def render_html_with_refs(output_text: str, references: list[SearchReference]):
             ref_links.append(f'<a href="{url}">{idx + 1}</a>')
         ref_str_clean = ", ".join(ref_links)
         if ref_links:
-            html += f"<sup><b>[{ref_str_clean}]</b></sup>"
+            html += f"<sup>[{ref_str_clean}]</sup>"
         html += end_separator
         last_match_end = match.end()
     html += output_text[last_match_end:]
