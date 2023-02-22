@@ -49,45 +49,39 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             CompareText2ImgPage,
         ]
 
-    def render_form(self) -> bool:
-        with st.form("my_form"):
-            face_file = st.file_uploader(
-                """
-                #### Input Face
-                Upload a video/image that contains faces to use
-                *Recommended - mp4 / mov / png / jpg*
-                """,
+    def render_form_v2(self):
+        st.file_uploader(
+            """
+            #### Input Face
+            Upload a video/image that contains faces to use
+            *Recommended - mp4 / mov / png / jpg*
+            """,
+            key="face_file",
+            upload_key="input_face",
+        )
+        st.text_area(
+            """
+            #### Input Text
+            This generates audio for your video
+            """,
+            key="text_prompt",
+        )
+
+    def validate_form_v2(self):
+        assert st.session_state["text_prompt"], "Text input cannot be empty"
+        face_file = st.session_state.get("face_file")
+        input_face = st.session_state.get("input_face")
+        assert face_file or input_face, "Please provide an Input Face"
+
+        if face_file:
+            st.session_state["input_face"] = upload_file_from_bytes(
+                face_file.name,
+                face_file.getvalue(),
+                content_type=face_file.type,
             )
 
-            text_prompt = st.text_area(
-                """
-                #### Input Text
-                This generates audio for your video
-                """,
-                key="text_prompt",
-                placeholder="This is a test",
-            )
-            submitted = st.form_submit_button("🏃‍ Submit")
-
-        # upload input files if submitted
-        if submitted:
-            if not text_prompt:
-                st.error("Text input cannot be empty", icon="⚠️")
-                return False
-            if not face_file:
-                if "input_face" not in st.session_state:
-                    st.error("Input face cannot be empty", icon="⚠️")
-                    return False
-
-            with st.spinner("Uploading..."):
-                if face_file:
-                    st.session_state["input_face"] = upload_file_from_bytes(
-                        face_file.name,
-                        face_file.getvalue(),
-                        content_type=face_file.type,
-                    )
-
-        return submitted
+    def get_price(self) -> int:
+        return 10
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_LIPSYNC_TTS_META_IMG
