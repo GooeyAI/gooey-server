@@ -9,7 +9,7 @@ WORKDIR $WORKDIR
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-opencv \
     libmagickwand-dev \
-    build-essentiallibpoppler-cpp-dev \
+    build-essential libpoppler-cpp-dev \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements.txt
