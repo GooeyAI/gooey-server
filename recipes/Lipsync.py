@@ -27,41 +27,48 @@ class LipsyncPage(BasePage):
     class ResponseModel(BaseModel):
         output_video: str
 
-    def render_form(self) -> bool:
-        with st.form("my_form"):
-            face_file = st.file_uploader(
-                """
-                #### Input Face
-                Upload a video/image that contains faces to use  
-                *Recommended - mp4 / mov / png / jpg* 
-                """,
+    def render_form_v2(self) -> bool:
+        st.file_uploader(
+            """
+            #### Input Face
+            Upload a video/image that contains faces to use  
+            *Recommended - mp4 / mov / png / jpg* 
+            """,
+            key="face_file",
+            upload_key="input_face",
+        )
+
+        st.file_uploader(
+            """
+            #### Input Audio
+            Upload the video/audio file to use as audio source for lipsyncing  
+            *Recommended - wav / mp3*
+            """,
+            key="audio_file",
+            upload_key="input_audio",
+        )
+
+    def validate_form_v2(self):
+        audio_file = st.session_state.get("audio_file")
+        input_audio = st.session_state.get("input_audio")
+        face_file = st.session_state.get("face_file")
+        input_face = st.session_state.get("input_face")
+        assert audio_file or input_audio, "Please provide an audio file"
+        assert face_file or input_face, "Please provide an Input Face"
+
+        if audio_file:
+            st.session_state["input_audio"] = upload_file_from_bytes(
+                audio_file.name,
+                audio_file.getvalue(),
+                content_type=audio_file.type,
             )
 
-            audio_file = st.file_uploader(
-                """
-                #### Input Audio
-                Upload the video/audio file to use as audio source for lipsyncing  
-                *Recommended - wav / mp3*
-                """,
+        if face_file:
+            st.session_state["input_face"] = upload_file_from_bytes(
+                face_file.name,
+                face_file.getvalue(),
+                content_type=face_file.type,
             )
-
-            submitted = st.form_submit_button("🏃‍ Submit")
-
-        # upload input files if submitted
-        if submitted:
-            with st.spinner("Uploading..."):
-                if face_file:
-                    st.session_state["input_face"] = upload_file_from_bytes(
-                        face_file.name,
-                        face_file.getvalue(),
-                        content_type=face_file.type,
-                    )
-                if audio_file:
-                    st.session_state["input_audio"] = upload_file_from_bytes(
-                        audio_file.name, audio_file.getvalue()
-                    )
-
-        return submitted
 
     def render_settings(self):
         lipsync_settings()
