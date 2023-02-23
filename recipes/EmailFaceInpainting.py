@@ -320,7 +320,7 @@ class ImageNotFound(Exception):
 
 
 class TwitterError(Exception):
-    "Raised when the twitter handle not found in email profile"
+    "Raised when the twitter handle Lookup returns an error"
     pass
 
 
