@@ -87,6 +87,7 @@ def output_resolution_setting():
 
 def sd_2_upscaling_setting():
     st.checkbox("**4x Upscaling**", key="sd_2_upscaling")
+    st.caption("Note: Currently, only square images can be upscaled")
 
 
 def guidance_scale_setting(selected_model: str = None):
