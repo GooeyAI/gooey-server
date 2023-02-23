@@ -65,31 +65,43 @@ def video_patch(self, value, *args, caption=None, **kwargs):
 
 @patch(st.file_uploader)
 def file_uploader_patch(self, *args, upload_key=None, **kwargs):
-    value = self(*args, **kwargs)
-    _render_preview(value, upload_key)
-    return value
+    retval = value = self(*args, **kwargs)
+    if not isinstance(value, list):
+        value = [value]
+    for item in value:
+        _render_preview(item, upload_key)
+    return retval
 
 
 def _render_preview(value: UploadedFile | None, upload_key: str):
-    # render preview from current value / uploaded value
-    if value:
+    is_local = bool(value)
+    is_uploaded = not is_local and st.session_state.get(upload_key)
+
+    # render preview from local file / uploaded file
+    if is_local:
         preview = value
         filename = value.name
-    elif upload_key in st.session_state:
+    elif is_uploaded:
         preview = st.session_state[upload_key]
-        filename = preview
+        try:
+            filename = furl(preview).path.segments[-1]
+        except IndexError:
+            return
     else:
         return
 
     _, col, _ = st.columns([1, 2, 1])
     with col:
+        # if uploaded file, display a link to it
+        if is_uploaded:
+            st.write(f"🔗 [{filename}]({preview})")
         # render preview as video/image
         ext = os.path.splitext(filename)[-1].lower()
         match ext:
             case ".mp4" | ".mov" | ".ogg":
-                st.video(preview)
+                return st.video(preview)
             case ".png" | ".jpg" | ".jpeg" | ".gif" | ".webp" | ".tiff":
-                st.image(preview)
+                return st.image(preview)
 
 
 @patch(st.text_input, st.text_area)

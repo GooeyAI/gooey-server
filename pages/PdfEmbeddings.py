@@ -1,6 +1,9 @@
 import datetime
 import json
+import os
 import re
+import subprocess
+import tempfile
 from collections import deque
 
 import numpy as np
@@ -15,7 +18,9 @@ from daras_ai_v2 import settings
 
 url = st.text_input("url")
 st.write("_or_")
-pdf_file = st.file_uploader("pdf", type=["pdf"])
+input_files = st.file_uploader(
+    "pdf", type=["pdf", "txt", "docx", "md"], accept_multiple_files=True
+)
 
 max_context_words = 200
 scroll_jump = 5
@@ -25,6 +30,26 @@ top_p = 3
 @st.cache_data()
 def pdf_to_text(f):
     return list(pdftotext.PDF(f))
+
+
+@st.cache_data()
+def pandoc_convert(f, to="plain"):
+    with tempfile.NamedTemporaryFile(
+        suffix="." + os.path.basename(f.name)
+    ) as infile, tempfile.NamedTemporaryFile("r") as outfile:
+        infile.write(f.getbuffer())
+        args = [
+            "pandoc",
+            "--standalone",
+            infile.name,
+            "--to",
+            to,
+            "--output",
+            outfile.name,
+        ]
+        print("\t$", " ".join(args))
+        subprocess.check_call(args)
+        return outfile.read()
 
 
 # language=regexp
@@ -65,14 +90,21 @@ word_breaks_re = re.compile(
 )
 
 docs = []
-if pdf_file:
-    # reader = PdfReader(pdf_file)
-    # pdf_pages = [page.extract_text() for page in reader.pages]
-    pdf_pages = pdf_to_text(pdf_file)
+if input_files:
+    pdf_pages = []
+    for f in input_files:
+        ext = os.path.splitext(f.name)[-1].lower()
+        match ext:
+            case ".pdf":
+                pdf_pages.extend(pdf_to_text(f))
+            case ".docx" | ".md":
+                pdf_pages.append(pandoc_convert(f))
+            case ".txt":
+                pdf_pages.append(f.getvalue().decode())
 
     with st.expander(f"{len(pdf_pages)} pages"):
         for idx, page in enumerate(pdf_pages[:50]):
-            st.text_area(f"pdf {idx}", page, 400)
+            st.text_area(f"page {idx}", page, 400)
 
     full_text = "\n\n".join(pdf_pages)
 
