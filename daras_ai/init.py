@@ -193,8 +193,7 @@ parent.document.addEventListener("click", (e) => {
                 "photo_url": current_user.photo_url,
             }
         )
-        request = _st_session_client().request
-        scope.set_extra("ws_request", request)
+        scope.set_extra("ws_request", get_websocket_request())
         scope.set_extra("query_params", gooey_get_query_params())
         scope.add_event_processor(_event_processor)
 
@@ -216,7 +215,7 @@ def _event_processor(event, hint):
     return event
 
 
-def _st_session_client():
+def get_websocket_request():
     ctx = get_script_run_ctx()
     if ctx is None:
         return None
@@ -230,4 +229,4 @@ def _st_session_client():
             f"SessionClient is not a BrowserWebSocketHandler! ({session_client})"
         )
 
-    return session_client
+    return session_client.request

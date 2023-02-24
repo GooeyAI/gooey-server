@@ -3,7 +3,7 @@ import typing
 import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, upload_st_file
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 
@@ -69,16 +69,11 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Text input cannot be empty"
-        face_file = st.session_state.get("face_file")
-        input_face = st.session_state.get("input_face")
-        assert face_file or input_face, "Please provide an Input Face"
 
+        face_file = st.session_state.get("face_file")
         if face_file:
-            st.session_state["input_face"] = upload_file_from_bytes(
-                face_file.name,
-                face_file.getvalue(),
-                content_type=face_file.type,
-            )
+            st.session_state["input_face"] = upload_st_file(face_file)
+        assert st.session_state.get("input_face"), "Please provide an Input Face"
 
     def get_price(self) -> int:
         return 10

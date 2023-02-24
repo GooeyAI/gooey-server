@@ -4,7 +4,7 @@ from pathlib import Path
 import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_from_bytes, safe_filename
+from daras_ai.image_input import upload_file_from_bytes, safe_filename, upload_st_file
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.lipsync_api import wav2lip
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -50,25 +50,14 @@ class LipsyncPage(BasePage):
 
     def validate_form_v2(self):
         audio_file = st.session_state.get("audio_file")
-        input_audio = st.session_state.get("input_audio")
-        face_file = st.session_state.get("face_file")
-        input_face = st.session_state.get("input_face")
-        assert audio_file or input_audio, "Please provide an audio file"
-        assert face_file or input_face, "Please provide an Input Face"
-
         if audio_file:
-            st.session_state["input_audio"] = upload_file_from_bytes(
-                audio_file.name,
-                audio_file.getvalue(),
-                content_type=audio_file.type,
-            )
+            st.session_state["input_audio"] = upload_st_file(audio_file)
+        assert st.session_state.get("input_audio"), "Please provide an Audio file"
 
+        face_file = st.session_state.get("face_file")
         if face_file:
-            st.session_state["input_face"] = upload_file_from_bytes(
-                face_file.name,
-                face_file.getvalue(),
-                content_type=face_file.type,
-            )
+            st.session_state["input_face"] = upload_st_file(face_file)
+        assert st.session_state.get("input_face"), "Please provide an Input Face"
 
     def render_settings(self):
         lipsync_settings()

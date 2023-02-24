@@ -93,3 +93,6 @@ TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
 TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")
 
 REDIS_URL = config("REDIS_URL", "redis://localhost:6379")
+
+PINECONE_API_KEY = config("PINECONE_API_KEY", "")
+PINECONE_ENVIRONMENT = config("PINECONE_ENVIRONMENT", "us-east1-gcp")

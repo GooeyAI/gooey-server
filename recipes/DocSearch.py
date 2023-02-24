@@ -1,6 +1,7 @@
 import datetime
 import heapq
 import io
+import math
 import os
 import re
 import subprocess
@@ -9,7 +10,6 @@ import typing
 from collections import deque
 
 import numpy as np
-import openai
 import pdftotext
 import requests
 import streamlit as st
@@ -17,12 +17,10 @@ from furl import furl
 from pydantic import BaseModel
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from daras_ai.face_restoration import map_parallel
-from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2 import settings
+from daras_ai.image_input import upload_st_file
 from daras_ai_v2.GoogleGPT import SearchReference, render_outputs
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.language_model import run_language_model
+from daras_ai_v2.language_model import run_language_model, get_embeddings
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 
 
@@ -84,11 +82,7 @@ class DocSearchPage(BasePage):
             "__document_files"
         )
         if document_files:
-            st.session_state["documents"] = [
-                upload_file_from_bytes(f.name, f.getvalue(), f.type)
-                for f in document_files
-            ]
-
+            st.session_state["documents"] = [upload_st_file(f) for f in document_files]
         assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_output(self):
@@ -188,35 +182,40 @@ If scroll jump is too high, there might not be enough overlap between the chunks
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: DocSearchPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        yield "Reading documents..."
-        rows = []
-        for f_url in request.documents or []:
-            f_name, pages = doc_url_to_text_pages(f_url)
-            full_text = "\n\n".join(pages)
-            # fix word breaks to the next line
-            full_text = word_breaks_re.sub(" - ", full_text)
-            # split document into chunks
-            for snippet in document_splitter(full_text, request):
-                rows.append({"url": f_url, "title": f_name, "snippet": snippet})
+        yield f"Getting query embeddings..."
+        query_embeds = get_embeddings_cached(request.search_query)[0]
 
         yield "Getting document embeddings..."
-        docs = [c["snippet"] for c in rows]
-        similarities = get_document_similarities(
-            request.search_query, docs, request.max_references
+        input_docs = request.documents or []
+        embeds = [
+            item
+            for f_url in input_docs
+            for item in doc_url_to_embeds(
+                f_url=f_url,
+                max_context_words=request.max_context_words,
+                scroll_jump=request.scroll_jump,
+            )
+        ]
+
+        yield f"Searching documents..."
+        candidates = [
+            {**meta, "score": vector_similarity(query_embeds, doc_embeds)}
+            for meta, doc_embeds in embeds
+        ]
+
+        # apply cutoff
+        cutoff = 0.7
+        candidates = [match for match in candidates if match["score"] >= cutoff]
+        # get top_k best matches
+        matches = heapq.nlargest(
+            request.max_references, candidates, key=lambda match: match["score"]
         )
         # empty search result, abort!
-        if not similarities:
+        if not matches:
             raise ValueError(
                 f"Your search - {request.search_query} - did not match any documents."
             )
-        # convert similarities to references
-        state["references"] = [
-            {
-                **rows[idx],
-                "score": score,
-            }
-            for idx, (_, score) in enumerate(similarities)
-        ]
+        state["references"] = matches
 
         # add time to prompt
         utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
@@ -227,10 +226,10 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         prompt = task_instructions.strip() + "\n\n"
         # add search results to the prompt
         search_results = "\n\n---\n\n".join(
-            f'''Search Result: [{idx + 1}]\nTitle: {rows[doc_idx]["title"]}\nSnippet: """\n{rows[doc_idx]["snippet"]}"""'''
-            for idx, (doc_idx, _) in enumerate(similarities)
+            f'''Search Result: [{idx + 1}]\nTitle: {ref["title"]}\nSnippet: """\n{ref["snippet"]}"""'''
+            for idx, ref in enumerate(state["references"])
         )
-        prompt += f"\n{search_results}\n\n"
+        prompt += f"{search_results}\n\n"
         # add the question
         prompt += f"Question: {request.search_query}\nAnswer:"
         state["final_prompt"] = prompt
@@ -250,7 +249,34 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         state["output_text"] = output_text
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False)
+def doc_url_to_embeds(*, f_url: str, max_context_words: int, scroll_jump: int):
+    f_name, pages = doc_url_to_text_pages(f_url)
+    full_text = "\n\n".join(pages)
+    # fix word breaks to the next line
+    full_text = word_breaks_re.sub(" - ", full_text)
+    # split document into chunks
+    texts = list(document_splitter(full_text, max_context_words, scroll_jump))
+    metas = [
+        {
+            "url": f_url,
+            "title": f_name,
+            "snippet": snippet,
+        }
+        for snippet in texts
+    ]
+    # get doc embeds in batches
+    embeds = []
+    batch_size = 100
+    num_batches = math.ceil(len(texts) / batch_size)
+    for i in range(num_batches):
+        # progress = int(i / num_batches * 100)
+        # yield f"Getting document embeddings ({progress}%)..."
+        batch = texts[i * batch_size : (i + 1) * batch_size]
+        embeds.extend(get_embeddings(batch))
+    return zip(metas, embeds)
+
+
 def doc_url_to_text_pages(f_url: str) -> (str, list[str]):
     # get document data from url
     f_name = furl(f_url).path.segments[-1]
@@ -269,24 +295,7 @@ def doc_url_to_text_pages(f_url: str) -> (str, list[str]):
     return f_name, pages
 
 
-def get_document_similarities(
-    query: str, docs: list[str], n: int, cutoff: float = 0.7
-) -> list[(float, int)]:
-    query_embedding = get_embedding(query)
-    embeddings = map_parallel(get_embedding, docs)
-    similarities = [
-        (vector_similarity(query_embedding, doc_embedding), doc_index)
-        for doc_index, doc_embedding in enumerate(embeddings)
-    ]
-    similarities = [(i, s) for s, i in similarities if s >= cutoff]
-    return heapq.nlargest(n, similarities)
-
-
-@st.cache_data(show_spinner=False)
-def get_embedding(text: str) -> list[float]:
-    openai.api_key = settings.OPENAI_API_KEY
-    result = openai.Embedding.create(model="text-embedding-ada-002", input=text)
-    return result["data"][0]["embedding"]
+get_embeddings_cached = st.cache_data(show_spinner=False)(get_embeddings)
 
 
 def vector_similarity(x: list[float], y: list[float]) -> float:
@@ -298,12 +307,10 @@ def vector_similarity(x: list[float], y: list[float]) -> float:
     return np.dot(np.array(x), np.array(y))
 
 
-# @st.cache_data()
 def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
     return list(pdftotext.PDF(f))
 
 
-# @st.cache_data()
 def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
     with (
         tempfile.NamedTemporaryFile("wb", suffix="." + f_name) as infile,
@@ -362,7 +369,7 @@ word_breaks_re = re.compile(
 )
 
 
-def document_splitter(full_text, request):
+def document_splitter(full_text, max_context_words, scroll_jump):
     window = deque()
     # split text into fragments
     all_frags = list(split_text_into_fragments(full_text))
@@ -379,12 +386,12 @@ def document_splitter(full_text, request):
             next_window = [*window, next_frag]
             next_window_words = sum(len(re.split("\s+", para)) for para in next_window)
             # next fragment can be safely used without exhausing context, continue expanding
-            if next_window_words <= request.max_context_words:
+            if next_window_words <= max_context_words:
                 continue
         # send off this window as a chunk
         yield "\n".join(window)
         # scroll jump - remove fragments from the start of window
-        for _ in range(request.scroll_jump):
+        for _ in range(scroll_jump):
             try:
                 window.popleft()
             except IndexError:
