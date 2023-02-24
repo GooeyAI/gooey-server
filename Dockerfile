@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt && pip install 'protobuf<4,>=3.12'
+RUN pip install -r requirements.txt && pip install -I 'protobuf<4,>=3.12'
 
 COPY . .
 
