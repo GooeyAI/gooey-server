@@ -657,9 +657,12 @@ class BasePage:
             submitted = True
 
         if submitted:
-            html_spinner("Starting...")
+            placeholder = st.empty()
+            with placeholder.container():
+                html_spinner("Starting...")
             # scroll_to_spinner()
             if not self.check_credits():
+                placeholder.empty()
                 return
             run_id, uid = self._pre_run_checklist()
             self._run_in_thread(run_id, uid)
