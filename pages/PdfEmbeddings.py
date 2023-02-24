@@ -203,9 +203,9 @@ Use this current date and time: {{ datetime.utcnow }}. \
 Combine Search Results together into a coherent answer. \
 Remember to cite the search results using [${number}] notation in your answer.
 
-Question: {{ request.query }}
 Search Results: 
 {{ search_results }}
+Question: {{ request.query }}
 Answer:""".replace(
         "{{ datetime.utcnow }}",
         datetime.datetime.utcnow().isoformat(),

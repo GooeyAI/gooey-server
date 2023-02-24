@@ -2,6 +2,7 @@ import streamlit as st
 
 from daras_ai.init import init_scripts
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
+from recipes.DocSearch import DocSearchPage
 
 init_scripts()
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -66,6 +67,7 @@ page_classes = [
     DeforumSDPage,
     CompareUpscalerPage,
     GoogleGPTPage,
+    DocSearchPage,
     # LipsyncPage,
     # ChyronPlantPage,
 ]

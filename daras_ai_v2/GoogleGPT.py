@@ -16,6 +16,7 @@ class SearchReference(typing.TypedDict):
     url: str
     title: str
     snippet: str
+    score: float
 
 
 class GoogleGPTPage(BasePage):
@@ -77,7 +78,7 @@ class GoogleGPTPage(BasePage):
         ).strip(), "Please enter a search query"
 
     def render_output(self):
-        self._render_outputs(st.session_state, 300)
+        render_outputs(st.session_state, 300)
 
         with st.expander("Sources"):
             for idx, ref in enumerate(st.session_state.get("references", [])):
@@ -91,19 +92,7 @@ class GoogleGPTPage(BasePage):
         site_filter = state.get("site_filter")
         if site_filter:
             st.write(f"**Site** \\\n{site_filter}")
-        self._render_outputs(state, 200)
-
-    def _render_outputs(self, state, height):
-        output_text = state.get("output_text", [])
-        if output_text:
-            st.write("**Answer**")
-        for text in output_text:
-            html = render_html_with_refs(text, state.get("references", []))
-            st.write(
-                # language=html
-                f"""<div style="max-height: {height}px;" class="gooey-output-text"><p>{html}</p></div>""",
-                unsafe_allow_html=True,
-            )
+        render_outputs(state, 200)
 
     def render_settings(self):
         st.text_area(
@@ -188,12 +177,11 @@ class GoogleGPTPage(BasePage):
             search_query = f"site:{f.host}{f.path} {search_query}"
 
         scaleserp_search_field = "organic_results"
-        scaleserp_results = call_scaleserp(
+        state["scaleserp_results"] = scaleserp_results = call_scaleserp(
             search_query,
             include_fields=scaleserp_search_field,
         )
 
-        state["scaleserp_results"] = scaleserp_results
         state["references"] = references = []
 
         utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
@@ -201,27 +189,30 @@ class GoogleGPTPage(BasePage):
             "{{ datetime.utcnow }}", utcnow
         )
         prompt = task_instructions.strip() + "\n\n"
-        prompt += f"Question: {request.search_query}\n"
         prompt += "Search Results:\n"
-        number = 0
-        for item in scaleserp_results[scaleserp_search_field]:
+        ref_num = 1
+        for item in scaleserp_results.get(scaleserp_search_field, []):
             try:
                 url = item["link"]
                 title = item["title"]
                 snippet = item["snippet"]
             except KeyError:
                 continue
-            prompt += f"[{number}] {snippet}\n"
-            references.append({"url": url, "title": title, "snippet": snippet})
-            number += 1
-            if number >= request.max_search_urls:
+            prompt += f"[{ref_num}] {snippet}\n"
+            references.append(
+                {"url": url, "title": title, "snippet": snippet, "score": 1.0}
+            )
+            if ref_num >= request.max_search_urls:
                 break
-        prompt += "Answer:"
-
+            ref_num += 1
+        if not references:
+            raise ValueError(
+                f"Your search - {request.search_query} - did not match any documents."
+            )
+        prompt += f"Question: {request.search_query}\nAnswer:"
         state["final_prompt"] = prompt
 
-        yield "Generating content using GPT-3..."
-
+        yield "Generating answer using GPT-3..."
         output_text = run_language_model(
             api_provider="openai",
             engine="text-davinci-003",
@@ -233,29 +224,41 @@ class GoogleGPTPage(BasePage):
             stop=None,
             avoid_repetition=request.avoid_repetition,
         )
-
         state["output_text"] = output_text
 
 
-def render_html_with_refs(output_text: str, references: list[SearchReference]):
+def render_outputs(state, height):
+    output_text = state.get("output_text", [])
+    if output_text:
+        st.write("**Answer**")
+    for text in output_text:
+        html = render_text_with_refs(text, state.get("references", []))
+        st.write(
+            # language=html
+            f"""<div style="max-height: {height}px;" class="gooey-output-text"><p>{html}</p></div>""",
+            unsafe_allow_html=True,
+        )
+
+
+def render_text_with_refs(text: str, references: list[SearchReference]):
     html = ""
     last_match_end = 0
-    for match in re.finditer(r"(\[[\d,\s]+\]([\,\.\s]*))+", output_text):
+    for match in re.finditer(r"(\[[\d,\s]+\]([\,\.\s]*))+", text):
         end_separator = match.group(2)
-        ref_str = output_text[match.start() : match.end()].strip()
+        ref_str = text[match.start() : match.end()].strip()
         ref_numbers = set(int(num) for num in re.findall(r"\d+", ref_str))
-        html += output_text[last_match_end : match.start()].strip()
+        html += text[last_match_end : match.start()].strip()
         ref_links = []
-        for idx in ref_numbers:
+        for ref_num in ref_numbers:
             try:
-                url = references[idx]["url"]
+                url = references[ref_num - 1]["url"]
             except IndexError:
                 continue
-            ref_links.append(f'<a href="{url}">{idx + 1}</a>')
+            ref_links.append(f'<a href="{url}">{ref_num}</a>')
         ref_str_clean = ", ".join(ref_links)
         if ref_links:
             html += f"<sup>[{ref_str_clean}]</sup>"
         html += end_separator
         last_match_end = match.end()
-    html += output_text[last_match_end:]
+    html += text[last_match_end:]
     return html

@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagickwand-dev \
     libgl1-mesa-glx \
     build-essential libpoppler-cpp-dev \
+    pandoc \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements.txt
