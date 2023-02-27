@@ -5,10 +5,11 @@ $ pip uninstall -y streamlit && poetry install --with dev --sync && python scrip
 """
 
 import site
+from glob import glob
 from pathlib import Path
 
 site_packages = Path(site.getsitepackages()[0])
-js_file = site_packages / "streamlit/static/static/js/main.ef6eee61.js"
+js_file = next(site_packages.glob("streamlit/static/static/js/main.*.js"))
 print(js_file)
 
 txt = js_file.read_text()

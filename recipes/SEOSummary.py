@@ -22,6 +22,9 @@ from daras_ai_v2.language_model import (
     calc_gpt_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.scaleserp_location_picker_widget import (
+    scaleserp_location_picker,
+)
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
 
@@ -62,6 +65,7 @@ class SEOSummaryPage(BasePage):
         title="Ruggable",
         company_url="https://ruggable.com",
         scaleserp_search_field="organic_results",
+        scaleserp_locations=["United States"],
         enable_html=False,
         sampling_temperature=0.8,
         max_tokens=1024,
@@ -84,6 +88,7 @@ class SEOSummaryPage(BasePage):
         task_instructions: str | None
 
         scaleserp_search_field: str | None
+        scaleserp_locations: list[str] | None
         enable_html: bool | None
 
         sampling_temperature: float | None
@@ -187,6 +192,7 @@ SearchSEO > Page Parsing > GPT3
                 min_value=1,
                 max_value=10,
             )
+        scaleserp_location_picker()
 
     def render_output(self):
         output_content = st.session_state.get("output_content")
@@ -274,6 +280,7 @@ SearchSEO > Page Parsing > GPT3
         scaleserp_results = call_scaleserp(
             request.search_query,
             include_fields=request.scaleserp_search_field,
+            location=",".join(request.scaleserp_locations),
         )
         search_urls = _extract_search_urls(request, scaleserp_results)[
             : request.max_search_urls

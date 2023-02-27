@@ -13,6 +13,9 @@ from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
+from daras_ai_v2.scaleserp_location_picker_widget import (
+    scaleserp_location_picker,
+)
 from daras_ai_v2.stable_diffusion import (
     img2img,
     Img2ImgModels,
@@ -33,6 +36,7 @@ class GoogleImageGenPage(BasePage):
         "sd_2_upscaling": False,
         "seed": 42,
         "image_guidance_scale": 1.2,
+        "scaleserp_locations": ["United States"],
     }
 
     class RequestModel(BaseModel):
@@ -54,6 +58,8 @@ class GoogleImageGenPage(BasePage):
         seed: int | None
 
         image_guidance_scale: float | None
+
+        scaleserp_locations: list[str] | None
 
     class ResponseModel(BaseModel):
         output_images: list[str]
@@ -97,6 +103,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             search_type="images",
             include_fields="image_results",
             images_size="medium",
+            location=",".join(request.scaleserp_locations),
         )
         image_urls = [
             result["image"]
@@ -176,6 +183,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
     def render_settings(self):
         img_model_settings(Img2ImgModels)
+        scaleserp_location_picker()
 
     def render_output(self):
         out_imgs = st.session_state.get("output_images")

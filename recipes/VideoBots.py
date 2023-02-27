@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import (
     upload_file_from_bytes,
     truncate_text_words,
+    upload_st_file,
 )
 from daras_ai_v2 import db
 from daras_ai_v2.base import BasePage, MenuTabs
@@ -140,16 +141,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         assert st.session_state["bot_script"], "Please provide the Bot Script"
 
         face_file = st.session_state.get("face_file")
-        input_face = st.session_state.get("input_face")
-        assert face_file or input_face, "Please provide the Input Face"
-
-        # upload input file
         if face_file:
-            st.session_state["input_face"] = upload_file_from_bytes(
-                face_file.name,
-                face_file.getvalue(),
-                content_type=face_file.type,
-            )
+            st.session_state["input_face"] = upload_st_file(face_file)
+        assert st.session_state.get("input_face"), "Please provide the Input Face"
 
     def render_settings(self):
         st.write("#### 📝 Script")

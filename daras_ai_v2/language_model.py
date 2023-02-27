@@ -14,6 +14,9 @@ GPT3_MAX_ALLOED_TOKENS = 4000
 
 _gpt2_tokenizer = None
 
+openai.api_key = settings.OPENAI_API_KEY
+openai.api_base = "https://api.openai.com/v1"
+
 
 class LargeLanguageModels(Enum):
     text_davinci_003 = "Davinci (GPT-3.5)"
@@ -57,6 +60,14 @@ def do_retry(
         return wrapper
 
     return decorator
+
+
+@do_retry()
+def get_embeddings(
+    texts: list[str], engine: str = "text-embedding-ada-002"
+) -> list[list[float]]:
+    res = openai.Embedding.create(input=texts, engine=engine)
+    return [record["embedding"] for record in res["data"]]
 
 
 @do_retry()

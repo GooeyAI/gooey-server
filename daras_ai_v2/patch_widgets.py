@@ -1,5 +1,6 @@
 import os.path
 from functools import wraps
+from itertools import zip_longest
 
 import numpy as np
 import streamlit as st
@@ -65,24 +66,41 @@ def video_patch(self, value, *args, caption=None, **kwargs):
 
 @patch(st.file_uploader)
 def file_uploader_patch(self, *args, upload_key=None, **kwargs):
-    value = self(*args, **kwargs)
-    _render_preview(value, upload_key)
-    return value
+    retval = value = self(*args, **kwargs)
+
+    if not isinstance(value, list):
+        value = [value]
+    uploaded_value = st.session_state.get(upload_key)
+    if not isinstance(uploaded_value, list):
+        uploaded_value = [uploaded_value]
+    for args in zip_longest(value, uploaded_value):
+        _render_preview(*args)
+
+    return retval
 
 
-def _render_preview(value: UploadedFile | None, upload_key: str):
-    # render preview from current value / uploaded value
-    if value:
-        preview = value
-        filename = value.name
-    elif upload_key in st.session_state:
-        preview = st.session_state[upload_key]
-        filename = preview
+def _render_preview(local_file: UploadedFile | None, upload_url: str | None):
+    is_local = bool(local_file)
+    is_uploaded = not is_local and bool(upload_url)
+
+    # render preview from local file / uploaded file
+    if is_local:
+        preview = local_file
+        filename = local_file.name
+    elif is_uploaded:
+        preview = upload_url
+        try:
+            filename = furl(preview).path.segments[-1]
+        except IndexError:
+            return
     else:
         return
 
     _, col, _ = st.columns([1, 2, 1])
     with col:
+        # if uploaded file, display a link to it
+        if is_uploaded:
+            st.write(f"🔗 [*{filename}*]({preview})")
         # render preview as video/image
         ext = os.path.splitext(filename)[-1].lower()
         match ext:

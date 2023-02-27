@@ -129,6 +129,11 @@ def resize_img_fit(img_bytes: bytes, size: (int, int)) -> bytes:
     return cv2_img_to_bytes(img_cv2)
 
 
+@st.cache_data
+def upload_st_file(f: UploadedFile) -> str:
+    return upload_file_from_bytes(f.name, f.getvalue(), f.type)
+
+
 def upload_file_from_bytes(
     filename: str,
     data: bytes,
