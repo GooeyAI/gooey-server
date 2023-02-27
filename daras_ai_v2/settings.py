@@ -96,3 +96,8 @@ REDIS_URL = config("REDIS_URL", "redis://localhost:6379")
 
 PINECONE_API_KEY = config("PINECONE_API_KEY", "")
 PINECONE_ENVIRONMENT = config("PINECONE_ENVIRONMENT", "us-east1-gcp")
+WIX_API_KEY = config("WIX_API_KEY", "")
+WIX_API_CONTACTS_URL="https://www.wixapis.com/contacts/v4/contacts"
+WIX_SITE_ID = config("WIX_SITE_ID", "")
+
+

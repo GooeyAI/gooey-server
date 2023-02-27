@@ -1,9 +1,11 @@
 import datetime
+import json
 import re
 import typing
 from time import time
 
 import httpx
+import requests
 import streamlit as st
 from fastapi import FastAPI, Depends
 from fastapi import HTTPException, Body
@@ -89,6 +91,20 @@ app.add_middleware(
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.post("/add-to-wix-contact", include_in_schema=False)
+def add_to_wix_contact(request: Request):
+    print("ADDing ")
+    # response = requests.post(
+    #     settings.WIX_API_CONTACTS_URL,
+    #     headers={
+    #         "Authorization": settings.WIX_API_KEY,
+    #         "wix-site-id": settings.WIX_SITE_ID,
+    #     },
+    #     data=json.dumps(contact),
+    # )
+    return JSONResponse(content={"status": "success"})
 
 
 @app.get("/sitemap.xml/", include_in_schema=False)
