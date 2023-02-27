@@ -14,7 +14,7 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 from recipes.FaceInpainting import FaceInpaintingPage
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
-twitter_handle_regex = r"^[A-Za-z0-9_]{1,15}$"
+twitter_handle_regex = r"(@)?[A-Za-z0-9_]{1,15}"
 
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
@@ -133,7 +133,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             st.text_input(
                 """
                 #### Twitter Handle
-                Give us your twitter handle without @, we'll try to get your photo from there
+                Give us your twitter handle, we'll try to get your photo from there
                 """,
                 key="twitter_handle",
                 max_chars=15,
@@ -238,8 +238,8 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         else:
             # For twitter-photo-cache to find the user irrespective
             # User may enter the handle case-insensitively
-            lower_case_handle = request.twitter_handle.lower()
-            photo_url = get_photo_for_twitter_handle(lower_case_handle)
+            clean_handle = self._clean_handle(request.twitter_handle)
+            photo_url = get_photo_for_twitter_handle(clean_handle)
         if photo_url:
             state["input_image"] = photo_url
             yield from super().run(state)
@@ -263,6 +263,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             raise ImageNotFound(
                 "This email has no photo with a face in it. Try [Face in an AI Image](/face-in-ai-generated-photo/) workflow instead."
             )
+
+    def _clean_handle(self, twitter_handle: str) -> str:
+        without_at_sign = twitter_handle.replace("@", "")
+        lower_case_handle = without_at_sign.lower()
+        return lower_case_handle
 
     def _get_email_body(
         self,
