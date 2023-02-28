@@ -140,7 +140,6 @@ def send_smtp_message(
     with smtplib.SMTP(
         config("AWS_SMTP_SERVER"), config("AWS_SMTP_PORT")
     ) as smtp_server:
-
         smtp_server.ehlo()
         smtp_server.starttls()
         # smtplib docs recommend calling ehlo() before and after starttls()

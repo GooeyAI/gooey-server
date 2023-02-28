@@ -5,7 +5,8 @@ on: [push, workflow_dispatch]
 jobs:
   test:
 
-    runs-on: self-hosted
+#    runs-on: self-hosted
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -20,8 +21,18 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
 
-    - name: Install dependencies
-      run: pip install -r requirements.txt
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+            python3-opencv \
+            libmagickwand-dev \
+            libgl1-mesa-glx \
+            build-essential libpoppler-cpp-dev pkg-config python3-dev \
+            pandoc
+
+    - name: Install python dependencies
+      run: |
+        pip install -r requirements.txt && pip install -I 'protobuf<4,>=3.12'
 
     - name: Load secrets into env
       uses: oNaiPs/secrets-to-env-action@v1

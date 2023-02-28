@@ -31,7 +31,22 @@ from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from routers.facebook import get_page_display_name, ig_connect_url, fb_connect_url
 
-BOT_SCRIPT_RE = re.compile(r"(\n)([\w\ ]+)(:)")
+BOT_SCRIPT_RE = re.compile(
+    # line break
+    r"[\r\n\f\v]"
+    # name of bot / user
+    "([\w\ \t]+)"
+    # colon
+    "\:"
+)
+
+START_TOKEN = "<|im_start|>"
+END_TOKEN = "<|im_end|>"
+
+
+class ConversationEntry(typing.TypedDict):
+    role: str
+    completion: str
 
 
 class VideoBotsPage(BasePage):
@@ -39,6 +54,7 @@ class VideoBotsPage(BasePage):
     slug_versions = ["video-bots"]
 
     sane_defaults = {
+        "conversation": [],
         # tts
         "tts_provider": TextToSpeechProviders.GOOGLE_TTS.name,
         "google_voice_name": "en-IN-Wavenet-A",
@@ -85,6 +101,8 @@ class VideoBotsPage(BasePage):
         face_padding_bottom: int | None
         face_padding_left: int | None
         face_padding_right: int | None
+
+        conversation: list[ConversationEntry] | None
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -138,39 +156,58 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def validate_form_v2(self):
         assert st.session_state["input_prompt"], "Please type in a Messsage"
-        assert st.session_state["bot_script"], "Please provide the Bot Script"
+        # assert st.session_state["bot_script"], "Please provide the Bot Script"
 
-        face_file = st.session_state.get("face_file")
-        if face_file:
-            st.session_state["input_face"] = upload_st_file(face_file)
-        assert st.session_state.get("input_face"), "Please provide the Input Face"
+        # face_file = st.session_state.get("face_file")
+        # if face_file:
+        #     st.session_state["input_face"] = upload_st_file(face_file)
+        # assert st.session_state.get("input_face"), "Please provide the Input Face"
 
     def render_settings(self):
-        st.write("#### 📝 Script")
         st.text_area(
             """
-            An example conversation with this bot (~1000 words)
+            ##### 📝 Script
+            A brief description of the bot, and an example conversation (~1000 words)
             """,
             key="bot_script",
             height=300,
         )
-        st.file_uploader(
-            """
-            #### 👩‍🦰 Input Face
-            Upload a video/image that contains faces to use  
-            *Recommended - mp4 / mov / png / jpg / gif* 
-            """,
-            key="face_file",
-            upload_key="input_face",
-        )
-
         st.write("---")
 
-        text_to_speech_settings()
-        st.write("---")
+        if not "__enable_audio" in st.session_state:
+            st.session_state["__enable_audio"] = bool(
+                st.session_state.get("tts_provider")
+            )
+        enable_audio = st.checkbox("Enable Audio?", key="__enable_audio")
+        if not enable_audio:
+            st.session_state["tts_provider"] = None
+        else:
+            text_to_speech_settings()
+            st.write("---")
+
+            if not "__enable_video" in st.session_state:
+                st.session_state["__enable_video"] = bool(
+                    st.session_state.get("input_face")
+                )
+            enable_video = st.checkbox("Enable Video?", key="__enable_video")
+            if not enable_video:
+                st.session_state["input_face"] = None
+            else:
+                st.file_uploader(
+                    """
+                    #### 👩‍🦰 Input Face
+                    Upload a video/image that contains faces to use  
+                    *Recommended - mp4 / mov / png / jpg / gif* 
+                    """,
+                    key="face_file",
+                    upload_key="input_face",
+                )
+                st.write("---")
+
+                lipsync_settings()
+                st.write("---")
+
         language_model_settings()
-        st.write("---")
-        lipsync_settings()
         st.write("---")
 
         st.text_input("##### 🤖 Landbot URL", key="landbot_url")
@@ -182,7 +219,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
         if input_prompt:
-            st.markdown("Prompt ```" + input_prompt.replace("\n", "") + "```")
+            st.write(
+                "**Prompt**\n```properties\n"
+                + truncate_text_words(input_prompt, maxlen=200)
+                + "\n```"
+            )
+
+        st.write("**Response**")
 
         output_video = state.get("output_video")
         if output_video:
@@ -190,17 +233,37 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         output_text = state.get("output_text")
         if output_text:
-            st.caption(truncate_text_words(output_text[0], maxlen=200))
+            st.write(truncate_text_words(output_text[0], maxlen=200))
+
+    def _render_before_output(self):
+        super()._render_before_output()
+        if st.button("🗑️ Clear History"):
+            st.session_state["conversation"] = []
 
     def render_output(self):
-        st.write(f"#### 💬 Response")
+        st.write(f"#### 💬 Conversation")
+
+        conversation = st.session_state.get("conversation", [])
+        if conversation:
+            st.caption(
+                "\n\n".join(
+                    [
+                        f'**_{entry["role"].capitalize()}_**\\\n{entry["completion"]}'
+                        for entry in conversation[:-1]
+                    ]
+                )
+            )
+            last_role = f'**_{conversation[-1]["role"].capitalize()}_**\\\n'
+        else:
+            last_role = ""
+
         for idx, output_text in enumerate(st.session_state.get("output_text", [])):
             try:
                 output_video = st.session_state.get("output_video", [])[idx]
                 st.video(output_video)
             except IndexError:
                 pass
-            st.caption(output_text.replace("\n", ""))
+            st.write(last_role + output_text)
 
     def show_landbot_widget(self):
         landbot_url = st.session_state.get("landbot_url")
@@ -252,44 +315,79 @@ top.myLandbot = new top.Landbot.Livechat({
                 st.audio(audio_url)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request = self.RequestModel.parse_obj(state)
+        request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        all_names = [m.group(2) for m in BOT_SCRIPT_RE.finditer(request.bot_script)]
-        common_names = collections.Counter(all_names).most_common()
-
-        try:
-            user_script_name, bot_script_name = (
-                common_names[0][0].strip(),
-                common_names[1][0].strip(),
+        bot_script = request.bot_script
+        script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
+        # extract system message from script
+        system_message = bot_script
+        if script_matches:
+            system_message = system_message[: script_matches[0].start()]
+        # extract conversation from script
+        script_conversation: list[ConversationEntry] = []
+        for idx in range(len(script_matches)):
+            match = script_matches[idx]
+            try:
+                next_match = script_matches[idx + 1]
+            except IndexError:
+                next_match_start = None
+            else:
+                next_match_start = next_match.start()
+            script_conversation.append(
+                {
+                    "role": match.group(1).strip(),
+                    "completion": bot_script[match.end() : next_match_start].strip(),
+                }
             )
-        except IndexError:
-            user_script_name = "User"
-            bot_script_name = "Bot"
 
-        username = user_script_name
+        # get user/assistatant role names
+        try:
+            user_role = script_conversation[0]["role"]
+        except IndexError:
+            user_role = "user"
+        try:
+            assistant_role = script_conversation[1]["role"]
+        except IndexError:
+            assistant_role = "assistant"
+
+        st.session_state["conversation"] = saved_conversation = request.conversation
+
+        # add user input to conversation
+        user_input = request.input_prompt.strip()
+        saved_conversation.append({"role": user_role, "completion": user_input})
+
+        # assistant prompt to triger a model response
+        saved_conversation.append({"role": assistant_role, "completion": ""})
+
+        # add the system message
+        system_message = system_message.strip()
+        if system_message:
+            script_conversation.insert(
+                0,
+                {"role": "system", "completion": system_message},
+            )
+
+        # add the entire conversation to the prompt
+        prompt = "\n".join(
+            format_convo_message(entry)
+            for entry in script_conversation + saved_conversation
+        )
+
+        # replace current user's name
+        username = user_role
         current_user = st.session_state.get("_current_user")
         if current_user and current_user.display_name:
             username = current_user.display_name
-
-        prompt = request.bot_script.strip()
         prompt = prompt.format(username=username)
-
-        # user input -- User: <input>
-        prompt += f"\n{user_script_name}: {request.input_prompt.strip()}"
-
-        # completion prompt for openai -- Bot:
-        prompt += f"\n{bot_script_name}:"
-
         state["final_prompt"] = prompt
 
-        yield "Running GPT-3..."
-
+        # ensure input script is not too big
         max_allowed_tokens = GPT3_MAX_ALLOED_TOKENS - calc_gpt_tokens(prompt)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
-
         if max_allowed_tokens < 0:
             raise ValueError("Input Script is too long! Please reduce the script size.")
 
+        yield "Running GPT-3..."
         state["output_text"] = run_language_model(
             api_provider="openai",
             engine="text-davinci-003",
@@ -298,19 +396,26 @@ top.myLandbot = new top.Landbot.Livechat({
             temperature=request.sampling_temperature,
             prompt=prompt,
             max_tokens=max_allowed_tokens,
-            stop=[f"{user_script_name}:", f"{bot_script_name}:"],
+            stop=[START_TOKEN, END_TOKEN],
             avoid_repetition=request.avoid_repetition,
         )
+        # save model response
+        saved_conversation[-1]["completion"] = state["output_text"][0]
 
-        tts_state = dict(state)
         state["output_audio"] = []
+        state["output_video"] = []
+
+        if not request.tts_provider:
+            return
+        tts_state = dict(state)
         for text in state["output_text"]:
             tts_state["text_prompt"] = text
             yield from TextToSpeechPage().run(tts_state)
             state["output_audio"].append(tts_state["audio_url"])
 
+        if not request.input_face:
+            return
         lip_state = dict(state)
-        state["output_video"] = []
         for audio_url in state["output_audio"]:
             lip_state["input_audio"] = audio_url
             yield from LipsyncPage().run(lip_state)
@@ -402,3 +507,11 @@ top.myLandbot = new top.Landbot.Livechat({
                         }
                     snapshot.reference.update(update)
             st.success("Done ✅")
+
+
+def format_convo_message(entry: ConversationEntry) -> str:
+    msg = START_TOKEN + entry["role"]
+    completion = entry.get("completion")
+    if completion:
+        msg += "\n" + completion + END_TOKEN
+    return msg
