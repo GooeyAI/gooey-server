@@ -42,6 +42,8 @@ class DocSearchPage(BasePage):
     class RequestModel(BaseModel):
         search_query: str
         documents: list[str] | None
+        data_source: str | None
+        url: str | None
         # selected_model: typing.Literal[
         #     tuple(e.name for e in LargeLanguageModels)
         # ] | None
@@ -66,24 +68,51 @@ class DocSearchPage(BasePage):
 
     def render_form_v2(self):
         st.text_input("##### Search Query", key="search_query")
-        st.file_uploader(
-            "##### Documents",
-            key="__document_files",
-            upload_key="documents",
-            type=["pdf", "txt", "docx", "md", "html"],
-            accept_multiple_files=True,
+        st.write(
+            """
+            You can either provide a URL to a document, or upload a file.
+            """
         )
+        # st.radio  for selecting url or file
+        source = st.radio(
+            "##### Source",
+            options=["URL", "File"],
+            key="data_source",
+        )
+        if source == "URL":
+            st.text_input(
+                """
+                ###### If you're using a URL, please make sure it's publicly accessible.
+                """,
+                key="url",
+            )
+        elif source == "File":
+            st.file_uploader(
+                """
+                ###### Documents
+                """,
+                key="__document_files",
+                upload_key="documents",
+                type=["pdf", "txt", "docx", "md", "html"],
+                accept_multiple_files=True,
+            )
+
 
     def validate_form_v2(self):
         search_query = st.session_state.get("search_query", "").strip()
         assert search_query, "Please enter a Search Query"
-
-        document_files: list[UploadedFile] | None = st.session_state.get(
-            "__document_files"
-        )
-        if document_files:
-            st.session_state["documents"] = [upload_st_file(f) for f in document_files]
-        assert st.session_state.get("documents"), "Please provide at least 1 Document"
+        # based on data_source check if url is empty
+        data_source = st.session_state.get("data_source")
+        if data_source == "URL":
+            url = st.session_state.get("url")
+            assert url, "Please provide a URL"
+        elif data_source == "File":
+            document_files: list[UploadedFile] | None = st.session_state.get(
+                "__document_files"
+            )
+            if document_files:
+                st.session_state["documents"] = [upload_st_file(f) for f in document_files]
+            assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_output(self):
         render_outputs(st.session_state, 300)
@@ -185,17 +214,26 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         yield f"Getting query embeddings..."
         query_embeds = get_embeddings_cached(request.search_query)[0]
 
-        yield "Getting document embeddings..."
-        input_docs = request.documents or []
-        embeds = [
-            embeds
-            for f_url in input_docs
-            for embeds in doc_url_to_embeds(
-                f_url=f_url,
+        embeds = []
+        if request.data_source == "File":
+            yield "Getting document embeddings..."
+            input_docs = request.documents or []
+            embeds = [
+                embeds
+                for f_url in input_docs
+                for embeds in url_to_embeds(
+                    f_url=f_url,
+                    max_context_words=request.max_context_words,
+                    scroll_jump=request.scroll_jump,
+                )
+            ]
+        elif request.data_source == "URL":
+            yield "Getting url embeddings..."
+            embeds = url_to_embeds(
+                f_url=request.url,
                 max_context_words=request.max_context_words,
                 scroll_jump=request.scroll_jump,
             )
-        ]
 
         yield f"Searching documents..."
         candidates = [
@@ -250,8 +288,8 @@ If scroll jump is too high, there might not be enough overlap between the chunks
 
 
 @st.cache_data(show_spinner=False)
-def doc_url_to_embeds(*, f_url: str, max_context_words: int, scroll_jump: int):
-    f_name, pages = doc_url_to_text_pages(f_url)
+def url_to_embeds(*, f_url: str, max_context_words: int, scroll_jump: int):
+    f_name, pages = url_to_text_pages(f_url)
     full_text = "\n\n".join(pages)
     # fix word breaks to the next line
     full_text = word_breaks_re.sub(" - ", full_text)
@@ -277,7 +315,7 @@ def doc_url_to_embeds(*, f_url: str, max_context_words: int, scroll_jump: int):
     return zip(metas, embeds)
 
 
-def doc_url_to_text_pages(f_url: str) -> (str, list[str]):
+def url_to_text_pages(f_url: str) -> (str, list[str]):
     # get document data from url
     f_name = furl(f_url).path.segments[-1]
     f_bytes = requests.get(f_url).content
@@ -291,7 +329,7 @@ def doc_url_to_text_pages(f_url: str) -> (str, list[str]):
         case ".txt":
             pages = [f_bytes.decode()]
         case _:
-            raise ValueError(f"Unsupported document format {ext!r}")
+            pages = [pandoc_to_text(f_name, f_bytes)]
     return f_name, pages
 
 
