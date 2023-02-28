@@ -70,7 +70,7 @@ class DocSearchPage(BasePage):
             "##### Documents",
             key="__document_files",
             upload_key="documents",
-            type=["pdf", "txt", "docx", "md"],
+            type=["pdf", "txt", "docx", "md", "html"],
             accept_multiple_files=True,
         )
 
@@ -286,7 +286,7 @@ def doc_url_to_text_pages(f_url: str) -> (str, list[str]):
     match ext:
         case ".pdf":
             pages = pdf_to_text_pages(io.BytesIO(f_bytes))
-        case ".docx" | ".md":
+        case ".docx" | ".md" | ".html":
             pages = [pandoc_to_text(f_name, f_bytes)]
         case ".txt":
             pages = [f_bytes.decode()]
