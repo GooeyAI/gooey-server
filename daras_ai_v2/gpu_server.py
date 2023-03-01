@@ -9,18 +9,22 @@ from daras_ai_v2 import settings
 
 
 class GpuEndpoints:
-    wav2lip = f"{settings.GPU_SERVER_1}:5001"
-    glid_3_xl_stable = f"{settings.GPU_SERVER_1}:5002"
-    gfpgan = f"{settings.GPU_SERVER_1}:5003"
-    dichotomous_image_segmentation = f"{settings.GPU_SERVER_1}:5004"
+    wav2lip = settings.GPU_SERVER_1.copy().set(port=5001)
+    glid_3_xl_stable = settings.GPU_SERVER_1.copy().set(port=5002)
+    gfpgan = settings.GPU_SERVER_1.copy().set(port=5003)
+    dichotomous_image_segmentation = settings.GPU_SERVER_1.copy().set(port=5004)
     # flan_t5 = f"{settings.GPU_SERVER_2}:5005"
     # runway_ml_inpainting = f"{settings.GPU_SERVER_2}:5006"
-    u2net = f"{settings.GPU_SERVER_1}:5007"
+    u2net = settings.GPU_SERVER_1.copy().set(port=5007)
     # deforum_sd = f"{settings.GPU_SERVER_2}:5008"
-    sd_2 = f"{settings.GPU_SERVER_1}:5011"
-    sd_multi = f"{settings.GPU_SERVER_1}:5012"
-    # real_esrgan = f"{settings.GPU_SERVER_1}:5013"
-    defourm_sd = f"{settings.GPU_SERVER_1}:5014"
+    sd_2 = settings.GPU_SERVER_1.copy().set(port=5011)
+    sd_multi = settings.GPU_SERVER_1.copy().set(port=5012)
+    # real_esrgan = settings.GPU_SERVER_1furl().set(port=5013)
+    defourm_sd = settings.GPU_SERVER_1.copy().set(port=5014) / "deforum"
+
+    lavis = settings.GPU_SERVER_1.copy().set(port=5015)
+    vqa = lavis / "vqa"
+    image_captioning = lavis / "image-captioning"
 
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
