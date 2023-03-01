@@ -304,7 +304,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         return email_body
 
     def render_example(self, state: dict):
-        st.write("**Input Email** -", state.get("email_address"))
+        if state.get("photo_source") == "Email Address":
+            st.write("**Input Email** -", state.get("email_address"))
+        elif state.get("photo_source") == "Twitter Handle":
+            st.write("**Input Twitter Handle** -", state.get("twitter_handle"))
         output_images = state.get("output_images")
         if output_images:
             for img in output_images:
