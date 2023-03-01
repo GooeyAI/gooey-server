@@ -72,7 +72,7 @@ def call_sd_multi(endpoint: str, pipeline: dict, inputs: dict) -> typing.List[st
     ]
 
     r = requests.post(
-        GpuEndpoints.sd_multi + f"/{endpoint}/",
+        GpuEndpoints.sd_multi / endpoint,
         json={
             "pipeline": pipeline,
             "inputs": inputs,
