@@ -201,7 +201,6 @@ async def request_body(request: Request):
 
 @router.post("/__/stripe/webhook")
 def webhook_received(request: Request, payload: bytes = Depends(request_body)):
-
     # Retrieve the event by verifying the signature using the raw body and secret if webhook signing is configured.
     event = stripe.Webhook.construct_event(
         payload=payload,

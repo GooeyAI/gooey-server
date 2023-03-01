@@ -164,7 +164,13 @@ class BasePage:
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
-        st.write("## " + st.session_state.get(StateKeys.page_title))
+        query_params = gooey_get_query_params()
+        example_id, run_id, uid = extract_query_params(query_params)
+        root_url = self.app_url(example_id=example_id)
+        st.write(
+            f'## <a style="text-decoration: none;" target="_top" href="{root_url}">{st.session_state.get(StateKeys.page_title)}</a>',
+            unsafe_allow_html=True,
+        )
         st.write(st.session_state.get(StateKeys.page_notes))
 
         selected_tab = page_tabs(
@@ -660,11 +666,11 @@ class BasePage:
             placeholder = st.empty()
             with placeholder.container():
                 html_spinner("Starting...")
+            run_id, uid = self._pre_run_checklist()
             # scroll_to_spinner()
             if not self.check_credits():
                 placeholder.empty()
                 return
-            run_id, uid = self._pre_run_checklist()
             self._run_in_thread(run_id, uid)
             sleep(0.1)
             st.experimental_rerun()

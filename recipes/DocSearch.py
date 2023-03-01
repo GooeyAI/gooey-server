@@ -70,7 +70,7 @@ class DocSearchPage(BasePage):
             "##### Documents",
             key="__document_files",
             upload_key="documents",
-            type=["pdf", "txt", "docx", "md"],
+            type=["pdf", "txt", "docx", "md", "html"],
             accept_multiple_files=True,
         )
 
@@ -188,9 +188,9 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         yield "Getting document embeddings..."
         input_docs = request.documents or []
         embeds = [
-            item
+            embeds
             for f_url in input_docs
-            for item in doc_url_to_embeds(
+            for embeds in doc_url_to_embeds(
                 f_url=f_url,
                 max_context_words=request.max_context_words,
                 scroll_jump=request.scroll_jump,
@@ -271,7 +271,7 @@ def doc_url_to_embeds(*, f_url: str, max_context_words: int, scroll_jump: int):
     num_batches = math.ceil(len(texts) / batch_size)
     for i in range(num_batches):
         # progress = int(i / num_batches * 100)
-        # yield f"Getting document embeddings ({progress}%)..."
+        # print(f"Getting document embeddings ({progress}%)...")
         batch = texts[i * batch_size : (i + 1) * batch_size]
         embeds.extend(get_embeddings(batch))
     return zip(metas, embeds)
@@ -286,7 +286,7 @@ def doc_url_to_text_pages(f_url: str) -> (str, list[str]):
     match ext:
         case ".pdf":
             pages = pdf_to_text_pages(io.BytesIO(f_bytes))
-        case ".docx" | ".md":
+        case ".docx" | ".md" | ".html":
             pages = [pandoc_to_text(f_name, f_bytes)]
         case ".txt":
             pages = [f_bytes.decode()]

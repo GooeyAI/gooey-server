@@ -215,7 +215,6 @@ Number of animation frames.
         ), "Please make sure that Frame Count matches the Animation Prompts"
 
     def render_settings(self):
-
         col1, col2 = st.columns(2)
         with col1:
             animation_mode = st.selectbox(
