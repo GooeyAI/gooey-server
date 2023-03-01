@@ -340,7 +340,7 @@ Choose fps for the video.
         blob = storage_blob_for(f"gooey.ai animation {request.animation_prompts}.mp4")
 
         r = requests.post(
-            GpuEndpoints.defourm_sd + f"/deforum/",
+            GpuEndpoints.defourm_sd,
             json={
                 "pipeline": dict(
                     model_id="Protogen_V2.2.ckpt",
