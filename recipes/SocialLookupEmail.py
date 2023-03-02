@@ -44,13 +44,14 @@ class SocialLookupEmailPage(BasePage):
         from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
         from recipes.SEOSummary import SEOSummaryPage
         from recipes.VideoBots import VideoBotsPage
-        from recipes.GoogleImageGen import GoogleImageGenPage
+
+        from daras_ai_v2.GoogleGPT import GoogleGPTPage
 
         return [
-            EmailFaceInpaintingPage,
+            GoogleGPTPage,
             SEOSummaryPage,
             VideoBotsPage,
-            GoogleImageGenPage,
+            EmailFaceInpaintingPage,
         ]
 
     def preview_image(self, state: dict) -> str | None:

@@ -11,6 +11,8 @@ from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import run_language_model
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 
+DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
+
 
 class SearchReference(typing.TypedDict):
     url: str
@@ -20,7 +22,7 @@ class SearchReference(typing.TypedDict):
 
 
 class GoogleGPTPage(BasePage):
-    title = "Google GPT"
+    title = "Web Search + GPT3"
     slug_versions = ["google-gpt"]
 
     sane_defaults = dict(
@@ -114,6 +116,25 @@ class GoogleGPTPage(BasePage):
             min_value=1,
             max_value=10,
         )
+
+    def related_workflows(self) -> list:
+        from recipes.SEOSummary import SEOSummaryPage
+        from recipes.DocSearch import DocSearchPage
+        from recipes.VideoBots import VideoBotsPage
+        from recipes.SocialLookupEmail import SocialLookupEmailPage
+
+        return [
+            DocSearchPage,
+            SEOSummaryPage,
+            VideoBotsPage,
+            SocialLookupEmailPage,
+        ]
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_GOOGLE_GPT_META_IMG
+
+    def preview_description(self, state: dict) -> str:
+        return "Like Bing + ChatGPT or perplexity.ai, this workflow queries Google and then summarizes the results (with citations!) using an editable GPT3 script.  Filter  results to your own website so users can ask anything and get answers based only on your site's pages."
 
     def render_steps(self):
         col1, col2 = st.columns(2)

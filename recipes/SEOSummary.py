@@ -116,14 +116,14 @@ class SEOSummaryPage(BasePage):
     def related_workflows(self):
         from recipes.SocialLookupEmail import SocialLookupEmailPage
         from recipes.GoogleImageGen import GoogleImageGenPage
-        from recipes.ObjectInpainting import ObjectInpaintingPage
-        from recipes.Img2Img import Img2ImgPage
+        from recipes.DocSearch import DocSearchPage
+        from daras_ai_v2.GoogleGPT import GoogleGPTPage
 
         return [
+            GoogleGPTPage,
+            DocSearchPage,
             SocialLookupEmailPage,
             GoogleImageGenPage,
-            ObjectInpaintingPage,
-            Img2ImgPage,
         ]
 
     def render_description(self):

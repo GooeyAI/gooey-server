@@ -9,6 +9,8 @@ from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.face_restoration import UpscalerModels, run_upscaler_model
 from daras_ai_v2.stable_diffusion import IMG_MAX_SIZE
 
+DEFAULT_COMPARE_UPSCALER_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/COMPARE%20IMAGE%20UPSCALERS.jpg"
+
 
 class CompareUpscalerPage(BasePage):
     title = "Compare AI Image Upscalers"
@@ -65,6 +67,16 @@ class CompareUpscalerPage(BasePage):
             min_value=1,
             max_value=4,
             step=1,
+        )
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_COMPARE_UPSCALER_META_IMG
+
+    def render_description(self):
+        st.write(
+            """
+            Have an old photo or just a funky AI picture? Run this workflow to compare the top image upscalers.
+            """
         )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
