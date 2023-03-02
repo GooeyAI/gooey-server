@@ -1,5 +1,4 @@
-import collections
-import json
+import os
 import os
 import os.path
 import re
@@ -10,9 +9,7 @@ from furl import furl
 from pydantic import BaseModel
 
 from daras_ai.image_input import (
-    upload_file_from_bytes,
     truncate_text_words,
-    upload_st_file,
 )
 from daras_ai_v2 import db
 from daras_ai_v2.base import BasePage, MenuTabs
@@ -49,9 +46,15 @@ BOT_SCRIPT_RE = re.compile(
 
 
 def _backwards_compat_convo(conversation):
+    role = "user"
     for entry in conversation:
         if "completion" in entry:
             entry["content"] = entry.pop("completion")
+        entry["role"] = role
+        if role == "user":
+            role = "assistant"
+        else:
+            role = "user"
 
 
 class VideoBotsPage(BasePage):
@@ -327,33 +330,13 @@ top.myLandbot = new top.Landbot.Livechat({
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
-
-        user_role = "user"
-        assistant_role = "assistant"
+        use_chatgpt = request.selected_model == LargeLanguageModels.gpt_3_5_turbo.name
 
         bot_script = request.bot_script
         script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
         # extract conversation from script
         script_conversation: list[ConversationEntry] = []
-        # extract system message from script
-        system_message = bot_script
-        if script_matches:
-            system_message = system_message[: script_matches[0].start()]
-        # add the system message
-        system_message = system_message.strip()
-        if system_message:
-            # replace current user's name
-            username = user_role
-            current_user = st.session_state.get("_current_user")
-            if current_user and current_user.display_name:
-                username = current_user.display_name
-            system_message = system_message.format(username=username)
-            # insert to top
-            script_conversation.append(
-                {"role": "system", "content": system_message},
-            )
         # add scripted conversations
-        role = user_role
         for idx in range(len(script_matches)):
             match = script_matches[idx]
             try:
@@ -362,29 +345,39 @@ top.myLandbot = new top.Landbot.Livechat({
                 next_match_start = None
             else:
                 next_match_start = next_match.start()
-            # name = match.group(1).strip()
             script_conversation.append(
                 {
-                    "role": role,
+                    "role": match.group(1).strip(),
                     "content": bot_script[match.end() : next_match_start].strip(),
                 }
             )
-            if role == user_role:
-                role = assistant_role
-            else:
-                role = user_role
+        _backwards_compat_convo(script_conversation)
+
+        # extract system message from script
+        system_message = bot_script
+        if script_matches:
+            system_message = system_message[: script_matches[0].start()]
+        # add the system message
+        system_message = system_message.strip()
+        if system_message:
+            # replace current user's name
+            current_user = st.session_state.get("_current_user")
+            if current_user and current_user.display_name:
+                username = current_user.display_name
+                system_message = system_message.format(username=username)
+            # insert to top
+            script_conversation.insert(0, {"role": "system", "content": system_message})
 
         st.session_state["conversation"] = saved_conversation = request.conversation
         _backwards_compat_convo(saved_conversation)
 
         # add user input to conversation
         user_input = request.input_prompt.strip()
-        saved_conversation.append({"role": user_role, "content": user_input})
+        saved_conversation.append({"role": "user", "content": user_input})
 
-        use_chatgpt = request.selected_model == LargeLanguageModels.gpt_3_5_turbo.name
         if not use_chatgpt:
             # assistant prompt to triger a model response
-            saved_conversation.append({"role": assistant_role, "content": ""})
+            saved_conversation.append({"role": "assisstant", "content": ""})
 
         # add the entire conversation to the prompt
         full_convo = script_conversation + saved_conversation
