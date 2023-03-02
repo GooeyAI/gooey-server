@@ -1,4 +1,5 @@
 import collections
+import json
 import os
 import os.path
 import re
@@ -20,6 +21,12 @@ from daras_ai_v2.language_model import (
     run_language_model,
     GPT3_MAX_ALLOED_TOKENS,
     calc_gpt_tokens,
+    ConversationEntry,
+    run_chatgpt,
+    format_chatml_message,
+    CHATML_END_TOKEN,
+    CHATML_START_TOKEN,
+    LargeLanguageModels,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -40,13 +47,11 @@ BOT_SCRIPT_RE = re.compile(
     "\:"
 )
 
-START_TOKEN = "<|im_start|>"
-END_TOKEN = "<|im_end|>"
 
-
-class ConversationEntry(typing.TypedDict):
-    role: str
-    completion: str
+def _backwards_compat_convo(conversation):
+    for entry in conversation:
+        if "completion" in entry:
+            entry["content"] = entry.pop("completion")
 
 
 class VideoBotsPage(BasePage):
@@ -63,6 +68,7 @@ class VideoBotsPage(BasePage):
         "uberduck_voice_name": "hecko",
         "uberduck_speaking_rate": 1.0,
         # gpt3
+        "selected_model": LargeLanguageModels.text_davinci_003.name,
         "avoid_repetition": True,
         "num_outputs": 1,
         "quality": 1.0,
@@ -91,6 +97,9 @@ class VideoBotsPage(BasePage):
         google_speaking_rate: float | None
         google_pitch: float | None
 
+        selected_model: typing.Literal[
+            tuple(e.name for e in LargeLanguageModels)
+        ] | None
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -244,11 +253,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         st.write(f"#### 💬 Conversation")
 
         conversation = st.session_state.get("conversation", [])
+        _backwards_compat_convo(conversation)
+
         if conversation:
             st.caption(
                 "\n\n".join(
                     [
-                        f'**_{entry["role"].capitalize()}_**\\\n{entry["completion"]}'
+                        f'**_{entry["role"].capitalize()}_**\\\n{entry["content"]}'
                         for entry in conversation[:-1]
                     ]
                 )
@@ -291,8 +302,8 @@ top.myLandbot = new top.Landbot.Livechat({
         )
 
     def render_steps(self):
-        st.write("Input Face")
-        st.video(st.session_state.get("input_face"))
+        if st.session_state.get("tts_provider"):
+            st.video(st.session_state.get("input_face"), caption="Input Face")
 
         st.text_area(
             "Final Prompt",
@@ -317,14 +328,32 @@ top.myLandbot = new top.Landbot.Livechat({
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
+        user_role = "user"
+        assistant_role = "assistant"
+
         bot_script = request.bot_script
         script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
+        # extract conversation from script
+        script_conversation: list[ConversationEntry] = []
         # extract system message from script
         system_message = bot_script
         if script_matches:
             system_message = system_message[: script_matches[0].start()]
-        # extract conversation from script
-        script_conversation: list[ConversationEntry] = []
+        # add the system message
+        system_message = system_message.strip()
+        if system_message:
+            # replace current user's name
+            username = user_role
+            current_user = st.session_state.get("_current_user")
+            if current_user and current_user.display_name:
+                username = current_user.display_name
+            system_message = system_message.format(username=username)
+            # insert to top
+            script_conversation.append(
+                {"role": "system", "content": system_message},
+            )
+        # add scripted conversations
+        role = user_role
         for idx in range(len(script_matches)):
             match = script_matches[idx]
             try:
@@ -333,74 +362,68 @@ top.myLandbot = new top.Landbot.Livechat({
                 next_match_start = None
             else:
                 next_match_start = next_match.start()
+            # name = match.group(1).strip()
             script_conversation.append(
                 {
-                    "role": match.group(1).strip(),
-                    "completion": bot_script[match.end() : next_match_start].strip(),
+                    "role": role,
+                    "content": bot_script[match.start() : next_match_start].strip(),
                 }
             )
-
-        # get user/assistatant role names
-        try:
-            user_role = script_conversation[0]["role"]
-        except IndexError:
-            user_role = "user"
-        try:
-            assistant_role = script_conversation[1]["role"]
-        except IndexError:
-            assistant_role = "assistant"
+            if role == user_role:
+                role = assistant_role
+            else:
+                role = user_role
 
         st.session_state["conversation"] = saved_conversation = request.conversation
+        _backwards_compat_convo(saved_conversation)
 
         # add user input to conversation
         user_input = request.input_prompt.strip()
-        saved_conversation.append({"role": user_role, "completion": user_input})
+        saved_conversation.append({"role": user_role, "content": user_input})
 
-        # assistant prompt to triger a model response
-        saved_conversation.append({"role": assistant_role, "completion": ""})
-
-        # add the system message
-        system_message = system_message.strip()
-        if system_message:
-            script_conversation.insert(
-                0,
-                {"role": "system", "completion": system_message},
-            )
+        use_chatgpt = request.selected_model == LargeLanguageModels.gpt_3_5_turbo.name
+        if not use_chatgpt:
+            # assistant prompt to triger a model response
+            saved_conversation.append({"role": assistant_role, "content": ""})
 
         # add the entire conversation to the prompt
-        prompt = "\n".join(
-            format_convo_message(entry)
-            for entry in script_conversation + saved_conversation
-        )
-
-        # replace current user's name
-        username = user_role
-        current_user = st.session_state.get("_current_user")
-        if current_user and current_user.display_name:
-            username = current_user.display_name
-        prompt = prompt.format(username=username)
+        full_convo = script_conversation + saved_conversation
+        prompt = "\n".join(format_chatml_message(entry) for entry in full_convo)
         state["final_prompt"] = prompt
-
         # ensure input script is not too big
         max_allowed_tokens = GPT3_MAX_ALLOED_TOKENS - calc_gpt_tokens(prompt)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
             raise ValueError("Input Script is too long! Please reduce the script size.")
 
-        yield "Running GPT-3..."
-        state["output_text"] = run_language_model(
-            api_provider="openai",
-            engine="text-davinci-003",
-            quality=request.quality,
-            num_outputs=request.num_outputs,
-            temperature=request.sampling_temperature,
-            prompt=prompt,
-            max_tokens=max_allowed_tokens,
-            stop=[START_TOKEN, END_TOKEN],
-            avoid_repetition=request.avoid_repetition,
-        )
-        # save model response
-        saved_conversation[-1]["completion"] = state["output_text"][0]
+        if use_chatgpt:
+            yield "Running ChatGPT..."
+            output_messages = run_chatgpt(
+                # messages=full_convo,
+                max_tokens=max_allowed_tokens,
+                # quality=request.quality,
+                num_outputs=request.num_outputs,
+                temperature=request.sampling_temperature,
+                avoid_repetition=request.avoid_repetition,
+            )
+            # save model response
+            saved_conversation.append(output_messages[0])
+            state["output_text"] = [entry["content"] for entry in output_messages]
+        else:
+            # assistant prompt to triger a model response
+            yield f"Running {request}"
+            state["output_text"] = run_language_model(
+                model=request.selected_model,
+                quality=request.quality,
+                num_outputs=request.num_outputs,
+                temperature=request.sampling_temperature,
+                prompt=prompt,
+                max_tokens=max_allowed_tokens,
+                stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
+                avoid_repetition=request.avoid_repetition,
+            )
+            # save model response
+            saved_conversation[-1]["content"] = state["output_text"][0]
 
         state["output_audio"] = []
         state["output_video"] = []
@@ -507,11 +530,3 @@ top.myLandbot = new top.Landbot.Livechat({
                         }
                     snapshot.reference.update(update)
             st.success("Done ✅")
-
-
-def format_convo_message(entry: ConversationEntry) -> str:
-    msg = START_TOKEN + entry["role"]
-    completion = entry.get("completion")
-    if completion:
-        msg += "\n" + completion + END_TOKEN
-    return msg

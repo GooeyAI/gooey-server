@@ -1,27 +1,44 @@
 import streamlit as st
 
+from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.language_model import LargeLanguageModels
 
-def language_model_settings():
-    st.write("#### 🔠 Language Model Optimizations")
+
+def language_model_settings(show_selector=True):
+    st.write("#### 🔠 Language Model Settings")
+
+    if show_selector:
+        enum_selector(LargeLanguageModels, label="##### Model", key="selected_model")
 
     st.checkbox("Avoid Repetition", key="avoid_repetition")
 
     col1, col2 = st.columns(2)
     with col1:
         st.slider(
-            label="###### Number of Outputs",
+            label="""
+###### Number of Outputs
+How many completion choices to generate for each input
+            """,
             key="num_outputs",
             min_value=1,
             max_value=4,
         )
-    with col2:
-        st.slider(
-            label="###### Quality",
-            key="quality",
-            min_value=1.0,
-            max_value=5.0,
-            step=0.1,
-        )
+    if (
+        show_selector
+        and st.session_state.get("selected_model")
+        != LargeLanguageModels.gpt_3_5_turbo.name
+    ):
+        with col2:
+            st.slider(
+                label="""
+###### Quality
+*(Not applicable for ChatGPT)*
+            """,
+                key="quality",
+                min_value=1.0,
+                max_value=5.0,
+                step=0.1,
+            )
 
     col1, col2 = st.columns(2)
     with col1:

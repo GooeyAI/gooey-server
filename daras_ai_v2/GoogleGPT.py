@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.google_search import call_scaleserp
-from daras_ai_v2.language_model import run_language_model
+from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 
 
@@ -30,6 +30,7 @@ class GoogleGPTPage(BasePage):
         company_url="https://ruggable.com",
         scaleserp_search_field="organic_results",
         enable_html=False,
+        selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
         max_tokens=1024,
         num_outputs=1,
@@ -45,12 +46,12 @@ class GoogleGPTPage(BasePage):
     class RequestModel(BaseModel):
         search_query: str
         site_filter: str
-        # selected_model: typing.Literal[
-        #     tuple(e.name for e in LargeLanguageModels)
-        # ] | None
 
         task_instructions: str | None
 
+        selected_model: typing.Literal[
+            tuple(e.name for e in LargeLanguageModels)
+        ] | None
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -214,14 +215,12 @@ class GoogleGPTPage(BasePage):
 
         yield "Generating answer using GPT-3..."
         output_text = run_language_model(
-            api_provider="openai",
-            engine="text-davinci-003",
+            model=request.selected_model,
             quality=request.quality,
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
             prompt=prompt,
             max_tokens=request.max_tokens,
-            stop=None,
             avoid_repetition=request.avoid_repetition,
         )
         state["output_text"] = output_text

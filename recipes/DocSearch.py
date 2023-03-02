@@ -20,7 +20,11 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 from daras_ai.image_input import upload_st_file
 from daras_ai_v2.GoogleGPT import SearchReference, render_outputs
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.language_model import run_language_model, get_embeddings
+from daras_ai_v2.language_model import (
+    run_language_model,
+    get_embeddings,
+    LargeLanguageModels,
+)
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 
 
@@ -37,17 +41,18 @@ class DocSearchPage(BasePage):
         max_context_words=200,
         scroll_jump=5,
         avoid_repetition=True,
+        selected_model=LargeLanguageModels.text_davinci_003.name,
     )
 
     class RequestModel(BaseModel):
         search_query: str
         documents: list[str] | None
-        # selected_model: typing.Literal[
-        #     tuple(e.name for e in LargeLanguageModels)
-        # ] | None
 
         task_instructions: str | None
 
+        selected_model: typing.Literal[
+            tuple(e.name for e in LargeLanguageModels)
+        ] | None
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -65,7 +70,7 @@ class DocSearchPage(BasePage):
         final_prompt: str
 
     def render_form_v2(self):
-        st.text_input("##### Search Query", key="search_query")
+        st.text_area("##### Search Query", key="search_query")
         st.file_uploader(
             "##### Documents",
             key="__document_files",
@@ -236,14 +241,12 @@ If scroll jump is too high, there might not be enough overlap between the chunks
 
         yield "Generating answer using GPT-3..."
         output_text = run_language_model(
-            api_provider="openai",
-            engine="text-davinci-003",
+            model=request.selected_model,
             quality=request.quality,
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
             prompt=prompt,
             max_tokens=request.max_tokens,
-            stop=None,
             avoid_repetition=request.avoid_repetition,
         )
         state["output_text"] = output_text

@@ -7,7 +7,6 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
-from daras_ai_v2.scrollable_html_widget import scrollable_html
 
 DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/compare%20llm%20under%201%20mg%20gif.gif"
 
@@ -67,7 +66,7 @@ class CompareLLMPage(BasePage):
         assert st.session_state["selected_models"], "Please select at least one model"
 
     def render_settings(self):
-        language_model_settings()
+        language_model_settings(show_selector=False)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareLLMPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -77,30 +76,13 @@ class CompareLLMPage(BasePage):
         for selected_model in request.selected_models:
             yield f"Running {LargeLanguageModels[selected_model].value}..."
 
-            match selected_model:
-                case LargeLanguageModels.text_davinci_003.name:
-                    engine = "text-davinci-003"
-                case LargeLanguageModels.code_davinci_002.name:
-                    engine = "code-davinci-002"
-                case LargeLanguageModels.text_curie_001.name:
-                    engine = "text-curie-001"
-                case LargeLanguageModels.text_babbage_001.name:
-                    engine = "text-babbage-001"
-                case LargeLanguageModels.text_ada_001.name:
-                    engine = "text-ada-001"
-                case _:
-                    continue
-
             output_text[selected_model] = run_language_model(
-                api_provider="openai",
-                engine=engine,
+                model=selected_model,
                 quality=request.quality,
                 num_outputs=request.num_outputs,
                 temperature=request.sampling_temperature,
                 prompt=request.input_prompt,
                 max_tokens=request.max_tokens,
-                stop=None,
-                # stop=[f"{user_script_name}:", f"{bot_script_name}:"],
                 avoid_repetition=request.avoid_repetition,
             )
 
@@ -133,6 +115,8 @@ class CompareLLMPage(BasePage):
         total = 0
         for name in selected_models:
             match name:
+                case LargeLanguageModels.gpt_3_5_turbo.name:
+                    total += 1
                 case LargeLanguageModels.text_davinci_003.name | LargeLanguageModels.code_davinci_002.name:
                     total += 10
                 case LargeLanguageModels.text_curie_001.name:
