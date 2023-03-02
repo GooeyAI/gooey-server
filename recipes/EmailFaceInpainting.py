@@ -30,6 +30,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         "guidance_scale": 7.5,
         "seed": 42,
         "upscale_factor": 1.0,
+        "twitter_handle": "seanb",
     }
 
     class RequestModel(BaseModel):
