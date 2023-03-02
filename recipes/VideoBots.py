@@ -411,7 +411,7 @@ top.myLandbot = new top.Landbot.Livechat({
             state["output_text"] = [entry["content"] for entry in output_messages]
         else:
             # assistant prompt to triger a model response
-            yield f"Running {request}"
+            yield f"Running GPT-3..."
             state["output_text"] = run_language_model(
                 model=request.selected_model,
                 quality=request.quality,
