@@ -366,7 +366,7 @@ top.myLandbot = new top.Landbot.Livechat({
             script_conversation.append(
                 {
                     "role": role,
-                    "content": bot_script[match.start() : next_match_start].strip(),
+                    "content": bot_script[match.end() : next_match_start].strip(),
                 }
             )
             if role == user_role:
@@ -399,7 +399,7 @@ top.myLandbot = new top.Landbot.Livechat({
         if use_chatgpt:
             yield "Running ChatGPT..."
             output_messages = run_chatgpt(
-                # messages=full_convo,
+                messages=full_convo,
                 max_tokens=max_allowed_tokens,
                 # quality=request.quality,
                 num_outputs=request.num_outputs,
