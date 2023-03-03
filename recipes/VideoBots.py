@@ -158,9 +158,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         assert st.session_state["input_prompt"], "Please type in a Messsage"
         # assert st.session_state["bot_script"], "Please provide the Bot Script"
 
-        # face_file = st.session_state.get("face_file")
-        # if face_file:
-        #     st.session_state["input_face"] = upload_st_file(face_file)
+        face_file = st.session_state.get("face_file")
+        if face_file:
+            st.session_state["input_face"] = upload_st_file(face_file)
         # assert st.session_state.get("input_face"), "Please provide the Input Face"
 
     def render_settings(self):
