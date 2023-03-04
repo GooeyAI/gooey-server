@@ -146,7 +146,10 @@ def run_language_model(
         case LargeLanguageModels.gpt_3_5_turbo.name:
             messages = run_chatgpt(
                 messages=[
-                    {"role": "system", "content": ""},
+                    {
+                        "role": "system",
+                        "content": "You are an intelligent AI assistant. Follow the instructions as closely as possible.",
+                    },
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=max_tokens,
