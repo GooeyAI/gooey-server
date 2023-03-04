@@ -74,6 +74,7 @@ def get_embeddings(
 
 class ConversationEntry(typing.TypedDict):
     role: str
+    display_name: str | None
     content: str
 
 
@@ -81,7 +82,7 @@ class ConversationEntry(typing.TypedDict):
 def run_chatgpt(
     *,
     # api_provider: str,
-    messages: list[ConversationEntry],
+    messages: list[dict],
     max_tokens: int,
     # quality: float,
     num_outputs: int,
@@ -89,7 +90,7 @@ def run_chatgpt(
     engine: str = "gpt-3.5-turbo",
     stop: list[str] = None,
     avoid_repetition: bool = False,
-) -> list[ConversationEntry]:
+) -> list[dict]:
     r = openai.ChatCompletion.create(
         model=engine,
         messages=messages,
@@ -186,10 +187,17 @@ def run_language_model(
 CHATML_START_TOKEN = "<|im_start|>"
 CHATML_END_TOKEN = "<|im_end|>"
 
+CHATML_ROLE_SYSTEM = "system"
+CHATML_ROLE_ASSISSTANT = "assistant"
+CHATML_ROLE_USER = "user"
+
 
 def format_chatml_message(entry: ConversationEntry) -> str:
     msg = CHATML_START_TOKEN + entry["role"]
     content = entry.get("content")
+    display_name = entry.get("display_name")
+    if display_name:
+        pass
     if content:
         msg += "\n" + content + CHATML_END_TOKEN
     return msg
