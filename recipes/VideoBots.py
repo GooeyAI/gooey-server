@@ -63,7 +63,7 @@ class VideoBotsPage(BasePage):
         "uberduck_voice_name": "hecko",
         "uberduck_speaking_rate": 1.0,
         # gpt3
-        "selected_model": LargeLanguageModels.gpt_3_5_turbo.name,
+        "selected_model": LargeLanguageModels.text_davinci_003.name,
         "avoid_repetition": True,
         "num_outputs": 1,
         "quality": 1.0,
