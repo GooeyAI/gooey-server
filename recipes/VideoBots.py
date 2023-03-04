@@ -42,9 +42,9 @@ BOT_SCRIPT_RE = re.compile(
     # start of line
     r"^"
     # name of bot / user
-    "([\w\ \t]+)"
+    r"([\w\ \t]+)"
     # colon
-    "\:\ ",
+    r"\:\ ",
     flags=re.M,
 )
 

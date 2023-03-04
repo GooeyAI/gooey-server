@@ -387,7 +387,7 @@ def document_splitter(full_text, max_context_words, scroll_jump):
         else:
             # calculate the size of window + next fragment
             next_window = [*window, next_frag]
-            next_window_words = sum(len(re.split("\s+", para)) for para in next_window)
+            next_window_words = sum(len(re.split(r"\s+", para)) for para in next_window)
             # next fragment can be safely used without exhausing context, continue expanding
             if next_window_words <= max_context_words:
                 continue

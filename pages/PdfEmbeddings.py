@@ -133,7 +133,7 @@ for idx in range(len(all_frags)):
         pass
     else:
         next_window = [*window, next_frag]
-        next_window_words = sum(len(re.split("\s+", para)) for para in next_window)
+        next_window_words = sum(len(re.split(r"\s+", para)) for para in next_window)
         if next_window_words <= max_context_words:
             continue
 
