@@ -26,6 +26,7 @@ from recipes.ObjectInpainting import ObjectInpaintingPage
 from recipes.SEOSummary import SEOSummaryPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
+from recipes.VideoBots import VideoBotsPage
 from server import app
 
 client = TestClient(app)
@@ -34,7 +35,7 @@ pages_to_test = [
     ChyronPlantPage,
     FaceInpaintingPage,
     EmailFaceInpaintingPage,
-    # LetterWriterPage,
+    # LetterWriterPage, ## deprecated
     LipsyncPage,
     CompareLLMPage,
     ImageSegmentationPage,
@@ -47,7 +48,7 @@ pages_to_test = [
     CompareText2ImgPage,
     SEOSummaryPage,
     GoogleImageGenPage,
-    CompareLLMPage,
+    VideoBotsPage,
     CompareUpscalerPage,
     GoogleGPTPage,
     DocSearchPage,
