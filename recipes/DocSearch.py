@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.image_input import upload_st_file
-from daras_ai_v2.GoogleGPT import SearchReference, render_outputs
+from daras_ai_v2.GoogleGPT import SearchReference, render_outputs, GoogleGPTPage
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
@@ -31,9 +31,11 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 
+DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
+
 
 class DocSearchPage(BasePage):
-    title = "Search Documents using GPT"
+    title = "Search your Docs with GPT"
     slug_versions = ["doc-search"]
 
     sane_defaults = {
@@ -88,6 +90,18 @@ class DocSearchPage(BasePage):
             st.session_state["documents"] = [upload_st_file(f) for f in document_files]
         assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
+    def related_workflows(self) -> list:
+        from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
+        from recipes.SEOSummary import SEOSummaryPage
+        from recipes.VideoBots import VideoBotsPage
+
+        return [
+            GoogleGPTPage,
+            EmailFaceInpaintingPage,
+            SEOSummaryPage,
+            VideoBotsPage,
+        ]
+
     def render_output(self):
         render_outputs(st.session_state, 300)
 
@@ -113,6 +127,12 @@ class DocSearchPage(BasePage):
         st.write("---")
 
         doc_search_settings()
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_DOC_SEARCH_META_IMG
+
+    def preview_description(self, state: dict) -> str:
+        return "Add your PDF, Word, HTML or Text docs, train our AI on them with OpenAI embeddings & vector search and then process results with a GPT3 script. This workflow is perfect for anything NOT in ChatGPT: 250-page compliance PDFs, training manuals, your diary, etc."
 
     def render_steps(self):
         col1, col2 = st.columns(2)
