@@ -327,13 +327,17 @@ Use this for prompting GPT to use the document search results.
     def render_output(self):
         output_text = st.session_state.get("output_text", [])
         output_video = st.session_state.get("output_video", [])
+        output_audio = st.session_state.get("output_audio", [])
         if output_text:
             st.write(f"#### 💌 Response")
             for idx, text in enumerate(output_text):
                 try:
                     st.video(output_video[idx])
                 except IndexError:
-                    pass
+                    try:
+                        st.audio(output_audio[idx])
+                    except IndexError:
+                        pass
                 st.write(text)
 
         messages = st.session_state.get("messages", [])
