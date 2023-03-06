@@ -1,16 +1,43 @@
 import streamlit as st
 
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.stable_diffusion import Text2ImgModels, InpaintingModels, Img2ImgModels
+from daras_ai_v2.stable_diffusion import (
+    Text2ImgModels,
+    InpaintingModels,
+    Img2ImgModels,
+    ControlNetModels,
+)
 
 
 def img_model_settings(models_enum):
     st.write("### Image Generation Settings")
-    selected_model = enum_selector(
-        models_enum,
-        label="#### Model",
-        key="selected_model",
-    )
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_model = enum_selector(
+            models_enum,
+            label="#### Model",
+            key="selected_model",
+        )
+    with col2:
+        if models_enum is Img2ImgModels:
+            if st.session_state.get("selected_model") in [
+                Img2ImgModels.instruct_pix2pix.name,
+                Img2ImgModels.dall_e.name,
+                Img2ImgModels.jack_qiao.name,
+                Img2ImgModels.sd_2.name,
+            ]:
+                st.session_state["selected_controlnet_model"] = None
+            else:
+                enum_selector(
+                    ControlNetModels,
+                    label="""
+#### Control Net
+Choose any [conditioning model](https://huggingface.co/lllyasviel?search=controlnet).
+                    """,
+                    key="selected_controlnet_model",
+                    allow_none=True,
+                    use_selectbox=True,
+                )
 
     negative_prompt_setting(selected_model)
 
@@ -27,7 +54,9 @@ def img_model_settings(models_enum):
         guidance_scale_setting(selected_model)
 
     with col2:
-        if models_enum is Img2ImgModels:
+        if models_enum is Img2ImgModels and not st.session_state.get(
+            "selected_controlnet_model"
+        ):
             prompt_strength_setting(selected_model)
         if selected_model == Img2ImgModels.instruct_pix2pix.name:
             instruct_pix2pix_settings()

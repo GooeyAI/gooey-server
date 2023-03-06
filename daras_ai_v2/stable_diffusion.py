@@ -32,33 +32,80 @@ class InpaintingModels(Enum):
     dall_e = "Dall-E (OpenAI)"
 
 
+class Text2ImgModels(Enum):
+    # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
+    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
+    sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+    openjourney = "Open Journey (PromptHero)"
+    openjourney_2 = "Open Journey v2 beta (PromptHero)"
+    analog_diffusion = "Analog Diffusion (wavymulder)"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
+    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
+    rodent_diffusion_1_5 = "Rodent Diffusion 1.5 (NerdyRodent)"
+    jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
+    dall_e = "Dall-E (OpenAI)"
+
+
+text2img_model_ids = {
+    Text2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
+    Text2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
+    Text2ImgModels.openjourney: "prompthero/openjourney",
+    Text2ImgModels.openjourney_2: "prompthero/openjourney-v2",
+    Text2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
+    Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
+    Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
+    Text2ImgModels.rodent_diffusion_1_5: "devxpy/rodent-diffusion-1-5",
+}
+
+
 class Img2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
-    jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
-    dall_e = "Dall-E (OpenAI)"
     openjourney = "Open Journey (PromptHero)"
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
     protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
     dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 (NerdyRodent)"
-
-
-class Text2ImgModels(Enum):
-    # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
-    sd_2 = "Stable Diffusion v2.1 (stability.ai)"
-    sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
-    openjourney = "Open Journey (PromptHero)"
-    openjourney_2 = "Open Journey v2 beta (PromptHero)"
-    analog_diffusion = "Analog Diffusion (wavymulder)"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
-    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
-    rodent_diffusion_1_5 = "Rodent Diffusion 1.5 (NerdyRodent)"
     dall_e = "Dall-E (OpenAI)"
+
+
+img2img_model_ids = {
+    Img2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
+    Img2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
+    Img2ImgModels.openjourney: "prompthero/openjourney",
+    Img2ImgModels.openjourney_2: "prompthero/openjourney-v2",
+    Img2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
+    Img2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
+    Img2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
+    Img2ImgModels.rodent_diffusion_1_5: "devxpy/rodent-diffusion-1-5",
+}
+
+
+class ControlNetModels(Enum):
+    sd_controlnet_canny = "Canny"
+    sd_controlnet_depth = "Depth"
+    sd_controlnet_hed = "HED Boundary"
+    sd_controlnet_mlsd = "M-LSD Straight Line"
+    sd_controlnet_normal = "Normal Map"
+    sd_controlnet_openpose = "Human Pose"
+    sd_controlnet_scribble = "Scribble"
+    sd_controlnet_seg = "Image Segmentation"
+
+
+controlnet_model_ids = {
+    ControlNetModels.sd_controlnet_canny: "lllyasviel/sd-controlnet-canny",
+    ControlNetModels.sd_controlnet_depth: "lllyasviel/sd-controlnet-depth",
+    ControlNetModels.sd_controlnet_hed: "lllyasviel/sd-controlnet-hed",
+    ControlNetModels.sd_controlnet_mlsd: "lllyasviel/sd-controlnet-mlsd",
+    ControlNetModels.sd_controlnet_normal: "lllyasviel/sd-controlnet-normal",
+    ControlNetModels.sd_controlnet_openpose: "lllyasviel/sd-controlnet-openpose",
+    ControlNetModels.sd_controlnet_scribble: "lllyasviel/sd-controlnet-scribble",
+    ControlNetModels.sd_controlnet_seg: "lllyasviel/sd-controlnet-seg",
+}
 
 
 def sd_upscale(
@@ -75,7 +122,8 @@ def sd_upscale(
         "upscale",
         pipeline={
             "model_id": "stabilityai/stable-diffusion-x4-upscaler",
-            # "scheduler": None,
+            # "scheduler": "UniPCMultistepScheduler",
+            "disable_safety_checker": True,
             "seed": seed,
         },
         inputs={
@@ -104,7 +152,8 @@ def instruct_pix2pix(
         "instruct_pix2pix",
         pipeline={
             "model_id": "timbrooks/instruct-pix2pix",
-            # "scheduler": None,
+            # "scheduler": "UniPCMultistepScheduler",
+            "disable_safety_checker": True,
             "seed": seed,
         },
         inputs={
@@ -161,34 +210,13 @@ def text2img(
             )
             out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
         case _:
-            match selected_model:
-                case Text2ImgModels.sd_1_5.name:
-                    hf_model_id = "runwayml/stable-diffusion-v1-5"
-                case Text2ImgModels.sd_2.name:
-                    hf_model_id = "stabilityai/stable-diffusion-2-1"
-                case Text2ImgModels.openjourney.name:
-                    prompt = "mdjrny-v4 style " + prompt
-                    hf_model_id = "prompthero/openjourney"
-                case Text2ImgModels.openjourney_2.name:
-                    hf_model_id = "prompthero/openjourney-v2"
-                case Text2ImgModels.analog_diffusion.name:
-                    prompt = "analog style " + prompt
-                    hf_model_id = "wavymulder/Analog-Diffusion"
-                case Text2ImgModels.protogen_5_3.name:
-                    prompt = "modelshoot style " + prompt
-                    hf_model_id = "darkstorm2150/Protogen_v5.3_Official_Release"
-                case Text2ImgModels.dreamlike_2.name:
-                    prompt = "photo, " + prompt
-                    hf_model_id = "dreamlike-art/dreamlike-photoreal-2.0"
-                case Text2ImgModels.rodent_diffusion_1_5.name:
-                    hf_model_id = "devxpy/rodent-diffusion-1-5"
-                case _:
-                    return []
+            prompt = add_prompt_prefix(prompt, selected_model)
             return call_sd_multi(
                 "text2img",
                 pipeline={
-                    "model_id": hf_model_id,
-                    # "scheduler": None,
+                    "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
+                    # "scheduler": "EulerDiscreteScheduler",
+                    "disable_safety_checker": True,
                     "seed": seed,
                 },
                 inputs={
@@ -230,7 +258,7 @@ def img2img(
     prompt_strength: float = None,
     negative_prompt: str = None,
     guidance_scale: float = None,
-    sd_2_upscaling: bool = False,
+    # sd_2_upscaling: bool = False,
     seed: int = 42,
 ):
     prompt_strength = prompt_strength or 0.7
@@ -277,34 +305,13 @@ def img2img(
                 for part in response["data"]
             ]
         case _:
-            match selected_model:
-                case Img2ImgModels.sd_1_5.name:
-                    hf_model_id = "runwayml/stable-diffusion-v1-5"
-                case Img2ImgModels.sd_2.name:
-                    hf_model_id = "stabilityai/stable-diffusion-2-1"
-                case Img2ImgModels.openjourney.name:
-                    prompt = "mdjrny-v4 style " + prompt
-                    hf_model_id = "prompthero/openjourney"
-                case Img2ImgModels.openjourney_2.name:
-                    hf_model_id = "prompthero/openjourney-v2"
-                case Img2ImgModels.analog_diffusion.name:
-                    prompt = "analog style " + prompt
-                    hf_model_id = "wavymulder/Analog-Diffusion"
-                case Img2ImgModels.protogen_5_3.name:
-                    prompt = "modelshoot style " + prompt
-                    hf_model_id = "darkstorm2150/Protogen_v5.3_Official_Release"
-                case Img2ImgModels.dreamlike_2.name:
-                    prompt = "photo, " + prompt
-                    hf_model_id = "dreamlike-art/dreamlike-photoreal-2.0"
-                case Img2ImgModels.rodent_diffusion_1_5.name:
-                    hf_model_id = "devxpy/rodent-diffusion-1-5"
-                case _:
-                    return []
+            prompt = add_prompt_prefix(prompt, selected_model)
             return call_sd_multi(
                 "img2img",
                 pipeline={
-                    "model_id": hf_model_id,
-                    # "scheduler": None,
+                    "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
+                    # "scheduler": "UniPCMultistepScheduler",
+                    "disable_safety_checker": True,
                     "seed": seed,
                 },
                 inputs={
@@ -321,6 +328,58 @@ def img2img(
         upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
         for sd_img_bytes in out_imgs
     ]
+
+
+def controlnet(
+    *,
+    selected_model: str,
+    selected_controlnet_model: str,
+    prompt: str,
+    num_outputs: int,
+    init_image: str,
+    init_image_bytes: bytes = None,
+    num_inference_steps: int,
+    negative_prompt: str = None,
+    guidance_scale: float = None,
+    seed: int = 42,
+):
+    height, width, _ = bytes_to_cv2_img(init_image_bytes).shape
+    _resolution_check(width, height)
+    prompt = add_prompt_prefix(prompt, selected_model)
+    return call_sd_multi(
+        "controlnet",
+        pipeline={
+            "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
+            "seed": seed,
+            "scheduler": "UniPCMultistepScheduler",
+            "disable_safety_checker": True,
+            "controlnet_model_id": controlnet_model_ids[
+                ControlNetModels[selected_controlnet_model]
+            ],
+        },
+        inputs={
+            "prompt": [prompt],
+            "negative_prompt": [negative_prompt] if negative_prompt else None,
+            "num_images_per_prompt": num_outputs,
+            "num_inference_steps": num_inference_steps,
+            "guidance_scale": guidance_scale,
+            "image": [init_image],
+            # "strength": prompt_strength,
+        },
+    )
+
+
+def add_prompt_prefix(prompt: str, selected_model: str) -> str:
+    match selected_model:
+        case Text2ImgModels.openjourney.name:
+            prompt = "mdjrny-v4 style " + prompt
+        case Text2ImgModels.analog_diffusion.name:
+            prompt = "analog style " + prompt
+        case Text2ImgModels.protogen_5_3.name:
+            prompt = "modelshoot style " + prompt
+        case Text2ImgModels.dreamlike_2.name:
+            prompt = "photo, " + prompt
+    return prompt
 
 
 def inpainting(
