@@ -20,6 +20,7 @@ from daras_ai_v2.language_model import (
     run_language_model,
     GPT3_MAX_ALLOED_TOKENS,
     calc_gpt_tokens,
+    LargeLanguageModels,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scaleserp_location_picker_widget import (
@@ -67,6 +68,7 @@ class SEOSummaryPage(BasePage):
         scaleserp_search_field="organic_results",
         scaleserp_locations=["United States"],
         enable_html=False,
+        selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
         max_tokens=1024,
         num_outputs=1,
@@ -91,6 +93,9 @@ class SEOSummaryPage(BasePage):
         scaleserp_locations: list[str] | None
         enable_html: bool | None
 
+        selected_model: typing.Literal[
+            tuple(e.name for e in LargeLanguageModels)
+        ] | None
         sampling_temperature: float | None
         max_tokens: int | None
         num_outputs: int | None
@@ -352,8 +357,7 @@ def _crosslink_keywords(output_content, request):
 
 def _run_lm(request: SEOSummaryPage.RequestModel, final_prompt: str) -> list[str]:
     return run_language_model(
-        api_provider="openai",
-        engine="text-davinci-003",
+        model=request.selected_model,
         quality=request.quality,
         num_outputs=request.num_outputs,
         temperature=request.sampling_temperature,

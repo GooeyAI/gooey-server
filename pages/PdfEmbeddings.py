@@ -19,7 +19,7 @@ from daras_ai_v2 import settings
 url = st.text_input("url")
 st.write("_or_")
 input_files = st.file_uploader(
-    "pdf", type=["pdf", "txt", "docx", "md"], accept_multiple_files=True
+    "pdf", type=["pdf", "txt", "docx", "doc", "md"], accept_multiple_files=True
 )
 
 max_context_words = 200
@@ -97,7 +97,7 @@ if input_files:
         match ext:
             case ".pdf":
                 pdf_pages.extend(pdf_to_text(f))
-            case ".docx" | ".md":
+            case ".docx" | ".doc" | ".md":
                 pdf_pages.append(pandoc_convert(f))
             case ".txt":
                 pdf_pages.append(f.getvalue().decode())
@@ -133,7 +133,7 @@ for idx in range(len(all_frags)):
         pass
     else:
         next_window = [*window, next_frag]
-        next_window_words = sum(len(re.split("\s+", para)) for para in next_window)
+        next_window_words = sum(len(re.split(r"\s+", para)) for para in next_window)
         if next_window_words <= max_context_words:
             continue
 
