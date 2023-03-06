@@ -8,6 +8,7 @@ from daras_ai.image_input import (
     upload_file_hq,
 )
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.stable_diffusion import (
     InpaintingModels,
@@ -15,6 +16,8 @@ from daras_ai_v2.stable_diffusion import (
     img2img,
     IMG_MAX_SIZE,
     instruct_pix2pix,
+    controlnet,
+    ControlNetModels,
 )
 
 
@@ -29,9 +32,10 @@ class Img2ImgPage(BasePage):
         "output_height": 512,
         "guidance_scale": 7.5,
         "prompt_strength": 0.4,
-        "sd_2_upscaling": False,
+        # "sd_2_upscaling": False,
         "seed": 42,
         "image_guidance_scale": 1.2,
+        "selected_controlnet_model": None,
     }
 
     class RequestModel(BaseModel):
@@ -39,6 +43,9 @@ class Img2ImgPage(BasePage):
         text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
+        selected_controlnet_model: typing.Literal[
+            tuple(e.name for e in ControlNetModels)
+        ] | None
         negative_prompt: str | None
 
         num_outputs: int | None
@@ -50,7 +57,7 @@ class Img2ImgPage(BasePage):
         guidance_scale: float | None
         prompt_strength: float | None
 
-        sd_2_upscaling: bool | None
+        # sd_2_upscaling: bool | None
 
         seed: int | None
 
@@ -154,6 +161,19 @@ class Img2ImgPage(BasePage):
                 images=[init_image],
                 image_guidance_scale=request.image_guidance_scale,
             )
+        elif request.selected_controlnet_model:
+            state["output_images"] = controlnet(
+                selected_model=request.selected_model,
+                selected_controlnet_model=request.selected_controlnet_model,
+                prompt=request.text_prompt,
+                num_outputs=request.num_outputs,
+                init_image=init_image,
+                init_image_bytes=init_image_bytes,
+                num_inference_steps=request.quality,
+                negative_prompt=request.negative_prompt,
+                guidance_scale=request.guidance_scale,
+                seed=request.seed,
+            )
         else:
             state["output_images"] = img2img(
                 selected_model=request.selected_model,
@@ -165,7 +185,7 @@ class Img2ImgPage(BasePage):
                 prompt_strength=request.prompt_strength,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
-                sd_2_upscaling=request.sd_2_upscaling,
+                # sd_2_upscaling=request.sd_2_upscaling,
                 seed=request.seed,
             )
 
