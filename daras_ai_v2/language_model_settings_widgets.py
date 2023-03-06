@@ -5,10 +5,14 @@ from daras_ai_v2.language_model import LargeLanguageModels
 
 
 def language_model_settings(show_selector=True):
-    st.write("#### 🔠 Language Model Settings")
+    st.write("##### 🔠 Language Model Settings")
 
     if show_selector:
-        enum_selector(LargeLanguageModels, label="##### Model", key="selected_model")
+        enum_selector(
+            LargeLanguageModels,
+            label_visibility="collapsed",
+            key="selected_model",
+        )
 
     st.checkbox("Avoid Repetition", key="avoid_repetition")
 

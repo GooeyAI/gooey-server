@@ -20,6 +20,10 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 from daras_ai.image_input import upload_st_file
 from daras_ai_v2.GoogleGPT import SearchReference, render_outputs
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.doc_search_settings_widgets import (
+    doc_search_settings,
+    document_uploader,
+)
 from daras_ai_v2.language_model import (
     run_language_model,
     get_embeddings,
@@ -29,20 +33,20 @@ from daras_ai_v2.language_model_settings_widgets import language_model_settings
 
 
 class DocSearchPage(BasePage):
-    title = " Search Documents using GPT"
+    title = "Search Documents using GPT"
     slug_versions = ["doc-search"]
 
-    sane_defaults = dict(
-        sampling_temperature=0.1,
-        max_tokens=256,
-        num_outputs=1,
-        quality=1.0,
-        max_references=3,
-        max_context_words=200,
-        scroll_jump=5,
-        avoid_repetition=True,
-        selected_model=LargeLanguageModels.text_davinci_003.name,
-    )
+    sane_defaults = {
+        "sampling_temperature": 0.1,
+        "max_tokens": 256,
+        "num_outputs": 1,
+        "quality": 1.0,
+        "max_references": 3,
+        "max_context_words": 200,
+        "scroll_jump": 5,
+        "avoid_repetition": True,
+        "selected_model": LargeLanguageModels.text_davinci_003.name,
+    }
 
     class RequestModel(BaseModel):
         search_query: str
@@ -71,13 +75,7 @@ class DocSearchPage(BasePage):
 
     def render_form_v2(self):
         st.text_area("##### Search Query", key="search_query")
-        st.file_uploader(
-            "##### Documents",
-            key="__document_files",
-            upload_key="documents",
-            type=["pdf", "txt", "docx", "md", "html"],
-            accept_multiple_files=True,
-        )
+        document_uploader("##### Documents")
 
     def validate_form_v2(self):
         search_query = st.session_state.get("search_query", "").strip()
@@ -93,7 +91,7 @@ class DocSearchPage(BasePage):
     def render_output(self):
         render_outputs(st.session_state, 300)
 
-        with st.expander("Sources"):
+        with st.expander("💁‍♀️ Sources"):
             for idx, ref in enumerate(st.session_state.get("references", [])):
                 st.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
                 st.text(ref["snippet"])
@@ -105,7 +103,7 @@ class DocSearchPage(BasePage):
 
     def render_settings(self):
         st.text_area(
-            "### Task Instructions",
+            "### 👩‍🏫 Task Instructions",
             key="task_instructions",
             height=100,
         )
@@ -114,40 +112,7 @@ class DocSearchPage(BasePage):
         language_model_settings()
         st.write("---")
 
-        st.write("### 🔎m Search Settings")
-        st.number_input(
-            label="""
-##### Max References
-The maximum number of References to include from the source document.
-            """,
-            key="max_references",
-            min_value=1,
-            max_value=10,
-        )
-
-        st.number_input(
-            label="""
-##### Max context size (in words)
-
-The maximum size of each split of the document.\\
-A high context size allows GPT to access a greater chunk of information from the source document, 
-at the cost of being too verbose, and running out of input tokens. 
-            """,
-            key="max_context_words",
-            min_value=10,
-            max_value=500,
-        )
-
-        st.number_input(
-            label="""
-##### Scroll Jump
-We split the documents into chunks by scrolling through it.\\
-If scroll jump is too high, there might not be enough overlap between the chunks to answer the questions accurately.
-""",
-            key="scroll_jump",
-            min_value=1,
-            max_value=50,
-        )
+        doc_search_settings()
 
     def render_steps(self):
         col1, col2 = st.columns(2)
@@ -187,40 +152,14 @@ If scroll jump is too high, there might not be enough overlap between the chunks
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: DocSearchPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        yield f"Getting query embeddings..."
-        query_embeds = get_embeddings_cached(request.search_query)[0]
+        references = yield from get_top_k_references(request)
+        state["references"] = references
 
-        yield "Getting document embeddings..."
-        input_docs = request.documents or []
-        embeds = [
-            embeds
-            for f_url in input_docs
-            for embeds in doc_url_to_embeds(
-                f_url=f_url,
-                max_context_words=request.max_context_words,
-                scroll_jump=request.scroll_jump,
-            )
-        ]
-
-        yield f"Searching documents..."
-        candidates = [
-            {**meta, "score": vector_similarity(query_embeds, doc_embeds)}
-            for meta, doc_embeds in embeds
-        ]
-
-        # apply cutoff
-        cutoff = 0.7
-        candidates = [match for match in candidates if match["score"] >= cutoff]
-        # get top_k best matches
-        matches = heapq.nlargest(
-            request.max_references, candidates, key=lambda match: match["score"]
-        )
         # empty search result, abort!
-        if not matches:
+        if not references:
             raise ValueError(
                 f"Your search - {request.search_query} - did not match any documents."
             )
-        state["references"] = matches
 
         # add time to prompt
         utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
@@ -230,11 +169,7 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         # add task instructions
         prompt = task_instructions.strip() + "\n\n"
         # add search results to the prompt
-        search_results = "\n\n---\n\n".join(
-            f'''Search Result: [{idx + 1}]\nTitle: {ref["title"]}\nSnippet: """\n{ref["snippet"]}"""'''
-            for idx, ref in enumerate(state["references"])
-        )
-        prompt += f"{search_results}\n\n"
+        prompt += references_as_prompt(references) + "\n\n"
         # add the question
         prompt += f"Question: {request.search_query}\nAnswer:"
         state["final_prompt"] = prompt
@@ -250,6 +185,50 @@ If scroll jump is too high, there might not be enough overlap between the chunks
             avoid_repetition=request.avoid_repetition,
         )
         state["output_text"] = output_text
+
+
+def get_top_k_references(
+    request: DocSearchPage.RequestModel,
+) -> typing.Generator[str, None, list[SearchReference]]:
+    yield f"Getting query embeddings..."
+    query_embeds = get_embeddings_cached(request.search_query)[0]
+    yield "Getting document embeddings..."
+    input_docs = request.documents or []
+    embeds = [
+        embeds
+        for f_url in input_docs
+        for embeds in doc_url_to_embeds(
+            f_url=f_url,
+            max_context_words=request.max_context_words,
+            scroll_jump=request.scroll_jump,
+        )
+    ]
+    yield f"Searching documents..."
+    candidates = [
+        {**meta, "score": vector_similarity(query_embeds, doc_embeds)}
+        for meta, doc_embeds in embeds
+    ]
+    # apply cutoff
+    cutoff = 0.7
+    candidates = [match for match in candidates if match["score"] >= cutoff]
+    # get top_k best matches
+    matches = heapq.nlargest(
+        request.max_references, candidates, key=lambda match: match["score"]
+    )
+    return matches
+
+
+def references_as_prompt(references: list[SearchReference], sep="\n\n---\n\n") -> str:
+    return sep.join(
+        f'''\
+Search Result: [{idx + 1}]
+Title: {ref["title"]}
+Snippet: """
+{ref["snippet"]}
+"""\
+'''
+        for idx, ref in enumerate(references)
+    )
 
 
 @st.cache_data(show_spinner=False)
