@@ -173,8 +173,8 @@ class VideoBotsPage(BasePage):
         output_video: list[str]
 
         # doc search
-        references: list[SearchReference]
-        search_query: str
+        references: list[SearchReference] | None
+        search_query: str | None
 
     def related_workflows(self):
         from recipes.LipsyncTTS import LipsyncTTSPage
