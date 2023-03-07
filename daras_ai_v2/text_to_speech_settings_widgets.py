@@ -31,7 +31,7 @@ class TextToSpeechProviders(Enum):
 def text_to_speech_settings():
     st.write(
         """
-        #### 🗣️ Voice Settings
+        ##### 🗣️ Voice Settings
         """
     )
 

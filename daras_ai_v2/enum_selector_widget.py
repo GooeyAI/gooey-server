@@ -48,7 +48,7 @@ def enum_selector(
     label: str = "",
     **kwargs,
 ) -> str:
-    label = label or enum_cls.name
+    label = label or enum_cls.__name__
     return st.radio(
         **kwargs,
         options=[e.name for e in enum_cls],
