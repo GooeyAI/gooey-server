@@ -30,6 +30,7 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
 
@@ -168,6 +169,9 @@ class DocSearchPage(BasePage):
 
         st.write("**References**")
         st.json(st.session_state.get("references", []), expanded=False)
+
+    def render_usage_guide(self):
+        youtube_video("Xe4L_dQ2KvU")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: DocSearchPage.RequestModel = self.RequestModel.parse_obj(state)
