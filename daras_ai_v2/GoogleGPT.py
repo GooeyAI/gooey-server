@@ -10,6 +10,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
 
@@ -136,6 +137,9 @@ class GoogleGPTPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return "Like Bing + ChatGPT or perplexity.ai, this workflow queries Google and then summarizes the results (with citations!) using an editable GPT3 script.  Filter  results to your own website so users can ask anything and get answers based only on your site's pages."
+
+    def render_usage_guide(self):
+        youtube_video("mcscNaUIosA")
 
     def render_steps(self):
         col1, col2 = st.columns(2)
