@@ -197,15 +197,16 @@ class DocSearchPage(BasePage):
                 f"Your search - {request.search_query} - did not match any documents."
             )
 
-        # add time to prompt
+        prompt = ""
+        # add time to instructions
         utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
         task_instructions = request.task_instructions.replace(
             "{{ datetime.utcnow }}", utcnow
         )
-        # add task instructions
-        prompt = task_instructions.strip() + "\n\n"
         # add search results to the prompt
         prompt += references_as_prompt(references) + "\n\n"
+        # add task instructions
+        prompt += task_instructions.strip() + "\n\n"
         # add the question
         prompt += f"Question: {request.search_query}\nAnswer:"
         state["final_prompt"] = prompt
@@ -254,7 +255,7 @@ def get_top_k_references(
     return matches
 
 
-def references_as_prompt(references: list[SearchReference], sep="\n\n---\n\n") -> str:
+def references_as_prompt(references: list[SearchReference], sep="\n\n") -> str:
     return sep.join(
         f'''\
 Search Result: [{idx + 1}]

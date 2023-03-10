@@ -465,11 +465,12 @@ Use this for prompting GPT to use the document search results.
             state["references"] = references
             # if doc search is successful, add the search results to the prompt
             if references:
-                system_message += (
-                    "\n"
-                    + request.task_instructions.strip()
+                system_message = (
+                    references_as_prompt(references)
                     + "\n\n"
-                    + references_as_prompt(references)
+                    + system_message
+                    + "\n"
+                    + request.task_instructions.strip()
                 )
 
         if not use_chatgpt:
