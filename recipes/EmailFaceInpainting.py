@@ -34,9 +34,8 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     }
 
     class RequestModel(BaseModel):
-        email_address: str
+        email_address: str | None
         twitter_handle: str | None
-        photo_source: str | None
 
         text_prompt: str
 
@@ -114,12 +113,19 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             key="text_prompt",
             placeholder="winter's day in paris",
         )
+        if "__photo_source" not in st.session_state:
+            st.session_state["__photo_source"] = (
+                "Email Address"
+                if st.session_state.get("email_address")
+                else "Twitter Handle"
+            )
+
         source = st.radio(
             """
             ### Photo Source
             From where we should get the photo?""",
             options=["Email Address", "Twitter Handle"],
-            key="photo_source",
+            key="__photo_source",
         )
         if source == "Email Address":
             st.text_input(
@@ -130,6 +136,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 key="email_address",
                 placeholder="john@appleseed.com",
             )
+            st.session_state["twitter_handle"] = None
         else:
             st.text_input(
                 """
@@ -139,6 +146,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 key="twitter_handle",
                 max_chars=15,
             )
+            st.session_state["email_address"] = None
 
     def validate_form_v2(self):
         text_prompt = st.session_state.get("text_prompt")
@@ -146,16 +154,16 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         twitter_handle = st.session_state.get("twitter_handle")
         assert text_prompt, "Please provide a Prompt and your Email Address"
 
-        if st.session_state.get("photo_source") == "Twitter Handle":
-            assert twitter_handle, "Please provide a Twitter Handle"
+        if st.session_state.get("twitter_handle"):
             assert re.fullmatch(
                 twitter_handle_regex, twitter_handle
             ), "Please provide a valid Twitter Handle"
-        elif st.session_state.get("photo_source") == "Email Address":
-            assert email_address, "Please provide a Email Address"
+        elif st.session_state.get("email_address"):
             assert re.fullmatch(
                 email_regex, email_address
             ), "Please provide a valid Email Address"
+        else:
+            raise AssertionError("Please provide an Email Address or Twitter Handle")
 
         from_email = st.session_state.get("email_from")
         email_subject = st.session_state.get("email_subject")
@@ -234,13 +242,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         )
 
         yield "Fetching profile..."
-        if request.photo_source == "Email Address":
-            photo_url = get_photo_for_email(request.email_address)
-        else:
-            # For twitter-photo-cache to find the user irrespective
-            # User may enter the handle case-insensitively
-            clean_handle = self._clean_handle(request.twitter_handle)
-            photo_url = get_photo_for_twitter_handle(clean_handle)
+        photo_url = self._get_photo_url(request)
         if photo_url:
             state["input_image"] = photo_url
             yield from super().run(state)
@@ -264,6 +266,16 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             raise ImageNotFound(
                 "This email has no photo with a face in it. Try [Face in an AI Image](/face-in-ai-generated-photo/) workflow instead."
             )
+
+    def _get_photo_url(self, request):
+        if request.email_address:
+            photo_url = get_photo_for_email(request.email_address)
+        else:
+            # For twitter-photo-cache to find the user irrespective
+            # User may enter the handle case-insensitively
+            clean_handle = self._clean_handle(request.twitter_handle)
+            photo_url = get_photo_for_twitter_handle(clean_handle)
+        return photo_url
 
     def _clean_handle(self, twitter_handle: str) -> str:
         without_at_sign = twitter_handle.replace("@", "")
@@ -305,9 +317,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         return email_body
 
     def render_example(self, state: dict):
-        if state.get("photo_source") == "Email Address":
+        if state.get("email_address"):
             st.write("**Input Email** -", state.get("email_address"))
-        elif state.get("photo_source") == "Twitter Handle":
+        elif state.get("twitter_handle"):
             st.write("**Input Twitter Handle** -", state.get("twitter_handle"))
         output_images = state.get("output_images")
         if output_images:
