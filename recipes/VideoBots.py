@@ -1,4 +1,4 @@
-import collections
+import datetime
 import os
 import os.path
 import re
@@ -7,19 +7,33 @@ import typing
 import streamlit as st
 from furl import furl
 from pydantic import BaseModel
+from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.image_input import (
-    upload_file_from_bytes,
     truncate_text_words,
     upload_st_file,
 )
 from daras_ai_v2 import db
+from daras_ai_v2.GoogleGPT import SearchReference
 from daras_ai_v2.base import BasePage, MenuTabs
+from daras_ai_v2.doc_search_settings_widgets import (
+    doc_search_settings,
+    document_uploader,
+)
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.language_model import (
     run_language_model,
     GPT3_MAX_ALLOED_TOKENS,
     calc_gpt_tokens,
+    ConversationEntry,
+    run_chatgpt,
+    format_chatml_message,
+    CHATML_END_TOKEN,
+    CHATML_START_TOKEN,
+    LargeLanguageModels,
+    CHATML_ROLE_ASSISSTANT,
+    CHATML_ROLE_USER,
+    CHATML_ROLE_SYSTEM,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -27,11 +41,50 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
 )
+from recipes.DocSearch import (
+    get_top_k_references,
+    DocSearchPage,
+    references_as_prompt,
+)
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from routers.facebook import get_page_display_name, ig_connect_url, fb_connect_url
 
-BOT_SCRIPT_RE = re.compile(r"(\n)([\w\ ]+)(:)")
+BOT_SCRIPT_RE = re.compile(
+    # start of line
+    r"^"
+    # name of bot / user
+    r"([\w\ \t]+)"
+    # colon
+    r"\:\ ",
+    flags=re.M,
+)
+
+
+def show_landbot_widget():
+    landbot_url = st.session_state.get("landbot_url")
+    if not landbot_url:
+        return
+
+    f = furl(landbot_url)
+    config_path = os.path.join(f.host, *f.path.segments[:2])
+    config_url = f"https://storage.googleapis.com/{config_path}/index.json"
+
+    hidden_html_js(
+        """
+<script>
+// destroy existing instance
+if (top.myLandbot) {
+top.myLandbot.destroy();
+}
+// create new instance
+top.myLandbot = new top.Landbot.Livechat({
+configUrl: %r,
+});
+</script>
+        """
+        % config_url
+    )
 
 
 class VideoBotsPage(BasePage):
@@ -39,6 +92,7 @@ class VideoBotsPage(BasePage):
     slug_versions = ["video-bots"]
 
     sane_defaults = {
+        "messages": [],
         # tts
         "tts_provider": TextToSpeechProviders.GOOGLE_TTS.name,
         "google_voice_name": "en-IN-Wavenet-A",
@@ -47,6 +101,7 @@ class VideoBotsPage(BasePage):
         "uberduck_voice_name": "hecko",
         "uberduck_speaking_rate": 1.0,
         # gpt3
+        "selected_model": LargeLanguageModels.text_davinci_003.name,
         "avoid_repetition": True,
         "num_outputs": 1,
         "quality": 1.0,
@@ -57,50 +112,80 @@ class VideoBotsPage(BasePage):
         "face_padding_bottom": 10,
         "face_padding_left": 0,
         "face_padding_right": 0,
+        # doc search
+        "documents": [],
+        "task_instructions": "Make sure to use only the following search results to guide your response. "
+        'If the Search Results do not contain enough information, say "I don\'t know".',
+        "max_references": 3,
+        "max_context_words": 200,
+        "scroll_jump": 5,
     }
 
     class RequestModel(BaseModel):
         input_prompt: str
         bot_script: str | None
-        input_face: str | None
 
+        # tts settings
         tts_provider: typing.Literal[
             tuple(e.name for e in TextToSpeechProviders)
         ] | None
-
         uberduck_voice_name: str | None
         uberduck_speaking_rate: float | None
-
         google_voice_name: str | None
         google_speaking_rate: float | None
         google_pitch: float | None
 
+        # llm settings
+        selected_model: typing.Literal[
+            tuple(e.name for e in LargeLanguageModels)
+        ] | None
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
         max_tokens: int | None
         sampling_temperature: float | None
 
+        # lipsync
+        input_face: str | None
         face_padding_top: int | None
         face_padding_bottom: int | None
         face_padding_left: int | None
         face_padding_right: int | None
 
+        # conversation history/context
+        messages: list[ConversationEntry] | None
+
+        # doc search
+        task_instructions: str | None
+        documents: list[str] | None
+        max_references: int | None
+        max_context_words: int | None
+        scroll_jump: int | None
+
     class ResponseModel(BaseModel):
-        output_text: list[str]
-        output_audio: list[str]
-        output_video: list[str]
         final_prompt: str
+        output_text: list[str]
+
+        # tts
+        output_audio: list[str]
+
+        # lipsync
+        output_video: list[str]
+
+        # doc search
+        references: list[SearchReference] | None
+        search_query: str | None
 
     def related_workflows(self):
         from recipes.LipsyncTTS import LipsyncTTSPage
         from recipes.CompareText2Img import CompareText2ImgPage
         from recipes.DeforumSD import DeforumSDPage
+        from recipes.DocSearch import DocSearchPage
 
         return [
             LipsyncTTSPage,
+            DocSearchPage,
             DeforumSDPage,
-            TextToSpeechPage,
             CompareText2ImgPage,
         ]
 
@@ -137,44 +222,88 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
     def validate_form_v2(self):
-        assert st.session_state["input_prompt"], "Please type in a Messsage"
-        assert st.session_state["bot_script"], "Please provide the Bot Script"
+        # assert st.session_state["input_prompt"], "Please type in a Messsage"
+        # assert st.session_state["bot_script"], "Please provide the Bot Script"
 
         face_file = st.session_state.get("face_file")
         if face_file:
             st.session_state["input_face"] = upload_st_file(face_file)
-        assert st.session_state.get("input_face"), "Please provide the Input Face"
+        # assert st.session_state.get("input_face"), "Please provide the Input Face"
+
+        document_files: list[UploadedFile] | None = st.session_state.get(
+            "__document_files"
+        )
+        if document_files:
+            st.session_state["documents"] = [upload_st_file(f) for f in document_files]
+        # assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_settings(self):
-        st.write("#### 📝 Script")
         st.text_area(
             """
-            An example conversation with this bot (~1000 words)
+            ##### 📝 Script
+            Instructions to the bot + an example scripted conversation (~1000 words)
             """,
             key="bot_script",
             height=300,
         )
-        st.file_uploader(
+        st.write("---")
+
+        if not "__enable_audio" in st.session_state:
+            st.session_state["__enable_audio"] = bool(
+                st.session_state.get("tts_provider")
+            )
+        enable_audio = st.checkbox("Enable Audio Ouput?", key="__enable_audio")
+        if not enable_audio:
+            st.write("---")
+            st.session_state["tts_provider"] = None
+        else:
+            text_to_speech_settings()
+            st.write("---")
+
+            if not "__enable_video" in st.session_state:
+                st.session_state["__enable_video"] = bool(
+                    st.session_state.get("input_face")
+                )
+            enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
+            if not enable_video:
+                st.write("---")
+                st.session_state["input_face"] = None
+            else:
+                st.file_uploader(
+                    """
+                    #### 👩‍🦰 Input Face
+                    Upload a video/image that contains faces to use  
+                    *Recommended - mp4 / mov / png / jpg / gif* 
+                    """,
+                    key="face_file",
+                    upload_key="input_face",
+                )
+                lipsync_settings()
+                st.write("---")
+
+        document_uploader(
             """
-            #### 👩‍🦰 Input Face
-            Upload a video/image that contains faces to use  
-            *Recommended - mp4 / mov / png / jpg / gif* 
-            """,
-            key="face_file",
-            upload_key="input_face",
+##### 📄 Documents
+Enable document search, to use custom documents as information sources.
+"""
         )
+        if st.session_state.get("documents") or st.session_state.get(
+            "__document_files"
+        ):
+            st.text_area(
+                """
+##### 👩‍🏫 Task Instructions
+Use this for prompting GPT to use the document search results.
+""",
+                key="task_instructions",
+                height=100,
+            )
+            st.write("---")
 
-        st.write("---")
+            doc_search_settings()
+            st.write("---")
 
-        text_to_speech_settings()
-        st.write("---")
         language_model_settings()
-        st.write("---")
-        lipsync_settings()
-        st.write("---")
-
-        st.text_input("##### 🤖 Landbot URL", key="landbot_url")
-        self.show_landbot_widget()
 
     def fields_to_save(self) -> [str]:
         return super().fields_to_save() + ["landbot_url"]
@@ -182,7 +311,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
         if input_prompt:
-            st.markdown("Prompt ```" + input_prompt.replace("\n", "") + "```")
+            st.write(
+                "**Prompt**\n```properties\n"
+                + truncate_text_words(input_prompt, maxlen=200)
+                + "\n```"
+            )
+
+        st.write("**Response**")
 
         output_video = state.get("output_video")
         if output_video:
@@ -190,46 +325,56 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         output_text = state.get("output_text")
         if output_text:
-            st.caption(truncate_text_words(output_text[0], maxlen=200))
+            st.write(truncate_text_words(output_text[0], maxlen=200))
 
     def render_output(self):
-        st.write(f"#### 💬 Response")
-        for idx, output_text in enumerate(st.session_state.get("output_text", [])):
-            try:
-                output_video = st.session_state.get("output_video", [])[idx]
-                st.video(output_video)
-            except IndexError:
-                pass
-            st.caption(output_text.replace("\n", ""))
+        output_text = st.session_state.get("output_text", [])
+        output_video = st.session_state.get("output_video", [])
+        output_audio = st.session_state.get("output_audio", [])
+        if output_text:
+            st.write(f"#### 💌 Response")
+            for idx, text in enumerate(output_text):
+                try:
+                    st.video(output_video[idx])
+                except IndexError:
+                    try:
+                        st.audio(output_audio[idx])
+                    except IndexError:
+                        pass
+                st.write(text)
 
-    def show_landbot_widget(self):
-        landbot_url = st.session_state.get("landbot_url")
-        if not landbot_url:
-            return
+        messages = st.session_state.get("messages", [])
+        if messages and st.button("🗑️ Clear History"):
+            messages.clear()
+        if messages:
+            with st.expander(f"💬 Conversation", expanded=True):
+                for entry in messages:
+                    display_name = entry.get("display_name") or entry["role"]
+                    display_name = display_name.capitalize()
+                    st.caption(f'**_{display_name}_**\\\n{entry["content"]}')
 
-        f = furl(landbot_url)
-        config_path = os.path.join(f.host, *f.path.segments[:2])
-        config_url = f"https://storage.googleapis.com/{config_path}/index.json"
-
-        hidden_html_js(
-            """
-<script>
-// destroy existing instance
-if (top.myLandbot) {
-    top.myLandbot.destroy();
-}
-// create new instance
-top.myLandbot = new top.Landbot.Livechat({
-    configUrl: %r,
-});
-</script>
-            """
-            % config_url
-        )
+        with st.expander("💁‍♀️ Sources"):
+            for idx, ref in enumerate(st.session_state.get("references", [])):
+                st.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
+                st.text(ref["snippet"])
 
     def render_steps(self):
-        st.write("Input Face")
-        st.video(st.session_state.get("input_face"))
+        if st.session_state.get("tts_provider"):
+            st.video(st.session_state.get("input_face"), caption="Input Face")
+
+        search_query = st.session_state.get("search_query")
+        if search_query:
+            st.text_area(
+                "Document Search Query",
+                value=search_query,
+                height=100,
+                disabled=True,
+            )
+
+        references = st.session_state.get("references", [])
+        if references:
+            st.write("**References**")
+            st.json(references, expanded=False)
 
         st.text_area(
             "Final Prompt",
@@ -252,65 +397,169 @@ top.myLandbot = new top.Landbot.Livechat({
                 st.audio(audio_url)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request = self.RequestModel.parse_obj(state)
+        request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        all_names = [m.group(2) for m in BOT_SCRIPT_RE.finditer(request.bot_script)]
-        common_names = collections.Counter(all_names).most_common()
+        user_input = request.input_prompt.strip()
+        if not user_input:
+            return
+        use_chatgpt = request.selected_model == LargeLanguageModels.gpt_3_5_turbo.name
+        saved_msgs = request.messages.copy()
+        bot_script = request.bot_script
 
-        try:
-            user_script_name, bot_script_name = (
-                common_names[0][0].strip(),
-                common_names[1][0].strip(),
+        # run regex to find scripted messages in script text
+        script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
+        # extract system message from script
+        system_message = bot_script
+        if script_matches:
+            system_message = system_message[: script_matches[0].start()]
+        system_message = system_message.strip()
+        # extract pre-scripted messages from script
+        scripted_msgs = []
+        for idx in range(len(script_matches)):
+            match = script_matches[idx]
+            try:
+                next_match = script_matches[idx + 1]
+            except IndexError:
+                next_match_start = None
+            else:
+                next_match_start = next_match.start()
+            if (len(script_matches) - idx) % 2 == 0:
+                role = CHATML_ROLE_USER
+            else:
+                role = CHATML_ROLE_ASSISSTANT
+            scripted_msgs.append(
+                {
+                    "role": role,
+                    "display_name": match.group(1).strip(),
+                    "content": bot_script[match.end() : next_match_start].strip(),
+                }
             )
+
+        # get user/bot display names
+        try:
+            bot_display_name = scripted_msgs[-1]["display_name"]
         except IndexError:
-            user_script_name = "User"
-            bot_script_name = "Bot"
+            bot_display_name = CHATML_ROLE_ASSISSTANT
+        try:
+            user_display_name = scripted_msgs[-2]["display_name"]
+        except IndexError:
+            user_display_name = CHATML_ROLE_USER
 
-        username = user_script_name
-        current_user = st.session_state.get("_current_user")
-        if current_user and current_user.display_name:
-            username = current_user.display_name
+        # add user input to conversation
+        saved_msgs.append(
+            {
+                "role": CHATML_ROLE_USER,
+                "display_name": user_display_name,
+                "content": user_input,
+            }
+        )
 
-        prompt = request.bot_script.strip()
-        prompt = prompt.format(username=username)
+        # if documents are provided, run doc search and include results in system message
+        if request.documents:
+            # formulate the search query as a history of all the messages
+            state["search_query"] = "\n\n".join(msg["content"] for msg in saved_msgs)
+            # perform doc search
+            references = yield from get_top_k_references(
+                DocSearchPage.RequestModel.parse_obj(state)
+            )
+            state["references"] = references
+            # if doc search is successful, add the search results to the prompt
+            if references:
+                system_message += (
+                    "\n"
+                    + request.task_instructions.strip()
+                    + "\n\n"
+                    + references_as_prompt(references)
+                )
 
-        # user input -- User: <input>
-        prompt += f"\n{user_script_name}: {request.input_prompt.strip()}"
+        if not use_chatgpt:
+            # assistant prompt to triger a model response
+            saved_msgs.append(
+                {
+                    "role": CHATML_ROLE_ASSISSTANT,
+                    "display_name": bot_display_name,
+                    "content": "",
+                }
+            )
 
-        # completion prompt for openai -- Bot:
-        prompt += f"\n{bot_script_name}:"
-
+        all_messages = scripted_msgs + saved_msgs
+        # add the system message
+        if system_message:
+            # replace current user's name
+            current_user = st.session_state.get("_current_user")
+            if current_user and current_user.display_name:
+                system_message = system_message.format(
+                    username=current_user.display_name
+                )
+            # add time to prompt
+            utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
+            system_message = system_message.replace("{{ datetime.utcnow }}", utcnow)
+            # insert to top
+            all_messages.insert(
+                0, {"role": CHATML_ROLE_SYSTEM, "content": system_message}
+            )
+        # use the entire conversation as the prompt
+        prompt = "\n".join(format_chatml_message(entry) for entry in all_messages)
         state["final_prompt"] = prompt
-
-        yield "Running GPT-3..."
-
+        # ensure input script is not too big
         max_allowed_tokens = GPT3_MAX_ALLOED_TOKENS - calc_gpt_tokens(prompt)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
-
         if max_allowed_tokens < 0:
             raise ValueError("Input Script is too long! Please reduce the script size.")
 
-        state["output_text"] = run_language_model(
-            api_provider="openai",
-            engine="text-davinci-003",
-            quality=request.quality,
-            num_outputs=request.num_outputs,
-            temperature=request.sampling_temperature,
-            prompt=prompt,
-            max_tokens=max_allowed_tokens,
-            stop=[f"{user_script_name}:", f"{bot_script_name}:"],
-            avoid_repetition=request.avoid_repetition,
-        )
+        if use_chatgpt:
+            yield "Running ChatGPT..."
+            output_messages = run_chatgpt(
+                messages=[
+                    {"role": s["role"], "content": s["content"]} for s in all_messages
+                ],
+                max_tokens=max_allowed_tokens,
+                # quality=request.quality,
+                num_outputs=request.num_outputs,
+                temperature=request.sampling_temperature,
+                avoid_repetition=request.avoid_repetition,
+            )
+            # save model response
+            saved_msgs.append(
+                {
+                    "role": CHATML_ROLE_ASSISSTANT,
+                    "display_name": bot_display_name,
+                    "content": output_messages[0]["content"],
+                }
+            )
+            state["output_text"] = [entry["content"] for entry in output_messages]
+        else:
+            # assistant prompt to triger a model response
+            yield f"Running GPT-3..."
+            state["output_text"] = run_language_model(
+                model=request.selected_model,
+                quality=request.quality,
+                num_outputs=request.num_outputs,
+                temperature=request.sampling_temperature,
+                prompt=prompt,
+                max_tokens=max_allowed_tokens,
+                stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
+                avoid_repetition=request.avoid_repetition,
+            )
+            # save model response
+            saved_msgs[-1]["content"] = state["output_text"][0]
 
-        tts_state = dict(state)
+        state["messages"] = saved_msgs
+        st.session_state["messages"] = saved_msgs
         state["output_audio"] = []
+        state["output_video"] = []
+
+        if not request.tts_provider:
+            return
+        tts_state = dict(state)
         for text in state["output_text"]:
             tts_state["text_prompt"] = text
             yield from TextToSpeechPage().run(tts_state)
             state["output_audio"].append(tts_state["audio_url"])
 
+        if not request.input_face:
+            return
         lip_state = dict(state)
-        state["output_video"] = []
         for audio_url in state["output_audio"]:
             lip_state["input_audio"] = audio_url
             yield from LipsyncPage().run(lip_state)
@@ -324,37 +573,45 @@ top.myLandbot = new top.Landbot.Livechat({
     def render_selected_tab(self, selected_tab):
         super().render_selected_tab(selected_tab)
 
-        if selected_tab != MenuTabs.integrations:
-            return
+        if selected_tab == MenuTabs.integrations:
+            user = st.session_state.get("_current_user")
+            if not user or hasattr(user, "_is_anonymous"):
+                st.write(
+                    "**Please Login to connect this workflow to Your Website, Instagram, Whatsapp & More**"
+                )
+                return
 
-        user = st.session_state.get("_current_user")
-        if not user or hasattr(user, "_is_anonymous"):
-            st.write(
-                "**Please Login to connect this workflow to Your Website, Instagram, Whatsapp & More**"
-            )
-            return
+            self.messenger_bot_integration(user)
+            st.write("---")
 
+            st.text_input("#### 🤖 Landbot URL", key="landbot_url")
+            st.write("---")
+
+        show_landbot_widget()
+
+    def messenger_bot_integration(self, user):
         st.write("### Messenger Bot")
 
         st.markdown(
+            # language=html
             f"""
-            <!--
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
-                  <img height="20" src="https://www.instagram.com/favicon.ico">️
-                  &nbsp; 
-                  Add Your Instagram Page
-                </a>
-            </div>
-            -->
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
-                  <img height="20" src="https://www.facebook.com/favicon.ico">️             
-                  &nbsp; 
-                  Add Your Facebook Page
-                </a>
-            </div>
-            """,
+<!--
+<div style='height: 50px'>
+    <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
+      <img height="20" src="https://www.instagram.com/favicon.ico">️
+      &nbsp; 
+      Add Your Instagram Page
+    </a>
+</div>
+-->
+<div style='height: 50px'>
+    <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
+      <img height="20" src="https://www.facebook.com/favicon.ico">️             
+      &nbsp; 
+      Add Your Facebook Page
+    </a>
+</div>
+""",
             unsafe_allow_html=True,
         )
 

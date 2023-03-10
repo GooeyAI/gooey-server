@@ -215,7 +215,6 @@ Number of animation frames.
         ), "Please make sure that Frame Count matches the Animation Prompts"
 
     def render_settings(self):
-
         col1, col2 = st.columns(2)
         with col1:
             animation_mode = st.selectbox(
@@ -341,7 +340,7 @@ Choose fps for the video.
         blob = storage_blob_for(f"gooey.ai animation {request.animation_prompts}.mp4")
 
         r = requests.post(
-            GpuEndpoints.defourm_sd + f"/deforum/",
+            GpuEndpoints.defourm_sd,
             json={
                 "pipeline": dict(
                     model_id="Protogen_V2.2.ckpt",

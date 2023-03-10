@@ -8,6 +8,8 @@ from furl import furl
 from streamlit.runtime.state import get_session_state
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
+from daras_ai_v2.gdrive_downloader import is_gdrive_url
+
 
 def patch(*targets):
     def decorator(patch_fn):
@@ -66,33 +68,33 @@ def video_patch(self, value, *args, caption=None, **kwargs):
 
 @patch(st.file_uploader)
 def file_uploader_patch(self, *args, upload_key=None, **kwargs):
-    retval = value = self(*args, **kwargs)
-
-    if not isinstance(value, list):
-        value = [value]
-    uploaded_value = st.session_state.get(upload_key)
-    if not isinstance(uploaded_value, list):
-        uploaded_value = [uploaded_value]
-    for args in zip_longest(value, uploaded_value):
-        _render_preview(*args)
-
+    retval = self(*args, **kwargs)
+    uploaded_files = st.session_state.get(upload_key)
+    _render_preview(retval or uploaded_files)
     return retval
 
 
-def _render_preview(local_file: UploadedFile | None, upload_url: str | None):
-    is_local = bool(local_file)
-    is_uploaded = not is_local and bool(upload_url)
+def _render_preview(file: list | UploadedFile | str | None):
+    if isinstance(file, list):
+        for item in file:
+            _render_preview(item)
+        return
 
-    # render preview from local file / uploaded file
+    is_local = isinstance(file, UploadedFile)
+    is_uploaded = isinstance(file, str)
+
+    # determine appropriate filename
     if is_local:
-        preview = local_file
-        filename = local_file.name
+        filename = file.name
     elif is_uploaded:
-        preview = upload_url
-        try:
-            filename = furl(preview).path.segments[-1]
-        except IndexError:
-            return
+        f = furl(file)
+        if is_gdrive_url(f):
+            filename = str(f)
+        else:
+            try:
+                filename = f.path.segments[-1]
+            except IndexError:
+                return
     else:
         return
 
@@ -100,14 +102,14 @@ def _render_preview(local_file: UploadedFile | None, upload_url: str | None):
     with col:
         # if uploaded file, display a link to it
         if is_uploaded:
-            st.write(f"🔗 [*{filename}*]({preview})")
+            st.write(f"🔗[*{filename}*]({file})")
         # render preview as video/image
         ext = os.path.splitext(filename)[-1].lower()
         match ext:
             case ".mp4" | ".mov" | ".ogg":
-                st.video(preview)
+                st.video(file)
             case ".png" | ".jpg" | ".jpeg" | ".gif" | ".webp" | ".tiff":
-                st.image(preview)
+                st.image(file)
 
 
 @patch(st.text_input, st.text_area)

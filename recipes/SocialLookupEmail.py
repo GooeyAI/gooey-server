@@ -7,7 +7,7 @@ import streamlit as st
 
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.language_model import run_language_model
+from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/email%20ver%202.png"
@@ -16,6 +16,10 @@ DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG = "https://storage.googleapis.com/dara-c1b5
 class SocialLookupEmailPage(BasePage):
     title = "Profile Lookup + GPT3 for AI-Personalized Emails"
     slug_versions = ["SocialLookupEmail", "email-writer-with-profile-lookup"]
+
+    sane_defaults = {
+        "selected_model": LargeLanguageModels.text_davinci_003.name,
+    }
 
     class RequestModel(BaseModel):
         email_address: str
@@ -29,6 +33,9 @@ class SocialLookupEmailPage(BasePage):
         domain: str | None
         key_words: str | None
 
+        selected_model: typing.Literal[
+            tuple(e.name for e in LargeLanguageModels)
+        ] | None
         sampling_temperature: float | None
         max_tokens: int | None
 
@@ -44,13 +51,14 @@ class SocialLookupEmailPage(BasePage):
         from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
         from recipes.SEOSummary import SEOSummaryPage
         from recipes.VideoBots import VideoBotsPage
-        from recipes.GoogleImageGen import GoogleImageGenPage
+
+        from daras_ai_v2.GoogleGPT import GoogleGPTPage
 
         return [
-            EmailFaceInpaintingPage,
+            GoogleGPTPage,
             SEOSummaryPage,
             VideoBotsPage,
-            GoogleImageGenPage,
+            EmailFaceInpaintingPage,
         ]
 
     def preview_image(self, state: dict) -> str | None:
@@ -160,14 +168,12 @@ class SocialLookupEmailPage(BasePage):
         yield "Running GPT-3..."
 
         state["output_email_body"] = run_language_model(
-            api_provider="openai",
-            engine="text-davinci-003",
+            model=request.selected_model,
             quality=1,
             num_outputs=1,
             temperature=request.sampling_temperature,
             prompt=state["final_prompt"],
             max_tokens=request.max_tokens,
-            stop=None,
         )[0]
 
     def _input_variables(self, state: dict):

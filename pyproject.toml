@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 streamlit = "^1.15.2"
-openai = "0.25.0"
+openai = "0.27.0"
 python-decouple = "^3.6"
 requests = "^2.28.1"
 glom = "^22.1.0"
@@ -47,6 +47,8 @@ requests-html = "^0.10.0"
 pdftotext = "^2.2.2"
 "pdfminer.six" = "^20221105"
 pinecone-client = {extras = ["grpc"], version = "^2.2.0"}
+google-api-python-client = "^2.80.0"
+oauth2client = "^4.1.3"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"
