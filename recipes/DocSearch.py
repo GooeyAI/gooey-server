@@ -24,12 +24,19 @@ from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
 )
+from daras_ai_v2.gdrive_downloader import (
+    gdrive_download,
+    is_gdrive_url,
+    url_to_gdrive_file_id,
+    gdrive_metadata,
+)
 from daras_ai_v2.language_model import (
     run_language_model,
     get_embeddings,
     LargeLanguageModels,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
 
@@ -87,7 +94,13 @@ class DocSearchPage(BasePage):
             "__document_files"
         )
         if document_files:
-            st.session_state["documents"] = [upload_st_file(f) for f in document_files]
+            uploaded = []
+            for f in document_files:
+                if f.name == "urls.txt":
+                    uploaded.extend(f.getvalue().decode().splitlines())
+                else:
+                    uploaded.append(upload_st_file(f))
+            st.session_state["documents"] = uploaded
         assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def related_workflows(self) -> list:
@@ -168,6 +181,9 @@ class DocSearchPage(BasePage):
 
         st.write("**References**")
         st.json(st.session_state.get("references", []), expanded=False)
+
+    def render_usage_guide(self):
+        youtube_video("Xe4L_dQ2KvU")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: DocSearchPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -251,21 +267,51 @@ Snippet: """
     )
 
 
+def doc_url_to_embeds(
+    *,
+    f_url: str,
+    max_context_words: int,
+    scroll_jump: int,
+):
+    f = furl(f_url)
+    if is_gdrive_url(f):
+        # extract filename from google drive metadata
+        meta = gdrive_metadata(url_to_gdrive_file_id(f))
+        f_name = meta["name"]
+        f_etag = meta.get("md5Checksum") or meta.get("modifiedTime")
+    else:
+        # extract filename from url
+        f_name = f.path.segments[-1]
+        f_etag = None
+    return _doc_url_to_embeds(
+        f_url=f_url,
+        f_name=f_name,
+        f_etag=f_etag,
+        max_context_words=max_context_words,
+        scroll_jump=scroll_jump,
+    )
+
+
 @st.cache_data(show_spinner=False)
-def doc_url_to_embeds(*, f_url: str, max_context_words: int, scroll_jump: int):
-    f_name, pages = doc_url_to_text_pages(f_url)
-    full_text = "\n\n".join(pages)
-    # fix word breaks to the next line
-    full_text = word_breaks_re.sub(" - ", full_text)
+def _doc_url_to_embeds(
+    *,
+    f_url: str,
+    f_name: str,
+    f_etag: str | None,  # used as cache key
+    max_context_words: int,
+    scroll_jump: int,
+):
+    pages = doc_url_to_text_pages(f_url, f_name)
     # split document into chunks
-    texts = list(document_splitter(full_text, max_context_words, scroll_jump))
+    chunks = list(document_splitter(pages, max_context_words, scroll_jump))
+    texts = [snippet for page_num, snippet in chunks]
     metas = [
         {
-            "url": f_url,
+            "url": f_url + (f"#page={page}" if len(pages) > 1 else ""),
             "title": f_name,
             "snippet": snippet,
         }
-        for snippet in texts
+        for page, snippet in chunks
     ]
     # get doc embeds in batches
     embeds = []
@@ -279,10 +325,14 @@ def doc_url_to_embeds(*, f_url: str, max_context_words: int, scroll_jump: int):
     return zip(metas, embeds)
 
 
-def doc_url_to_text_pages(f_url: str) -> (str, list[str]):
-    # get document data from url
-    f_name = furl(f_url).path.segments[-1]
-    f_bytes = requests.get(f_url).content
+def doc_url_to_text_pages(f_url: str, f_name: str) -> list[str]:
+    f = furl(f_url)
+    if is_gdrive_url(f):
+        # download from google drive
+        f_bytes = gdrive_download(f)
+    else:
+        # download from url
+        f_bytes = requests.get(f_url).content
     # convert document to text
     ext = os.path.splitext(f_name)[-1].lower()
     match ext:
@@ -290,11 +340,11 @@ def doc_url_to_text_pages(f_url: str) -> (str, list[str]):
             pages = pdf_to_text_pages(io.BytesIO(f_bytes))
         case ".docx" | ".md" | ".html":
             pages = [pandoc_to_text(f_name, f_bytes)]
-        case ".txt":
+        case ".txt" | "":
             pages = [f_bytes.decode()]
         case _:
-            raise ValueError(f"Unsupported document format {ext!r}")
-    return f_name, pages
+            raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
+    return pages
 
 
 get_embeddings_cached = st.cache_data(show_spinner=False)(get_embeddings)
@@ -351,7 +401,9 @@ fragment_split_re = re.compile(
 )
 
 
-def split_text_into_fragments(text):
+def split_text_into_fragments(text: str):
+    # fix word breaks to the next line
+    text = word_breaks_re.sub(" - ", text)
     last_idx = 0
     for match in fragment_split_re.finditer(text):
         end_char = match.group(2) or ""
@@ -360,6 +412,7 @@ def split_text_into_fragments(text):
         if frag:
             yield frag
         last_idx = match.end()
+    yield text[last_idx:]
 
 
 word_breaks_re = re.compile(
@@ -371,10 +424,14 @@ word_breaks_re = re.compile(
 )
 
 
-def document_splitter(full_text, max_context_words, scroll_jump):
+def document_splitter(pages: list[str], max_context_words: int, scroll_jump: int):
     window = deque()
     # split text into fragments
-    all_frags = list(split_text_into_fragments(full_text))
+    all_frags = [
+        (idx + 1, frag)
+        for idx, page in enumerate(pages)
+        for frag in split_text_into_fragments(page)
+    ]
     for idx in range(len(all_frags)):
         # add this fragment to the window
         window.append(all_frags[idx])
@@ -386,12 +443,12 @@ def document_splitter(full_text, max_context_words, scroll_jump):
         else:
             # calculate the size of window + next fragment
             next_window = [*window, next_frag]
-            next_window_words = sum(len(re.split(r"\s+", para)) for para in next_window)
+            next_window_words = sum(len(w[1].split()) for w in next_window)
             # next fragment can be safely used without exhausing context, continue expanding
             if next_window_words <= max_context_words:
                 continue
         # send off this window as a chunk
-        yield "\n".join(window)
+        yield window[0][0], "\n".join(w[1] for w in window)
         # scroll jump - remove fragments from the start of window
         for _ in range(scroll_jump):
             try:

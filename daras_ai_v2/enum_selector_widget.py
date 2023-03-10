@@ -46,12 +46,21 @@ def enum_multiselect(
 def enum_selector(
     enum_cls: E,
     label: str = "",
+    allow_none: bool = False,
+    use_selectbox: bool = False,
     **kwargs,
 ) -> str:
     label = label or enum_cls.__name__
-    return st.radio(
+    options = [e.name for e in enum_cls]
+    if allow_none:
+        options.insert(0, None)
+    if use_selectbox:
+        widget = st.selectbox
+    else:
+        widget = st.radio
+    return widget(
         **kwargs,
-        options=[e.name for e in enum_cls],
-        format_func=lambda k: enum_cls[k].value,
+        options=options,
+        format_func=lambda k: enum_cls[k].value if k else "———",
         label=label,
     )
