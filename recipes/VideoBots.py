@@ -465,11 +465,12 @@ Use this for prompting GPT to use the document search results.
             state["references"] = references
             # if doc search is successful, add the search results to the prompt
             if references:
-                system_message += (
-                    "\n"
-                    + request.task_instructions.strip()
+                system_message = (
+                    references_as_prompt(references)
                     + "\n\n"
-                    + references_as_prompt(references)
+                    + system_message
+                    + "\n"
+                    + request.task_instructions.strip()
                 )
 
         if not use_chatgpt:
@@ -485,12 +486,12 @@ Use this for prompting GPT to use the document search results.
         all_messages = scripted_msgs + saved_msgs
         # add the system message
         if system_message:
-            # replace current user's name
-            current_user = st.session_state.get("_current_user")
-            if current_user and current_user.display_name:
-                system_message = system_message.format(
-                    username=current_user.display_name
-                )
+            # # replace current user's name
+            # current_user = st.session_state.get("_current_user")
+            # if current_user and current_user.display_name:
+            #     system_message = system_message.format(
+            #         username=current_user.display_name
+            #     )
             # add time to prompt
             utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
             system_message = system_message.replace("{{ datetime.utcnow }}", utcnow)

@@ -1,3 +1,4 @@
+import re
 import typing
 from enum import Enum
 from functools import wraps
@@ -17,6 +18,16 @@ _gpt2_tokenizer = None
 
 openai.api_key = settings.OPENAI_API_KEY
 openai.api_base = "https://api.openai.com/v1"
+
+
+DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
+
+CHATML_START_TOKEN = "<|im_start|>"
+CHATML_END_TOKEN = "<|im_end|>"
+
+CHATML_ROLE_SYSTEM = "system"
+CHATML_ROLE_ASSISSTANT = "assistant"
+CHATML_ROLE_USER = "user"
 
 
 class LargeLanguageModels(Enum):
@@ -144,14 +155,9 @@ def run_language_model(
 
     match model:
         case LargeLanguageModels.gpt_3_5_turbo.name:
+            is_chatml, messages = parse_chatml(prompt)
             messages = run_chatgpt(
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an intelligent AI assistant. Follow the instructions as closely as possible.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
+                messages=messages,
                 max_tokens=max_tokens,
                 # quality=quality,
                 num_outputs=num_outputs,
@@ -159,7 +165,10 @@ def run_language_model(
                 stop=stop,
                 avoid_repetition=avoid_repetition,
             )
-            return [entry["content"] for entry in messages]
+            return [
+                format_chatml_message(entry) if is_chatml else entry["content"]
+                for entry in messages
+            ]
         case LargeLanguageModels.text_davinci_003.name:
             engine = "text-davinci-003"
         case LargeLanguageModels.code_davinci_002.name:
@@ -187,14 +196,6 @@ def run_language_model(
     return [choice["text"].strip() for choice in r["choices"]]
 
 
-CHATML_START_TOKEN = "<|im_start|>"
-CHATML_END_TOKEN = "<|im_end|>"
-
-CHATML_ROLE_SYSTEM = "system"
-CHATML_ROLE_ASSISSTANT = "assistant"
-CHATML_ROLE_USER = "user"
-
-
 def format_chatml_message(entry: ConversationEntry) -> str:
     msg = CHATML_START_TOKEN + entry["role"]
     content = entry.get("content")
@@ -204,3 +205,31 @@ def format_chatml_message(entry: ConversationEntry) -> str:
     if content:
         msg += "\n" + content + CHATML_END_TOKEN
     return msg
+
+
+chatml_re = re.compile(
+    re.escape(CHATML_START_TOKEN) + r"(.*)$",
+    flags=re.M,
+)
+
+
+def parse_chatml(prompt: str) -> (bool, list[dict]):
+    splits = chatml_re.split(prompt)
+    is_chatml = len(splits) > 1
+    if is_chatml:
+        messages = []
+        for i in range(1, len(splits) - 1, 2):
+            role = splits[i].strip()
+            content = (
+                splits[i + 1]
+                .replace(CHATML_START_TOKEN, "")
+                .replace(CHATML_END_TOKEN, "")
+                .strip()
+            )
+            messages.append({"role": role, "content": content})
+    else:
+        messages = [
+            {"role": "system", "content": DEFAULT_SYSTEM_MSG},
+            {"role": "user", "content": prompt},
+        ]
+    return is_chatml, messages
