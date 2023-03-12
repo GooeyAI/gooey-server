@@ -88,6 +88,7 @@ templates = Jinja2Templates(directory="templates")
 FB_APP_ID = config("FB_APP_ID", "")
 FB_APP_SECRET = config("FB_APP_SECRET", "")
 FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
+WHATSAPP_ACCESS_TOKEN = config("WHATSAPP_ACCESS_TOKEN", None)
 
 TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
 TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")

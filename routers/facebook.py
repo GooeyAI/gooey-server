@@ -1,5 +1,6 @@
 from functools import partial
 
+import glom
 import requests
 from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
@@ -25,19 +26,116 @@ PAGE_NOT_CONNECTED_ERROR = (
 async def fb_webhook(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     print(data)
-    object_ = data.get("object")
+    object_name = data.get("object")
     for entry in data.get("entry", []):
-        for messaging in entry.get("messaging", []):
-            message = messaging.get("message")
-            if not message:
-                continue
-            if message.get("is_echo"):
-                continue
-            background_tasks.add_task(_on_message, object_, messaging)
+        match object_name:
+            # handle whatsapp messages
+            case "whatsapp_business_account":
+                value = glom.glom(entry, "changes.0.value", default={})
+                for message in value.get("messages", []):
+                    background_tasks.add_task(
+                        _on_wa_message, message, value["metadata"]
+                    )
+            # handle fb/insta messages
+            case "instagram" | "page":
+                for messaging in entry.get("messaging", []):
+                    message = messaging.get("message")
+                    if not message:
+                        continue
+                    # handle echo of bot sent messags
+                    if message.get("is_echo"):
+                        continue
+                    background_tasks.add_task(_on_message, object_name, messaging)
     return Response("OK")
 
 
-def _on_message(object_: str, messaging: dict):
+def _on_wa_message(message: dict, metadata: dict):
+    from server import call_api, page_map, normalize_slug
+    from recipes.VideoBots import VideoBotsPage
+
+    match message["type"]:
+        case "text":
+            phone_number_id = metadata["phone_number_id"]
+            # send read receipt
+            r = requests.post(
+                f"https://graph.facebook.com/v16.0/{phone_number_id}/messages",
+                headers={
+                    "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
+                },
+                json={
+                    "messaging_product": "whatsapp",
+                    "status": "read",
+                    "message_id": message["id"],
+                },
+            )
+            print(r.status_code, r.json())
+            # make API call
+            text = message["text"]["body"]
+            result = call_api(
+                page_cls=VideoBotsPage,
+                user=auth.get_user("BdKPkn4uZ1Ys0vXTnxNnyPyXixt1"),
+                request_body={
+                    "input_prompt": text,
+                },
+                query_params={
+                    "example_id": "hho7u0f4",
+                },
+            )
+            # result = {"output": {"output_text": ["echo:" + text]}}
+            response_text = result["output"]["output_text"][0]
+            # send reply
+            try:
+                response_video = result["output"]["output_video"][0]
+            except (KeyError, IndexError):
+                # text message
+                replies = [
+                    {
+                        "type": "text",
+                        "text": {"body": response_text},
+                    },
+                ]
+                try:
+                    response_audio = result["output"]["output_audio"][0]
+                except (KeyError, IndexError):
+                    pass
+                else:
+                    # audio doesn't support captions
+                    replies.append(
+                        {
+                            "type": "audio",
+                            "audio": {"link": response_audio},
+                        },
+                    )
+            else:
+                # video message with caption
+                replies = [
+                    {
+                        "type": "video",
+                        "video": {"link": response_video, "caption": response_text},
+                    }
+                ]
+            send_wa_messages(
+                phone_number_id=phone_number_id, to=message["from"], messages=replies
+            )
+
+
+def send_wa_messages(*, phone_number_id, to, messages: list):
+    for msg in messages:
+        r = requests.post(
+            f"https://graph.facebook.com/v16.0/{phone_number_id}/messages",
+            headers={
+                "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
+            },
+            json={
+                "messaging_product": "whatsapp",
+                "to": to,
+                **msg,
+            },
+        )
+        print(r.status_code, r.json())
+
+
+def _on_message(object_name: str, messaging: dict):
     text = messaging["message"].get("text")
     if not text:
         return
@@ -45,7 +143,7 @@ def _on_message(object_: str, messaging: dict):
     sender_id = messaging["sender"]["id"]
     recipient_id = messaging["recipient"]["id"]
 
-    if object_ == "instagram":
+    if object_name == "instagram":
         try:
             snapshot = list(
                 db.get_collection_ref(db.FB_PAGES_COLLECTION)
@@ -56,7 +154,7 @@ def _on_message(object_: str, messaging: dict):
         except IndexError:
             return
         page_id = snapshot.id
-    elif object_ == "page":
+    elif object_name == "page":
         page_id = recipient_id
         snapshot = db.get_fb_page_ref(page_id).get()
     else:
@@ -71,7 +169,7 @@ def _on_message(object_: str, messaging: dict):
     if not access_token:
         return
 
-    if object_ == "page":
+    if object_name == "page":
         _send_messages(
             page_id=page_id,
             access_token=access_token,
@@ -112,20 +210,40 @@ def _on_message(object_: str, messaging: dict):
         },
         query_params=fb_page.get("connected_query_params") or {},
     )
-    response_text = result["output"]["output_text"][0]
-    response_video = result["output"]["output_video"][0]
 
-    _send_messages(
-        page_id=page_id,
-        access_token=access_token,
-        recipient_id=sender_id,
-        messages=[
-            {
-                "messaging_type": "RESPONSE",
-                "message": {
-                    "text": response_text,
-                },
+    response_text = result["output"]["output_text"][0]
+    messages = [
+        {
+            "messaging_type": "RESPONSE",
+            "message": {
+                "text": response_text,
             },
+        },
+    ]
+
+    try:
+        response_video = result["output"]["output_video"][0]
+    except (KeyError, IndexError):
+        try:
+            response_audio = result["output"]["output_audio"][0]
+        except (KeyError, IndexError):
+            pass
+        else:
+            messages.append(
+                {
+                    "messaging_type": "RESPONSE",
+                    "message": {
+                        "attachment": {
+                            "type": "audio",
+                            "payload": {
+                                "url": response_audio,
+                            },
+                        },
+                    },
+                },
+            )
+    else:
+        messages.append(
             {
                 "messaging_type": "RESPONSE",
                 "message": {
@@ -137,7 +255,13 @@ def _on_message(object_: str, messaging: dict):
                     },
                 },
             },
-        ],
+        )
+
+    _send_messages(
+        page_id=page_id,
+        access_token=access_token,
+        recipient_id=sender_id,
+        messages=messages,
     )
 
 
