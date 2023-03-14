@@ -309,7 +309,7 @@ def _doc_url_to_embeds(
     metas = [
         {
             "url": f_url + (f"#page={page}" if len(pages) > 1 else ""),
-            "title": f_name,
+            "title": f_name + (f" - Page {page}" if len(pages) > 1 else ""),
             "snippet": snippet,
         }
         for page, snippet in chunks
