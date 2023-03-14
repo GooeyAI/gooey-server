@@ -14,6 +14,7 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 from recipes.FaceInpainting import FaceInpaintingPage
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+twitter_handle_regex = r"(@)?[A-Za-z0-9_]{1,15}"
 
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
@@ -29,10 +30,12 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         "guidance_scale": 7.5,
         "seed": 42,
         "upscale_factor": 1.0,
+        "twitter_handle": "seanb",
     }
 
     class RequestModel(BaseModel):
-        email_address: str
+        email_address: str | None
+        twitter_handle: str | None
 
         text_prompt: str
 
@@ -110,26 +113,57 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             key="text_prompt",
             placeholder="winter's day in paris",
         )
+        if "__photo_source" not in st.session_state:
+            st.session_state["__photo_source"] = (
+                "Email Address"
+                if st.session_state.get("email_address")
+                else "Twitter Handle"
+            )
 
-        st.text_input(
+        source = st.radio(
             """
-            ### Email Address
-            Give us your email address and we'll try to get your photo 
-            """,
-            key="email_address",
-            placeholder="john@appleseed.com",
+            ### Photo Source
+            From where we should get the photo?""",
+            options=["Email Address", "Twitter Handle"],
+            key="__photo_source",
         )
+        if source == "Email Address":
+            st.text_input(
+                """
+                #### Email Address
+                Give us your email address and we'll try to get your photo 
+                """,
+                key="email_address",
+                placeholder="john@appleseed.com",
+            )
+            st.session_state["twitter_handle"] = None
+        else:
+            st.text_input(
+                """
+                #### Twitter Handle
+                Give us your twitter handle, we'll try to get your photo from there
+                """,
+                key="twitter_handle",
+                max_chars=15,
+            )
+            st.session_state["email_address"] = None
 
     def validate_form_v2(self):
         text_prompt = st.session_state.get("text_prompt")
         email_address = st.session_state.get("email_address")
-        assert (
-            text_prompt and email_address
-        ), "Please provide a Prompt and your Email Address"
+        twitter_handle = st.session_state.get("twitter_handle")
+        assert text_prompt, "Please provide a Prompt and your Email Address"
 
-        assert re.fullmatch(
-            email_regex, email_address
-        ), "Please provide a valid Email Address"
+        if st.session_state.get("twitter_handle"):
+            assert re.fullmatch(
+                twitter_handle_regex, twitter_handle
+            ), "Please provide a valid Twitter Handle"
+        elif st.session_state.get("email_address"):
+            assert re.fullmatch(
+                email_regex, email_address
+            ), "Please provide a valid Email Address"
+        else:
+            raise AssertionError("Please provide an Email Address or Twitter Handle")
 
         from_email = st.session_state.get("email_from")
         email_subject = st.session_state.get("email_subject")
@@ -208,8 +242,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         )
 
         yield "Fetching profile..."
-
-        photo_url = get_photo_for_email(request.email_address)
+        photo_url = self._get_photo_url(request)
         if photo_url:
             state["input_image"] = photo_url
             yield from super().run(state)
@@ -233,6 +266,21 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             raise ImageNotFound(
                 "This email has no photo with a face in it. Try [Face in an AI Image](/face-in-ai-generated-photo/) workflow instead."
             )
+
+    def _get_photo_url(self, request):
+        if request.email_address:
+            photo_url = get_photo_for_email(request.email_address)
+        else:
+            # For twitter-photo-cache to find the user irrespective
+            # User may enter the handle case-insensitively
+            clean_handle = self._clean_handle(request.twitter_handle)
+            photo_url = get_photo_for_twitter_handle(clean_handle)
+        return photo_url
+
+    def _clean_handle(self, twitter_handle: str) -> str:
+        without_at_sign = twitter_handle.replace("@", "")
+        lower_case_handle = without_at_sign.lower()
+        return lower_case_handle
 
     def _get_email_body(
         self,
@@ -269,7 +317,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         return email_body
 
     def render_example(self, state: dict):
-        st.write("**Input Email** -", state.get("email_address"))
+        if state.get("email_address"):
+            st.write("**Input Email** -", state.get("email_address"))
+        elif state.get("twitter_handle"):
+            st.write("**Input Twitter Handle** -", state.get("twitter_handle"))
         output_images = state.get("output_images")
         if output_images:
             for img in output_images:
@@ -286,6 +337,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
 class ImageNotFound(Exception):
     "Raised when the image not found in email profile"
+    pass
+
+
+class TwitterError(Exception):
+    "Raised when the twitter handle Lookup returns an error"
     pass
 
 
@@ -321,6 +377,37 @@ def get_photo_for_email(email_address):
         )
         doc_ref.set({"photo_url": photo_url})
 
+        return photo_url
+
+
+@st.cache_data()
+def get_photo_for_twitter_handle(twitter_handle):
+    doc_ref = db.get_doc_ref(twitter_handle, collection_id="twitter_photo_cache")
+
+    doc = db.get_or_create_doc(doc_ref).to_dict()
+    photo_url = doc.get("photo_url")
+    if photo_url:
+        return photo_url
+    r = requests.get(
+        f"https://api.twitter.com/2/users/by?usernames={twitter_handle}&user.fields=profile_image_url",
+        headers={"Authorization": f"Bearer {settings.TWITTER_BEARER_TOKEN}"},
+    )
+    r.raise_for_status()
+    error = glom.glom(r.json(), "errors.0.title", default=None)
+    if error:
+        if error == "Not Found Error":
+            raise TwitterError("Twitter handle does not exist")
+        raise TwitterError(error)
+
+    twitter_photo_url_normal = glom.glom(
+        r.json(), "data.0.profile_image_url", default=None
+    )
+    if twitter_photo_url_normal:
+        original_photo_url = twitter_photo_url_normal.replace("_normal", "")
+        photo_url = upload_file_from_bytes(
+            "face_photo.png", requests.get(original_photo_url).content
+        )
+        doc_ref.set({"photo_url": photo_url})
         return photo_url
 
 
