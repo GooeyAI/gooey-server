@@ -234,7 +234,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             "__document_files"
         )
         if document_files:
-            st.session_state["documents"] = [upload_st_file(f) for f in document_files]
+            uploaded = []
+            for f in document_files:
+                if f.name == "urls.txt":
+                    uploaded.extend(f.getvalue().decode().splitlines())
+                else:
+                    uploaded.append(upload_st_file(f))
+            st.session_state["documents"] = uploaded
         # assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_settings(self):

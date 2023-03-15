@@ -2,13 +2,25 @@ import streamlit as st
 
 
 def document_uploader(label: str):
-    return st.file_uploader(
-        label,
-        key="__document_files",
-        upload_key="documents",
-        type=["pdf", "txt", "docx", "md", "html"],
-        accept_multiple_files=True,
-    )
+    st.write(label)
+    if st.checkbox("Enter Custom URLs"):
+        documents = st.session_state.get("documents", [])
+        text_value = st.text_area(
+            label,
+            label_visibility="collapsed",
+            value="\n".join(documents),
+            height=150,
+        )
+        st.session_state["documents"] = text_value.splitlines()
+    else:
+        st.file_uploader(
+            label,
+            label_visibility="collapsed",
+            key="__document_files",
+            upload_key="documents",
+            type=["pdf", "txt", "docx", "md", "html"],
+            accept_multiple_files=True,
+        )
 
 
 def doc_search_settings():
