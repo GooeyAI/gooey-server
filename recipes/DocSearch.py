@@ -25,7 +25,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
 )
 from daras_ai_v2.gdrive_downloader import (
-    gdrive_download,
+    gdrive_download_as_txt,
     is_gdrive_url,
     url_to_gdrive_file_id,
     gdrive_metadata,
@@ -330,18 +330,21 @@ def doc_url_to_text_pages(f_url: str, f_name: str) -> list[str]:
     f = furl(f_url)
     if is_gdrive_url(f):
         # download from google drive
-        f_bytes = gdrive_download(f)
+        f_bytes = gdrive_download_as_txt(f)
+        # gdrive url doesn't have an extension
+        ext = ".txt"
     else:
         # download from url
         f_bytes = requests.get(f_url).content
+        # get extension from filename
+        ext = os.path.splitext(f_name)[-1].lower()
     # convert document to text
-    ext = os.path.splitext(f_name)[-1].lower()
     match ext:
         case ".pdf":
             pages = pdf_to_text_pages(io.BytesIO(f_bytes))
-        case ".docx" | ".md" | ".html":
+        case ".docx" | ".md" | ".html" | "":
             pages = [pandoc_to_text(f_name, f_bytes)]
-        case ".txt" | "":
+        case ".txt":
             pages = [f_bytes.decode()]
         case _:
             raise ValueError(f"Unsupported document format {ext!r} ({f_name})")

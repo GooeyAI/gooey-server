@@ -24,7 +24,7 @@ def url_to_gdrive_file_id(f: furl) -> str:
     return file_id
 
 
-def gdrive_download(f: furl) -> bytes:
+def gdrive_download_as_txt(f: furl) -> bytes:
     # get drive file id
     file_id = url_to_gdrive_file_id(f)
     # get metadata
