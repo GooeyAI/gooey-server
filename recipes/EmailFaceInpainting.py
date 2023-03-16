@@ -185,6 +185,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             LipsyncTTSPage,
         ]
 
+    def render_usage_guide(self):
+        youtube_video("3C23HwQPITg")
+
     def render_settings(self):
         super().render_settings()
         st.write(
@@ -330,9 +333,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                     + state.get("text_prompt", "").replace("\n", "")
                     + "```",
                 )
-
-    def render_usage_guide(self):
-        youtube_video("bffH8X3YBCQ")
 
 
 class ImageNotFound(Exception):
