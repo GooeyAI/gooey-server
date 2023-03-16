@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.gpu_server import GpuEndpoints
+from daras_ai_v2.loom_video_widget import youtube_video
 
 
 class _AnimationPrompt(typing.TypedDict):
@@ -213,6 +214,9 @@ Number of animation frames.
         assert (
             get_last_frame(prompt_list) <= max_frames
         ), "Please make sure that Frame Count matches the Animation Prompts"
+
+    def render_usage_guide(self):
+        youtube_video("DwhUJ6O_6E8")
 
     def render_settings(self):
         col1, col2 = st.columns(2)
