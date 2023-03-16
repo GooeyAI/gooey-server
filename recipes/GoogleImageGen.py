@@ -156,13 +156,11 @@ The result is a fantastic, one of kind image that's relevant to your search (and
                 negative_prompt=request.negative_prompt,
                 init_image=selected_image_url,
                 init_image_bytes=selected_image_bytes,
-                ##
                 selected_model=request.selected_model,
                 num_inference_steps=request.quality,
                 prompt_strength=request.prompt_strength,
                 num_outputs=request.num_outputs,
                 guidance_scale=request.guidance_scale,
-                sd_2_upscaling=request.sd_2_upscaling,
                 seed=request.seed,
             )
 

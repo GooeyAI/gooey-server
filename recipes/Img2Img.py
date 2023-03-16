@@ -172,7 +172,6 @@ class Img2ImgPage(BasePage):
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
                 init_image=init_image,
-                init_image_bytes=init_image_bytes,
                 num_inference_steps=request.quality,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
@@ -189,7 +188,6 @@ class Img2ImgPage(BasePage):
                 prompt_strength=request.prompt_strength,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
-                # sd_2_upscaling=request.sd_2_upscaling,
                 seed=request.seed,
             )
 

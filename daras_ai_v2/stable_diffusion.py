@@ -115,7 +115,7 @@ def sd_upscale(
     image: str,
     num_inference_steps: int,
     negative_prompt: str = None,
-    guidance_scale: float = None,
+    guidance_scale: float,
     seed: int = 42,
 ):
     return call_sd_multi(
@@ -144,7 +144,7 @@ def instruct_pix2pix(
     images: typing.List[str],
     num_inference_steps: int,
     negative_prompt: str = None,
-    guidance_scale: float = None,
+    guidance_scale: float,
     image_guidance_scale: float,
     seed: int = 42,
 ):
@@ -257,8 +257,7 @@ def img2img(
     num_inference_steps: int,
     prompt_strength: float = None,
     negative_prompt: str = None,
-    guidance_scale: float = None,
-    # sd_2_upscaling: bool = False,
+    guidance_scale: float,
     seed: int = 42,
 ):
     prompt_strength = prompt_strength or 0.7
@@ -337,14 +336,11 @@ def controlnet(
     prompt: str,
     num_outputs: int,
     init_image: str,
-    init_image_bytes: bytes = None,
     num_inference_steps: int,
     negative_prompt: str = None,
-    guidance_scale: float = None,
+    guidance_scale: float,
     seed: int = 42,
 ):
-    height, width, _ = bytes_to_cv2_img(init_image_bytes).shape
-    _resolution_check(width, height)
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
         "controlnet",
@@ -395,7 +391,7 @@ def inpainting(
     width: int,
     height: int,
     negative_prompt: str = None,
-    guidance_scale: float = None,
+    guidance_scale: float,
     seed: int = 42,
 ) -> list[str]:
     _resolution_check(width, height)
