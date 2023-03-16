@@ -213,4 +213,5 @@ def negative_prompt_setting(selected_model: str = None):
     st.caption(
         """
         Text2Image engines can often generate disproportionate body parts, extra limbs or fingers, strange textures etc. Use negative prompting to avoid disfiguration or for creative outputs like avoiding certain colour schemes, elements or styles.
-    """)
+    """
+    )
