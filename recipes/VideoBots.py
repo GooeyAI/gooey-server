@@ -37,6 +37,7 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
@@ -242,6 +243,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     uploaded.append(upload_st_file(f))
             st.session_state["documents"] = uploaded
         # assert st.session_state.get("documents"), "Please provide at least 1 Document"
+
+    def render_usage_guide(self):
+        youtube_video("N5uJ-MbsSwc")
 
     def render_settings(self):
         st.text_area(
