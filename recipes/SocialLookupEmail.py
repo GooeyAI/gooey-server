@@ -8,6 +8,7 @@ import streamlit as st
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
+from daras_ai_v2.loom_video_widget import youtube_video
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/email%20ver%202.png"
@@ -79,6 +80,9 @@ class SocialLookupEmailPage(BasePage):
 
     """
         )
+
+    def render_usage_guide(self):
+        youtube_video("lVWQbS_rFaM")
 
     def render_settings(self):
         st.slider(

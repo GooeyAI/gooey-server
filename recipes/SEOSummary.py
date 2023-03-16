@@ -23,6 +23,7 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import (
     scaleserp_location_picker,
 )
@@ -130,6 +131,9 @@ class SEOSummaryPage(BasePage):
             SocialLookupEmailPage,
             GoogleImageGenPage,
         ]
+
+    def render_usage_guide(self):
+        youtube_video("8VDYTYWhOaw")
 
     def render_description(self):
         st.write(

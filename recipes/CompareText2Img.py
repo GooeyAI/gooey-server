@@ -15,6 +15,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     instruct_pix2pix_settings,
     sd_2_upscaling_setting,
 )
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
     text2img,
@@ -108,6 +109,9 @@ class CompareText2ImgPage(BasePage):
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
         assert st.session_state["selected_models"], "Please select at least one model"
+
+    def render_usage_guide(self):
+        youtube_video("TxT-mTYP0II")
 
     def render_description(self):
         st.markdown(

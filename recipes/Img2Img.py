@@ -10,6 +10,7 @@ from daras_ai.image_input import (
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
     InpaintingModels,
     Img2ImgModels,
@@ -123,6 +124,9 @@ class Img2ImgPage(BasePage):
 
     def render_settings(self):
         img_model_settings(Img2ImgModels)
+
+    def render_usage_guide(self):
+        youtube_video("narcZNyuNAg")
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
