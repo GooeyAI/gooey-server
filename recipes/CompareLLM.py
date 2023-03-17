@@ -1,3 +1,4 @@
+import random
 import typing
 
 import streamlit as st
@@ -109,7 +110,7 @@ class CompareLLMPage(BasePage):
             for idx, text in enumerate(output_text):
                 st.text_area(
                     f"**{LargeLanguageModels[key].value}**",
-                    help=f"output {key} {idx}",
+                    help=f"output {key} {idx} {random.random()}",
                     disabled=True,
                     value=text,
                     height=height,
