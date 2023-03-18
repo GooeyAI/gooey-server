@@ -1,3 +1,4 @@
+import math
 import mimetypes
 import re
 import uuid
@@ -114,7 +115,7 @@ def _heic_to_png(img_bytes: bytes) -> bytes:
 def resize_img_scale(img_bytes: bytes, size: (int, int)) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
-    factor = (size[0] * size[1]) / (img_pil.size[0] * img_pil.size[1])
+    factor = math.sqrt((size[0] * size[1]) / (img_pil.size[0] * img_pil.size[1]))
     if 1 - factor > 1e-2:
         img_pil = ImageOps.scale(img_pil, factor)
     img_cv2 = np.array(img_pil)
