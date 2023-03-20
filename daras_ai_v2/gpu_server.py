@@ -26,6 +26,8 @@ class GpuEndpoints:
     vqa = lavis / "vqa"
     image_captioning = lavis / "image-captioning"
 
+    whisper = settings.GPU_SERVER_1.copy().set(port=6012) / "whisper"
+
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
     b64_data = call_gpu_server(endpoint=endpoint, input_data=input_data)
