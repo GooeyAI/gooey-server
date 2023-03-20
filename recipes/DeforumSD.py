@@ -358,7 +358,6 @@ Use the Camera Settings to generate animations with depth and other 3D parameter
             
             This recipe takes any text and creates animation. It's based on the Deforum notebook with lots of details at http://deforum.art.
             """
-
         )
 
     def render_output(self):
