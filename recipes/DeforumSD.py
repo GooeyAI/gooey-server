@@ -372,6 +372,7 @@ Choose fps for the video.
                     rotation_3d_x=request.rotation_3d_x,
                     rotation_3d_y=request.rotation_3d_y,
                     rotation_3d_z=request.rotation_3d_z,
+                    translation_z="0:(0)",
                     fps=request.fps,
                 ),
             },
