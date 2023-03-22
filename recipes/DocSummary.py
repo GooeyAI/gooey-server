@@ -15,7 +15,7 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.image_input import upload_st_file
 from daras_ai_v2 import settings
-from daras_ai_v2.GoogleGPT import SearchReference, render_outputs
+from daras_ai_v2.GoogleGPT import render_outputs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
@@ -49,9 +49,6 @@ class DocSummaryPage(BasePage):
         "max_tokens": 256,
         "num_outputs": 1,
         "quality": 1.0,
-        "max_references": 3,
-        "max_context_words": 200,
-        "scroll_jump": 5,
         "avoid_repetition": True,
         "selected_model": LargeLanguageModels.text_davinci_003.name,
     }
@@ -74,7 +71,6 @@ class DocSummaryPage(BasePage):
     class ResponseModel(BaseModel):
         output_text: list[str]
 
-        references: list[SearchReference]
         final_prompt: str
 
     def render_form_v2(self):
@@ -143,9 +139,6 @@ class DocSummaryPage(BasePage):
                 value=text,
                 height=200,
             )
-
-        st.write("**References**")
-        st.json(st.session_state.get("references", []), expanded=False)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: DocSummaryPage.RequestModel = self.RequestModel.parse_obj(state)
