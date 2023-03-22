@@ -68,13 +68,6 @@ for model in Text2ImgModels:
         guidance_scale=7,
     )
 
-sd_upscale(
-    prompt=get_random_string(1024, string.ascii_letters),
-    num_outputs=4,
-    num_inference_steps=1,
-    guidance_scale=7,
-    image=random_img,
-)
 
 instruct_pix2pix(
     prompt=get_random_string(1024, string.ascii_letters),
@@ -83,4 +76,11 @@ instruct_pix2pix(
     images=[random_img],
     guidance_scale=7,
     image_guidance_scale=2,
+)
+sd_upscale(
+    prompt=get_random_string(1024, string.ascii_letters),
+    num_outputs=1,
+    num_inference_steps=1,
+    guidance_scale=7,
+    image=random_img,
 )

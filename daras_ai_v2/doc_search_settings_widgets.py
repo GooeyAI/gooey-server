@@ -1,23 +1,30 @@
 import streamlit as st
 
+from daras_ai_v2 import settings
 
-def document_uploader(label: str):
+
+def is_user_uploaded_url(url: str) -> bool:
+    return f"storage.googleapis.com/{settings.GS_BUCKET_NAME}/daras_ai" in url
+
+
+def document_uploader(label: str, key="documents"):
     st.write(label)
-    if st.checkbox("Enter Custom URLs"):
-        documents = st.session_state.get("documents", [])
+    documents = st.session_state.get(key, [])
+    has_custom_urls = not all(map(is_user_uploaded_url, documents))
+    if st.checkbox("Enter Custom URLs", value=has_custom_urls):
         text_value = st.text_area(
             label,
             label_visibility="collapsed",
             value="\n".join(documents),
             height=150,
         )
-        st.session_state["documents"] = text_value.splitlines()
+        st.session_state[key] = text_value.splitlines()
     else:
         st.file_uploader(
             label,
             label_visibility="collapsed",
-            key="__document_files",
-            upload_key="documents",
+            key=f"__{key}_files",
+            upload_key=key,
             type=["pdf", "txt", "docx", "md", "html"],
             accept_multiple_files=True,
         )

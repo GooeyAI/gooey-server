@@ -39,6 +39,20 @@ class LargeLanguageModels(Enum):
     text_ada_001 = "Ada"
 
 
+engine_names = {
+    LargeLanguageModels.gpt_3_5_turbo: "gpt-3.5-turbo",
+    LargeLanguageModels.text_davinci_003: "text-davinci-003",
+    LargeLanguageModels.code_davinci_002: "code-davinci-002",
+    LargeLanguageModels.text_curie_001: "text-curie-001",
+    LargeLanguageModels.text_babbage_001: "text-babbage-001",
+    LargeLanguageModels.text_ada_001: "text-ada-001",
+}
+
+
+def is_chat_model(model: LargeLanguageModels) -> bool:
+    return model in [LargeLanguageModels.gpt_3_5_turbo]
+
+
 def calc_gpt_tokens(text: str) -> int:
     global _gpt2_tokenizer
 
@@ -125,7 +139,7 @@ def run_chatgpt(
 @do_retry()
 def run_language_model(
     *,
-    model: LargeLanguageModels,
+    model: str,
     prompt: str,
     max_tokens: int,
     quality: float,
@@ -152,38 +166,23 @@ def run_language_model(
                     "n": num_outputs,
                 },
             )
-
-    match model:
-        case LargeLanguageModels.gpt_3_5_turbo.name:
-            is_chatml, messages = parse_chatml(prompt)
-            messages = run_chatgpt(
-                messages=messages,
-                max_tokens=max_tokens,
-                # quality=quality,
-                num_outputs=num_outputs,
-                temperature=temperature,
-                stop=stop,
-                avoid_repetition=avoid_repetition,
-            )
-            return [
-                format_chatml_message(entry) if is_chatml else entry["content"]
-                for entry in messages
-            ]
-        case LargeLanguageModels.text_davinci_003.name:
-            engine = "text-davinci-003"
-        case LargeLanguageModels.code_davinci_002.name:
-            engine = "code-davinci-002"
-        case LargeLanguageModels.text_curie_001.name:
-            engine = "text-curie-001"
-        case LargeLanguageModels.text_babbage_001.name:
-            engine = "text-babbage-001"
-        case LargeLanguageModels.text_ada_001.name:
-            engine = "text-ada-001"
-        case _:
-            raise ValueError(f"Unrecognized LLM: {model!r}")
-
+    model = LargeLanguageModels[model]
+    if is_chat_model(model):
+        is_chatml, messages = parse_chatml(prompt)
+        messages = run_chatgpt(
+            messages=messages,
+            max_tokens=max_tokens,
+            num_outputs=num_outputs,
+            temperature=temperature,
+            stop=stop,
+            avoid_repetition=avoid_repetition,
+        )
+        return [
+            format_chatml_message(entry) if is_chatml else entry["content"]
+            for entry in messages
+        ]
     r = openai.Completion.create(
-        engine=engine,
+        engine=engine_names[model],
         prompt=prompt,
         max_tokens=max_tokens,
         stop=stop,

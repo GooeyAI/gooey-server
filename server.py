@@ -57,6 +57,7 @@ from recipes.CompareText2Img import CompareText2ImgPage
 from recipes.CompareUpscaler import CompareUpscalerPage
 from recipes.DeforumSD import DeforumSDPage
 from recipes.DocSearch import DocSearchPage
+from recipes.DocSummary import DocSummaryPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
 from recipes.FaceInpainting import FaceInpaintingPage
 from recipes.GoogleImageGen import GoogleImageGenPage
@@ -519,6 +520,7 @@ all_pages: list[typing.Type[BasePage]] = [
     CompareUpscalerPage,
     GoogleGPTPage,
     DocSearchPage,
+    DocSummaryPage,
 ]
 
 

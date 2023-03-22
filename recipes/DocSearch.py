@@ -274,6 +274,17 @@ def doc_url_to_embeds(
     max_context_words: int,
     scroll_jump: int,
 ):
+    f_name, f_etag = doc_url_to_metadata(f_url)
+    return _doc_url_to_embeds(
+        f_url=f_url,
+        f_name=f_name,
+        f_etag=f_etag,
+        max_context_words=max_context_words,
+        scroll_jump=scroll_jump,
+    )
+
+
+def doc_url_to_metadata(f_url: str) -> (str, str):
     f = furl(f_url)
     if is_gdrive_url(f):
         # extract filename from google drive metadata
@@ -284,13 +295,7 @@ def doc_url_to_embeds(
         # extract filename from url
         f_name = f.path.segments[-1]
         f_etag = None
-    return _doc_url_to_embeds(
-        f_url=f_url,
-        f_name=f_name,
-        f_etag=f_etag,
-        max_context_words=max_context_words,
-        scroll_jump=scroll_jump,
-    )
+    return f_name, f_etag
 
 
 @st.cache_data(show_spinner=False)
@@ -302,7 +307,7 @@ def _doc_url_to_embeds(
     max_context_words: int,
     scroll_jump: int,
 ):
-    pages = doc_url_to_text_pages(f_url, f_name)
+    pages = doc_url_to_text_pages(f_url, f_name, f_etag)
     # split document into chunks
     chunks = list(document_splitter(pages, max_context_words, scroll_jump))
     texts = [snippet for page_num, snippet in chunks]
@@ -326,7 +331,12 @@ def _doc_url_to_embeds(
     return zip(metas, embeds)
 
 
-def doc_url_to_text_pages(f_url: str, f_name: str) -> list[str]:
+@st.cache_data(show_spinner=False)
+def doc_url_to_text_pages(
+    f_url: str,
+    f_name: str,
+    f_etag: str | None,  # used as cache key
+) -> list[str]:
     f = furl(f_url)
     if is_gdrive_url(f):
         # download from google drive
@@ -338,11 +348,14 @@ def doc_url_to_text_pages(f_url: str, f_name: str) -> list[str]:
         f_bytes = requests.get(f_url).content
         # get extension from filename
         ext = os.path.splitext(f_name)[-1].lower()
+    if not ext:  # default to html (useful for URLs)
+        ext = ".html"
+        f_name += ".html"
     # convert document to text
     match ext:
         case ".pdf":
             pages = pdf_to_text_pages(io.BytesIO(f_bytes))
-        case ".docx" | ".md" | ".html" | "":
+        case ".docx" | ".md" | ".html":
             pages = [pandoc_to_text(f_name, f_bytes)]
         case ".txt":
             pages = [f_bytes.decode()]
