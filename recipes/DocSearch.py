@@ -91,7 +91,7 @@ class DocSearchPage(BasePage):
         assert search_query, "Please enter a Search Query"
 
         document_files: list[UploadedFile] | None = st.session_state.get(
-            "__document_files"
+            "__documents_files"
         )
         if document_files:
             uploaded = []

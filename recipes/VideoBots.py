@@ -232,7 +232,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # assert st.session_state.get("input_face"), "Please provide the Input Face"
 
         document_files: list[UploadedFile] | None = st.session_state.get(
-            "__document_files"
+            "__documents_files"
         )
         if document_files:
             uploaded = []
@@ -298,7 +298,7 @@ Enable document search, to use custom documents as information sources.
 """
         )
         if st.session_state.get("documents") or st.session_state.get(
-            "__document_files"
+            "__documents_files"
         ):
             st.text_area(
                 """

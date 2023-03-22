@@ -7,7 +7,11 @@ def is_user_uploaded_url(url: str) -> bool:
     return f"storage.googleapis.com/{settings.GS_BUCKET_NAME}/daras_ai" in url
 
 
-def document_uploader(label: str, key="documents"):
+def document_uploader(
+    label: str,
+    key="documents",
+    type=("pdf", "txt", "docx", "md", "html"),
+):
     st.write(label)
     documents = st.session_state.get(key, [])
     has_custom_urls = not all(map(is_user_uploaded_url, documents))
@@ -25,7 +29,7 @@ def document_uploader(label: str, key="documents"):
             label_visibility="collapsed",
             key=f"__{key}_files",
             upload_key=key,
-            type=["pdf", "txt", "docx", "md", "html"],
+            type=type,
             accept_multiple_files=True,
         )
 
