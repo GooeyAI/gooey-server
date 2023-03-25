@@ -88,7 +88,7 @@ def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
 @st.cache_data
 def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
     img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
-    img_bytes = resize_img_scale(img_bytes, resize)
+    img_bytes = downscale_img_scale(img_bytes, resize)
     return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
 
 
@@ -112,14 +112,24 @@ def _heic_to_png(img_bytes: bytes) -> bytes:
     return img_bytes
 
 
-def resize_img_scale(img_bytes: bytes, size: (int, int)) -> bytes:
+def downscale_img_scale(img_bytes: bytes, size: (int, int)) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
-    factor = math.sqrt((size[0] * size[1]) / (img_pil.size[0] * img_pil.size[1]))
-    if 1 - factor > 1e-2:
-        img_pil = ImageOps.scale(img_pil, factor)
+    downscale_factor = get_downscale_factor(im_size=img_pil.size, max_size=size)
+    if downscale_factor:
+        img_pil = ImageOps.scale(img_pil, downscale_factor)
     img_cv2 = np.array(img_pil)
     return cv2_img_to_bytes(img_cv2)
+
+
+def get_downscale_factor(*, im_size: (int, int), max_size: (int, int)) -> float | None:
+    downscale_factor = math.sqrt(
+        (max_size[0] * max_size[1]) / (im_size[0] * im_size[1])
+    )
+    if downscale_factor < 0.99:
+        return downscale_factor
+    else:
+        return None
 
 
 def resize_img_fit(img_bytes: bytes, size: (int, int)) -> bytes:
