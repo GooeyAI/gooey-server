@@ -68,6 +68,7 @@ def animation_prompts_editor(
     st.caption(
         """
         Describe the scenes or series of images that you want to generate into an animation. You can add as many prompts as you like. Mention the keyframe number for each prompt i.e. the transition point from the first prompt to the next. 
+        View the ‘Details’ drop down menu to get started.
         """
     )
     updated_st_list = []
@@ -328,15 +329,15 @@ Choose fps for the video.
     def render_description(self):
         st.markdown(
             """
-You can indicate how long you want your animation to be by increasing or decreasing your frame count. 
+Animation Length: You can indicate how long you want your animation to be by increasing or decreasing your frame count. 
 
-Every Animation is set at 12 frames per second by default. You can change this default frame rate/ frames per second (FPS) on the Settings menu. 
+FPS: Every Animation is set at 12 frames per second by default. You can change this default frame rate/ frames per second (FPS) on the Settings menu. 
 
-Within your sequence you can input multiple text Prompts for your visuals. Each prompt can be defined for a specific keyframe number. 
+Prompts: Within your sequence you can input multiple text Prompts for your visuals. Each prompt can be defined for a specific keyframe number. 
 
 ##### What are keyframes? 
 
-Keyframes define the transition points from one prompt to the next, or the start and end points of a prompted action set in between the total frame count or sequence. These keyframes or markers are necessary to establish smooth transitions or jump cuts, whatever you prefer. 
+Keyframes define the transition points from one prompt to the next, or the start and end points of a prompted action set in between the total frame count or sequence. These keyframes or markers are necessary to establish smooth transitions or jump cuts, whatever you prefer.
 
 Use the Camera Settings to generate animations with depth and other 3D parameters.  
             """
@@ -354,9 +355,20 @@ Use the Camera Settings to generate animations with depth and other 3D parameter
             - What are the Details?
             eg. facial features or expressions, the space and landscape, lighting or the colours etc. 
 
-            For example: [here]({furl(settings.APP_BASE_URL).add(path='animation-generator').add({"example_id": "czvtn7du"}).url})
+            [Example]({furl(settings.APP_BASE_URL).add(path='animation-generator').add({"example_id": "czvtn7du"}).url})
             
+            """
+        )
+        st.markdown(
+            """
+            Pro-tip:
+
+            Changing Elements transition better from a visual prompt that is artefact or object heavy to another busy visual prompt. For example: Prompt 1: a busy street transitions to Prompt 2: a busy interior of a park. This transition will render interesting and beautiful imagery.
+
+            `Transitions from a simpler or plain visual prompt to a more complex visual might be challenging to generate. For example: Prompt 1: a blue sky to Prompt 2: a crowded market. This is because there are fewer artefacts for the generator to transition.`
+
             This recipe takes any text and creates animation. It's based on the Deforum notebook with lots of details at http://deforum.art.
+
             """
         )
 
