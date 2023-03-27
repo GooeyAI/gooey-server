@@ -15,6 +15,7 @@ from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
 from recipes.CompareUpscaler import CompareUpscalerPage
 from recipes.DocSearch import DocSearchPage
+from recipes.DocSummary import DocSummaryPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
 from recipes.FaceInpainting import FaceInpaintingPage
 from recipes.GoogleImageGen import GoogleImageGenPage
@@ -52,6 +53,7 @@ pages_to_test = [
     CompareUpscalerPage,
     GoogleGPTPage,
     DocSearchPage,
+    DocSummaryPage,
 ]
 
 

@@ -1,6 +1,5 @@
 import os.path
 from functools import wraps
-from itertools import zip_longest
 
 import numpy as np
 import streamlit as st
@@ -8,7 +7,7 @@ from furl import furl
 from streamlit.runtime.state import get_session_state
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from daras_ai_v2.gdrive_downloader import is_gdrive_url
+from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 
 
 def patch(*targets):
@@ -87,14 +86,12 @@ def _render_preview(file: list | UploadedFile | str | None):
     if is_local:
         filename = file.name
     elif is_uploaded:
-        f = furl(file)
-        if is_gdrive_url(f):
-            filename = str(f)
+        # show only the filename for user uploaded files
+        if is_user_uploaded_url(file):
+            f = furl(file)
+            filename = f.path.segments[-1]
         else:
-            try:
-                filename = f.path.segments[-1]
-            except IndexError:
-                return
+            filename = file
     else:
         return
 

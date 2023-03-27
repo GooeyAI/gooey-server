@@ -12,6 +12,7 @@ from daras_ai.image_input import (
     bytes_to_cv2_img,
     resize_img_pad,
     resize_img_fit,
+    get_downscale_factor,
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.extract_face import rgb_img_to_rgba
@@ -520,7 +521,7 @@ def _recomposite_inpainting_outputs(
 
 
 def _resolution_check(width, height):
-    if width * height > IMG_MAX_SIZE[0] * IMG_MAX_SIZE[1]:
+    if get_downscale_factor(im_size=(width, height), max_size=IMG_MAX_SIZE):
         raise ValueError(
             f"Maximum size is {IMG_MAX_SIZE[0]}x{IMG_MAX_SIZE[1]} pixels, because of memory limits. "
             f"Please select a lower width or height."

@@ -104,6 +104,7 @@ video, img {
 .gooey-output-text p {
     padding: 0.75rem;
     margin: 0;
+    white-space: pre-wrap;
 }
 
 sup {

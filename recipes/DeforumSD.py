@@ -416,6 +416,7 @@ Use the Camera Settings to generate animations with depth and other 3D parameter
                     rotation_3d_x=request.rotation_3d_x,
                     rotation_3d_y=request.rotation_3d_y,
                     rotation_3d_z=request.rotation_3d_z,
+                    translation_z="0:(0)",
                     fps=request.fps,
                 ),
             },
