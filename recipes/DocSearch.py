@@ -19,6 +19,7 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.image_input import upload_st_file
 from daras_ai_v2.GoogleGPT import SearchReference, render_outputs, GoogleGPTPage
+from daras_ai_v2.asr import AsrModels, run_asr
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
@@ -75,6 +76,9 @@ class DocSearchPage(BasePage):
         max_references: int | None
         max_context_words: int | None
         scroll_jump: int | None
+
+        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        google_translate_target: str | None
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -238,6 +242,8 @@ def get_top_k_references(
             f_url=f_url,
             max_context_words=request.max_context_words,
             scroll_jump=request.scroll_jump,
+            selected_asr_model=request.selected_asr_model,
+            google_translate_target=request.google_translate_target,
         )
     ]
     yield f"Searching documents..."
@@ -273,6 +279,8 @@ def doc_url_to_embeds(
     f_url: str,
     max_context_words: int,
     scroll_jump: int,
+    selected_asr_model: str = None,
+    google_translate_target: str = None,
 ):
     f_name, f_etag = doc_url_to_metadata(f_url)
     return _doc_url_to_embeds(
@@ -281,6 +289,8 @@ def doc_url_to_embeds(
         f_etag=f_etag,
         max_context_words=max_context_words,
         scroll_jump=scroll_jump,
+        selected_asr_model=selected_asr_model,
+        google_translate_target=google_translate_target,
     )
 
 
@@ -306,8 +316,16 @@ def _doc_url_to_embeds(
     f_etag: str | None,  # used as cache key
     max_context_words: int,
     scroll_jump: int,
+    selected_asr_model: str = None,
+    google_translate_target: str = None,
 ):
-    pages = doc_url_to_text_pages(f_url, f_name, f_etag)
+    pages = doc_url_to_text_pages(
+        f_url,
+        f_name,
+        f_etag,
+        selected_asr_model=selected_asr_model,
+        google_translate_target=google_translate_target,
+    )
     # split document into chunks
     chunks = list(document_splitter(pages, max_context_words, scroll_jump))
     texts = [snippet for page_num, snippet in chunks]
@@ -336,6 +354,8 @@ def doc_url_to_text_pages(
     f_url: str,
     f_name: str,
     f_etag: str | None,  # used as cache key
+    selected_asr_model: str,
+    google_translate_target: str,
 ) -> list[str]:
     f = furl(f_url)
     if is_gdrive_url(f):
@@ -359,6 +379,18 @@ def doc_url_to_text_pages(
             pages = [pandoc_to_text(f_name, f_bytes)]
         case ".txt":
             pages = [f_bytes.decode()]
+        case ".wav" | ".ogg" | ".mp3" | ".aac":
+            if not selected_asr_model:
+                raise ValueError(
+                    "For transcribing audio/video, please choose an ASR model from the settings!"
+                )
+            pages = [
+                run_asr(
+                    f_url,
+                    selected_model=selected_asr_model,
+                    google_translate_target=google_translate_target,
+                )
+            ]
         case _:
             raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
     return pages

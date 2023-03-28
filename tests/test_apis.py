@@ -28,6 +28,7 @@ from recipes.SEOSummary import SEOSummaryPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
+from recipes.asr import AsrPage
 from server import app
 
 client = TestClient(app)
@@ -54,6 +55,7 @@ pages_to_test = [
     GoogleGPTPage,
     DocSearchPage,
     DocSummaryPage,
+    AsrPage,
 ]
 
 
