@@ -1,3 +1,22 @@
+import logging
+import contextlib
+from asyncio import sleep
+from http.client import HTTPConnection  # py3
+from threading import Thread
+
+import requests
+
+from daras_ai_v2.gpu_server import GpuEndpoints
+
+HTTPConnection.debuglevel = 1
+
+logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
+requests_log = logging.getLogger("requests.packages.urllib3")
+requests_log.setLevel(logging.DEBUG)
+requests_log.propagate = True
+
+import os
 import string
 
 import numpy as np
@@ -15,8 +34,48 @@ from daras_ai_v2.stable_diffusion import (
     sd_upscale,
 )
 
-random_img = "https://picsum.photos/512"
+random_img = "https://picsum.photos/768"
 blank_img_bytes = cv2_img_to_bytes(np.zeros((768, 768, 3), dtype=np.uint8))
+
+
+# def fn():
+#     text2img(
+#         selected_model=Img2ImgModels.sd_1_5.name,
+#         prompt=get_random_string(100, string.ascii_letters),
+#         num_outputs=1,
+#         num_inference_steps=1,
+#         width=768,
+#         height=768,
+#         guidance_scale=7,
+#     )
+#     # r = requests.get(GpuEndpoints.sd_multi / "magic")
+#     # r.raise_for_status()
+#     # img2img(
+#     #     selected_model=Img2ImgModels.sd_1_5.name,
+#     #     prompt=get_random_string(100, string.ascii_letters),
+#     #     num_outputs=1,
+#     #     init_image=random_img,
+#     #     init_image_bytes=blank_img_bytes,
+#     #     num_inference_steps=1,
+#     #     guidance_scale=7,
+#     # )
+#     # controlnet(
+#     #     selected_controlnet_model=ControlNetModels.sd_controlnet_depth.name,
+#     #     selected_model=Img2ImgModels.sd_1_5.name,
+#     #     prompt=get_random_string(100, string.ascii_letters),
+#     #     num_outputs=1,
+#     #     init_image=random_img,
+#     #     num_inference_steps=1,
+#     #     guidance_scale=7,
+#     # )
+#
+#
+# while True:
+#     for _ in range(1):
+#         t = Thread(target=fn)
+#         t.start()
+#     t.join()
+# exit()
 
 for model in Img2ImgModels:
     if model in [
@@ -28,7 +87,7 @@ for model in Img2ImgModels:
     print(model)
     img2img(
         selected_model=model.name,
-        prompt=get_random_string(1024, string.ascii_letters),
+        prompt=get_random_string(100, string.ascii_letters),
         num_outputs=4,
         num_inference_steps=10,
         init_image=random_img,
@@ -44,7 +103,7 @@ for model in Img2ImgModels:
         controlnet(
             selected_model=model.name,
             selected_controlnet_model=controlnet_model.name,
-            prompt=get_random_string(1024, string.ascii_letters),
+            prompt=get_random_string(100, string.ascii_letters),
             num_outputs=4,
             init_image=random_img,
             num_inference_steps=1,
@@ -60,7 +119,7 @@ for model in Text2ImgModels:
     print(model)
     text2img(
         selected_model=model.name,
-        prompt=get_random_string(1024, string.ascii_letters),
+        prompt=get_random_string(100, string.ascii_letters),
         num_outputs=4,
         num_inference_steps=1,
         width=768,
@@ -70,7 +129,7 @@ for model in Text2ImgModels:
 
 
 instruct_pix2pix(
-    prompt=get_random_string(1024, string.ascii_letters),
+    prompt=get_random_string(100, string.ascii_letters),
     num_outputs=4,
     num_inference_steps=10,
     images=[random_img],
@@ -78,7 +137,7 @@ instruct_pix2pix(
     image_guidance_scale=2,
 )
 sd_upscale(
-    prompt=get_random_string(1024, string.ascii_letters),
+    prompt=get_random_string(100, string.ascii_letters),
     num_outputs=1,
     num_inference_steps=1,
     guidance_scale=7,

@@ -1,6 +1,8 @@
 import streamlit as st
 
 from daras_ai_v2 import settings
+from daras_ai_v2.asr import AsrModels, google_translate_language_selector
+from daras_ai_v2.enum_selector_widget import enum_selector
 
 
 def is_user_uploaded_url(url: str) -> bool:
@@ -10,7 +12,7 @@ def is_user_uploaded_url(url: str) -> bool:
 def document_uploader(
     label: str,
     key="documents",
-    type=("pdf", "txt", "docx", "md", "html"),
+    type=("pdf", "txt", "docx", "md", "html", "wav", "ogg", "mp3", "aac"),
 ):
     st.write(label)
     documents = st.session_state.get(key, [])
@@ -70,3 +72,15 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         min_value=1,
         max_value=50,
     )
+
+    st.write("---")
+    st.write("##### 🎤 Speech Recognition Settings")
+
+    enum_selector(
+        AsrModels,
+        label="###### ASR Model",
+        key="selected_asr_model",
+        allow_none=True,
+        use_selectbox=True,
+    )
+    google_translate_language_selector()

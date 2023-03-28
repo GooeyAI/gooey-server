@@ -71,6 +71,7 @@ from recipes.SEOSummary import SEOSummaryPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
+from recipes.asr import AsrPage
 from routers import billing, facebook, talkjs, realtime
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -521,6 +522,7 @@ all_pages: list[typing.Type[BasePage]] = [
     GoogleGPTPage,
     DocSearchPage,
     DocSummaryPage,
+    AsrPage,
 ]
 
 

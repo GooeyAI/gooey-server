@@ -4,6 +4,7 @@ from daras_ai.init import init_scripts
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from recipes.DocSearch import DocSearchPage
 from recipes.DocSummary import DocSummaryPage
+from recipes.asr import AsrPage
 
 init_scripts()
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -70,6 +71,7 @@ page_classes = [
     GoogleGPTPage,
     DocSearchPage,
     DocSummaryPage,
+    AsrPage,
     # LipsyncPage,
     # ChyronPlantPage,
 ]

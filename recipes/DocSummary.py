@@ -16,6 +16,7 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 from daras_ai.image_input import upload_st_file
 from daras_ai_v2 import settings
 from daras_ai_v2.GoogleGPT import render_outputs
+from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
@@ -67,6 +68,9 @@ class DocSummaryPage(BasePage):
         sampling_temperature: float | None
 
         chain_type: typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
+
+        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        google_translate_target: str | None
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -148,7 +152,13 @@ class DocSummaryPage(BasePage):
         full_text = ""
         for f_url in request.documents:
             f_name, f_etag = doc_url_to_metadata(f_url)
-            pages = doc_url_to_text_pages(f_url, f_name, f_etag)
+            pages = doc_url_to_text_pages(
+                f_url,
+                f_name,
+                f_etag,
+                selected_asr_model=request.selected_asr_model,
+                google_translate_target=request.google_translate_target,
+            )
             full_text += "\n\n".join(pages)
 
         model = LargeLanguageModels[request.selected_model]
