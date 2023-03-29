@@ -2,6 +2,7 @@ import requests
 
 from daras_ai_v2 import settings
 
+
 async def construct_contact(user_data):
     return {
         "info": {
@@ -18,6 +19,7 @@ async def construct_contact(user_data):
             },
         }
     }
+
 
 async def trigger_sign_up_email_automation(access_token, created_contact, data):
     response = requests.post(
@@ -47,4 +49,3 @@ async def get_wix_access_token() -> str:
     response.raise_for_status()
     data = response.json()
     return data.get("access_token")
-

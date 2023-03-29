@@ -73,7 +73,11 @@ from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
 from routers import billing, facebook, talkjs, realtime
-from wix.wix_functions import get_wix_access_token, trigger_sign_up_email_automation, construct_contact
+from wix.wix_functions import (
+    get_wix_access_token,
+    trigger_sign_up_email_automation,
+    construct_contact,
+)
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
