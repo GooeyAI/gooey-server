@@ -98,4 +98,11 @@ PINECONE_API_KEY = config("PINECONE_API_KEY", "")
 PINECONE_ENVIRONMENT = config("PINECONE_ENVIRONMENT", "us-east1-gcp")
 WIX_API_KEY = config("WIX_API_KEY", "")
 WIX_API_CONTACTS_URL = "https://www.wixapis.com/contacts/v4/contacts"
+WIX_API_EVENTS_REPORT_URL = "https://www.wixapis.com/automations/v1/events/report"
+WIX_APP_OAUTH_URL = "https://www.wixapis.com/oauth/access"
+
 WIX_SITE_ID = config("WIX_SITE_ID", "")
+WIX_EMAIL_APP_REFRESH_TOKEN = config("WIX_EMAIL_APP_REFRESH_TOKEN", "")
+WIX_APP_CLIENT_ID = config("WIX_APP_CLIENT_ID", "")
+WIX_APP_CLIENT_SECRET = config("WIX_APP_CLIENT_SECRET", "")
+WIX_AUTOMATION_TRIGGER_KEY = "email_trigger_app_v2-signup"

@@ -24,7 +24,7 @@ function createWixContact(email, name, phone) {
     }
     var xhr = new XMLHttpRequest();
     xhr.open("POST", '/add-to-wix-contact', true);
-    xhr.send(JSON.stringify({"info": data}));
+    xhr.send(JSON.stringify(data));
 }
 
 

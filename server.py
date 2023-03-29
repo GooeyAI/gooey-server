@@ -73,6 +73,7 @@ from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
 from routers import billing, facebook, talkjs, realtime
+from wix.wix_functions import get_wix_access_token, trigger_sign_up_email_automation, construct_contact
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
@@ -95,26 +96,21 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.post("/add-to-wix-contact", include_in_schema=False)
 async def add_to_wix_contact(request: Request):
-    data = await request.json()
-
-    contact = {
-        "info": {
-            "name": {
-                "first": data.get("name"),
-            },
-            "emails": {"items": [{"tag": "MAIN", "email": data.get("email")}]},
-        }
-    }
-    r = requests.post(
+    user_data = await request.json()
+    contact_data = await construct_contact(user_data)
+    response = requests.post(
         settings.WIX_API_CONTACTS_URL,
         headers={
             "Authorization": settings.WIX_API_KEY,
             "wix-site-id": settings.WIX_SITE_ID,
         },
-        data=json.dumps(contact),
+        json=contact_data,
     )
-    r.raise_for_status()
-    return JSONResponse(content={"status_code": r.status_code})
+    response.raise_for_status()
+    created_contact = response.json().get("contact")
+    access_token = await get_wix_access_token()
+    await trigger_sign_up_email_automation(access_token, created_contact, user_data)
+    return JSONResponse(content={"status_code": response.status_code})
 
 
 @app.get("/sitemap.xml/", include_in_schema=False)
