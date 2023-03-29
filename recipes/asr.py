@@ -24,7 +24,7 @@ from daras_ai_v2.gpu_server import GpuEndpoints
 
 
 class AsrPage(BasePage):
-    title = "Speech Recognition + Translate"
+    title = "Speech Recognition & Translation"
     slug_versions = ["asr", "speech"]
 
     sane_defaults = {}
