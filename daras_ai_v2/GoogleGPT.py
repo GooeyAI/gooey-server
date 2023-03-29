@@ -26,6 +26,8 @@ class GoogleGPTPage(BasePage):
     title = "Web Search + GPT3"
     slug_versions = ["google-gpt"]
 
+    price = 175
+
     sane_defaults = dict(
         search_query="rugs",
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
