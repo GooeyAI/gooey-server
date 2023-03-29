@@ -60,6 +60,7 @@ class AsrPage(BasePage):
         from recipes.TextToSpeech import TextToSpeechPage
 
         from recipes.LipsyncTTS import LipsyncTTSPage
+
         return [
             VideoBotsPage,
             LipsyncTTSPage,
