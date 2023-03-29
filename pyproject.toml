@@ -49,6 +49,9 @@ pdftotext = "^2.2.2"
 pinecone-client = {extras = ["grpc"], version = "^2.2.0"}
 google-api-python-client = "^2.80.0"
 oauth2client = "^4.1.3"
+langchain = "^0.0.117"
+tiktoken = "^0.3.2"
+google-cloud-translate = ">=2.0.1,<2.1.0"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"

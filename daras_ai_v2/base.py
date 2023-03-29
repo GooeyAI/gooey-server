@@ -19,10 +19,8 @@ from pydantic import BaseModel
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
-from streamlit import markdown
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 
-from daras_ai.init import init_scripts
 from daras_ai.secret_key_checker import is_admin
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
@@ -33,13 +31,12 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
+from daras_ai_v2.db import USER_RUNS_COLLECTION, EXAMPLES_COLLECTION
 from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
-from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.html_spinner_widget import (
-    scroll_to_spinner,
     scroll_to_top,
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -57,10 +54,6 @@ from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
 from routers.realtime import realtime_subscribe, realtime_set
-
-EXAMPLES_COLLECTION = "examples"
-USER_RUNS_COLLECTION = "user_runs"
-
 
 DEFAULT_META_IMG = (
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"

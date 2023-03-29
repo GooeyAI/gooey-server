@@ -5,11 +5,14 @@ import uuid
 
 import requests
 import streamlit as st
+from furl import furl
 from pydantic import BaseModel
 
 from daras_ai.image_input import storage_blob_for
+from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.gpu_server import GpuEndpoints
+from daras_ai_v2.loom_video_widget import youtube_video
 
 
 class _AnimationPrompt(typing.TypedDict):
@@ -62,6 +65,12 @@ def animation_prompts_editor(
         st.session_state[st_list_key] = prompt_st_list
 
     st.write("#### 👩‍💻 Animation Prompts")
+    st.caption(
+        """
+        Describe the scenes or series of images that you want to generate into an animation. You can add as many prompts as you like. Mention the keyframe number for each prompt i.e. the transition point from the first prompt to the next. 
+        View the ‘Details’ drop down menu to get started.
+        """
+    )
     updated_st_list = []
     for idx, fp in enumerate(prompt_st_list):
         fp_key = fp["key"]
@@ -122,6 +131,11 @@ def animation_prompts_editor(
 
     st.session_state[animation_prompts_key] = st_list_to_animation_prompt(
         prompt_st_list
+    )
+    st.caption(
+        """
+        Pro-tip: To avoid abrupt endings on your animation, ensure that the last keyframe prompt is set for a higher number of keyframes/time than the previous transition rate. There should be an ample number of frames between the last frame and the total frame count of the animation. 
+        """
     )
 
 
@@ -187,8 +201,8 @@ class DeforumSDPage(BasePage):
         with col1:
             st.number_input(
                 """
-#### Frame Count
-Number of animation frames.
+                #### Frame Count
+                Choose the number of frames in your animation.
                 """,
                 min_value=10,
                 max_value=1000,
@@ -199,7 +213,7 @@ Number of animation frames.
     def additional_notes(self) -> str | None:
         return """
 *Cost ≈ 0.25 credits per frame* \\
-*Run Time ≈ 5 seconds per frame*
+*Process Run Time ≈ 5 seconds per frame*
         """
 
     def get_price(self) -> int:
@@ -214,6 +228,9 @@ Number of animation frames.
             get_last_frame(prompt_list) <= max_frames
         ), "Please make sure that Frame Count matches the Animation Prompts"
 
+    def render_usage_guide(self):
+        youtube_video("DwhUJ6O_6E8")
+
     def render_settings(self):
         col1, col2 = st.columns(2)
         with col1:
@@ -224,13 +241,19 @@ Number of animation frames.
         st.text_input(
             """
 ###### Zoom
-How should the camera zoom in or out? Scales the canvas size, multiplicatively. 1 is static, with numbers greater than 1 moving forwards and numbers less than 1 moving backwards. E.g. use `0: (1.004)` to zoom in moderately, starting at frame 0 and continuing until the end.
+How should the camera zoom in or out? This setting scales the canvas size, multiplicatively. 
+1 is static, with numbers greater than 1 moving forward (or zooming in) and numbers less than 1 moving backwards (or zooming out). 
             """,
             key="zoom",
         )
+        st.caption(
+            """
+            With 0 as the starting keyframe, the input of 0: (1.004) can be used to zoom in moderately, starting at frame 0 and continuing until the end. 
+            """
+        )
         st.text_input(
             """
-###### Horiztonal Pan
+###### Horizontal Pan
 How should the camera pan horizontally? This parameter uses positive values to move right and negative values to move left.
             """,
             key="translation_x",
@@ -246,7 +269,7 @@ How should the camera pan vertically? This parameter uses positive values to mov
             st.text_input(
                 """
 ###### Camera Rotation
-Rolls the camera clockwise or counterclockwise in degrees per frame. This parameter uses positive values to roll counterclockwise and negative values to roll clockwise. E.g. use `0:(-1), 20:(0)` to roll the camera 1 degree clockwise for the first 20 frames.
+Gradually moves the camera on a focal axis. Roll the camera clockwise or counterclockwise in a specific degree per frame. This parameter uses positive values to roll counterclockwise and negative values to roll clockwise. E.g. use `0:(-1), 20:(0)` to roll the camera 1 degree clockwise for the first 20 frames.
                 """,
                 key="rotation_3d_z",
             )
@@ -266,7 +289,7 @@ Pans the canvas left or right in degrees per frame. This parameter uses positive
             )
         st.slider(
             """
-###### FPS
+###### FPS (Frames per second) 
 Choose fps for the video.
             """,
             min_value=10,
@@ -301,14 +324,51 @@ Choose fps for the video.
         return DEFAULT_ANIMATION_META_IMG
 
     def preview_description(self, state: dict) -> str:
-        return "Input your text (including keyframes!) and animate using Stable Diffusion's Deforum. Create AI generated animation for free and easier than CoLab notebooks. Inspired by deforum.art."
+        return "Inspired by deforum.art, create AI-generated Animation for free without complex CoLab notebooks. Input your text prompts with keyframe numbers and animate using Stable Diffusion's Deforum."
 
     def render_description(self):
-        st.write(
+        st.markdown(
             """
-            This recipe takes any text and creates animation. 
+Animation Length: You can indicate how long you want your animation to be by increasing or decreasing your frame count. 
 
-            It's based off the Deforum notebook with lots of details at http://deforum.art. 
+FPS: Every Animation is set at 12 frames per second by default. You can change this default frame rate/ frames per second (FPS) on the Settings menu. 
+
+Prompts: Within your sequence you can input multiple text Prompts for your visuals. Each prompt can be defined for a specific keyframe number. 
+
+##### What are keyframes? 
+
+Keyframes define the transition points from one prompt to the next, or the start and end points of a prompted action set in between the total frame count or sequence. These keyframes or markers are necessary to establish smooth transitions or jump cuts, whatever you prefer.
+
+Use the Camera Settings to generate animations with depth and other 3D parameters.  
+            """
+        )
+        st.markdown(
+            f"""
+            ##### How can you construct the visual prompts?
+            
+            - What is the Medium of the stills in your animation? 
+            eg. It is a painting, a sculpture, an old photograph, portrait, 3D render, etc.
+            - What/Who are the Subject(s) or Main Object(s)?
+            eg. A human, an animal, an identity like gender, race, or occupation like dancer, astronaut etc. 
+            - What is the Style?
+            eg. Is it Analogue photography, a watercolor, a line drawing, digital painting etc. 
+            - What are the Details?
+            eg. facial features or expressions, the space and landscape, lighting or the colours etc. 
+
+            [Example]({furl(settings.APP_BASE_URL).add(path='animation-generator').add({"example_id": "czvtn7du"}).url})
+            
+            """
+        )
+        st.markdown(
+            """
+            Pro-tip:
+
+            Changing Elements transition better from a visual prompt that is artefact or object heavy to another busy visual prompt. For example: Prompt 1: a busy street transitions to Prompt 2: a busy interior of a park. This transition will render interesting and beautiful imagery.
+
+            `Transitions from a simpler or plain visual prompt to a more complex visual might be challenging to generate. For example: Prompt 1: a blue sky to Prompt 2: a crowded market. This is because there are fewer artefacts for the generator to transition.`
+
+            This recipe takes any text and creates animation. It's based on the Deforum notebook with lots of details at http://deforum.art.
+
             """
         )
 
@@ -368,6 +428,7 @@ Choose fps for the video.
                     rotation_3d_x=request.rotation_3d_x,
                     rotation_3d_y=request.rotation_3d_y,
                     rotation_3d_z=request.rotation_3d_z,
+                    translation_z="0:(0)",
                     fps=request.fps,
                 ),
             },

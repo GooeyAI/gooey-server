@@ -1,3 +1,4 @@
+import math
 import mimetypes
 import re
 import uuid
@@ -114,11 +115,21 @@ def _heic_to_png(img_bytes: bytes) -> bytes:
 def resize_img_scale(img_bytes: bytes, size: (int, int)) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
-    factor = (size[0] * size[1]) / (img_pil.size[0] * img_pil.size[1])
-    if 1 - factor > 1e-2:
-        img_pil = ImageOps.scale(img_pil, factor)
+    downscale_factor = get_downscale_factor(im_size=img_pil.size, max_size=size)
+    if downscale_factor:
+        img_pil = ImageOps.scale(img_pil, downscale_factor)
     img_cv2 = np.array(img_pil)
     return cv2_img_to_bytes(img_cv2)
+
+
+def get_downscale_factor(*, im_size: (int, int), max_size: (int, int)) -> float | None:
+    downscale_factor = math.sqrt(
+        (max_size[0] * max_size[1]) / (im_size[0] * im_size[1])
+    )
+    if downscale_factor < 0.99:
+        return downscale_factor
+    else:
+        return None
 
 
 def resize_img_fit(img_bytes: bytes, size: (int, int)) -> bytes:

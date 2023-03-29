@@ -13,6 +13,7 @@ from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import (
     scaleserp_location_picker,
 )
@@ -155,13 +156,11 @@ The result is a fantastic, one of kind image that's relevant to your search (and
                 negative_prompt=request.negative_prompt,
                 init_image=selected_image_url,
                 init_image_bytes=selected_image_bytes,
-                ##
                 selected_model=request.selected_model,
                 num_inference_steps=request.quality,
                 prompt_strength=request.prompt_strength,
                 num_outputs=request.num_outputs,
                 guidance_scale=request.guidance_scale,
-                sd_2_upscaling=request.sd_2_upscaling,
                 seed=request.seed,
             )
 
@@ -180,6 +179,9 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             """,
             key="text_prompt",
         )
+
+    def render_usage_guide(self):
+        youtube_video("rnjvtaYYe8g")
 
     def render_settings(self):
         img_model_settings(Img2ImgModels)

@@ -68,20 +68,36 @@ def num_outputs_setting(selected_model: str = None):
     col1, col2 = st.columns(2, gap="medium")
     with col1:
         st.slider(
-            label="##### Number of Outputs",
+            label="""
+            ##### Number of Outputs
+            Change the number of outputs for a single run here:
+            """,
             key="num_outputs",
             min_value=1,
             max_value=4,
             step=1,
         )
+        st.caption(
+            """
+            By default, each run produces one output per Model.
+            """
+        )
     with col2:
         if selected_model != InpaintingModels.dall_e.name:
             st.slider(
-                label="##### Quality",
+                label="""
+                ##### Quality
+                How precise, or focused do you want your output to be? 
+                """,
                 key="quality",
                 min_value=10,
                 max_value=200,
                 step=10,
+            )
+            st.caption(
+                """
+                An increase in output quality is comparable to a gradual progression in any drawing process that begins with a draft version and ends with a finished product. 
+                """
             )
         else:
             st.empty()
@@ -126,16 +142,20 @@ def guidance_scale_setting(selected_model: str = None):
     ]:
         st.number_input(
             label="""
-##### 🎨️ Artistic Pressure
-([*Text Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter)) \\
-How pressurized should the AI feel to produce what you want? \\
-At lower values the image will effectively be random.
-Values that are too high can also distort the image.
+            ##### 🎨️ Artistic Pressure
+            ([*Text Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter)) \\
+            How pressurized should the AI feel to produce what you want?
+            How much creative freedom do you want the AI to have when interpreting your prompt?
             """,
             key="guidance_scale",
             min_value=0.0,
             max_value=25.0,
             step=0.5,
+        )
+        st.caption(
+            """
+            At lower values the image will effectively be random. The standard value is between 6-8. Values that are too high can also distort the image.
+            """
         )
 
 
@@ -185,8 +205,13 @@ def negative_prompt_setting(selected_model: str = None):
     st.text_area(
         """
         ##### 🧽 Negative Prompt
-        This allows you to specify what you DON'T want to see. 
+        This allows you to specify what you DON'T want to see in your output.
         Useful negative prompts can be found [here](https://www.youtube.com/watch?v=cWZsizoAwT4).
         """,
         key="negative_prompt",
+    )
+    st.caption(
+        """
+        Text2Image engines can often generate disproportionate body parts, extra limbs or fingers, strange textures etc. Use negative prompting to avoid disfiguration or for creative outputs like avoiding certain colour schemes, elements or styles.
+    """
     )

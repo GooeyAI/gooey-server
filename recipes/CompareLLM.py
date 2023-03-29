@@ -1,3 +1,4 @@
+import random
 import typing
 
 import streamlit as st
@@ -7,6 +8,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/compare%20llm%20under%201%20mg%20gif.gif"
 
@@ -66,6 +68,9 @@ class CompareLLMPage(BasePage):
         assert st.session_state["input_prompt"], "Please enter a Prompt"
         assert st.session_state["selected_models"], "Please select at least one model"
 
+    def render_usage_guide(self):
+        youtube_video("dhexRRDAuY8")
+
     def render_settings(self):
         language_model_settings(show_selector=False)
 
@@ -105,7 +110,7 @@ class CompareLLMPage(BasePage):
             for idx, text in enumerate(output_text):
                 st.text_area(
                     f"**{LargeLanguageModels[key].value}**",
-                    help=f"output {key} {idx}",
+                    help=f"output {key} {idx} {random.random()}",
                     disabled=True,
                     value=text,
                     height=height,

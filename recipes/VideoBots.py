@@ -37,6 +37,7 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
@@ -231,11 +232,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # assert st.session_state.get("input_face"), "Please provide the Input Face"
 
         document_files: list[UploadedFile] | None = st.session_state.get(
-            "__document_files"
+            "__documents_files"
         )
         if document_files:
-            st.session_state["documents"] = [upload_st_file(f) for f in document_files]
+            uploaded = []
+            for f in document_files:
+                if f.name == "urls.txt":
+                    uploaded.extend(f.getvalue().decode().splitlines())
+                else:
+                    uploaded.append(upload_st_file(f))
+            st.session_state["documents"] = uploaded
         # assert st.session_state.get("documents"), "Please provide at least 1 Document"
+
+    def render_usage_guide(self):
+        youtube_video("N5uJ-MbsSwc")
 
     def render_settings(self):
         st.text_area(
@@ -288,7 +298,7 @@ Enable document search, to use custom documents as information sources.
 """
         )
         if st.session_state.get("documents") or st.session_state.get(
-            "__document_files"
+            "__documents_files"
         ):
             st.text_area(
                 """

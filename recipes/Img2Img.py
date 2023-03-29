@@ -10,6 +10,7 @@ from daras_ai.image_input import (
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
     InpaintingModels,
     Img2ImgModels,
@@ -124,6 +125,9 @@ class Img2ImgPage(BasePage):
     def render_settings(self):
         img_model_settings(Img2ImgModels)
 
+    def render_usage_guide(self):
+        youtube_video("narcZNyuNAg")
+
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
         output_images = st.session_state.get("output_images", [])
@@ -168,7 +172,6 @@ class Img2ImgPage(BasePage):
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
                 init_image=init_image,
-                init_image_bytes=init_image_bytes,
                 num_inference_steps=request.quality,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
@@ -185,7 +188,6 @@ class Img2ImgPage(BasePage):
                 prompt_strength=request.prompt_strength,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
-                # sd_2_upscaling=request.sd_2_upscaling,
                 seed=request.seed,
             )
 

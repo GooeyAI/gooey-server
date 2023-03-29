@@ -59,6 +59,7 @@ from recipes.CompareText2Img import CompareText2ImgPage
 from recipes.CompareUpscaler import CompareUpscalerPage
 from recipes.DeforumSD import DeforumSDPage
 from recipes.DocSearch import DocSearchPage
+from recipes.DocSummary import DocSummaryPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
 from recipes.FaceInpainting import FaceInpaintingPage
 from recipes.GoogleImageGen import GoogleImageGenPage
@@ -72,6 +73,7 @@ from recipes.SEOSummary import SEOSummaryPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
+from recipes.asr import AsrPage
 from routers import billing, facebook, talkjs, realtime
 from wix.wix_functions import (
     get_wix_access_token,
@@ -545,6 +547,8 @@ all_pages: list[typing.Type[BasePage]] = [
     CompareUpscalerPage,
     GoogleGPTPage,
     DocSearchPage,
+    DocSummaryPage,
+    AsrPage,
 ]
 
 

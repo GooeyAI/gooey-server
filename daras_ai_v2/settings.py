@@ -20,7 +20,7 @@ if not DEBUG:
         # Set traces_sample_rate to 1.0 to capture 100%
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
-        traces_sample_rate=0.1,
+        traces_sample_rate=0.01,
         send_default_pii=True,
         integrations=[
             ThreadingIntegration(propagate_hub=True),
@@ -88,11 +88,13 @@ templates = Jinja2Templates(directory="templates")
 FB_APP_ID = config("FB_APP_ID", "")
 FB_APP_SECRET = config("FB_APP_SECRET", "")
 FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
+WHATSAPP_ACCESS_TOKEN = config("WHATSAPP_ACCESS_TOKEN", None)
 
 TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
 TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")
 
 REDIS_URL = config("REDIS_URL", "redis://localhost:6379")
+TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
 
 PINECONE_API_KEY = config("PINECONE_API_KEY", "")
 PINECONE_ENVIRONMENT = config("PINECONE_ENVIRONMENT", "us-east1-gcp")

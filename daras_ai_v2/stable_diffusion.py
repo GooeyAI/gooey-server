@@ -12,6 +12,7 @@ from daras_ai.image_input import (
     bytes_to_cv2_img,
     resize_img_pad,
     resize_img_fit,
+    get_downscale_factor,
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.extract_face import rgb_img_to_rgba
@@ -115,7 +116,7 @@ def sd_upscale(
     image: str,
     num_inference_steps: int,
     negative_prompt: str = None,
-    guidance_scale: float = None,
+    guidance_scale: float,
     seed: int = 42,
 ):
     return call_sd_multi(
@@ -144,7 +145,7 @@ def instruct_pix2pix(
     images: typing.List[str],
     num_inference_steps: int,
     negative_prompt: str = None,
-    guidance_scale: float = None,
+    guidance_scale: float,
     image_guidance_scale: float,
     seed: int = 42,
 ):
@@ -257,8 +258,7 @@ def img2img(
     num_inference_steps: int,
     prompt_strength: float = None,
     negative_prompt: str = None,
-    guidance_scale: float = None,
-    # sd_2_upscaling: bool = False,
+    guidance_scale: float,
     seed: int = 42,
 ):
     prompt_strength = prompt_strength or 0.7
@@ -337,14 +337,11 @@ def controlnet(
     prompt: str,
     num_outputs: int,
     init_image: str,
-    init_image_bytes: bytes = None,
     num_inference_steps: int,
     negative_prompt: str = None,
-    guidance_scale: float = None,
+    guidance_scale: float,
     seed: int = 42,
 ):
-    height, width, _ = bytes_to_cv2_img(init_image_bytes).shape
-    _resolution_check(width, height)
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
         "controlnet",
@@ -395,7 +392,7 @@ def inpainting(
     width: int,
     height: int,
     negative_prompt: str = None,
-    guidance_scale: float = None,
+    guidance_scale: float,
     seed: int = 42,
 ) -> list[str]:
     _resolution_check(width, height)
@@ -524,7 +521,7 @@ def _recomposite_inpainting_outputs(
 
 
 def _resolution_check(width, height):
-    if width * height > IMG_MAX_SIZE[0] * IMG_MAX_SIZE[1]:
+    if get_downscale_factor(im_size=(width, height), max_size=IMG_MAX_SIZE):
         raise ValueError(
             f"Maximum size is {IMG_MAX_SIZE[0]}x{IMG_MAX_SIZE[1]} pixels, because of memory limits. "
             f"Please select a lower width or height."

@@ -19,13 +19,14 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.image_input import upload_st_file
 from daras_ai_v2.GoogleGPT import SearchReference, render_outputs, GoogleGPTPage
+from daras_ai_v2.asr import AsrModels, run_asr
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
 )
 from daras_ai_v2.gdrive_downloader import (
-    gdrive_download,
+    gdrive_download_as_txt,
     is_gdrive_url,
     url_to_gdrive_file_id,
     gdrive_metadata,
@@ -76,6 +77,9 @@ class DocSearchPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
+        selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        google_translate_target: str | None
+
     class ResponseModel(BaseModel):
         output_text: list[str]
 
@@ -91,7 +95,7 @@ class DocSearchPage(BasePage):
         assert search_query, "Please enter a Search Query"
 
         document_files: list[UploadedFile] | None = st.session_state.get(
-            "__document_files"
+            "__documents_files"
         )
         if document_files:
             uploaded = []
@@ -238,6 +242,8 @@ def get_top_k_references(
             f_url=f_url,
             max_context_words=request.max_context_words,
             scroll_jump=request.scroll_jump,
+            selected_asr_model=request.selected_asr_model,
+            google_translate_target=request.google_translate_target,
         )
     ]
     yield f"Searching documents..."
@@ -273,7 +279,22 @@ def doc_url_to_embeds(
     f_url: str,
     max_context_words: int,
     scroll_jump: int,
+    selected_asr_model: str = None,
+    google_translate_target: str = None,
 ):
+    f_name, f_etag = doc_url_to_metadata(f_url)
+    return _doc_url_to_embeds(
+        f_url=f_url,
+        f_name=f_name,
+        f_etag=f_etag,
+        max_context_words=max_context_words,
+        scroll_jump=scroll_jump,
+        selected_asr_model=selected_asr_model,
+        google_translate_target=google_translate_target,
+    )
+
+
+def doc_url_to_metadata(f_url: str) -> (str, str):
     f = furl(f_url)
     if is_gdrive_url(f):
         # extract filename from google drive metadata
@@ -284,13 +305,7 @@ def doc_url_to_embeds(
         # extract filename from url
         f_name = f.path.segments[-1]
         f_etag = None
-    return _doc_url_to_embeds(
-        f_url=f_url,
-        f_name=f_name,
-        f_etag=f_etag,
-        max_context_words=max_context_words,
-        scroll_jump=scroll_jump,
-    )
+    return f_name, f_etag
 
 
 @st.cache_data(show_spinner=False)
@@ -301,15 +316,23 @@ def _doc_url_to_embeds(
     f_etag: str | None,  # used as cache key
     max_context_words: int,
     scroll_jump: int,
+    selected_asr_model: str = None,
+    google_translate_target: str = None,
 ):
-    pages = doc_url_to_text_pages(f_url, f_name)
+    pages = doc_url_to_text_pages(
+        f_url,
+        f_name,
+        f_etag,
+        selected_asr_model=selected_asr_model,
+        google_translate_target=google_translate_target,
+    )
     # split document into chunks
     chunks = list(document_splitter(pages, max_context_words, scroll_jump))
     texts = [snippet for page_num, snippet in chunks]
     metas = [
         {
             "url": f_url + (f"#page={page}" if len(pages) > 1 else ""),
-            "title": f_name,
+            "title": f_name + (f" - Page {page}" if len(pages) > 1 else ""),
             "snippet": snippet,
         }
         for page, snippet in chunks
@@ -326,23 +349,48 @@ def _doc_url_to_embeds(
     return zip(metas, embeds)
 
 
-def doc_url_to_text_pages(f_url: str, f_name: str) -> list[str]:
+@st.cache_data(show_spinner=False)
+def doc_url_to_text_pages(
+    f_url: str,
+    f_name: str,
+    f_etag: str | None,  # used as cache key
+    selected_asr_model: str,
+    google_translate_target: str,
+) -> list[str]:
     f = furl(f_url)
     if is_gdrive_url(f):
         # download from google drive
-        f_bytes = gdrive_download(f)
+        f_bytes = gdrive_download_as_txt(f)
+        # gdrive url doesn't have an extension
+        ext = ".txt"
     else:
         # download from url
         f_bytes = requests.get(f_url).content
+        # get extension from filename
+        ext = os.path.splitext(f_name)[-1].lower()
+    if not ext:  # default to html (useful for URLs)
+        ext = ".html"
+        f_name += ".html"
     # convert document to text
-    ext = os.path.splitext(f_name)[-1].lower()
     match ext:
         case ".pdf":
             pages = pdf_to_text_pages(io.BytesIO(f_bytes))
         case ".docx" | ".md" | ".html":
             pages = [pandoc_to_text(f_name, f_bytes)]
-        case ".txt" | "":
+        case ".txt":
             pages = [f_bytes.decode()]
+        case ".wav" | ".ogg" | ".mp3" | ".aac":
+            if not selected_asr_model:
+                raise ValueError(
+                    "For transcribing audio/video, please choose an ASR model from the settings!"
+                )
+            pages = [
+                run_asr(
+                    f_url,
+                    selected_model=selected_asr_model,
+                    google_translate_target=google_translate_target,
+                )
+            ]
         case _:
             raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
     return pages

@@ -18,6 +18,9 @@ API_KEYS_COLLECTION = "api_keys"
 
 USER_BALANCE_FIELD = "balance"
 
+EXAMPLES_COLLECTION = "examples"
+USER_RUNS_COLLECTION = "user_runs"
+
 _db = firestore.Client()
 
 
