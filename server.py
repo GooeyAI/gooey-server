@@ -78,7 +78,7 @@ from routers import billing, facebook, talkjs, realtime
 from wix.wix_functions import (
     get_wix_access_token,
     trigger_sign_up_email_automation,
-    construct_contact,
+    construct_contact, check_wix_contact_exists,
 )
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -103,9 +103,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.post("/add-to-wix-contact", include_in_schema=False)
 async def add_to_wix_contact(request: Request):
     user_data = await request.json()
+    email = user_data.get("email")
+    # No email-> phone number signin
+    if not email:
+        return
+    # Check if wix contact already exists
+    wix_contact = await check_wix_contact_exists(email)
+    if wix_contact:
+        return
+    # Create wix contact
     contact_data = await construct_contact(user_data)
     response = requests.post(
-        settings.WIX_API_CONTACTS_URL,
+        settings.WIX_API_CREATE_CONTACTS_ENDPOINT,
         headers={
             "Authorization": settings.WIX_API_KEY,
             "wix-site-id": settings.WIX_SITE_ID,
