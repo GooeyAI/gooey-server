@@ -67,5 +67,3 @@ async def check_wix_contact_exists(email) -> bool:
         if primary_info.get("email") == email:
             return True
     return False
-
-
