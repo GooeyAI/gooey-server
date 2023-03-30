@@ -45,6 +45,8 @@ class DocSummaryPage(BasePage):
     title = "Summarize your Docs with GPT"
     slug_versions = ["doc-summary"]
 
+    price = 225
+
     sane_defaults = {
         "sampling_temperature": 0.1,
         "max_tokens": 256,
