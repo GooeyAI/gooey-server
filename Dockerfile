@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     cmake \
     libboost-dev \
+    libfreetype-dev \
 	&& rm -rf /var/lib/apt/lists/*
 RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.03.0.tar.xz' | tar -xJ \
     && cd poppler-23.03.0 \
