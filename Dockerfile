@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     cmake \
     libboost-dev \
-    libfreetype-dev \
+    libmagickwand-dev \
+    libgl1-mesa-glx \
 	&& rm -rf /var/lib/apt/lists/*
 RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.03.0.tar.xz' | tar -xJ \
     && cd poppler-23.03.0 \
@@ -22,10 +23,9 @@ RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.03.0.tar.xz' | tar -xJ
     && cd $WORKDIR \
     && rm -rf poppler-23.03.0
 
+# app dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-opencv \
-    libmagickwand-dev \
-    libgl1-mesa-glx \
     pandoc \
 	&& rm -rf /var/lib/apt/lists/*
 
