@@ -10,12 +10,12 @@ WORKDIR $WORKDIR
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     wget \
-    cmake \
+    cmake . \
     libboost-dev \
 	&& rm -rf /var/lib/apt/lists/*
 RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.03.0.tar.xz' | tar -xJ \
     && cd poppler-23.03.0 \
-    && cmake \
+    && cmake . \
     && ldconfig \
     && make install \
     && cd $WORKDIR \
