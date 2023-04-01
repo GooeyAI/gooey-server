@@ -6,11 +6,24 @@ ENV WORKDIR /usr/src/app
 RUN mkdir -p $WORKDIR
 WORKDIR $WORKDIR
 
+# install latest poppler - https://poppler.freedesktop.org/
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    wget \
+    libboost-dev \
+	&& rm -rf /var/lib/apt/lists/*
+RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.03.0.tar.xz' | tar -xJ \
+    && cd poppler-23.03.0 \
+    && cmake \
+    && ldconfig \
+    && make install \
+    && cd $WORKDIR \
+    && rm -rf poppler-23.03.0
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-opencv \
     libmagickwand-dev \
     libgl1-mesa-glx \
-    build-essential libpoppler-cpp-dev \
     pandoc \
 	&& rm -rf /var/lib/apt/lists/*
 
