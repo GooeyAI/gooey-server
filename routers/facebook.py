@@ -78,7 +78,7 @@ def _on_wa_message(message: dict, metadata: dict):
                     "input_prompt": text,
                 },
                 query_params={
-                    "example_id": "hho7u0f4",
+                    "example_id": "nuwsqmzp",
                 },
             )
             # result = {"output": {"output_text": ["echo:" + text]}}
