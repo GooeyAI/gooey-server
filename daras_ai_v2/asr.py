@@ -23,6 +23,11 @@ asr_model_ids = {
 
 
 def google_translate_language_selector(key="google_translate_target"):
+    """
+    Streamlit widget for selecting a language for Google Translate.
+    :param key: Streamlit key.
+    :return: None
+    """
     languages = google_translate_languages()
     options = list(languages.keys())
     options.insert(0, None)
@@ -38,6 +43,10 @@ def google_translate_language_selector(key="google_translate_target"):
 
 @st.cache_data()
 def google_translate_languages() -> dict[str, str]:
+    """
+    Get list of supported languages for Google Translate.
+    :return: Dictionary of language codes and display names.
+    """
     parent = f"projects/dara-c1b52/locations/global"
     client = translate.TranslationServiceClient()
     supported_languages = client.get_supported_languages(
@@ -50,18 +59,39 @@ def google_translate_languages() -> dict[str, str]:
     }
 
 
+def run_google_translate(texts: list[str], google_translate_target: str) -> list[str]:
+    """
+    Translate text using the Google Translate API.
+    Args:
+        texts (list[str]): Text to be translated.
+        google_translate_target (str): Language code to translate to.
+    Returns:
+        list[str]: Translated text.
+    """
+    translate_client = translate_v2.Client()
+    result = translate_client.translate(
+        texts, target_language=google_translate_target, format_="text"
+    )
+    return [r["translatedText"] for r in result]
+
+
 def run_asr(
     audio: str,
     selected_model: str,
-    google_translate_target: str | None,
 ) -> str:
+    """
+    Run ASR on audio.
+    Args:
+        audio (str): Audio to be transcribed.
+        selected_model (str): ASR model to use.
+    Returns:
+        str: Transcribed text.
+    """
     selected_model = AsrModels[selected_model]
-
     if "hindi" in selected_model.name:
         language = "hindi"
     else:
         language = "english"
-
     if "whisper" in selected_model.name:
         r = requests.post(
             str(GpuEndpoints.whisper),
@@ -89,14 +119,4 @@ def run_asr(
             },
         )
     r.raise_for_status()
-
-    text = r.json()["text"]
-
-    if google_translate_target:
-        translate_client = translate_v2.Client()
-        result = translate_client.translate(
-            [text], target_language=google_translate_target
-        )[0]
-        text = result["translatedText"]
-
-    return text
+    return r.json()["text"]

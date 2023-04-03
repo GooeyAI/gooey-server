@@ -1,5 +1,7 @@
 import streamlit as st
+from streamlit.runtime.uploaded_file_manager import UploadedFile
 
+from daras_ai.image_input import upload_st_file
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, google_translate_language_selector
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -34,6 +36,38 @@ def document_uploader(
             type=type,
             accept_multiple_files=True,
         )
+
+
+def validate_upload_documents(
+    *,
+    key="documents",
+    required=True,
+) -> None:
+    """
+    Validate the user documents, upload them and save to the session state.
+
+    Args:
+        key: the key to save the documents to in the session state
+        required: whether the documents are required or not
+
+    Returns:
+        None
+    """
+    uploaded_files: list[UploadedFile] | None = st.session_state.get(f"__{key}_files")
+    if uploaded_files:
+        uploaded = []
+        for f in uploaded_files:
+            # if the file is a urls.txt file
+            if f.name == "urls.txt":
+                # add the urls from the file
+                uploaded.extend(f.getvalue().decode().splitlines())
+            else:
+                # add the url after uploading file
+                uploaded.append(upload_st_file(f))
+        # save the urls to the session state
+        st.session_state[key] = uploaded
+    if required:
+        assert st.session_state.get(key), "Please provide at least 1 Document"
 
 
 def doc_search_settings():
