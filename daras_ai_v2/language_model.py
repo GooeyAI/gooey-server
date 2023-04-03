@@ -6,7 +6,7 @@ from time import sleep
 
 import openai
 from decouple import config
-from openai.error import ServiceUnavailableError, RateLimitError
+import openai.error
 from transformers import GPT2TokenizerFast
 
 from daras_ai_v2 import settings
@@ -65,7 +65,13 @@ def calc_gpt_tokens(text: str) -> int:
 def do_retry(
     max_retries: int = 5,
     retry_delay: float = 5,
-    error_cls=(ServiceUnavailableError, RateLimitError),
+    error_cls=(
+        openai.error.Timeout,
+        openai.error.APIError,
+        openai.error.APIConnectionError,
+        openai.error.RateLimitError,
+        openai.error.ServiceUnavailableError,
+    ),
 ):
     def decorator(fn):
         @wraps(fn)
