@@ -17,6 +17,7 @@ import requests
 import streamlit as st
 from furl import furl
 from pydantic import BaseModel
+from pympler.util.bottle import Jinja2Template
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.face_restoration import map_parallel
@@ -204,6 +205,13 @@ class DocSearchPage(BasePage):
             raise ValueError(
                 f"Your search - {request.search_query} - did not match any documents."
             )
+        # get the response template if it exists
+        try:
+            response_template = jinja2.Template(
+                references[0]["response_template"].strip()
+            )
+        except (IndexError, KeyError):
+            response_template = None
 
         prompt = ""
         # add time to instructions
@@ -229,12 +237,11 @@ class DocSearchPage(BasePage):
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
         )
-        output_text = [
-            jinja2.Template(references[0]["response_template"]).render(
-                **references[0], output_text=text
-            )
-            for text in output_text
-        ]
+        if response_template:
+            output_text = [
+                response_template.render(**references[0], output_text=text)
+                for text in output_text
+            ]
         state["output_text"] = output_text
 
 
