@@ -491,7 +491,9 @@ Use this for prompting GPT to use the document search results.
                 )
             # get the response template if it exists
             try:
-                response_template = references[0]["response_template"].strip()
+                response_template = jinja2.Template(
+                    references[0]["response_template"].strip()
+                )
             except (IndexError, KeyError):
                 pass
 
@@ -568,9 +570,8 @@ Use this for prompting GPT to use the document search results.
             saved_msgs[-1]["content"] = output_text[0]
 
         if response_template:
-            template = jinja2.Template(response_template)
             output_text = [
-                template.render(**references[0], output_text=text)
+                response_template.render(**references[0], output_text=text)
                 for text in output_text
             ]
         saved_msgs[-1]["content"] = output_text[0]
