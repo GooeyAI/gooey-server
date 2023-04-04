@@ -1,12 +1,12 @@
 import re
-import typing
 from enum import Enum
 from functools import wraps
 from time import sleep
 
 import openai
-from decouple import config
 import openai.error
+import typing_extensions
+from decouple import config
 from transformers import GPT2TokenizerFast
 
 from daras_ai_v2 import settings
@@ -103,9 +103,9 @@ def get_embeddings(
     return [record["embedding"] for record in res["data"]]
 
 
-class ConversationEntry(typing.TypedDict):
+class ConversationEntry(typing_extensions.TypedDict):
     role: str
-    display_name: str | None
+    display_name: typing_extensions.NotRequired[str]
     content: str
 
 

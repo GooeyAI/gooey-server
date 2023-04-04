@@ -12,6 +12,8 @@ from starlette.responses import HTMLResponse, Response
 
 from daras_ai.face_restoration import map_parallel
 from daras_ai_v2 import settings, db
+from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
+
 
 router = APIRouter()
 
@@ -20,6 +22,10 @@ PAGE_NOT_CONNECTED_ERROR = (
     "Looks like you haven't connected this page to a gooey.ai workflow. "
     "Please go to the Integrations Tab and connect this page."
 )
+
+
+RESET_KEYWORD = "reset"
+RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
 
 
 @router.post("/__/fb/webhook/")
@@ -50,15 +56,17 @@ async def fb_webhook(request: Request, background_tasks: BackgroundTasks):
 
 
 def _on_wa_message(message: dict, metadata: dict):
-    from server import call_api, page_map, normalize_slug
+    from server import call_api
     from recipes.VideoBots import VideoBotsPage
+
+    bot_number = metadata["phone_number_id"]
+    user_number = message["from"]
 
     match message["type"]:
         case "text":
-            phone_number_id = metadata["phone_number_id"]
             # send read receipt
             r = requests.post(
-                f"https://graph.facebook.com/v16.0/{phone_number_id}/messages",
+                f"https://graph.facebook.com/v16.0/{bot_number}/messages",
                 headers={
                     "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
                 },
@@ -71,18 +79,37 @@ def _on_wa_message(message: dict, metadata: dict):
             print(r.status_code, r.json())
             # make API call
             text = message["text"]["body"]
-            result = call_api(
-                page_cls=VideoBotsPage,
-                user=auth.get_user("BdKPkn4uZ1Ys0vXTnxNnyPyXixt1"),
-                request_body={
-                    "input_prompt": text,
-                },
-                query_params={
-                    "example_id": "nuwsqmzp",
-                },
-            )
-            # result = {"output": {"output_text": ["echo:" + text]}}
-            response_text = result["output"]["output_text"][0]
+            if text.strip().lower() == RESET_KEYWORD:
+                saved_msgs = []
+                response_text = RESET_MSG
+                result = {"output": {"output_text": [response_text]}}
+            else:
+                saved_msgs = db.get_user_msgs(
+                    bot_id=bot_number,
+                    user_id=user_number,
+                )
+                result = call_api(
+                    page_cls=VideoBotsPage,
+                    user=auth.get_user("BdKPkn4uZ1Ys0vXTnxNnyPyXixt1"),
+                    request_body={
+                        "input_prompt": text,
+                        "messages": saved_msgs,
+                    },
+                    query_params={
+                        "example_id": "nuwsqmzp",
+                    },
+                )
+                response_text = result["output"]["output_text"][0]
+                saved_msgs += [
+                    {
+                        "role": CHATML_ROLE_USER,
+                        "content": text,
+                    },
+                    {
+                        "role": CHATML_ROLE_ASSISSTANT,
+                        "content": response_text,
+                    },
+                ]
             # send reply
             try:
                 response_video = result["output"]["output_video"][0]
@@ -115,7 +142,13 @@ def _on_wa_message(message: dict, metadata: dict):
                     }
                 ]
             send_wa_messages(
-                phone_number_id=phone_number_id, to=message["from"], messages=replies
+                phone_number_id=bot_number, to=user_number, messages=replies
+            )
+            db.save_user_msgs(
+                bot_id=bot_number,
+                user_id=user_number,
+                messages=saved_msgs,
+                platform="wa",
             )
 
 
@@ -140,23 +173,27 @@ def _on_message(object_name: str, messaging: dict):
     if not text:
         return
 
-    sender_id = messaging["sender"]["id"]
-    recipient_id = messaging["recipient"]["id"]
+    user_id = messaging["sender"]["id"]
+    bot_id = messaging["recipient"]["id"]
 
-    if object_name == "instagram":
+    is_instagram = object_name == "instagram"
+    is_facebook = object_name == "page"
+
+    if is_instagram:
+        # need to resolve the facebook page_id for this instagram page
         try:
             snapshot = list(
                 db.get_collection_ref(db.FB_PAGES_COLLECTION)
-                .where("ig_account_id", "==", recipient_id)
+                .where("ig_account_id", "==", bot_id)
                 .limit(1)
                 .get()
             )[0]
         except IndexError:
             return
-        page_id = snapshot.id
-    elif object_name == "page":
-        page_id = recipient_id
-        snapshot = db.get_fb_page_ref(page_id).get()
+        bot_id = snapshot.id
+    elif is_facebook:
+        bot_id = bot_id
+        snapshot = db.get_fb_page_ref(bot_id).get()
     else:
         return
 
@@ -169,11 +206,11 @@ def _on_message(object_name: str, messaging: dict):
     if not access_token:
         return
 
-    if object_name == "page":
+    if is_facebook:
         _send_messages(
-            page_id=page_id,
+            page_id=bot_id,
             access_token=access_token,
-            recipient_id=sender_id,
+            recipient_id=user_id,
             messages=[
                 {"sender_action": "mark_seen"},
                 {"sender_action": "typing_on"},
@@ -185,9 +222,9 @@ def _on_message(object_name: str, messaging: dict):
     page_slug = fb_page.get("connected_page_slug")
     if not page_slug:
         _send_messages(
-            page_id=page_id,
+            page_id=bot_id,
             access_token=access_token,
-            recipient_id=sender_id,
+            recipient_id=user_id,
             messages=[
                 {
                     "messaging_type": "RESPONSE",
@@ -202,16 +239,35 @@ def _on_message(object_name: str, messaging: dict):
         page_cls = page_map[page_slug]
     except KeyError:
         return
-    result = call_api(
-        page_cls=page_cls,
-        user=auth.get_user(fb_page["uid"]),
-        request_body={
-            "input_prompt": text,
-        },
-        query_params=fb_page.get("connected_query_params") or {},
-    )
-
-    response_text = result["output"]["output_text"][0]
+    if text.strip().lower() == RESET_KEYWORD:
+        saved_msgs = []
+        response_text = RESET_MSG
+        result = {"output": {"output_text": [response_text]}}
+    else:
+        saved_msgs = db.get_user_msgs(
+            bot_id=bot_id,
+            user_id=user_id,
+        )
+        result = call_api(
+            page_cls=page_cls,
+            user=auth.get_user(fb_page["uid"]),
+            request_body={
+                "input_prompt": text,
+                "messages": saved_msgs,
+            },
+            query_params=fb_page.get("connected_query_params") or {},
+        )
+        response_text = result["output"]["output_text"][0]
+        saved_msgs += [
+            {
+                "role": CHATML_ROLE_USER,
+                "content": text,
+            },
+            {
+                "role": CHATML_ROLE_ASSISSTANT,
+                "content": response_text,
+            },
+        ]
     messages = [
         {
             "messaging_type": "RESPONSE",
@@ -258,10 +314,17 @@ def _on_message(object_name: str, messaging: dict):
         )
 
     _send_messages(
-        page_id=page_id,
+        page_id=bot_id,
         access_token=access_token,
-        recipient_id=sender_id,
+        recipient_id=user_id,
         messages=messages,
+    )
+
+    db.save_user_msgs(
+        bot_id=bot_id,
+        user_id=user_id,
+        messages=saved_msgs,
+        platform="fb" if is_facebook else "ig",
     )
 
 

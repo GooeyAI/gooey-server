@@ -1,4 +1,5 @@
 import datetime
+import typing
 
 from firebase_admin import auth
 from google.cloud import firestore
@@ -20,6 +21,8 @@ USER_BALANCE_FIELD = "balance"
 
 EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
+
+USER_CHAT_HISTORY_COLLECTION = "user_chat_history"
 
 _db = firestore.Client()
 
@@ -169,3 +172,35 @@ def update_pages_for_user(page_docs_list: list[(str, dict)], uid: str):
 
 def get_fb_page_ref(page_id):
     return _db.collection(FB_PAGES_COLLECTION).document(page_id)
+
+
+def get_user_msgs(*, bot_id: str, user_id: str) -> list:
+    doc_ref = get_doc_ref(
+        collection_id=USER_CHAT_HISTORY_COLLECTION,
+        document_id=f"{bot_id}:{user_id}",
+    )
+    doc = doc_ref.get()
+    if doc.exists:
+        return doc.to_dict().get("messages", [])
+    return []
+
+
+def save_user_msgs(
+    *,
+    bot_id: str,
+    user_id: str,
+    messages: list,
+    platform: typing.Literal["fb", "ig", "wa"],
+):
+    doc_ref = get_doc_ref(
+        collection_id=USER_CHAT_HISTORY_COLLECTION,
+        document_id=f"{bot_id}:{user_id}",
+    )
+    doc_ref.set(
+        {
+            "platform": platform,
+            "bot_id": bot_id,
+            "user_id": user_id,
+            "messages": messages,
+        }
+    )
