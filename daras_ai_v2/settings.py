@@ -58,7 +58,7 @@ EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 IFRAME_BASE_URL = config("IFRAME_BASE_URL", "/__/st/")
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
-# GPU_SERVER_2 = furl(config("GPU_SERVER_2", "http://gpu-2.gooey.ai"))
+GPU_SERVER_2 = furl(config("GPU_SERVER_2", "http://gpu-2.gooey.ai"))
 
 SCALESERP_API_KEY = config("SCALESERP_API_KEY", None)
 

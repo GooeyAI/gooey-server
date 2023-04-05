@@ -291,7 +291,6 @@ def _on_msg(bot: BotInterface):
         response_text = RESET_MSG
         response_audio = None
         response_video = None
-    # make API call to gooey bots to get the response
     else:
         # translate response text, but don't save the translated text
         if bot.language != "en":
@@ -300,6 +299,7 @@ def _on_msg(bot: BotInterface):
                 google_translate_target="en",
             )[0]
         try:
+            # make API call to gooey bots to get the response
             response_text, response_audio, response_video, saved_msgs = _process_msg(
                 page_cls=bot.page_cls,
                 api_user=billing_account,
