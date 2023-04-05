@@ -1,6 +1,7 @@
 import datetime
 import typing
 
+
 from firebase_admin import auth
 from google.cloud import firestore
 from google.cloud.firestore_v1.transaction import Transaction
@@ -8,7 +9,6 @@ from starlette.requests import Request
 
 from daras_ai_v2 import settings
 
-FB_PAGES_COLLECTION = "fb_pages"
 
 FIREBASE_SESSION_COOKIE = "firebase_session"
 ANONYMOUS_USER_COOKIE = "anonymous_user"
@@ -23,6 +23,10 @@ EXAMPLES_COLLECTION = "examples"
 USER_RUNS_COLLECTION = "user_runs"
 
 USER_CHAT_HISTORY_COLLECTION = "user_chat_history"
+
+CONNECTED_BOTS_COLLECTION = "connected_bots"
+
+BOT_PLATFORM_LITERAL = typing.Literal["fb", "ig", "wa"]
 
 _db = firestore.Client()
 
@@ -144,7 +148,7 @@ def get_doc_ref(
 
 
 def get_page_access_token(page_id: str) -> str | None:
-    doc_ref = get_fb_page_ref(page_id)
+    doc_ref = get_connected_bot_page_ref("fb", page_id)
     return get_doc_field(doc_ref, "access_token")
 
 
@@ -153,10 +157,13 @@ def update_pages_for_user(page_docs_list: list[(str, dict)], uid: str):
     batch = _db.batch()
 
     existing_user_pages = (
-        _db.collection(FB_PAGES_COLLECTION).where("uid", "==", uid).get()
+        _db.collection(CONNECTED_BOTS_COLLECTION)
+        .where("uid", "==", uid)
+        .where("platform", "==", "fb")
+        .get()
     )
     for snapshot in existing_user_pages:
-        if snapshot.id in page_docs:
+        if snapshot.id.split(":")[1] in page_docs:
             # update page data because it belongs to same user
             batch.update(snapshot.reference, page_docs.pop(snapshot.id))
         else:
@@ -165,13 +172,15 @@ def update_pages_for_user(page_docs_list: list[(str, dict)], uid: str):
 
     for page_id, page_doc in page_docs.items():
         # create / overwrite data for new pages
-        batch.set(get_fb_page_ref(page_id), page_doc)
+        batch.set(get_connected_bot_page_ref("fb", page_id), page_doc)
 
     batch.commit()
 
 
-def get_fb_page_ref(page_id):
-    return _db.collection(FB_PAGES_COLLECTION).document(page_id)
+def get_connected_bot_page_ref(
+    platform: BOT_PLATFORM_LITERAL, bot_id: str
+) -> firestore.DocumentReference:
+    return _db.collection(CONNECTED_BOTS_COLLECTION).document(f"{platform}:{bot_id}")
 
 
 def get_user_msgs(*, bot_id: str, user_id: str) -> list:
@@ -190,7 +199,7 @@ def save_user_msgs(
     bot_id: str,
     user_id: str,
     messages: list,
-    platform: typing.Literal["fb", "ig", "wa"],
+    platform: BOT_PLATFORM_LITERAL,
 ):
     doc_ref = get_doc_ref(
         collection_id=USER_CHAT_HISTORY_COLLECTION,

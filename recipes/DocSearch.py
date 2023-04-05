@@ -403,8 +403,7 @@ def _doc_url_to_embeds_cached(
     )
     metas: list[SearchReference]
     if isinstance(pages, pd.DataFrame):
-        print(pages)
-        texts = list(pages["snippet"])
+        texts = pages["snippet"].tolist()
         metas = [
             {
                 "title": doc_meta.name,

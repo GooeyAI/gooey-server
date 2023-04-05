@@ -652,7 +652,7 @@ Use this for prompting GPT to use the document search results.
         if "__fb_pages" not in st.session_state:
             with st.spinner("Loading Facebook Pages..."):
                 fb_pages = (
-                    db.get_collection_ref(db.FB_PAGES_COLLECTION)
+                    db.get_collection_ref(db.CONNECTED_BOTS_COLLECTION)
                     .where("uid", "==", user.uid)
                     .get()
                 )

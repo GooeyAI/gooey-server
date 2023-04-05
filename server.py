@@ -314,12 +314,18 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         user: auth.UserRecord = Depends(api_auth_header),
         page_request: page_cls.RequestModel = body_spec,
     ):
-        return call_api(
-            page_cls=page_cls,
-            user=user,
-            request_body=page_request.dict(),
-            query_params=request.query_params,
-        )
+        try:
+            return call_api(
+                page_cls=page_cls,
+                user=user,
+                request_body=page_request.dict(),
+                query_params=request.query_params,
+            )
+        except HTTPException as e:
+            return JSONResponse(
+                status_code=e.status_code,
+                content=e.detail,
+            )
 
 
 def call_api(
@@ -328,7 +334,7 @@ def call_api(
     user: auth.UserRecord,
     request_body: dict,
     query_params,
-):
+) -> dict:
     created_at = datetime.datetime.utcnow().isoformat()
     # init a new page for every request
     page = page_cls()
@@ -358,9 +364,9 @@ def call_api(
     balance = db.get_doc_field(db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0)
     if balance < page.get_price():
         account_url = furl(settings.APP_BASE_URL) / "account"
-        return JSONResponse(
+        raise HTTPException(
             status_code=402,
-            content={
+            detail={
                 "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
             },
         )
@@ -383,9 +389,9 @@ def call_api(
             pass
     except Exception as e:
         capture_exception(e)
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "id": run_id,
                 "url": run_url,
                 "created_at": created_at,
