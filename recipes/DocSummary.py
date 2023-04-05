@@ -42,8 +42,8 @@ DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot
 
 class CombineDocumentsChains(Enum):
     map_reduce = "Map Reduce"
-    refine = "Refine"
-    stuff = "Stuffing (Only works for small documents)"
+    # refine = "Refine"
+    # stuff = "Stuffing (Only works for small documents)"
 
 
 class DocSummaryPage(BasePage):
@@ -93,7 +93,7 @@ class DocSummaryPage(BasePage):
             CombineDocumentsChains,
             label="""
 #### 🦜🔗 LangChain Type
-[Read More](https://langchain.readthedocs.io/en/latest/modules/indexes/combine_docs.html)
+[Read More](https://docs.langchain.com/docs/components/chains/index_related_chains)
 """,
             key="chain_type",
         )
