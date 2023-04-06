@@ -4,6 +4,7 @@ from daras_ai.init import init_scripts
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from recipes.DocSearch import DocSearchPage
 from recipes.DocSummary import DocSummaryPage
+from recipes.Lipsync import LipsyncPage
 from recipes.asr import AsrPage
 
 init_scripts()
@@ -51,28 +52,27 @@ from recipes.TextToSpeech import TextToSpeechPage
 
 assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
-
 page_classes = [
-    VideoBotsPage,
-    SEOSummaryPage,
-    GoogleImageGenPage,
-    CompareLLMPage,
-    CompareText2ImgPage,
-    FaceInpaintingPage,
-    EmailFaceInpaintingPage,
-    SocialLookupEmailPage,
-    TextToSpeechPage,
-    LipsyncTTSPage,
-    ObjectInpaintingPage,
-    ImageSegmentationPage,
-    Img2ImgPage,
-    DeforumSDPage,
-    CompareUpscalerPage,
-    GoogleGPTPage,
     DocSearchPage,
     DocSummaryPage,
+    GoogleGPTPage,
+    VideoBotsPage,
+    LipsyncTTSPage,
+    TextToSpeechPage,
     AsrPage,
-    # LipsyncPage,
+    LipsyncPage,
+    DeforumSDPage,
+    CompareText2ImgPage,
+    Img2ImgPage,
+    FaceInpaintingPage,
+    GoogleImageGenPage,
+    CompareUpscalerPage,
+    SEOSummaryPage,
+    EmailFaceInpaintingPage,
+    SocialLookupEmailPage,
+    ObjectInpaintingPage,
+    ImageSegmentationPage,
+    CompareLLMPage,
     # ChyronPlantPage,
 ]
 
