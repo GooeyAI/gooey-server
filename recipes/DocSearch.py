@@ -484,7 +484,7 @@ def doc_url_to_text_pages(
                 )
             pages = [run_asr(f_url, selected_model=selected_asr_model)]
         case ".csv" | ".xlsx" | ".tsv" | ".ods":
-            df = pd.read_csv(io.BytesIO(f_bytes))
+            df = pd.read_csv(io.BytesIO(f_bytes), dtype=str).dropna()
             assert (
                 "snippet" in df.columns
             ), f'uploaded spreadsheet must contain a "snippet" column - {f_name !r}'
