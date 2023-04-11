@@ -640,7 +640,10 @@ class BasePage:
         example_id, *_ = extract_query_params(query_params)
         uid = current_user.uid
 
-        self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
+        Thread(
+            target=self.run_doc_ref(run_id, uid).set,
+            args=[self.state_to_doc(st.session_state)],
+        ).start()
         gooey_reset_query_parm(
             **self._clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
         )
@@ -661,7 +664,7 @@ class BasePage:
                 html_spinner("Starting...")
             run_id, uid = self._pre_run_checklist()
             # scroll_to_spinner()
-            if not self.check_credits():
+            if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
                 placeholder.empty()
                 return
             self._run_in_thread(run_id, uid)

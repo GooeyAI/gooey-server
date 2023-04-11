@@ -16,8 +16,8 @@ import pdftotext
 import requests
 import streamlit as st
 from furl import furl
+from googleapiclient.errors import HttpError
 from pydantic import BaseModel
-from pympler.util.bottle import Jinja2Template
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.face_restoration import map_parallel
@@ -43,6 +43,7 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.search_ref import apply_response_template
 
 DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
 
@@ -205,13 +206,6 @@ class DocSearchPage(BasePage):
             raise ValueError(
                 f"Your search - {request.search_query} - did not match any documents."
             )
-        # get the response template if it exists
-        try:
-            response_template = jinja2.Template(
-                references[0]["response_template"].strip()
-            )
-        except (IndexError, KeyError):
-            response_template = None
 
         prompt = ""
         # add time to instructions
@@ -237,11 +231,7 @@ class DocSearchPage(BasePage):
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
         )
-        if response_template:
-            output_text = [
-                response_template.render(**references[0], output_text=text)
-                for text in output_text
-            ]
+        apply_response_template(output_text, references)
         state["output_text"] = output_text
 
 
@@ -359,7 +349,16 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
     f = furl(f_url)
     if is_gdrive_url(f):
         # extract filename from google drive metadata
-        meta = gdrive_metadata(url_to_gdrive_file_id(f))
+        try:
+            meta = gdrive_metadata(url_to_gdrive_file_id(f))
+        except HttpError as e:
+            if e.status_code == 404:
+                raise FileNotFoundError(
+                    f"Could not download the google doc at {f_url} "
+                    f"Please make sure to make the document public for viewing."
+                ) from e
+            else:
+                raise
         name = meta["name"]
         etag = meta.get("md5Checksum") or meta.get("modifiedTime")
         mime_type = meta["mimeType"]
@@ -403,7 +402,6 @@ def _doc_url_to_embeds_cached(
     )
     metas: list[SearchReference]
     if isinstance(pages, pd.DataFrame):
-        texts = pages["snippet"].tolist()
         metas = [
             {
                 "title": doc_meta.name,
@@ -417,7 +415,6 @@ def _doc_url_to_embeds_cached(
     else:
         # split document into chunks
         chunks = list(document_splitter(pages, max_context_words, scroll_jump))
-        texts = [snippet for page_num, snippet in chunks]
         metas = [
             {
                 "title": doc_meta.name + (f" - Page {page}" if len(pages) > 1 else ""),
@@ -430,6 +427,7 @@ def _doc_url_to_embeds_cached(
     # get doc embeds in batches
     embeds = []
     batch_size = 100
+    texts = [m["title"] + "\n\n" + m["snippet"] for m in metas]
     num_batches = math.ceil(len(texts) / batch_size)
     for i in range(num_batches):
         # progress = int(i / num_batches * 100)

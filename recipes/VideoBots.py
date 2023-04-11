@@ -4,7 +4,6 @@ import os.path
 import re
 import typing
 
-import jinja2
 import streamlit as st
 from furl import furl
 from pydantic import BaseModel
@@ -16,6 +15,10 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2 import db
 from daras_ai_v2.GoogleGPT import SearchReference
+from daras_ai_v2.asr import (
+    run_google_translate,
+    google_translate_language_selector,
+)
 from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
@@ -39,6 +42,7 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.search_ref import apply_response_template
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
@@ -88,6 +92,38 @@ configUrl: %r,
         """
         % config_url
     )
+
+
+def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
+    # run regex to find scripted messages in script text
+    script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
+    # extract system message from script
+    system_message = bot_script
+    if script_matches:
+        system_message = system_message[: script_matches[0].start()]
+    system_message = system_message.strip()
+    # extract pre-scripted messages from script
+    scripted_msgs: list[ConversationEntry] = []
+    for idx in range(len(script_matches)):
+        match = script_matches[idx]
+        try:
+            next_match = script_matches[idx + 1]
+        except IndexError:
+            next_match_start = None
+        else:
+            next_match_start = next_match.start()
+        if (len(script_matches) - idx) % 2 == 0:
+            role = CHATML_ROLE_USER
+        else:
+            role = CHATML_ROLE_ASSISSTANT
+        scripted_msgs.append(
+            {
+                "role": role,
+                "display_name": match.group(1).strip(),
+                "content": bot_script[match.end() : next_match_start].strip(),
+            }
+        )
+    return system_message, scripted_msgs
 
 
 class VideoBotsPage(BasePage):
@@ -165,8 +201,11 @@ class VideoBotsPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
+        user_language: str | None
+
     class ResponseModel(BaseModel):
         final_prompt: str
+        # raw_output_text: list[str]
         output_text: list[str]
 
         # tts
@@ -224,6 +263,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             height=50,
         )
 
+        st.checkbox("♻️ Disable Memory", value=True, key="__clear_msgs")
+
         document_uploader(
             """
 ##### 📄 Documents (*optional*)
@@ -264,6 +305,13 @@ Enable document search, to use custom documents as information sources.
             """,
             key="bot_script",
             height=300,
+        )
+        google_translate_language_selector(
+            """
+            ###### 🔠 User Language
+            If provided, the bot will translate input prompt to english, and the responses to this language.
+            """,
+            key="user_language",
         )
         st.write("---")
 
@@ -357,8 +405,8 @@ Use this for prompting GPT to use the document search results.
                 st.write(text)
 
         messages = st.session_state.get("messages", [])
-        if messages and st.button("🗑️ Clear History"):
-            messages.clear()
+        # if messages and st.checkbox("🗑️ Clear History"):
+        #     messages.clear()
         if messages:
             with st.expander(f"💬 Conversation", expanded=True):
                 for entry in messages:
@@ -399,20 +447,31 @@ Use this for prompting GPT to use the document search results.
             height=300,
         )
 
+        # for idx, text in enumerate(st.session_state.get("raw_output_text", [])):
+        #     st.text_area(
+        #         f"**Raw Text Response {idx + 1}**",
+        #         value=text,
+        #         disabled=True,
+        #     )
+
         col1, col2 = st.columns(2)
         with col1:
             for idx, text in enumerate(st.session_state.get("output_text", [])):
                 st.text_area(
-                    f"Text Response {idx + 1}",
+                    f"**Final Response {idx + 1}**",
                     value=text,
                     disabled=True,
                 )
         with col2:
             for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
-                st.write(f"Generated Audio {idx + 1}")
+                st.write(f"**Generated Audio {idx + 1}**")
                 st.audio(audio_url)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
+        clear_msgs = state.get("__clear_msgs")
+        if clear_msgs:
+            state.get("messages", []).clear()
+
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
         user_input = request.input_prompt.strip()
@@ -422,34 +481,16 @@ Use this for prompting GPT to use the document search results.
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
-        # run regex to find scripted messages in script text
-        script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
-        # extract system message from script
-        system_message = bot_script
-        if script_matches:
-            system_message = system_message[: script_matches[0].start()]
-        system_message = system_message.strip()
-        # extract pre-scripted messages from script
-        scripted_msgs = []
-        for idx in range(len(script_matches)):
-            match = script_matches[idx]
-            try:
-                next_match = script_matches[idx + 1]
-            except IndexError:
-                next_match_start = None
-            else:
-                next_match_start = next_match.start()
-            if (len(script_matches) - idx) % 2 == 0:
-                role = CHATML_ROLE_USER
-            else:
-                role = CHATML_ROLE_ASSISSTANT
-            scripted_msgs.append(
-                {
-                    "role": role,
-                    "display_name": match.group(1).strip(),
-                    "content": bot_script[match.end() : next_match_start].strip(),
-                }
-            )
+        # translate input text
+        if request.user_language and request.user_language != "en":
+            yield f"Translating input to english..."
+            user_input = run_google_translate(
+                texts=[user_input],
+                google_translate_target="en",
+            )[0]
+
+        # parse the bot script
+        system_message, scripted_msgs = parse_script(bot_script)
 
         # get user/bot display names
         try:
@@ -470,44 +511,8 @@ Use this for prompting GPT to use the document search results.
             }
         )
 
-        response_template = None
-        # if documents are provided, run doc search and include results in system message
-        if request.documents:
-            # formulate the search query as a history of all the messages
-            state["search_query"] = "\n\n".join(msg["content"] for msg in saved_msgs)
-            # perform doc search
-            references = yield from get_top_k_references(
-                DocSearchPage.RequestModel.parse_obj(state)
-            )
-            state["references"] = references
-            # if doc search is successful, add the search results to the prompt
-            if references:
-                system_message = (
-                    references_as_prompt(references)
-                    + "\n\n"
-                    + system_message
-                    + "\n"
-                    + request.task_instructions.strip()
-                )
-            # get the response template if it exists
-            try:
-                response_template = jinja2.Template(
-                    references[0]["response_template"].strip()
-                )
-            except (IndexError, KeyError):
-                pass
+        prompt_messages = []
 
-        if not use_chatgpt:
-            # assistant prompt to triger a model response
-            saved_msgs.append(
-                {
-                    "role": CHATML_ROLE_ASSISSTANT,
-                    "display_name": bot_display_name,
-                    "content": "",
-                }
-            )
-
-        all_messages = scripted_msgs + saved_msgs
         # add the system message
         if system_message:
             # # replace current user's name
@@ -520,11 +525,53 @@ Use this for prompting GPT to use the document search results.
             utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
             system_message = system_message.replace("{{ datetime.utcnow }}", utcnow)
             # insert to top
-            all_messages.insert(
-                0, {"role": CHATML_ROLE_SYSTEM, "content": system_message}
+            prompt_messages.append(
+                {"role": CHATML_ROLE_SYSTEM, "content": system_message}
             )
-        # use the entire conversation as the prompt
-        prompt = "\n".join(format_chatml_message(entry) for entry in all_messages)
+
+        prompt_messages += scripted_msgs
+        prompt_messages += saved_msgs
+
+        references = None
+        # if documents are provided, run doc search and include results in prompt
+        if request.documents:
+            # formulate the search query as a history of all the messages
+            state["search_query"] = "\n\n".join(msg["content"] for msg in saved_msgs)
+            # perform doc search
+            references = yield from get_top_k_references(
+                DocSearchPage.RequestModel.parse_obj(state)
+            )
+            state["references"] = references
+            # if doc search is successful, add the search results to prompt
+            if references:
+                # system_message = (
+                #     references_as_prompt(references)
+                #     + "\n\n"
+                #     + system_message
+                #     + "\n"
+                #     + request.task_instructions.strip()
+                # )
+                prompt_messages[-1] = {
+                    **prompt_messages[-1],
+                    "content": (
+                        references_as_prompt(references)
+                        + f"\n**********\nInstructions: {request.task_instructions.strip()}\n**********\n"
+                        + prompt_messages[-1]["content"]
+                    ),
+                }
+
+        # for backwards compat with non-chat models
+        if not use_chatgpt:
+            # assistant prompt to triger a model response
+            prompt_messages.append(
+                {
+                    "role": CHATML_ROLE_ASSISSTANT,
+                    "display_name": bot_display_name,
+                    "content": "",
+                }
+            )
+
+        prompt = "\n".join(format_chatml_message(entry) for entry in prompt_messages)
         state["final_prompt"] = prompt
         # ensure input script is not too big
         max_allowed_tokens = GPT3_MAX_ALLOED_TOKENS - calc_gpt_tokens(prompt)
@@ -536,7 +583,8 @@ Use this for prompting GPT to use the document search results.
             yield "Running ChatGPT..."
             output_messages = run_chatgpt(
                 messages=[
-                    {"role": s["role"], "content": s["content"]} for s in all_messages
+                    {"role": s["role"], "content": s["content"]}
+                    for s in prompt_messages
                 ],
                 max_tokens=max_allowed_tokens,
                 # quality=request.quality,
@@ -546,14 +594,6 @@ Use this for prompting GPT to use the document search results.
             )
             # convert msgs to text
             output_text = [entry["content"] for entry in output_messages]
-            # save model response
-            saved_msgs.append(
-                {
-                    "role": CHATML_ROLE_ASSISSTANT,
-                    "display_name": bot_display_name,
-                    "content": output_text[0],
-                }
-            )
         else:
             yield f"Running GPT-3..."
             output_text = run_language_model(
@@ -566,19 +606,32 @@ Use this for prompting GPT to use the document search results.
                 stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
                 avoid_repetition=request.avoid_repetition,
             )
-            # save model response
-            saved_msgs[-1]["content"] = output_text[0]
+        # save model response
+        saved_msgs.append(
+            {
+                "role": CHATML_ROLE_ASSISSTANT,
+                "display_name": bot_display_name,
+                "content": output_text[0],
+            }
+        )
+        # save message history
+        if not clear_msgs:
+            st.session_state["messages"] = state["messages"] = saved_msgs
+        # state["raw_output_text"] = output_text.copy()
 
-        if response_template:
-            output_text = [
-                response_template.render(**references[0], output_text=text)
-                for text in output_text
-            ]
-        saved_msgs[-1]["content"] = output_text[0]
+        # translate response text
+        if request.user_language and request.user_language != "en":
+            yield f"Translating response to {request.user_language}..."
+            output_text = run_google_translate(
+                texts=output_text,
+                google_translate_target=request.user_language,
+            )
+
+        if references:
+            apply_response_template(output_text, references)
 
         state["output_text"] = output_text
-        state["messages"] = saved_msgs
-        st.session_state["messages"] = saved_msgs
+
         state["output_audio"] = []
         state["output_video"] = []
 

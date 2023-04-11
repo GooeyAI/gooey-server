@@ -7,19 +7,13 @@ from furl import furl
 from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.search_ref import SearchReference, render_text_with_refs
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
-
-
-class SearchReference(typing.TypedDict):
-    url: str
-    title: str
-    snippet: str
-    score: float
 
 
 class GoogleGPTPage(BasePage):
@@ -264,27 +258,3 @@ def render_outputs(state, height):
             f"""<div style="max-height: {height}px;" class="gooey-output-text"><p>{html}</p></div>""",
             unsafe_allow_html=True,
         )
-
-
-def render_text_with_refs(text: str, references: list[SearchReference]):
-    html = ""
-    last_match_end = 0
-    for match in re.finditer(r"(\[[\d,\s]+\]([\,\.\s]*))+", text):
-        end_separator = match.group(2)
-        ref_str = text[match.start() : match.end()].strip()
-        ref_numbers = set(int(num) for num in re.findall(r"\d+", ref_str))
-        html += text[last_match_end : match.start()].strip()
-        ref_links = []
-        for ref_num in ref_numbers:
-            try:
-                url = references[ref_num - 1]["url"]
-            except IndexError:
-                continue
-            ref_links.append(f'<a href="{url}">{ref_num}</a>')
-        ref_str_clean = ", ".join(ref_links)
-        if ref_links:
-            html += f"<sup>[{ref_str_clean}]</sup>"
-        html += end_separator
-        last_match_end = match.end()
-    html += text[last_match_end:]
-    return html

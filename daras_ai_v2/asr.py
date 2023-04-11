@@ -22,19 +22,23 @@ asr_model_ids = {
 }
 
 
-def google_translate_language_selector(key="google_translate_target"):
+def google_translate_language_selector(
+    label="""
+    ###### Google Translate (*optional*)
+    """,
+    key="google_translate_target",
+):
     """
     Streamlit widget for selecting a language for Google Translate.
-    :param key: Streamlit key.
-    :return: None
+    Args:
+        label: the label to display
+        key: the key to save the selected language to in the session state
     """
     languages = google_translate_languages()
     options = list(languages.keys())
     options.insert(0, None)
     st.selectbox(
-        label="""
-        ###### Google Translate (*optional*)
-        """,
+        label=label,
         key=key,
         format_func=lambda k: languages[k] if k else "———",
         options=options,
