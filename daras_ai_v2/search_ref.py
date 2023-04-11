@@ -34,10 +34,14 @@ def apply_response_template(output_text: list[str], references: list[SearchRefer
         formatted = ""
         all_refs = {}
         for snippet, ref_map in parse_refs(text, references):
-            formatted += snippet
+            formatted += (
+                snippet
+                + " "
+                + " ".join(f"[{ref_num}]" for ref_num in ref_map.keys())
+                + " "
+            )
             all_refs.update(ref_map)
         for ref_num, ref in all_refs.items():
-            formatted += f" [{ref_num}] "
             try:
                 template = ref["response_template"]
             except KeyError:

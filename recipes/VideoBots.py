@@ -263,7 +263,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             height=50,
         )
 
-        st.checkbox("♻️ Disable Memory", value=True, key="__clear_msgs")
+        st.checkbox("♻️ Disable Memory", key="__clear_msgs")
 
         document_uploader(
             """
@@ -468,7 +468,8 @@ Use this for prompting GPT to use the document search results.
                 st.audio(audio_url)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        clear_msgs = state.get("__clear_msgs")
+        # clear message history if requested
+        clear_msgs = bool(state.get("__clear_msgs"))
         if clear_msgs:
             state.get("messages", []).clear()
 
@@ -511,6 +512,17 @@ Use this for prompting GPT to use the document search results.
             }
         )
 
+        # if documents are provided, run doc search on the entire conversation and get back the references
+        references = None
+        if request.documents:
+            # formulate the search query as a history of all the messages
+            state["search_query"] = "\n\n".join(msg["content"] for msg in saved_msgs)
+            # perform doc search
+            references = yield from get_top_k_references(
+                DocSearchPage.RequestModel.parse_obj(state)
+            )
+            state["references"] = references
+
         prompt_messages = []
 
         # add the system message
@@ -532,33 +544,16 @@ Use this for prompting GPT to use the document search results.
         prompt_messages += scripted_msgs
         prompt_messages += saved_msgs
 
-        references = None
-        # if documents are provided, run doc search and include results in prompt
-        if request.documents:
-            # formulate the search query as a history of all the messages
-            state["search_query"] = "\n\n".join(msg["content"] for msg in saved_msgs)
-            # perform doc search
-            references = yield from get_top_k_references(
-                DocSearchPage.RequestModel.parse_obj(state)
-            )
-            state["references"] = references
-            # if doc search is successful, add the search results to prompt
-            if references:
-                # system_message = (
-                #     references_as_prompt(references)
-                #     + "\n\n"
-                #     + system_message
-                #     + "\n"
-                #     + request.task_instructions.strip()
-                # )
-                prompt_messages[-1] = {
-                    **prompt_messages[-1],
-                    "content": (
-                        references_as_prompt(references)
-                        + f"\n**********\nInstructions: {request.task_instructions.strip()}\n**********\n"
-                        + prompt_messages[-1]["content"]
-                    ),
-                }
+        # if doc search is successful, add the search results to the last message
+        if references:
+            prompt_messages[-1] = {
+                **prompt_messages[-1],
+                "content": (
+                    references_as_prompt(references)
+                    + f"\n**********\n{request.task_instructions.strip()}\n**********\n"
+                    + prompt_messages[-1]["content"]
+                ),
+            }
 
         # for backwards compat with non-chat models
         if not use_chatgpt:
