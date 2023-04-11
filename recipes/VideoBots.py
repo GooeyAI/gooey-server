@@ -205,7 +205,7 @@ class VideoBotsPage(BasePage):
 
     class ResponseModel(BaseModel):
         final_prompt: str
-        # raw_output_text: list[str]
+        raw_output_text: list[str] | None
         output_text: list[str]
 
         # tts
@@ -447,12 +447,12 @@ Use this for prompting GPT to use the document search results.
             height=300,
         )
 
-        # for idx, text in enumerate(st.session_state.get("raw_output_text", [])):
-        #     st.text_area(
-        #         f"**Raw Text Response {idx + 1}**",
-        #         value=text,
-        #         disabled=True,
-        #     )
+        for idx, text in enumerate(st.session_state.get("raw_output_text", [])):
+            st.text_area(
+                f"**Raw Text Response {idx + 1}**",
+                value=text,
+                disabled=True,
+            )
 
         col1, col2 = st.columns(2)
         with col1:
@@ -617,7 +617,7 @@ Use this for prompting GPT to use the document search results.
         # save message history
         if not clear_msgs:
             st.session_state["messages"] = state["messages"] = saved_msgs
-        # state["raw_output_text"] = output_text.copy()
+        state["raw_output_text"] = output_text.copy()
 
         # translate response text
         if request.user_language and request.user_language != "en":
@@ -739,6 +739,7 @@ Use this for prompting GPT to use the document search results.
                             "connected_query_params": query_params,
                         }
                     else:
+                        continue  # todo: figure out the ux for disconnecting
                         update = {
                             "connected_page_slug": None,
                             "connected_query_params": {},

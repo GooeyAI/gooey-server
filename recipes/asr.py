@@ -24,12 +24,12 @@ class AsrPage(BasePage):
     slug_versions = ["asr", "speech"]
 
     class RequestModel(BaseModel):
-        documents: list[str] | None
+        documents: list[str]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         google_translate_target: str | None
 
     class ResponseModel(BaseModel):
-        asr_text: list[str] | None
+        raw_output_text: list[str] | None
         output_text: list[str]
 
     def preview_description(self, state: dict):
@@ -77,7 +77,7 @@ class AsrPage(BasePage):
 
     def render_steps(self):
         if st.session_state.get("google_translate_target"):
-            text_outputs("**Transcription**", key="asr_text", height=200)
+            text_outputs("**Transcription**", key="raw_output_text", height=200)
             text_outputs("**Translation**", key="output_text", height=300)
         else:
             text_outputs("**Transcription**", key="output_text", height=200)
@@ -96,7 +96,9 @@ class AsrPage(BasePage):
 
         # Run Translation
         if request.google_translate_target:
-            state["asr_text"] = state["output_text"]  # Save ASR text for details view
+            # Save the raw ASR text for details view
+            state["raw_output_text"] = state["output_text"]
+            # Run Translation
             state["output_text"] = run_google_translate(
                 state["output_text"],
                 google_translate_target=request.google_translate_target,

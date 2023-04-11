@@ -37,10 +37,11 @@ def apply_response_template(output_text: list[str], references: list[SearchRefer
             formatted += snippet
             all_refs.update(ref_map)
         for ref_num, ref in all_refs.items():
+            formatted += f" [{ref_num}] "
             try:
                 template = ref["response_template"]
             except KeyError:
-                formatted += f"[{ref_num}]"
+                pass
             else:
                 formatted = jinja2.Template(template).render(
                     **ref,

@@ -17,6 +17,7 @@ import requests
 import streamlit as st
 from furl import furl
 from googleapiclient.errors import HttpError
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pydantic import BaseModel
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
@@ -402,15 +403,20 @@ def _doc_url_to_embeds_cached(
     )
     metas: list[SearchReference]
     if isinstance(pages, pd.DataFrame):
+        text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+            chunk_size=int(max_context_words / 0.75),
+            chunk_overlap=int(max_context_words / 0.75 / 5),
+        )
         metas = [
             {
                 "title": doc_meta.name,
                 "url": f_url,
-                "snippet": row["snippet"],
-                "score": -1,
                 **row,
+                "score": -1,
+                "snippet": snippet,
             }
             for idx, row in pages.iterrows()
+            for snippet in text_splitter.split_text(row["snippet"])
         ]
     else:
         # split document into chunks
