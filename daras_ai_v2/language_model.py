@@ -1,12 +1,12 @@
 import re
-import typing
 from enum import Enum
 from functools import wraps
 from time import sleep
 
 import openai
+import openai.error
+import typing_extensions
 from decouple import config
-from openai.error import ServiceUnavailableError, RateLimitError
 from transformers import GPT2TokenizerFast
 
 from daras_ai_v2 import settings
@@ -65,7 +65,13 @@ def calc_gpt_tokens(text: str) -> int:
 def do_retry(
     max_retries: int = 5,
     retry_delay: float = 5,
-    error_cls=(ServiceUnavailableError, RateLimitError),
+    error_cls=(
+        openai.error.Timeout,
+        openai.error.APIError,
+        openai.error.APIConnectionError,
+        openai.error.RateLimitError,
+        openai.error.ServiceUnavailableError,
+    ),
 ):
     def decorator(fn):
         @wraps(fn)
@@ -97,9 +103,9 @@ def get_embeddings(
     return [record["embedding"] for record in res["data"]]
 
 
-class ConversationEntry(typing.TypedDict):
+class ConversationEntry(typing_extensions.TypedDict):
     role: str
-    display_name: str | None
+    display_name: typing_extensions.NotRequired[str]
     content: str
 
 

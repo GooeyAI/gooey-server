@@ -9,24 +9,29 @@ import tempfile
 import typing
 from collections import deque
 
+import jinja2
 import numpy as np
+import pandas as pd
 import pdftotext
 import requests
 import streamlit as st
 from furl import furl
 from pydantic import BaseModel
+from pympler.util.bottle import Jinja2Template
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
+from daras_ai.face_restoration import map_parallel
 from daras_ai.image_input import upload_st_file
 from daras_ai_v2.GoogleGPT import SearchReference, render_outputs, GoogleGPTPage
-from daras_ai_v2.asr import AsrModels, run_asr
+from daras_ai_v2.asr import AsrModels, run_asr, run_google_translate
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
 )
+from daras_ai_v2.functional import flatten
 from daras_ai_v2.gdrive_downloader import (
-    gdrive_download_as_txt,
+    gdrive_download,
     is_gdrive_url,
     url_to_gdrive_file_id,
     gdrive_metadata,
@@ -200,6 +205,13 @@ class DocSearchPage(BasePage):
             raise ValueError(
                 f"Your search - {request.search_query} - did not match any documents."
             )
+        # get the response template if it exists
+        try:
+            response_template = jinja2.Template(
+                references[0]["response_template"].strip()
+            )
+        except (IndexError, KeyError):
+            response_template = None
 
         prompt = ""
         # add time to instructions
@@ -225,35 +237,47 @@ class DocSearchPage(BasePage):
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
         )
+        if response_template:
+            output_text = [
+                response_template.render(**references[0], output_text=text)
+                for text in output_text
+            ]
         state["output_text"] = output_text
 
 
 def get_top_k_references(
     request: DocSearchPage.RequestModel,
 ) -> typing.Generator[str, None, list[SearchReference]]:
+    """
+    Get the top k documents that ref the search query
+
+    Args:
+        request: the document search request
+
+    Returns:
+        the top k documents
+    """
     yield f"Getting query embeddings..."
     query_embeds = get_embeddings_cached(request.search_query)[0]
     yield "Getting document embeddings..."
     input_docs = request.documents or []
-    embeds = [
-        embeds
-        for f_url in input_docs
-        for embeds in doc_url_to_embeds(
+    nested_embeds: list[list[tuple[SearchReference, list[float]]]] = map_parallel(
+        lambda f_url: doc_url_to_embeds(
             f_url=f_url,
             max_context_words=request.max_context_words,
             scroll_jump=request.scroll_jump,
             selected_asr_model=request.selected_asr_model,
             google_translate_target=request.google_translate_target,
-        )
-    ]
+        ),
+        input_docs,
+    )
+    embeds: list[tuple[SearchReference, list[float]]] = flatten(nested_embeds)
     yield f"Searching documents..."
-    candidates = [
-        {**meta, "score": vector_similarity(query_embeds, doc_embeds)}
-        for meta, doc_embeds in embeds
-    ]
+    for ref, doc_embeds in embeds:
+        ref["score"] = vector_similarity(query_embeds, doc_embeds)
     # apply cutoff
     cutoff = 0.7
-    candidates = [match for match in candidates if match["score"] >= cutoff]
+    candidates = [ref for ref, _ in embeds if ref["score"] >= cutoff]
     # get top_k best matches
     matches = heapq.nlargest(
         request.max_references, candidates, key=lambda match: match["score"]
@@ -262,6 +286,16 @@ def get_top_k_references(
 
 
 def references_as_prompt(references: list[SearchReference], sep="\n\n") -> str:
+    """
+    Convert a list of references to a prompt containing the formatted search results.
+
+    Args:
+        references: list of references
+        sep: separator between references in the prompt
+
+    Returns:
+        prompt string
+    """
     return sep.join(
         f'''\
 Search Result: [{idx + 1}]
@@ -281,12 +315,24 @@ def doc_url_to_embeds(
     scroll_jump: int,
     selected_asr_model: str = None,
     google_translate_target: str = None,
-):
-    f_name, f_etag = doc_url_to_metadata(f_url)
-    return _doc_url_to_embeds(
+) -> list[tuple[SearchReference, list[float]]]:
+    """
+    Get document embeddings for a given document url.
+
+    Args:
+        f_url: document url
+        max_context_words: max number of words to include in each chunk
+        scroll_jump: number of words to scroll by
+        google_translate_target: target language for google translate
+        selected_asr_model: selected ASR model (used for audio files)
+
+    Returns:
+        list of (SearchReference, embeddings vector) tuples
+    """
+    doc_meta = doc_url_to_metadata(f_url)
+    return _doc_url_to_embeds_cached(
         f_url=f_url,
-        f_name=f_name,
-        f_etag=f_etag,
+        doc_meta=doc_meta,
         max_context_words=max_context_words,
         scroll_jump=scroll_jump,
         selected_asr_model=selected_asr_model,
@@ -294,49 +340,93 @@ def doc_url_to_embeds(
     )
 
 
-def doc_url_to_metadata(f_url: str) -> (str, str):
+class DocMetadata(typing.NamedTuple):
+    name: str
+    etag: str | None
+    mime_type: str | None
+
+
+def doc_url_to_metadata(f_url: str) -> DocMetadata:
+    """
+    Fetches the google drive metadata for a document url
+
+    Args:
+        f_url: document url
+
+    Returns:
+        document metadata
+    """
     f = furl(f_url)
     if is_gdrive_url(f):
         # extract filename from google drive metadata
         meta = gdrive_metadata(url_to_gdrive_file_id(f))
-        f_name = meta["name"]
-        f_etag = meta.get("md5Checksum") or meta.get("modifiedTime")
+        name = meta["name"]
+        etag = meta.get("md5Checksum") or meta.get("modifiedTime")
+        mime_type = meta["mimeType"]
     else:
         # extract filename from url
-        f_name = f.path.segments[-1]
-        f_etag = None
-    return f_name, f_etag
+        name = f.path.segments[-1]
+        etag = None
+        mime_type = None
+    return DocMetadata(name, etag, mime_type)
 
 
 @st.cache_data(show_spinner=False)
-def _doc_url_to_embeds(
+def _doc_url_to_embeds_cached(
     *,
     f_url: str,
-    f_name: str,
-    f_etag: str | None,  # used as cache key
+    doc_meta: DocMetadata,
     max_context_words: int,
     scroll_jump: int,
-    selected_asr_model: str = None,
     google_translate_target: str = None,
-):
+    selected_asr_model: str = None,
+) -> list[tuple[SearchReference, list[float]]]:
+    """
+    Get document embeddings for a given document url.
+
+    Args:
+        f_url: document url
+        doc_meta: document metadata
+        max_context_words: max number of words to include in each chunk
+        scroll_jump: number of words to scroll by
+        google_translate_target: target language for google translate
+        selected_asr_model: selected ASR model (used for audio files)
+
+    Returns:
+        list of (metadata, embeddings) tuples
+    """
     pages = doc_url_to_text_pages(
-        f_url,
-        f_name,
-        f_etag,
+        f_url=f_url,
+        doc_meta=doc_meta,
         selected_asr_model=selected_asr_model,
         google_translate_target=google_translate_target,
     )
-    # split document into chunks
-    chunks = list(document_splitter(pages, max_context_words, scroll_jump))
-    texts = [snippet for page_num, snippet in chunks]
-    metas = [
-        {
-            "url": f_url + (f"#page={page}" if len(pages) > 1 else ""),
-            "title": f_name + (f" - Page {page}" if len(pages) > 1 else ""),
-            "snippet": snippet,
-        }
-        for page, snippet in chunks
-    ]
+    metas: list[SearchReference]
+    if isinstance(pages, pd.DataFrame):
+        texts = pages["snippet"].tolist()
+        metas = [
+            {
+                "title": doc_meta.name,
+                "url": f_url,
+                "snippet": row["snippet"],
+                "score": -1,
+                **row,
+            }
+            for idx, row in pages.iterrows()
+        ]
+    else:
+        # split document into chunks
+        chunks = list(document_splitter(pages, max_context_words, scroll_jump))
+        texts = [snippet for page_num, snippet in chunks]
+        metas = [
+            {
+                "title": doc_meta.name + (f" - Page {page}" if len(pages) > 1 else ""),
+                "url": f_url + (f"#page={page}" if len(pages) > 1 else ""),
+                "snippet": snippet,
+                "score": -1,
+            }
+            for page, snippet in chunks
+        ]
     # get doc embeds in batches
     embeds = []
     batch_size = 100
@@ -346,37 +436,45 @@ def _doc_url_to_embeds(
         # print(f"Getting document embeddings ({progress}%)...")
         batch = texts[i * batch_size : (i + 1) * batch_size]
         embeds.extend(get_embeddings(batch))
-    return zip(metas, embeds)
+    return list(zip(metas, embeds))
 
 
 @st.cache_data(show_spinner=False)
 def doc_url_to_text_pages(
+    *,
     f_url: str,
-    f_name: str,
-    f_etag: str | None,  # used as cache key
-    selected_asr_model: str,
-    google_translate_target: str,
+    doc_meta: DocMetadata,
+    google_translate_target: str | None,
+    selected_asr_model: str | None,
 ) -> list[str]:
+    """
+    Download document from url and convert to text pages.
+
+    Args:
+        f_url: url of document
+        doc_meta: document metadata
+        google_translate_target: target language for google translate
+        selected_asr_model: selected ASR model (used for audio files)
+
+    Returns:
+        list of text pages
+    """
     f = furl(f_url)
+    f_name = doc_meta.name
     if is_gdrive_url(f):
         # download from google drive
-        f_bytes = gdrive_download_as_txt(f)
-        # gdrive url doesn't have an extension
-        ext = ".txt"
+        f_bytes, ext = gdrive_download(f, doc_meta.mime_type)
     else:
         # download from url
         f_bytes = requests.get(f_url).content
-        # get extension from filename
-        ext = os.path.splitext(f_name)[-1].lower()
-    if not ext:  # default to html (useful for URLs)
-        ext = ".html"
-        f_name += ".html"
-    # convert document to text
+        # get extension from filename, defaulting to html (useful for URLs)
+        ext = os.path.splitext(f_name)[-1].lower() or ".html"
+    # convert document to text pages
     match ext:
         case ".pdf":
             pages = pdf_to_text_pages(io.BytesIO(f_bytes))
-        case ".docx" | ".md" | ".html":
-            pages = [pandoc_to_text(f_name, f_bytes)]
+        case ".docx" | ".md" | ".html" | ".rtf" | ".epub" | ".odt":
+            pages = [pandoc_to_text(f_name + ext, f_bytes)]
         case ".txt":
             pages = [f_bytes.decode()]
         case ".wav" | ".ogg" | ".mp3" | ".aac":
@@ -384,15 +482,18 @@ def doc_url_to_text_pages(
                 raise ValueError(
                     "For transcribing audio/video, please choose an ASR model from the settings!"
                 )
-            pages = [
-                run_asr(
-                    f_url,
-                    selected_model=selected_asr_model,
-                    google_translate_target=google_translate_target,
-                )
-            ]
+            pages = [run_asr(f_url, selected_model=selected_asr_model)]
+        case ".csv" | ".xlsx" | ".tsv" | ".ods":
+            df = pd.read_csv(io.BytesIO(f_bytes))
+            assert (
+                "snippet" in df.columns
+            ), f'uploaded spreadsheet must contain a "snippet" column - {f_name !r}'
+            pages = df
         case _:
             raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
+    # optionally, translate text
+    if google_translate_target:
+        pages = run_google_translate(pages, google_translate_target)
     return pages
 
 
@@ -413,6 +514,17 @@ def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
 
 
 def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
+    """
+    Convert document to text using pandoc.
+
+    Args:
+        f_name: filename of document
+        f_bytes: document bytes
+        to: pandoc output format (default: plain)
+
+    Returns:
+        extracted text content of document
+    """
     with (
         tempfile.NamedTemporaryFile("wb", suffix="." + f_name) as infile,
         tempfile.NamedTemporaryFile("r") as outfile,
@@ -473,7 +585,23 @@ word_breaks_re = re.compile(
 )
 
 
-def document_splitter(pages: list[str], max_context_words: int, scroll_jump: int):
+def document_splitter(
+    pages: list[str],
+    max_context_words: int,
+    scroll_jump: int,
+) -> typing.Generator[tuple[int, str], None, None]:
+    """
+    Split document into chunks of text.
+    Each chunk is built iteratively by adding fragments to the current chunk until the max_context_words is reached.
+
+    Args:
+        pages: list of text pages
+        max_context_words: maximum number of words in each chunk
+        scroll_jump: number of fragments to jump when scrolling
+
+    Returns:
+        generator of (page number, fragment) tuples
+    """
     window = deque()
     # split text into fragments
     all_frags = [

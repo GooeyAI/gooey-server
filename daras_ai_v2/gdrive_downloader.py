@@ -1,4 +1,5 @@
 import io
+import mimetypes
 
 from furl import furl
 from googleapiclient import discovery
@@ -24,7 +25,7 @@ def url_to_gdrive_file_id(f: furl) -> str:
     return file_id
 
 
-def gdrive_download_as_txt(f: furl) -> bytes:
+def gdrive_download(f: furl, mime_type: str) -> (bytes, str):
     # get drive file id
     file_id = url_to_gdrive_file_id(f)
     # get metadata
@@ -32,27 +33,57 @@ def gdrive_download_as_txt(f: furl) -> bytes:
     # get files in drive directly
     if f.host == "drive.google.com":
         request = service.files().get_media(fileId=file_id)
-    # export google docs to text
+        ext = mimetypes.guess_extension(mime_type)
+    # export google docs to appropriate type
     else:
-        request = service.files().export_media(fileId=file_id, mimeType="text/plain")
+        mime_type, ext = docs_export_mimetype(f)
+        request = service.files().export_media(fileId=file_id, mimeType=mime_type)
     # download
     file = io.BytesIO()
     downloader = MediaIoBaseDownload(file, request)
     done = False
     while done is False:
-        status, done = downloader.next_chunk()
+        _, done = downloader.next_chunk()
         # print(f"Download {int(status.progress() * 100)}%")
     f_bytes = file.getvalue()
-    return f_bytes
+    return f_bytes, ext
+
+
+def docs_export_mimetype(f: furl) -> (str, str):
+    """
+    return the mimetype to export google docs - https://developers.google.com/drive/api/guides/ref-export-formats
+
+    Args:
+        f (furl): google docs link
+
+    Returns:
+        tuple[str, str]: (mime_type, extension)
+    """
+    if "document" in f.path.segments:
+        mime_type = "text/plain"
+        ext = ".txt"
+    elif "spreadsheets" in f.path.segments:
+        mime_type = "text/csv"
+        ext = ".csv"
+    elif "presentation" in f.path.segments:
+        mime_type = "application/pdf"
+        ext = ".pdf"
+    elif "drawings" in f.path.segments:
+        mime_type = "application/pdf"
+        ext = ".pdf"
+    else:
+        raise ValueError(f"Not sure how to export google docs url: {str(f)!r}")
+    return mime_type, ext
 
 
 def gdrive_metadata(file_id: str) -> dict:
     service = discovery.build("drive", "v3")
-    return (
+    metadata = (
         service.files()
         .get(
             fileId=file_id,
-            fields="name,md5Checksum,modifiedTime",
+            fields="name,md5Checksum,modifiedTime,mimeType",
         )
         .execute()
     )
+    return metadata

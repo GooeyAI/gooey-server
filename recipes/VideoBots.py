@@ -4,6 +4,7 @@ import os.path
 import re
 import typing
 
+import jinja2
 import streamlit as st
 from furl import furl
 from pydantic import BaseModel
@@ -38,6 +39,7 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
@@ -222,6 +224,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             height=50,
         )
 
+        document_uploader(
+            """
+##### 📄 Documents (*optional*)
+Enable document search, to use custom documents as information sources.
+"""
+        )
+
     def validate_form_v2(self):
         # assert st.session_state["input_prompt"], "Please type in a Messsage"
         # assert st.session_state["bot_script"], "Please provide the Bot Script"
@@ -291,12 +300,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 lipsync_settings()
                 st.write("---")
 
-        document_uploader(
-            """
-##### 📄 Documents
-Enable document search, to use custom documents as information sources.
-"""
-        )
         if st.session_state.get("documents") or st.session_state.get(
             "__documents_files"
         ):
@@ -366,7 +369,11 @@ Use this for prompting GPT to use the document search results.
         with st.expander("💁‍♀️ Sources"):
             for idx, ref in enumerate(st.session_state.get("references", [])):
                 st.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
-                st.text(ref["snippet"])
+                text_output(
+                    "Source Document",
+                    value=ref["snippet"],
+                    label_visibility="collapsed",
+                )
 
     def render_steps(self):
         if st.session_state.get("tts_provider"):
@@ -386,11 +393,10 @@ Use this for prompting GPT to use the document search results.
             st.write("**References**")
             st.json(references, expanded=False)
 
-        st.text_area(
-            "Final Prompt",
+        text_output(
+            "**Final Prompt**",
             value=st.session_state.get("final_prompt"),
-            height=200,
-            disabled=True,
+            height=300,
         )
 
         col1, col2 = st.columns(2)
@@ -464,6 +470,7 @@ Use this for prompting GPT to use the document search results.
             }
         )
 
+        response_template = None
         # if documents are provided, run doc search and include results in system message
         if request.documents:
             # formulate the search query as a history of all the messages
@@ -482,6 +489,13 @@ Use this for prompting GPT to use the document search results.
                     + "\n"
                     + request.task_instructions.strip()
                 )
+            # get the response template if it exists
+            try:
+                response_template = jinja2.Template(
+                    references[0]["response_template"].strip()
+                )
+            except (IndexError, KeyError):
+                pass
 
         if not use_chatgpt:
             # assistant prompt to triger a model response
@@ -530,19 +544,19 @@ Use this for prompting GPT to use the document search results.
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
             )
+            # convert msgs to text
+            output_text = [entry["content"] for entry in output_messages]
             # save model response
             saved_msgs.append(
                 {
                     "role": CHATML_ROLE_ASSISSTANT,
                     "display_name": bot_display_name,
-                    "content": output_messages[0]["content"],
+                    "content": output_text[0],
                 }
             )
-            state["output_text"] = [entry["content"] for entry in output_messages]
         else:
-            # assistant prompt to triger a model response
             yield f"Running GPT-3..."
-            state["output_text"] = run_language_model(
+            output_text = run_language_model(
                 model=request.selected_model,
                 quality=request.quality,
                 num_outputs=request.num_outputs,
@@ -553,8 +567,16 @@ Use this for prompting GPT to use the document search results.
                 avoid_repetition=request.avoid_repetition,
             )
             # save model response
-            saved_msgs[-1]["content"] = state["output_text"][0]
+            saved_msgs[-1]["content"] = output_text[0]
 
+        if response_template:
+            output_text = [
+                response_template.render(**references[0], output_text=text)
+                for text in output_text
+            ]
+        saved_msgs[-1]["content"] = output_text[0]
+
+        state["output_text"] = output_text
         state["messages"] = saved_msgs
         st.session_state["messages"] = saved_msgs
         state["output_audio"] = []
@@ -630,7 +652,7 @@ Use this for prompting GPT to use the document search results.
         if "__fb_pages" not in st.session_state:
             with st.spinner("Loading Facebook Pages..."):
                 fb_pages = (
-                    db.get_collection_ref(db.FB_PAGES_COLLECTION)
+                    db.get_collection_ref(db.CONNECTED_BOTS_COLLECTION)
                     .where("uid", "==", user.uid)
                     .get()
                 )

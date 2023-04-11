@@ -20,7 +20,7 @@ class GpuEndpoints:
     sd_2 = settings.GPU_SERVER_1.copy().set(port=5011)
     sd_multi = settings.GPU_SERVER_1.copy().set(port=5012)
     # real_esrgan = settings.GPU_SERVER_1furl().set(port=5013)
-    defourm_sd = settings.GPU_SERVER_1.copy().set(port=5014) / "deforum"
+    defourm_sd = settings.GPU_SERVER_2.copy().set(port=5014) / "deforum"
 
     lavis = settings.GPU_SERVER_1.copy().set(port=5015)
     vqa = lavis / "vqa"

@@ -28,17 +28,22 @@ from daras_ai_v2.language_model import (
     is_chat_model,
     engine_names,
     GPT3_MAX_ALLOED_TOKENS,
+    calc_gpt_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
-from recipes.DocSearch import doc_url_to_text_pages, doc_url_to_metadata
+from recipes.DocSearch import (
+    doc_url_to_text_pages,
+    doc_url_to_metadata,
+    document_splitter,
+)
 
 DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
 
 
 class CombineDocumentsChains(Enum):
     map_reduce = "Map Reduce"
-    refine = "Refine"
-    stuff = "Stuffing (Only works for small documents)"
+    # refine = "Refine"
+    # stuff = "Stuffing (Only works for small documents)"
 
 
 class DocSummaryPage(BasePage):
@@ -88,16 +93,13 @@ class DocSummaryPage(BasePage):
             CombineDocumentsChains,
             label="""
 #### 🦜🔗 LangChain Type
-[Read More](https://langchain.readthedocs.io/en/latest/modules/indexes/combine_docs.html)
+[Read More](https://docs.langchain.com/docs/components/chains/index_related_chains)
 """,
             key="chain_type",
         )
         st.write("---")
 
         language_model_settings()
-        st.write("---")
-
-        doc_search_settings()
 
     def validate_form_v2(self):
         search_query = st.session_state.get("task_instructions", "").strip()
@@ -153,11 +155,10 @@ class DocSummaryPage(BasePage):
 
         full_text = ""
         for f_url in request.documents:
-            f_name, f_etag = doc_url_to_metadata(f_url)
+            doc_meta = doc_url_to_metadata(f_url)
             pages = doc_url_to_text_pages(
-                f_url,
-                f_name,
-                f_etag,
+                f_url=f_url,
+                doc_meta=doc_meta,
                 selected_asr_model=request.selected_asr_model,
                 google_translate_target=request.google_translate_target,
             )
@@ -187,24 +188,35 @@ class DocSummaryPage(BasePage):
                 presence_penalty=0.25 if request.avoid_repetition else 0,
             )
 
+        final_prompt = "{text}\n**********\n" + request.task_instructions.strip()
+        state["final_prompt"] = final_prompt
+        prompt_template = PromptTemplate(
+            template=final_prompt, input_variables=["text"]
+        )
+
         buffer = 100
         text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-            chunk_size=GPT3_MAX_ALLOED_TOKENS - request.max_tokens - buffer,
+            chunk_size=2000,
+            # chunk_size=GPT3_MAX_ALLOED_TOKENS
+            # - calc_gpt_tokens(final_prompt)
+            # - request.max_tokens
+            # - buffer,
             chunk_overlap=buffer,
         )
         texts = text_splitter.split_text(full_text)
         docs = [Document(page_content=t) for t in texts]
-
-        prompt_template = "{text}\n**********\n" + request.task_instructions.strip()
-        state["final_prompt"] = prompt_template
-        PROMPT = PromptTemplate(template=prompt_template, input_variables=["text"])
+        # docs = [
+        #     Document(page_content=t)
+        #     for _, t in document_splitter([full_text], 600, 550)
+        # ]
+        print([len(d.page_content) for d in docs])
 
         yield f"Summarizing using {model.value}..."
         chain = load_summarize_chain(
             llm,
             chain_type=request.chain_type,
-            map_prompt=PROMPT,
-            combine_prompt=PROMPT,
+            map_prompt=prompt_template,
+            combine_prompt=prompt_template,
             # verbose=True,
         )
         state["output_text"] = [chain.run(docs).strip()]
