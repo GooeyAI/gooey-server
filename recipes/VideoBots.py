@@ -667,6 +667,46 @@ Use this for prompting GPT to use the document search results.
 
             st.text_input("#### 🤖 Landbot URL", key="landbot_url")
             st.write("---")
+            st.markdown(
+                """
+                ## How to Integrate Chatbots
+                """
+            )
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write(
+                    """
+                    ### Part 1:
+                    [Interactive Chatbots for your Content - Part 1: Make your Chatbot - How to use Gooey.AI Workflows ](https://youtu.be/-j2su1r8pEg)
+                    """
+                )
+                st.markdown(
+                    """
+                    <div style="position: relative; padding-bottom: 56.25%; height: 0; width:100%">
+                            <iframe src="https://www.youtube.com/embed/-j2su1r8pEg" title="YouTube video player" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                    </iframe>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with col2:
+                st.write(
+                    """
+                    
+                    ### Part 2:
+                    [Interactive Chatbots for your Content - Part 2: Make your Chatbot - How to use Gooey.AI Workflows ](https://youtu.be/h817RolPjq4)
+                    """
+                )
+                st.markdown(
+                    """
+                    <div style="position: relative; padding-bottom: 56.25%; height: 0;">
+                            <iframe src="https://www.youtube.com/embed/h817RolPjq4" title="YouTube video player" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                    </iframe>                    
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
         show_landbot_widget()
 
