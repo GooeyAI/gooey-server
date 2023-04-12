@@ -38,6 +38,7 @@ class GoogleImageGenPage(BasePage):
         "seed": 42,
         "image_guidance_scale": 1.2,
         "scaleserp_locations": ["United States"],
+        "alter_images": True,
     }
 
     class RequestModel(BaseModel):
@@ -47,6 +48,7 @@ class GoogleImageGenPage(BasePage):
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
 
         negative_prompt: str | None
+        alter_images: bool | None
 
         num_outputs: int | None
         quality: int | None
@@ -112,7 +114,9 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             if "image" in result
         ][:10]
         gooey_rng.shuffle(image_urls)
-
+        if not state["alter_images"]:
+            state["output_images"] = image_urls
+            return
         state["image_urls"] = image_urls
 
         yield "Downloading..."
@@ -171,6 +175,12 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             Type a query you'd use in [Google image search](https://images.google.com/?gws_rd=ssl)
             """,
             key="search_query",
+        )
+        st.checkbox(
+            label="""
+            Alter returned images with the following AI prompt. E.g. "give them sunglasses" 
+            """,
+            key="alter_images",
         )
         st.text_area(
             """
