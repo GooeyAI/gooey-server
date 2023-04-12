@@ -177,9 +177,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             key="search_query",
         )
         st.checkbox(
-            label="""
-            Alter returned images with the following AI prompt. E.g. "give them sunglasses" 
-            """,
+            label="Alter returned images with the following AI prompt. E.g. \"give them sunglasses\"",
             key="alter_images",
         )
         st.text_area(
