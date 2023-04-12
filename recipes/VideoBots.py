@@ -295,7 +295,7 @@ Enable document search, to use custom documents as information sources.
         # assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_usage_guide(self):
-        youtube_video("N5uJ-MbsSwc")
+        youtube_video("-j2su1r8pEg")
 
     def render_settings(self):
         st.text_area(
