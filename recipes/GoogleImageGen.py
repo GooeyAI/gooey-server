@@ -123,7 +123,8 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         # If we're not altering the images, just upload them
 
         if not state["alter_images"]:
-            def get_image(g_img_url:str):
+
+            def get_image(g_img_url: str):
                 try:
                     r = requests.get(g_img_url)
                     uploaded_url = upload_file_from_bytes(
