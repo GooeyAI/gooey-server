@@ -1,4 +1,5 @@
 import typing
+import uuid
 
 import requests
 import streamlit as st
@@ -114,12 +115,24 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             if "image" in result
         ][:10]
         gooey_rng.shuffle(image_urls)
-        if not state["alter_images"]:
-            state["output_images"] = image_urls
-            return
-        state["image_urls"] = image_urls
 
         yield "Downloading..."
+        state["image_urls"] = image_urls
+        uploaded_images = []
+        # If we're not altering the images, just upload them
+        if not state["alter_images"]:
+            for img_url in image_urls:
+                try:
+                    r = requests.get(img_url)
+                    uploaded_url = upload_file_from_bytes(
+                        filename=f"{uuid.uuid4()}", data=r.content
+                    )
+                    uploaded_images.append(uploaded_url)
+                except (IOError, ConnectionError, ValueError):
+                    continue
+
+            state["output_images"] = uploaded_images
+            return  # Break out of the generator
 
         selected_image_bytes = None
         for selected_image_url in image_urls:
@@ -176,16 +189,21 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             """,
             key="search_query",
         )
-        st.checkbox(
-            label="Alter returned images with the following AI prompt. E.g. \"give them sunglasses\"",
-            key="alter_images",
-        )
-        st.text_area(
+        st.write(
             """
             ### 👩‍💻 Prompt
-            Describe how you want to edit the photo in words
             """,
+        )
+        alter_images = st.checkbox(
+            label='Alter returned images with the following AI prompt. E.g. "give them sunglasses"',
+            key="alter_images",
+            value=True,
+        )
+        st.text_area(
+            label="Text prompt",
             key="text_prompt",
+            disabled=not alter_images,
+            label_visibility="hidden",
         )
 
     def render_usage_guide(self):
