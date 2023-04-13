@@ -1,5 +1,4 @@
 import datetime
-import re
 import typing
 
 import streamlit as st
@@ -7,11 +6,12 @@ from furl import furl
 from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.search_ref import SearchReference, render_text_with_refs
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
+from daras_ai_v2.search_ref import SearchReference, render_text_with_refs
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
 
@@ -28,6 +28,7 @@ class GoogleGPTPage(BasePage):
         title="Ruggable",
         company_url="https://ruggable.com",
         scaleserp_search_field="organic_results",
+        scaleserp_locations=["United States"],
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
@@ -58,6 +59,9 @@ class GoogleGPTPage(BasePage):
         sampling_temperature: float | None
 
         max_search_urls: int | None
+
+        scaleserp_search_field: str | None
+        scaleserp_locations: list[str] | None
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -105,15 +109,25 @@ class GoogleGPTPage(BasePage):
 
         st.write("---")
 
-        st.number_input(
-            label="""
-            ###### Max References
-            The maximum number of search URLs to consider as References
-            """,
-            key="max_search_urls",
-            min_value=1,
-            max_value=10,
-        )
+        st.write("#### Search Tools")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.text_input(
+                "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**",
+                key="scaleserp_search_field",
+            )
+        with col2:
+            st.number_input(
+                label="""
+                ###### Max Search URLs
+                The maximum number of search URLs to consider as References
+                """,
+                key="max_search_urls",
+                min_value=1,
+                max_value=10,
+            )
+        scaleserp_location_picker()
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage
@@ -198,10 +212,10 @@ class GoogleGPTPage(BasePage):
             f = furl(request.site_filter)
             search_query = f"site:{f.host}{f.path} {search_query}"
 
-        scaleserp_search_field = "organic_results"
         state["scaleserp_results"] = scaleserp_results = call_scaleserp(
             search_query,
-            include_fields=scaleserp_search_field,
+            include_fields=request.scaleserp_search_field,
+            location=",".join(request.scaleserp_locations),
         )
 
         state["references"] = references = []
@@ -213,7 +227,7 @@ class GoogleGPTPage(BasePage):
         prompt = task_instructions.strip() + "\n\n"
         prompt += "Search Results:\n"
         ref_num = 1
-        for item in scaleserp_results.get(scaleserp_search_field, []):
+        for item in scaleserp_results.get(request.scaleserp_search_field, []):
             try:
                 url = item["link"]
                 title = item["title"]
