@@ -46,11 +46,11 @@ class GoogleImageGenPage(BasePage):
     class RequestModel(BaseModel):
         search_query: str
         text_prompt: str
+        alter_images: bool
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
 
         negative_prompt: str | None
-        alter_images: bool | None
 
         num_outputs: int | None
         quality: int | None
