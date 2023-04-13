@@ -10,6 +10,7 @@ from daras_ai.image_input import (
     resize_img_scale,
 )
 from daras_ai_v2.base import BasePage, gooey_rng
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
@@ -120,18 +121,22 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         state["image_urls"] = image_urls
         uploaded_images = []
         # If we're not altering the images, just upload them
-        if not state["alter_images"]:
-            for img_url in image_urls:
-                try:
-                    r = requests.get(img_url)
-                    uploaded_url = upload_file_from_bytes(
-                        filename=f"{uuid.uuid4()}", data=r.content
-                    )
-                    uploaded_images.append(uploaded_url)
-                except (IOError, ConnectionError, ValueError):
-                    continue
 
-            state["output_images"] = uploaded_images
+        if not state["alter_images"]:
+            def get_image(g_img_url:str):
+                try:
+                    r = requests.get(g_img_url)
+                    uploaded_url = upload_file_from_bytes(
+                        filename=f"{uuid.uuid4()}.png", data=r.content
+                    )
+                    return uploaded_url
+                except (IOError, ConnectionError, ValueError):
+                    pass
+
+            state["output_images"] = map_parallel(
+                get_image,
+                image_urls,
+            )
             return  # Break out of the generator
 
         selected_image_bytes = None
