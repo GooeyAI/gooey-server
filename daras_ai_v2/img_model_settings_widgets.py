@@ -53,7 +53,9 @@ def model_selector(models_enum):
         )
     with col2:
         if models_enum is Img2ImgModels:
-            if st.session_state.get("selected_model") in [
+            if st.session_state.get("selected_model") is None or st.session_state.get(
+                "selected_model"
+            ) in [
                 Img2ImgModels.instruct_pix2pix.name,
                 Img2ImgModels.dall_e.name,
                 Img2ImgModels.jack_qiao.name,
