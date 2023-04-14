@@ -115,6 +115,14 @@ class LipsyncPage(BasePage):
     def render_output(self):
         self.render_example(st.session_state)
 
+    def related_workflows(self) -> list:
+        from recipes.DeforumSD import DeforumSDPage
+        from recipes.LipsyncTTS import LipsyncTTSPage
+        from recipes.asr import AsrPage
+        from recipes.VideoBots import VideoBotsPage
+
+        return [DeforumSDPage, LipsyncTTSPage, AsrPage, VideoBotsPage]
+
     def render_usage_guide(self):
         youtube_video("J87EtK7ZVz0")
 

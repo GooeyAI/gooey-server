@@ -15,7 +15,7 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.image_input import upload_st_file
 from daras_ai_v2 import settings
-from daras_ai_v2.GoogleGPT import render_outputs
+from daras_ai_v2.GoogleGPT import render_outputs, GoogleGPTPage
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -35,6 +35,7 @@ from recipes.DocSearch import (
     doc_url_to_text_pages,
     doc_url_to_metadata,
     document_splitter,
+    DocSearchPage,
 )
 
 DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
@@ -147,6 +148,12 @@ class DocSummaryPage(BasePage):
                 value=text,
                 height=200,
             )
+
+    def related_workflows(self) -> list:
+        from recipes.VideoBots import VideoBotsPage
+        from recipes.SEOSummary import SEOSummaryPage
+
+        return [GoogleGPTPage, DocSearchPage, VideoBotsPage, SEOSummaryPage]
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: DocSummaryPage.RequestModel = self.RequestModel.parse_obj(state)
