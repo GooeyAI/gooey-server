@@ -8,6 +8,7 @@ from daras_ai_v2.stable_diffusion import (
     ControlNetModels,
 )
 
+
 def img_model_settings(models_enum, render_model_selector=True):
     st.write("### Image Generation Settings")
     if render_model_selector:

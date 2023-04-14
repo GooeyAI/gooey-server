@@ -1,5 +1,4 @@
 import typing
-import uuid
 
 import requests
 import streamlit as st
@@ -10,10 +9,10 @@ from daras_ai.image_input import (
     resize_img_scale,
 )
 from daras_ai_v2.base import BasePage, gooey_rng
-from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
-    img_model_settings, model_selector,
+    img_model_settings,
+    model_selector,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import (
