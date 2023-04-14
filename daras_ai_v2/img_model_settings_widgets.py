@@ -8,36 +8,12 @@ from daras_ai_v2.stable_diffusion import (
     ControlNetModels,
 )
 
-
-def img_model_settings(models_enum):
+def img_model_settings(models_enum, render_model_selector=True):
     st.write("### Image Generation Settings")
-    col1, col2 = st.columns(2)
-    with col1:
-        selected_model = enum_selector(
-            models_enum,
-            label="#### Model",
-            key="selected_model",
-        )
-    with col2:
-        if models_enum is Img2ImgModels:
-            if st.session_state.get("selected_model") in [
-                Img2ImgModels.instruct_pix2pix.name,
-                Img2ImgModels.dall_e.name,
-                Img2ImgModels.jack_qiao.name,
-                Img2ImgModels.sd_2.name,
-            ]:
-                st.session_state["selected_controlnet_model"] = None
-            else:
-                enum_selector(
-                    ControlNetModels,
-                    label="""
-#### Control Net
-Choose any [conditioning model](https://huggingface.co/lllyasviel?search=controlnet).
-                    """,
-                    key="selected_controlnet_model",
-                    allow_none=True,
-                    use_selectbox=True,
-                )
+    if render_model_selector:
+        selected_model = model_selector(models_enum)
+    else:
+        selected_model = st.session_state.get("selected_model")
 
     negative_prompt_setting(selected_model)
 
@@ -61,6 +37,39 @@ Choose any [conditioning model](https://huggingface.co/lllyasviel?search=control
         if selected_model == Img2ImgModels.instruct_pix2pix.name:
             instruct_pix2pix_settings()
 
+    return selected_model
+
+
+def model_selector(models_enum):
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_model = enum_selector(
+            models_enum,
+            label="#### Model",
+            key="selected_model",
+            use_selectbox=True,
+            allow_none=True,
+        )
+    with col2:
+        if models_enum is Img2ImgModels:
+            if st.session_state.get("selected_model") in [
+                Img2ImgModels.instruct_pix2pix.name,
+                Img2ImgModels.dall_e.name,
+                Img2ImgModels.jack_qiao.name,
+                Img2ImgModels.sd_2.name,
+            ]:
+                st.session_state["selected_controlnet_model"] = None
+            else:
+                enum_selector(
+                    ControlNetModels,
+                    label="""
+#### Control Net
+Choose any [conditioning model](https://huggingface.co/lllyasviel?search=controlnet).
+                    """,
+                    key="selected_controlnet_model",
+                    allow_none=True,
+                    use_selectbox=True,
+                )
     return selected_model
 
 

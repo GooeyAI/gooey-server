@@ -13,7 +13,7 @@ from daras_ai_v2.base import BasePage, gooey_rng
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
-    img_model_settings,
+    img_model_settings, model_selector,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import (
@@ -40,13 +40,11 @@ class GoogleImageGenPage(BasePage):
         "seed": 42,
         "image_guidance_scale": 1.2,
         "scaleserp_locations": ["United States"],
-        "alter_images": True,
     }
 
     class RequestModel(BaseModel):
         search_query: str
         text_prompt: str
-        alter_images: bool
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
 
@@ -119,25 +117,9 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
         yield "Downloading..."
         state["image_urls"] = image_urls
-        uploaded_images = []
-        # If we're not altering the images, just upload them
-
-        if not state["alter_images"]:
-
-            def get_image(g_img_url: str):
-                try:
-                    r = requests.get(g_img_url)
-                    uploaded_url = upload_file_from_bytes(
-                        filename=f"{uuid.uuid4()}.png", data=r.content
-                    )
-                    return uploaded_url
-                except (IOError, ConnectionError, ValueError):
-                    pass
-
-            state["output_images"] = map_parallel(
-                get_image,
-                image_urls,
-            )
+        # If model is not selected, don't do anything else
+        if not state["selected_model"]:
+            state["output_images"] = image_urls
             return  # Break out of the generator
 
         selected_image_bytes = None
@@ -195,28 +177,21 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             """,
             key="search_query",
         )
-        st.write(
+        model_selector(Img2ImgModels)
+        st.text_area(
             """
             ### 👩‍💻 Prompt
+            Describe how you want to edit the photo in words
             """,
-        )
-        alter_images = st.checkbox(
-            label='Alter returned images with the following AI prompt. E.g. "give them sunglasses"',
-            key="alter_images",
-            value=True,
-        )
-        st.text_area(
-            label="Text prompt",
             key="text_prompt",
-            disabled=not alter_images,
-            label_visibility="hidden",
+            disabled=st.session_state.get("selected_model") is None,
         )
 
     def render_usage_guide(self):
         youtube_video("rnjvtaYYe8g")
 
     def render_settings(self):
-        img_model_settings(Img2ImgModels)
+        img_model_settings(Img2ImgModels, render_model_selector=False)
         scaleserp_location_picker()
 
     def render_output(self):
