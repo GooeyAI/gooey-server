@@ -67,7 +67,7 @@ class GoogleImageGenPage(BasePage):
         output_images: list[str]
 
         image_urls: list[str]
-        selected_image: str
+        selected_image: str | None
 
     def related_workflows(self):
         from recipes.ObjectInpainting import ObjectInpaintingPage
