@@ -82,7 +82,7 @@ class Text2AudioPage(BasePage):
             ##### ⏱️ Audio Duration (sec)
             """,
             key="duration_sec",
-            min_value=5,
+            min_value=1,
             max_value=20,
             step=1,
         )
