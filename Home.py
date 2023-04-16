@@ -5,6 +5,7 @@ from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from recipes.DocSearch import DocSearchPage
 from recipes.DocSummary import DocSummaryPage
 from recipes.Lipsync import LipsyncPage
+from recipes.Text2Audio import Text2AudioPage
 from recipes.asr import AsrPage
 
 init_scripts()
@@ -63,6 +64,7 @@ page_classes = [
     LipsyncPage,
     DeforumSDPage,
     CompareText2ImgPage,
+    Text2AudioPage,
     Img2ImgPage,
     FaceInpaintingPage,
     GoogleImageGenPage,
