@@ -1,4 +1,5 @@
 import typing
+from pprint import pprint
 
 import requests
 import streamlit as st
@@ -43,7 +44,7 @@ class GoogleImageGenPage(BasePage):
 
     class RequestModel(BaseModel):
         search_query: str
-        text_prompt: str
+        text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
 
