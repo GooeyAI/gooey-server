@@ -11,9 +11,7 @@ class SearchReference(typing.TypedDict):
     score: float
 
 
-pat = re.compile(
-    r"(" + r"(\[" + "[\d,\s\.\,\]\[]+" + "\])+" + r")+",
-)
+pat = re.compile(r"\[" r"[\d,\s\.\,\]\[]+" r"\]")
 
 
 def render_text_with_refs(text: str, references: list[SearchReference]):
