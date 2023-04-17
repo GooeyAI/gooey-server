@@ -1,3 +1,6 @@
+import os.path
+import subprocess
+import tempfile
 from enum import Enum
 
 import requests
@@ -6,6 +9,7 @@ from furl import furl
 from google.cloud import speech_v1p1beta1
 from google.cloud import translate, translate_v2
 
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.gpu_server import GpuEndpoints
 
 
@@ -97,12 +101,17 @@ def run_asr(
         str: Transcribed text.
     """
     selected_model = AsrModels[selected_model]
+    is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
+    if is_youtube_url:
+        audio_url = download_youtube_to_wav(audio_url)
     # call usm model
     if selected_model == AsrModels.usm:
+        if not is_youtube_url:
+            audio_url = audio_to_wav(audio_url)
         # Initialize request argument(s)
         config = speech_v1p1beta1.RecognitionConfig()
         config.language_code = language
-        config.audio_channel_count = 2
+        config.audio_channel_count = 1
         audio = speech_v1p1beta1.RecognitionAudio()
         audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
         request = speech_v1p1beta1.LongRunningRecognizeRequest(
@@ -151,3 +160,50 @@ def run_asr(
         )
     r.raise_for_status()
     return r.json()["text"]
+
+
+def download_youtube_to_wav(youtube_url: str) -> str:
+    """
+    Convert a youtube video to wav audio file.
+    Returns:
+        str: url of the wav audio file.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        infile = os.path.join(tmpdir, "infile")
+        outfile = os.path.join(tmpdir, "outfile.wav")
+        # run yt-dlp to download audio
+        args = [
+            "yt-dlp",
+            "--no-playlist",
+            "--format",
+            "bestaudio",
+            "--output",
+            infile,
+            youtube_url,
+        ]
+        print("\t$", " ".join(args))
+        subprocess.check_call(args)
+        # convert audio to single channel wav
+        args = ["ffmpeg", "-y", "-i", infile, "-ac", "1", outfile]
+        print("\t$", " ".join(args))
+        subprocess.check_call(args)
+        # read wav file into memory
+        with open(outfile, "rb") as f:
+            wavdata = f.read()
+    # upload the wav file
+    return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav")
+
+
+def audio_to_wav(audio_url: str) -> str:
+    with (
+        tempfile.NamedTemporaryFile() as infile,
+        tempfile.NamedTemporaryFile(suffix=".wav") as outfile,
+    ):
+        infile.write(requests.get(audio_url).content)
+        infile.flush()
+        args = ["ffmpeg", "-y", "-i", infile.name, "-ac", "1", outfile.name]
+        print("\t$", " ".join(args))
+        subprocess.check_call(args)
+        wavdata = outfile.read()
+    filename = furl(audio_url).path.segments[-1] + ".wav"
+    return upload_file_from_bytes(filename, wavdata, "audio/wav")

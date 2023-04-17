@@ -257,13 +257,14 @@ def _on_msg(bot: BotInterface):
                 if bot.language == "hi":
                     selected_model = "nemo_hindi"
                 else:
-                    selected_model = "whisper_large_v2"
+                    selected_model = "usm"
                 result = call_api(
                     page_cls=AsrPage,
                     user=billing_account,
                     request_body={
                         "documents": [bot.get_input_audio()],
                         "selected_model": selected_model,
+                        "language": bot.language,
                         "google_translate_target": None,
                     },
                     query_params={},
