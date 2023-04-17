@@ -264,11 +264,13 @@ def get_top_k_references(
     )
     embeds: list[tuple[SearchReference, list[float]]] = flatten(nested_embeds)
     yield f"Searching documents..."
-    for ref, doc_embeds in embeds:
-        ref["score"] = vector_similarity(query_embeds, doc_embeds)
-    # apply cutoff
+    # get all matches above cutoff based on cosine similarity
     cutoff = 0.7
-    candidates = [ref for ref, _ in embeds if ref["score"] >= cutoff]
+    candidates = [
+        {**ref, "score": score}
+        for ref, doc_embeds in embeds
+        if (score := vector_similarity(query_embeds, doc_embeds)) >= cutoff
+    ]
     # get top_k best matches
     matches = heapq.nlargest(
         request.max_references, candidates, key=lambda match: match["score"]
