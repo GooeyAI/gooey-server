@@ -240,3 +240,10 @@ scaleserp_locations_list = [
     "Zambia",
     "Zimbabwe",
 ]
+
+scaleserp_image_sizes = [
+    "any",
+    "large",
+    "medium",
+    "icon",
+]

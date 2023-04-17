@@ -17,7 +17,7 @@ from daras_ai_v2.img_model_settings_widgets import (
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import (
-    scaleserp_location_picker,
+    scaleserp_location_picker, scaleserp_image_size_picker,
 )
 from daras_ai_v2.stable_diffusion import (
     img2img,
@@ -40,6 +40,7 @@ class GoogleImageGenPage(BasePage):
         "seed": 42,
         "image_guidance_scale": 1.2,
         "scaleserp_locations": ["United States"],
+        "scaleserp_image_size": "any",
     }
 
     class RequestModel(BaseModel):
@@ -63,6 +64,7 @@ class GoogleImageGenPage(BasePage):
         image_guidance_scale: float | None
 
         scaleserp_locations: list[str] | None
+        scaleserp_image_size: str | None
 
     class ResponseModel(BaseModel):
         output_images: list[str]
@@ -105,8 +107,8 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             request.search_query,
             search_type="images",
             include_fields="image_results",
-            images_size="medium",
             location=",".join(request.scaleserp_locations),
+            images_size=request.scaleserp_image_size,
         )
         image_urls = [
             result["image"]
@@ -193,6 +195,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
     def render_settings(self):
         img_model_settings(Img2ImgModels, render_model_selector=False)
         scaleserp_location_picker()
+        scaleserp_image_size_picker()
 
     def render_output(self):
         out_imgs = st.session_state.get("output_images")
