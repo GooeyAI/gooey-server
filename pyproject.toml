@@ -52,6 +52,7 @@ langchain = "^0.0.117"
 tiktoken = "^0.3.2"
 google-cloud-translate = ">=2.0.1,<2.1.0"
 google-cloud-speech = "^2.19.0"
+yt-dlp = "^2023.3.4"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"
