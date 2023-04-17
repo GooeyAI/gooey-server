@@ -26,6 +26,7 @@ class AsrPage(BasePage):
     class RequestModel(BaseModel):
         documents: list[str]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        language: str | None
         google_translate_target: str | None
 
     class ResponseModel(BaseModel):
@@ -63,7 +64,10 @@ class AsrPage(BasePage):
 
     def render_form_v2(self):
         document_uploader("##### Audio Files", type=("wav", "ogg", "mp3", "aac"))
+        st.write("---")
         enum_selector(AsrModels, label="###### ASR Model", key="selected_model")
+        st.text_input("###### Spoken Language", key="language")
+        st.write("---")
         google_translate_language_selector()
 
     def validate_form_v2(self):
@@ -90,7 +94,11 @@ class AsrPage(BasePage):
         selected_model = AsrModels[request.selected_model]
         yield f"Running {selected_model.value}..."
         state["output_text"] = map_parallel(
-            lambda audio: run_asr(audio, selected_model=request.selected_model),
+            lambda audio: run_asr(
+                audio_url=audio,
+                selected_model=request.selected_model,
+                language=request.language,
+            ),
             request.documents,
         )
 

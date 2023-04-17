@@ -2,6 +2,8 @@ from enum import Enum
 
 import requests
 import streamlit as st
+from furl import furl
+from google.cloud import speech_v1p1beta1
 from google.cloud import translate, translate_v2
 
 from daras_ai_v2.gpu_server import GpuEndpoints
@@ -12,6 +14,7 @@ class AsrModels(Enum):
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
+    usm = "USM (Google)"
 
 
 asr_model_ids = {
@@ -80,23 +83,47 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
 
 
 def run_asr(
-    audio: str,
+    audio_url: str,
     selected_model: str,
+    language: str = None,
 ) -> str:
     """
     Run ASR on audio.
     Args:
-        audio (str): Audio to be transcribed.
+        audio_url (str): url of audio to be transcribed.
         selected_model (str): ASR model to use.
+        language: language of the audio
     Returns:
         str: Transcribed text.
     """
     selected_model = AsrModels[selected_model]
-    if "hindi" in selected_model.name:
-        language = "hindi"
-    else:
-        language = "english"
+    # call usm model
+    if selected_model == AsrModels.usm:
+        # Initialize request argument(s)
+        config = speech_v1p1beta1.RecognitionConfig()
+        config.language_code = language
+        config.audio_channel_count = 2
+        audio = speech_v1p1beta1.RecognitionAudio()
+        audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
+        request = speech_v1p1beta1.LongRunningRecognizeRequest(
+            config=config, audio=audio
+        )
+        # Create a client
+        client = speech_v1p1beta1.SpeechClient()
+        # Make the request
+        operation = client.long_running_recognize(request=request)
+        # Wait for operation to complete
+        response = operation.result()
+        # Handle the response
+        return "\n\n".join(
+            result.alternatives[0].transcript for result in response.results
+        )
+    # call one of the self-hosted models
     if "whisper" in selected_model.name:
+        if language:
+            language = language.split("-")[0]
+        elif "hindi" in selected_model.name:
+            language = "hi"
         r = requests.post(
             str(GpuEndpoints.whisper),
             json={
@@ -104,7 +131,7 @@ def run_asr(
                     model_id=asr_model_ids[selected_model],
                 ),
                 "inputs": {
-                    "audio": audio,
+                    "audio": audio_url,
                     "task": "transcribe",
                     "language": language,
                 },
@@ -118,7 +145,7 @@ def run_asr(
                     model_id=asr_model_ids[selected_model],
                 ),
                 "inputs": {
-                    "audio": audio,
+                    "audio": audio_url,
                 },
             },
         )
