@@ -42,7 +42,7 @@ class GoogleImageGenPage(BasePage):
         "seed": 42,
         "image_guidance_scale": 1.2,
         "scaleserp_locations": ["United States"],
-        "scaleserp_image_size": "any",
+        "scaleserp_image_size": "medium",
     }
 
     class RequestModel(BaseModel):

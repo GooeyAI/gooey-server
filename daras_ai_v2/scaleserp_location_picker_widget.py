@@ -14,10 +14,8 @@ def scaleserp_location_picker():
 
 
 def scaleserp_image_size_picker():
-    defaults = st.session_state.get("scaleserp_image_size", "any")
     selected_image_size = st.selectbox(
         "**ScaleSERP [Image Size](https://www.scaleserp.com/docs/search-api/searches/google/images)**",
         options=scaleserp_image_sizes,
-        # default=defaults,
     )
     st.session_state["scaleserp_image_size"] = selected_image_size

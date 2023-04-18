@@ -242,7 +242,6 @@ scaleserp_locations_list = [
 ]
 
 scaleserp_image_sizes = [
-    "any",
     "large",
     "medium",
     "icon",
