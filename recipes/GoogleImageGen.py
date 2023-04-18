@@ -121,9 +121,10 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
         yield "Downloading..."
         state["image_urls"] = image_urls
+        num_outputs = state.get("num_outputs")
         # If model is not selected, don't do anything else
         if not state["selected_model"]:
-            state["output_images"] = image_urls
+            state["output_images"] = image_urls[:num_outputs]
             return  # Break out of the generator
 
         selected_image_bytes = None
