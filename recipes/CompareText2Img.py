@@ -10,10 +10,8 @@ from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.img_model_settings_widgets import (
     negative_prompt_setting,
     guidance_scale_setting,
-    num_outputs_setting,
-    output_resolution_setting,
     instruct_pix2pix_settings,
-    sd_2_upscaling_setting,
+    sd_2_upscaling_setting, num_outputs_and_quality_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
@@ -180,8 +178,8 @@ class CompareText2ImgPage(BasePage):
         )
 
         negative_prompt_setting()
+        num_outputs_and_quality_settings(max_num_outputs=4)
         output_resolution_setting()
-        num_outputs_setting()
         sd_2_upscaling_setting()
         col1, col2 = st.columns(2)
         with col1:

@@ -11,7 +11,9 @@ from daras_ai_v2.stable_diffusion import (
 )
 
 
-def img_model_settings(models_enum, render_model_selector=True):
+def img_model_settings(
+    models_enum, render_model_selector=True, render_num_outputs=True
+):
     st.write("### Image Generation Settings")
     if render_model_selector:
         selected_model = model_selector(models_enum)
@@ -20,7 +22,7 @@ def img_model_settings(models_enum, render_model_selector=True):
 
     negative_prompt_setting(selected_model)
 
-    num_outputs_setting(selected_model)
+    num_outputs_and_quality_settings(selected_model, render_num_outputs)
     if models_enum is not Img2ImgModels:
         output_resolution_setting()
 
@@ -78,43 +80,58 @@ Choose any [conditioning model](https://huggingface.co/lllyasviel?search=control
     return selected_model
 
 
-def num_outputs_setting(selected_model: str = None):
-    col1, col2 = st.columns(2, gap="medium")
-    with col1:
+def num_outputs_setting(selected_model: str = None, max_value: int = None):
+    max_outputs = max_value or (4 if selected_model else 10)
+    st.slider(
+        label="""
+        ##### Number of Outputs
+        Change the number of outputs for a single run here:
+        """,
+        key="num_outputs",
+        min_value=1,
+        max_value=max_outputs,
+        step=1,
+    )
+    st.caption(
+        """
+        By default, each run produces one output per Model.
+        """
+    )
+
+
+def quality_setting(selected_model: str = None):
+    if selected_model != InpaintingModels.dall_e.name:
         st.slider(
             label="""
-            ##### Number of Outputs
-            Change the number of outputs for a single run here:
+            ##### Quality
+            How precise, or focused do you want your output to be? 
             """,
-            key="num_outputs",
-            min_value=1,
-            max_value=4 if selected_model else 10,
-            step=1,
+            key="quality",
+            min_value=10,
+            max_value=200,
+            step=10,
         )
         st.caption(
             """
-            By default, each run produces one output per Model.
+            An increase in output quality is comparable to a gradual progression in any drawing process that begins with a draft version and ends with a finished product. 
             """
         )
-    with col2:
-        if selected_model != InpaintingModels.dall_e.name:
-            st.slider(
-                label="""
-                ##### Quality
-                How precise, or focused do you want your output to be? 
-                """,
-                key="quality",
-                min_value=10,
-                max_value=200,
-                step=10,
-            )
-            st.caption(
-                """
-                An increase in output quality is comparable to a gradual progression in any drawing process that begins with a draft version and ends with a finished product. 
-                """
-            )
-        else:
-            st.empty()
+    else:
+        st.empty()
+
+
+def num_outputs_and_quality_settings(
+    selected_model: str = None, render_num_outputs=True,
+        max_num_outputs=None
+):
+    if not render_num_outputs:
+        quality_setting(selected_model)
+        return
+    num_outputs, quality = st.columns(2, gap="medium")
+    with num_outputs:
+        num_outputs_setting(selected_model, max_value=max_num_outputs)
+    with quality:
+        quality_setting(selected_model)
 
 
 RESOLUTIONS = {

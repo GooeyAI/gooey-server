@@ -13,11 +13,12 @@ from daras_ai_v2.base import BasePage, gooey_rng
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
-    model_selector,
+    model_selector, num_outputs_setting,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import (
-    scaleserp_location_picker, scaleserp_image_size_picker,
+    scaleserp_location_picker,
+    scaleserp_image_size_picker,
 )
 from daras_ai_v2.stable_diffusion import (
     img2img,
@@ -180,6 +181,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             key="search_query",
         )
         model_selector(Img2ImgModels)
+        num_outputs_setting(selected_model=st.session_state.get("selected_model"))
         st.text_area(
             """
             ### 👩‍💻 Prompt
@@ -192,8 +194,21 @@ The result is a fantastic, one of kind image that's relevant to your search (and
     def render_usage_guide(self):
         youtube_video("rnjvtaYYe8g")
 
+    def get_price(self) -> int:
+        selected_model = st.session_state.get("selected_model")
+        # If model is not selected, don't do anything else
+        if selected_model:
+            return 5
+        number_of_outputs = st.session_state.get("num_outputs")
+        total = 0
+        for i in range(number_of_outputs):
+            total += 5
+        return total
+
     def render_settings(self):
-        img_model_settings(Img2ImgModels, render_model_selector=False)
+        img_model_settings(
+            Img2ImgModels, render_model_selector=False, render_num_outputs=False
+        )
         scaleserp_location_picker()
         scaleserp_image_size_picker()
 

@@ -13,7 +13,7 @@ from daras_ai_v2.gpu_server import GpuEndpoints
 from daras_ai_v2.img_model_settings_widgets import (
     negative_prompt_setting,
     guidance_scale_setting,
-    num_outputs_setting,
+    num_outputs_and_quality_settings,
 )
 
 
@@ -87,7 +87,7 @@ class Text2AudioPage(BasePage):
             step=1,
         )
         negative_prompt_setting()
-        num_outputs_setting()
+        num_outputs_and_quality_settings(max_num_outputs=4)
         guidance_scale_setting()
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
