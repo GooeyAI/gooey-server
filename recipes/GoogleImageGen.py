@@ -13,7 +13,8 @@ from daras_ai_v2.base import BasePage, gooey_rng
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
-    model_selector, num_outputs_setting,
+    model_selector,
+    num_outputs_setting,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import (

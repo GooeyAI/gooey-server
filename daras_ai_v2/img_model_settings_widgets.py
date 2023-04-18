@@ -121,8 +121,7 @@ def quality_setting(selected_model: str = None):
 
 
 def num_outputs_and_quality_settings(
-    selected_model: str = None, render_num_outputs=True,
-        max_num_outputs=None
+    selected_model: str = None, render_num_outputs=True, max_num_outputs=None
 ):
     if not render_num_outputs:
         quality_setting(selected_model)

@@ -11,7 +11,8 @@ from daras_ai_v2.img_model_settings_widgets import (
     negative_prompt_setting,
     guidance_scale_setting,
     instruct_pix2pix_settings,
-    sd_2_upscaling_setting, num_outputs_and_quality_settings,
+    sd_2_upscaling_setting,
+    num_outputs_and_quality_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (

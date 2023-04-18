@@ -12,6 +12,7 @@ def scaleserp_location_picker():
     )
     st.session_state["scaleserp_locations"] = selected_countries
 
+
 def scaleserp_image_size_picker():
     defaults = st.session_state.get("scaleserp_image_size", "any")
     selected_image_size = st.selectbox(
