@@ -88,7 +88,7 @@ def num_outputs_setting(selected_model: str = None):
             """,
             key="num_outputs",
             min_value=1,
-            max_value=4,
+            max_value=4 if selected_model else 10,
             step=1,
         )
         st.caption(
