@@ -1,6 +1,7 @@
 import requests
 
 from daras_ai_v2 import settings
+
 WIX_API_CREATE_CONTACTS_ENDPOINT = "https://www.wixapis.com/contacts/v4/contacts"
 WIX_API_QUERY_CONTACTS_ENDPOINT = "https://www.wixapis.com/contacts/v4/contacts/query"
 WIX_API_EVENTS_REPORT_ENDPOINT = "https://www.wixapis.com/automations/v1/events/report"
@@ -17,7 +18,7 @@ def add_to_wix_contact(user_data: dict):
     if wix_contact:
         return
     # Create wix contact
-    contact_data =construct_contact(user_data)
+    contact_data = construct_contact(user_data)
     response = requests.post(
         WIX_API_CREATE_CONTACTS_ENDPOINT,
         headers={

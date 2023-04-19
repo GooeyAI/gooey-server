@@ -95,8 +95,6 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-
-
 @app.get("/sitemap.xml/", include_in_schema=False)
 async def get_sitemap():
     my_sitemap = """<?xml version="1.0" encoding="UTF-8"?>
