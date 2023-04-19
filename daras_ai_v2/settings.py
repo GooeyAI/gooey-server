@@ -99,10 +99,6 @@ TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
 PINECONE_API_KEY = config("PINECONE_API_KEY", "")
 PINECONE_ENVIRONMENT = config("PINECONE_ENVIRONMENT", "us-east1-gcp")
 WIX_API_KEY = config("WIX_API_KEY", "")
-WIX_API_CREATE_CONTACTS_ENDPOINT = "https://www.wixapis.com/contacts/v4/contacts"
-WIX_API_QUERY_CONTACTS_ENDPOINT = "https://www.wixapis.com/contacts/v4/contacts/query"
-WIX_API_EVENTS_REPORT_ENDPOINT = "https://www.wixapis.com/automations/v1/events/report"
-WIX_APP_OAUTH_ENDPOINT = "https://www.wixapis.com/oauth/access"
 
 WIX_SITE_ID = config("WIX_SITE_ID", "")
 WIX_EMAIL_APP_REFRESH_TOKEN = config("WIX_EMAIL_APP_REFRESH_TOKEN", "")

@@ -1,11 +1,9 @@
 import datetime
-import json
 import re
 import typing
 from time import time
 
 import httpx
-import requests
 import streamlit as st
 from fastapi import FastAPI, Depends, BackgroundTasks
 from fastapi import HTTPException, Body
@@ -28,7 +26,6 @@ from starlette.responses import (
     PlainTextResponse,
     Response,
     FileResponse,
-    StreamingResponse,
 )
 
 from auth_backend import (
@@ -42,7 +39,6 @@ from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
     DEFAULT_META_IMG,
-    StateKeys,
 )
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import (
@@ -77,10 +73,7 @@ from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
 from routers import billing, facebook, talkjs, realtime
 from wix.wix_functions import (
-    get_wix_access_token,
-    trigger_sign_up_email_automation,
-    construct_contact,
-    check_wix_contact_exists,
+    add_to_wix_contact,
 )
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -102,30 +95,6 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-def add_to_wix_contact(user_data: dict):
-    email = user_data.get("email")
-    # No email-> phone number signin
-    if not email:
-        return
-    # Check if wix contact already exists
-    wix_contact = check_wix_contact_exists(email)
-    if wix_contact:
-        return
-    # Create wix contact
-    contact_data =construct_contact(user_data)
-    response = requests.post(
-        settings.WIX_API_CREATE_CONTACTS_ENDPOINT,
-        headers={
-            "Authorization": settings.WIX_API_KEY,
-            "wix-site-id": settings.WIX_SITE_ID,
-        },
-        json=contact_data,
-    )
-    response.raise_for_status()
-    created_contact = response.json().get("contact")
-    access_token = get_wix_access_token()
-    trigger_sign_up_email_automation(access_token, created_contact, user_data)
-    return JSONResponse(content={"status_code": response.status_code})
 
 
 @app.get("/sitemap.xml/", include_in_schema=False)
