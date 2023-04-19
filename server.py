@@ -7,7 +7,7 @@ from time import time
 import httpx
 import requests
 import streamlit as st
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, BackgroundTasks
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -102,19 +102,17 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-@app.post("/add-to-wix-contact", include_in_schema=False)
-async def add_to_wix_contact(request: Request):
-    user_data = await request.json()
+def add_to_wix_contact(user_data: dict):
     email = user_data.get("email")
     # No email-> phone number signin
     if not email:
         return
     # Check if wix contact already exists
-    wix_contact = await check_wix_contact_exists(email)
+    wix_contact = check_wix_contact_exists(email)
     if wix_contact:
         return
     # Create wix contact
-    contact_data = await construct_contact(user_data)
+    contact_data =construct_contact(user_data)
     response = requests.post(
         settings.WIX_API_CREATE_CONTACTS_ENDPOINT,
         headers={
@@ -125,8 +123,8 @@ async def add_to_wix_contact(request: Request):
     )
     response.raise_for_status()
     created_contact = response.json().get("contact")
-    access_token = await get_wix_access_token()
-    await trigger_sign_up_email_automation(access_token, created_contact, user_data)
+    access_token = get_wix_access_token()
+    trigger_sign_up_email_automation(access_token, created_contact, user_data)
     return JSONResponse(content={"status_code": response.status_code})
 
 
@@ -223,8 +221,24 @@ async def request_body(request: Request):
     return await request.body()
 
 
+async def request_json(request: Request):
+    j = await request.json()
+    print("json", j)
+    return j
+
+
 @app.post("/sessionLogin", include_in_schema=False)
-def authentication(request: Request, id_token: bytes = Depends(request_body)):
+def authentication(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    data: dict = Depends(request_json),
+):
+    id_token = data.get("idToken")
+    del data["idToken"]
+    # Add to wix contacts if email is present
+    if "email" in data.keys():
+        background_tasks.add_task(add_to_wix_contact, data)
+
     ## Taken from https://firebase.google.com/docs/auth/admin/manage-cookies#create_session_cookie
 
     # To ensure that cookies are set only on recently signed in users, check auth_time in

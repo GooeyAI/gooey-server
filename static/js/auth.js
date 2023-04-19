@@ -16,27 +16,23 @@ window.addEventListener('load', function () {
     // As httpOnly cookies are to be used, do not persist any state client side.
     firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
 });
-function createWixContact(email, name, phone) {
-    var data = {
-        "email": email,
-        "name": name,
-        "phone": phone
-    }
-    var xhr = new XMLHttpRequest();
-    xhr.open("POST", '/add-to-wix-contact', true);
-    xhr.send(JSON.stringify(data));
-}
 
 
 function onSignIn(authResult) {
     const user = authResult.user;
     if (!user) return;
-    if(authResult.additionalUserInfo.isNewUser){
-        createWixContact(user.email, user.displayName, user.phoneNumber);
-    }
 
     // Get the user's ID token as it is needed to exchange for a session cookie.
     user.getIdToken().then(idToken => {
+        var data = {"idToken": idToken};
+        if (authResult.additionalUserInfo.isNewUser) {
+            data = {
+                ...data,
+                "email": user.email,
+                "name": user.displayName,
+                "phone": user.phoneNumber,
+            }
+        }
         // Session login endpoint is queried and the session cookie is set.
         const xhr = new XMLHttpRequest();
         xhr.open("POST", '/sessionLogin', true);
@@ -51,7 +47,7 @@ function onSignIn(authResult) {
                 window.location = next;
             }
         }
-        xhr.send(idToken);
+        xhr.send(JSON.stringify(data));
     });
 }
 

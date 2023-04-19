@@ -3,7 +3,7 @@ import requests
 from daras_ai_v2 import settings
 
 
-async def construct_contact(user_data):
+def construct_contact(user_data):
     return {
         "info": {
             "name": {
@@ -21,7 +21,7 @@ async def construct_contact(user_data):
     }
 
 
-async def trigger_sign_up_email_automation(access_token, created_contact, data):
+def trigger_sign_up_email_automation(access_token, created_contact, data):
     response = requests.post(
         settings.WIX_API_EVENTS_REPORT_ENDPOINT,
         headers={
@@ -38,7 +38,7 @@ async def trigger_sign_up_email_automation(access_token, created_contact, data):
     response.raise_for_status()
 
 
-async def get_wix_access_token() -> str:
+def get_wix_access_token() -> str:
     refresh_token_data = {
         "grant_type": "refresh_token",
         "client_id": settings.WIX_APP_CLIENT_ID,
