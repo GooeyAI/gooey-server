@@ -1,5 +1,4 @@
 import datetime
-import re
 import typing
 
 import streamlit as st
@@ -11,15 +10,10 @@ from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
+from daras_ai_v2.search_ref import SearchReference, render_text_with_refs
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
-
-
-class SearchReference(typing.TypedDict):
-    url: str
-    title: str
-    snippet: str
-    score: float
 
 
 class GoogleGPTPage(BasePage):
@@ -34,6 +28,7 @@ class GoogleGPTPage(BasePage):
         title="Ruggable",
         company_url="https://ruggable.com",
         scaleserp_search_field="organic_results",
+        scaleserp_locations=["United States"],
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
@@ -64,6 +59,9 @@ class GoogleGPTPage(BasePage):
         sampling_temperature: float | None
 
         max_search_urls: int | None
+
+        scaleserp_search_field: str | None
+        scaleserp_locations: list[str] | None
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -111,15 +109,25 @@ class GoogleGPTPage(BasePage):
 
         st.write("---")
 
-        st.number_input(
-            label="""
-            ###### Max References
-            The maximum number of search URLs to consider as References
-            """,
-            key="max_search_urls",
-            min_value=1,
-            max_value=10,
-        )
+        st.write("#### Search Tools")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.text_input(
+                "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**",
+                key="scaleserp_search_field",
+            )
+        with col2:
+            st.number_input(
+                label="""
+                ###### Max Search URLs
+                The maximum number of search URLs to consider as References
+                """,
+                key="max_search_urls",
+                min_value=1,
+                max_value=10,
+            )
+        scaleserp_location_picker()
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage
@@ -204,10 +212,10 @@ class GoogleGPTPage(BasePage):
             f = furl(request.site_filter)
             search_query = f"site:{f.host}{f.path} {search_query}"
 
-        scaleserp_search_field = "organic_results"
         state["scaleserp_results"] = scaleserp_results = call_scaleserp(
             search_query,
-            include_fields=scaleserp_search_field,
+            include_fields=request.scaleserp_search_field,
+            location=",".join(request.scaleserp_locations),
         )
 
         state["references"] = references = []
@@ -219,7 +227,7 @@ class GoogleGPTPage(BasePage):
         prompt = task_instructions.strip() + "\n\n"
         prompt += "Search Results:\n"
         ref_num = 1
-        for item in scaleserp_results.get(scaleserp_search_field, []):
+        for item in scaleserp_results.get(request.scaleserp_search_field, []):
             try:
                 url = item["link"]
                 title = item["title"]
@@ -264,27 +272,3 @@ def render_outputs(state, height):
             f"""<div style="max-height: {height}px;" class="gooey-output-text"><p>{html}</p></div>""",
             unsafe_allow_html=True,
         )
-
-
-def render_text_with_refs(text: str, references: list[SearchReference]):
-    html = ""
-    last_match_end = 0
-    for match in re.finditer(r"(\[[\d,\s]+\]([\,\.\s]*))+", text):
-        end_separator = match.group(2)
-        ref_str = text[match.start() : match.end()].strip()
-        ref_numbers = set(int(num) for num in re.findall(r"\d+", ref_str))
-        html += text[last_match_end : match.start()].strip()
-        ref_links = []
-        for ref_num in ref_numbers:
-            try:
-                url = references[ref_num - 1]["url"]
-            except IndexError:
-                continue
-            ref_links.append(f'<a href="{url}">{ref_num}</a>')
-        ref_str_clean = ", ".join(ref_links)
-        if ref_links:
-            html += f"<sup>[{ref_str_clean}]</sup>"
-        html += end_separator
-        last_match_end = match.end()
-    html += text[last_match_end:]
-    return html

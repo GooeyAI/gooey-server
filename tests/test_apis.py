@@ -26,6 +26,7 @@ from recipes.LipsyncTTS import LipsyncTTSPage
 from recipes.ObjectInpainting import ObjectInpaintingPage
 from recipes.SEOSummary import SEOSummaryPage
 from recipes.SocialLookupEmail import SocialLookupEmailPage
+from recipes.Text2Audio import Text2AudioPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
@@ -48,6 +49,7 @@ pages_to_test = [
     ObjectInpaintingPage,
     SocialLookupEmailPage,
     CompareText2ImgPage,
+    Text2AudioPage,
     SEOSummaryPage,
     GoogleImageGenPage,
     VideoBotsPage,

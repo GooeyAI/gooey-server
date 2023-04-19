@@ -257,7 +257,7 @@ def _on_msg(bot: BotInterface):
                 if bot.language == "hi":
                     selected_model = "nemo_hindi"
                 else:
-                    selected_model = "nemo_english"
+                    selected_model = "whisper_large_v2"
                 result = call_api(
                     page_cls=AsrPage,
                     user=billing_account,
@@ -292,12 +292,6 @@ def _on_msg(bot: BotInterface):
         response_audio = None
         response_video = None
     else:
-        # translate response text, but don't save the translated text
-        if bot.language != "en":
-            input_text = run_google_translate(
-                texts=[input_text],
-                google_translate_target="en",
-            )[0]
         try:
             # make API call to gooey bots to get the response
             response_text, response_audio, response_video, saved_msgs = _process_msg(
@@ -307,6 +301,7 @@ def _on_msg(bot: BotInterface):
                 bot_id=bot.bot_id,
                 user_id=bot.user_id,
                 input_text=input_text,
+                user_language=bot.language,
             )
         except HTTPException as e:
             # handle exceptions
@@ -314,12 +309,6 @@ def _on_msg(bot: BotInterface):
             # send error msg as repsonse
             bot.send_msg(text=ERROR_MSG.format(e))
             return
-        # translate response text, but don't save the translated text
-        if bot.language != "en":
-            response_text = run_google_translate(
-                texts=[response_text],
-                google_translate_target=bot.language,
-            )[0]
     # this really shouldn't happen, but just in case it does, we should have a nice message for the user
     response_text = response_text or DEFAULT_RESPONSE
     # send the response to the user
@@ -341,6 +330,7 @@ def _process_msg(
     bot_id: str,
     user_id: str,
     input_text: str,
+    user_language: str,
 ) -> tuple[str, str | None, str | None, list[dict]]:
     from server import call_api
 
@@ -356,6 +346,7 @@ def _process_msg(
         request_body={
             "input_prompt": input_text,
             "messages": saved_msgs,
+            "user_language": user_language,
         },
         query_params=query_params,
     )
@@ -368,10 +359,11 @@ def _process_msg(
         response_audio = result["output"]["output_audio"][0]
     except (KeyError, IndexError):
         pass
+    raw_output_text = result["output"]["raw_output_text"][0]
     response_text = result["output"]["output_text"][0]
     # save new messages for context
     saved_msgs += [
         {"role": CHATML_ROLE_USER, "content": input_text},
-        {"role": CHATML_ROLE_ASSISSTANT, "content": response_text},
+        {"role": CHATML_ROLE_ASSISSTANT, "content": raw_output_text},
     ]
     return response_text, response_audio, response_video, saved_msgs

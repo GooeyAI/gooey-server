@@ -195,7 +195,7 @@ SearchSEO > Page Parsing > GPT3
             st.number_input(
                 label="""
                 ###### Max Search URLs
-                The maximum number of search URLs to consider as training data
+                The maximum number of search URLs to consider as References
                 """,
                 key="max_search_urls",
                 min_value=1,

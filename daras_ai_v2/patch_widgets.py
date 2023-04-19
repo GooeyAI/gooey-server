@@ -7,8 +7,6 @@ from furl import furl
 from streamlit.runtime.state import get_session_state
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
-
 
 def patch(*targets):
     def decorator(patch_fn):
@@ -35,8 +33,8 @@ def _patcher(fn_name, patch_fn):
     setattr(st, flag, True)
 
 
-@patch(st.image)
-def image_patch(self, value, *args, caption=None, **kwargs):
+@patch(st.image, st.audio)
+def caption_patch(self, value, *args, caption=None, **kwargs):
     if not (isinstance(value, np.ndarray) or value):
         st.empty()
         return
@@ -74,6 +72,8 @@ def file_uploader_patch(self, *args, upload_key=None, **kwargs):
 
 
 def _render_preview(file: list | UploadedFile | str | None):
+    from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
+
     if isinstance(file, list):
         for item in file:
             _render_preview(item)

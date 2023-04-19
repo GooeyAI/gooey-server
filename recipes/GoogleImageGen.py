@@ -12,6 +12,7 @@ from daras_ai_v2.base import BasePage, gooey_rng
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
+    model_selector,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import (
@@ -66,7 +67,7 @@ class GoogleImageGenPage(BasePage):
         output_images: list[str]
 
         image_urls: list[str]
-        selected_image: str
+        selected_image: str | None
 
     def related_workflows(self):
         from recipes.ObjectInpainting import ObjectInpaintingPage
@@ -113,9 +114,12 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         ][:10]
         gooey_rng.shuffle(image_urls)
 
-        state["image_urls"] = image_urls
-
         yield "Downloading..."
+        state["image_urls"] = image_urls
+        # If model is not selected, don't do anything else
+        if not state["selected_model"]:
+            state["output_images"] = image_urls
+            return  # Break out of the generator
 
         selected_image_bytes = None
         for selected_image_url in image_urls:
@@ -172,19 +176,21 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             """,
             key="search_query",
         )
+        model_selector(Img2ImgModels)
         st.text_area(
             """
             ### 👩‍💻 Prompt
             Describe how you want to edit the photo in words
             """,
             key="text_prompt",
+            disabled=st.session_state.get("selected_model") is None,
         )
 
     def render_usage_guide(self):
         youtube_video("rnjvtaYYe8g")
 
     def render_settings(self):
-        img_model_settings(Img2ImgModels)
+        img_model_settings(Img2ImgModels, render_model_selector=False)
         scaleserp_location_picker()
 
     def render_output(self):

@@ -30,6 +30,8 @@ class GpuEndpoints:
     whisper = _asr / "whisper"
     nemo_asr = _asr / "nemo/asr"
 
+    audio_ldm = settings.GPU_SERVER_1.copy().set(port=5017) / "audio_ldm"
+
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
     b64_data = call_gpu_server(endpoint=endpoint, input_data=input_data)
