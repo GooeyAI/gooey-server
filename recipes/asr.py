@@ -77,14 +77,17 @@ class AsrPage(BasePage):
         text_outputs("**Transcription**", key="output_text", height=300)
 
     def render_example(self, state: dict):
-        text_outputs("**Transcription**", key="output_text", height=200)
+        text_outputs("**Transcription**", key="output_text")
 
     def render_steps(self):
         if st.session_state.get("google_translate_target"):
-            text_outputs("**Transcription**", key="raw_output_text", height=200)
-            text_outputs("**Translation**", key="output_text", height=300)
+            col1, col2 = st.columns(2)
+            with col1:
+                text_outputs("**Transcription**", key="raw_output_text")
+            with col2:
+                text_outputs("**Translation**", key="output_text")
         else:
-            text_outputs("**Transcription**", key="output_text", height=200)
+            text_outputs("**Transcription**", key="output_text")
 
     def run(self, state: dict):
         # Parse Request
@@ -93,7 +96,7 @@ class AsrPage(BasePage):
         # Run ASR
         selected_model = AsrModels[request.selected_model]
         yield f"Running {selected_model.value}..."
-        state["output_text"] = map_parallel(
+        asr_output = map_parallel(
             lambda audio: run_asr(
                 audio_url=audio,
                 selected_model=request.selected_model,
@@ -105,9 +108,12 @@ class AsrPage(BasePage):
         # Run Translation
         if request.google_translate_target:
             # Save the raw ASR text for details view
-            state["raw_output_text"] = state["output_text"]
+            state["raw_output_text"] = asr_output
             # Run Translation
             state["output_text"] = run_google_translate(
-                state["output_text"],
+                asr_output,
                 google_translate_target=request.google_translate_target,
             )
+        else:
+            # Save the raw ASR text for details view
+            state["output_text"] = asr_output

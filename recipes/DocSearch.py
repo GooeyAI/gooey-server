@@ -436,11 +436,10 @@ def _doc_url_to_embeds_cached(
     embeds = []
     batch_size = 100
     texts = [m["title"] + "\n\n" + m["snippet"] for m in metas]
-    num_batches = math.ceil(len(texts) / batch_size)
-    for i in range(num_batches):
-        # progress = int(i / num_batches * 100)
+    for i in range(0, len(texts), batch_size):
+        # progress = int(i / len(texts) * 100)
         # print(f"Getting document embeddings ({progress}%)...")
-        batch = texts[i * batch_size : (i + 1) * batch_size]
+        batch = texts[i : i + batch_size]
         embeds.extend(get_embeddings(batch))
     return list(zip(metas, embeds))
 
