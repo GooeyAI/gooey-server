@@ -491,7 +491,7 @@ def doc_url_to_text_pages(
                 f_url = upload_file_from_bytes(
                     f_name, f_bytes, content_type=doc_meta.mime_type
                 )
-            pages = [run_asr(f_url, selected_model=selected_asr_model)]
+            pages = [run_asr(f_url, selected_model=selected_asr_model, language="en")]
         case ".csv" | ".xlsx" | ".tsv" | ".ods":
             df = pd.read_csv(io.BytesIO(f_bytes), dtype=str).dropna()
             assert (
