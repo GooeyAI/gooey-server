@@ -11,9 +11,7 @@ from daras_ai_v2.stable_diffusion import (
 )
 
 
-def img_model_settings(
-    models_enum, render_model_selector=True
-):
+def img_model_settings(models_enum, render_model_selector=True):
     st.write("### Image Generation Settings")
     if render_model_selector:
         selected_model = model_selector(models_enum)

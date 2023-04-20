@@ -204,9 +204,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         return total
 
     def render_settings(self):
-        img_model_settings(
-            Img2ImgModels
-        )
+        img_model_settings(Img2ImgModels)
         scaleserp_location_picker()
         scaleserp_image_size_picker()
 
