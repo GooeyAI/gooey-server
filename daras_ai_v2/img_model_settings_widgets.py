@@ -12,7 +12,7 @@ from daras_ai_v2.stable_diffusion import (
 
 
 def img_model_settings(
-    models_enum, render_model_selector=True, render_num_outputs=True
+    models_enum, render_model_selector=True
 ):
     st.write("### Image Generation Settings")
     if render_model_selector:
@@ -22,7 +22,7 @@ def img_model_settings(
 
     negative_prompt_setting(selected_model)
 
-    num_outputs_and_quality_settings(selected_model, render_num_outputs)
+    num_outputs_and_quality_settings(selected_model)
     if models_enum is not Img2ImgModels:
         output_resolution_setting()
 
@@ -120,12 +120,7 @@ def quality_setting(selected_model: str = None):
         st.empty()
 
 
-def num_outputs_and_quality_settings(
-    selected_model: str = None, render_num_outputs=True, max_num_outputs=None
-):
-    if not render_num_outputs:
-        quality_setting(selected_model)
-        return
+def num_outputs_and_quality_settings(selected_model: str = None, max_num_outputs=None):
     num_outputs, quality = st.columns(2, gap="medium")
     with num_outputs:
         num_outputs_setting(selected_model, max_value=max_num_outputs)

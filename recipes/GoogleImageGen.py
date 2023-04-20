@@ -13,8 +13,6 @@ from daras_ai_v2.base import BasePage, gooey_rng
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
-    model_selector,
-    num_outputs_setting,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import (
@@ -182,8 +180,6 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             """,
             key="search_query",
         )
-        model_selector(Img2ImgModels)
-        num_outputs_setting(selected_model=st.session_state.get("selected_model"))
         st.text_area(
             """
             ### 👩‍💻 Prompt
@@ -209,7 +205,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
     def render_settings(self):
         img_model_settings(
-            Img2ImgModels, render_model_selector=False, render_num_outputs=False
+            Img2ImgModels
         )
         scaleserp_location_picker()
         scaleserp_image_size_picker()
