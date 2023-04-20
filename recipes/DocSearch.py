@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.face_restoration import map_parallel
-from daras_ai.image_input import upload_st_file
+from daras_ai.image_input import upload_st_file, upload_file_from_bytes
 from daras_ai_v2.GoogleGPT import SearchReference, render_outputs, GoogleGPTPage
 from daras_ai_v2.asr import AsrModels, run_asr, run_google_translate
 from daras_ai_v2.base import BasePage
@@ -486,6 +486,10 @@ def doc_url_to_text_pages(
             if not selected_asr_model:
                 raise ValueError(
                     "For transcribing audio/video, please choose an ASR model from the settings!"
+                )
+            if is_gdrive_url(f):
+                f_url = upload_file_from_bytes(
+                    f_name, f_bytes, content_type=doc_meta.mime_type
                 )
             pages = [run_asr(f_url, selected_model=selected_asr_model)]
         case ".csv" | ".xlsx" | ".tsv" | ".ods":
