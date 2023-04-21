@@ -214,6 +214,8 @@ class BasePage:
                 with input_col:
                     self.render_author()
                     form_placeholder = st.empty()
+                    with form_placeholder.container():
+                        submitted1 = self.render_form()
                     with st.expander("⚙️ Settings"):
                         self.render_settings()
                         st.write("---")
