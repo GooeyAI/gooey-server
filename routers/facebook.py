@@ -46,6 +46,15 @@ ERROR_MSG = """
 """.strip()
 
 
+FEEDBACK_THUMBS_UP_MSG = (
+    "🙏 Thanks! Your feedback helps us make Farmer.CHAT better. How else can I help you?"
+)
+# FEEDBACK_THUMBS_DOWN_MSG = (
+#     "🤔 How could I better answer your question? What did you expect?"
+# )
+FEEDBACK_THUMBS_DOWN_MSG = "🙏 Thanks! Your feedback helps us make Farmer.CHAT better. Do you have more farming questions for me?"
+
+
 @router.get("/__/fb/connect/")
 def fb_connect_redirect(request: Request):
     if not request.user:
@@ -248,6 +257,19 @@ def _on_msg(bot: BotInterface):
     billing_account = auth.get_user(bot.billing_account_uid)
     # get the user's input
     match bot.input_type:
+        # handle button press
+        case "interactive":
+            try:
+                reply_id = bot.input_message["interactive"]["button_reply"]["id"]
+            except KeyError:
+                reply_id = None
+            match reply_id:
+                case ButtonIds.feedback_thumbs_up:
+                    bot.send_msg(text=FEEDBACK_THUMBS_UP_MSG)
+                    return
+                case ButtonIds.feedback_thumbs_down:
+                    bot.send_msg(text=FEEDBACK_THUMBS_DOWN_MSG)
+                    return
         case "audio":
             try:
                 from recipes.asr import AsrPage
@@ -274,8 +296,8 @@ def _on_msg(bot: BotInterface):
                 bot.send_msg(text=ERROR_MSG.format(e))
                 return
             else:
-                # get input text, and let the caller produce a repsonse
-                input_text = result["output"]["output_text"][0]
+                # set the asr output as the input text
+                input_text = result["output"]["output_text"][0].strip()
                 # send confirmation of asr
                 bot.send_msg(text=AUDIO_ASR_CONFIRMATION.format(input_text))
         case "text":
@@ -312,7 +334,12 @@ def _on_msg(bot: BotInterface):
     # this really shouldn't happen, but just in case it does, we should have a nice message for the user
     response_text = response_text or DEFAULT_RESPONSE
     # send the response to the user
-    bot.send_msg(text=response_text, audio=response_audio, video=response_video)
+    bot.send_msg(
+        text=response_text,
+        audio=response_audio,
+        video=response_video,
+        buttons=_feedback_buttons() if bot.show_feedback_buttons else None,
+    )
     # save the messages for future context
     db.save_user_msgs(
         bot_id=bot.bot_id,
@@ -320,6 +347,24 @@ def _on_msg(bot: BotInterface):
         messages=saved_msgs,
         platform="wa",
     )
+
+
+class ButtonIds:
+    feedback_thumbs_up = "FEEDBACK_THUMBS_UP"
+    feedback_thumbs_down = "FEEDBACK_THUMBS_DOWN"
+
+
+def _feedback_buttons():
+    return [
+        {
+            "type": "reply",
+            "reply": {"id": ButtonIds.feedback_thumbs_up, "title": "👍🏾"},
+        },
+        {
+            "type": "reply",
+            "reply": {"id": ButtonIds.feedback_thumbs_down, "title": "👎🏾"},
+        },
+    ]
 
 
 def _process_msg(

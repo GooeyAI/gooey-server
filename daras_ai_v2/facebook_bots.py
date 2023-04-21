@@ -13,6 +13,7 @@ WHATSAPP_AUTH_HEADER = {
 
 
 class BotInterface:
+    input_message: dict
     platform: db.BOT_PLATFORM_LITERAL
     billing_account_uid: str
     page_cls: typing.Type | None
@@ -21,8 +22,16 @@ class BotInterface:
     user_id: str
     input_type: str
     language: str
+    show_feedback_buttons: bool = False
 
-    def send_msg(self, *, text: str = None, audio: str = None, video: str = None):
+    def send_msg(
+        self,
+        *,
+        text: str = None,
+        audio: str = None,
+        video: str = None,
+        buttons: list = None,
+    ):
         raise NotImplementedError
 
     def mark_read(self):
@@ -32,6 +41,9 @@ class BotInterface:
         raise NotImplementedError
 
     def get_input_audio(self) -> str | None:
+        raise NotImplementedError
+
+    def get_input_video(self) -> str | None:
         raise NotImplementedError
 
     def nice_filename(self, mime_type: str) -> str:
@@ -60,12 +72,14 @@ class BotInterface:
         except KeyError:
             self.page_cls = None
 
+        self.show_feedback_buttons = fb_page.get("show_feedback_buttons", False)
+
         return fb_page
 
 
 class WhatsappBot(BotInterface):
     def __init__(self, message: dict, metadata: dict):
-        self._message = message
+        self.input_message = message
         self.platform = "wa"
 
         self.bot_id = metadata["phone_number_id"]
@@ -78,36 +92,53 @@ class WhatsappBot(BotInterface):
 
     def get_input_text(self) -> str | None:
         try:
-            return self._message["text"]["body"]
+            return self.input_message["text"]["body"]
         except KeyError:
             return None
 
     def get_input_audio(self) -> str | None:
         try:
-            media_id = self._message["audio"]["id"]
+            media_id = self.input_message["audio"]["id"]
         except KeyError:
             return None
+        return self._download_wa_media(media_id)
+
+    def get_input_video(self) -> str | None:
+        try:
+            media_id = self.input_message["video"]["id"]
+        except KeyError:
+            return None
+        return self._download_wa_media(media_id)
+
+    def _download_wa_media(self, media_id: str) -> str:
         # download file from whatsapp
         content, mime_type = retrieve_wa_media_by_id(media_id)
         # upload file to firebase
-        audio_url = upload_file_from_bytes(
+        return upload_file_from_bytes(
             filename=self.nice_filename(mime_type),
             data=content,
             content_type=mime_type,
         )
-        return audio_url
 
-    def send_msg(self, *, text: str = None, audio: str = None, video: str = None):
+    def send_msg(
+        self,
+        *,
+        text: str = None,
+        audio: str = None,
+        video: str = None,
+        buttons: list = None,
+    ):
         send_wa_msg(
             bot_number=self.bot_id,
             user_number=self.user_id,
             response_text=text,
             response_audio=audio,
             response_video=video,
+            buttons=buttons,
         )
 
     def mark_read(self):
-        wa_mark_read(self.bot_id, self._message["id"])
+        wa_mark_read(self.bot_id, self.input_message["id"])
 
 
 def send_wa_msg(
@@ -117,27 +148,64 @@ def send_wa_msg(
     response_text: str,
     response_audio: str = None,
     response_video: str = None,
+    buttons: list = None,
 ):
     if response_video:
-        # video message with caption
-        messages = [
-            {
-                "type": "video",
-                "video": {"link": response_video, "caption": response_text},
-            },
-        ]
+        if buttons:
+            # video in header with text body
+            messages = [
+                {
+                    "body": {"text": response_text},
+                    "header": {
+                        "type": "video",
+                        "video": {"link": response_video},
+                    },
+                },
+            ]
+        else:
+            # video message with caption
+            messages = [
+                {
+                    "type": "video",
+                    "video": {"link": response_video, "caption": response_text},
+                },
+            ]
     elif response_audio:
-        # audio doesn't support captions, so send text and audio separately
-        messages = [
-            {"type": "text", "text": {"body": response_text}},
-            {"type": "audio", "audio": {"link": response_audio}},
-        ]
+        if buttons:
+            # audio can't be sent as an interaction, so send text and audio separately
+            messages = [
+                {"type": "audio", "audio": {"link": response_audio}},
+            ]
+            send_wa_msgs_raw(
+                bot_number=bot_number,
+                user_number=user_number,
+                messages=messages,
+            )
+            messages = [
+                {"body": {"text": response_text}},
+            ]
+        else:
+            # audio doesn't support captions, so send text and audio separately
+            messages = [
+                {"type": "text", "text": {"body": response_text}},
+                {"type": "audio", "audio": {"link": response_audio}},
+            ]
     else:
         # text message
-        messages = [
-            {"type": "text", "text": {"body": response_text}},
-        ]
-    send_wa_msgs_raw(bot_number=bot_number, user_number=user_number, messages=messages)
+        if buttons:
+            messages = [
+                {"body": {"text": response_text}},
+            ]
+        else:
+            messages = [
+                {"type": "text", "text": {"body": response_text}},
+            ]
+    send_wa_msgs_raw(
+        bot_number=bot_number,
+        user_number=user_number,
+        messages=messages,
+        buttons=buttons,
+    )
 
 
 def retrieve_wa_media_by_id(media_id: str) -> (bytes, str):
@@ -159,16 +227,27 @@ def retrieve_wa_media_by_id(media_id: str) -> (bytes, str):
     return content, media_info["mime_type"]
 
 
-def send_wa_msgs_raw(*, bot_number, user_number, messages: list):
+def send_wa_msgs_raw(*, bot_number, user_number, messages: list, buttons: list = None):
     for msg in messages:
+        body = {
+            "messaging_product": "whatsapp",
+            "to": user_number,
+        }
+        if buttons:
+            body |= {
+                "type": "interactive",
+                "interactive": {
+                    "type": "button",
+                    **msg,
+                    "action": {"buttons": buttons},
+                },
+            }
+        else:
+            body |= msg
         r = requests.post(
             f"https://graph.facebook.com/v16.0/{bot_number}/messages",
             headers=WHATSAPP_AUTH_HEADER,
-            json={
-                "messaging_product": "whatsapp",
-                "to": user_number,
-                **msg,
-            },
+            json=body,
         )
         print("send_wa_msgs_raw:", r.status_code, r.json())
 
@@ -194,12 +273,12 @@ class FacebookBot(BotInterface):
         else:
             self.platform = "fb"
 
-        self._message = messaging["message"]
+        self.input_message = messaging["message"]
 
-        if "text" in self._message:
+        if "text" in self.input_message:
             self.input_type = "text"
-        elif "attachments" in self._message:
-            self.input_type = self._message["attachments"][0]["type"]
+        elif "attachments" in self.input_message:
+            self.input_type = self.input_message["attachments"][0]["type"]
         else:
             self.input_type = "unknown"
 
@@ -209,7 +288,14 @@ class FacebookBot(BotInterface):
         fb_page = self.unpack_fb_page_snapshot(snapshot)
         self._access_token = fb_page.get("page_access_token")
 
-    def send_msg(self, *, text: str = None, audio: str = None, video: str = None):
+    def send_msg(
+        self,
+        *,
+        text: str = None,
+        audio: str = None,
+        video: str = None,
+        buttons: list = None,
+    ):
         send_fb_msg(
             access_token=self._access_token,
             bot_id=self.bot_id,
@@ -234,10 +320,12 @@ class FacebookBot(BotInterface):
         )
 
     def get_input_text(self) -> str | None:
-        return self._message.get("text")
+        return self.input_message.get("text")
 
     def get_input_audio(self) -> str | None:
-        url = self._message.get("attachments", [{}])[0].get("payload", {}).get("url")
+        url = (
+            self.input_message.get("attachments", [{}])[0].get("payload", {}).get("url")
+        )
         if not url:
             return None
         # downlad file from facebook
@@ -251,6 +339,9 @@ class FacebookBot(BotInterface):
             content_type=mime_type,
         )
         return audio_url
+
+    def get_input_video(self) -> str | None:
+        raise NotImplementedError
 
 
 def _resolve_fb_page(
