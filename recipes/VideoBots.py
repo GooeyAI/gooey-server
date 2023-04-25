@@ -482,7 +482,6 @@ Use this for prompting GPT to use the document search results.
         use_chatgpt = is_chat_model(
             LargeLanguageModels.from_str(request.selected_model)
         )
-        print("use_chatgpt",use_chatgpt)
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
