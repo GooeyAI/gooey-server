@@ -210,9 +210,6 @@ def run_language_model(
 def format_chatml_message(entry: ConversationEntry) -> str:
     msg = CHATML_START_TOKEN + entry["role"]
     content = entry.get("content")
-    display_name = entry.get("display_name")
-    if display_name:
-        pass
     if content:
         msg += "\n" + content + CHATML_END_TOKEN
     return msg
