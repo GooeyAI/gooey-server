@@ -31,6 +31,7 @@ CHATML_ROLE_USER = "user"
 
 
 class LargeLanguageModels(Enum):
+    gpt_4 = "GPT 4"
     gpt_3_5_turbo = "ChatGPT (GPT-3.5-turbo)"
     text_davinci_003 = "Davinci (GPT-3.5)"
     code_davinci_002 = "Code Davinci (Codex)"
@@ -40,6 +41,7 @@ class LargeLanguageModels(Enum):
 
 
 engine_names = {
+    LargeLanguageModels.gpt_4: "gpt-4",
     LargeLanguageModels.gpt_3_5_turbo: "gpt-3.5-turbo",
     LargeLanguageModels.text_davinci_003: "text-davinci-003",
     LargeLanguageModels.code_davinci_002: "code-davinci-002",
@@ -50,7 +52,7 @@ engine_names = {
 
 
 def is_chat_model(model: LargeLanguageModels) -> bool:
-    return model in [LargeLanguageModels.gpt_3_5_turbo]
+    return model in [LargeLanguageModels.gpt_3_5_turbo, LargeLanguageModels.gpt_4]
 
 
 def calc_gpt_tokens(text: str) -> int:
