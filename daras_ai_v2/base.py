@@ -1079,9 +1079,15 @@ class BasePage:
         )
         st.markdown(f"### [📖 API Docs]({api_docs_url})")
 
+        include_all = st.checkbox("Show all fields")
+
         api_url = str(self._get_current_api_url())
-        request_body = get_example_request_body(self.RequestModel, st.session_state)
-        response_body = self.get_example_response_body(st.session_state)
+        request_body = get_example_request_body(
+            self.RequestModel, st.session_state, include_all=include_all
+        )
+        response_body = self.get_example_response_body(
+            st.session_state, include_all=include_all
+        )
 
         st.write("#### 📤 Example Request")
         api_example_generator(api_url, request_body)
@@ -1093,7 +1099,7 @@ class BasePage:
             return
 
         st.write("#### 🎁 Example Response")
-        st.json(response_body, expanded=False)
+        st.json(response_body)
 
         st.write("---")
         st.write("### 🔐 API keys")
@@ -1152,13 +1158,21 @@ class BasePage:
     def get_price(self) -> int:
         return self.price
 
-    def get_example_response_body(self, state: dict) -> dict:
+    def get_example_response_body(
+        self,
+        state: dict,
+        include_all: bool = False,
+    ) -> dict:
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         return dict(
             id=run_id or example_id or get_random_doc_id(),
             url=self._get_current_app_url(),
             created_at=datetime.datetime.utcnow().isoformat(),
-            output=get_example_request_body(self.ResponseModel, state),
+            output=get_example_request_body(
+                self.ResponseModel,
+                state,
+                include_all=include_all,
+            ),
         )
 
     def additional_notes(self) -> str | None:
@@ -1166,12 +1180,14 @@ class BasePage:
 
 
 def get_example_request_body(
-    request_model: typing.Type[BaseModel], state: dict
+    request_model: typing.Type[BaseModel],
+    state: dict,
+    include_all: bool = False,
 ) -> dict:
     return {
         field_name: state.get(field_name)
         for field_name, field in request_model.__fields__.items()
-        if field.required
+        if include_all or field.required
     }
 
 
