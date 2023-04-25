@@ -478,7 +478,10 @@ Use this for prompting GPT to use the document search results.
         user_input = request.input_prompt.strip()
         if not user_input:
             return
-        use_chatgpt = request.selected_model == LargeLanguageModels.gpt_3_5_turbo.name
+        use_chatgpt = request.selected_model in [
+            LargeLanguageModels.gpt_3_5_turbo.name,
+            LargeLanguageModels.gpt_4.name,
+        ]
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
