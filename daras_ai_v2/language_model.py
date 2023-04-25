@@ -184,6 +184,7 @@ def run_language_model(
             temperature=temperature,
             stop=stop,
             avoid_repetition=avoid_repetition,
+            engine=engine_names[model],
         )
         return [
             format_chatml_message(entry) if is_chatml else entry["content"]

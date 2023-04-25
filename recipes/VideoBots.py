@@ -38,7 +38,7 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISSTANT,
     CHATML_ROLE_USER,
     CHATML_ROLE_SYSTEM,
-    is_chat_model,
+    is_chat_model, engine_names,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -587,6 +587,7 @@ Use this for prompting GPT to use the document search results.
                 num_outputs=request.num_outputs,
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
+                engine=engine_names[LargeLanguageModels[request.selected_model]],
             )
             # convert msgs to text
             output_text = [entry["content"] for entry in output_messages]
