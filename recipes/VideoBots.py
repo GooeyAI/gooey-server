@@ -479,9 +479,7 @@ Use this for prompting GPT to use the document search results.
         user_input = request.input_prompt.strip()
         if not user_input:
             return
-        use_chatgpt = is_chat_model(
-            LargeLanguageModels.from_str(request.selected_model)
-        )
+        use_chatgpt = is_chat_model(LargeLanguageModels[request.selected_model])
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
