@@ -111,13 +111,10 @@ class ConversationEntry(typing_extensions.TypedDict):
     content: str
 
 
-@do_retry()
-def run_chatgpt(
+def _run_chat_model(
     *,
-    # api_provider: str,
     messages: list[dict],
     max_tokens: int,
-    # quality: float,
     num_outputs: int,
     temperature: float,
     engine: str = "gpt-3.5-turbo",
@@ -129,7 +126,6 @@ def run_chatgpt(
         messages=messages,
         max_tokens=max_tokens,
         stop=stop,
-        # best_of=int(num_outputs * quality),
         n=num_outputs,
         temperature=temperature,
         frequency_penalty=0.1 if avoid_repetition else 0,
@@ -147,16 +143,20 @@ def run_chatgpt(
 @do_retry()
 def run_language_model(
     *,
-    model: str,
-    prompt: str,
-    max_tokens: int,
-    quality: float,
-    num_outputs: int,
-    temperature: float,
     api_provider: str = "openai",
+    model: str,
+    prompt: str = None,
+    messages: list[dict] = None,
+    max_tokens: int = 512,
+    quality: float = 1.0,
+    num_outputs: int = 1.0,
+    temperature: float = 0.7,
     stop: list[str] = None,
     avoid_repetition: bool = False,
 ) -> list[str]:
+    assert bool(prompt) != bool(
+        messages
+    ), "Pleave provide exactly one of { prompt, messages }"
     match api_provider:
         case "openai":
             openai.api_key = settings.OPENAI_API_KEY
@@ -176,15 +176,18 @@ def run_language_model(
             )
     model = LargeLanguageModels[model]
     if is_chat_model(model):
-        is_chatml, messages = parse_chatml(prompt)
-        messages = run_chatgpt(
+        if messages:
+            is_chatml = False
+        else:
+            is_chatml, messages = parse_chatml(prompt)
+        messages = _run_chat_model(
+            engine=engine_names[model],
             messages=messages,
             max_tokens=max_tokens,
             num_outputs=num_outputs,
             temperature=temperature,
             stop=stop,
             avoid_repetition=avoid_repetition,
-            engine=engine_names[model],
         )
         return [
             format_chatml_message(entry) if is_chatml else entry["content"]

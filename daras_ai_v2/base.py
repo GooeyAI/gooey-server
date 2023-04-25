@@ -677,16 +677,14 @@ class BasePage:
         else:
             self._render_before_output()
 
-            # render errors
             err_msg = st.session_state.get(StateKeys.error_msg)
+            run_time = st.session_state.get(StateKeys.run_time, 0)
+
+            # render errors
             if err_msg is not None:
                 st.error(err_msg, icon="⚠️")
-                # don't render output
-                return
-
             # render run time
-            run_time = st.session_state.get(StateKeys.run_time, 0)
-            if run_time:
+            elif run_time:
                 st.success(
                     f"Success! Run Time: `{run_time:.2f}` seconds. ",
                     icon="✅",
