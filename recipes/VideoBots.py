@@ -479,7 +479,10 @@ Use this for prompting GPT to use the document search results.
         user_input = request.input_prompt.strip()
         if not user_input:
             return
-        use_chatgpt = is_chat_model(request.selected_model)
+        use_chatgpt = is_chat_model(
+            LargeLanguageModels.from_str(request.selected_model)
+        )
+        print("use_chatgpt",use_chatgpt)
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
@@ -576,7 +579,7 @@ Use this for prompting GPT to use the document search results.
             raise ValueError("Input Script is too long! Please reduce the script size.")
 
         if use_chatgpt:
-            yield f"Running {request.selected_model}..."
+            yield f"Running {LargeLanguageModels[request.selected_model].value}..."
             output_messages = run_chatgpt(
                 messages=[
                     {"role": s["role"], "content": s["content"]}
