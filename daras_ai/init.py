@@ -1,6 +1,7 @@
 from gooeysite import wsgi
 
 assert wsgi
+
 import os
 
 import django
@@ -19,6 +20,9 @@ from daras_ai_v2.st_session_cookie import get_current_user, get_anonymous_user
 
 
 def init_scripts():
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "daras_ai_v2.settings")
+    django.setup()
+
     st.set_page_config(layout="wide")
 
     # remove fullscreen button and footer

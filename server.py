@@ -3,12 +3,14 @@ from gooeysite import wsgi
 assert wsgi
 
 import datetime
+import os
 import json
 import re
 import typing
 from time import time
 from traceback import print_exc
 
+import django
 import httpx
 from fastapi import FastAPI, Form, Depends
 from fastapi import HTTPException, Body
@@ -18,7 +20,6 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from firebase_admin import auth, exceptions
 from furl import furl
-from google.cloud import firestore
 from lxml.html import HtmlElement
 from pydantic import BaseModel, create_model, ValidationError
 from pydantic.generics import GenericModel
@@ -75,6 +76,9 @@ app.add_middleware(
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "daras_ai_v2.settings")
+django.setup()
 
 
 @app.get("/sitemap.xml/", include_in_schema=False)
@@ -462,31 +466,30 @@ def st_page(request: Request, page_slug, tab=""):
     )
 
 
-all_pages: list[typing.Type[BasePage]] = [
-    ChyronPlantPage,
-    FaceInpaintingPage,
-    EmailFaceInpaintingPage,
-    LetterWriterPage,
-    LipsyncPage,
-    CompareLLMPage,
-    ImageSegmentationPage,
-    TextToSpeechPage,
-    LipsyncTTSPage,
-    DeforumSDPage,
-    Img2ImgPage,
-    ObjectInpaintingPage,
-    SocialLookupEmailPage,
-    CompareText2ImgPage,
-    Text2AudioPage,
-    SEOSummaryPage,
-    GoogleImageGenPage,
-    VideoBotsPage,
-    CompareUpscalerPage,
-    GoogleGPTPage,
-    DocSearchPage,
-    DocSummaryPage,
-    AsrPage,
-]
+def _st_page(
+    request: Request,
+    iframe_url: str,
+    *,
+    block_incognito: bool = False,
+    context: dict,
+):
+    f = furl(iframe_url)
+    f.query.params["embed"] = "true"
+    f.query.params["embed_options"] = "disable_scrolling"
+    f.query.params.update(**request.query_params)  # pass down query params
+
+    db.get_or_init_user_data(request)
+
+    return templates.TemplateResponse(
+        "st_page.html",
+        context={
+            "request": request,
+            "iframe_url": f.url,
+            "settings": settings,
+            "block_incognito": block_incognito,
+            **context,
+        },
+    )
 
 
 def normalize_slug(page_slug):
