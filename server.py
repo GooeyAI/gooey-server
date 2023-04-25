@@ -1,8 +1,10 @@
 import datetime
+import os
 import re
 import typing
 from time import time
 
+import django
 import httpx
 import streamlit as st
 from fastapi import FastAPI, Depends
@@ -26,7 +28,6 @@ from starlette.responses import (
     PlainTextResponse,
     Response,
     FileResponse,
-    StreamingResponse,
 )
 
 from auth_backend import (
@@ -35,12 +36,11 @@ from auth_backend import (
 )
 from daras_ai.computer import run_compute_steps
 from daras_ai_v2 import settings, db
-from daras_ai_v2.GoogleGPT import GoogleGPTPage
+from daras_ai_v2.all_pages import all_api_pages
 from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
     DEFAULT_META_IMG,
-    StateKeys,
 )
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import (
@@ -51,28 +51,6 @@ from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from gooey_token_authentication1.token_authentication import api_auth_header
-from recipes.ChyronPlant import ChyronPlantPage
-from recipes.CompareLLM import CompareLLMPage
-from recipes.CompareText2Img import CompareText2ImgPage
-from recipes.CompareUpscaler import CompareUpscalerPage
-from recipes.DeforumSD import DeforumSDPage
-from recipes.DocSearch import DocSearchPage
-from recipes.DocSummary import DocSummaryPage
-from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
-from recipes.FaceInpainting import FaceInpaintingPage
-from recipes.GoogleImageGen import GoogleImageGenPage
-from recipes.ImageSegmentation import ImageSegmentationPage
-from recipes.Img2Img import Img2ImgPage
-from recipes.LetterWriter import LetterWriterPage
-from recipes.Lipsync import LipsyncPage
-from recipes.LipsyncTTS import LipsyncTTSPage
-from recipes.ObjectInpainting import ObjectInpaintingPage
-from recipes.SEOSummary import SEOSummaryPage
-from recipes.SocialLookupEmail import SocialLookupEmailPage
-from recipes.Text2Audio import Text2AudioPage
-from recipes.TextToSpeech import TextToSpeechPage
-from recipes.VideoBots import VideoBotsPage
-from recipes.asr import AsrPage
 from routers import billing, facebook, talkjs, realtime
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -93,6 +71,9 @@ app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "daras_ai_v2.settings")
+django.setup()
+
 
 @app.get("/sitemap.xml/", include_in_schema=False)
 async def get_sitemap():
@@ -100,7 +81,7 @@ async def get_sitemap():
                 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"""
 
     all_paths = ["/", "/faq", "/pricing", "/privacy", "/terms"] + [
-        page.slug_versions[-1] for page in all_pages
+        page.slug_versions[-1] for page in all_api_pages
     ]
 
     for path in all_paths:
@@ -494,6 +475,7 @@ def _st_page(
 ):
     f = furl(iframe_url)
     f.query.params["embed"] = "true"
+    f.query.params["embed_options"] = "disable_scrolling"
     f.query.params.update(**request.query_params)  # pass down query params
 
     db.get_or_init_user_data(request)
@@ -510,44 +492,17 @@ def _st_page(
     )
 
 
-all_pages: list[typing.Type[BasePage]] = [
-    ChyronPlantPage,
-    FaceInpaintingPage,
-    EmailFaceInpaintingPage,
-    LetterWriterPage,
-    LipsyncPage,
-    CompareLLMPage,
-    ImageSegmentationPage,
-    TextToSpeechPage,
-    LipsyncTTSPage,
-    DeforumSDPage,
-    Img2ImgPage,
-    ObjectInpaintingPage,
-    SocialLookupEmailPage,
-    CompareText2ImgPage,
-    Text2AudioPage,
-    SEOSummaryPage,
-    GoogleImageGenPage,
-    VideoBotsPage,
-    CompareUpscalerPage,
-    GoogleGPTPage,
-    DocSearchPage,
-    DocSummaryPage,
-    AsrPage,
-]
-
-
 def normalize_slug(page_slug):
     return re.sub(r"[-_]", "", page_slug.lower())
 
 
 page_map: dict[str, typing.Type[BasePage]] = {
-    normalize_slug(slug): page for page in all_pages for slug in page.slug_versions
+    normalize_slug(slug): page for page in all_api_pages for slug in page.slug_versions
 }
 
 
 def setup_pages():
-    for page_cls in all_pages:
+    for page_cls in all_api_pages:
         script_to_api(page_cls)
 
 

@@ -35,7 +35,7 @@ RUN pip install -r requirements.txt && pip install -I 'protobuf<4,>=3.12'
 
 COPY . .
 
-RUN python scripts/fix_st_timeout.py
+#RUN python scripts/fix_st_timeout.py
 
 ENV FORWARDED_ALLOW_IPS='*'
 ENV PYTHONUNBUFFERED=1

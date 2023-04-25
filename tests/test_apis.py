@@ -5,60 +5,14 @@ from fastapi.testclient import TestClient
 
 from auth_backend import force_authentication
 from daras_ai_v2 import db
-from daras_ai_v2.GoogleGPT import GoogleGPTPage
+from daras_ai_v2.all_pages import pages_to_test
 from daras_ai_v2.base import (
     BasePage,
     get_example_request_body,
 )
-from recipes.ChyronPlant import ChyronPlantPage
-from recipes.CompareLLM import CompareLLMPage
-from recipes.CompareText2Img import CompareText2ImgPage
-from recipes.CompareUpscaler import CompareUpscalerPage
-from recipes.DocSearch import DocSearchPage
-from recipes.DocSummary import DocSummaryPage
-from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
-from recipes.FaceInpainting import FaceInpaintingPage
-from recipes.GoogleImageGen import GoogleImageGenPage
-from recipes.ImageSegmentation import ImageSegmentationPage
-from recipes.Img2Img import Img2ImgPage
-from recipes.Lipsync import LipsyncPage
-from recipes.LipsyncTTS import LipsyncTTSPage
-from recipes.ObjectInpainting import ObjectInpaintingPage
-from recipes.SEOSummary import SEOSummaryPage
-from recipes.SocialLookupEmail import SocialLookupEmailPage
-from recipes.Text2Audio import Text2AudioPage
-from recipes.TextToSpeech import TextToSpeechPage
-from recipes.VideoBots import VideoBotsPage
-from recipes.asr import AsrPage
 from server import app
 
 client = TestClient(app)
-
-pages_to_test = [
-    ChyronPlantPage,
-    FaceInpaintingPage,
-    EmailFaceInpaintingPage,
-    # LetterWriterPage, ## deprecated
-    LipsyncPage,
-    CompareLLMPage,
-    ImageSegmentationPage,
-    TextToSpeechPage,
-    LipsyncTTSPage,
-    # DeforumSDPage, ## too slow!
-    Img2ImgPage,
-    ObjectInpaintingPage,
-    SocialLookupEmailPage,
-    CompareText2ImgPage,
-    Text2AudioPage,
-    SEOSummaryPage,
-    GoogleImageGenPage,
-    VideoBotsPage,
-    CompareUpscalerPage,
-    GoogleGPTPage,
-    DocSearchPage,
-    DocSummaryPage,
-    AsrPage,
-]
 
 
 @pytest.mark.parametrize("page_cls", pages_to_test)

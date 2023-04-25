@@ -9,7 +9,7 @@ from furl import furl
 from starlette.responses import StreamingResponse
 
 from daras_ai_v2 import settings
-from mycomponent import pubsub_component
+from pubsub_component import pubusb_rerunner
 
 router = APIRouter()
 
@@ -44,7 +44,7 @@ def realtime_subscribe(redis_key: str = None):
     else:
         redis_key = redis_key
 
-    pubsub_component(url=str(get_key_events_url(redis_key)))
+    pubusb_rerunner(url=str(get_key_events_url(redis_key)))
 
     r = get_redis()
     value = r.get(redis_key)

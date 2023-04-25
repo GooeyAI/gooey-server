@@ -1,3 +1,6 @@
+import os
+
+import django
 import sentry_sdk
 import streamlit as st
 from firebase_admin import auth
@@ -16,6 +19,9 @@ from daras_ai_v2.st_session_cookie import get_current_user, get_anonymous_user
 
 
 def init_scripts():
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "daras_ai_v2.settings")
+    django.setup()
+
     st.set_page_config(layout="wide")
 
     # remove fullscreen button and footer
@@ -123,6 +129,15 @@ sup a {
 }
 sup a:hover {
     color: #acd9d6;
+}
+
+/* make the pubsub rerun component invisible */
+div iframe[title="pubsub_component.pubusb_rerunner"] {
+    display: none;
+}
+
+.pretty-json-container {
+    font-family: monospace; 
 }
 
 .string-value { 

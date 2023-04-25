@@ -54,6 +54,7 @@ google-cloud-speech = "^2.19.0"
 yt-dlp = "^2023.3.4"
 llama-index = "^0.5.27"
 nltk = "^3.8.1"
+Django = "^4.2"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"

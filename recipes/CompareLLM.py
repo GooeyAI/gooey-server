@@ -56,7 +56,7 @@ class CompareLLMPage(BasePage):
             """,
             key="input_prompt",
             help="What a fine day..",
-            height=400,
+            height=300,
         )
         enum_multiselect(
             LargeLanguageModels,
