@@ -39,10 +39,6 @@ class LargeLanguageModels(Enum):
     text_babbage_001 = "Babbage"
     text_ada_001 = "Ada"
 
-    @staticmethod
-    def from_str(name: str):
-        return getattr(LargeLanguageModels, name)
-
 
 engine_names = {
     LargeLanguageModels.gpt_4: "gpt-4",
