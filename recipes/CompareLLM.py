@@ -121,6 +121,8 @@ class CompareLLMPage(BasePage):
         total = 0
         for name in selected_models:
             match name:
+                case LargeLanguageModels.gpt_4.name:
+                    total += 10
                 case LargeLanguageModels.gpt_3_5_turbo.name:
                     total += 1
                 case LargeLanguageModels.text_davinci_003.name | LargeLanguageModels.code_davinci_002.name:

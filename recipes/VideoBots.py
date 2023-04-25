@@ -38,6 +38,7 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISSTANT,
     CHATML_ROLE_USER,
     CHATML_ROLE_SYSTEM,
+    is_chat_model,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -478,10 +479,7 @@ Use this for prompting GPT to use the document search results.
         user_input = request.input_prompt.strip()
         if not user_input:
             return
-        use_chatgpt = request.selected_model in [
-            LargeLanguageModels.gpt_3_5_turbo.name,
-            LargeLanguageModels.gpt_4.name,
-        ]
+        use_chatgpt = is_chat_model(request.selected_model)
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
@@ -578,7 +576,7 @@ Use this for prompting GPT to use the document search results.
             raise ValueError("Input Script is too long! Please reduce the script size.")
 
         if use_chatgpt:
-            yield "Running ChatGPT..."
+            yield f"Running {request.selected_model}..."
             output_messages = run_chatgpt(
                 messages=[
                     {"role": s["role"], "content": s["content"]}
