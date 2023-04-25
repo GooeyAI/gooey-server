@@ -54,7 +54,6 @@ How many completion choices to generate for each input
             key="max_tokens",
             min_value=10,
             step=10,
-            max_value=4096,
         )
     with col2:
         st.slider(

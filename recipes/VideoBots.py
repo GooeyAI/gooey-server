@@ -30,7 +30,6 @@ from daras_ai_v2.language_model import (
     GPT3_MAX_ALLOED_TOKENS,
     calc_gpt_tokens,
     ConversationEntry,
-    run_chatgpt,
     format_chatml_message,
     CHATML_END_TOKEN,
     CHATML_START_TOKEN,
@@ -39,7 +38,6 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
     CHATML_ROLE_SYSTEM,
     is_chat_model,
-    engine_names,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -480,7 +478,8 @@ Use this for prompting GPT to use the document search results.
         user_input = request.input_prompt.strip()
         if not user_input:
             return
-        use_chatgpt = is_chat_model(LargeLanguageModels[request.selected_model])
+        model = LargeLanguageModels[request.selected_model]
+        use_chat_model = is_chat_model(model)
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
@@ -558,7 +557,7 @@ Use this for prompting GPT to use the document search results.
             }
 
         # for backwards compat with non-chat models
-        if not use_chatgpt:
+        if not use_chat_model:
             # assistant prompt to triger a model response
             prompt_messages.append(
                 {
@@ -576,33 +575,29 @@ Use this for prompting GPT to use the document search results.
         if max_allowed_tokens < 0:
             raise ValueError("Input Script is too long! Please reduce the script size.")
 
-        if use_chatgpt:
-            yield f"Running {LargeLanguageModels[request.selected_model].value}..."
-            output_messages = run_chatgpt(
+        yield f"Running {model.value}..."
+        if use_chat_model:
+            output_text = run_language_model(
+                model=request.selected_model,
                 messages=[
                     {"role": s["role"], "content": s["content"]}
                     for s in prompt_messages
                 ],
                 max_tokens=max_allowed_tokens,
-                # quality=request.quality,
                 num_outputs=request.num_outputs,
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
-                engine=engine_names[LargeLanguageModels[request.selected_model]],
             )
-            # convert msgs to text
-            output_text = [entry["content"] for entry in output_messages]
         else:
-            yield f"Running GPT-3..."
             output_text = run_language_model(
                 model=request.selected_model,
+                prompt=prompt,
+                max_tokens=max_allowed_tokens,
                 quality=request.quality,
                 num_outputs=request.num_outputs,
                 temperature=request.sampling_temperature,
-                prompt=prompt,
-                max_tokens=max_allowed_tokens,
-                stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
                 avoid_repetition=request.avoid_repetition,
+                stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
             )
         # save model response
         saved_msgs.append(
