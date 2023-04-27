@@ -213,18 +213,14 @@ class BasePage:
                 input_col, output_col = st.columns([3, 2], gap="medium")
                 with input_col:
                     self.render_author()
-                    form_placeholder = st.empty()
+                    self.render_form()
                     with st.expander("⚙️ Settings"):
                         self.render_settings()
                         st.write("---")
                         st.write("##### 🖌️ Personalize")
                         st.text_input("Title", key=StateKeys.page_title)
                         st.text_area("Notes", key=StateKeys.page_notes)
-                        st.write("---")
-                        submitted2 = self.render_submit_button(key="--submit-2")
-                    with form_placeholder.container():
-                        submitted1 = self.render_form()
-                    submitted = submitted1 or submitted2
+                    submitted = self.render_submit_button()
                 with output_col:
                     self._render_output_col(submitted)
 
@@ -493,9 +489,8 @@ class BasePage:
             return
         self._render_author(user)
 
-    def render_form(self) -> bool:
+    def render_form(self):
         self.render_form_v2()
-        return self.render_submit_button()
 
     def get_credits_click_url(self):
         current_user: UserRecord = st.session_state.get("_current_user")
