@@ -464,6 +464,24 @@ Use this for prompting GPT to use the document search results.
             for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
                 st.write(f"**Generated Audio {idx + 1}**")
                 st.audio(audio_url)
+    def get_price(self) -> int:
+        selected_model = st.session_state.get("selected_model")
+        total = 0
+        match selected_model:
+            case LargeLanguageModels.gpt_4.name:
+                total = 10
+            case LargeLanguageModels.gpt_3_5_turbo.name:
+                total = 5
+            case LargeLanguageModels.text_davinci_003.name | LargeLanguageModels.code_davinci_002.name:
+                total = 10
+            case LargeLanguageModels.text_curie_001.name:
+                total = 5
+            case LargeLanguageModels.text_babbage_001.name:
+                total = 5
+            case LargeLanguageModels.text_ada_001.name:
+                total = 5
+        return total
+
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         # clear message history if requested
