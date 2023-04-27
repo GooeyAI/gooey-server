@@ -22,6 +22,10 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.pt import PromptTree
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_pricing,
+)
 from recipes.DocSearch import (
     doc_url_to_text_pages,
     doc_url_to_metadata,
@@ -77,6 +81,11 @@ class DocSummaryPage(BasePage):
 
         prompt_tree: PromptTree | None
         final_prompt: str
+
+    def get_price(self) -> int:
+        selected_model = st.session_state.get("selected_model")
+        price = language_model_pricing(selected_model)
+        return price
 
     def render_form_v2(self):
         document_uploader("##### 📎 Documents")

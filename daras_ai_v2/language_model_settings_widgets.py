@@ -4,6 +4,26 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.language_model import LargeLanguageModels
 
 
+def language_model_pricing(selected_model) -> int:
+    if not selected_model:
+        return 5
+    total = 0
+    match selected_model:
+        case LargeLanguageModels.gpt_4.name:
+            total = 10
+        case LargeLanguageModels.gpt_3_5_turbo.name:
+            total = 5
+        case LargeLanguageModels.text_davinci_003.name | LargeLanguageModels.code_davinci_002.name:
+            total = 10
+        case LargeLanguageModels.text_curie_001.name:
+            total = 5
+        case LargeLanguageModels.text_babbage_001.name:
+            total = 5
+        case LargeLanguageModels.text_ada_001.name:
+            total = 5
+    return total
+
+
 def language_model_settings(show_selector=True):
     st.write("##### 🔠 Language Model Settings")
 

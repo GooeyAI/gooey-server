@@ -8,7 +8,10 @@ from pydantic import BaseModel
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_pricing,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
 from daras_ai_v2.search_ref import SearchReference, render_text_with_refs
@@ -97,6 +100,11 @@ class GoogleGPTPage(BasePage):
         if site_filter:
             st.write(f"**Site** \\\n{site_filter}")
         render_outputs(state, 200)
+
+    def get_price(self) -> int:
+        selected_model = st.session_state.get("selected_model")
+        price = language_model_pricing(selected_model)
+        return price
 
     def render_settings(self):
         st.text_area(

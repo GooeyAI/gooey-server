@@ -37,7 +37,10 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_SYSTEM,
     model_max_tokens,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_pricing,
+)
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.search_ref import apply_response_template
@@ -464,24 +467,11 @@ Use this for prompting GPT to use the document search results.
             for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
                 st.write(f"**Generated Audio {idx + 1}**")
                 st.audio(audio_url)
+
     def get_price(self) -> int:
         selected_model = st.session_state.get("selected_model")
-        total = 0
-        match selected_model:
-            case LargeLanguageModels.gpt_4.name:
-                total = 10
-            case LargeLanguageModels.gpt_3_5_turbo.name:
-                total = 5
-            case LargeLanguageModels.text_davinci_003.name | LargeLanguageModels.code_davinci_002.name:
-                total = 10
-            case LargeLanguageModels.text_curie_001.name:
-                total = 5
-            case LargeLanguageModels.text_babbage_001.name:
-                total = 5
-            case LargeLanguageModels.text_ada_001.name:
-                total = 5
-        return total
-
+        price = language_model_pricing(selected_model)
+        return price
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         # clear message history if requested

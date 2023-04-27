@@ -22,7 +22,10 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
     model_max_tokens,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_pricing,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import (
     scaleserp_location_picker,
@@ -131,6 +134,11 @@ class SEOSummaryPage(BasePage):
             SocialLookupEmailPage,
             GoogleImageGenPage,
         ]
+
+    def get_price(self) -> int:
+        selected_model = st.session_state.get("selected_model")
+        price = language_model_pricing(selected_model)
+        return price
 
     def render_usage_guide(self):
         youtube_video("8VDYTYWhOaw")

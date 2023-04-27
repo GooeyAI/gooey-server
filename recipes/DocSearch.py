@@ -40,7 +40,10 @@ from daras_ai_v2.language_model import (
     get_embeddings,
     LargeLanguageModels,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.language_model_settings_widgets import (
+    language_model_settings,
+    language_model_pricing,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.search_ref import apply_response_template
 
@@ -193,6 +196,11 @@ class DocSearchPage(BasePage):
 
     def render_usage_guide(self):
         youtube_video("Xe4L_dQ2KvU")
+
+    def get_price(self) -> int:
+        selected_model = st.session_state.get("selected_model")
+        price = language_model_pricing(selected_model)
+        return price
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: DocSearchPage.RequestModel = self.RequestModel.parse_obj(state)
