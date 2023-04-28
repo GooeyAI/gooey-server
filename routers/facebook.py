@@ -2,7 +2,8 @@ from functools import partial
 
 import glom
 import requests
-from fastapi import APIRouter, HTTPException
+from django.db import transaction
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from firebase_admin import auth
 from furl import furl
@@ -11,10 +12,11 @@ from starlette.background import BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response
 
-from daras_ai.face_restoration import map_parallel
+from bots.models import BotIntegration, Platform, Message, Conversation
 from daras_ai_v2 import settings, db
 from daras_ai_v2.asr import run_google_translate
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot, BotInterface
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
 
 router = APIRouter()
@@ -81,14 +83,12 @@ def fb_connect_redirect(request: Request):
             status_code=400,
         )
 
-    page_docs = map_parallel(
-        lambda fb_page: _subscribe_to_page(request, user_access_token, fb_page),
-        fb_pages,
+    map_parallel(_subscribe_to_page, fb_pages)
+    integrations = BotIntegration.objects.reset_fb_pages_for_user(
+        request.user.uid, fb_pages
     )
 
-    db.update_pages_for_user(page_docs, request.user.uid)
-
-    page_names = ", ".join(get_page_display_name(page) for _, page in page_docs)
+    page_names = ", ".join(map(str, integrations))
     return HTMLResponse(
         f"Sucessfully Connected to {page_names}! You may now close this page."
     )
@@ -121,9 +121,15 @@ async def fb_webhook_verify(request: Request):
         return Response(status_code=403)
 
 
+async def request_json(request: Request):
+    return await request.json()
+
+
 @router.post("/__/fb/webhook/")
-async def fb_webhook(request: Request, background_tasks: BackgroundTasks):
-    data = await request.json()
+def fb_webhook(
+    background_tasks: BackgroundTasks,
+    data: dict = Depends(request_json),
+):
     print("fb_webhook:", data)
     object_name = data.get("object")
     for entry in data.get("entry", []):
@@ -200,13 +206,6 @@ ig_connect_url = str(
 )
 
 
-def get_page_display_name(page: dict) -> str:
-    if page.get("ig_username"):
-        return page["ig_username"] + " & " + page["name"]
-    else:
-        return page["name"]
-
-
 def _get_access_token_from_code(code: str) -> str:
     r = requests.get(
         "https://graph.facebook.com/v15.0/oauth/access_token",
@@ -221,11 +220,9 @@ def _get_access_token_from_code(code: str) -> str:
     return r.json()["access_token"]
 
 
-def _subscribe_to_page(
-    request: Request, user_access_token: str, fb_page: dict
-) -> (str, dict):
+def _subscribe_to_page(fb_page: dict):
+    """Subscribe to the page's messages"""
     page_id = fb_page["id"]
-
     r = requests.post(
         f"https://graph.facebook.com/{page_id}/subscribed_apps",
         params={
@@ -235,17 +232,6 @@ def _subscribe_to_page(
     )
     r.raise_for_status()
 
-    return page_id, dict(
-        platform="fb",
-        page_id=page_id,
-        uid=request.user.uid,
-        name=fb_page["name"],
-        user_access_token=user_access_token,
-        page_access_token=fb_page["access_token"],
-        ig_account_id=fb_page.get("instagram_business_account", {}).get("id"),
-        ig_username=fb_page.get("instagram_business_account", {}).get("username"),
-    )
-
 
 def _on_msg(bot: BotInterface):
     if not bot.page_cls:
@@ -254,7 +240,7 @@ def _on_msg(bot: BotInterface):
     # mark message as read
     bot.mark_read()
     # get the attached billing account
-    billing_account = auth.get_user(bot.billing_account_uid)
+    billing_account_user = auth.get_user(bot.billing_account_uid)
     # get the user's input
     match bot.input_type:
         # handle button press
@@ -266,10 +252,9 @@ def _on_msg(bot: BotInterface):
             match reply_id:
                 case ButtonIds.feedback_thumbs_up:
                     bot.send_msg(text=FEEDBACK_THUMBS_UP_MSG)
-                    return
                 case ButtonIds.feedback_thumbs_down:
                     bot.send_msg(text=FEEDBACK_THUMBS_DOWN_MSG)
-                    return
+            return
         case "audio":
             try:
                 from recipes.asr import AsrPage
@@ -282,7 +267,7 @@ def _on_msg(bot: BotInterface):
                     selected_model = "whisper_large_v2"
                 result = call_api(
                     page_cls=AsrPage,
-                    user=billing_account,
+                    user=billing_account_user,
                     request_body={
                         "documents": [bot.get_input_audio()],
                         "selected_model": selected_model,
@@ -308,7 +293,7 @@ def _on_msg(bot: BotInterface):
     # handle reset keyword
     if input_text.strip().lower() == RESET_KEYWORD:
         # clear saved messages
-        saved_msgs = []
+        msgs_to_save = []
         # let the user know we've reset
         response_text = RESET_MSG
         response_audio = None
@@ -316,12 +301,11 @@ def _on_msg(bot: BotInterface):
     else:
         try:
             # make API call to gooey bots to get the response
-            response_text, response_audio, response_video, saved_msgs = _process_msg(
+            response_text, response_audio, response_video, msgs_to_save = _process_msg(
                 page_cls=bot.page_cls,
-                api_user=billing_account,
+                api_user=billing_account_user,
                 query_params=bot.query_params,
-                bot_id=bot.bot_id,
-                user_id=bot.user_id,
+                convo=bot.convo,
                 input_text=input_text,
                 user_language=bot.language,
             )
@@ -340,13 +324,8 @@ def _on_msg(bot: BotInterface):
         video=response_video,
         buttons=_feedback_buttons() if bot.show_feedback_buttons else None,
     )
-    # save the messages for future context
-    db.save_user_msgs(
-        bot_id=bot.bot_id,
-        user_id=bot.user_id,
-        messages=saved_msgs,
-        platform="wa",
-    )
+    for msg in msgs_to_save:
+        msg.save()
 
 
 class ButtonIds:
@@ -372,29 +351,34 @@ def _process_msg(
     page_cls,
     api_user: auth.UserRecord,
     query_params: dict,
-    bot_id: str,
-    user_id: str,
+    convo: Conversation,
     input_text: str,
     user_language: str,
-) -> tuple[str, str | None, str | None, list[dict]]:
+) -> tuple[str, str | None, str | None, list[Message]]:
     from server import call_api
 
     # initialize variables
     response_audio = None
     response_video = None
     # get saved messages for context
-    saved_msgs = db.get_user_msgs(bot_id=bot_id, user_id=user_id)
+    saved_msgs = list(convo.messages.all().values("role", "content"))
     # call the api with provided input
-    result = call_api(
-        page_cls=page_cls,
-        user=api_user,
-        request_body={
-            "input_prompt": input_text,
-            "messages": saved_msgs,
-            "user_language": user_language,
-        },
-        query_params=query_params,
-    )
+    result = {
+        "output": {
+            "output_text": ["Hello, world! https://www.youtube.com/"],
+            "raw_output_text": ["Hello, world! https://www.youtube.com/"],
+        }
+    }
+    # result = call_api(
+    #     page_cls=page_cls,
+    #     user=api_user,
+    #     request_body={
+    #         "input_prompt": input_text,
+    #         "messages": saved_msgs,
+    #         "user_language": user_language,
+    #     },
+    #     query_params=query_params,
+    # )
     # extract response video/audio/text
     try:
         response_video = result["output"]["output_video"][0]
@@ -407,9 +391,18 @@ def _process_msg(
     raw_input_text = result["output"]["raw_input_text"]
     raw_output_text = result["output"]["raw_output_text"][0]
     response_text = result["output"]["output_text"][0]
-    # save new messages for context
-    saved_msgs += [
-        {"role": CHATML_ROLE_USER, "content": raw_input_text},
-        {"role": CHATML_ROLE_ASSISSTANT, "content": raw_output_text},
+    # save new messages for future context
+    msgs_to_save = [
+        Message(
+            conversation=convo,
+            role=CHATML_ROLE_USER,
+            content=raw_input_text,
+        ),
+        Message(
+            conversation=convo,
+            role=CHATML_ROLE_ASSISSTANT,
+            content=raw_output_text,
+            app_url=result.get("url", ""),
+        ),
     ]
-    return response_text, response_audio, response_video, saved_msgs
+    return response_text, response_audio, response_video, msgs_to_save

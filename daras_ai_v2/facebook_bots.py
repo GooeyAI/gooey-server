@@ -2,8 +2,10 @@ import mimetypes
 import typing
 
 import requests
+from furl import furl
 from google.cloud import firestore
 
+from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings, db
 
@@ -14,7 +16,7 @@ WHATSAPP_AUTH_HEADER = {
 
 class BotInterface:
     input_message: dict
-    platform: db.BOT_PLATFORM_LITERAL
+    platform: Platform
     billing_account_uid: str
     page_cls: typing.Type | None
     query_params: dict
@@ -23,6 +25,7 @@ class BotInterface:
     input_type: str
     language: str
     show_feedback_buttons: bool = False
+    convo: Conversation
 
     def send_msg(
         self,
@@ -50,45 +53,40 @@ class BotInterface:
         ext = mimetypes.guess_extension(mime_type) or ""
         return f"{self.platform}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
 
-    def unpack_fb_page_snapshot(
-        self, snapshot: firestore.DocumentSnapshot | None
-    ) -> dict:
-        if not (snapshot and snapshot.exists):
-            raise ValueError(f"Bot {self.bot_id} not found")
-        fb_page = snapshot.to_dict()
-
+    def _unpack_bot_integration(self, bi: BotIntegration):
         from server import page_map, normalize_slug
 
-        self.query_params = fb_page.get("connected_query_params") or {}
-        self.billing_account_uid = fb_page["uid"]
+        f = furl(bi.app_url)
+        self.query_params = f.query.params
+        self.billing_account_uid = bi.billing_account_uid
+        self.language = bi.user_language
+        self.show_feedback_buttons = bi.show_feedback_buttons
 
-        self.language = fb_page.get("language", "en")
-
-        page_slug = fb_page.get("connected_page_slug")
-        if page_slug:
-            page_slug = normalize_slug(page_slug)
         try:
+            page_slug = f.path.segments[-1] or f.path.segments[-2]
+            if page_slug:
+                page_slug = normalize_slug(page_slug)
             self.page_cls = page_map[page_slug]
-        except KeyError:
+        except (IndexError, KeyError):
             self.page_cls = None
-
-        self.show_feedback_buttons = fb_page.get("show_feedback_buttons", False)
-
-        return fb_page
 
 
 class WhatsappBot(BotInterface):
     def __init__(self, message: dict, metadata: dict):
         self.input_message = message
-        self.platform = "wa"
+        self.platform = Platform.WHATSAPP
 
         self.bot_id = metadata["phone_number_id"]
         self.user_id = message["from"]
 
         self.input_type = message["type"]
 
-        snapshot = db.get_connected_bot_page_ref("wa", self.bot_id).get()
-        self.unpack_fb_page_snapshot(snapshot)
+        bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
+        self.convo = Conversation.objects.get_or_create(
+            bot_integration=bi,
+            wa_phone_number_id=self.user_id,
+        )[0]
+        self._unpack_bot_integration(bi)
 
     def get_input_text(self) -> str | None:
         try:
@@ -152,10 +150,13 @@ def send_wa_msg(
 ):
     if response_video:
         if buttons:
-            # video in header with text body
             messages = [
+                # interactive text msg + video in header
                 {
-                    "body": {"text": response_text},
+                    "body": {
+                        "text": response_text,
+                        "preview_url": True,
+                    },
                     "header": {
                         "type": "video",
                         "video": {"link": response_video},
@@ -163,18 +164,25 @@ def send_wa_msg(
                 },
             ]
         else:
-            # video message with caption
             messages = [
+                # simple video msg + text caption
                 {
                     "type": "video",
-                    "video": {"link": response_video, "caption": response_text},
+                    "video": {
+                        "link": response_video,
+                        "caption": response_text,
+                    },
                 },
             ]
     elif response_audio:
         if buttons:
             # audio can't be sent as an interaction, so send text and audio separately
             messages = [
-                {"type": "audio", "audio": {"link": response_audio}},
+                # simple audio msg
+                {
+                    "type": "audio",
+                    "audio": {"link": response_audio},
+                },
             ]
             send_wa_msgs_raw(
                 bot_number=bot_number,
@@ -182,23 +190,52 @@ def send_wa_msg(
                 messages=messages,
             )
             messages = [
-                {"body": {"text": response_text}},
+                # interactive text msg
+                {
+                    "body": {
+                        "text": response_text,
+                        "preview_url": True,
+                    },
+                },
             ]
         else:
             # audio doesn't support captions, so send text and audio separately
             messages = [
-                {"type": "text", "text": {"body": response_text}},
-                {"type": "audio", "audio": {"link": response_audio}},
+                # simple text msg
+                {
+                    "type": "text",
+                    "text": {
+                        "body": response_text,
+                        "preview_url": True,
+                    },
+                },
+                # simple audio msg
+                {
+                    "type": "audio",
+                    "audio": {"link": response_audio},
+                },
             ]
     else:
         # text message
         if buttons:
             messages = [
-                {"body": {"text": response_text}},
+                # interactive text msg
+                {
+                    "body": {
+                        "text": response_text,
+                    }
+                },
             ]
         else:
             messages = [
-                {"type": "text", "text": {"body": response_text}},
+                # simple text msg
+                {
+                    "type": "text",
+                    "text": {
+                        "body": response_text,
+                        "preview_url": True,
+                    },
+                },
             ]
     send_wa_msgs_raw(
         bot_number=bot_number,
@@ -232,6 +269,7 @@ def send_wa_msgs_raw(*, bot_number, user_number, messages: list, buttons: list =
         body = {
             "messaging_product": "whatsapp",
             "to": user_number,
+            "preview_url": True,
         }
         if buttons:
             body |= {
@@ -269,9 +307,9 @@ def wa_mark_read(bot_number: str, message_id: str):
 class FacebookBot(BotInterface):
     def __init__(self, object_name: str, messaging: dict):
         if object_name == "instagram":
-            self.platform = "ig"
+            self.platform = Platform.INSTAGRAM
         else:
-            self.platform = "fb"
+            self.platform = Platform.FACEBOOK
 
         self.input_message = messaging["message"]
 
@@ -283,10 +321,24 @@ class FacebookBot(BotInterface):
             self.input_type = "unknown"
 
         self.user_id = messaging["sender"]["id"]
-        self.bot_id, snapshot = _resolve_fb_page(self.platform, messaging)
+        recipient_id = messaging["recipient"]["id"]
+        if self.platform == Platform.INSTAGRAM:
+            bi = BotIntegration.objects.get(ig_account_id=recipient_id)
+            self.convo = Conversation.objects.get_or_create(
+                bot_integration=bi,
+                fb_page_id=self.user_id,
+            )[0]
+        else:
+            bi = BotIntegration.objects.get(fb_page_id=recipient_id)
+            self.convo = Conversation.objects.get_or_create(
+                bot_integration=bi,
+                fb_page_id=self.user_id,
+                ig_account_id=self.user_id,
+            )[0]
+        self._unpack_bot_integration(bi)
+        self.bot_id = bi.fb_page_id
 
-        fb_page = self.unpack_fb_page_snapshot(snapshot)
-        self._access_token = fb_page.get("page_access_token")
+        self._access_token = bi.fb_page_access_token
 
     def send_msg(
         self,
@@ -306,7 +358,7 @@ class FacebookBot(BotInterface):
         )
 
     def mark_read(self):
-        if self.platform == "ig":
+        if self.platform == Platform.INSTAGRAM:
             # instagram doesn't support read receipts :(
             return
         send_fb_msgs_raw(
@@ -342,29 +394,6 @@ class FacebookBot(BotInterface):
 
     def get_input_video(self) -> str | None:
         raise NotImplementedError
-
-
-def _resolve_fb_page(
-    platform: db.BOT_PLATFORM_LITERAL, messaging: dict
-) -> (str, firestore.DocumentSnapshot | None):
-    page_id = messaging["recipient"]["id"]
-    snapshot = None
-    if platform == "ig":
-        # need to resolve the facebook page connected to this instagram page
-        try:
-            snapshot = list(
-                db.get_collection_ref(db.CONNECTED_BOTS_COLLECTION)
-                .where("ig_account_id", "==", page_id)
-                .limit(1)
-                .get()
-            )[0]
-            page_id = snapshot.id.split(":")[1]
-        except IndexError:
-            # if ig page is not saved in db, ignore
-            pass
-    else:
-        snapshot = db.get_connected_bot_page_ref("fb", page_id).get()
-    return page_id, snapshot
 
 
 def send_fb_msg(

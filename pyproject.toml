@@ -55,6 +55,7 @@ yt-dlp = "^2023.3.4"
 llama-index = "^0.5.27"
 nltk = "^3.8.1"
 Django = "^4.2"
+django-phonenumber-field = {extras = ["phonenumberslite"], version = "^7.0.2"}
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"

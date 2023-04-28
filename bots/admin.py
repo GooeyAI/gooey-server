@@ -1,0 +1,76 @@
+from django import forms
+from django.contrib import admin
+
+from bots import models
+from gooeysite.util import list_related_html_url
+
+
+class BotIntegrationAdminForm(forms.ModelForm):
+    class Meta:
+        widgets = {
+            "platform": forms.Select(
+                attrs={
+                    "--hideshow-fields": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username,wa_phone_number,wa_phone_number_id",
+                    "--show-on-1": "fb_page_id,fb_page_name,fb_page_access_token",
+                    "--show-on-2": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username",
+                    "--show-on-3": "wa_phone_number,wa_phone_number_id",
+                },
+            ),
+        }
+
+    class Media:
+        js = [
+            "https://cdn.jsdelivr.net/gh/scientifichackers/django-hideshow@0.0.1/hideshow.js",
+        ]
+
+
+@admin.register(models.BotIntegration)
+class BotIntegrationAdmin(admin.ModelAdmin):
+    search_fields = [
+        "name",
+        "ig_account_id",
+        "ig_username",
+        "fb_page_id",
+        "phone_number",
+    ]
+    form = BotIntegrationAdminForm
+    readonly_fields = ["view_conversations", "created_at", "updated_at"]
+
+    def view_conversations(self, bi: models.BotIntegration):
+        return list_related_html_url(bi.conversations)
+
+    view_conversations.short_description = "Messages"
+
+
+@admin.register(models.Conversation)
+class ConversationAdmin(admin.ModelAdmin):
+    autocomplete_fields = ["bot_integration"]
+    search_fields = ["bot_integration", "user_phone_number"]
+    readonly_fields = ["view_messages", "created_at"]
+
+    def view_messages(self, convo: models.Conversation):
+        return list_related_html_url(convo.messages)
+
+    view_messages.short_description = "Messages"
+
+
+class FeedbackInline(admin.TabularInline):
+    model = models.Feedback
+    extra = 0
+    can_delete = False
+    readonly_fields = ["created_at"]
+
+
+@admin.register(models.Message)
+class MessageAdmin(admin.ModelAdmin):
+    autocomplete_fields = ["conversation"]
+    search_fields = ["conversation", "role", "content"]
+    readonly_fields = ["conversation", "role", "content", "created_at"]
+
+    inlines = [FeedbackInline]
+
+
+@admin.register(models.Feedback)
+class FeedbackAdmin(admin.ModelAdmin):
+    autocomplete_fields = ["message"]
+    readonly_fields = ["created_at"]

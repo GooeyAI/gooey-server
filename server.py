@@ -1,10 +1,12 @@
+from gooeysite import wsgi
+
+assert wsgi
+
 import datetime
-import os
 import re
 import typing
 from time import time
 
-import django
 import httpx
 import streamlit as st
 from fastapi import FastAPI, Depends
@@ -70,9 +72,6 @@ app.add_middleware(
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "daras_ai_v2.settings")
-django.setup()
 
 
 @app.get("/sitemap.xml/", include_in_schema=False)
