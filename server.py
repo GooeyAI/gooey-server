@@ -10,7 +10,6 @@ import typing
 from time import time
 from traceback import print_exc
 
-import django
 import httpx
 from fastapi import FastAPI, Form, Depends
 from fastapi import HTTPException, Body
@@ -76,9 +75,6 @@ app.add_middleware(
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "daras_ai_v2.settings")
-django.setup()
 
 
 @app.get("/sitemap.xml/", include_in_schema=False)

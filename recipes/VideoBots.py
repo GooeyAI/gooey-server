@@ -53,6 +53,7 @@ from recipes.DocSearch import (
 )
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
+from routers.facebook import ig_connect_url, fb_connect_url
 
 BOT_SCRIPT_RE = re.compile(
     # start of line

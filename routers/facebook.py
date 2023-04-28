@@ -2,6 +2,7 @@ import traceback
 
 import glom
 import requests
+from django.db import transaction
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from firebase_admin import auth
@@ -401,16 +402,22 @@ def _process_msg(
         ),
     )
     # call the api with provided input
-    result = call_api(
-        page_cls=page_cls,
-        user=api_user,
-        request_body={
-            "input_prompt": input_text,
-            "messages": saved_msgs,
-            "user_language": user_language,
-        },
-        query_params=query_params,
-    )
+    result = {
+        "output": {
+            "output_text": ["Hello, world! https://www.youtube.com/"],
+            "raw_output_text": ["Hello, world! https://www.youtube.com/"],
+        }
+    }
+    # result = call_api(
+    #     page_cls=page_cls,
+    #     user=api_user,
+    #     request_body={
+    #         "input_prompt": input_text,
+    #         "messages": saved_msgs,
+    #         "user_language": user_language,
+    #     },
+    #     query_params=query_params,
+    # )
     # extract response video/audio/text
     try:
         response_video = result["output"]["output_video"][0]
