@@ -2,39 +2,28 @@ import typing
 from enum import Enum
 
 import streamlit as st
-from langchain import OpenAI
-from langchain.chains.summarize import load_summarize_chain
-from langchain.chat_models import ChatOpenAI
-from langchain.docstore.document import Document
-from langchain.prompts import PromptTemplate
-from langchain.text_splitter import (
-    RecursiveCharacterTextSplitter,
-)
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pydantic import BaseModel
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from daras_ai.image_input import upload_st_file
-from daras_ai_v2 import settings
 from daras_ai_v2.GoogleGPT import render_outputs, GoogleGPTPage
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    doc_search_settings,
     document_uploader,
 )
-from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
     LargeLanguageModels,
-    is_chat_model,
-    engine_names,
-    GPT3_MAX_ALLOED_TOKENS,
+    run_language_model,
+    model_max_tokens,
     calc_gpt_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from recipes.DocSearch import (
     doc_url_to_text_pages,
     doc_url_to_metadata,
-    document_splitter,
     DocSearchPage,
 )
 
@@ -45,6 +34,14 @@ class CombineDocumentsChains(Enum):
     map_reduce = "Map Reduce"
     # refine = "Refine"
     # stuff = "Stuffing (Only works for small documents)"
+
+
+class PromptTreeNode(BaseModel):
+    prompt: str
+    children: list["PromptTreeNode"]
+
+
+PromptTree = list[PromptTreeNode]
 
 
 class DocSummaryPage(BasePage):
@@ -66,6 +63,8 @@ class DocSummaryPage(BasePage):
         task_instructions: str | None
         documents: list[str] | None
 
+        merge_instructions: str | None
+
         selected_model: typing.Literal[
             tuple(e.name for e in LargeLanguageModels)
         ] | None
@@ -83,21 +82,29 @@ class DocSummaryPage(BasePage):
     class ResponseModel(BaseModel):
         output_text: list[str]
 
+        prompt_tree: PromptTree | None
         final_prompt: str
 
     def render_form_v2(self):
-        document_uploader("##### Documents")
-        st.text_area("##### Instructions", key="task_instructions", height=150)
+        document_uploader("##### 📎 Documents")
+        st.text_area("##### 👩‍💻 Instructions", key="task_instructions", height=150)
 
     def render_settings(self):
-        enum_selector(
-            CombineDocumentsChains,
-            label="""
-#### 🦜🔗 LangChain Type
-[Read More](https://docs.langchain.com/docs/components/chains/index_related_chains)
-""",
-            key="chain_type",
+        st.text_area(
+            """
+##### 📄+📄 Merge Instructions
+Prompt for merging several outputs together 
+        """,
+            key="merge_instructions",
+            height=150,
         )
+
+        #         enum_selector(
+        #             CombineDocumentsChains,
+        #             label="""
+        # """,
+        #             key="chain_type",
+        #         )
         st.write("---")
 
         language_model_settings()
@@ -128,6 +135,11 @@ class DocSummaryPage(BasePage):
         render_outputs(state, 200)
 
     def render_steps(self):
+        prompt_tree = st.session_state.get("prompt_tree", {})
+        if prompt_tree:
+            st.write("**Prompt Tree**")
+            st.json(prompt_tree, expanded=False)
+
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
             st.text_area(
@@ -171,59 +183,107 @@ class DocSummaryPage(BasePage):
             )
             full_text += "\n\n".join(pages)
 
-        model = LargeLanguageModels[request.selected_model]
+        chain_type = CombineDocumentsChains[request.chain_type]
+        match chain_type:
+            case CombineDocumentsChains.map_reduce:
+                state["output_text"] = yield from _map_reduce(request, full_text, state)
+                state["final_prompt"] = state["prompt_tree"][-1]["prompt"]
+            case _:
+                raise NotImplementedError(f"{chain_type} not implemented")
 
-        if is_chat_model(model):
-            llm = ChatOpenAI(
-                openai_api_key=settings.OPENAI_API_KEY,
-                model_name=engine_names[model],
-                max_tokens=request.max_tokens,
-                n=request.num_outputs,
-                temperature=request.sampling_temperature,
-                frequency_penalty=0.1 if request.avoid_repetition else 0,
-                presence_penalty=0.25 if request.avoid_repetition else 0,
-            )
-        else:
-            llm = OpenAI(
-                openai_api_key=settings.OPENAI_API_KEY,
-                model_name=engine_names[model],
-                max_tokens=request.max_tokens,
-                best_of=int(request.num_outputs * request.quality),
-                n=request.num_outputs,
-                temperature=request.sampling_temperature,
-                frequency_penalty=0.1 if request.avoid_repetition else 0,
-                presence_penalty=0.25 if request.avoid_repetition else 0,
-            )
 
-        final_prompt = "{text}\n**********\n" + request.task_instructions.strip()
-        state["final_prompt"] = final_prompt
-        prompt_template = PromptTemplate(
-            template=final_prompt, input_variables=["text"]
+MAP_REDUCE_PROMPT = """
+{documents}
+**********
+[Instructions]
+{instructions}
+**********
+Read the Documents above and produce a Response that best follows the given Instructions.
+Response:
+""".strip()
+
+
+def documents_as_prompt(docs: list[str], sep="\n\n") -> str:
+    return sep.join(
+        f'''
+[Document {idx + 1}]: """
+{text}
+"""
+'''.strip()
+        for idx, text in enumerate(docs)
+    )
+
+
+def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: dict):
+    model = LargeLanguageModels[request.selected_model]
+
+    task_instructions = request.task_instructions.strip()
+    merge_instructions = request.merge_instructions.strip()
+
+    text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+        chunk_size=model_max_tokens[model]
+        - calc_gpt_tokens(task_instructions + merge_instructions)
+        - request.max_tokens
+        - 100,
+        chunk_overlap=500,
+    )
+    texts = text_splitter.split_text(full_text)
+
+    def llm(p: str) -> str:
+        return run_language_model(
+            prompt=p,
+            model=request.selected_model,
+            max_tokens=request.max_tokens,
+            quality=request.quality,
+            num_outputs=request.num_outputs,
+            temperature=request.sampling_temperature,
+            avoid_repetition=request.avoid_repetition,
+        )[0]
+
+    state["prompt_tree"] = prompt_tree = []
+    llm_prompts = []
+    for chunk in texts:
+        prompt = MAP_REDUCE_PROMPT.format(
+            documents=documents_as_prompt([chunk]),
+            instructions=task_instructions,
         )
+        llm_prompts.append(prompt)
+        prompt_tree.append({"prompt": prompt, "children": []})
 
-        buffer = 100
-        text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-            chunk_size=2000,
-            # chunk_size=GPT3_MAX_ALLOED_TOKENS
-            # - calc_gpt_tokens(final_prompt)
-            # - request.max_tokens
-            # - buffer,
-            chunk_overlap=buffer,
-        )
-        texts = text_splitter.split_text(full_text)
-        docs = [Document(page_content=t) for t in texts]
-        # docs = [
-        #     Document(page_content=t)
-        #     for _, t in document_splitter([full_text], 600, 550)
-        # ]
-        print([len(d.page_content) for d in docs])
+    progress = 0
+    extra_doc = None
 
-        yield f"Summarizing using {model.value}..."
-        chain = load_summarize_chain(
-            llm,
-            chain_type=request.chain_type,
-            map_prompt=prompt_template,
-            combine_prompt=prompt_template,
-            # verbose=True,
-        )
-        state["output_text"] = [chain.run(docs).strip()]
+    while True:
+        progress += 1
+        yield f"[{progress}] Summarizing using {model.value}..."
+        documents = map_parallel(llm, llm_prompts, max_workers=4)
+        # append the left over document from the previous iteration
+        if extra_doc:
+            documents.append(extra_doc)
+        # reached the end
+        if len(documents) < 2:
+            break
+        # build the prompts for the next batch
+        llm_prompts = []
+        prompt_tree_next = []
+        extra_doc = None
+        # combine previous documents with a batch size of 2
+        batch_size = 2
+        for idx in range(0, len(documents), batch_size):
+            two_docs = documents[idx : idx + batch_size]
+            if len(two_docs) <= 1:
+                # use this left over document in the next iteration
+                extra_doc = two_docs[0]
+            else:
+                prompt = MAP_REDUCE_PROMPT.format(
+                    documents=documents_as_prompt(two_docs),
+                    instructions=merge_instructions,
+                )
+                llm_prompts.append(prompt)
+                prompt_tree_next.append(
+                    {"prompt": prompt, "children": prompt_tree[idx : idx + 2]}
+                )
+        # use the updated prompt tree in the next iteration
+        state["prompt_tree"] = prompt_tree = prompt_tree_next
+
+    return documents

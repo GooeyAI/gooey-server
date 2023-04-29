@@ -511,7 +511,7 @@ class BasePage:
                 "🏃 Submit",
                 key=key,
                 type="primary",
-                disabled=bool(st.session_state.get(StateKeys.run_status)),
+                # disabled=bool(st.session_state.get(StateKeys.run_status)),
             )
         if not submitted:
             return False

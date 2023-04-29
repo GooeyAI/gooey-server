@@ -1,18 +1,18 @@
 import re
+import threading
+import typing
 from enum import Enum
 from functools import wraps
 from time import sleep
 
 import openai
 import openai.error
+import tiktoken
 import typing_extensions
 from decouple import config
-from transformers import GPT2TokenizerFast
 
 from daras_ai_v2 import settings
 from daras_ai_v2.gpu_server import call_gpu_server, GpuEndpoints
-
-GPT3_MAX_ALLOED_TOKENS = 4000
 
 _gpt2_tokenizer = None
 
@@ -55,13 +55,28 @@ def is_chat_model(model: LargeLanguageModels) -> bool:
     return model in [LargeLanguageModels.gpt_3_5_turbo, LargeLanguageModels.gpt_4]
 
 
+model_max_tokens = {
+    LargeLanguageModels.gpt_4: 8192,
+    LargeLanguageModels.gpt_3_5_turbo: 4096,
+    LargeLanguageModels.text_davinci_003: 4097,
+    LargeLanguageModels.code_davinci_002: 8001,
+    LargeLanguageModels.text_curie_001: 2049,
+    LargeLanguageModels.text_babbage_001: 2049,
+    LargeLanguageModels.text_ada_001: 2049,
+}
+
+
 def calc_gpt_tokens(text: str) -> int:
-    global _gpt2_tokenizer
+    local = threading.local()
+    try:
+        enc = local.gpt2enc
+    except AttributeError:
+        enc = tiktoken.get_encoding("gpt2")
+        local.gpt2enc = enc
+    return len(enc.encode(text))
 
-    if not _gpt2_tokenizer:
-        _gpt2_tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
 
-    return len(_gpt2_tokenizer.encode(text, verbose=False))
+F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
 
 
 def do_retry(
@@ -74,7 +89,7 @@ def do_retry(
         openai.error.RateLimitError,
         openai.error.ServiceUnavailableError,
     ),
-):
+) -> typing.Callable[[F], F]:
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
