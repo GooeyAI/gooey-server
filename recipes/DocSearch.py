@@ -220,7 +220,7 @@ class DocSearchPage(BasePage):
         prompt += f"Question: {request.search_query}\nAnswer:"
         state["final_prompt"] = prompt
 
-        yield "Generating answer using GPT-3..."
+        yield f"Generating answer using {LargeLanguageModels[request.selected_model].name}..."
         output_text = run_language_model(
             model=request.selected_model,
             quality=request.quality,
