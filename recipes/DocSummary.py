@@ -60,9 +60,9 @@ class DocSummaryPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        task_instructions: str | None
-        documents: list[str] | None
+        documents: list[str]
 
+        task_instructions: str | None
         merge_instructions: str | None
 
         selected_model: typing.Literal[
