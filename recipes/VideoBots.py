@@ -27,7 +27,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.language_model import (
     run_language_model,
-    GPT3_MAX_ALLOED_TOKENS,
     calc_gpt_tokens,
     ConversationEntry,
     format_chatml_message,
@@ -38,6 +37,7 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
     CHATML_ROLE_SYSTEM,
     is_chat_model,
+    model_max_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -570,7 +570,7 @@ Use this for prompting GPT to use the document search results.
         prompt = "\n".join(format_chatml_message(entry) for entry in prompt_messages)
         state["final_prompt"] = prompt
         # ensure input script is not too big
-        max_allowed_tokens = GPT3_MAX_ALLOED_TOKENS - calc_gpt_tokens(prompt)
+        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(prompt)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
             raise ValueError("Input Script is too long! Please reduce the script size.")

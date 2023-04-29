@@ -18,9 +18,9 @@ from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import (
     run_language_model,
-    GPT3_MAX_ALLOED_TOKENS,
     calc_gpt_tokens,
     LargeLanguageModels,
+    model_max_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -392,7 +392,9 @@ def _gen_final_prompt(
     )
 
     max_allowed_tokens = (
-        GPT3_MAX_ALLOED_TOKENS - request.max_tokens - calc_gpt_tokens(end_input_prompt)
+        model_max_tokens[LargeLanguageModels[request.selected_model]]
+        - request.max_tokens
+        - calc_gpt_tokens(end_input_prompt)
     )
 
     state["final_prompt"] = request.task_instructions.strip() + "\n\n"

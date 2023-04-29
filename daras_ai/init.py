@@ -124,6 +124,17 @@ sup a {
 sup a:hover {
     color: #acd9d6;
 }
+
+.string-value { 
+    white-space: pre; 
+}
+.variable-value {
+    background-color: rgb(20, 20, 20);
+    border-radius: 5px;
+    max-width: 100%;
+    max-height: 250px; 
+    overflow: auto; 
+}
 </style>
         """
         + st_like_btn_css_html

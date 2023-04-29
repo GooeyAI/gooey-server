@@ -1,7 +1,6 @@
 import datetime
 import heapq
 import io
-import math
 import os
 import re
 import subprocess
@@ -9,7 +8,6 @@ import tempfile
 import typing
 from collections import deque
 
-import jinja2
 import numpy as np
 import pandas as pd
 import pdftotext
@@ -17,7 +15,7 @@ import requests
 import streamlit as st
 from furl import furl
 from googleapiclient.errors import HttpError
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from llama_index.langchain_helpers.text_splitter import SentenceSplitter
 from pydantic import BaseModel
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
@@ -405,7 +403,7 @@ def _doc_url_to_embeds_cached(
     )
     metas: list[SearchReference]
     if isinstance(pages, pd.DataFrame):
-        text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+        text_splitter = SentenceSplitter(
             chunk_size=int(max_context_words / 0.75),
             chunk_overlap=int(max_context_words / 0.75 / 5),
         )
