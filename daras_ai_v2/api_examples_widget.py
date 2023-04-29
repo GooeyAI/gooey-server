@@ -1,4 +1,5 @@
 import json
+import pprint
 import shlex
 from textwrap import indent
 
@@ -64,7 +65,7 @@ print(response.status_code, data)
             % (
                 api_url,
                 auth_keyword,
-                indent(json.dumps(request_body, indent=4), " " * 4)[4:],
+                indent(pprint.pformat(request_body), " " * 9)[9:],
             )
         )
 
