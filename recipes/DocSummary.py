@@ -220,12 +220,23 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
     task_instructions = request.task_instructions.strip()
     merge_instructions = request.merge_instructions.strip()
 
+    safety_buffer = 100
+    prompt_token_count = (
+        calc_gpt_tokens(task_instructions + merge_instructions) + safety_buffer
+    )
+
+    # to merge 2 outputs, we need to have at least 1/3 of the max tokens available
+    max_tokens_bound = model_max_tokens[model] // 3 - prompt_token_count
+    assert request.max_tokens <= max_tokens_bound, (
+        f"To summarize accurately, output size must be at max {max_tokens_bound} for {model.value}, "
+        f"but got {request.max_tokens}. Please reduce the output size."
+    )
+
+    # logic: model max tokens = prompt + output + document chunk
+    chunk_size = model_max_tokens[model] - (prompt_token_count + request.max_tokens)
     text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-        chunk_size=model_max_tokens[model]
-        - calc_gpt_tokens(task_instructions + merge_instructions)
-        - request.max_tokens
-        - 100,
-        chunk_overlap=500,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_size // 10,
     )
     texts = text_splitter.split_text(full_text)
 
