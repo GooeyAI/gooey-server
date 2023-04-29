@@ -2,7 +2,7 @@ import typing
 from enum import Enum
 
 import streamlit as st
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from llama_index.langchain_helpers.text_splitter import SentenceSplitter
 from pydantic import BaseModel
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
@@ -234,11 +234,15 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
 
     # logic: model max tokens = prompt + output + document chunk
     chunk_size = model_max_tokens[model] - (prompt_token_count + request.max_tokens)
-    text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+    text_splitter = SentenceSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_size // 10,
     )
     texts = text_splitter.split_text(full_text)
+    print(chunk_size)
+    print(chunk_size // 10)
+    print([len(text) for text in texts])
+    print([calc_gpt_tokens(text) for text in texts])
 
     def llm(p: str) -> str:
         return run_language_model(
