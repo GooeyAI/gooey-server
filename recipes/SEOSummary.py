@@ -300,7 +300,7 @@ SearchSEO > Page Parsing > GPT3
 
         yield from _gen_final_prompt(request, state)
 
-        yield f"Generating content using {LargeLanguageModels[request.selected_model].name}..."
+        yield f"Generating content using {LargeLanguageModels[request.selected_model].value}..."
 
         output_content = _run_lm(request, state["final_prompt"])
 

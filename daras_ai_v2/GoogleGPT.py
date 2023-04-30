@@ -248,7 +248,7 @@ class GoogleGPTPage(BasePage):
         prompt += f"Question: {request.search_query}\nAnswer:"
         state["final_prompt"] = prompt
 
-        yield f"Generating answer using [{LargeLanguageModels[request.selected_model].name}]..."
+        yield f"Generating answer using [{LargeLanguageModels[request.selected_model].value}]..."
         output_text = run_language_model(
             model=request.selected_model,
             quality=request.quality,
