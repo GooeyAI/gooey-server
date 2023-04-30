@@ -15,7 +15,7 @@ import requests
 import streamlit as st
 from furl import furl
 from googleapiclient.errors import HttpError
-from llama_index.langchain_helpers.text_splitter import SentenceSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pydantic import BaseModel
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
@@ -403,7 +403,7 @@ def _doc_url_to_embeds_cached(
     )
     metas: list[SearchReference]
     if isinstance(pages, pd.DataFrame):
-        text_splitter = SentenceSplitter(
+        text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
             chunk_size=int(max_context_words / 0.75),
             chunk_overlap=int(max_context_words / 0.75 / 5),
         )

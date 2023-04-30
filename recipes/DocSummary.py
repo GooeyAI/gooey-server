@@ -238,10 +238,6 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
         chunk_overlap=chunk_size // 10,
     )
     texts = text_splitter.split_text(full_text)
-    print(chunk_size)
-    print(chunk_size // 10)
-    print([len(text) for text in texts])
-    print([calc_gpt_tokens(text) for text in texts])
 
     def llm(p: str) -> str:
         return run_language_model(
