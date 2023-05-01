@@ -45,6 +45,7 @@ class Text2ImgModels(Enum):
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 (NerdyRodent)"
     jack_qiao = "Stable Diffusion v1.4 (Jack Qiao)"
     dall_e = "Dall-E (OpenAI)"
+    deepfloyd_if = "DeepFloyd IF (stability.ai)"
 
 
 text2img_model_ids = {
@@ -56,6 +57,11 @@ text2img_model_ids = {
     Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Text2ImgModels.rodent_diffusion_1_5: "devxpy/rodent-diffusion-1-5",
+    Text2ImgModels.deepfloyd_if: [
+        "DeepFloyd/IF-I-XL-v1.0",
+        "DeepFloyd/IF-II-L-v1.0",
+        "stabilityai/stable-diffusion-x4-upscaler",
+    ],
 }
 
 
@@ -183,7 +189,7 @@ def text2img(
     guidance_scale: float = None,
     negative_prompt: str = None,
 ):
-    _resolution_check(width, height)
+    _resolution_check(width, height, max_size=(1024, 1024))
 
     match selected_model:
         case Text2ImgModels.jack_qiao.name:
@@ -520,9 +526,9 @@ def _recomposite_inpainting_outputs(
     return ret
 
 
-def _resolution_check(width, height):
-    if get_downscale_factor(im_size=(width, height), max_size=IMG_MAX_SIZE):
+def _resolution_check(width, height, max_size=IMG_MAX_SIZE):
+    if get_downscale_factor(im_size=(width, height), max_size=max_size):
         raise ValueError(
-            f"Maximum size is {IMG_MAX_SIZE[0]}x{IMG_MAX_SIZE[1]} pixels, because of memory limits. "
+            f"Maximum size is {max_size[0]}x{max_size[1]} pixels, because of memory limits. "
             f"Please select a lower width or height."
         )

@@ -28,6 +28,7 @@ class CompareText2ImgPage(BasePage):
     title = "Compare AI Image Generators"
     slug_versions = [
         "CompareText2Img",
+        "text2img",
         "compare-ai-image-generators",
     ]
 
@@ -179,8 +180,8 @@ class CompareText2ImgPage(BasePage):
         )
 
         negative_prompt_setting()
-        num_outputs_setting()
         output_resolution_setting()
+        num_outputs_setting()
         sd_2_upscaling_setting()
         col1, col2 = st.columns(2)
         with col1:
@@ -265,6 +266,8 @@ class CompareText2ImgPage(BasePage):
         total = 0
         for name in selected_models:
             match name:
+                case Text2ImgModels.deepfloyd_if.name:
+                    total += 5
                 case Text2ImgModels.dall_e.name:
                     total += 15
                 case _:

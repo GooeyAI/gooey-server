@@ -440,11 +440,14 @@ def st_editor(request: Request):
 
 @app.get("/{page_slug}/", include_in_schema=False)
 def st_page(request: Request, page_slug):
-    page_slug = normalize_slug(page_slug)
+    lookup = normalize_slug(page_slug)
     try:
-        page_cls = page_map[page_slug]
+        page_cls = page_map[lookup]
     except KeyError:
         raise HTTPException(status_code=404)
+    latest_slug = page_cls.slug_versions[-1]
+    if latest_slug != page_slug:
+        return RedirectResponse(request.url.replace(path=f"/{latest_slug}/"))
     page = page_cls()
 
     state = page.get_doc_from_query_params(dict(request.query_params))

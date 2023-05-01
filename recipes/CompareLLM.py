@@ -15,7 +15,7 @@ DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot
 
 class CompareLLMPage(BasePage):
     title = "Large Language Models: GPT-3"
-    slug_versions = ["CompareLLM", "compare-large-language-models"]
+    slug_versions = ["CompareLLM", "llm", "compare-large-language-models"]
 
     sane_defaults = {
         "avoid_repetition": False,

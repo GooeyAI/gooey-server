@@ -3,6 +3,7 @@ import datetime
 import typing
 
 import requests
+from furl import furl
 
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2 import settings
@@ -33,6 +34,8 @@ class GpuEndpoints:
     audio_ldm = settings.GPU_SERVER_1.copy().set(port=5017) / "audio_ldm"
     bark = settings.GPU_SERVER_1.copy().set(port=5017) / "bark"
 
+    deepfloyd_if = settings.GPU_SERVER_1.copy().set(port=5018) / "deepfloyd_if"
+
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
     b64_data = call_gpu_server(endpoint=endpoint, input_data=input_data)
@@ -56,16 +59,44 @@ def call_gpu_server(*, endpoint: str, input_data: dict) -> typing.Any:
     return r.json()["output"]
 
 
-def call_sd_multi(endpoint: str, pipeline: dict, inputs: dict) -> typing.List[str]:
+def call_sd_multi(
+    endpoint: str,
+    pipeline: dict,
+    inputs: dict,
+) -> typing.List[str]:
     prompt = inputs["prompt"]
     num_images_per_prompt = inputs["num_images_per_prompt"]
     num_outputs = len(prompt) * num_images_per_prompt
+    # deepfloyd
+    if isinstance(pipeline["model_id"], list):
+        base = GpuEndpoints.deepfloyd_if
+        inputs["num_inference_steps"] = [inputs["num_inference_steps"], 50, 75]
+        inputs["guidance_scale"] = [inputs["guidance_scale"], 4, 9]
+    else:
+        base = GpuEndpoints.sd_multi
+    return call_gooey_gpu(
+        endpoint=base / endpoint,
+        content_type="image/png",
+        pipeline=pipeline,
+        inputs=inputs,
+        num_outputs=num_outputs,
+        filename=prompt,
+    )
 
+
+def call_gooey_gpu(
+    *,
+    endpoint: furl,
+    content_type: str,
+    pipeline: dict,
+    inputs: dict,
+    num_outputs: int,
+    filename: str,
+) -> list[str]:
     blobs = [
-        storage_blob_for(f"gooey.ai - {prompt} ({i + 1}).png")
+        storage_blob_for(f"gooey.ai - {filename} ({i + 1}).png")
         for i in range(num_outputs)
     ]
-
     pipeline["upload_urls"] = [
         blob.generate_signed_url(
             version="v4",
@@ -73,18 +104,13 @@ def call_sd_multi(endpoint: str, pipeline: dict, inputs: dict) -> typing.List[st
             expiration=datetime.timedelta(minutes=30),
             # Allow PUT requests using this URL.
             method="PUT",
-            content_type="image/png",
+            content_type=content_type,
         )
         for blob in blobs
     ]
-
     r = requests.post(
-        GpuEndpoints.sd_multi / endpoint,
-        json={
-            "pipeline": pipeline,
-            "inputs": inputs,
-        },
+        str(endpoint),
+        json={"pipeline": pipeline, "inputs": inputs},
     )
     r.raise_for_status()
-
     return [blob.public_url for blob in blobs]

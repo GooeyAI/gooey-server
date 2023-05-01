@@ -1,3 +1,5 @@
+import math
+
 import streamlit as st
 
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -115,31 +117,97 @@ def num_outputs_setting(selected_model: str = None):
             st.empty()
 
 
+RESOLUTIONS = {
+    512: {
+        (512, 512): "square",
+        (576, 448): "A4",
+        (640, 384): "laptop",
+        (768, 320): "smartphone",
+        (960, 256): "cinema",
+        (1024, 256): "panorama",
+    },
+    768: {
+        (768, 768): "square",
+        (896, 640): "A4",
+        (1024, 576): "laptop",
+        (1024, 512): "smartphone",
+        (1152, 512): "cinema",
+        (1536, 384): "panorama",
+    },
+    1024: {
+        (1024, 1024): "square",
+        (1024, 768): "A4",
+        (1280, 768): "laptop",
+        (1536, 512): "smartphone",
+        (1792, 512): "cinema",
+        (2048, 512): "panorama",
+    },
+}
+
+LANDSCAPE = "Landscape"
+PORTRAIT = "Portrait"
+
+
 def output_resolution_setting():
-    col1, col2, col3 = st.columns([10, 1, 10])
+    col1, col2, col3 = st.columns(3)
+
+    if "__pixels" not in st.session_state:
+        saved = (
+            st.session_state.get("output_width"),
+            st.session_state.get("output_height"),
+        )
+        if not saved[0]:
+            saved = (768, 768)
+        if saved[0] < saved[1]:
+            orientation = PORTRAIT
+            saved = saved[::-1]
+        else:
+            orientation = LANDSCAPE
+        for pixels, spec in RESOLUTIONS.items():
+            for res in spec.keys():
+                if res != saved:
+                    continue
+                st.session_state["__pixels"] = pixels
+                st.session_state["__res"] = res
+                st.session_state["__orientation"] = orientation
+                break
+
+    selected_model = st.session_state.get(
+        "selected_model", st.session_state.get("selected_models", "")
+    )
+    if "jack_qiao" in selected_model or "sd_1_4" in selected_model:
+        pixel_options = [512]
+    elif "deepfloyd_if" in selected_model:
+        pixel_options = [1024]
+    else:
+        pixel_options = [768, 1024]
+
     with col1:
-        st.slider(
-            "##### Width",
-            key="output_width",
-            min_value=512,
-            max_value=1152,
-            step=64,
+        pixels = st.selectbox(
+            "##### Size",
+            key="__pixels",
+            format_func=lambda x: f"{x}p",
+            options=pixel_options,
         )
     with col2:
-        st.write("X")
-    with col3:
-        st.slider(
-            "##### Height",
-            key="output_height",
-            min_value=512,
-            max_value=1152,
-            step=64,
+        res = st.selectbox(
+            "##### Resolution",
+            key="__res",
+            format_func=lambda x: f"{x[0]} x {x[1]} ({RESOLUTIONS[pixels][x]})",
+            options=RESOLUTIONS[pixels].keys(),
         )
-    st.write(
-        """
-        *Note: Dall-E only supports 512x512*
-        """
-    )
+    if res[0] != res[1]:
+        with col3:
+            orientation = st.selectbox(
+                "##### Orientation",
+                key="__orientation",
+                options=[LANDSCAPE, PORTRAIT],
+            )
+        if orientation == PORTRAIT:
+            res = res[::-1]
+
+    st.session_state["output_width"] = res[0]
+    st.session_state["output_height"] = res[1]
 
 
 def sd_2_upscaling_setting():
