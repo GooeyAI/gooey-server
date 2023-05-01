@@ -404,11 +404,12 @@ def _process_msg(
         response_audio = result["output"]["output_audio"][0]
     except (KeyError, IndexError):
         pass
+    raw_input_text = result["output"]["raw_input_text"]
     raw_output_text = result["output"]["raw_output_text"][0]
     response_text = result["output"]["output_text"][0]
     # save new messages for context
     saved_msgs += [
-        {"role": CHATML_ROLE_USER, "content": input_text},
+        {"role": CHATML_ROLE_USER, "content": raw_input_text},
         {"role": CHATML_ROLE_ASSISSTANT, "content": raw_output_text},
     ]
     return response_text, response_audio, response_video, saved_msgs

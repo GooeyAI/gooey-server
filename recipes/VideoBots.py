@@ -205,6 +205,7 @@ class VideoBotsPage(BasePage):
 
     class ResponseModel(BaseModel):
         final_prompt: str
+        raw_input_text: str | None
         raw_output_text: list[str] | None
         output_text: list[str]
 
@@ -505,6 +506,7 @@ Use this for prompting GPT to use the document search results.
             user_display_name = CHATML_ROLE_USER
 
         # add user input to conversation
+        state["raw_input_text"] = user_input
         saved_msgs.append(
             {
                 "role": CHATML_ROLE_USER,
