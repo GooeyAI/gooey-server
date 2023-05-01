@@ -26,6 +26,33 @@ UBERDUCK_VOICES = {
 class TextToSpeechProviders(Enum):
     GOOGLE_TTS = "Google Cloud Text-to-Speech"
     UBERDUCK = "uberduck.ai"
+    BARK = "Bark (suno-ai)"
+
+
+BARK_SUPPORTED_LANGS = [
+    ("English", "en"),
+    ("German", "de"),
+    ("Spanish", "es"),
+    ("French", "fr"),
+    ("Hindi", "hi"),
+    ("Italian", "it"),
+    ("Japanese", "ja"),
+    ("Korean", "ko"),
+    ("Polish", "pl"),
+    ("Portuguese", "pt"),
+    ("Russian", "ru"),
+    ("Turkish", "tr"),
+    ("Chinese", "zh"),
+]
+
+BARK_ALLOWED_PROMPTS = {
+    None: "———",
+    "announcer": "Announcer",
+} | {
+    f"{code}_speaker_{n}": f"Speaker {n} ({lang})"
+    for lang, code in BARK_SUPPORTED_LANGS
+    for n in range(10)
+}
 
 
 def text_to_speech_settings():
@@ -44,6 +71,17 @@ def text_to_speech_settings():
         )
 
     match tts_provider:
+        case TextToSpeechProviders.BARK.name:
+            with col2:
+                st.selectbox(
+                    label="""
+                    ###### Bark History Prompt
+                    """,
+                    key="bark_history_prompt",
+                    format_func=BARK_ALLOWED_PROMPTS.__getitem__,
+                    options=BARK_ALLOWED_PROMPTS.keys(),
+                )
+
         case TextToSpeechProviders.GOOGLE_TTS.name:
             with col2:
                 voices = google_tts_voices()

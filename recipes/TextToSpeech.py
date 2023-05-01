@@ -1,15 +1,17 @@
+import datetime
 import json
 import time
+import typing
 
 import requests
 import streamlit as st
-import typing
 from google.cloud import texttospeech
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, storage_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.gpu_server import GpuEndpoints
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_settings,
@@ -21,7 +23,12 @@ DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/da
 
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"
-    slug_versions = ["TextToSpeech", "compare-text-to-speech-engines"]
+    slug_versions = [
+        "TextToSpeech",
+        "tts",
+        "text2speech",
+        "compare-text-to-speech-engines",
+    ]
 
     sane_defaults = {
         "tts_provider": TextToSpeechProviders.GOOGLE_TTS.value,
@@ -45,6 +52,8 @@ class TextToSpeechPage(BasePage):
         google_voice_name: str | None
         google_speaking_rate: float | None
         google_pitch: float | None
+
+        bark_history_prompt: str | None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -96,87 +105,115 @@ class TextToSpeechPage(BasePage):
             st.empty()
 
     def run(self, state: dict):
-        yield "Generating Audio..."
         text = state["text_prompt"].strip()
         tts_provider = (
             state["tts_provider"]
             if "tts_provider" in state
             else TextToSpeechProviders.UBERDUCK.name
         )
-        if tts_provider == TextToSpeechProviders.UBERDUCK.name:
-            voice_name = (
-                state["uberduck_voice_name"]
-                if "uberduck_voice_name" in state
-                else "hecko"
-            ).strip()
-            pace = (
-                state["uberduck_speaking_rate"]
-                if "uberduck_speaking_rate" in state
-                else 1.0
-            )
-
-            response = requests.post(
-                "https://api.uberduck.ai/speak",
-                auth=(settings.UBERDUCK_KEY, settings.UBERDUCK_SECRET),
-                json={
-                    "speech": text,
-                    "voice": voice_name,
-                    "pace": pace,
-                },
-            )
-            response.raise_for_status()
-            file_uuid = json.loads(response.text)["uuid"]
-            while True:
-                data = requests.get(
-                    f"https://api.uberduck.ai/speak-status?uuid={file_uuid}"
+        provider = TextToSpeechProviders[tts_provider]
+        yield f"Generating audio using {provider.value} ..."
+        match provider:
+            case TextToSpeechProviders.BARK:
+                blob = storage_blob_for(f"bark_tts.wav")
+                r = requests.post(
+                    str(GpuEndpoints.bark),
+                    json={
+                        "pipeline": dict(
+                            upload_urls=[
+                                blob.generate_signed_url(
+                                    version="v4",
+                                    # This URL is valid for 15 minutes
+                                    expiration=datetime.timedelta(minutes=30),
+                                    # Allow PUT requests using this URL.
+                                    method="PUT",
+                                    content_type="audio/wav",
+                                ),
+                            ],
+                        ),
+                        "inputs": dict(
+                            prompt=text.split("---"),
+                            # history_prompt=history_prompt,
+                        ),
+                    },
                 )
-                path = json.loads(data.text)["path"]
-                if path:
-                    yield "Uploading Audio file..."
-                    audio_url = upload_file_from_bytes(
-                        "uberduck_gen.wav", requests.get(path).content
+                r.raise_for_status()
+                state["audio_url"] = blob.public_url
+
+            case TextToSpeechProviders.UBERDUCK:
+                voice_name = (
+                    state["uberduck_voice_name"]
+                    if "uberduck_voice_name" in state
+                    else "hecko"
+                ).strip()
+                pace = (
+                    state["uberduck_speaking_rate"]
+                    if "uberduck_speaking_rate" in state
+                    else 1.0
+                )
+
+                response = requests.post(
+                    "https://api.uberduck.ai/speak",
+                    auth=(settings.UBERDUCK_KEY, settings.UBERDUCK_SECRET),
+                    json={
+                        "speech": text,
+                        "voice": voice_name,
+                        "pace": pace,
+                    },
+                )
+                response.raise_for_status()
+                file_uuid = json.loads(response.text)["uuid"]
+                while True:
+                    data = requests.get(
+                        f"https://api.uberduck.ai/speak-status?uuid={file_uuid}"
                     )
-                    state["audio_url"] = audio_url
-                    break
-                else:
-                    time.sleep(0.1)
+                    path = json.loads(data.text)["path"]
+                    if path:
+                        yield "Uploading Audio file..."
+                        audio_url = upload_file_from_bytes(
+                            "uberduck_gen.wav", requests.get(path).content
+                        )
+                        state["audio_url"] = audio_url
+                        break
+                    else:
+                        time.sleep(0.1)
 
-        if tts_provider == TextToSpeechProviders.GOOGLE_TTS.name:
-            voice_name = (
-                state["google_voice_name"]
-                if "google_voice_name" in state
-                else "en-US-Neural2-F"
-            ).strip()
-            pitch = state["google_pitch"] if "google_pitch" in state else 0.0
-            speaking_rate = (
-                state["google_speaking_rate"]
-                if "google_speaking_rate" in state
-                else 1.0
-            )
+            case TextToSpeechProviders.GOOGLE_TTS:
+                voice_name = (
+                    state["google_voice_name"]
+                    if "google_voice_name" in state
+                    else "en-US-Neural2-F"
+                ).strip()
+                pitch = state["google_pitch"] if "google_pitch" in state else 0.0
+                speaking_rate = (
+                    state["google_speaking_rate"]
+                    if "google_speaking_rate" in state
+                    else 1.0
+                )
 
-            synthesis_input = texttospeech.SynthesisInput(text=text)
+                synthesis_input = texttospeech.SynthesisInput(text=text)
 
-            voice = texttospeech.VoiceSelectionParams()
-            voice.language_code = "-".join(voice_name.split("-")[:2])
-            voice.name = voice_name  # optional
+                voice = texttospeech.VoiceSelectionParams()
+                voice.language_code = "-".join(voice_name.split("-")[:2])
+                voice.name = voice_name  # optional
 
-            # Select the type of audio file you want returned
-            audio_config = texttospeech.AudioConfig()
-            audio_config.audio_encoding = texttospeech.AudioEncoding.MP3
-            audio_config.pitch = pitch  # optional
-            audio_config.speaking_rate = speaking_rate  # optional
+                # Select the type of audio file you want returned
+                audio_config = texttospeech.AudioConfig()
+                audio_config.audio_encoding = texttospeech.AudioEncoding.MP3
+                audio_config.pitch = pitch  # optional
+                audio_config.speaking_rate = speaking_rate  # optional
 
-            # Perform the text-to-speech request on the text input with the selected
-            # voice parameters and audio file type
-            client = texttospeech.TextToSpeechClient()
-            response = client.synthesize_speech(
-                input=synthesis_input, voice=voice, audio_config=audio_config
-            )
+                # Perform the text-to-speech request on the text input with the selected
+                # voice parameters and audio file type
+                client = texttospeech.TextToSpeechClient()
+                response = client.synthesize_speech(
+                    input=synthesis_input, voice=voice, audio_config=audio_config
+                )
 
-            yield "Uploading Audio file..."
-            state["audio_url"] = upload_file_from_bytes(
-                f"google_tts_gen.mp3", response.audio_content
-            )
+                yield "Uploading Audio file..."
+                state["audio_url"] = upload_file_from_bytes(
+                    f"google_tts_gen.mp3", response.audio_content
+                )
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
