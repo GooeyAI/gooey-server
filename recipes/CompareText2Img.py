@@ -12,7 +12,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     guidance_scale_setting,
     instruct_pix2pix_settings,
     sd_2_upscaling_setting,
-    num_outputs_and_quality_settings,
+    num_outputs_and_quality_settings, output_resolution_setting,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
@@ -179,8 +179,8 @@ class CompareText2ImgPage(BasePage):
         )
 
         negative_prompt_setting()
-        num_outputs_and_quality_settings(max_num_outputs=4)
         output_resolution_setting()
+        num_outputs_and_quality_settings(max_num_outputs=4)
         sd_2_upscaling_setting()
         col1, col2 = st.columns(2)
         with col1:
