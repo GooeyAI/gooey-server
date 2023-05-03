@@ -2,7 +2,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import requests
-import streamlit as st
+import streamlit2 as st
 
 from daras_ai.core import daras_ai_step_computer, daras_ai_step_config
 from daras_ai.image_input import (

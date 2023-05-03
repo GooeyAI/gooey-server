@@ -1,6 +1,6 @@
 import ast
 import parse
-import streamlit as st
+import streamlit2 as st
 from glom import glom
 from html2text import html2text
 

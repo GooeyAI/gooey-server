@@ -5,13 +5,13 @@ import os
 
 import django
 import sentry_sdk
-import streamlit as st
+import streamlit2 as st
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from furl import furl
-from streamlit import runtime
-from streamlit.runtime.scriptrunner import get_script_run_ctx
-from streamlit.web.server.browser_websocket_handler import BrowserWebSocketHandler
+from streamlit2 import runtime
+from streamlit2 import get_script_run_ctx
+from streamlit2 import BrowserWebSocketHandler
 
 from daras_ai_v2.copy_to_clipboard_button_widget import st_like_btn_css_html
 from daras_ai_v2.hidden_html_widget import hidden_html_js, hidden_html_nojs
@@ -73,12 +73,6 @@ textarea, input[type=text] {
 
 .streamlit-expanderHeader p {
     font-size: 1.1rem;
-}
-
-video, img {
-    max-width: 350px;
-    max-height: 350px;
-    border-radius: 5px;
 }
 
 .stSpinner * {
@@ -223,7 +217,7 @@ parent.document.addEventListener("click", (e) => {
                 "photo_url": current_user.photo_url,
             }
         )
-        scope.set_extra("ws_request", get_websocket_request())
+        # scope.set_extra("ws_request", get_websocket_request())
         scope.set_extra("query_params", gooey_get_query_params())
         scope.add_event_processor(_event_processor)
 

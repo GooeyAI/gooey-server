@@ -1,5 +1,5 @@
 import requests
-import streamlit as st
+import streamlit2 as st
 from furl import furl
 
 from daras_ai_v2 import settings

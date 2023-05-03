@@ -2,10 +2,10 @@ import os.path
 from functools import wraps
 
 import numpy as np
-import streamlit as st
+import streamlit2 as st
 from furl import furl
-from streamlit.runtime.state import get_session_state
-from streamlit.runtime.uploaded_file_manager import UploadedFile
+from streamlit2 import get_session_state
+from streamlit2 import UploadedFile
 
 
 def patch(*targets):
@@ -71,7 +71,10 @@ def file_uploader_patch(self, *args, upload_key=None, **kwargs):
     return retval
 
 
-def _render_preview(file: list | UploadedFile | str | None):
+def _render_preview(
+    file,
+    # : list | UploadedFile | str | None
+):
     from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 
     if isinstance(file, list):

@@ -6,8 +6,7 @@ from copy import deepcopy
 from time import time
 
 import requests
-import streamlit as st
-import streamlit.components.v1 as components
+import streamlit2 as st
 from google.cloud import firestore
 
 from daras_ai.computer import run_compute_steps
@@ -60,7 +59,7 @@ def fork_me():
     fork_doc_ref.set(fork_state)
     list_all_docs()  # refresh list of docs
 
-    components.html(
+    st.html(
         f"""
         <script>
             let new_url = window.top.location.href.split("?")[0] + "?id={fork_doc_id}";

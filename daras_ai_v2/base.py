@@ -11,7 +11,7 @@ from time import time, sleep
 
 import requests
 import sentry_sdk
-import streamlit as st
+import streamlit2 as st
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from furl import furl
@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
-from streamlit.runtime.scriptrunner import add_script_run_ctx
+from streamlit2 import add_script_run_ctx
 
 from daras_ai.secret_key_checker import is_admin
 from daras_ai_v2 import db
@@ -42,7 +42,8 @@ from daras_ai_v2.html_spinner_widget import (
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
+
+# from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import (
     gooey_reset_query_parm,
     gooey_get_query_params,
@@ -143,7 +144,8 @@ class BasePage:
             sentry_sdk.capture_exception(e)
             raise
         finally:
-            ensure_hidden_widgets_loaded()
+            pass
+            # ensure_hidden_widgets_loaded()
 
     def _render(self):
         with sentry_sdk.configure_scope() as scope:
@@ -154,7 +156,7 @@ class BasePage:
 
         self._user_disabled_check()
 
-        self._realtime_subscribe()
+        # self._realtime_subscribe()
         self._load_session_state()
         self._check_if_flagged()
 

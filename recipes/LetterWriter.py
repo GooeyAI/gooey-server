@@ -2,7 +2,7 @@ import json
 import typing
 
 import requests
-import streamlit as st
+import streamlit2 as st
 from pydantic.main import BaseModel
 
 from daras_ai.text_format import daras_ai_format_str

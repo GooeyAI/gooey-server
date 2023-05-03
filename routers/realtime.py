@@ -3,7 +3,7 @@ import uuid
 
 import redis
 import redis.asyncio
-import streamlit as st
+import streamlit2 as st
 from fastapi import APIRouter
 from furl import furl
 from starlette.responses import StreamingResponse

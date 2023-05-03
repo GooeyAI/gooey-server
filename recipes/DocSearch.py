@@ -12,12 +12,12 @@ import numpy as np
 import pandas as pd
 import pdftotext
 import requests
-import streamlit as st
+import streamlit2 as st
 from furl import furl
 from googleapiclient.errors import HttpError
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pydantic import BaseModel
-from streamlit.runtime.uploaded_file_manager import UploadedFile
+from streamlit2 import UploadedFile
 
 from daras_ai.face_restoration import map_parallel
 from daras_ai.image_input import upload_st_file, upload_file_from_bytes

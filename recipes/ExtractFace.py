@@ -1,5 +1,5 @@
 import cv2
-import streamlit as st
+import streamlit2 as st
 
 from daras_ai.extract_face import extract_face_cv2, extract_and_reposition_face_cv2
 from daras_ai.image_input import (

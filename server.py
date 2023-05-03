@@ -10,7 +10,7 @@ from time import time
 from traceback import print_exc
 
 import httpx
-import streamlit as st
+import streamlit2 as st
 from fastapi import FastAPI, Form, Depends
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -58,10 +58,12 @@ from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from gooey_token_authentication1.token_authentication import api_auth_header
 from routers import billing, facebook, talkjs, realtime
+import Home
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
 app.include_router(realtime.router, include_in_schema=False)
+app.include_router(Home.app, include_in_schema=False)
 app.include_router(billing.router, include_in_schema=False)
 app.include_router(talkjs.router, include_in_schema=False)
 app.include_router(facebook.router, include_in_schema=False)

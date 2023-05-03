@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit2 as st
 
 
 def _dummy_deco(fn=None, *args, **kwargs):

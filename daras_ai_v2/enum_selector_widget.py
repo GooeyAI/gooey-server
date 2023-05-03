@@ -1,7 +1,7 @@
 import enum
 from typing import TypeVar, Type
 
-import streamlit as st
+import streamlit2 as st
 
 from daras_ai_v2.grid_layout_widget import grid_layout
 

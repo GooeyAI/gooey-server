@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit2 as st
 import json
 from base64 import b64decode
 
@@ -6,7 +6,7 @@ import itsdangerous
 from firebase_admin import auth
 from itsdangerous import BadSignature
 from starlette.requests import cookie_parser
-from streamlit.web.server.websocket_headers import _get_websocket_headers
+from streamlit2 import _get_websocket_headers
 
 from auth_backend import (
     FIREBASE_SESSION_COOKIE,
@@ -17,6 +17,7 @@ from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 
 
 def get_anonymous_user() -> auth.UserRecord | None:
+    return auth.get_user_by_email("dev@dara.network")
     session = get_request_session()
     uid = session.get(ANONYMOUS_USER_COOKIE, {}).get("uid")
     if not uid:
@@ -27,6 +28,7 @@ def get_anonymous_user() -> auth.UserRecord | None:
 
 
 def get_current_user() -> auth.UserRecord | None:
+    return auth.get_user_by_email("dev@dara.network")
     session = get_request_session()
     if not session:
         return None

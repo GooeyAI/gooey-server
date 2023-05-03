@@ -5,7 +5,7 @@ import types
 from functools import wraps
 from pathlib import Path
 
-import streamlit as st
+import streamlit2 as st
 import typing
 
 OUTPUT_STEPS = "output_steps"

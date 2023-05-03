@@ -1,6 +1,6 @@
 import typing
 
-import streamlit as st
+import streamlit2 as st
 from jinja2.lexer import whitespace_re
 from pydantic import BaseModel
 

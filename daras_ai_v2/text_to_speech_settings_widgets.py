@@ -1,6 +1,6 @@
 from enum import Enum
 
-import streamlit as st
+import streamlit2 as st
 from google.cloud import texttospeech
 
 from daras_ai_v2.enum_selector_widget import enum_selector

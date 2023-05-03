@@ -3,7 +3,7 @@ import typing
 import requests
 
 from pydantic import BaseModel
-import streamlit as st
+import streamlit2 as st
 
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage

@@ -1,5 +1,7 @@
-import streamlit as st
-from streamlit_option_menu import option_menu
+import streamlit2 as st
+
+# from streamlit_option_menu import option_menu
+from streamlit2 import option_menu
 
 
 class MenuTabs:

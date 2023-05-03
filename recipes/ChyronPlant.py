@@ -1,5 +1,5 @@
 import openai
-import streamlit as st
+import streamlit2 as st
 from decouple import config
 from pydantic import BaseModel
 

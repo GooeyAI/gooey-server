@@ -1,5 +1,5 @@
-import streamlit as st
-from streamlit.runtime.uploaded_file_manager import UploadedFile
+import streamlit2 as st
+from streamlit2 import UploadedFile
 
 from daras_ai.image_input import upload_st_file
 from daras_ai_v2 import settings
