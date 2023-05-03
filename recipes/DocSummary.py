@@ -225,7 +225,7 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
     )
 
     # to merge 2 outputs, we need to have at least 1/3 of the max tokens available
-    max_tokens_bound = model_max_tokens[model] // 3 - prompt_token_count
+    max_tokens_bound = (model_max_tokens[model] - prompt_token_count) // 3
     assert request.max_tokens <= max_tokens_bound, (
         f"To summarize accurately, output size must be at max {max_tokens_bound} for {model.value}, "
         f"but got {request.max_tokens}. Please reduce the output size."
