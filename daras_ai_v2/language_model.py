@@ -39,6 +39,9 @@ class LargeLanguageModels(Enum):
     text_babbage_001 = "Babbage"
     text_ada_001 = "Ada"
 
+    def is_chat_model(self) -> bool:
+        return self in [LargeLanguageModels.gpt_3_5_turbo, LargeLanguageModels.gpt_4]
+
 
 engine_names = {
     LargeLanguageModels.gpt_4: "gpt-4",
@@ -49,10 +52,6 @@ engine_names = {
     LargeLanguageModels.text_babbage_001: "text-babbage-001",
     LargeLanguageModels.text_ada_001: "text-ada-001",
 }
-
-
-def is_chat_model(model: LargeLanguageModels) -> bool:
-    return model in [LargeLanguageModels.gpt_3_5_turbo, LargeLanguageModels.gpt_4]
 
 
 model_max_tokens = {
@@ -66,14 +65,36 @@ model_max_tokens = {
 }
 
 
-def calc_gpt_tokens(text: str) -> int:
+def calc_gpt_tokens(
+    text: str | list[str] | dict | list[dict],
+    *,
+    sep: str = "",
+    is_chat_model: bool = True,
+) -> int:
     local = threading.local()
     try:
         enc = local.gpt2enc
     except AttributeError:
         enc = tiktoken.get_encoding("gpt2")
         local.gpt2enc = enc
-    return len(enc.encode(text))
+    if isinstance(text, (str, dict)):
+        messages = [text]
+    else:
+        messages = text
+    combined = sep.join(
+        content
+        for entry in messages
+        if (
+            content := (
+                format_chatml_message(entry) + "\n"
+                if is_chat_model
+                else entry.get("content", "")
+            )
+            if isinstance(entry, dict)
+            else str(entry)
+        )
+    )
+    return len(enc.encode(combined))
 
 
 F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
@@ -116,6 +137,8 @@ def do_retry(
 def get_embeddings(
     texts: list[str], engine: str = "text-embedding-ada-002"
 ) -> list[list[float]]:
+    # replace newlines, which can negavely affect performance
+    texts = [t.replace("\n", " ") for t in texts]
     res = openai.Embedding.create(input=texts, engine=engine)
     return [record["embedding"] for record in res["data"]]
 
@@ -190,10 +213,11 @@ def run_language_model(
                 },
             )
     model = LargeLanguageModels[model]
-    if is_chat_model(model):
+    if model.is_chat_model():
         if messages:
             is_chatml = False
         else:
+            # if input is chatml, parse out the json messages
             is_chatml, messages = parse_chatml(prompt)
         messages = _run_chat_model(
             engine=engine_names[model],
@@ -205,6 +229,7 @@ def run_language_model(
             avoid_repetition=avoid_repetition,
         )
         return [
+            # return messages back as either chatml or json messages
             format_chatml_message(entry) if is_chatml else entry["content"]
             for entry in messages
         ]
@@ -223,7 +248,7 @@ def run_language_model(
 
 
 def format_chatml_message(entry: ConversationEntry) -> str:
-    msg = CHATML_START_TOKEN + entry["role"]
+    msg = CHATML_START_TOKEN + entry.get("role", "")
     content = entry.get("content")
     if content:
         msg += "\n" + content + CHATML_END_TOKEN

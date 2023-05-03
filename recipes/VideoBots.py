@@ -36,7 +36,6 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISSTANT,
     CHATML_ROLE_USER,
     CHATML_ROLE_SYSTEM,
-    is_chat_model,
     model_max_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
@@ -480,7 +479,7 @@ Use this for prompting GPT to use the document search results.
         if not user_input:
             return
         model = LargeLanguageModels[request.selected_model]
-        use_chat_model = is_chat_model(model)
+        is_chat_model = model.is_chat_model()
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
@@ -495,40 +494,7 @@ Use this for prompting GPT to use the document search results.
         # parse the bot script
         system_message, scripted_msgs = parse_script(bot_script)
 
-        # get user/bot display names
-        try:
-            bot_display_name = scripted_msgs[-1]["display_name"]
-        except IndexError:
-            bot_display_name = CHATML_ROLE_ASSISSTANT
-        try:
-            user_display_name = scripted_msgs[-2]["display_name"]
-        except IndexError:
-            user_display_name = CHATML_ROLE_USER
-
-        # add user input to conversation
-        state["raw_input_text"] = user_input
-        saved_msgs.append(
-            {
-                "role": CHATML_ROLE_USER,
-                "display_name": user_display_name,
-                "content": user_input,
-            }
-        )
-
-        # if documents are provided, run doc search on the entire conversation and get back the references
-        references = None
-        if request.documents:
-            # formulate the search query as a history of all the messages
-            state["search_query"] = "\n\n".join(msg["content"] for msg in saved_msgs)
-            # perform doc search
-            references = yield from get_top_k_references(
-                DocSearchPage.RequestModel.parse_obj(state)
-            )
-            state["references"] = references
-
-        prompt_messages = []
-
-        # add the system message
+        # consturct the system prompt
         if system_message:
             # # replace current user's name
             # current_user = st.session_state.get("_current_user")
@@ -540,26 +506,68 @@ Use this for prompting GPT to use the document search results.
             utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
             system_message = system_message.replace("{{ datetime.utcnow }}", utcnow)
             # insert to top
-            prompt_messages.append(
-                {"role": CHATML_ROLE_SYSTEM, "content": system_message}
+            system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": system_message}
+        else:
+            system_prompt = None
+
+        # get user/bot display names
+        try:
+            bot_display_name = scripted_msgs[-1]["display_name"]
+        except IndexError:
+            bot_display_name = CHATML_ROLE_ASSISSTANT
+        try:
+            user_display_name = scripted_msgs[-2]["display_name"]
+        except IndexError:
+            user_display_name = CHATML_ROLE_USER
+
+        # construct user prompt
+        state["raw_input_text"] = user_input
+        user_prompt = {
+            "role": CHATML_ROLE_USER,
+            "display_name": user_display_name,
+            "content": user_input,
+        }
+
+        # if documents are provided, run doc search on the saved msgs and get back the references
+        references = None
+        if request.documents:
+            # formulate the search query as a history of all the messages
+            query_msgs = saved_msgs + [user_prompt]
+            clip_idx = convo_window_clipper(
+                query_msgs, max(request.max_tokens * 4, 4000), sep=" "
+            )
+            query_msgs = reversed(query_msgs[clip_idx:])
+            state["search_query"] = "\n---\n".join(msg["content"] for msg in query_msgs)
+            # perform doc search
+            references = yield from get_top_k_references(
+                DocSearchPage.RequestModel.parse_obj(state)
+            )
+            state["references"] = references
+        # if doc search is successful, add the search results to the user prompt
+        if references:
+            user_prompt["content"] = (
+                references_as_prompt(references)
+                + f"\n**********\n{request.task_instructions.strip()}\n**********\n"
+                + user_prompt["content"]
             )
 
-        prompt_messages += scripted_msgs
-        prompt_messages += saved_msgs
-
-        # if doc search is successful, add the search results to the last message
-        if references:
-            prompt_messages[-1] = {
-                **prompt_messages[-1],
-                "content": (
-                    references_as_prompt(references)
-                    + f"\n**********\n{request.task_instructions.strip()}\n**********\n"
-                    + prompt_messages[-1]["content"]
-                ),
-            }
+        # truncate the history to fit the model's max tokens
+        safety_buffer = 100
+        history_window = scripted_msgs + saved_msgs
+        max_history_tokens = (
+            model_max_tokens[model]
+            - calc_gpt_tokens([system_prompt, user_prompt], is_chat_model=is_chat_model)
+            - request.max_tokens
+            - safety_buffer
+        )
+        clip_idx = convo_window_clipper(
+            history_window, max_history_tokens, is_chat_model=is_chat_model
+        )
+        history_window = history_window[clip_idx:]
+        prompt_messages = [system_prompt, *history_window, user_prompt]
 
         # for backwards compat with non-chat models
-        if not use_chat_model:
+        if not is_chat_model:
             # assistant prompt to triger a model response
             prompt_messages.append(
                 {
@@ -569,16 +577,20 @@ Use this for prompting GPT to use the document search results.
                 }
             )
 
+        # final prompt to display
         prompt = "\n".join(format_chatml_message(entry) for entry in prompt_messages)
         state["final_prompt"] = prompt
+
         # ensure input script is not too big
-        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(prompt)
+        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(
+            prompt_messages, is_chat_model=is_chat_model
+        )
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
             raise ValueError("Input Script is too long! Please reduce the script size.")
 
         yield f"Running {model.value}..."
-        if use_chat_model:
+        if is_chat_model:
             output_text = run_language_model(
                 model=request.selected_model,
                 messages=[
@@ -602,12 +614,19 @@ Use this for prompting GPT to use the document search results.
                 stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
             )
         # save model response
-        saved_msgs.append(
-            {
-                "role": CHATML_ROLE_ASSISSTANT,
-                "display_name": bot_display_name,
-                "content": output_text[0],
-            }
+        saved_msgs.extend(
+            [
+                {
+                    "role": CHATML_ROLE_USER,
+                    "display_name": user_display_name,
+                    "content": user_input,
+                },
+                {
+                    "role": CHATML_ROLE_ASSISSTANT,
+                    "display_name": bot_display_name,
+                    "content": output_text[0],
+                },
+            ]
         )
         # save message history
         if not clear_msgs:
@@ -781,3 +800,20 @@ Use this for prompting GPT to use the document search results.
                         }
                     snapshot.reference.update(update)
             st.success("Done ✅")
+
+
+def convo_window_clipper(
+    window: list[ConversationEntry],
+    max_tokens,
+    *,
+    sep: str = "",
+    is_chat_model: bool = True,
+    step=2,
+):
+    for i in range(len(window) - 2, -1, -step):
+        if (
+            calc_gpt_tokens(window[i:], sep=sep, is_chat_model=is_chat_model)
+            > max_tokens
+        ):
+            return i + step
+    return 0

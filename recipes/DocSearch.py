@@ -247,7 +247,7 @@ def get_top_k_references(
         the top k documents
     """
     yield f"Getting query embeddings..."
-    query_embeds = get_embeddings_cached(request.search_query)[0]
+    query_embeds = get_embeddings_cached([request.search_query])[0]
     yield "Getting document embeddings..."
     input_docs = request.documents or []
     nested_embeds: list[list[tuple[SearchReference, list[float]]]] = map_parallel(
