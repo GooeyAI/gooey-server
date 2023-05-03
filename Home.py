@@ -6,12 +6,11 @@ import streamlit2 as st
 
 app = APIRouter()
 
-cache = None
-
 
 @app.get("/render/")
 def render() -> st.RenderTree:
-    global cache
+    cache = None
+    # global cache
     if not cache:
         try:
             main()
