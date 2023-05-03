@@ -1,7 +1,8 @@
 import sys
+import threading
 import types
 import typing
-from functools import partial
+from functools import partial, lru_cache
 from textwrap import dedent
 
 import streamlit
@@ -21,7 +22,14 @@ RenderTree = list[RenderTreeElement]
 
 
 class Context:
-    render_tree: RenderTree = []
+    def __init__(self):
+        self.render_tree: RenderTree = []
+
+
+try:
+    context = threading.local().context
+except AttributeError:
+    context = threading.local().context = Context()
 
 
 class Base:
@@ -59,7 +67,7 @@ class StComponentMock(Base):
             args=args,
             repr=call_repr,
         )
-        Context.render_tree.append(elem)
+        context.render_tree.append(elem)
         tabs = [
             RenderTreeElement(
                 name="st.tab",
@@ -82,7 +90,7 @@ class StComponentMock(Base):
             args=args,
             repr=call_repr,
         )
-        Context.render_tree.append(elem)
+        context.render_tree.append(elem)
         total_weight = sum(spec)
         columns = [
             RenderTreeElement(
@@ -100,14 +108,14 @@ class StComponentMock(Base):
         if args and isinstance(args[0], str):
             args = (dedent(args[0]).strip(),) + args[1:]
         call_repr = pretty_call_repr(self.name, args, kwargs)
-        # print(">", call_repr)
+        print(">", call_repr)
         elem = RenderTreeElement(
             name=self.name,
             args=args,
             kwargs=kwargs,
             repr=call_repr,
         )
-        Context.render_tree.append(elem)
+        context.render_tree.append(elem)
         return self.__class__(call_repr, elem)
 
     def __getitem__(self, item):
@@ -116,12 +124,12 @@ class StComponentMock(Base):
         return self.__class__(__repr__)
 
     def __enter__(self, *args, **kwargs):
-        self._parent = Context.render_tree
-        Context.render_tree = self.elem.children
+        self._parent = context.render_tree
+        context.render_tree = self.elem.children
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        Context.render_tree = self._parent
+        context.render_tree = self._parent
         del self._parent
         return False
 
@@ -136,20 +144,20 @@ class StMock(StComponentMock, types.ModuleType):
     def experimental_get_query_params(self):
         return self._query_params
 
-    # _query_params = {}
-    _query_params = {"page_slug": ["video-bots"]}
+    _query_params = {}
+    # _query_params = {"page_slug": ["video-bots"]}
     session_state = {}
-    render_tree = Context.render_tree
+    render_tree = context.render_tree
 
     def cache_data(self, fn=None, *args, **kwargs):
         if not fn:
-            return partial(self.cache_data, *args, **kwargs)
-        return fn
+            return lru_cache
+        return lru_cache(fn)
 
     def cache_resource(self, fn=None, *args, **kwargs):
         if not fn:
-            return partial(self.cache_resource, *args, **kwargs)
-        return fn
+            return lru_cache
+        return lru_cache(fn)
 
 
 sys.modules["streamlit2"] = StMock("st")

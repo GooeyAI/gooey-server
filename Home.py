@@ -2,21 +2,28 @@ from pprint import pprint
 
 from fastapi import FastAPI, APIRouter
 from pydantic import BaseModel
+from starlette.requests import Request
+
 import streamlit2 as st
 
 app = APIRouter()
 
 
+# cache = None
+
+
 @app.get("/render/")
-def render() -> st.RenderTree:
-    cache = None
+def render(request: Request) -> st.RenderTree:
     # global cache
-    if not cache:
-        try:
-            main()
-        except SystemExit:
-            pass
-        cache = st.render_tree
+    # if not cache:
+    st._query_params = dict(request.query_params)
+    st.render_tree.clear()
+    st.session_state.clear()
+    try:
+        main()
+    except SystemExit:
+        pass
+    cache = st.render_tree
     print(cache)
     return cache
 
@@ -41,7 +48,7 @@ def main():
     #
     query_params = st.experimental_get_query_params()
     try:
-        page_slug = normalize_slug(query_params["page_slug"][0])
+        page_slug = normalize_slug(query_params["page_slug"])
     except KeyError:
         pass
     else:
