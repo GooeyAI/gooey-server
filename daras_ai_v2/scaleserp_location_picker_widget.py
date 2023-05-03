@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit2 as st
 
 from recipes.scale_serp import scaleserp_locations_list
 

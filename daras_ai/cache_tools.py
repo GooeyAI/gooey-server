@@ -1,7 +1,7 @@
 from functools import wraps
 from threading import Thread
 
-import streamlit as st
+import streamlit2 as st
 
 
 def cache_and_refresh(fn):

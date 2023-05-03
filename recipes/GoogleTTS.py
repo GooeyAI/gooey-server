@@ -1,5 +1,5 @@
 import uuid
-import streamlit as st
+import streamlit2 as st
 from google.cloud import texttospeech
 from enum import Enum
 

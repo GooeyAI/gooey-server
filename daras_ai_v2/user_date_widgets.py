@@ -1,6 +1,6 @@
 import datetime
 
-from streamlit import markdown
+from streamlit2 import markdown
 
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 

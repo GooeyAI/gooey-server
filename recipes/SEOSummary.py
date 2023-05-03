@@ -5,7 +5,7 @@ from functools import partial
 
 import readability
 import requests
-import streamlit as st
+import streamlit2 as st
 from bs4 import BeautifulSoup
 from furl import furl
 from html_sanitizer import Sanitizer

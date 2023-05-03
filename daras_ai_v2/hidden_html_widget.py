@@ -1,5 +1,5 @@
-import streamlit as st
-import streamlit.components.v1 as components
+import streamlit2 as st
+from streamlit2 import components
 
 
 def hidden_html_nojs(raw_html: str):
@@ -21,7 +21,7 @@ def hidden_html_js(raw_html: str, is_static=False):
             + raw_html
         )
 
-    components.html(
+    st.html(
         raw_html,
         height=0,
         width=0,

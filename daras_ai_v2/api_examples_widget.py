@@ -3,7 +3,7 @@ import pprint
 import shlex
 from textwrap import indent
 
-import streamlit as st
+import streamlit2 as st
 
 from gooey_token_authentication1.token_authentication import auth_keyword
 

@@ -1,7 +1,7 @@
 import random
 
 import replicate
-import streamlit as st
+import streamlit2 as st
 
 
 from daras_ai.core import daras_ai_step_config, daras_ai_step_computer

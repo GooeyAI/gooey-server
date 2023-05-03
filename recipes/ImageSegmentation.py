@@ -5,7 +5,7 @@ import PIL
 import cv2
 import numpy as np
 import requests
-import streamlit as st
+import streamlit2 as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import (

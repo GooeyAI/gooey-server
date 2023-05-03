@@ -1,7 +1,7 @@
 import random
 import typing
 
-import streamlit as st
+import streamlit2 as st
 from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage

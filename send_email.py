@@ -4,7 +4,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from os.path import basename
 
-import streamlit as st
+import streamlit2 as st
 from decouple import config
 
 from daras_ai.image_input import upload_file_from_bytes

@@ -1,6 +1,6 @@
 import random
 
-import streamlit as st
+import streamlit2 as st
 
 
 def text_outputs(

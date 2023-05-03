@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit2 as st
 
 
 def youtube_video(video_id: str):

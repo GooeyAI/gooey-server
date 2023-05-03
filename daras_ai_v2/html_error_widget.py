@@ -1,6 +1,6 @@
 from textwrap import dedent
 
-import streamlit as st
+import streamlit2 as st
 
 
 def html_error(body, icon="⚠️"):

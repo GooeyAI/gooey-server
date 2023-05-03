@@ -1,10 +1,10 @@
 import typing
 from enum import Enum
 
-import streamlit as st
+import streamlit2 as st
 from llama_index.langchain_helpers.text_splitter import SentenceSplitter
 from pydantic import BaseModel
-from streamlit.runtime.uploaded_file_manager import UploadedFile
+from streamlit2 import UploadedFile
 
 from daras_ai.image_input import upload_st_file
 from daras_ai_v2.GoogleGPT import render_outputs, GoogleGPTPage

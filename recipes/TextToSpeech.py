@@ -4,7 +4,7 @@ import time
 import typing
 
 import requests
-import streamlit as st
+import streamlit2 as st
 from google.cloud import texttospeech
 from pydantic import BaseModel
 

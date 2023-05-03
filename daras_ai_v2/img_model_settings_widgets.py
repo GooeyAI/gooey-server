@@ -1,6 +1,6 @@
 import math
 
-import streamlit as st
+import streamlit2 as st
 
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.stable_diffusion import (

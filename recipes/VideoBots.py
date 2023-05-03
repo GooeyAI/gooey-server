@@ -4,10 +4,10 @@ import os.path
 import re
 import typing
 
-import streamlit as st
+import streamlit2 as st
 from furl import furl
 from pydantic import BaseModel
-from streamlit.runtime.uploaded_file_manager import UploadedFile
+from streamlit2 import UploadedFile
 
 from daras_ai.image_input import (
     truncate_text_words,

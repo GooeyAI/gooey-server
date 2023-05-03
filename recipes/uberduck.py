@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 from os.path import basename
 
 import requests
-import streamlit as st
+import streamlit2 as st
 from decouple import config
 
 

@@ -3,7 +3,7 @@ import json
 import json
 
 import openai
-import streamlit as st
+import streamlit2 as st
 from decouple import config
 
 from daras_ai.core import daras_ai_step_computer

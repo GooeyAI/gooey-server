@@ -7,7 +7,7 @@ from os.path import basename
 import requests
 from decouple import config
 from firebase_admin.auth import UserRecord
-from streamlit.runtime.uploaded_file_manager import UploadedFile
+from streamlit2 import UploadedFile
 
 from daras_ai_v2 import settings
 from daras_ai_v2.settings import templates

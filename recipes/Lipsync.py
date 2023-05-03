@@ -1,7 +1,7 @@
 import typing
 from pathlib import Path
 
-import streamlit as st
+import streamlit2 as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes, safe_filename, upload_st_file

@@ -112,11 +112,18 @@ def do_retry(
     return decorator
 
 
+whitespace_re = re.compile(r"\s+")
+
+
 @do_retry()
 def get_embeddings(
     texts: list[str], engine: str = "text-embedding-ada-002"
 ) -> list[list[float]]:
+    # replace newlines, which can negatively affect performance.
+    texts = [whitespace_re.sub(" ", text) for text in texts]
+    # create the embeddings
     res = openai.Embedding.create(input=texts, engine=engine)
+    # return the embedding vectors
     return [record["embedding"] for record in res["data"]]
 
 

@@ -1,6 +1,6 @@
 import secrets
 
-from streamlit.components.v1 import html
+from streamlit2 import html
 
 st_like_btn_css_html = """
 <style>

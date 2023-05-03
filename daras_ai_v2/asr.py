@@ -4,7 +4,7 @@ import tempfile
 from enum import Enum
 
 import requests
-import streamlit as st
+import streamlit2 as st
 from furl import furl
 from google.cloud import speech_v1p1beta1
 from google.cloud import translate, translate_v2

@@ -4,14 +4,14 @@ import typing
 import uuid
 
 import requests
-import streamlit as st
+import streamlit2 as st
 from furl import furl
 from pydantic import BaseModel
 
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.gpu_server import GpuEndpoints
+from daras_ai_v2.gpu_server import GpuEndpoints, call_gooey_gpu
 from daras_ai_v2.loom_video_widget import youtube_video
 
 
@@ -389,13 +389,38 @@ Use the Camera Settings to generate animations with depth and other 3D parameter
         display = "\n\n".join(
             [f"[{fp['frame']}] {fp['prompt']}" for fp in animation_prompts]
         )
-        st.markdown("```lua\n" + display + "\n```")
+        st.markdown("```lua\n" + display + "\n```", style="color: green;")
 
         st.video(state.get("output_video"))
 
     def run(self, state: dict):
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
+
+        state["output_video"] = call_gooey_gpu(
+            endpoint=GpuEndpoints.defourm_sd,
+            filename=str(request.animation_prompts),
+            content_type="video/mp4",
+            pipeline=dict(
+                model_id="Protogen_V2.2.ckpt",
+                seed=request.seed,
+            ),
+            inputs=dict(
+                animation_mode=request.animation_mode,
+                animation_prompts={
+                    fp["frame"]: fp["prompt"] for fp in request.animation_prompts
+                },
+                max_frames=request.max_frames,
+                zoom=request.zoom,
+                translation_x=request.translation_x,
+                translation_y=request.translation_y,
+                rotation_3d_x=request.rotation_3d_x,
+                rotation_3d_y=request.rotation_3d_y,
+                rotation_3d_z=request.rotation_3d_z,
+                translation_z="0:(0)",
+                fps=request.fps,
+            ),
+        )
 
         blob = storage_blob_for(f"gooey.ai animation {request.animation_prompts}.mp4")
 

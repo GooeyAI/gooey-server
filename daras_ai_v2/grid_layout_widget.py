@@ -1,6 +1,6 @@
 import typing
 
-import streamlit as st
+import streamlit2 as st
 
 
 def _default_sep():

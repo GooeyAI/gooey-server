@@ -4,7 +4,7 @@ import typing
 from time import time
 
 import httpx
-import streamlit as st
+import streamlit2 as st
 from fastapi import FastAPI, Depends
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -74,10 +74,12 @@ from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
 from routers import billing, facebook, talkjs, realtime
+import Home
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
 app.include_router(realtime.router, include_in_schema=False)
+app.include_router(Home.app, include_in_schema=False)
 app.include_router(billing.router, include_in_schema=False)
 app.include_router(talkjs.router, include_in_schema=False)
 app.include_router(facebook.router, include_in_schema=False)

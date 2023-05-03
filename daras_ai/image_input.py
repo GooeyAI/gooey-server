@@ -6,10 +6,10 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import streamlit as st
+import streamlit2 as st
 from PIL import Image, ImageOps
 from firebase_admin import storage
-from streamlit.runtime.uploaded_file_manager import UploadedFile
+from streamlit2 import UploadedFile
 
 from daras_ai.core import daras_ai_step_config, daras_ai_step_io
 from daras_ai_v2 import settings

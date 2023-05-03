@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit2 as st
 
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 
