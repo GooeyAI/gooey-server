@@ -102,7 +102,7 @@ class TextToSpeechPage(BasePage):
         if audio_url:
             st.audio(audio_url)
         else:
-            st.empty()
+            st.div()
 
     def run(self, state: dict):
         text = state["text_prompt"].strip()

@@ -199,7 +199,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             for img in out_imgs:
                 st.image(img, caption="Generated Image")
         else:
-            st.empty()
+            st.div()
 
     def render_steps(self):
         image_urls = st.session_state.get("image_urls")
@@ -207,13 +207,13 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             st.write("**Image URLs**")
             st.json(image_urls, expanded=False)
         else:
-            st.empty()
+            st.div()
 
         selected_image = st.session_state.get("selected_image")
         if selected_image:
             st.image(selected_image, caption="Selected Image")
         else:
-            st.empty()
+            st.div()
 
     def render_example(self, state: dict):
         st.write(

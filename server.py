@@ -10,7 +10,6 @@ from time import time
 from traceback import print_exc
 
 import httpx
-import streamlit2 as st
 from fastapi import FastAPI, Form, Depends
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +34,8 @@ from starlette.responses import (
     FileResponse,
 )
 
+import Home
+import streamlit2 as st
 from auth_backend import (
     SessionAuthBackend,
     FIREBASE_SESSION_COOKIE,
@@ -58,7 +59,6 @@ from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from gooey_token_authentication1.token_authentication import api_auth_header
 from routers import billing, facebook, talkjs, realtime
-import Home
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 

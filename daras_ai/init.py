@@ -5,16 +5,13 @@ import os
 
 import django
 import sentry_sdk
-import streamlit2 as st
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from furl import furl
-from streamlit2 import runtime
-from streamlit2 import get_script_run_ctx
-from streamlit2 import BrowserWebSocketHandler
 
+import streamlit2 as st
 from daras_ai_v2.copy_to_clipboard_button_widget import st_like_btn_css_html
-from daras_ai_v2.hidden_html_widget import hidden_html_js, hidden_html_nojs
+from daras_ai_v2.hidden_html_widget import hidden_html_nojs
 from daras_ai_v2.html_spinner_widget import html_spinner_css
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
@@ -25,169 +22,7 @@ def init_scripts():
     st.set_page_config(layout="wide")
 
     # remove fullscreen button and footer
-    hidden_html_nojs(
-        # language=html
-        """
-<style>
-button[kind="primary"] {
-    background-color: #b2ebf2;
-    text-shadow: 0 0 0 black;
-    color: transparent;  
-}
-
-.element-container {
-    opacity:1 !important
-}
-
-.row-widget:has(button[kind="primary"]) {
-    text-align: right;
-}
-
-button[title="View fullscreen"], footer {
-    visibility: hidden;
-}
-
-textarea, input[type=text] {
-    -webkit-text-fill-color: white !important;
-    color: white !important;
-}
-
-.stMultiSelect [data-baseweb=select] span {
-    max-width: 500px;
-    color: black;
-}
-
-.stTabs [data-baseweb=tab] p {
-    font-size: 1.2rem;
-} 
-.stTabs [data-baseweb=tab] {
-    padding: 25px 0;
-    padding-right: 10px;
-} 
-.stTabs [data-baseweb=tab-list] {
-    overflow-y: hidden;
-}
-.stTabs [data-baseweb=tab-border] {
-    margin-bottom: 10px;
-}
-
-.streamlit-expanderHeader p {
-    font-size: 1.1rem;
-}
-
-.stSpinner * {
-    font-size: 1.1rem;
-}
-
-.stCodeBlock {
-    margin-bottom: 1rem;
-}
-.stCodeBlock * code {
-    white-space: pre-wrap !important;
-}
-.stCodeBlock pre {
-    padding: 0.75rem !important;
-}
-.stCodeBlock pre div {
-    max-height: 500px;
-    overflow-x: clip;
-    overflow-y: scroll;
-}
-
-.stTooltipIcon * svg {
-    display: none !important;
-}
-        
-.gooey-output-text {
-    background-color: rgb(32, 32, 32);
-    overflow-y: scroll;
-    border-radius: 5px;
-    margin-bottom: 1rem;
-}
-.gooey-output-text p {
-    padding: 0.75rem;
-    margin: 0;
-    white-space: pre-wrap;
-}
-
-sup {
-    font-size: 80%%;
-    line-height: 0;
-    position: relative;
-    vertical-align: initial;
-    top: -0.5em;
-    padding: 0 2px;
-}
-sup a {
-    text-decoration: none;
-    font-weight: bold;
-    color: #03dac5;
-    padding: 0 1px;
-}
-sup a:hover {
-    color: #acd9d6;
-}
-
-/* make the pubsub rerun component invisible */
-div iframe[title="pubsub_component.pubusb_rerunner"] {
-    display: none;
-}
-
-.pretty-json-container {
-    font-family: monospace; 
-}
-
-.string-value { 
-    white-space: pre; 
-}
-.variable-value {
-    background-color: rgb(20, 20, 20);
-    border-radius: 5px;
-    max-width: 100%;
-    max-height: 250px; 
-    overflow: auto; 
-}
-</style>
-        """
-        + st_like_btn_css_html
-        + html_spinner_css
-    )
-
-    # for automatically resizing the iframe
-    hidden_html_js(
-        # language=html
-        """
-<script>
-const stBlock = parent.document.querySelector('[data-testid="stVerticalBlock"]');
-
-const observer = new ResizeObserver(entries => {
-    notifyHeight(entries[0].contentRect.height);
-});
-observer.observe(stBlock);
-
-setInterval(function() {
-    notifyHeight(stBlock.clientHeight)
-}, 500);
-
-let lastHeight = 0;
-
-function notifyHeight(height) {
-    if (lastHeight == height) return;
-    lastHeight = height;
-    top.postMessage({ type: "GOOEY_IFRAME_RESIZE", height: height }, "*");
-}
-</script>
-
-<script>
-parent.document.addEventListener("click", (e) => {
-    if (e.target.tagName == "IMG") {
-        window.open(e.target.src);                    
-    }
-});
-</script>
-        """,
-        is_static=True,
-    )
+    hidden_html_nojs(st_like_btn_css_html + html_spinner_css)
 
     if "_current_user" not in st.session_state:
         st.session_state["_current_user"] = get_current_user() or get_anonymous_user()
@@ -237,20 +72,3 @@ def _event_processor(event, hint):
             request_data["env"] = {"REMOTE_ADDR": ws_request.remote_ip}
         event["request"] = request_data
     return event
-
-
-def get_websocket_request():
-    ctx = get_script_run_ctx()
-    if ctx is None:
-        return None
-
-    session_client = runtime.get_instance().get_client(ctx.session_id)
-    if session_client is None:
-        return None
-
-    if not isinstance(session_client, BrowserWebSocketHandler):
-        raise RuntimeError(
-            f"SessionClient is not a BrowserWebSocketHandler! ({session_client})"
-        )
-
-    return session_client.request

@@ -10,11 +10,11 @@ QUERY_PARAMS_KEY = "__query_params"
 
 def gooey_get_query_params():
     try:
-        query_params = st.session_state[QUERY_PARAMS_KEY]
+        return st.session_state[QUERY_PARAMS_KEY]
     except KeyError:
-        query_params = {k: v[0] for k, v in st.experimental_get_query_params().items()}
+        query_params = st.get_query_params()
         st.session_state[QUERY_PARAMS_KEY] = query_params
-    return query_params
+        return query_params
 
 
 def gooey_reset_query_parm(**public_params):

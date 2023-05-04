@@ -32,7 +32,7 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
     db_collection = db._db.collection(db.API_KEYS_COLLECTION)
     api_keys = _load_api_keys(db_collection, user)
 
-    table_area = st.container()
+    table_area = st.div()
 
     if st.button("＋ Create new secret key"):
         with st.spinner("Generating a new API key..."):
@@ -50,16 +50,6 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
                     for api_key in api_keys
                 ],
             ),
-        )
-        # hide table index
-        hidden_html_nojs(
-            """
-            <style>
-            table {font-family:"Source Code Pro", monospace}
-            thead tr th:first-child {display:none}
-            tbody th {display:none}
-            </style>
-            """
         )
 
 

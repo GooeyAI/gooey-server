@@ -124,7 +124,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
                 st.write("**Input Text**")
                 st.write(input_text)
             else:
-                st.empty()
+                st.div()
 
             # input_audio = state.get("input_audio")
             # if input_audio:
@@ -138,7 +138,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             if output_video:
                 st.video(output_video, caption="Output Video")
             else:
-                st.empty()
+                st.div()
 
     def render_output(self):
         self.render_example(st.session_state)

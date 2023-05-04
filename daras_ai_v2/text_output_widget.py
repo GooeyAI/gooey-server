@@ -25,7 +25,7 @@ def text_outputs(
                     value=text,
                 )
         case _:
-            st.empty()
+            st.div()
 
 
 def text_output(label: str, *, value: str, height: int = 200, idx: int = 0, **kwargs):

@@ -36,7 +36,7 @@ def _patcher(fn_name, patch_fn):
 @patch(st.image, st.audio)
 def caption_patch(self, value, *args, caption=None, **kwargs):
     if not (isinstance(value, np.ndarray) or value):
-        st.empty()
+        st.div()
         return
 
     if caption:
@@ -48,7 +48,7 @@ def caption_patch(self, value, *args, caption=None, **kwargs):
 @patch(st.video)
 def video_patch(self, value, *args, caption=None, **kwargs):
     if not value:
-        st.empty()
+        st.div()
         return
 
     if caption:
@@ -71,10 +71,7 @@ def file_uploader_patch(self, *args, upload_key=None, **kwargs):
     return retval
 
 
-def _render_preview(
-    file,
-    # : list | UploadedFile | str | None
-):
+def _render_preview(file: list | UploadedFile | str | None):
     from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 
     if isinstance(file, list):

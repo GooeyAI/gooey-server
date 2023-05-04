@@ -237,7 +237,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         if st.session_state.get("email_sent"):
             st.write(f"✅ Email sent to {st.session_state.get('email_address')}")
         else:
-            st.empty()
+            st.div()
 
     def run(self, state: dict):
         request: EmailFaceInpaintingPage.RequestModel = self.RequestModel.parse_obj(

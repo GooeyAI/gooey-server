@@ -89,7 +89,7 @@ class LipsyncPage(BasePage):
         with col1:
             input_face = state.get("input_face")
             if not input_face:
-                st.empty()
+                st.div()
             elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
                 st.write("Input Face (Video)")
                 st.video(input_face)
@@ -102,7 +102,7 @@ class LipsyncPage(BasePage):
                 st.write("Input Audio")
                 st.audio(input_audio)
             else:
-                st.empty()
+                st.div()
 
         with col2:
             output_video = state.get("output_video")
@@ -110,7 +110,7 @@ class LipsyncPage(BasePage):
                 st.write("Output Video")
                 st.video(output_video)
             else:
-                st.empty()
+                st.div()
 
     def render_output(self):
         self.render_example(st.session_state)
