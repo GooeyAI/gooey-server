@@ -149,7 +149,7 @@ Prompt for merging several outputs together
                 disabled=True,
             )
         else:
-            st.empty()
+            st.div()
 
         output_text: list = st.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):

@@ -114,7 +114,7 @@ def num_outputs_setting(selected_model: str = None):
                 """
             )
         else:
-            st.empty()
+            st.div()
 
 
 RESOLUTIONS = {

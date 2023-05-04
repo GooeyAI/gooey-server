@@ -19,7 +19,7 @@ from daras_ai_v2.query_params import gooey_reset_query_parm
 
 
 def get_or_create_doc_id():
-    query_params = st.experimental_get_query_params()
+    query_params = st.get_query_params()
     doc_id = query_params.get("id", [new_doc_id()])[0]
     gooey_reset_query_parm(id=doc_id)
     return doc_id

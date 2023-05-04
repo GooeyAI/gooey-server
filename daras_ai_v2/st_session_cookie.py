@@ -6,7 +6,6 @@ import itsdangerous
 from firebase_admin import auth
 from itsdangerous import BadSignature
 from starlette.requests import cookie_parser
-from streamlit2 import _get_websocket_headers
 
 from auth_backend import (
     FIREBASE_SESSION_COOKIE,
@@ -54,6 +53,7 @@ signer = itsdangerous.TimestampSigner(str(settings.SECRET_KEY))
 
 
 def get_request_session() -> dict:
+    return {}
     # https://github.com/streamlit/streamlit/pull/5457
     headers = _get_websocket_headers()
     try:

@@ -378,7 +378,7 @@ Use the Camera Settings to generate animations with depth and other 3D parameter
             st.write("Output Video")
             st.video(output_video)
         else:
-            st.empty()
+            st.div()
 
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
@@ -389,7 +389,7 @@ Use the Camera Settings to generate animations with depth and other 3D parameter
         display = "\n\n".join(
             [f"[{fp['frame']}] {fp['prompt']}" for fp in animation_prompts]
         )
-        st.markdown("```lua\n" + display + "\n```", style="color: green;")
+        st.markdown("```lua\n" + display + "\n```")
 
         st.video(state.get("output_video"))
 

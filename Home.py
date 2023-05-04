@@ -11,21 +11,23 @@ app = APIRouter()
 
 # cache = None
 
+cache = None
+
 
 @app.get("/render/")
-def render(request: Request) -> st.RenderTree:
+def render(request: Request) -> list[st.RenderTreeNode]:
     # global cache
-    # if not cache:
-    st._query_params = dict(request.query_params)
-    st.render_tree.clear()
-    st.session_state.clear()
+    # if cache:
+    #     return cache
+    st.query_params = dict(request.query_params)
+    st.render_root = st.RenderTreeNode(name="root")
+    st.session_state = {}
     try:
         main()
     except SystemExit:
         pass
-    cache = st.render_tree
-    print(cache)
-    return cache
+    # cache = ret
+    return st.render_root.children
 
 
 def main():
@@ -46,7 +48,7 @@ def main():
 
     # try to load page from query params
     #
-    query_params = st.experimental_get_query_params()
+    query_params = st.get_query_params()
     try:
         page_slug = normalize_slug(query_params["page_slug"])
     except KeyError:
@@ -155,3 +157,13 @@ def main():
     #             """,
     #             unsafe_allow_html=True,
     #         )
+
+
+#
+# st.query_params = {}
+# st.render_root = st.RenderTreeNode(name="root")
+# st.session_state = {}
+# try:
+#     main()
+# except SystemExit:
+#     pass

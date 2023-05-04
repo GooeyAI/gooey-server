@@ -165,7 +165,7 @@ class DocSearchPage(BasePage):
                 st.write("**ScaleSERP Results**")
                 st.json(scaleserp_results, expanded=False)
             else:
-                st.empty()
+                st.div()
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
@@ -176,7 +176,7 @@ class DocSearchPage(BasePage):
                 disabled=True,
             )
         else:
-            st.empty()
+            st.div()
 
         output_text: list = st.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):

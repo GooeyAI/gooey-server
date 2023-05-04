@@ -11,6 +11,15 @@ class MenuTabs:
     history = "📖 History"
     integrations = "🔌 Integrations"
 
+    paths = {
+        run: "",
+        examples: "examples",
+        run_as_api: "api",
+        history: "history",
+        integrations: "integrations",
+    }
+    paths_reverse = {v: k for k, v in paths.items()}
+
 
 def page_tabs(*, tabs, key=None):
     selected_menu = option_menu(

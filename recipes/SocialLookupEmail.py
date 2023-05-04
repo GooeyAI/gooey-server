@@ -211,7 +211,7 @@ class SocialLookupEmailPage(BasePage):
                 expanded=False,
             )
         else:
-            st.empty()
+            st.div()
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
@@ -222,7 +222,7 @@ class SocialLookupEmailPage(BasePage):
                 height=200,
             )
         else:
-            st.empty()
+            st.div()
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)

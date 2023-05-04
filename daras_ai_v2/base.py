@@ -19,7 +19,6 @@ from pydantic import BaseModel
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
-from streamlit2 import add_script_run_ctx
 
 from daras_ai.secret_key_checker import is_admin
 from daras_ai_v2 import db
@@ -99,12 +98,14 @@ class BasePage:
         return f"{self.slug_versions[0]}#{self.version}"
 
     @classmethod
-    def app_url(cls, example_id=None, run_id=None, uid=None) -> str:
+    def app_url(cls, example_id=None, run_id=None, uid=None, tab_path=None) -> str:
         query_params = cls._clean_query_params(example_id, run_id, uid)
-        return str(
-            furl(settings.APP_BASE_URL, query_params=query_params)
-            / (cls.slug_versions[-1] + "/")
+        f = furl(settings.APP_BASE_URL, query_params=query_params) / (
+            cls.slug_versions[-1] + "/"
         )
+        if tab_path:
+            f /= tab_path
+        return str(f)
 
     @classmethod
     def _clean_query_params(cls, example_id, run_id, uid) -> dict:
@@ -168,12 +169,29 @@ class BasePage:
         )
         st.write(st.session_state.get(StateKeys.page_notes))
 
-        selected_tab = page_tabs(
-            tabs=self.get_tabs(),
-            key=StateKeys.option_menu_key,
-        )
-        self.render_selected_tab(selected_tab)
+        selected_tab_path = st.get_query_params().get("tab", "")
+        try:
+            selected_tab = MenuTabs.paths_reverse[selected_tab_path]
+        except KeyError:
+            st.error(f"## 404 - Tab {selected_tab_path!r} Not found")
+            return
 
+        tab_names = self.get_tabs()
+        st.write("---")
+        for name in tab_names:
+            bgcolor = "gray" if name == selected_tab else "transparent"
+            url = self.app_url(tab_path=MenuTabs.paths[name])
+            st.markdown(
+                # language=html
+                f"""
+<a href="{url}" 
+    style="font-size: 1.25rem; background-color: {bgcolor}">
+{name}
+</a>""",
+            )
+        st.write("---")
+
+        self.render_selected_tab(selected_tab)
         render_js_dynamic_dates()
 
     def _user_disabled_check(self):
@@ -369,12 +387,12 @@ class BasePage:
             st.experimental_rerun()
 
     def _load_session_state(self):
-        placeholder = st.empty()
+        placeholder = st.div()
 
         if st.session_state.get("__loaded__"):
             return
 
-        with placeholder.container(), st.spinner("Loading Settings..."):
+        with placeholder, st.spinner("Loading Settings..."):
             query_params = gooey_get_query_params()
             doc = self.get_doc_from_query_params(query_params)
 
@@ -531,7 +549,7 @@ class BasePage:
             with col1:
                 self.render_description()
             with col2:
-                placeholder = st.empty()
+                placeholder = st.div()
                 try:
                     self.render_steps()
                 except NotImplementedError:
@@ -541,7 +559,7 @@ class BasePage:
                         st.write("##### 👣 Steps")
 
     def _render_help(self):
-        placeholder = st.empty()
+        placeholder = st.div()
         try:
             self.render_usage_guide()
         except NotImplementedError:
@@ -661,8 +679,8 @@ class BasePage:
             submitted = True
 
         if submitted:
-            placeholder = st.empty()
-            with placeholder.container():
+            placeholder = st.div()
+            with placeholder:
                 html_spinner("Starting...")
             run_id, uid = self._pre_run_checklist()
             # scroll_to_spinner()
@@ -706,7 +724,6 @@ class BasePage:
             return
 
         t = Thread(target=self._run_thread, args=[run_id, uid])
-        add_script_run_ctx(t)
         t.start()
 
     def _run_thread(self, run_id, uid):
