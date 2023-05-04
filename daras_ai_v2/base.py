@@ -60,8 +60,11 @@ from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_da
 from routers.realtime import realtime_subscribe, realtime_set
 
 DEFAULT_META_IMG = (
+    # Small
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/optimized%20hp%20gif.gif"
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
+    # Big
+    # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
 )
 MAX_SEED = 4294967294
 gooey_rng = Random()
