@@ -1,33 +1,4 @@
-from pprint import pprint
-
-from fastapi import FastAPI, APIRouter
-from pydantic import BaseModel
-from starlette.requests import Request
-
 import streamlit2 as st
-
-app = APIRouter()
-
-
-# cache = None
-
-cache = None
-
-
-@app.get("/render/")
-def render(request: Request) -> list[st.RenderTreeNode]:
-    # global cache
-    # if cache:
-    #     return cache
-    st.query_params = dict(request.query_params)
-    st.render_root = st.RenderTreeNode(name="root")
-    st.session_state = {}
-    try:
-        main()
-    except SystemExit:
-        pass
-    # cache = ret
-    return st.render_root.children
 
 
 def main():
@@ -61,9 +32,6 @@ def main():
         else:
             page().render()
         st.stop()
-    from furl import furl
-    from google.cloud.firestore_v1 import DocumentSnapshot
-    from daras_ai.db import list_all_docs
     from daras_ai_v2 import settings
     from daras_ai_v2.face_restoration import map_parallel
     from recipes.CompareText2Img import CompareText2ImgPage
@@ -112,11 +80,12 @@ def main():
         page, example_doc = args
 
         st.markdown(
+            # language=html
             f"""
-                    <a style="font-size: 24px" href="{page.app_url()}" target = "_top">
-                        <h2>{page.title}</h2>
-                    </a>
-                    """,
+<a style="font-size: 24px" href="{page.app_url()}" target = "_top">
+    <h2>{page.title}</h2>
+</a>
+            """,
             unsafe_allow_html=True,
         )
 
@@ -129,41 +98,3 @@ def main():
         page.render_example(example_doc)
 
     grid_layout(3, zip(pages, all_examples), _render)
-    # with st.expander("Early Recipes"):
-    #     for snapshot in list_all_docs():
-    #         snapshot: DocumentSnapshot
-    #
-    #         recipe_id = snapshot.id
-    #         doc = snapshot.to_dict()
-    #
-    #         if doc.get("header_is_hidden"):
-    #             continue
-    #         name = doc.get("header_title", doc.get(""))
-    #         if not name:
-    #             continue
-    #
-    #         tagline = doc.get("header_tagline", "")
-    #         editor_url = (
-    #             furl(settings.APP_BASE_URL, query_params={"id": recipe_id}) / "Editor/"
-    #         )
-    #
-    #         st.markdown(
-    #             f"""
-    #             <a style="font-size: 24px" href="{editor_url}" target = "_top">
-    #                 {name}
-    #             </a>
-    #             <br>
-    #             <i>{tagline}</i>
-    #             """,
-    #             unsafe_allow_html=True,
-    #         )
-
-
-#
-# st.query_params = {}
-# st.render_root = st.RenderTreeNode(name="root")
-# st.session_state = {}
-# try:
-#     main()
-# except SystemExit:
-#     pass

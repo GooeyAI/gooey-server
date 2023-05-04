@@ -77,7 +77,6 @@ from routers import billing, facebook, talkjs, realtime
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
 app.include_router(realtime.router, include_in_schema=False)
-app.include_router(Home.app, include_in_schema=False)
 app.include_router(billing.router, include_in_schema=False)
 app.include_router(talkjs.router, include_in_schema=False)
 app.include_router(facebook.router, include_in_schema=False)
@@ -414,19 +413,6 @@ def call_api(
     }
 
 
-@app.get("/explore/", include_in_schema=False)
-def st_home(request: Request):
-    iframe_url = furl(settings.IFRAME_BASE_URL).url
-    return _st_page(
-        request,
-        iframe_url,
-        context={
-            "title": "Explore - Gooey.AI",
-            "image": DEFAULT_META_IMG,
-        },
-    )
-
-
 @app.get("/Editor/", include_in_schema=False)
 def st_editor(request: Request):
     iframe_url = furl(settings.IFRAME_BASE_URL) / "Editor"
@@ -438,8 +424,21 @@ def st_editor(request: Request):
     )
 
 
+@app.get("/explore/", include_in_schema=False)
+def explore():
+    st.query_params = {}
+    st.render_root = st.RenderTreeNode(name="root")
+    st.session_state = {}
+    try:
+        Home.main()
+    except SystemExit:
+        pass
+    return st.render_root.children
+
+
 @app.get("/{page_slug}/", include_in_schema=False)
-def st_page(request: Request, page_slug):
+@app.get("/{page_slug}/{tab}/", include_in_schema=False)
+def st_page(request: Request, page_slug, tab=""):
     lookup = normalize_slug(page_slug)
     try:
         page_cls = page_map[lookup]
@@ -453,6 +452,15 @@ def st_page(request: Request, page_slug):
     state = page.get_doc_from_query_params(dict(request.query_params))
     if state is None:
         raise HTTPException(status_code=404)
+
+    st.query_params = dict(request.query_params) | {"page_slug": page_slug, "tab": tab}
+    st.render_root = st.RenderTreeNode(name="root")
+    st.session_state = state
+    try:
+        Home.main()
+    except SystemExit:
+        pass
+    return st.render_root.children
 
     iframe_url = furl(
         settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
