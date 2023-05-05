@@ -87,7 +87,7 @@ def cache_resource(fn=None, *args, **kwargs):
 def html(body: str, height: int = None, width: int = None):
     RenderTreeNode(
         name="html",
-        style=dict(height=f"{height}px", width=width),
+        style=dict(height=f"{height}px", width=f"{width}px"),
         props=dict(body=body),
     ).mount()
 
@@ -197,7 +197,7 @@ def image(
         return
     RenderTreeNode(
         name="img",
-        style=dict(width=width),
+        style=dict(width=f"{width}px"),
         props=dict(src=src, caption=caption, alt=alt),
     ).mount()
 
