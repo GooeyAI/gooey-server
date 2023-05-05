@@ -52,22 +52,18 @@ all_home_pages = [
     CompareLLMPage,
 ]
 
-
 # exposed as API
 all_api_pages = all_home_pages + [
     ChyronPlantPage,
     LetterWriterPage,
 ]
 
-
 # pytest suite
-all_test_pages = {
-    *all_home_pages,
-    ChyronPlantPage,
-} - {
-    # generally too slow for tests
-    DeforumSDPage,
-}
+all_test_pages = all_api_pages
+# deprecated
+all_test_pages.remove(ChyronPlantPage)
+# too slow
+all_test_pages.remove(DeforumSDPage)
 
 
 class Workflow(models.IntegerChoices):
