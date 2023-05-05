@@ -140,7 +140,8 @@ class BotIntegration(models.Model):
         choices=Platform.choices,
         help_text="The platform that the bot is integrated with",
     )
-    fb_page_id = models.TextField(
+    fb_page_id = models.CharField(
+        max_length=256,
         blank=True,
         default=None,
         null=True,
@@ -158,7 +159,8 @@ class BotIntegration(models.Model):
         help_text="Bot's Facebook page access token (required if platform is Facebook/Instagram)",
         editable=False,
     )
-    ig_account_id = models.TextField(
+    ig_account_id = models.CharField(
+        max_length=256,
         blank=True,
         default=None,
         null=True,
@@ -175,7 +177,8 @@ class BotIntegration(models.Model):
         default="",
         help_text="Bot's WhatsApp phone number (only for display)",
     )
-    wa_phone_number_id = models.TextField(
+    wa_phone_number_id = models.CharField(
+        max_length=256,
         blank=True,
         default=None,
         null=True,
