@@ -5,6 +5,7 @@ from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
 from gooeysite.custom_fields import CustomURLField
 
 
@@ -233,8 +234,8 @@ class Message(models.Model):
     role = models.CharField(
         choices=(
             # ("system", "System"),
-            ("user", "User"),
-            ("asisstant", "Asisstant"),
+            (CHATML_ROLE_USER, "User"),
+            (CHATML_ROLE_ASSISSTANT, "Asisstant"),
         ),
         max_length=10,
     )

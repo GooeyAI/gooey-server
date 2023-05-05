@@ -65,9 +65,23 @@ class FeedbackInline(admin.TabularInline):
 class MessageAdmin(admin.ModelAdmin):
     autocomplete_fields = ["conversation"]
     search_fields = ["conversation", "role", "content"]
-    readonly_fields = ["conversation", "role", "content", "created_at"]
+    readonly_fields = [
+        "conversation",
+        "role",
+        "content",
+        "created_at",
+        "wa_msg_id",
+        "app_url",
+    ]
+    list_display = ["__str__", "role", "created_at", "feedbacks"]
+    ordering = ["-created_at"]
 
     inlines = [FeedbackInline]
+
+    def feedbacks(self, msg: models.Message):
+        return msg.feedbacks.count() or None
+
+    feedbacks.short_description = "Feedbacks"
 
 
 @admin.register(models.Feedback)
