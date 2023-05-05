@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -ex
 if [ "$RUN_DJANGO" ]; then
+  ./manage.py collectstatic
   SENTRY_ENVIRONMENT="django" gunicorn gooeysite.wsgi --bind 0.0.0.0:8000 --threads $WEB_CONCURRENCY
 else
   SENTRY_ENVIRONMENT="streamlit" streamlit run Home.py --server.address=0.0.0.0 --server.port=8501 &
