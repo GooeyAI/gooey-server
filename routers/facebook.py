@@ -375,8 +375,12 @@ def _process_msg(
     # # mock testing
     # result = _mock_api_output(input_text)
 
-    # get saved messages for context
-    saved_msgs = list(convo.messages.all().values("role", "content"))
+    # get latest messages for context (upto 100)
+    saved_msgs = list(
+        reversed(
+            convo.messages.order_by("-created_at").values("role", "content")[:100],
+        ),
+    )
     # call the api with provided input
     result = call_api(
         page_cls=page_cls,

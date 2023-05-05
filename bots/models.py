@@ -74,6 +74,7 @@ class BotIntegration(models.Model):
     )
     billing_account_uid = models.TextField(
         help_text="The gooey account uid where the credits will be deducted from",
+        db_index=True,
     )
     user_language = models.TextField(
         default="en",
@@ -84,7 +85,6 @@ class BotIntegration(models.Model):
     )
     platform = models.IntegerField(
         choices=Platform.choices,
-        db_index=True,
         help_text="The platform that the bot is integrated with",
     )
     fb_page_id = models.TextField(
@@ -134,6 +134,12 @@ class BotIntegration(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = BotIntegrationQuerySet.as_manager()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["billing_account_uid", "platform"]),
+            models.Index(fields=["fb_page_id", "ig_account_id", "wa_phone_number_id"]),
+        ]
 
     def __str__(self):
         return f"{self.name or self.wa_phone_number or self.ig_username or self.fb_page_name}"
@@ -199,8 +205,17 @@ class Conversation(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # class Meta:
-    #     unique_together = ("bot_integration", "user_id")
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=[
+                    "bot_integration",
+                    "fb_page_id",
+                    "ig_account_id",
+                    "wa_phone_number_id",
+                ]
+            ),
+        ]
 
     def __str__(self):
         display_name = (
@@ -236,6 +251,8 @@ class Message(models.Model):
 
     class Meta:
         ordering = ("created_at",)
+        get_latest_by = "created_at"
+        indexes = [models.Index(fields=["conversation", "-created_at"])]
 
     def __str__(self):
         return f"{self.role} - {Truncator(self.content).words(10)}"
