@@ -6,12 +6,13 @@ import typing
 import numpy as np
 import pandas as pd
 from furl import furl
-from streamlit.type_util import LabelVisibility, OptionSequence
+
 
 import state
 import tree
 
 T = typing.TypeVar("T")
+LabelVisibility = typing.Literal["visible", "collapsed"]
 
 
 def dummy(*args, **kwargs):
@@ -151,7 +152,11 @@ def image(
 def video(src: str, caption: str = None):
     if not src:
         return
-    src += "#t=0.001"
+    if isinstance(src, str):
+        # https://muffinman.io/blog/hack-for-ios-safari-to-display-html-video-thumbnail/
+        f = furl(src)
+        f.fragment.args["t"] = "0.001"
+        src = f.url
     tree.RenderTreeNode(
         name="video",
         props=dict(src=src, caption=caption),
@@ -198,8 +203,8 @@ def text_area(
 
 def multiselect(
     label: str,
-    options: OptionSequence[T],
-    default: OptionSequence[T] = None,
+    options: typing.Iterable[T],
+    default: typing.Iterable[T] = None,
     format_func: tree.typing.Callable[[T], tree.typing.Any] = str,
     key: str = None,
     help: str = None,
@@ -234,7 +239,7 @@ def multiselect(
 
 def selectbox(
     label: str,
-    options: OptionSequence[T],
+    options: typing.Iterable[T],
     index: int = 0,
     format_func: tree.typing.Callable[[T], tree.typing.Any] = str,
     key: str = None,
@@ -446,7 +451,7 @@ def table(df: pd.DataFrame):
 
 def radio(
     label: str,
-    options: OptionSequence[T],
+    options: typing.Iterable[T],
     index: int = 0,
     format_func: tree.typing.Callable[[T], tree.typing.Any] = str,
     key: str = None,
