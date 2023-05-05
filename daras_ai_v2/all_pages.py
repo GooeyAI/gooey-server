@@ -61,7 +61,7 @@ all_api_pages = all_home_pages + [
 # pytest suite
 all_test_pages = all_api_pages
 # deprecated
-all_test_pages.remove(ChyronPlantPage)
+all_test_pages.remove(LetterWriterPage)
 # too slow
 all_test_pages.remove(DeforumSDPage)
 
