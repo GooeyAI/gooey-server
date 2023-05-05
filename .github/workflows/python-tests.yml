@@ -24,11 +24,13 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update && sudo apt-get install -y --no-install-recommends \
-            python3-opencv \
             libmagickwand-dev \
             libgl1-mesa-glx \
             build-essential libpoppler-cpp-dev pkg-config python3-dev \
-            pandoc
+            python3-opencv \
+            pandoc \
+            postgresql-client \
+            ffmpeg
 
     - name: Install python dependencies
       run: |

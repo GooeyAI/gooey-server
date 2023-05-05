@@ -27,6 +27,7 @@ RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.03.0.tar.xz' | tar -xJ
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-opencv \
     pandoc \
+    postgresql-client \
 	ffmpeg \
 	&& rm -rf /var/lib/apt/lists/*
 
