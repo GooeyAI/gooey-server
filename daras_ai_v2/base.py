@@ -1122,7 +1122,7 @@ class BasePage:
             return
 
         st.write("#### 🎁 Example Response")
-        st.json(response_body)
+        st.json(response_body, expanded=True)
 
         st.write("---")
         st.write("### 🔐 API keys")

@@ -315,6 +315,42 @@ def radio(
     return bool(value)
 
 
+def multiselect(
+    label: str,
+    options: OptionSequence[T],
+    default: OptionSequence[T] = None,
+    format_func: typing.Callable[[T], typing.Any] = str,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+) -> T:
+    if not options:
+        return None
+    options = list(options)
+    if key:
+        value = session_state.get(key)
+    else:
+        value = None
+    value = value or default
+    RenderTreeNode(
+        name="multiselect",
+        props=dict(
+            label=dedent(label),
+            disabled=disabled,
+            name=key,
+            defaultValue=[
+                {"value": item, "label": str(format_func(item))} for item in value or []
+            ],
+            options=[
+                {"value": option, "label": str(format_func(option))}
+                for option in options
+            ],
+        ),
+    ).mount()
+    return value
+
+
 def selectbox(
     label: str,
     options: OptionSequence[T],
@@ -330,7 +366,7 @@ def selectbox(
         return None
     options = list(options)
     if key:
-        value = session_state.get(key) or options[index]
+        value = session_state.get(key)
     else:
         value = None
     value = value or options[index]
@@ -567,7 +603,7 @@ def json(value: typing.Any, expanded: bool = False):
         props=dict(
             value=value,
             expanded=expanded,
-            collapseStringsAfterLength=False if expanded else 0,
+            defaultInspectDepth=3 if expanded else 1,
         ),
     ).mount()
 
