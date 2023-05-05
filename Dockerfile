@@ -15,13 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagickwand-dev \
     libgl1-mesa-glx \
 	&& rm -rf /var/lib/apt/lists/*
-RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.03.0.tar.xz' | tar -xJ \
-    && cd poppler-23.03.0 \
+RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.05.0.tar.xz' | tar -xJ \
+    && cd poppler-23.05.0 \
     && cmake . \
     && ldconfig \
     && make install \
     && cd $WORKDIR \
-    && rm -rf poppler-23.03.0
+    && rm -rf poppler-23.05.0
 
 # app dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
