@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bots", "0004_botintegration_bots_botint_fb_page_7a2a7f_idx"),
+        ("bots", "0002_remove_message_app_url_message_saved_run_and_more"),
     ]
 
     operations = [
