@@ -58,6 +58,7 @@ Django = "^4.2"
 django-phonenumber-field = {extras = ["phonenumberslite"], version = "^7.0.2"}
 gunicorn = "^20.1.0"
 psycopg2-binary = "^2.9.6"
+whitenoise = "^6.4.0"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.971"
