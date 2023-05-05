@@ -16,6 +16,7 @@ from daras_ai_v2.gpu_server import GpuEndpoints
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
+    whisper_telugu_large_v2 = "Whisper Telgu Large v2 (Bhashini)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     usm = "USM (Google)"
@@ -24,6 +25,7 @@ class AsrModels(Enum):
 asr_model_ids = {
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
     AsrModels.whisper_hindi_large_v2: "vasista22/whisper-hindi-large-v2",
+    AsrModels.whisper_telugu_large_v2: "vasista22/whisper-telugu-large-v2",
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
 }

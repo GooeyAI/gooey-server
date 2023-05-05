@@ -11,6 +11,7 @@ from starlette.responses import HTMLResponse, Response
 
 from bots.models import BotIntegration, Platform, Message, Conversation, Feedback
 from daras_ai_v2 import settings, db
+from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot, BotInterface
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
@@ -264,10 +265,17 @@ def _on_msg(bot: BotInterface):
                 from server import call_api
 
                 # run asr
-                if bot.language == "hi":
-                    selected_model = "nemo_hindi"
-                else:
-                    selected_model = "whisper_large_v2"
+                asr_lang = None
+                match bot.language.lower():
+                    case "am":
+                        selected_model = AsrModels.usm.name
+                        asr_lang = "am-et"
+                    case "hi":
+                        selected_model = AsrModels.nemo_hindi.name
+                    case "te":
+                        selected_model = AsrModels.whisper_telugu_large_v2.name
+                    case _:
+                        selected_model = AsrModels.whisper_large_v2.name
                 result = call_api(
                     page_cls=AsrPage,
                     user=billing_account_user,
@@ -275,6 +283,7 @@ def _on_msg(bot: BotInterface):
                         "documents": [bot.get_input_audio()],
                         "selected_model": selected_model,
                         "google_translate_target": None,
+                        "asr_lang": asr_lang,
                     },
                     query_params={},
                 )
