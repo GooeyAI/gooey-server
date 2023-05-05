@@ -9,11 +9,11 @@ from furl import furl
 from pydantic import BaseModel
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
+from bots.models import BotIntegration, Platform
 from daras_ai.image_input import (
     truncate_text_words,
     upload_st_file,
 )
-from daras_ai_v2 import db
 from daras_ai_v2.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
     run_google_translate,
@@ -682,13 +682,10 @@ Use this for prompting GPT to use the document search results.
                 return
 
             self.messenger_bot_integration(user)
-            st.write("---")
 
-            st.text_input("#### 🤖 Landbot URL", key="landbot_url")
-            st.write("---")
             st.markdown(
                 """
-                ## How to Integrate Chatbots
+                ### How to Integrate Chatbots
                 """
             )
 
@@ -696,7 +693,7 @@ Use this for prompting GPT to use the document search results.
             with col1:
                 st.write(
                     """
-                    ### Part 1:
+                    #### Part 1:
                     [Interactive Chatbots for your Content - Part 1: Make your Chatbot - How to use Gooey.AI Workflows ](https://youtu.be/-j2su1r8pEg)
                     """
                 )
@@ -713,7 +710,7 @@ Use this for prompting GPT to use the document search results.
                 st.write(
                     """
                     
-                    ### Part 2:
+                    #### Part 2:
                     [Interactive Chatbots for your Content - Part 2: Make your Chatbot - How to use Gooey.AI Workflows ](https://youtu.be/h817RolPjq4)
                     """
                 )
@@ -727,14 +724,22 @@ Use this for prompting GPT to use the document search results.
                     unsafe_allow_html=True,
                 )
 
+            st.write("---")
+            st.text_input(
+                "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
+            )
+
         show_landbot_widget()
 
     def messenger_bot_integration(self, user):
-        st.write("### Messenger Bot")
-
         st.markdown(
             # language=html
             f"""
+<h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>       
+
+Your can connect your FB Messenger account here directly.<br>
+If you ping us at support@gooey.ai, we'll add your other accounts too!
+
 <!--
 <div style='height: 50px'>
     <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
@@ -754,52 +759,48 @@ Use this for prompting GPT to use the document search results.
 """,
             unsafe_allow_html=True,
         )
+        st.write("---")
 
-        fb_pages = st.session_state.get("__fb_pages")
-        if "__fb_pages" not in st.session_state:
-            with st.spinner("Loading Facebook Pages..."):
-                fb_pages = (
-                    db.get_collection_ref(db.CONNECTED_BOTS_COLLECTION)
-                    .where("uid", "==", user.uid)
-                    .get()
-                )
-            st.session_state["__fb_pages"] = fb_pages
-        st.write("Please reload this page after logging in.")
+        st.button("🔄 Refresh")
 
-        if not fb_pages:
+        integrations = BotIntegration.objects.filter(
+            billing_account_uid=user.uid
+        ).order_by("platform")
+        if not integrations:
             return
 
-        st.write("##### Select Pages to Connect")
-        selected_pages = {}
-
-        page_slug = self.slug_versions[0]
         query_params = dict(self._get_current_api_url().query.params)
 
-        for snapshot in fb_pages:
-            fb_page = snapshot.to_dict()
+        for bi in integrations:
+            bi_page_cls, bi_query_params = bi.parse_app_url()
             is_connected = (
-                fb_page.get("connected_page_slug") == self.slug_versions[0]
-                and fb_page.get("connected_query_params") == query_params
+                bi_page_cls == self.__class__ and bi_query_params == query_params
             )
-            selected = st.checkbox(get_page_display_name(fb_page), value=is_connected)
-            selected_pages[snapshot.id] = (snapshot, selected)
+            col1, col2, *_ = st.columns([1, 1, 2])
+            with col1:
+                favicon = Platform(bi.platform).get_favicon()
+                st.markdown(
+                    # language=html
+                    f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
+                    f"<span>{bi}</span>",
+                    unsafe_allow_html=True,
+                )
+            with col2:
+                pressed = st.button(
+                    "🔌💔️ Disconnect" if is_connected else "🖇️ Connect",
+                    help=f"Update {bi} ({bi.id})",
+                )
+            if not pressed:
+                continue
+            if is_connected:
+                bi.app_url = ""
+            else:
+                bi.app_url = self.app_url(**query_params)
+            bi.save()
+            with col2:
+                st.experimental_rerun()
 
-        if selected_pages and st.button("🖇️ Connect"):
-            with st.spinner("Connecting..."):
-                for snapshot, selected in selected_pages.values():
-                    if selected:
-                        update = {
-                            "connected_page_slug": page_slug,
-                            "connected_query_params": query_params,
-                        }
-                    else:
-                        continue  # todo: figure out the ux for disconnecting
-                        update = {
-                            "connected_page_slug": None,
-                            "connected_query_params": {},
-                        }
-                    snapshot.reference.update(update)
-            st.success("Done ✅")
+        st.write("---")
 
 
 def convo_window_clipper(

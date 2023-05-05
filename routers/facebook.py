@@ -12,7 +12,7 @@ from starlette.background import BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response
 
-from bots.models import BotIntegration, Platform, Message, Conversation
+from bots.models import BotIntegration, Platform, Message, Conversation, Feedback
 from daras_ai_v2 import settings, db
 from daras_ai_v2.asr import run_google_translate
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot, BotInterface
@@ -48,13 +48,9 @@ ERROR_MSG = """
 """.strip()
 
 
-FEEDBACK_THUMBS_UP_MSG = (
-    "🙏 Thanks! Your feedback helps us make Farmer.CHAT better. How else can I help you?"
+FEEDBACK_MSG = (
+    "🙏 Thanks! Your feedback helps us make {bot_name} better. How else can I help you?"
 )
-# FEEDBACK_THUMBS_DOWN_MSG = (
-#     "🤔 How could I better answer your question? What did you expect?"
-# )
-FEEDBACK_THUMBS_DOWN_MSG = "🙏 Thanks! Your feedback helps us make Farmer.CHAT better. Do you have more farming questions for me?"
 
 
 @router.get("/__/fb/connect/")
@@ -246,14 +242,25 @@ def _on_msg(bot: BotInterface):
         # handle button press
         case "interactive":
             try:
-                reply_id = bot.input_message["interactive"]["button_reply"]["id"]
-            except KeyError:
-                reply_id = None
-            match reply_id:
+                button_id = bot.input_message["interactive"]["button_reply"]["id"]
+                context_msg_id = bot.input_message["context"]["id"]
+                context_msg = Message.objects.get(wa_msg_id=context_msg_id)
+            except (KeyError, Message.DoesNotExist) as e:
+                bot.send_msg(text=ERROR_MSG.format(e))
+                return
+            bot_name = str(context_msg.conversation.bot_integration)
+            match button_id:
                 case ButtonIds.feedback_thumbs_up:
-                    bot.send_msg(text=FEEDBACK_THUMBS_UP_MSG)
+                    bot.send_msg(text=FEEDBACK_MSG.format(bot_name=bot_name))
+                    rating = Feedback.RATING_THUMBS_UP
                 case ButtonIds.feedback_thumbs_down:
-                    bot.send_msg(text=FEEDBACK_THUMBS_DOWN_MSG)
+                    bot.send_msg(text=FEEDBACK_MSG.format(bot_name=bot_name))
+                    rating = Feedback.RATING_THUMBS_DOWN
+                case _:
+                    # not sure what button was pressed, ignore
+                    bot.send_msg(text=FEEDBACK_MSG.format(bot_name="this bot"))
+                    return
+            Feedback.objects.create(message=context_msg, rating=rating)
             return
         case "audio":
             try:
@@ -299,6 +306,10 @@ def _on_msg(bot: BotInterface):
         response_audio = None
         response_video = None
     else:
+        # # mock testing
+        # msgs_to_save, response_audio, response_text, response_video = _echo(
+        #     bot, input_text
+        # )
         try:
             # make API call to gooey bots to get the response
             response_text, response_audio, response_video, msgs_to_save = _process_msg(
@@ -318,12 +329,16 @@ def _on_msg(bot: BotInterface):
     # this really shouldn't happen, but just in case it does, we should have a nice message for the user
     response_text = response_text or DEFAULT_RESPONSE
     # send the response to the user
-    bot.send_msg(
+    msg_id = bot.send_msg(
         text=response_text,
         audio=response_audio,
         video=response_video,
         buttons=_feedback_buttons() if bot.show_feedback_buttons else None,
     )
+    if not msgs_to_save:
+        return
+    if bot.platform == Platform.WHATSAPP:
+        msgs_to_save[-1].wa_msg_id = msg_id
     for msg in msgs_to_save:
         msg.save()
 
@@ -357,37 +372,31 @@ def _process_msg(
 ) -> tuple[str, str | None, str | None, list[Message]]:
     from server import call_api
 
-    # initialize variables
-    response_audio = None
-    response_video = None
+    # # mock testing
+    # result = _mock_api_output(input_text)
+
     # get saved messages for context
     saved_msgs = list(convo.messages.all().values("role", "content"))
     # call the api with provided input
-    result = {
-        "output": {
-            "output_text": ["Hello, world! https://www.youtube.com/"],
-            "raw_output_text": ["Hello, world! https://www.youtube.com/"],
-        }
-    }
-    # result = call_api(
-    #     page_cls=page_cls,
-    #     user=api_user,
-    #     request_body={
-    #         "input_prompt": input_text,
-    #         "messages": saved_msgs,
-    #         "user_language": user_language,
-    #     },
-    #     query_params=query_params,
-    # )
+    result = call_api(
+        page_cls=page_cls,
+        user=api_user,
+        request_body={
+            "input_prompt": input_text,
+            "messages": saved_msgs,
+            "user_language": user_language,
+        },
+        query_params=query_params,
+    )
     # extract response video/audio/text
     try:
         response_video = result["output"]["output_video"][0]
     except (KeyError, IndexError):
-        pass
+        response_video = None
     try:
         response_audio = result["output"]["output_audio"][0]
     except (KeyError, IndexError):
-        pass
+        response_audio = None
     raw_input_text = result["output"]["raw_input_text"]
     raw_output_text = result["output"]["raw_output_text"][0]
     response_text = result["output"]["output_text"][0]
@@ -406,3 +415,27 @@ def _process_msg(
         ),
     ]
     return response_text, response_audio, response_video, msgs_to_save
+
+
+def _echo(bot, input_text):
+    response_text = f"You said ```{input_text}```\nhttps://www.youtube.com/"
+    if bot.get_input_audio():
+        response_audio = [bot.get_input_audio()]
+    else:
+        response_audio = None
+    if bot.get_input_video():
+        response_video = [bot.get_input_video()]
+    else:
+        response_video = None
+    msgs_to_save = []
+    return msgs_to_save, response_audio, response_text, response_video
+
+
+def _mock_api_output(input_text):
+    return {
+        "output": {
+            "raw_input_text": input_text,
+            "output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
+            "raw_output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
+        }
+    }

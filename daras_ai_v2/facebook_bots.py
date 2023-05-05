@@ -2,12 +2,10 @@ import mimetypes
 import typing
 
 import requests
-from furl import furl
-from google.cloud import firestore
 
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2 import settings, db
+from daras_ai_v2 import settings
 
 WHATSAPP_AUTH_HEADER = {
     "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
@@ -34,7 +32,7 @@ class BotInterface:
         audio: str = None,
         video: str = None,
         buttons: list = None,
-    ):
+    ) -> str | None:
         raise NotImplementedError
 
     def mark_read(self):
@@ -54,21 +52,10 @@ class BotInterface:
         return f"{self.platform}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
 
     def _unpack_bot_integration(self, bi: BotIntegration):
-        from server import page_map, normalize_slug
-
-        f = furl(bi.app_url)
-        self.query_params = f.query.params
+        self.page_cls, self.query_params = bi.parse_app_url()
         self.billing_account_uid = bi.billing_account_uid
         self.language = bi.user_language
         self.show_feedback_buttons = bi.show_feedback_buttons
-
-        try:
-            page_slug = f.path.segments[-1] or f.path.segments[-2]
-            if page_slug:
-                page_slug = normalize_slug(page_slug)
-            self.page_cls = page_map[page_slug]
-        except (IndexError, KeyError):
-            self.page_cls = None
 
 
 class WhatsappBot(BotInterface):
@@ -125,8 +112,8 @@ class WhatsappBot(BotInterface):
         audio: str = None,
         video: str = None,
         buttons: list = None,
-    ):
-        send_wa_msg(
+    ) -> str | None:
+        return send_wa_msg(
             bot_number=self.bot_id,
             user_number=self.user_id,
             response_text=text,
@@ -147,7 +134,7 @@ def send_wa_msg(
     response_audio: str = None,
     response_video: str = None,
     buttons: list = None,
-):
+) -> str | None:
     if response_video:
         if buttons:
             messages = [
@@ -155,7 +142,6 @@ def send_wa_msg(
                 {
                     "body": {
                         "text": response_text,
-                        "preview_url": True,
                     },
                     "header": {
                         "type": "video",
@@ -194,7 +180,6 @@ def send_wa_msg(
                 {
                     "body": {
                         "text": response_text,
-                        "preview_url": True,
                     },
                 },
             ]
@@ -237,7 +222,7 @@ def send_wa_msg(
                     },
                 },
             ]
-    send_wa_msgs_raw(
+    return send_wa_msgs_raw(
         bot_number=bot_number,
         user_number=user_number,
         messages=messages,
@@ -264,7 +249,10 @@ def retrieve_wa_media_by_id(media_id: str) -> (bytes, str):
     return content, media_info["mime_type"]
 
 
-def send_wa_msgs_raw(*, bot_number, user_number, messages: list, buttons: list = None):
+def send_wa_msgs_raw(
+    *, bot_number, user_number, messages: list, buttons: list = None
+) -> str | None:
+    msg_id = None
     for msg in messages:
         body = {
             "messaging_product": "whatsapp",
@@ -287,7 +275,10 @@ def send_wa_msgs_raw(*, bot_number, user_number, messages: list, buttons: list =
             headers=WHATSAPP_AUTH_HEADER,
             json=body,
         )
-        print("send_wa_msgs_raw:", r.status_code, r.json())
+        confirmation = r.json()
+        print("send_wa_msgs_raw:", r.status_code, confirmation)
+        msg_id = confirmation["messages"][0]["id"]
+    return msg_id
 
 
 def wa_mark_read(bot_number: str, message_id: str):

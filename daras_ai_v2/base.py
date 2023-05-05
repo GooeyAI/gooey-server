@@ -42,7 +42,11 @@ from daras_ai_v2.html_spinner_widget import (
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
-from daras_ai_v2.query_params import gooey_reset_query_parm, gooey_get_query_params
+from daras_ai_v2.query_params import (
+    gooey_reset_query_parm,
+    gooey_get_query_params,
+    QUERY_PARAMS_KEY,
+)
 from daras_ai_v2.query_params_util import (
     extract_query_params,
     EXAMPLE_ID_QUERY_PARAM,
@@ -78,6 +82,8 @@ class StateKeys:
 
     examples_cache = "__examples_cache"
     history_cache = "__history_cache"
+
+    query_params = QUERY_PARAMS_KEY
 
 
 class BasePage:
@@ -982,7 +988,11 @@ class BasePage:
                 # preserve cache
                 cache = {
                     k: st.session_state[k]
-                    for k in [StateKeys.examples_cache, StateKeys.history_cache]
+                    for k in [
+                        StateKeys.examples_cache,
+                        StateKeys.history_cache,
+                        StateKeys.query_params,
+                    ]
                     if k in st.session_state
                 }
                 # clear state

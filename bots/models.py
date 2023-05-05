@@ -1,8 +1,10 @@
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils.text import Truncator
+from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
+from daras_ai_v2.base import BasePage
 from gooeysite.custom_fields import CustomURLField
 
 
@@ -11,24 +13,39 @@ class Platform(models.IntegerChoices):
     INSTAGRAM = (2, "Instagram & FB")
     WHATSAPP = 3
 
+    def get_favicon(self):
+        if self == Platform.WHATSAPP:
+            return f"https://static.facebook.com/images/whatsapp/www/favicon.png"
+        else:
+            return f"https://www.{self.name.lower()}.com/favicon.ico"
+
 
 class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
-    def reset_fb_pages_for_user(self, uid: str, fb_pages: list[dict]):
-        saved_ids = []
+    def reset_fb_pages_for_user(
+        self, uid: str, fb_pages: list[dict]
+    ) -> list["BotIntegration"]:
+        saved = []
         for fb_page in fb_pages:
+            fb_page_id = fb_page["id"]
+            ig_account_id = (
+                fb_page.get("instagram_business_account", {}).get("id") or ""
+            )
             # save to db / update exiting
             try:
-                bi = BotIntegration.objects.get(fb_page_id=fb_page["id"])
+                bi = BotIntegration.objects.get(
+                    Q(fb_page_id=fb_page_id) | Q(ig_account_id=ig_account_id)
+                )
             except BotIntegration.DoesNotExist:
-                bi = BotIntegration(fb_page_id=fb_page["id"])
+                bi = BotIntegration(fb_page_id=fb_page_id)
             bi.billing_account_uid = uid
             bi.fb_page_name = fb_page["name"]
             # bi.fb_user_access_token = user_access_token
             bi.fb_page_access_token = fb_page["access_token"]
-            bi.ig_account_id = fb_page.get("instagram_business_account", {}).get("id")
-            bi.ig_username = fb_page.get("instagram_business_account", {}).get(
-                "username"
+            if ig_account_id:
+                bi.ig_account_id = ig_account_id
+            bi.ig_username = (
+                fb_page.get("instagram_business_account", {}).get("username") or ""
             )
             if bi.ig_username:
                 bi.name = bi.ig_username + " & " + bi.fb_page_name
@@ -37,14 +54,15 @@ class BotIntegrationQuerySet(models.QuerySet):
                 bi.platform = Platform.FACEBOOK
                 bi.name = bi.fb_page_name
             bi.save()
-            saved_ids.append(bi.id)
+            saved.append(bi)
         # delete pages that are no longer connected for this user
         self.filter(
+            Q(platform=Platform.FACEBOOK) | Q(platform=Platform.INSTAGRAM),
             billing_account_uid=uid,
-            platform=Q(Platform.FACEBOOK) | Q(Platform.INSTAGRAM),
         ).exclude(
-            id__in=saved_ids,
+            id__in=[bi.id for bi in saved],
         ).delete()
+        return saved
 
 
 class BotIntegration(models.Model):
@@ -118,7 +136,20 @@ class BotIntegration(models.Model):
     objects = BotIntegrationQuerySet.as_manager()
 
     def __str__(self):
-        return f"{self.name or self.wa_phone_number or self.ig_username or self.fb_page_name} ({self.get_platform_display()})"
+        return f"{self.name or self.wa_phone_number or self.ig_username or self.fb_page_name}"
+
+    def parse_app_url(self) -> (BasePage | None, dict):
+        from server import normalize_slug, page_map
+
+        f = furl(self.app_url)
+        try:
+            page_slug = f.path.segments[0]
+            if page_slug:
+                page_slug = normalize_slug(page_slug)
+            page_cls = page_map[page_slug]
+        except (IndexError, KeyError):
+            page_cls = None
+        return page_cls, f.query.params
 
 
 class Conversation(models.Model):
@@ -194,6 +225,12 @@ class Message(models.Model):
     )
     content = models.TextField()
     app_url = CustomURLField(editable=False, blank=True, default="")
+
+    wa_msg_id = models.TextField(
+        blank=True,
+        default="",
+        help_text="WhatsApp message id (required if platform is WhatsApp)",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
