@@ -76,7 +76,7 @@ class WhatsappBot(BotInterface):
         bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
-            wa_phone_number_id=self.user_id,
+            wa_phone_number_id="+" + self.user_id,
         )[0]
         self._unpack_bot_integration(bi)
 
