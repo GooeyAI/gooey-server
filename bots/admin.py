@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin
 
 from bots import models
-from gooeysite.util import list_related_html_url
+from gooeysite.util import list_related_html_url, open_in_new_tab
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
@@ -24,8 +24,30 @@ class BotIntegrationAdminForm(forms.ModelForm):
         ]
 
 
+@admin.register(models.SavedRun)
+class SavedRunAdmin(admin.ModelAdmin):
+    search_fields = ["workflow", "example_id", "run_id", "uid", "view_in_firebase"]
+    readonly_fields = ["view_bots", "open_in_firebase", "open_in_gooey"]
+
+    def view_bots(self, saved_run: models.SavedRun):
+        return list_related_html_url(saved_run.botintegrations)
+
+    view_bots.short_description = "View Bots"
+
+    def open_in_firebase(self, saved_run: models.SavedRun):
+        return open_in_new_tab(saved_run.get_firebase_url())
+
+    open_in_firebase.short_description = "Open in Firebase"
+
+    def open_in_gooey(self, saved_run: models.SavedRun):
+        return open_in_new_tab(saved_run.get_app_url())
+
+    open_in_gooey.short_description = "Open in Gooey"
+
+
 @admin.register(models.BotIntegration)
 class BotIntegrationAdmin(admin.ModelAdmin):
+    autocomplete_fields = ["saved_run"]
     search_fields = [
         "name",
         "ig_account_id",
@@ -35,6 +57,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
     ]
     form = BotIntegrationAdminForm
     readonly_fields = ["view_conversations", "created_at", "updated_at"]
+    list_display = ["__str__", "platform", "wa_phone_number"]
 
     def view_conversations(self, bi: models.BotIntegration):
         return list_related_html_url(bi.conversations)
@@ -71,7 +94,7 @@ class MessageAdmin(admin.ModelAdmin):
         "content",
         "created_at",
         "wa_msg_id",
-        "app_url",
+        "saved_run",
     ]
     list_display = ["__str__", "role", "created_at", "feedbacks"]
     ordering = ["-created_at"]

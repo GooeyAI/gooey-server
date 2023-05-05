@@ -141,35 +141,3 @@ def get_doc_ref(
         sub_collection = doc_ref.collection(sub_collection_id)
         doc_ref = sub_collection.document(sub_document_id)
     return doc_ref
-
-
-def get_user_msgs(*, bot_id: str, user_id: str) -> list:
-    doc_ref = get_doc_ref(
-        collection_id=USER_CHAT_HISTORY_COLLECTION,
-        document_id=f"{bot_id}:{user_id}",
-    )
-    doc = doc_ref.get()
-    if doc.exists:
-        return doc.to_dict().get("messages", [])
-    return []
-
-
-def save_user_msgs(
-    *,
-    bot_id: str,
-    user_id: str,
-    messages: list,
-    # platform: BOT_PLATFORM_LITERAL,
-):
-    doc_ref = get_doc_ref(
-        collection_id=USER_CHAT_HISTORY_COLLECTION,
-        document_id=f"{bot_id}:{user_id}",
-    )
-    doc_ref.set(
-        {
-            "platform": platform,
-            "bot_id": bot_id,
-            "user_id": user_id,
-            "messages": messages,
-        }
-    )

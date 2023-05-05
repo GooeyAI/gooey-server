@@ -1,4 +1,9 @@
+import typing
+
+from django.db import models
+
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
+from daras_ai_v2.base import BasePage
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
@@ -22,6 +27,7 @@ from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
 
+# note: the ordering here matters!
 all_home_pages = [
     DocSearchPage,
     DocSummaryPage,
@@ -44,57 +50,51 @@ all_home_pages = [
     ObjectInpaintingPage,
     ImageSegmentationPage,
     CompareLLMPage,
-    # ChyronPlantPage,
 ]
 
-all_api_pages = [
+
+# exposed as API
+all_api_pages = all_home_pages + [
     ChyronPlantPage,
-    FaceInpaintingPage,
-    EmailFaceInpaintingPage,
     LetterWriterPage,
-    LipsyncPage,
-    CompareLLMPage,
-    ImageSegmentationPage,
-    TextToSpeechPage,
-    LipsyncTTSPage,
-    DeforumSDPage,
-    Img2ImgPage,
-    ObjectInpaintingPage,
-    SocialLookupEmailPage,
-    CompareText2ImgPage,
-    Text2AudioPage,
-    SEOSummaryPage,
-    GoogleImageGenPage,
-    VideoBotsPage,
-    CompareUpscalerPage,
-    GoogleGPTPage,
-    DocSearchPage,
-    DocSummaryPage,
-    AsrPage,
 ]
 
-pages_to_test = [
+
+# pytest suite
+all_test_pages = {
+    *all_home_pages,
     ChyronPlantPage,
-    FaceInpaintingPage,
-    EmailFaceInpaintingPage,
-    # LetterWriterPage, ## deprecated
-    LipsyncPage,
-    CompareLLMPage,
-    ImageSegmentationPage,
-    TextToSpeechPage,
-    LipsyncTTSPage,
-    # DeforumSDPage, ## too slow!
-    Img2ImgPage,
-    ObjectInpaintingPage,
-    SocialLookupEmailPage,
-    CompareText2ImgPage,
-    Text2AudioPage,
-    SEOSummaryPage,
-    GoogleImageGenPage,
-    VideoBotsPage,
-    CompareUpscalerPage,
-    GoogleGPTPage,
-    DocSearchPage,
-    DocSummaryPage,
-    AsrPage,
-]
+} - {
+    # generally too slow for tests
+    DeforumSDPage,
+}
+
+
+class Workflow(models.IntegerChoices):
+    DOCSEARCH = (1, DocSearchPage.__name__)
+    DOCSUMMARY = (2, DocSummaryPage.__name__)
+    GOOGLEGPT = (3, GoogleGPTPage.__name__)
+    VIDEOBOTS = (4, VideoBotsPage.__name__)
+    LIPSYNCTTS = (5, LipsyncTTSPage.__name__)
+    TEXTTOSPEECH = (6, TextToSpeechPage.__name__)
+    ASR = (7, AsrPage.__name__)
+    LIPSYNC = (8, LipsyncPage.__name__)
+    DEFORUMSD = (9, DeforumSDPage.__name__)
+    COMPARETEXT2IMG = (10, CompareText2ImgPage.__name__)
+    TEXT2AUDIO = (11, Text2AudioPage.__name__)
+    IMG2IMG = (12, Img2ImgPage.__name__)
+    FACEINPAINTING = (13, FaceInpaintingPage.__name__)
+    GOOGLEIMAGEGEN = (14, GoogleImageGenPage.__name__)
+    COMPAREUPSCALER = (15, CompareUpscalerPage.__name__)
+    SEOSUMMARY = (16, SEOSummaryPage.__name__)
+    EMAILFACEINPAINTING = (17, EmailFaceInpaintingPage.__name__)
+    SOCIALLOOKUPEMAIL = (18, SocialLookupEmailPage.__name__)
+    OBJECTINPAINTING = (19, ObjectInpaintingPage.__name__)
+    IMAGESEGMENTATION = (20, ImageSegmentationPage.__name__)
+    COMPARELLM = (21, CompareLLMPage.__name__)
+    CHYRONPLANT = (22, ChyronPlantPage.__name__)
+    LETTERWRITER = (23, LetterWriterPage.__name__)
+
+    @property
+    def page_cls(self) -> typing.Type[BasePage]:
+        return globals()[self.label]

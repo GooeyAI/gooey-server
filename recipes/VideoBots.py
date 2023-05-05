@@ -9,7 +9,6 @@ from furl import furl
 from pydantic import BaseModel
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from bots.models import BotIntegration, Platform
 from daras_ai.image_input import (
     truncate_text_words,
     upload_st_file,
@@ -54,7 +53,6 @@ from recipes.DocSearch import (
 )
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
-from routers.facebook import ig_connect_url, fb_connect_url
 
 BOT_SCRIPT_RE = re.compile(
     # start of line
@@ -732,6 +730,11 @@ Use this for prompting GPT to use the document search results.
         show_landbot_widget()
 
     def messenger_bot_integration(self, user):
+        from bots.models import BotIntegration, Platform
+        from routers.facebook import ig_connect_url, fb_connect_url
+        from daras_ai_v2.all_pages import Workflow
+        from bots.models import SavedRun
+
         st.markdown(
             # language=html
             f"""
@@ -772,9 +775,16 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
         query_params = dict(self._get_current_api_url().query.params)
 
         for bi in integrations:
-            bi_page_cls, bi_query_params = bi.parse_app_url()
             is_connected = (
-                bi_page_cls == self.__class__ and bi_query_params == query_params
+                bi.saved_run
+                and Workflow(bi.saved_run.workflow) == Workflow.VIDEOBOTS
+                and (
+                    (
+                        query_params.get("run_id") == bi.saved_run.run_id
+                        and query_params.get("uid") == bi.saved_run.uid
+                    )
+                    or (query_params.get("example_id") == bi.saved_run.example_id)
+                )
             )
             col1, col2, *_ = st.columns([1, 1, 2])
             with col1:
@@ -793,9 +803,12 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
             if not pressed:
                 continue
             if is_connected:
-                bi.app_url = ""
+                bi.saved_run = None
             else:
-                bi.app_url = self.app_url(**query_params)
+                bi.saved_run = SavedRun.objects.get_or_create(
+                    workflow=Workflow.VIDEOBOTS,
+                    **query_params,
+                )[0]
             bi.save()
             with col2:
                 st.experimental_rerun()

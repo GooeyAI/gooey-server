@@ -6,6 +6,8 @@ import requests
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
+from daras_ai_v2.all_pages import Workflow
+from daras_ai_v2.base import BasePage
 
 WHATSAPP_AUTH_HEADER = {
     "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
@@ -16,7 +18,7 @@ class BotInterface:
     input_message: dict
     platform: Platform
     billing_account_uid: str
-    page_cls: typing.Type | None
+    page_cls: typing.Type[BasePage] | None
     query_params: dict
     bot_id: str
     user_id: str
@@ -52,7 +54,10 @@ class BotInterface:
         return f"{self.platform}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
 
     def _unpack_bot_integration(self, bi: BotIntegration):
-        self.page_cls, self.query_params = bi.parse_app_url()
+        self.page_cls = Workflow(bi.saved_run.workflow).page_cls
+        self.query_params = self.page_cls.clean_query_params(
+            bi.saved_run.example_id, bi.saved_run.run_id, bi.saved_run.uid
+        )
         self.billing_account_uid = bi.billing_account_uid
         self.language = bi.user_language
         self.show_feedback_buttons = bi.show_feedback_buttons

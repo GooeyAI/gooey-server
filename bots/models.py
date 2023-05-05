@@ -1,9 +1,9 @@
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils.text import Truncator
-from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
+from daras_ai_v2.all_pages import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
 from gooeysite.custom_fields import CustomURLField
@@ -19,6 +19,52 @@ class Platform(models.IntegerChoices):
             return f"https://static.facebook.com/images/whatsapp/www/favicon.png"
         else:
             return f"https://www.{self.name.lower()}.com/favicon.ico"
+
+
+class SavedRun(models.Model):
+    workflow = models.IntegerField(choices=Workflow.choices, default=Workflow.VIDEOBOTS)
+    example_id = models.TextField(
+        default="",
+        blank=True,
+    )
+    run_id = models.TextField(
+        default="",
+        blank=True,
+    )
+    uid = models.TextField(
+        default="",
+        blank=True,
+    )
+
+    class Meta:
+        unique_together = ["workflow", "example_id", "run_id", "uid"]
+        indexes = [
+            models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
+            models.Index(fields=["workflow"]),
+            models.Index(fields=["run_id", "uid"]),
+            models.Index(fields=["example_id"]),
+        ]
+
+    def __str__(self):
+        return self.get_app_url()
+
+    def get_app_url(self):
+        page_cls = Workflow(self.workflow).page_cls
+        return page_cls.app_url(self.example_id, self.run_id, self.uid)
+
+    def get_firebase_url(self):
+        """return the url to the firebase dashboard for the document daras-ai-v2/workflow/example_id or daras-ai-v2/workflow or daras-ai-v2/uid/run_id"""
+        page = Workflow(self.workflow).page_cls()
+        if self.run_id and self.uid:
+            ref = page.run_doc_ref(self.uid, self.run_id)
+        elif self.example_id:
+            ref = page.example_doc_ref(self.example_id)
+        else:
+            ref = page.recipe_doc_ref()
+        return (
+            "https://console.firebase.google.com/project/dara-c1b52/firestore/data/"
+            + ref.path
+        )
 
 
 class BotIntegrationQuerySet(models.QuerySet):
@@ -70,8 +116,14 @@ class BotIntegration(models.Model):
     name = models.CharField(
         max_length=1024, help_text="The name of the bot (for display purposes)"
     )
-    app_url = CustomURLField(
-        help_text="The gooey run url / example url / recipe url of the bot"
+    saved_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.SET_NULL,
+        related_name="botintegrations",
+        null=True,
+        default=None,
+        blank=True,
+        help_text="The saved run that the bot is based on",
     )
     billing_account_uid = models.TextField(
         help_text="The gooey account uid where the credits will be deducted from",
@@ -144,19 +196,6 @@ class BotIntegration(models.Model):
 
     def __str__(self):
         return f"{self.name or self.wa_phone_number or self.ig_username or self.fb_page_name}"
-
-    def parse_app_url(self) -> (BasePage | None, dict):
-        from server import normalize_slug, page_map
-
-        f = furl(self.app_url)
-        try:
-            page_slug = f.path.segments[0]
-            if page_slug:
-                page_slug = normalize_slug(page_slug)
-            page_cls = page_map[page_slug]
-        except (IndexError, KeyError):
-            page_cls = None
-        return page_cls, f.query.params
 
 
 class Conversation(models.Model):
@@ -240,7 +279,16 @@ class Message(models.Model):
         max_length=10,
     )
     content = models.TextField()
-    app_url = CustomURLField(editable=False, blank=True, default="")
+
+    saved_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.SET_NULL,
+        related_name="messages",
+        null=True,
+        blank=True,
+        default=None,
+        help_text="The saved run that generated this message",
+    )
 
     wa_msg_id = models.TextField(
         blank=True,

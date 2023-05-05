@@ -1,8 +1,5 @@
-from functools import partial
-
 import glom
 import requests
-from django.db import transaction
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from firebase_admin import auth
@@ -14,7 +11,6 @@ from starlette.responses import HTMLResponse, Response
 
 from bots.models import BotIntegration, Platform, Message, Conversation, Feedback
 from daras_ai_v2 import settings, db
-from daras_ai_v2.asr import run_google_translate
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot, BotInterface
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT

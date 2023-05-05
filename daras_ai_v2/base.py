@@ -105,14 +105,14 @@ class BasePage:
 
     @classmethod
     def app_url(cls, example_id=None, run_id=None, uid=None) -> str:
-        query_params = cls._clean_query_params(example_id, run_id, uid)
+        query_params = cls.clean_query_params(example_id, run_id, uid)
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
             / (cls.slug_versions[-1] + "/")
         )
 
     @classmethod
-    def _clean_query_params(cls, example_id, run_id, uid) -> dict:
+    def clean_query_params(cls, example_id, run_id, uid) -> dict:
         query_params = {}
         if run_id and uid:
             query_params |= dict(run_id=run_id, uid=uid)
@@ -427,15 +427,15 @@ class BasePage:
         if run_id and uid:
             snapshot = self.run_doc_ref(run_id, uid).get()
         elif example_id:
-            snapshot = self._example_doc_ref(example_id).get()
+            snapshot = self.example_doc_ref(example_id).get()
         else:
             snapshot = self.get_recipe_doc()
         return snapshot.to_dict()
 
     def get_recipe_doc(self) -> firestore.DocumentSnapshot:
-        return db.get_or_create_doc(self._recipe_doc_ref())
+        return db.get_or_create_doc(self.recipe_doc_ref())
 
-    def _recipe_doc_ref(self) -> firestore.DocumentReference:
+    def recipe_doc_ref(self) -> firestore.DocumentReference:
         return db.get_doc_ref(self.doc_name)
 
     def run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
@@ -446,7 +446,7 @@ class BasePage:
             sub_document_id=run_id,
         )
 
-    def _example_doc_ref(self, example_id: str) -> firestore.DocumentReference:
+    def example_doc_ref(self, example_id: str) -> firestore.DocumentReference:
         return db.get_doc_ref(
             sub_collection_id=EXAMPLES_COLLECTION,
             document_id=self.doc_name,
@@ -651,7 +651,7 @@ class BasePage:
             args=[self.state_to_doc(st.session_state)],
         ).start()
         gooey_reset_query_parm(
-            **self._clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
+            **self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
         )
 
         return run_id, uid
@@ -830,7 +830,7 @@ class BasePage:
             with col2:
                 if st.button("🔖 Add as Example"):
                     new_example_id = get_random_doc_id()
-                    doc_ref = self._example_doc_ref(new_example_id)
+                    doc_ref = self.example_doc_ref(new_example_id)
                     gooey_reset_query_parm(example_id=new_example_id)
 
             with col3:
@@ -838,7 +838,7 @@ class BasePage:
                     "💾 Save Example & Settings"
                 ):
                     example_id = query_params[EXAMPLE_ID_QUERY_PARAM][0]
-                    doc_ref = self._example_doc_ref(example_id)
+                    doc_ref = self.example_doc_ref(example_id)
                     gooey_reset_query_parm(example_id=example_id)
 
             if not doc_ref:
@@ -1040,7 +1040,7 @@ class BasePage:
         if not pressed_delete:
             return
 
-        example = self._example_doc_ref(example_id)
+        example = self.example_doc_ref(example_id)
 
         with st.spinner("deleting..."):
             example.update({"__hidden": True})

@@ -24,7 +24,7 @@ route_paths = [
         and not route.param_convertors
         and route.endpoint not in excluded_endpoints
     )
-] + [slug for page_cls in test_apis.pages_to_test for slug in page_cls.slug_versions]
+] + [slug for page_cls in test_apis.all_test_pages for slug in page_cls.slug_versions]
 
 
 @pytest.mark.parametrize("path", route_paths)
