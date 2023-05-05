@@ -8,8 +8,8 @@ import pandas as pd
 from furl import furl
 
 
-import state
-import tree
+from . import state
+from . import tree
 
 T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]

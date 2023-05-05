@@ -1,3 +1,3 @@
-python scripts/uvicorn_run_dev.py
-nginx -c $PWD/nginx.dev.conf &
-wait
+#!/usr/bin/env bash
+
+uvicorn server:app --host 0.0.0.0 --port 8080 --reload
