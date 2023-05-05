@@ -4,7 +4,7 @@ import time
 import typing
 
 import requests
-import streamlit2 as st
+import gooey_ui as st
 from google.cloud import texttospeech
 from pydantic import BaseModel
 

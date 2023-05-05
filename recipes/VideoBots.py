@@ -4,10 +4,10 @@ import os.path
 import re
 import typing
 
-import streamlit2 as st
+import gooey_ui as st
 from furl import furl
 from pydantic import BaseModel
-from streamlit2 import UploadedFile
+from gooey_ui import UploadedFile
 
 from daras_ai.image_input import (
     truncate_text_words,

@@ -1,7 +1,7 @@
 import typing
 
 import requests
-import streamlit2 as st
+import gooey_ui as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import (

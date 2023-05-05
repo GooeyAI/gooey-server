@@ -1,4 +1,4 @@
-import streamlit2 as st
+import gooey_ui as st
 
 
 def main():

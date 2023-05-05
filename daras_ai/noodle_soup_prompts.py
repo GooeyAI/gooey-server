@@ -1,4 +1,4 @@
-import streamlit2 as st
+import gooey_ui as st
 
 from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
 from daras_ai.nsp_pantry import nsp_parse

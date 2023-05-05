@@ -6,7 +6,7 @@ from copy import deepcopy
 from time import time
 
 import requests
-import streamlit2 as st
+import gooey_ui as st
 from google.cloud import firestore
 
 from daras_ai.computer import run_compute_steps

@@ -1,6 +1,6 @@
 import ast
 import parse
-import streamlit2 as st
+import gooey_ui as st
 from glom import glom
 from html2text import html2text
 

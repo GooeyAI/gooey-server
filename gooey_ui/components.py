@@ -1,52 +1,21 @@
 import base64
 import os
-import typing
-from contextlib import contextmanager
-from functools import lru_cache
 import textwrap
+import typing
 
 import numpy as np
 import pandas as pd
 from furl import furl
-from pydantic import BaseModel
 from streamlit.type_util import LabelVisibility, OptionSequence
 
+import state
+import tree
 
-Style = dict[str, str | None]
 T = typing.TypeVar("T")
-
-query_params: dict = None
-session_state: dict = None
-render_root: "RenderTreeNode" = None
-
-
-def dedent(text: str | None) -> str | None:
-    if not text:
-        return text
-    return textwrap.dedent(text)
-
-
-class RenderTreeNode(BaseModel):
-    name: str
-    props: dict[str, typing.Any] = {}
-    children: list["RenderTreeNode"] = []
-    style: Style = {}
-
-    def mount(self) -> "RenderTreeNode":
-        render_root.children.append(self)
-        return self
-
-
-def get_query_params():
-    return query_params
-
-
-class UploadedFile:
-    pass
 
 
 def dummy(*args, **kwargs):
-    return _node_ctx(render_root)
+    return tree.nesting_ctx(tree.render_root)
 
 
 spinner = dummy
@@ -55,44 +24,21 @@ experimental_rerun = dummy
 form = dummy
 
 
-@contextmanager
-def _node_ctx(node: RenderTreeNode):
-    global render_root
-    old = render_root
-    render_root = node
-    try:
-        yield
-    finally:
-        render_root = old
-
-
-def div() -> typing.ContextManager:
-    node = RenderTreeNode(name="div")
+def div() -> tree.typing.ContextManager:
+    node = tree.RenderTreeNode(name="div")
     node.mount()
-    return _node_ctx(node)
-
-
-def cache_data(fn=None, *args, **kwargs):
-    if not fn:
-        return lru_cache
-    return lru_cache(fn)
-
-
-def cache_resource(fn=None, *args, **kwargs):
-    if not fn:
-        return lru_cache
-    return lru_cache(fn)
+    return tree.nesting_ctx(node)
 
 
 def html(body: str, height: int = None, width: int = None):
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="html",
         style=dict(height=f"{height}px", width=f"{width}px"),
         props=dict(body=body),
     ).mount()
 
 
-def write(*objs: typing.Any, unsafe_allow_html=False):
+def write(*objs: tree.typing.Any, unsafe_allow_html=False):
     for obj in objs:
         markdown(
             obj if isinstance(obj, str) else repr(obj),
@@ -101,7 +47,7 @@ def write(*objs: typing.Any, unsafe_allow_html=False):
 
 
 def markdown(body: str, *, style: dict[str, str] = None, unsafe_allow_html=False):
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="markdown",
         style=style or {},
         props=dict(body=dedent(body), unsafe_allow_html=unsafe_allow_html),
@@ -109,7 +55,7 @@ def markdown(body: str, *, style: dict[str, str] = None, unsafe_allow_html=False
 
 
 def text(body: str, *, style: dict[str, str] = None, unsafe_allow_html=False):
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="pre",
         style=style or {},
         props=dict(body=dedent(body), unsafe_allow_html=unsafe_allow_html),
@@ -150,28 +96,28 @@ def option_menu(*args, options, **kwargs):
     return tabs(options)
 
 
-def tabs(labels: list[str]) -> list[typing.ContextManager]:
-    parent = RenderTreeNode(
+def tabs(labels: list[str]) -> list[tree.typing.ContextManager]:
+    parent = tree.RenderTreeNode(
         name="tabs",
         children=[
-            RenderTreeNode(
+            tree.RenderTreeNode(
                 name="tab",
                 props=dict(label=dedent(label)),
             )
             for label in labels
         ],
     ).mount()
-    return [_node_ctx(tab) for tab in parent.children]
+    return [tree.nesting_ctx(tab) for tab in parent.children]
 
 
-def columns(spec, *, gap: str = None) -> list[typing.ContextManager]:
+def columns(spec, *, gap: str = None) -> list[tree.typing.ContextManager]:
     if isinstance(spec, int):
         spec = [1] * spec
     total_weight = sum(spec)
-    parent = RenderTreeNode(
+    parent = tree.RenderTreeNode(
         name="columns",
         children=[
-            RenderTreeNode(
+            tree.RenderTreeNode(
                 name="div",
                 style={"width": p, "flexBasis": p},
             )
@@ -180,7 +126,7 @@ def columns(spec, *, gap: str = None) -> list[typing.ContextManager]:
         ],
     )
     parent.mount()
-    return [_node_ctx(tab) for tab in parent.children]
+    return [tree.nesting_ctx(tab) for tab in parent.children]
 
 
 def image(
@@ -195,7 +141,7 @@ def image(
         src = "data:image/png;base64," + b64
     if not src:
         return
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="img",
         style=dict(width=f"{width}px"),
         props=dict(src=src, caption=caption, alt=alt),
@@ -203,19 +149,19 @@ def image(
 
 
 def video(src: str, caption: str = None):
-    if not (isinstance(src, np.ndarray) or src):
+    if not src:
         return
     src += "#t=0.001"
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="video",
         props=dict(src=src, caption=caption),
     ).mount()
 
 
 def audio(src: str, caption: str = None):
-    if not (isinstance(src, np.ndarray) or src):
+    if not src:
         return
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="audio",
         props=dict(src=src, caption=caption),
     ).mount()
@@ -233,10 +179,10 @@ def text_area(
 ) -> str:
     if key:
         assert not value, "only one of value or key can be provided"
-        value = session_state.get(key)
+        value = state.session_state.get(key)
     if label_visibility != "visible":
         label = None
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="textarea",
         style=dict(height=f"{height}px"),
         props=dict(
@@ -250,76 +196,11 @@ def text_area(
     return value or ""
 
 
-def checkbox(
-    label: str,
-    value: bool = False,
-    key: str = None,
-    help: str = None,
-    *,
-    disabled: bool = False,
-    label_visibility: LabelVisibility = "visible",
-) -> bool:
-    if key:
-        assert not value, "only one of value or key can be provided"
-        value = session_state.get(key)
-    if label_visibility != "visible":
-        label = None
-    RenderTreeNode(
-        name="input",
-        props=dict(
-            type="checkbox",
-            name=key,
-            label=dedent(label),
-            defaultValue=value,
-            help=help,
-            disabled=disabled,
-        ),
-    ).mount()
-    return bool(value)
-
-
-def radio(
-    label: str,
-    options: OptionSequence[T],
-    index: int = 0,
-    format_func: typing.Callable[[T], typing.Any] = str,
-    key: str = None,
-    help: str = None,
-    *,
-    disabled: bool = False,
-    label_visibility: LabelVisibility = "visible",
-) -> typing.Optional[T]:
-    if not options:
-        return None
-    options = list(options)
-    if key:
-        value = session_state.get(key)
-    else:
-        value = None
-    value = value or options[index]
-    if label_visibility != "visible":
-        label = None
-    markdown(label)
-    for option in options:
-        RenderTreeNode(
-            name="input",
-            props=dict(
-                type="radio",
-                name=key,
-                label=dedent(str(format_func(option))),
-                defaultValue=value,
-                help=help,
-                disabled=disabled,
-            ),
-        ).mount()
-    return bool(value)
-
-
 def multiselect(
     label: str,
     options: OptionSequence[T],
     default: OptionSequence[T] = None,
-    format_func: typing.Callable[[T], typing.Any] = str,
+    format_func: tree.typing.Callable[[T], tree.typing.Any] = str,
     key: str = None,
     help: str = None,
     *,
@@ -329,11 +210,11 @@ def multiselect(
         return None
     options = list(options)
     if key:
-        value = session_state.get(key)
+        value = state.session_state.get(key)
     else:
         value = None
     value = value or default
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="multiselect",
         props=dict(
             label=dedent(label),
@@ -355,7 +236,7 @@ def selectbox(
     label: str,
     options: OptionSequence[T],
     index: int = 0,
-    format_func: typing.Callable[[T], typing.Any] = str,
+    format_func: tree.typing.Callable[[T], tree.typing.Any] = str,
     key: str = None,
     help: str = None,
     *,
@@ -366,13 +247,13 @@ def selectbox(
         return None
     options = list(options)
     if key:
-        value = session_state.get(key)
+        value = state.session_state.get(key)
     else:
         value = None
     value = value or options[index]
     if label_visibility != "visible":
         label = None
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="select",
         props=dict(
             label=dedent(label),
@@ -380,7 +261,7 @@ def selectbox(
             disabled=disabled,
         ),
         children=[
-            RenderTreeNode(
+            tree.RenderTreeNode(
                 name="option",
                 props=dict(
                     label=dedent(str(format_func(option))),
@@ -399,10 +280,10 @@ def button(
     key: str = None,
     help: str = None,
     *,
-    type: typing.Literal["primary", "secondary"] = "secondary",
+    type: tree.typing.Literal["primary", "secondary"] = "secondary",
     disabled: bool = False,
 ) -> bool:
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="button",
         props=dict(
             label=dedent(label),
@@ -418,7 +299,7 @@ form_submit_button = button
 
 
 def expander(label: str, *, expanded: bool = False):
-    node = RenderTreeNode(
+    node = tree.RenderTreeNode(
         name="details",
         props=dict(
             label=dedent(label),
@@ -426,101 +307,7 @@ def expander(label: str, *, expanded: bool = False):
         ),
     )
     node.mount()
-    return _node_ctx(node)
-
-
-def number_input(
-    label: str,
-    min_value: float = None,
-    max_value: float = None,
-    value: float = None,
-    step: float = None,
-    key: str = None,
-    help: str = None,
-    *,
-    disabled: bool = False,
-) -> float:
-    if key:
-        assert not value, "only one of value or key can be provided"
-        value = session_state.get(key)
-    RenderTreeNode(
-        name="input",
-        props=dict(
-            type="number",
-            name=key,
-            label=dedent(label),
-            defaultValue=value,
-            help=help,
-            disabled=disabled,
-            min=min_value,
-            max=max_value,
-            step=step or (0.1 if isinstance(min_value, float) else 1),
-        ),
-    ).mount()
-    return value or 0
-
-
-def slider(
-    label: str,
-    min_value: float = None,
-    max_value: float = None,
-    value: float = None,
-    step: float = None,
-    key: str = None,
-    help: str = None,
-    *,
-    disabled: bool = False,
-) -> float:
-    if key:
-        assert not value, "only one of value or key can be provided"
-        value = session_state.get(key)
-    RenderTreeNode(
-        name="input",
-        props=dict(
-            type="range",
-            name=key,
-            label=dedent(label),
-            defaultValue=value,
-            help=help,
-            disabled=disabled,
-            min=min_value,
-            max=max_value,
-            step=step or (0.1 if isinstance(min_value, float) else 1),
-        ),
-    ).mount()
-    return value or 0
-
-
-def text_input(
-    label: str,
-    value: str = "",
-    max_chars: str = None,
-    key: str = None,
-    help: str = None,
-    *,
-    placeholder: str = None,
-    disabled: bool = False,
-    label_visibility: LabelVisibility = "visible",
-) -> str:
-    if key:
-        assert not value, "only one of value or key can be provided"
-        value = session_state.get(key)
-    if label_visibility != "visible":
-        label = None
-    RenderTreeNode(
-        name="input",
-        props=dict(
-            type="text",
-            name=key,
-            label=dedent(label),
-            defaultValue=value,
-            help=help,
-            disabled=disabled,
-            maxLength=max_chars,
-            placeholder=placeholder,
-        ),
-    ).mount()
-    return value or ""
+    return tree.nesting_ctx(node)
 
 
 def file_uploader(
@@ -534,7 +321,7 @@ def file_uploader(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
 ):
-    value = session_state.get(key)
+    value = state.session_state.get(key)
     if label_visibility != "visible":
         label = None
     if type:
@@ -543,7 +330,7 @@ def file_uploader(
         accept = ",".join(type)
     else:
         accept = None
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="input",
         props=dict(
             type="file",
@@ -559,7 +346,7 @@ def file_uploader(
     return value or ""
 
 
-def _render_preview(file: list | UploadedFile | str | None):
+def _render_preview(file: list | tree.UploadedFile | str | None):
     from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 
     if isinstance(file, list):
@@ -567,7 +354,7 @@ def _render_preview(file: list | UploadedFile | str | None):
             _render_preview(item)
         return
 
-    is_local = isinstance(file, UploadedFile)
+    is_local = isinstance(file, tree.UploadedFile)
     is_uploaded = isinstance(file, str)
 
     # determine appropriate filename
@@ -597,8 +384,8 @@ def _render_preview(file: list | UploadedFile | str | None):
                 image(file)
 
 
-def json(value: typing.Any, expanded: bool = False):
-    RenderTreeNode(
+def json(value: tree.typing.Any, expanded: bool = False):
+    tree.RenderTreeNode(
         name="json",
         props=dict(
             value=value,
@@ -609,19 +396,19 @@ def json(value: typing.Any, expanded: bool = False):
 
 
 def table(df: pd.DataFrame):
-    RenderTreeNode(
+    tree.RenderTreeNode(
         name="table",
         children=[
-            RenderTreeNode(
+            tree.RenderTreeNode(
                 name="thead",
                 children=[
-                    RenderTreeNode(
+                    tree.RenderTreeNode(
                         name="tr",
                         children=[
-                            RenderTreeNode(
+                            tree.RenderTreeNode(
                                 name="th",
                                 children=[
-                                    RenderTreeNode(
+                                    tree.RenderTreeNode(
                                         name="markdown",
                                         props=dict(body=dedent(col)),
                                     ),
@@ -632,16 +419,16 @@ def table(df: pd.DataFrame):
                     ),
                 ],
             ),
-            RenderTreeNode(
+            tree.RenderTreeNode(
                 name="tbody",
                 children=[
-                    RenderTreeNode(
+                    tree.RenderTreeNode(
                         name="tr",
                         children=[
-                            RenderTreeNode(
+                            tree.RenderTreeNode(
                                 name="td",
                                 children=[
-                                    RenderTreeNode(
+                                    tree.RenderTreeNode(
                                         name="markdown",
                                         props=dict(body=dedent(str(value))),
                                     ),
@@ -657,5 +444,182 @@ def table(df: pd.DataFrame):
     ).mount()
 
 
-def stop():
-    exit(0)
+def radio(
+    label: str,
+    options: OptionSequence[T],
+    index: int = 0,
+    format_func: tree.typing.Callable[[T], tree.typing.Any] = str,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+) -> tree.typing.Optional[T]:
+    if not options:
+        return None
+    options = list(options)
+    if key:
+        value = state.session_state.get(key)
+    else:
+        value = None
+    value = value or options[index]
+    if label_visibility != "visible":
+        label = None
+    markdown(label)
+    for option in options:
+        tree.RenderTreeNode(
+            name="input",
+            props=dict(
+                type="radio",
+                name=key,
+                label=dedent(str(format_func(option))),
+                defaultValue=value,
+                help=help,
+                disabled=disabled,
+            ),
+        ).mount()
+    return bool(value)
+
+
+def text_input(
+    label: str,
+    value: str = "",
+    max_chars: str = None,
+    key: str = None,
+    help: str = None,
+    *,
+    placeholder: str = None,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+) -> str:
+    value = _input_widget(
+        input_type="text",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        maxLength=max_chars,
+        placeholder=placeholder,
+    )
+    return value or ""
+
+
+def slider(
+    label: str,
+    min_value: float = None,
+    max_value: float = None,
+    value: float = None,
+    step: float = None,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+) -> float:
+    value = _input_widget(
+        input_type="range",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        min=min_value,
+        max=max_value,
+        step=_step_value(min_value, max_value, step),
+    )
+    return value or 0
+
+
+def number_input(
+    label: str,
+    min_value: float = None,
+    max_value: float = None,
+    value: float = None,
+    step: float = None,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+) -> float:
+    value = _input_widget(
+        input_type="number",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        min=min_value,
+        max=max_value,
+        step=_step_value(min_value, max_value, step),
+    )
+    return value or 0
+
+
+def _step_value(
+    min_value: float | None, max_value: float | None, step: float | None
+) -> float:
+    if step:
+        return step
+    elif isinstance(min_value, float) or isinstance(max_value, float):
+        return 0.1
+    else:
+        return 1
+
+
+def checkbox(
+    label: str,
+    value: bool = False,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+) -> bool:
+    value = _input_widget(
+        input_type="checkbox",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+    )
+    return bool(value)
+
+
+def _input_widget(
+    *,
+    input_type: str,
+    label: str,
+    value: tree.typing.Any = None,
+    key: str = None,
+    help: str = None,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    **kwargs,
+) -> tree.typing.Any:
+    if key:
+        assert not value, "only one of value or key can be provided"
+        value = state.session_state.get(key)
+    if label_visibility != "visible":
+        label = None
+    tree.RenderTreeNode(
+        name="input",
+        props=dict(
+            type=input_type,
+            name=key,
+            label=dedent(label),
+            defaultValue=value,
+            help=help,
+            disabled=disabled,
+            **kwargs,
+        ),
+    ).mount()
+    return value
+
+
+def dedent(text: str | None) -> str | None:
+    if not text:
+        return text
+    return textwrap.dedent(text)

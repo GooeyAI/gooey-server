@@ -3,7 +3,7 @@ import shlex
 from textwrap import indent
 
 import black
-import streamlit2 as st
+import gooey_ui as st
 from furl import furl
 
 from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url

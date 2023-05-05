@@ -3,7 +3,7 @@ from functools import partial
 
 import cv2
 import requests
-import streamlit2 as st
+import gooey_ui as st
 from pydantic import BaseModel
 
 from daras_ai.extract_face import extract_and_reposition_face_cv2

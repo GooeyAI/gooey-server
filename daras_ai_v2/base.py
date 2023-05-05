@@ -11,7 +11,7 @@ from time import time, sleep
 
 import requests
 import sentry_sdk
-import streamlit2 as st
+import gooey_ui as st
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from furl import furl

@@ -1,7 +1,7 @@
 import datetime
 import typing
 
-import streamlit2 as st
+import gooey_ui as st
 from furl import furl
 from pydantic import BaseModel
 

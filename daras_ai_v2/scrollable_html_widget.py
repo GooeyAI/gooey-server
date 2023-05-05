@@ -1,4 +1,4 @@
-from streamlit2 import html
+from gooey_ui import html
 
 
 def scrollable_html(

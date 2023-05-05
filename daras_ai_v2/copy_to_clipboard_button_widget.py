@@ -1,6 +1,6 @@
 import secrets
 
-from streamlit2 import html
+from gooey_ui import html
 
 st_like_btn_css_html = """
 <style>

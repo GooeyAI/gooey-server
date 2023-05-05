@@ -1,7 +1,7 @@
 import datetime
 
 import pandas as pd
-import streamlit2 as st
+import gooey_ui as st
 from firebase_admin import auth
 
 from daras_ai_v2 import db

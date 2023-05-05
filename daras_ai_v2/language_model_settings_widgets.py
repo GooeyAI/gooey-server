@@ -1,4 +1,4 @@
-import streamlit2 as st
+import gooey_ui as st
 
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.language_model import LargeLanguageModels

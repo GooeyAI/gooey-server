@@ -1,4 +1,4 @@
-import streamlit2 as st
+import gooey_ui as st
 
 from recipes.scale_serp import scaleserp_locations_list
 

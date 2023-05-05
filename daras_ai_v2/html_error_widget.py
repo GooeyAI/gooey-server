@@ -1,6 +1,6 @@
 from textwrap import dedent
 
-import streamlit2 as st
+import gooey_ui as st
 
 
 def html_error(body, icon="⚠️"):

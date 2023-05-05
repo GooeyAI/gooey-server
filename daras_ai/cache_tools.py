@@ -1,7 +1,7 @@
 from functools import wraps
 from threading import Thread
 
-import streamlit2 as st
+import gooey_ui as st
 
 
 def cache_and_refresh(fn):

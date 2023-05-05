@@ -1,7 +1,7 @@
-import streamlit2 as st
+import gooey_ui as st
 
 # from streamlit_option_menu import option_menu
-from streamlit2 import option_menu
+from gooey_ui import option_menu
 
 
 class MenuTabs:

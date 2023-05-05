@@ -2,10 +2,10 @@ import os.path
 from functools import wraps
 
 import numpy as np
-import streamlit2 as st
+import gooey_ui as st
 from furl import furl
-from streamlit2 import get_session_state
-from streamlit2 import UploadedFile
+from gooey_ui import get_session_state
+from gooey_ui import UploadedFile
 
 
 def patch(*targets):

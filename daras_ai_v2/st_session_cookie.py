@@ -1,4 +1,4 @@
-import streamlit2 as st
+import gooey_ui as st
 import json
 from base64 import b64decode
 

@@ -4,7 +4,7 @@ import tempfile
 from enum import Enum
 
 import requests
-import streamlit2 as st
+import gooey_ui as st
 import typing_extensions
 from furl import furl
 from google.cloud import speech_v1p1beta1

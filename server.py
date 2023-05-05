@@ -35,7 +35,7 @@ from starlette.responses import (
 )
 
 import Home
-import streamlit2 as st
+import gooey_ui as st
 from auth_backend import (
     SessionAuthBackend,
     FIREBASE_SESSION_COOKIE,

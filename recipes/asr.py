@@ -1,6 +1,6 @@
 import typing
 
-import streamlit2 as st
+import gooey_ui as st
 from jinja2.lexer import whitespace_re
 from pydantic import BaseModel
 

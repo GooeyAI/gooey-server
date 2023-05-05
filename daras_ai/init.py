@@ -9,7 +9,7 @@ from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from furl import furl
 
-import streamlit2 as st
+import gooey_ui as st
 from daras_ai_v2.copy_to_clipboard_button_widget import st_like_btn_css_html
 from daras_ai_v2.hidden_html_widget import hidden_html_nojs
 from daras_ai_v2.html_spinner_widget import html_spinner_css
@@ -60,7 +60,7 @@ def init_scripts():
 def _event_processor(event, hint):
     extra = event.get("extra")
     if extra:
-        request_data = {"data": st.session_state.to_dict()}
+        request_data = {"data": st.session_state}
         base_url = extra.get("base_url")
         if base_url:
             query_params = extra.get("query_params", {})
