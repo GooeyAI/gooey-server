@@ -9,8 +9,16 @@ from starlette.background import BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response
 
-from bots.models import BotIntegration, Platform, Message, Conversation, Feedback
+from bots.models import (
+    BotIntegration,
+    Platform,
+    Message,
+    Conversation,
+    Feedback,
+    SavedRun,
+)
 from daras_ai_v2 import settings, db
+from daras_ai_v2.all_pages import Workflow
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot, BotInterface
 from daras_ai_v2.functional import map_parallel
@@ -420,7 +428,10 @@ def _process_msg(
             conversation=convo,
             role=CHATML_ROLE_ASSISSTANT,
             content=raw_output_text,
-            app_url=result.get("url", ""),
+            saved_run=SavedRun.objects.get_or_create(
+                workflow=Workflow.VIDEOBOTS,
+                **furl(result.get("url", "")).query.params,
+            )[0],
         ),
     ]
     return response_text, response_audio, response_video, msgs_to_save
