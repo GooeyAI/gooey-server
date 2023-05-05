@@ -51,6 +51,7 @@ google-cloud-speech = "^2.19.0"
 yt-dlp = "^2023.3.4"
 llama-index = "^0.5.27"
 nltk = "^3.8.1"
+Jinja2 = "^3.1.2"
 Django = "^4.2"
 django-phonenumber-field = {extras = ["phonenumberslite"], version = "^7.0.2"}
 gunicorn = "^20.1.0"
