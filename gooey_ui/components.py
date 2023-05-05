@@ -7,16 +7,14 @@ import numpy as np
 import pandas as pd
 from furl import furl
 
-
-from . import state
-from . import tree
+from gooey_ui import state
 
 T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]
 
 
 def dummy(*args, **kwargs):
-    return tree.nesting_ctx(tree.render_root)
+    return state.nesting_ctx(state._render_root)
 
 
 spinner = dummy
@@ -25,21 +23,21 @@ experimental_rerun = dummy
 form = dummy
 
 
-def div() -> tree.typing.ContextManager:
-    node = tree.RenderTreeNode(name="div")
+def div() -> state.typing.ContextManager:
+    node = state.RenderTreeNode(name="div")
     node.mount()
-    return tree.nesting_ctx(node)
+    return state.nesting_ctx(node)
 
 
 def html(body: str, height: int = None, width: int = None):
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="html",
         style=dict(height=f"{height}px", width=f"{width}px"),
         props=dict(body=body),
     ).mount()
 
 
-def write(*objs: tree.typing.Any, unsafe_allow_html=False):
+def write(*objs: state.typing.Any, unsafe_allow_html=False):
     for obj in objs:
         markdown(
             obj if isinstance(obj, str) else repr(obj),
@@ -48,7 +46,7 @@ def write(*objs: tree.typing.Any, unsafe_allow_html=False):
 
 
 def markdown(body: str, *, style: dict[str, str] = None, unsafe_allow_html=False):
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="markdown",
         style=style or {},
         props=dict(body=dedent(body), unsafe_allow_html=unsafe_allow_html),
@@ -56,7 +54,7 @@ def markdown(body: str, *, style: dict[str, str] = None, unsafe_allow_html=False
 
 
 def text(body: str, *, style: dict[str, str] = None, unsafe_allow_html=False):
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="pre",
         style=style or {},
         props=dict(body=dedent(body), unsafe_allow_html=unsafe_allow_html),
@@ -97,28 +95,28 @@ def option_menu(*args, options, **kwargs):
     return tabs(options)
 
 
-def tabs(labels: list[str]) -> list[tree.typing.ContextManager]:
-    parent = tree.RenderTreeNode(
+def tabs(labels: list[str]) -> list[state.typing.ContextManager]:
+    parent = state.RenderTreeNode(
         name="tabs",
         children=[
-            tree.RenderTreeNode(
+            state.RenderTreeNode(
                 name="tab",
                 props=dict(label=dedent(label)),
             )
             for label in labels
         ],
     ).mount()
-    return [tree.nesting_ctx(tab) for tab in parent.children]
+    return [state.nesting_ctx(tab) for tab in parent.children]
 
 
-def columns(spec, *, gap: str = None) -> list[tree.typing.ContextManager]:
+def columns(spec, *, gap: str = None) -> list[state.typing.ContextManager]:
     if isinstance(spec, int):
         spec = [1] * spec
     total_weight = sum(spec)
-    parent = tree.RenderTreeNode(
+    parent = state.RenderTreeNode(
         name="columns",
         children=[
-            tree.RenderTreeNode(
+            state.RenderTreeNode(
                 name="div",
                 style={"width": p, "flexBasis": p},
             )
@@ -127,7 +125,7 @@ def columns(spec, *, gap: str = None) -> list[tree.typing.ContextManager]:
         ],
     )
     parent.mount()
-    return [tree.nesting_ctx(tab) for tab in parent.children]
+    return [state.nesting_ctx(tab) for tab in parent.children]
 
 
 def image(
@@ -142,7 +140,7 @@ def image(
         src = "data:image/png;base64," + b64
     if not src:
         return
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="img",
         style=dict(width=f"{width}px"),
         props=dict(src=src, caption=caption, alt=alt),
@@ -157,7 +155,7 @@ def video(src: str, caption: str = None):
         f = furl(src)
         f.fragment.args["t"] = "0.001"
         src = f.url
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="video",
         props=dict(src=src, caption=caption),
     ).mount()
@@ -166,7 +164,7 @@ def video(src: str, caption: str = None):
 def audio(src: str, caption: str = None):
     if not src:
         return
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="audio",
         props=dict(src=src, caption=caption),
     ).mount()
@@ -187,7 +185,7 @@ def text_area(
         value = state.session_state.get(key)
     if label_visibility != "visible":
         label = None
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="textarea",
         style=dict(height=f"{height}px"),
         props=dict(
@@ -205,7 +203,7 @@ def multiselect(
     label: str,
     options: typing.Iterable[T],
     default: typing.Iterable[T] = None,
-    format_func: tree.typing.Callable[[T], tree.typing.Any] = str,
+    format_func: state.typing.Callable[[T], state.typing.Any] = str,
     key: str = None,
     help: str = None,
     *,
@@ -219,7 +217,7 @@ def multiselect(
     else:
         value = None
     value = value or default
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="multiselect",
         props=dict(
             label=dedent(label),
@@ -241,7 +239,7 @@ def selectbox(
     label: str,
     options: typing.Iterable[T],
     index: int = 0,
-    format_func: tree.typing.Callable[[T], tree.typing.Any] = str,
+    format_func: state.typing.Callable[[T], state.typing.Any] = str,
     key: str = None,
     help: str = None,
     *,
@@ -258,7 +256,7 @@ def selectbox(
     value = value or options[index]
     if label_visibility != "visible":
         label = None
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="select",
         props=dict(
             label=dedent(label),
@@ -266,7 +264,7 @@ def selectbox(
             disabled=disabled,
         ),
         children=[
-            tree.RenderTreeNode(
+            state.RenderTreeNode(
                 name="option",
                 props=dict(
                     label=dedent(str(format_func(option))),
@@ -285,10 +283,10 @@ def button(
     key: str = None,
     help: str = None,
     *,
-    type: tree.typing.Literal["primary", "secondary"] = "secondary",
+    type: state.typing.Literal["primary", "secondary"] = "secondary",
     disabled: bool = False,
 ) -> bool:
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="button",
         props=dict(
             label=dedent(label),
@@ -304,7 +302,7 @@ form_submit_button = button
 
 
 def expander(label: str, *, expanded: bool = False):
-    node = tree.RenderTreeNode(
+    node = state.RenderTreeNode(
         name="details",
         props=dict(
             label=dedent(label),
@@ -312,7 +310,7 @@ def expander(label: str, *, expanded: bool = False):
         ),
     )
     node.mount()
-    return tree.nesting_ctx(node)
+    return state.nesting_ctx(node)
 
 
 def file_uploader(
@@ -335,7 +333,7 @@ def file_uploader(
         accept = ",".join(type)
     else:
         accept = None
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="input",
         props=dict(
             type="file",
@@ -351,7 +349,7 @@ def file_uploader(
     return value or ""
 
 
-def _render_preview(file: list | tree.UploadedFile | str | None):
+def _render_preview(file: list | state.UploadedFile | str | None):
     from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 
     if isinstance(file, list):
@@ -359,7 +357,7 @@ def _render_preview(file: list | tree.UploadedFile | str | None):
             _render_preview(item)
         return
 
-    is_local = isinstance(file, tree.UploadedFile)
+    is_local = isinstance(file, state.UploadedFile)
     is_uploaded = isinstance(file, str)
 
     # determine appropriate filename
@@ -389,8 +387,8 @@ def _render_preview(file: list | tree.UploadedFile | str | None):
                 image(file)
 
 
-def json(value: tree.typing.Any, expanded: bool = False):
-    tree.RenderTreeNode(
+def json(value: state.typing.Any, expanded: bool = False):
+    state.RenderTreeNode(
         name="json",
         props=dict(
             value=value,
@@ -401,19 +399,19 @@ def json(value: tree.typing.Any, expanded: bool = False):
 
 
 def table(df: pd.DataFrame):
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="table",
         children=[
-            tree.RenderTreeNode(
+            state.RenderTreeNode(
                 name="thead",
                 children=[
-                    tree.RenderTreeNode(
+                    state.RenderTreeNode(
                         name="tr",
                         children=[
-                            tree.RenderTreeNode(
+                            state.RenderTreeNode(
                                 name="th",
                                 children=[
-                                    tree.RenderTreeNode(
+                                    state.RenderTreeNode(
                                         name="markdown",
                                         props=dict(body=dedent(col)),
                                     ),
@@ -424,16 +422,16 @@ def table(df: pd.DataFrame):
                     ),
                 ],
             ),
-            tree.RenderTreeNode(
+            state.RenderTreeNode(
                 name="tbody",
                 children=[
-                    tree.RenderTreeNode(
+                    state.RenderTreeNode(
                         name="tr",
                         children=[
-                            tree.RenderTreeNode(
+                            state.RenderTreeNode(
                                 name="td",
                                 children=[
-                                    tree.RenderTreeNode(
+                                    state.RenderTreeNode(
                                         name="markdown",
                                         props=dict(body=dedent(str(value))),
                                     ),
@@ -453,13 +451,13 @@ def radio(
     label: str,
     options: typing.Iterable[T],
     index: int = 0,
-    format_func: tree.typing.Callable[[T], tree.typing.Any] = str,
+    format_func: state.typing.Callable[[T], state.typing.Any] = str,
     key: str = None,
     help: str = None,
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
-) -> tree.typing.Optional[T]:
+) -> state.typing.Optional[T]:
     if not options:
         return None
     options = list(options)
@@ -472,7 +470,7 @@ def radio(
         label = None
     markdown(label)
     for option in options:
-        tree.RenderTreeNode(
+        state.RenderTreeNode(
             name="input",
             props=dict(
                 type="radio",
@@ -597,19 +595,19 @@ def _input_widget(
     *,
     input_type: str,
     label: str,
-    value: tree.typing.Any = None,
+    value: state.typing.Any = None,
     key: str = None,
     help: str = None,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     **kwargs,
-) -> tree.typing.Any:
+) -> state.typing.Any:
     if key:
         assert not value, "only one of value or key can be provided"
         value = state.session_state.get(key)
     if label_visibility != "visible":
         label = None
-    tree.RenderTreeNode(
+    state.RenderTreeNode(
         name="input",
         props=dict(
             type=input_type,

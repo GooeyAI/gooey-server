@@ -1,52 +1,10 @@
 import ast
+
 import parse
-import gooey_ui as st
 from glom import glom
 from html2text import html2text
 
-from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
-from daras_ai.train_data_formatter import input_spec_parse_pattern
-
-
-@daras_ai_step_config("Text formatter")
-def text_format(idx, variables, state):
-    format_str = st.text_area(
-        "Format String", help=f"Format String {idx}", value=state.get("format_str", "")
-    )
-    state.update({"format_str": format_str})
-
-    output_var = st.text_input(
-        "Output variable",
-        help=f"Output ID {idx}",
-        value=state.get("output_var", ""),
-    )
-    state.update({"output_var": output_var})
-
-    do_html2text = st.checkbox(
-        "HTML -> Text",
-        value=state.get("do_html2text", False),
-        help=f"Text format HTML -> Text {idx}",
-    )
-    state.update({"do_html2text": do_html2text})
-
-    st.text_area(
-        "Output value (generated)",
-        value=variables.get(output_var, ""),
-        help=f"Text format Output value (generated) {idx}",
-        disabled=True,
-    )
-
-
-@daras_ai_step_computer
-def text_format(idx, variables, state):
-    format_str = state["format_str"]
-    output_var = state["output_var"]
-    do_html2text = state["do_html2text"]
-
-    if not output_var:
-        raise ValueError
-
-    variables[output_var] = daras_ai_format_str(format_str, variables, do_html2text)
+input_spec_parse_pattern = "{" * 5 + "}" * 5
 
 
 def daras_ai_format_str(format_str, variables, do_html2text=False):

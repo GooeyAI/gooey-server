@@ -1,20 +1,9 @@
-import gooey_ui as st
-
-
 def main():
     from daras_ai.init import init_scripts
-    from daras_ai_v2.GoogleGPT import GoogleGPTPage
-    from recipes.DocSearch import DocSearchPage
-    from recipes.DocSummary import DocSummaryPage
-    from recipes.Lipsync import LipsyncPage
-    from recipes.Text2Audio import Text2AudioPage
-    from recipes.asr import AsrPage
 
     init_scripts()
-    from daras_ai_v2.grid_layout_widget import grid_layout
-    from recipes.CompareLLM import CompareLLMPage
-    from recipes.CompareUpscaler import CompareUpscalerPage
-    from recipes.VideoBots import VideoBotsPage
+
+    import gooey_ui as st
     from server import normalize_slug, page_map
 
     # try to load page from query params
@@ -33,7 +22,21 @@ def main():
         else:
             page().render()
         st.stop()
+
+    # otherwise, render the explore page
+    #
     from daras_ai_v2 import settings
+    from daras_ai_v2.grid_layout_widget import grid_layout
+
+    from daras_ai_v2.GoogleGPT import GoogleGPTPage
+    from recipes.DocSearch import DocSearchPage
+    from recipes.DocSummary import DocSummaryPage
+    from recipes.Lipsync import LipsyncPage
+    from recipes.Text2Audio import Text2AudioPage
+    from recipes.asr import AsrPage
+    from recipes.CompareLLM import CompareLLMPage
+    from recipes.CompareUpscaler import CompareUpscalerPage
+    from recipes.VideoBots import VideoBotsPage
     from daras_ai_v2.face_restoration import map_parallel
     from recipes.CompareText2Img import CompareText2ImgPage
     from recipes.DeforumSD import DeforumSDPage
@@ -49,6 +52,7 @@ def main():
     from recipes.TextToSpeech import TextToSpeechPage
 
     assert settings.GOOGLE_APPLICATION_CREDENTIALS
+
     page_classes = [
         DocSearchPage,
         DocSummaryPage,

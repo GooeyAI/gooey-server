@@ -11,7 +11,6 @@ from time import time, sleep
 
 import requests
 import sentry_sdk
-import gooey_ui as st
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
 from furl import furl
@@ -21,7 +20,7 @@ from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
 
-from daras_ai.secret_key_checker import is_admin
+import gooey_ui as st
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -56,7 +55,7 @@ from daras_ai_v2.query_params_util import (
 )
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
-from daras_ai_v2.tabs_widget import page_tabs, MenuTabs
+from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
 from routers.realtime import realtime_subscribe, realtime_set
 
@@ -1251,3 +1250,13 @@ def err_msg_for_exc(e):
         return f"(HTTP {response.status_code}) {err_body}"
     else:
         return f"{type(e).__name__}: {e}"
+
+
+def is_admin():
+    if "_current_user" not in st.session_state:
+        return False
+    current_user: UserRecord = st.session_state["_current_user"]
+    email = current_user.email
+    if email and email in settings.ADMIN_EMAILS:
+        return True
+    return False

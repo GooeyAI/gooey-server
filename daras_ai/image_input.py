@@ -6,66 +6,12 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import gooey_ui as st
 from PIL import Image, ImageOps
 from firebase_admin import storage
-from gooey_ui import UploadedFile
 
-from daras_ai.core import daras_ai_step_config, daras_ai_step_io
+import gooey_ui as st
 from daras_ai_v2 import settings
-
-
-@daras_ai_step_config("Image input", is_input=True)
-def image_input(idx, variables, state):
-    var_name = st.text_input(
-        "Variable Name",
-        value=state.get("var_name", "image_input"),
-        help=f"Image name {idx}",
-    )
-    state.update({"var_name": var_name})
-
-    # col1, col2 = st.columns(2)
-    # with col1:
-    #     resize_width = int(
-    #         st.number_input(
-    #             "Resize Width",
-    #             step=1,
-    #             value=state.get("resize_width", 512),
-    #             help=f"Resize Width {idx}",
-    #         )
-    #     )
-    #     state.update({"resize_width": resize_width})
-    # with col2:
-    #     resize_height = int(
-    #         st.number_input(
-    #             "Resize Height",
-    #             step=1,
-    #             value=state.get("resize_height", 512),
-    #             help=f"Resize Width {idx}",
-    #         )
-    #     )
-    #     state.update({"resize_height": resize_height})
-    #
-
-
-@daras_ai_step_io
-def image_input(idx, variables, state):
-    var_name = state.get("var_name", "")
-    # resize_width = state["resize_width"]
-    # resize_height = state["resize_height"]
-    if not var_name:
-        return
-    if var_name not in variables:
-        variables[var_name] = None
-
-    uploaded_file = st.file_uploader(var_name, help=f"Image input {var_name} {idx + 1}")
-    if uploaded_file:
-        image_url = upload_file(uploaded_file)
-        variables[var_name] = image_url
-
-    image_url = variables.get(var_name)
-    if image_url:
-        st.image(variables[var_name], width=300)
+from gooey_ui import UploadedFile
 
 
 # @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})

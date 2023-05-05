@@ -40,14 +40,12 @@ from auth_backend import (
     SessionAuthBackend,
     FIREBASE_SESSION_COOKIE,
 )
-from daras_ai.computer import run_compute_steps
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings, db
 from daras_ai_v2.all_pages import all_api_pages
 from daras_ai_v2.base import (
     BasePage,
     err_msg_for_exc,
-    DEFAULT_META_IMG,
 )
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.meta_content import (
@@ -201,66 +199,6 @@ def authentication(request: Request, id_token: bytes = Depends(request_body)):
 async def logout(request: Request):
     request.session.pop(FIREBASE_SESSION_COOKIE, None)
     return RedirectResponse(url=request.query_params.get("next", "/"))
-
-
-@app.post("/v1/run-recipe/", include_in_schema=False)
-def run(
-    params: dict = Body(
-        examples={
-            "political-ai": {
-                "summary": "Political AI example",
-                "value": {
-                    "recipe_id": "xYlKZM4b5T0",
-                    "inputs": {
-                        "action_id": "17716",
-                    },
-                },
-            },
-        },
-    ),
-):
-    recipe_id = params.get("recipie_id", params.get("recipe_id", None))
-    if not recipe_id:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "missing field in request body",
-                "path": ["recipe_id"],
-            },
-        )
-
-    db = firestore.Client()
-    db_collection = db.collection("daras-ai--political_example")
-    doc_ref = db_collection.document(recipe_id)
-    doc = doc_ref.get().to_dict()
-
-    variables = {}
-
-    # put input steps parameters into variables
-    for input_step in doc["input_steps"]:
-        var_name = input_step["var_name"]
-        try:
-            variables[var_name] = params["inputs"][var_name]
-        except (KeyError, TypeError):
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "missing field in request body",
-                    "path": ["inputs", var_name],
-                },
-            )
-
-    # run compute steps
-    compute_steps = doc["compute_steps"]
-    run_compute_steps(compute_steps, variables)
-
-    # put output steps parameters into variables
-    outputs = {}
-    for output_step in doc["output_steps"]:
-        var_name = output_step["var_name"]
-        outputs[var_name] = variables[var_name]
-
-    return {"outputs": outputs}
 
 
 class FailedReponseModel(BaseModel):
@@ -458,27 +396,14 @@ def call_api(
     }
 
 
-@app.get("/Editor/", include_in_schema=False)
-def st_editor(request: Request):
-    iframe_url = furl(settings.IFRAME_BASE_URL) / "Editor"
-    return _st_page(
-        request,
-        iframe_url,
-        block_incognito=True,
-        context={"title": f"Gooey.AI"},
-    )
-
-
 @app.get("/explore/", include_in_schema=False)
 def explore():
-    st.query_params = {}
-    st.render_root = st.RenderTreeNode(name="root")
-    st.session_state = {}
-    try:
-        Home.main()
-    except SystemExit:
-        pass
-    return st.render_root.children
+    with st.main() as root:
+        try:
+            Home.main()
+        except SystemExit:
+            pass
+        return root.children
 
 
 @app.get("/{page_slug}/", include_in_schema=False)
@@ -498,14 +423,13 @@ def st_page(request: Request, page_slug, tab=""):
     if state is None:
         raise HTTPException(status_code=404)
 
-    st.query_params = dict(request.query_params) | {"page_slug": page_slug, "tab": tab}
-    st.render_root = st.RenderTreeNode(name="root")
-    st.session_state = state
-    try:
-        Home.main()
-    except SystemExit:
-        pass
-    return st.render_root.children
+    query_params = dict(request.query_params) | {"page_slug": page_slug, "tab": tab}
+    with st.main(query_params=query_params) as root:
+        try:
+            Home.main()
+        except SystemExit:
+            pass
+        return root.children
 
     iframe_url = furl(
         settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
@@ -538,30 +462,31 @@ def st_page(request: Request, page_slug, tab=""):
     )
 
 
-def _st_page(
-    request: Request,
-    iframe_url: str,
-    *,
-    block_incognito: bool = False,
-    context: dict,
-):
-    f = furl(iframe_url)
-    f.query.params["embed"] = "true"
-    f.query.params["embed_options"] = "disable_scrolling"
-    f.query.params.update(**request.query_params)  # pass down query params
-
-    db.get_or_init_user_data(request)
-
-    return templates.TemplateResponse(
-        "st_page.html",
-        context={
-            "request": request,
-            "iframe_url": f.url,
-            "settings": settings,
-            "block_incognito": block_incognito,
-            **context,
-        },
-    )
+all_pages: list[typing.Type[BasePage]] = [
+    ChyronPlantPage,
+    FaceInpaintingPage,
+    EmailFaceInpaintingPage,
+    LetterWriterPage,
+    LipsyncPage,
+    CompareLLMPage,
+    ImageSegmentationPage,
+    TextToSpeechPage,
+    LipsyncTTSPage,
+    DeforumSDPage,
+    Img2ImgPage,
+    ObjectInpaintingPage,
+    SocialLookupEmailPage,
+    CompareText2ImgPage,
+    Text2AudioPage,
+    SEOSummaryPage,
+    GoogleImageGenPage,
+    VideoBotsPage,
+    CompareUpscalerPage,
+    GoogleGPTPage,
+    DocSearchPage,
+    DocSummaryPage,
+    AsrPage,
+]
 
 
 def normalize_slug(page_slug):
