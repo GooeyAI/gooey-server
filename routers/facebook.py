@@ -353,7 +353,7 @@ def _on_msg(bot: BotInterface):
     )
     if not msgs_to_save:
         return
-    if bot.platform == Platform.WHATSAPP:
+    if bot.platform == Platform.WHATSAPP and msg_id:
         msgs_to_save[-1].wa_msg_id = msg_id
     for msg in msgs_to_save:
         msg.save()

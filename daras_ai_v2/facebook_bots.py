@@ -285,7 +285,7 @@ def send_wa_msgs_raw(
         try:
             msg_id = confirmation["messages"][0]["id"]
         except (KeyError, IndexError):
-            mesg_id = None
+            pass
     return msg_id
 
 
