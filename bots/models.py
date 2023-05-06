@@ -56,9 +56,9 @@ class SavedRun(models.Model):
         """return the url to the firebase dashboard for the document daras-ai-v2/workflow/example_id or daras-ai-v2/workflow or daras-ai-v2/uid/run_id"""
         page = Workflow(self.workflow).page_cls()
         if self.run_id and self.uid:
-            ref = page.run_doc_ref(self.uid, self.run_id)
+            ref = page.run_doc_ref(uid=self.uid, run_id=self.run_id)
         elif self.example_id:
-            ref = page.example_doc_ref(self.example_id)
+            ref = page.example_doc_ref(example_id=self.example_id)
         else:
             ref = page.recipe_doc_ref()
         return (
