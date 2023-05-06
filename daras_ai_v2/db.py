@@ -1,15 +1,12 @@
 import datetime
 
-import typing
-
-from django.db import transaction
 from firebase_admin import auth
 from google.cloud import firestore
 from google.cloud.firestore_v1.transaction import Transaction
 from starlette.requests import Request
 
 from daras_ai_v2 import settings
-from bots.models import Message, Conversation, BotIntegration
+
 FIREBASE_SESSION_COOKIE = "firebase_session"
 ANONYMOUS_USER_COOKIE = "anonymous_user"
 
