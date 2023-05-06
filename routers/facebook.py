@@ -25,6 +25,7 @@ from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot, BotInterface
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
+from gooeysite.bg_db_conn import bg_db_task
 
 router = APIRouter()
 
@@ -236,6 +237,7 @@ def _subscribe_to_page(fb_page: dict):
     r.raise_for_status()
 
 
+@bg_db_task
 def _on_msg(bot: BotInterface):
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
