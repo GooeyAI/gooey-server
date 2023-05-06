@@ -1,3 +1,5 @@
+import traceback
+
 import glom
 import requests
 from fastapi import APIRouter, HTTPException, Depends
@@ -296,6 +298,7 @@ def _on_msg(bot: BotInterface):
                     query_params={},
                 )
             except HTTPException as e:
+                traceback.print_exc()
                 capture_exception(e)
                 # send error message
                 bot.send_msg(text=ERROR_MSG.format(e))
@@ -334,7 +337,7 @@ def _on_msg(bot: BotInterface):
                 user_language=bot.language,
             )
         except HTTPException as e:
-            # handle exceptions
+            traceback.print_exc()
             capture_exception(e)
             # send error msg as repsonse
             bot.send_msg(text=ERROR_MSG.format(e))

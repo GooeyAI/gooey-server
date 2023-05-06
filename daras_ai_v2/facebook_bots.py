@@ -68,15 +68,15 @@ class WhatsappBot(BotInterface):
         self.input_message = message
         self.platform = Platform.WHATSAPP
 
-        self.bot_id = metadata["phone_number_id"]
-        self.user_id = message["from"]
+        self.bot_id = metadata["phone_number_id"]  # this is NOT the phone number
+        self.user_id = message["from"]  # this is a phone number
 
         self.input_type = message["type"]
 
         bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
-            wa_phone_number_id="+" + self.user_id,
+            wa_phone_number="+" + self.user_id,
         )[0]
         self._unpack_bot_integration(bi)
 

@@ -237,13 +237,8 @@ class Conversation(models.Model):
     wa_phone_number = PhoneNumberField(
         blank=True,
         default="",
-        help_text="User's WhatsApp phone number (only for display)",
-    )
-    wa_phone_number_id = models.TextField(
-        blank=True,
-        default="",
         db_index=True,
-        help_text="User's WhatsApp phone number id (required if platform is WhatsApp)",
+        help_text="User's WhatsApp phone number (required if platform is WhatsApp)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -255,7 +250,7 @@ class Conversation(models.Model):
                     "bot_integration",
                     "fb_page_id",
                     "ig_account_id",
-                    "wa_phone_number_id",
+                    "wa_phone_number",
                 ]
             ),
         ]
