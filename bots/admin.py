@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin
 
 from bots import models
-from gooeysite.util import list_related_html_url, open_in_new_tab
+from gooeysite.admin_links import list_related_html_url, open_in_new_tab
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
