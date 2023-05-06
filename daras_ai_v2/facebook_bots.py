@@ -282,7 +282,10 @@ def send_wa_msgs_raw(
         )
         confirmation = r.json()
         print("send_wa_msgs_raw:", r.status_code, confirmation)
-        msg_id = confirmation["messages"][0]["id"]
+        try:
+            msg_id = confirmation["messages"][0]["id"]
+        except (KeyError, IndexError):
+            mesg_id = None
     return msg_id
 
 
