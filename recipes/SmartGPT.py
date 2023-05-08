@@ -85,11 +85,9 @@ class SmartGPTPage(BasePage):
         )
         state["prompt_tree"] = prompt_tree = [
             {
-                "prompt": (
-                    [
-                        {"role": CHATML_ROLE_USER, "content": cot_prompt},
-                    ]
-                ),
+                "prompt": [
+                    {"role": CHATML_ROLE_USER, "content": cot_prompt},
+                ],
                 "children": [],
             },
         ]
@@ -105,13 +103,11 @@ class SmartGPTPage(BasePage):
         )
         state["prompt_tree"] = prompt_tree = [
             {
-                "prompt": (
-                    [
-                        {"role": CHATML_ROLE_USER, "content": cot_prompt},
-                        {"role": CHATML_ROLE_ASSISSTANT, "content": cot_out},
-                        {"role": CHATML_ROLE_USER, "content": request.reflexion_prompt},
-                    ]
-                ),
+                "prompt": [
+                    {"role": CHATML_ROLE_USER, "content": cot_prompt},
+                    {"role": CHATML_ROLE_ASSISSTANT, "content": cot_out},
+                    {"role": CHATML_ROLE_USER, "content": request.reflexion_prompt},
+                ],
                 "children": prompt_tree,
             }
             for cot_out in cot_outputs
@@ -130,24 +126,22 @@ class SmartGPTPage(BasePage):
         )
         state["prompt_tree"] = prompt_tree = [
             {
-                "prompt": (
-                    [
-                        {"role": CHATML_ROLE_USER, "content": cot_prompt},
-                        {
-                            "role": CHATML_ROLE_ASSISSTANT,
-                            "content": answers_as_prompt(cot_outputs),
-                        },
-                        {
-                            "role": CHATML_ROLE_ASSISSTANT,
-                            "content": request.reflexion_prompt,
-                        },
-                        {
-                            "role": CHATML_ROLE_ASSISSTANT,
-                            "content": answers_as_prompt(reflexion_outputs),
-                        },
-                        {"role": CHATML_ROLE_USER, "content": request.dera_prompt},
-                    ]
-                ),
+                "prompt": [
+                    {"role": CHATML_ROLE_USER, "content": cot_prompt},
+                    {
+                        "role": CHATML_ROLE_ASSISSTANT,
+                        "content": answers_as_prompt(cot_outputs),
+                    },
+                    {
+                        "role": CHATML_ROLE_ASSISSTANT,
+                        "content": request.reflexion_prompt,
+                    },
+                    {
+                        "role": CHATML_ROLE_ASSISSTANT,
+                        "content": answers_as_prompt(reflexion_outputs),
+                    },
+                    {"role": CHATML_ROLE_USER, "content": request.dera_prompt},
+                ],
                 "children": prompt_tree,
             }
         ]
