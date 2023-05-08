@@ -29,14 +29,14 @@ How many completion choices to generate for each input
         )
     if (
         show_selector
-        and st.session_state.get("selected_model")
-        != LargeLanguageModels.gpt_3_5_turbo.name
+        and not LargeLanguageModels[
+            st.session_state.get("selected_model")
+        ].is_chat_model()
     ):
         with col2:
             st.slider(
                 label="""
 ###### Quality
-*(Not applicable for ChatGPT)*
             """,
                 key="quality",
                 min_value=1.0,

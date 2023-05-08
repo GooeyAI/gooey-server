@@ -21,6 +21,7 @@ from daras_ai_v2.language_model import (
     calc_gpt_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.pt import PromptTree
 from recipes.DocSearch import (
     doc_url_to_text_pages,
     doc_url_to_metadata,
@@ -34,14 +35,6 @@ class CombineDocumentsChains(Enum):
     map_reduce = "Map Reduce"
     # refine = "Refine"
     # stuff = "Stuffing (Only works for small documents)"
-
-
-class PromptTreeNode(BaseModel):
-    prompt: str
-    children: list["PromptTreeNode"]
-
-
-PromptTree = list[PromptTreeNode]
 
 
 class DocSummaryPage(BasePage):

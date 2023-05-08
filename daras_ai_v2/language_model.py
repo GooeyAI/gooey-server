@@ -187,7 +187,7 @@ def run_language_model(
     messages: list[dict] = None,
     max_tokens: int = 512,
     quality: float = 1.0,
-    num_outputs: int = 1.0,
+    num_outputs: int = 1,
     temperature: float = 0.7,
     stop: list[str] = None,
     avoid_repetition: bool = False,

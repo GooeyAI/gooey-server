@@ -9,6 +9,6 @@ def is_admin():
         return False
     current_user: UserRecord = st.session_state["_current_user"]
     email = current_user.email
-    if email and email in settings.ADMIN_EMAILS:
+    if settings.DEBUG or (email and email in settings.ADMIN_EMAILS):
         return True
     return False

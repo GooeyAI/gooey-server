@@ -4,6 +4,7 @@ from django.db import models
 
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.base import BasePage
+from recipes.SmartGPT import SmartGPTPage
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
@@ -50,6 +51,7 @@ all_home_pages = [
     ObjectInpaintingPage,
     ImageSegmentationPage,
     CompareLLMPage,
+    SmartGPTPage,
 ]
 
 # exposed as API
@@ -90,6 +92,7 @@ class Workflow(models.IntegerChoices):
     COMPARELLM = (21, CompareLLMPage.__name__)
     CHYRONPLANT = (22, ChyronPlantPage.__name__)
     LETTERWRITER = (23, LetterWriterPage.__name__)
+    SMARTGPT = (24, SmartGPTPage.__name__)
 
     @property
     def page_cls(self) -> typing.Type[BasePage]:
