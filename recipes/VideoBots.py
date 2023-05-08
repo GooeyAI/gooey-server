@@ -4,11 +4,10 @@ import os.path
 import re
 import typing
 
-import gooey_ui as st
 from furl import furl
 from pydantic import BaseModel
-from gooey_ui import UploadedFile
 
+import gooey_ui as st
 from daras_ai.image_input import (
     truncate_text_words,
     upload_st_file,
@@ -46,6 +45,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
 )
+from gooey_ui import UploadedFile
 from recipes.DocSearch import (
     get_top_k_references,
     DocSearchPage,
@@ -53,7 +53,6 @@ from recipes.DocSearch import (
 )
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
-from routers.facebook import ig_connect_url, fb_connect_url
 
 BOT_SCRIPT_RE = re.compile(
     # start of line

@@ -2,7 +2,6 @@ import traceback
 
 import glom
 import requests
-from django.db import transaction
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from firebase_admin import auth
@@ -390,8 +389,6 @@ def _process_msg(
     input_text: str,
     user_language: str,
 ) -> tuple[str, str | None, str | None, list[Message]]:
-    from server import call_api
-
     # # mock testing
     # result = _mock_api_output(input_text)
 
