@@ -166,8 +166,7 @@ class BasePage:
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
-        query_params = gooey_get_query_params()
-        example_id, run_id, uid = extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         root_url = self.app_url(example_id=example_id)
         st.write(
             f'## <a style="text-decoration: none;" target="_top" href="{root_url}">{st.session_state.get(StateKeys.page_title)}</a>',
@@ -194,8 +193,7 @@ class BasePage:
             st.stop()
 
     def _realtime_subscribe(self):
-        query_params = gooey_get_query_params()
-        _, run_id, uid = extract_query_params(query_params)
+        _, run_id, uid = extract_query_params(gooey_get_query_params())
         redis_key = f"runs/{uid}/{run_id}"
         updates = realtime_subscribe(redis_key)
         if updates:
@@ -354,8 +352,7 @@ class BasePage:
             with st.spinner("Reporting..."):
                 current_user: UserRecord = st.session_state.get("_current_user")
 
-                query_params = gooey_get_query_params()
-                example_id, run_id, uid = extract_query_params(query_params)
+                example_id, run_id, uid = extract_query_params(gooey_get_query_params())
 
                 send_reported_run_email(
                     user=current_user,
@@ -382,8 +379,7 @@ class BasePage:
             return
 
         with placeholder.container(), st.spinner("Loading Settings..."):
-            query_params = gooey_get_query_params()
-            doc = self.get_doc_from_query_params(query_params)
+            doc = self.get_doc_from_query_params(gooey_get_query_params())
 
             if doc is None:
                 st.write("### 404: We can't find this page!")
@@ -408,8 +404,7 @@ class BasePage:
             if not unflag_pressed:
                 return
             with st.spinner("Removing flag..."):
-                query_params = gooey_get_query_params()
-                example_id, run_id, uid = extract_query_params(query_params)
+                example_id, run_id, uid = extract_query_params(gooey_get_query_params())
                 if run_id and uid:
                     self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=False)
             st.success("Removed flag.", icon="✅")
@@ -583,8 +578,7 @@ class BasePage:
     def _render_report_button(self):
         current_user: UserRecord = st.session_state.get("_current_user")
 
-        query_params = gooey_get_query_params()
-        example_id, run_id, uid = extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
 
         if not (current_user and run_id and uid):
             # ONLY RUNS CAN BE REPORTED
@@ -598,8 +592,7 @@ class BasePage:
         st.experimental_rerun()
 
     def _render_before_output(self):
-        query_params = gooey_get_query_params()
-        example_id, run_id, uid = extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         if not (run_id or example_id):
             return
 
@@ -626,13 +619,11 @@ class BasePage:
             )
 
     def _get_current_app_url(self) -> str | None:
-        query_params = gooey_get_query_params()
-        example_id, run_id, uid = extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         return self.app_url(example_id, run_id, uid)
 
     def _get_current_api_url(self) -> furl | None:
-        query_params = gooey_get_query_params()
-        example_id, run_id, uid = extract_query_params(query_params)
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         return self.api_url(example_id, run_id, uid)
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
@@ -643,10 +634,9 @@ class BasePage:
 
     def create_new_run(self):
         current_user: auth.UserRecord = st.session_state["_current_user"]
-        query_params = gooey_get_query_params()
 
         run_id = get_random_doc_id()
-        example_id, *_ = extract_query_params(query_params)
+        example_id, *_ = extract_query_params(gooey_get_query_params())
         uid = current_user.uid
 
         Thread(
@@ -821,7 +811,7 @@ class BasePage:
 
         new_example_id = None
         doc_ref = None
-        query_params = gooey_get_query_params()
+        example_id, *_ = extract_query_params(gooey_get_query_params())
 
         with st.expander("🛠️ Admin Options"):
             col1, col2, col3 = st.columns(3)
@@ -837,10 +827,7 @@ class BasePage:
                     gooey_reset_query_parm(example_id=new_example_id)
 
             with col3:
-                if EXAMPLE_ID_QUERY_PARAM in query_params and st.button(
-                    "💾 Save Example & Settings"
-                ):
-                    example_id = query_params[EXAMPLE_ID_QUERY_PARAM][0]
+                if example_id and st.button("💾 Save Example & Settings"):
                     doc_ref = self.example_doc_ref(example_id)
                     gooey_reset_query_parm(example_id=example_id)
 

@@ -11,7 +11,7 @@ from server import normalize_slug, page_map
 #
 query_params = gooey_get_query_params()
 try:
-    page_slug = normalize_slug(query_params["page_slug"][0])
+    page_slug = normalize_slug(query_params["page_slug"])
 except KeyError:
     # no page_slug provided - render explore page
     import explore
