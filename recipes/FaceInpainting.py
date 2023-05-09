@@ -331,19 +331,17 @@ class FaceInpaintingPage(BasePage):
         ]
 
     def render_example(self, state: dict):
-        output_images = state.get("output_images")
-        if output_images:
-            for img in output_images:
-                st.image(
-                    img,
-                    caption="```"
-                    + state.get("text_prompt", "").replace("\n", "")
-                    + "```",
-                )
-
-        input_image = state.get("input_image")
-        if input_image:
+        col1, col2 = st.columns(2)
+        with col2:
+            output_images = state.get("output_images")
+            if output_images:
+                for img in output_images:
+                    st.image(img, caption="Generated Image")
+        with col1:
+            input_image = state.get("input_image")
             st.image(input_image, caption="Input Image")
+            st.write("**Prompt**")
+            st.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def get_price(self) -> int:
         selected_model = st.session_state.get("selected_model")

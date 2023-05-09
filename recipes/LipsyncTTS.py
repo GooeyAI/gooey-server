@@ -112,6 +112,14 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         col1, col2 = st.columns(2)
 
         with col1:
+            input_face = state.get("input_face")
+            if not input_face:
+                st.empty()
+            elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
+                st.video(input_face, caption="Input Face (Video)")
+            else:
+                st.image(input_face, caption="Input Face (Image)")
+
             input_text = state.get("text_prompt")
             if input_text:
                 st.write("**Input Text**")
@@ -125,14 +133,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             #    st.audio(input_audio)
             # else:
             #    st.empty()
-
-            input_face = state.get("input_face")
-            if not input_face:
-                st.empty()
-            elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
-                st.video(input_face, caption="Input Face (Video)")
-            else:
-                st.image(input_face, caption="Input Face (Image)")
 
         with col2:
             output_video = state.get("output_video")

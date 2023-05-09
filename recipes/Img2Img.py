@@ -8,7 +8,6 @@ from daras_ai.image_input import (
     upload_file_hq,
 )
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
@@ -136,15 +135,16 @@ class Img2ImgPage(BasePage):
             st.image(img, caption="```" + text_prompt.replace("\n", "") + "```")
 
     def render_example(self, state: dict):
-        output_images = state.get("output_images", [])
-        for img in output_images:
-            st.image(
-                img,
-                caption="```" + state.get("text_prompt", "").replace("\n", "") + "```",
-            )
-
-        input_image = state.get("input_image")
-        st.image(input_image, caption="Input Image")
+        col1, col2 = st.columns(2)
+        with col2:
+            output_images = state.get("output_images", [])
+            for img in output_images:
+                st.image(img, caption="Generated Image")
+        with col1:
+            input_image = state.get("input_image")
+            st.image(input_image, caption="Input Image")
+            st.write("**Prompt**")
+            st.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
