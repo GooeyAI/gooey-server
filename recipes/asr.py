@@ -19,6 +19,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.text_output_widget import text_outputs
+from recipes.DocSearch import render_documents
 
 
 class AsrPage(BasePage):
@@ -87,7 +88,8 @@ class AsrPage(BasePage):
         text_outputs("**Transcription**", key="output_text", height=300)
 
     def render_example(self, state: dict):
-        text_outputs("**Transcription**", key="output_text")
+        render_documents(state)
+        text_outputs("**Transcription**", value=state.get("output_text"))
 
     def render_steps(self):
         if st.session_state.get("google_translate_target"):

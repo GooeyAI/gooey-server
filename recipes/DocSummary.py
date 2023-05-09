@@ -26,6 +26,7 @@ from recipes.DocSearch import (
     doc_url_to_text_pages,
     doc_url_to_metadata,
     DocSearchPage,
+    render_documents,
 )
 
 DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
@@ -123,6 +124,7 @@ Prompt for merging several outputs together
         render_outputs(st.session_state, 300)
 
     def render_example(self, state: dict):
+        render_documents(state)
         st.write("**Instructions**")
         st.write("```properties\n" + state.get("task_instructions", "") + "\n```")
         render_outputs(state, 200)

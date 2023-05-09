@@ -6,10 +6,11 @@ import streamlit as st
 def text_outputs(
     label: str,
     *,
-    key: str,
+    key: str = None,
+    value: str = None,
     height: int = 200,
 ):
-    value = st.session_state.get(key)
+    value = value or st.session_state.get(key)
     match value:
         case str():
             text_output(label, height=height, value=value)

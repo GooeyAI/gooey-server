@@ -27,6 +27,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
+    is_user_uploaded_url,
 )
 from daras_ai_v2.functional import flatten
 from daras_ai_v2.gdrive_downloader import (
@@ -133,6 +134,7 @@ class DocSearchPage(BasePage):
                 st.text(ref["snippet"])
 
     def render_example(self, state: dict):
+        render_documents(state)
         st.write("**Search Query**")
         st.write("```properties\n" + state.get("search_query", "") + "\n```")
         render_outputs(state, 200)
@@ -639,3 +641,17 @@ def document_splitter(
                 window.popleft()
             except IndexError:
                 break
+
+
+def render_documents(state, label="**Documents**", *, key="documents"):
+    documents = state.get(key, [])
+    if not documents:
+        return
+    st.write(label)
+    for doc in documents:
+        if is_user_uploaded_url(doc):
+            f = furl(doc)
+            filename = f.path.segments[-1]
+        else:
+            filename = doc
+        st.write(f"🔗[*{filename}*]({doc})")
