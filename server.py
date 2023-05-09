@@ -1,3 +1,6 @@
+from pprint import pprint
+
+from daras_ai_v2.perf_timer import start_perf_timer, perf_timer
 from gooeysite import wsgi
 
 assert wsgi
@@ -396,70 +399,86 @@ def call_api(
     }
 
 
-@app.get("/explore/", include_in_schema=False)
+@app.post("/__/gooey-ui/", include_in_schema=False)
 def explore():
     with st.main() as root:
         try:
             Home.main()
         except SystemExit:
             pass
-        return root.children
+        return dict(
+            state=st.session_state,
+            children=root.children,
+        )
 
 
-@app.get("/{page_slug}/", include_in_schema=False)
-@app.get("/{page_slug}/{tab}/", include_in_schema=False)
-def st_page(request: Request, page_slug, tab=""):
+async def request_json(request: Request):
+    return await request.json()
+
+
+@app.post("/__/gooey-ui/{page_slug}/", include_in_schema=False)
+@app.post("/__/gooey-ui/{page_slug}/{tab}/", include_in_schema=False)
+def st_page(
+    request: Request, page_slug, tab="", json_data: dict = Depends(request_json)
+):
     lookup = normalize_slug(page_slug)
     try:
         page_cls = page_map[lookup]
     except KeyError:
         raise HTTPException(status_code=404)
     latest_slug = page_cls.slug_versions[-1]
-    if latest_slug != page_slug:
-        return RedirectResponse(request.url.replace(path=f"/{latest_slug}/"))
+    # if latest_slug != page_slug:
+    #     return RedirectResponse(request.url.replace(path=f"/{latest_slug}/"))
     page = page_cls()
 
-    state = page.get_doc_from_query_params(dict(request.query_params))
+    state = json_data.get("state")
+    if not state:
+        state = page.get_doc_from_query_params(dict(request.query_params))
     if state is None:
         raise HTTPException(status_code=404)
 
     query_params = dict(request.query_params) | {"page_slug": page_slug, "tab": tab}
     with st.main(query_params=query_params) as root:
+        st.session_state.update(state)
+        st.session_state["__loaded__"] = True
         try:
             Home.main()
         except SystemExit:
             pass
-        return root.children
-
-    iframe_url = furl(
-        settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
-    )
-    example_id, run_id, uid = extract_query_params(dict(request.query_params))
-
-    return _st_page(
-        request,
-        str(iframe_url),
-        block_incognito=True,
-        context={
-            "title": meta_title_for_page(
-                page=page,
-                state=state,
-                run_id=run_id,
-                uid=uid,
-                example_id=example_id,
-            ),
-            "description": meta_description_for_page(
-                page=page,
-                state=state,
-                run_id=run_id,
-                uid=uid,
-                example_id=example_id,
-            ),
-            "image": meta_preview_url(
-                page.preview_image(state), page.fallback_preivew_image()
-            ),
-        },
-    )
+        pprint(st.session_state)
+        return dict(
+            state=st.session_state,
+            children=root.children,
+        )
+    # iframe_url = furl(
+    #     settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
+    # )
+    # example_id, run_id, uid = extract_query_params(dict(request.query_params))
+    #
+    # return _st_page(
+    #     request,
+    #     str(iframe_url),
+    #     block_incognito=True,
+    #     context={
+    #         "title": meta_title_for_page(
+    #             page=page,
+    #             state=state,
+    #             run_id=run_id,
+    #             uid=uid,
+    #             example_id=example_id,
+    #         ),
+    #         "description": meta_description_for_page(
+    #             page=page,
+    #             state=state,
+    #             run_id=run_id,
+    #             uid=uid,
+    #             example_id=example_id,
+    #         ),
+    #         "image": meta_preview_url(
+    #             page.preview_image(state), page.fallback_preivew_image()
+    #         ),
+    #     },
+    # )
 
 
 def _st_page(

@@ -31,7 +31,6 @@ from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
 from daras_ai_v2.db import USER_RUNS_COLLECTION, EXAMPLES_COLLECTION
-from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
@@ -40,6 +39,7 @@ from daras_ai_v2.html_spinner_widget import (
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.perf_timer import perf_timer, start_perf_timer
 
 # from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import (
@@ -286,14 +286,15 @@ class BasePage:
             )
             return page, state, preview_image
 
-        if "__related_recipe_docs" not in st.session_state:
-            with st.spinner("Loading Related Recipes..."):
-                docs = map_parallel(
-                    _build_page_tuple,
-                    workflows,
-                )
-            st.session_state["__related_recipe_docs"] = docs
-        related_recipe_docs = st.session_state.get("__related_recipe_docs")
+        # if "__related_recipe_docs" not in st.session_state:
+        #     with st.spinner("Loading Related Recipes..."):
+        #         docs = map_parallel(
+        #             _build_page_tuple,
+        #             workflows,
+        #         )
+        #     st.session_state["__related_recipe_docs"] = docs
+        # related_recipe_docs = st.session_state.get("__related_recipe_docs")
+        related_recipe_docs = []
 
         def _render(page_tuple):
             page, state, preview_image = page_tuple
@@ -897,24 +898,24 @@ class BasePage:
         ]
 
     def _examples_tab(self):
-        if StateKeys.examples_cache not in st.session_state:
-            with st.spinner("Loading Examples..."):
-                example_docs = db.get_collection_ref(
-                    document_id=self.doc_name,
-                    sub_collection_id=EXAMPLES_COLLECTION,
-                ).get()
+        # if StateKeys.examples_cache not in st.session_state:
+        with st.spinner("Loading Examples..."):
+            example_docs = db.get_collection_ref(
+                document_id=self.doc_name,
+                sub_collection_id=EXAMPLES_COLLECTION,
+            ).get()
 
-                def sort_key(s):
-                    updated_at = s.to_dict().get(
-                        StateKeys.updated_at, datetime.datetime.fromtimestamp(0)
-                    )
-                    if isinstance(updated_at, str):
-                        updated_at = datetime.datetime.fromisoformat(updated_at)
-                    return updated_at.timestamp()
+            def sort_key(s):
+                updated_at = s.to_dict().get(
+                    StateKeys.updated_at, datetime.datetime.fromtimestamp(0)
+                )
+                if isinstance(updated_at, str):
+                    updated_at = datetime.datetime.fromisoformat(updated_at)
+                return updated_at.timestamp()
 
-                example_docs.sort(key=sort_key, reverse=True)
-            st.session_state[StateKeys.examples_cache] = example_docs
-        example_docs = st.session_state.get(StateKeys.examples_cache)
+            example_docs.sort(key=sort_key, reverse=True)
+        # st.session_state[StateKeys.examples_cache] = example_docs
+        # example_docs = st.session_state.get(StateKeys.examples_cache)
 
         allow_delete = is_admin()
 
@@ -945,6 +946,19 @@ class BasePage:
         uid = current_user.uid
         run_history = st.session_state.get(StateKeys.history_cache, [])
 
+        with st.spinner("Loading History..."):
+            run_history.extend(
+                db.get_collection_ref(
+                    collection_id=USER_RUNS_COLLECTION,
+                    document_id=uid,
+                    sub_collection_id=self.doc_name,
+                )
+                .order_by(StateKeys.updated_at, direction="DESCENDING")
+                .offset(len(run_history))
+                .limit(20)
+                .get()
+            )
+
         def _render(snapshot):
             run_id = snapshot.id
             doc = snapshot.to_dict()
@@ -968,21 +982,9 @@ class BasePage:
 
         grid_layout(2, run_history, _render)
 
-        if StateKeys.history_cache not in st.session_state or st.button("Load More"):
-            with st.spinner("Loading History..."):
-                run_history.extend(
-                    db.get_collection_ref(
-                        collection_id=USER_RUNS_COLLECTION,
-                        document_id=uid,
-                        sub_collection_id=self.doc_name,
-                    )
-                    .order_by(StateKeys.updated_at, direction="DESCENDING")
-                    .offset(len(run_history))
-                    .limit(20)
-                    .get()
-                )
-            st.session_state[StateKeys.history_cache] = run_history
-            st.experimental_rerun()
+        # if StateKeys.history_cache not in st.session_state or st.button("Load More"):
+        # st.session_state[StateKeys.history_cache] = run_history
+        # st.experimental_rerun()
 
     def _render_doc_example(
         self, *, allow_delete: bool, doc: dict, url: str, query_params: dict

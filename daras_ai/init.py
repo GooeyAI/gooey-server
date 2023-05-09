@@ -28,8 +28,12 @@ def init_scripts():
     # remove fullscreen button and footer
     hidden_html_nojs(st_like_btn_css_html + html_spinner_css)
 
-    if "_current_user" not in st.session_state:
-        st.session_state["_current_user"] = get_current_user() or get_anonymous_user()
+    # if "_current_user" not in st.session_state:
+    st.session_state["_current_user"] = get_current_user() or get_anonymous_user()
+    # else:
+    #     st.session_state["_current_user"] = auth.UserRecord(
+    #         st.session_state["_current_user"]
+    #     )
 
     current_user = st.session_state.get("_current_user")
     if not current_user:

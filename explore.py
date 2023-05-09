@@ -1,5 +1,4 @@
 import gooey_ui as gui
-from daras_ai_v2 import settings
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -23,8 +22,6 @@ from recipes.Text2Audio import Text2AudioPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
-
-assert settings.GOOGLE_APPLICATION_CREDENTIALS
 
 
 def render():

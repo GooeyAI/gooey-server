@@ -15,6 +15,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 
 
+@st.cache_data()
 def get_anonymous_user() -> auth.UserRecord | None:
     return auth.get_user_by_email("dev@dara.network")
     session = get_request_session()
@@ -26,6 +27,7 @@ def get_anonymous_user() -> auth.UserRecord | None:
     return user
 
 
+@st.cache_data()
 def get_current_user() -> auth.UserRecord | None:
     return auth.get_user_by_email("dev@dara.network")
     session = get_request_session()

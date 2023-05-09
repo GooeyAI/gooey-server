@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import os
 import textwrap
 import typing
@@ -213,7 +214,9 @@ def multiselect(
         return None
     options = list(options)
     if key:
-        value = state.session_state.get(key)
+        if key not in state.session_state:
+            state.session_state[key] = default
+        value = state.session_state[key]
     else:
         value = None
     value = value or default
@@ -250,7 +253,9 @@ def selectbox(
         return None
     options = list(options)
     if key:
-        value = state.session_state.get(key)
+        if key not in state.session_state:
+            state.session_state[key] = options[index]
+        value = state.session_state[key]
     else:
         value = None
     value = value or options[index]
@@ -462,7 +467,9 @@ def radio(
         return None
     options = list(options)
     if key:
-        value = state.session_state.get(key)
+        if key not in state.session_state:
+            state.session_state[key] = options[index]
+        value = state.session_state[key]
     else:
         value = None
     value = value or options[index]
@@ -476,12 +483,13 @@ def radio(
                 type="radio",
                 name=key,
                 label=dedent(str(format_func(option))),
-                defaultValue=value,
+                value=option,
+                defaultChecked=bool(value == option),
                 help=help,
                 disabled=disabled,
             ),
         ).mount()
-    return bool(value)
+    return value
 
 
 def text_input(
@@ -604,7 +612,13 @@ def _input_widget(
 ) -> state.typing.Any:
     if key:
         assert not value, "only one of value or key can be provided"
-        value = state.session_state.get(key)
+    else:
+        key = hashlib.md5(
+            f"{input_type}.{label}.{help}.{label_visibility}".encode()
+        ).hexdigest()
+    if key not in state.session_state:
+        state.session_state[key] = value
+    value = state.session_state.get(key)
     if label_visibility != "visible":
         label = None
     state.RenderTreeNode(
