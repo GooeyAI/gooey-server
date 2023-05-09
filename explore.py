@@ -15,7 +15,7 @@ def render():
     with st.spinner():
         all_examples = map_parallel(lambda page: page.get_recipe_doc().to_dict(), pages)
 
-    grid_layout(2, zip(pages, all_examples), _render)
+    grid_layout(3, zip(pages, all_examples), _render)
 
     with st.expander("Early Recipes"):
         for snapshot in list_all_docs():
