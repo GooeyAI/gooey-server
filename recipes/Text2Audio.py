@@ -87,7 +87,7 @@ class Text2AudioPage(BasePage):
             step=1,
         )
         negative_prompt_setting()
-        num_outputs_and_quality_settings(max_num_outputs=4)
+        num_outputs_and_quality_settings()
         guidance_scale_setting()
 
     def run(self, state: dict) -> typing.Iterator[str | None]:

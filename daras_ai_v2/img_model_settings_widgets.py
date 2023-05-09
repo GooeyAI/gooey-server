@@ -20,7 +20,11 @@ def img_model_settings(models_enum, render_model_selector=True):
 
     negative_prompt_setting(selected_model)
 
-    num_outputs_and_quality_settings(selected_model)
+    num_outputs_and_quality_settings(
+        selected_model,
+        # allow higher number of outputs if a model is not selected
+        max_outputs=4 if selected_model else 10,
+    )
     if models_enum is not Img2ImgModels:
         output_resolution_setting()
 
@@ -43,7 +47,7 @@ def img_model_settings(models_enum, render_model_selector=True):
     return selected_model
 
 
-def model_selector(models_enum):
+def model_selector(models_enum, allow_none=False):
     col1, col2 = st.columns(2)
     with col1:
         selected_model = enum_selector(
@@ -51,7 +55,7 @@ def model_selector(models_enum):
             label="#### Model",
             key="selected_model",
             use_selectbox=True,
-            allow_none=True,
+            allow_none=allow_none,
         )
     with col2:
         if models_enum is Img2ImgModels:
@@ -78,8 +82,15 @@ Choose any [conditioning model](https://huggingface.co/lllyasviel?search=control
     return selected_model
 
 
-def num_outputs_setting(selected_model: str = None, max_value: int = None):
-    max_outputs = max_value or (4 if selected_model else 10)
+def num_outputs_and_quality_settings(selected_model: str = None, *, max_outputs=4):
+    num_outputs, quality = st.columns(2, gap="medium")
+    with num_outputs:
+        num_outputs_setting(max_outputs=max_outputs)
+    with quality:
+        quality_setting(selected_model)
+
+
+def num_outputs_setting(*, max_outputs=4):
     st.slider(
         label="""
         ##### Number of Outputs
@@ -116,14 +127,6 @@ def quality_setting(selected_model: str = None):
         )
     else:
         st.empty()
-
-
-def num_outputs_and_quality_settings(selected_model: str = None, max_num_outputs=None):
-    num_outputs, quality = st.columns(2, gap="medium")
-    with num_outputs:
-        num_outputs_setting(selected_model, max_value=max_num_outputs)
-    with quality:
-        quality_setting(selected_model)
 
 
 RESOLUTIONS = {

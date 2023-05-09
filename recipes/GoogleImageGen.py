@@ -181,7 +181,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             """,
             key="search_query",
         )
-        model_selector(Img2ImgModels)
+        model_selector(Img2ImgModels, allow_none=True)
         st.text_area(
             """
             ### 👩‍💻 Prompt
@@ -199,11 +199,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         # If model is not selected, don't do anything else
         if selected_model:
             return 5
-        number_of_outputs = st.session_state.get("num_outputs")
-        total = 0
-        for i in range(number_of_outputs):
-            total += 5
-        return total
+        return 5 * int(st.session_state.get("num_outputs"))
 
     def render_settings(self):
         img_model_settings(Img2ImgModels, render_model_selector=False)

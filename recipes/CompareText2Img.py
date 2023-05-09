@@ -181,7 +181,7 @@ class CompareText2ImgPage(BasePage):
 
         negative_prompt_setting()
         output_resolution_setting()
-        num_outputs_and_quality_settings(max_num_outputs=4)
+        num_outputs_and_quality_settings()
         sd_2_upscaling_setting()
         col1, col2 = st.columns(2)
         with col1:
