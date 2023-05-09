@@ -31,6 +31,10 @@ class GpuEndpoints:
     whisper = _asr / "whisper"
     nemo_asr = _asr / "nemo/asr"
 
+    _asr_fast = settings.GPU_SERVER_1.copy().set(port=5019)
+    whisper_fast = _asr_fast / "whisper"
+    nemo_asr_fast = _asr_fast / "nemo/asr"
+
     audio_ldm = settings.GPU_SERVER_1.copy().set(port=5017) / "audio_ldm"
     bark = settings.GPU_SERVER_1.copy().set(port=5017) / "bark"
 

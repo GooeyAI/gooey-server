@@ -8,6 +8,8 @@ from daras_ai_v2.asr import (
     google_translate_language_selector,
     run_asr,
     run_google_translate,
+    AsrOutputFormat,
+    AsrOutputJson,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -23,15 +25,18 @@ class AsrPage(BasePage):
     title = "Speech Recognition & Translation"
     slug_versions = ["asr", "speech"]
 
+    sane_defaults = dict(output_format=AsrOutputFormat.text.name)
+
     class RequestModel(BaseModel):
         documents: list[str]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
         google_translate_target: str | None
+        output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
 
     class ResponseModel(BaseModel):
         raw_output_text: list[str] | None
-        output_text: list[str]
+        output_text: list[str | AsrOutputJson]
 
     def preview_description(self, state: dict):
         return "Transcribe mp3, WhatsApp audio + wavs with OpenAI's Whisper or AI4Bharat / Bhashini ASR models. Optionally translate to any language too."
@@ -66,9 +71,14 @@ class AsrPage(BasePage):
         document_uploader("##### Audio Files", type=("wav", "ogg", "mp3", "aac"))
         st.write("---")
         enum_selector(AsrModels, label="###### ASR Model", key="selected_model")
-        st.text_input("###### Spoken Language", key="language")
-        st.write("---")
+        st.text_input("###### Spoken Language _(optional)_", key="language")
+
+    def render_settings(self):
         google_translate_language_selector()
+        st.write("---")
+        enum_selector(
+            AsrOutputFormat, label="###### Output Format", key="output_format"
+        )
 
     def validate_form_v2(self):
         validate_upload_documents()
@@ -101,6 +111,7 @@ class AsrPage(BasePage):
                 audio_url=audio,
                 selected_model=request.selected_model,
                 language=request.language,
+                output_format=request.output_format,
             ),
             request.documents,
         )

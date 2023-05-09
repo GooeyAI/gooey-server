@@ -5,6 +5,7 @@ from enum import Enum
 
 import requests
 import streamlit as st
+import typing_extensions
 from furl import furl
 from google.cloud import speech_v1p1beta1
 from google.cloud import translate, translate_v2
@@ -29,6 +30,23 @@ asr_model_ids = {
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
 }
+
+
+class AsrChunk(typing_extensions.TypedDict):
+    timestamp: tuple[float, float]
+    text: str
+
+
+class AsrOutputJson(typing_extensions.TypedDict):
+    text: str
+    chunks: typing_extensions.NotRequired[list[AsrChunk]]
+
+
+class AsrOutputFormat(Enum):
+    text = "Text"
+    json = "JSON"
+    srt = "SRT"
+    vtt = "VTT"
 
 
 def google_translate_language_selector(
@@ -92,17 +110,20 @@ def run_asr(
     audio_url: str,
     selected_model: str,
     language: str = None,
-) -> str:
+    output_format: str = "text",
+) -> str | AsrOutputJson:
     """
     Run ASR on audio.
     Args:
         audio_url (str): url of audio to be transcribed.
         selected_model (str): ASR model to use.
         language: language of the audio
+        output_format: format of the output
     Returns:
         str: Transcribed text.
     """
     selected_model = AsrModels[selected_model]
+    output_format = AsrOutputFormat[output_format]
     is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
     if is_youtube_url:
         audio_url = download_youtube_to_wav(audio_url)
@@ -129,6 +150,9 @@ def run_asr(
         return "\n\n".join(
             result.alternatives[0].transcript for result in response.results
         )
+    # check if we should use the fast queue
+    # use_fast = _should_use_fast(audio_url)
+    use_fast = False
     # call one of the self-hosted models
     if "whisper" in selected_model.name:
         if language:
@@ -136,7 +160,7 @@ def run_asr(
         elif "hindi" in selected_model.name:
             language = "hi"
         r = requests.post(
-            str(GpuEndpoints.whisper),
+            str(GpuEndpoints.whisper_fast if use_fast else GpuEndpoints.whisper),
             json={
                 "pipeline": dict(
                     model_id=asr_model_ids[selected_model],
@@ -145,12 +169,13 @@ def run_asr(
                     "audio": audio_url,
                     "task": "transcribe",
                     "language": language,
+                    "return_timestamps": output_format != AsrOutputFormat.text,
                 },
             },
         )
     else:
         r = requests.post(
-            str(GpuEndpoints.nemo_asr),
+            str(GpuEndpoints.nemo_asr_fast if use_fast else GpuEndpoints.nemo_asr),
             json={
                 "pipeline": dict(
                     model_id=asr_model_ids[selected_model],
@@ -161,7 +186,27 @@ def run_asr(
             },
         )
     r.raise_for_status()
-    return r.json()["text"]
+    data = r.json()
+    match output_format:
+        case AsrOutputFormat.text:
+            return data["text"]
+        case AsrOutputFormat.json:
+            return data
+        case AsrOutputFormat.srt:
+            assert data.get("chunks"), f"{selected_model.value} can't generate SRT"
+            return generate_srt(data["chunks"])
+        case AsrOutputFormat.vtt:
+            assert data.get("chunks"), f"{selected_model.value} can't generate VTT"
+            return generate_vtt(data["chunks"])
+        case _:
+            raise ValueError(f"Invalid output format: {output_format}")
+
+
+def _should_use_fast(audio_url, min_size=5 * 1024 * 1024):
+    r = requests.head(audio_url)
+    r.raise_for_status()
+    print(r.headers)
+    return int(r.headers["Content-Length"]) < min_size
 
 
 def download_youtube_to_wav(youtube_url: str) -> str:
@@ -209,3 +254,56 @@ def audio_to_wav(audio_url: str) -> str:
         wavdata = outfile.read()
     filename = furl(audio_url).path.segments[-1] + ".wav"
     return upload_file_from_bytes(filename, wavdata, "audio/wav")
+
+
+# code stolen from https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e067f8/whisper/utils.py#L239
+#
+
+
+def generate_vtt(chunks: list[AsrChunk]):
+    vtt = "WEBVTT\n"
+    subs = iterate_subtitles(chunks, always_include_hours=False, decimal_marker=".")
+    for start, end, text in subs:
+        vtt += f"{start} --> {end}\n{text}\n\n"
+    return vtt
+
+
+def generate_srt(chunks: list[AsrChunk]):
+    srt = ""
+    subs = iterate_subtitles(chunks, always_include_hours=True, decimal_marker=",")
+    for i, (start, end, text) in enumerate(subs, start=1):
+        srt += f"{i}\n{start} --> {end}\n{text}\n\n"
+    return srt
+
+
+def iterate_subtitles(
+    chunks: list[AsrChunk], always_include_hours: bool, decimal_marker: str
+):
+    for chunk in chunks:
+        segment_start = format_timestamp(
+            chunk["timestamp"][0], always_include_hours, decimal_marker
+        )
+        segment_end = format_timestamp(
+            chunk["timestamp"][1], always_include_hours, decimal_marker
+        )
+        segment_text = chunk["text"].strip().replace("-->", "->")
+        yield segment_start, segment_end, segment_text
+
+
+def format_timestamp(seconds: float, always_include_hours: bool, decimal_marker: str):
+    assert seconds >= 0, "non-negative timestamp expected"
+    milliseconds = round(seconds * 1000.0)
+
+    hours = milliseconds // 3_600_000
+    milliseconds -= hours * 3_600_000
+
+    minutes = milliseconds // 60_000
+    milliseconds -= minutes * 60_000
+
+    seconds = milliseconds // 1_000
+    milliseconds -= seconds * 1_000
+
+    hours_marker = f"{hours:02d}:" if always_include_hours or hours > 0 else ""
+    return (
+        f"{hours_marker}{minutes:02d}:{seconds:02d}{decimal_marker}{milliseconds:03d}"
+    )

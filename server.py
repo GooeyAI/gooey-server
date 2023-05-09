@@ -1,3 +1,5 @@
+from traceback import print_exc
+
 from gooeysite import wsgi
 
 assert wsgi
@@ -369,6 +371,7 @@ def call_api(
         except StopIteration:
             pass
     except Exception as e:
+        print_exc()
         capture_exception(e)
         raise HTTPException(
             status_code=500,
