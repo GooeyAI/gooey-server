@@ -595,6 +595,7 @@ def checkbox(
         help=help,
         disabled=disabled,
         label_visibility=label_visibility,
+        default_value_attr="defaultChecked",
     )
     return bool(value)
 
@@ -608,6 +609,7 @@ def _input_widget(
     help: str = None,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
+    default_value_attr: str = "defaultValue",
     **kwargs,
 ) -> state.typing.Any:
     if key:
@@ -623,15 +625,15 @@ def _input_widget(
         label = None
     state.RenderTreeNode(
         name="input",
-        props=dict(
-            type=input_type,
-            name=key,
-            label=dedent(label),
-            defaultValue=value,
-            help=help,
-            disabled=disabled,
+        props={
+            "type": input_type,
+            "name": key,
+            "label": dedent(label),
+            default_value_attr: value,
+            "help": help,
+            "disabled": disabled,
             **kwargs,
-        ),
+        },
     ).mount()
     return value
 

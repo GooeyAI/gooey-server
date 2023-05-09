@@ -399,7 +399,7 @@ def call_api(
     }
 
 
-@app.post("/__/gooey-ui/", include_in_schema=False)
+@app.post("/__/gooey-ui/explore/", include_in_schema=False)
 def explore():
     with st.main() as root:
         try:
