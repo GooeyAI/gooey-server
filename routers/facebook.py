@@ -318,6 +318,7 @@ def _on_msg(bot: BotInterface):
     # handle reset keyword
     if input_text.strip().lower() == RESET_KEYWORD:
         # clear saved messages
+        bot.convo.messages.all().delete()
         msgs_to_save = []
         # let the user know we've reset
         response_text = RESET_MSG
