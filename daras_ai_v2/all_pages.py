@@ -55,13 +55,13 @@ all_home_pages = [
 ]
 
 # exposed as API
-all_api_pages = all_home_pages + [
+all_api_pages = all_home_pages.copy() + [
     ChyronPlantPage,
     LetterWriterPage,
 ]
 
 # pytest suite
-all_test_pages = all_api_pages
+all_test_pages = all_api_pages.copy()
 # deprecated
 all_test_pages.remove(LetterWriterPage)
 # too slow
