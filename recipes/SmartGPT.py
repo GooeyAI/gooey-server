@@ -76,9 +76,11 @@ class SmartGPTPage(BasePage):
             height=150,
         )
         language_model_settings()
+
     def related_workflows(self):
         from recipes.CompareLLM import CompareLLMPage
         from recipes.DocSearch import DocSearchPage
+
         # from recipes.DocSummary import DocSummaryPage
         from daras_ai_v2.GoogleGPT import GoogleGPTPage
 
