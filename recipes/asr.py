@@ -1,6 +1,7 @@
 import typing
 
 import streamlit as st
+from jinja2.lexer import whitespace_re
 from pydantic import BaseModel
 
 from daras_ai_v2.asr import (
@@ -69,7 +70,9 @@ class AsrPage(BasePage):
         ]
 
     def render_form_v2(self):
-        document_uploader("##### Audio Files", type=("wav", "ogg", "mp3", "aac"))
+        document_uploader(
+            "##### Audio Files", type=("wav", "ogg", "mp3", "aac", "opus")
+        )
         st.write("---")
         enum_selector(AsrModels, label="###### ASR Model", key="selected_model")
         st.text_input("###### Spoken Language _(optional)_", key="language")
@@ -130,3 +133,15 @@ class AsrPage(BasePage):
         else:
             # Save the raw ASR text for details view
             state["output_text"] = asr_output
+
+    def additional_notes(self) -> str | None:
+        return """
+*Cost ≈ 1 credit for 25 words ≈ 0.04 credits per word*
+              """
+
+    def get_raw_price(self):
+        total_words = sum(
+            len(whitespace_re.split(out))
+            for out in st.session_state.get("output_text", [])
+        )
+        return 0.04 * total_words

@@ -345,7 +345,7 @@ def call_api(
 
     # check the balance
     balance = db.get_doc_field(db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0)
-    if balance < page.get_price():
+    if balance <= 0:
         account_url = furl(settings.APP_BASE_URL) / "account"
         raise HTTPException(
             status_code=402,

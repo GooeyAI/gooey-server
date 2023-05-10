@@ -116,7 +116,7 @@ class CompareLLMPage(BasePage):
                     height=height,
                 )
 
-    def get_price(self) -> int:
+    def get_raw_price(self) -> int:
         selected_models = st.session_state.get("selected_models", [])
         total = 0
         for name in selected_models:

@@ -1,5 +1,6 @@
 import datetime
 import inspect
+import math
 import traceback
 import typing
 import uuid
@@ -505,7 +506,7 @@ class BasePage:
         with col1:
             st.caption(
                 f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ \\\n"
-                f"Run cost = [{self.get_price()} credits]({self.get_credits_click_url()})",
+                f"Run cost = [{self.get_price_roundoff()} credits]({self.get_credits_click_url()})",
             )
             additional_notes = self.additional_notes()
             if additional_notes:
@@ -708,7 +709,7 @@ class BasePage:
 
     def _run_thread(self, run_id, uid):
         redis_key = f"runs/{uid}/{run_id}"
-        local_state = dict(st.session_state)
+        st.session_state = deepcopy(st.session_state)
         run_time = 0
         yield_val = None
         error_msg = None
@@ -727,7 +728,7 @@ class BasePage:
             # extract outputs from local state
             output = {
                 k: v
-                for k, v in local_state.items()
+                for k, v in st.session_state.items()
                 if k in self.ResponseModel.__fields__
             }
             # send updates to streamlit
@@ -735,11 +736,13 @@ class BasePage:
                 redis_key, updates | output, expire=datetime.timedelta(hours=2)
             )
             # save to db
-            self.run_doc_ref(run_id, uid).set(self.state_to_doc(updates | local_state))
+            self.run_doc_ref(run_id, uid).set(
+                self.state_to_doc(updates | st.session_state)
+            )
 
         try:
             save()
-            gen = self.run(local_state)
+            gen = self.run(st.session_state)
             while True:
                 # record time
                 start_time = time()
@@ -1115,7 +1118,7 @@ class BasePage:
             db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
         )
 
-        if balance < self.get_price():
+        if balance <= 0:
             account_url = furl(settings.APP_BASE_URL) / "account/"
 
             if getattr(user, "_is_anonymous", False):
@@ -1151,11 +1154,14 @@ class BasePage:
         user = st.session_state.get("_current_user")
         if not user:
             return
-
-        amount = self.get_price()
+        # don't allow fractional pricing for now, min 1 credit
+        amount = self.get_price_roundoff()
         db.update_user_balance(user.uid, -abs(amount), f"gooey_in_{uuid.uuid1()}")
 
-    def get_price(self) -> int:
+    def get_price_roundoff(self) -> int:
+        return max(1, math.ceil(self.get_raw_price()))
+
+    def get_raw_price(self) -> float:
         return self.price
 
     def get_example_response_body(

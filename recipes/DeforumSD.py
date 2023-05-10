@@ -216,7 +216,7 @@ class DeforumSDPage(BasePage):
 *Process Run Time ≈ 5 seconds per frame*
         """
 
-    def get_price(self) -> int:
+    def get_raw_price(self) -> int:
         return math.ceil(st.session_state.get("max_frames", 100) * 0.25)
 
     def validate_form_v2(self):

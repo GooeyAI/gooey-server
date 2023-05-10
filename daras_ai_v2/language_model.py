@@ -10,6 +10,7 @@ import openai.error
 import tiktoken
 import typing_extensions
 from decouple import config
+from jinja2.lexer import whitespace_re
 
 from daras_ai_v2 import settings
 from daras_ai_v2.gpu_server import call_gpu_server, GpuEndpoints
@@ -137,9 +138,11 @@ def do_retry(
 def get_embeddings(
     texts: list[str], engine: str = "text-embedding-ada-002"
 ) -> list[list[float]]:
-    # replace newlines, which can negavely affect performance
-    texts = [t.replace("\n", " ") for t in texts]
+    # replace newlines, which can negatively affect performance.
+    texts = [whitespace_re.sub(" ", text) for text in texts]
+    # create the embeddings
     res = openai.Embedding.create(input=texts, engine=engine)
+    # return the embedding vectors
     return [record["embedding"] for record in res["data"]]
 
 

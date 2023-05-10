@@ -110,7 +110,7 @@ class CompareUpscalerPage(BasePage):
                 continue
             st.image(img, caption=UpscalerModels[key].value)
 
-    def get_price(self) -> int:
+    def get_raw_price(self) -> int:
         selected_models = st.session_state.get("selected_models", [])
         total = 5 * len(selected_models)
         return total

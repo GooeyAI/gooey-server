@@ -324,7 +324,7 @@ class ObjectInpaintingPage(BasePage):
     def render_usage_guide(self):
         youtube_video("to6_17XJeck")
 
-    def get_price(self) -> int:
+    def get_raw_price(self) -> int:
         selected_model = st.session_state.get("selected_model")
         match selected_model:
             case InpaintingModels.dall_e.name:

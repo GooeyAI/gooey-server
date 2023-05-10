@@ -194,7 +194,7 @@ class Img2ImgPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Add an image and a prompt and this workflow will alter the image using your text & the latest InstructPix2Pix or Stable Difussion Img2Img AI model."
 
-    def get_price(self) -> int:
+    def get_raw_price(self) -> int:
         selected_model = st.session_state.get("selected_model")
         match selected_model:
             case Img2ImgModels.dall_e.name:

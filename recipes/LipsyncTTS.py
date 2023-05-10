@@ -75,7 +75,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             st.session_state["input_face"] = upload_st_file(face_file)
         assert st.session_state.get("input_face"), "Please provide an Input Face"
 
-    def get_price(self) -> int:
+    def get_raw_price(self) -> int:
         return 10
 
     def preview_image(self, state: dict) -> str | None:
