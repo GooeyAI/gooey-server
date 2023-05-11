@@ -704,7 +704,7 @@ class BasePage:
             return
 
         t = Thread(target=self._run_thread, args=[run_id, uid])
-        add_script_run_ctx(t)
+        # add_script_run_ctx(t)
         t.start()
 
     def _run_thread(self, run_id, uid):
