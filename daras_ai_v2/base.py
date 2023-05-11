@@ -709,7 +709,7 @@ class BasePage:
 
     def _run_thread(self, run_id, uid):
         redis_key = f"runs/{uid}/{run_id}"
-        st.session_state = deepcopy(st.session_state)
+        st.session_state = dict(st.session_state)
         run_time = 0
         yield_val = None
         error_msg = None
