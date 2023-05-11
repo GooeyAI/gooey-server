@@ -102,6 +102,9 @@ Prompt for merging several outputs together
 
         language_model_settings()
 
+    def preview_description(self, state: dict) -> str:
+        return "Upload any collection of PDFs, docs and/or audio files and we'll transcribe them. Then give any GPT based instruction and we'll do a map-reduce and return the result. Great for summarizing large data sets to create structured data. Check out the examples for more."
+
     def validate_form_v2(self):
         search_query = st.session_state.get("task_instructions", "").strip()
         assert search_query, "Please enter the Instructions"
