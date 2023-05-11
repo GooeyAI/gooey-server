@@ -43,6 +43,7 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.search_ref import apply_response_template
 
 DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
@@ -249,7 +250,7 @@ def get_top_k_references(
         the top k documents
     """
     yield f"Getting query embeddings..."
-    query_embeds = get_embeddings_cached([request.search_query])[0]
+    query_embeds = get_embeddings([request.search_query])[0]
     yield "Getting document embeddings..."
     input_docs = request.documents or []
     nested_embeds: list[list[tuple[SearchReference, list[float]]]] = map_parallel(
@@ -373,7 +374,8 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
     return DocMetadata(name, etag, mime_type)
 
 
-@st.cache_data(show_spinner=False)
+@redis_cache_decorator
+# @st.cache_data(show_spinner=False)
 def _doc_url_to_embeds_cached(
     *,
     f_url: str,
@@ -444,7 +446,8 @@ def _doc_url_to_embeds_cached(
     return list(zip(metas, embeds))
 
 
-@st.cache_data(show_spinner=False)
+@redis_cache_decorator
+# @st.cache_data(show_spinner=False)
 def doc_url_to_text_pages(
     *,
     f_url: str,
@@ -504,9 +507,6 @@ def doc_url_to_text_pages(
     if google_translate_target:
         pages = run_google_translate(pages, google_translate_target)
     return pages
-
-
-get_embeddings_cached = st.cache_data(show_spinner=False)(get_embeddings)
 
 
 def vector_similarity(x: list[float], y: list[float]) -> float:

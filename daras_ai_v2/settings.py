@@ -240,6 +240,8 @@ TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
 TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")
 
 REDIS_URL = config("REDIS_URL", "redis://localhost:6379")
+# redis configured as cache backend
+REDIS_CACHE_URL = config("REDIS_CACHE_URL", "redis://localhost:6379")
 TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
 
 PINECONE_API_KEY = config("PINECONE_API_KEY", "")

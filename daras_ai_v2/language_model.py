@@ -14,6 +14,7 @@ from jinja2.lexer import whitespace_re
 
 from daras_ai_v2 import settings
 from daras_ai_v2.gpu_server import call_gpu_server, GpuEndpoints
+from daras_ai_v2.redis_cache import redis_cache_decorator
 
 _gpt2_tokenizer = None
 
@@ -141,9 +142,14 @@ def get_embeddings(
     # replace newlines, which can negatively affect performance.
     texts = [whitespace_re.sub(" ", text) for text in texts]
     # create the embeddings
-    res = openai.Embedding.create(input=texts, engine=engine)
+    res = _openai_embedding_create(input=texts, engine=engine)
     # return the embedding vectors
     return [record["embedding"] for record in res["data"]]
+
+
+@redis_cache_decorator
+def _openai_embedding_create(*args, **kwargs):
+    return openai.Embedding.create(*args, **kwargs)
 
 
 class ConversationEntry(typing_extensions.TypedDict):
