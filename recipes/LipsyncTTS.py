@@ -14,6 +14,8 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lipsync Video with Any Text"
     slug_versions = ["LipsyncTTS", "lipsync-maker"]
 
+    price = 10
+
     class RequestModel(BaseModel):
         input_face: str
         input_audio: str | None
@@ -74,9 +76,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         if face_file:
             st.session_state["input_face"] = upload_st_file(face_file)
         assert st.session_state.get("input_face"), "Please provide an Input Face"
-
-    def get_raw_price(self) -> int:
-        return 10
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_LIPSYNC_TTS_META_IMG

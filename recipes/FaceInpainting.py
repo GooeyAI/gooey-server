@@ -343,8 +343,8 @@ class FaceInpaintingPage(BasePage):
             st.write("**Prompt**")
             st.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
-    def get_raw_price(self) -> int:
-        selected_model = st.session_state.get("selected_model")
+    def get_raw_price(self, state: dict) -> int:
+        selected_model = state.get("selected_model")
         match selected_model:
             case InpaintingModels.dall_e.name:
                 return 20

@@ -139,9 +139,7 @@ class AsrPage(BasePage):
 *Cost ≈ 1 credit for 25 words ≈ 0.04 credits per word*
               """
 
-    def get_raw_price(self):
-        total_words = sum(
-            len(whitespace_re.split(out))
-            for out in st.session_state.get("output_text", [])
-        )
+    def get_raw_price(self, state: dict):
+        texts = state.get("output_text", [])
+        total_words = sum(len(whitespace_re.split(out)) for out in texts)
         return 0.04 * total_words

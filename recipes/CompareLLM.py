@@ -116,8 +116,8 @@ class CompareLLMPage(BasePage):
                     height=height,
                 )
 
-    def get_raw_price(self) -> int:
-        selected_models = st.session_state.get("selected_models", [])
+    def get_raw_price(self, state: dict) -> int:
+        selected_models = state.get("selected_models", [])
         total = 0
         for name in selected_models:
             match name:

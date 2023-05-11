@@ -386,7 +386,7 @@ def call_api(
     # save the run
     run_doc_ref.set(page.state_to_doc(state))
     # deduct credits
-    page.deduct_credits()
+    page.deduct_credits(st.session_state)
 
     # return updated state
     return {

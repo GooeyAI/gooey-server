@@ -506,7 +506,7 @@ class BasePage:
         with col1:
             st.caption(
                 f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ \\\n"
-                f"Run cost = [{self.get_price_roundoff()} credits]({self.get_credits_click_url()})",
+                f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()})",
             )
             additional_notes = self.additional_notes()
             if additional_notes:
@@ -703,13 +703,15 @@ class BasePage:
             st.error("Already running, please wait or open in a new tab...")
             return
 
-        t = Thread(target=self._run_thread, args=[run_id, uid])
-        # add_script_run_ctx(t)
+        t = Thread(
+            target=self._run_thread,
+            args=[run_id, uid, dict(st.session_state)],
+        )
+        add_script_run_ctx(t)
         t.start()
 
-    def _run_thread(self, run_id, uid):
+    def _run_thread(self, run_id, uid, local_state):
         redis_key = f"runs/{uid}/{run_id}"
-        st.session_state = dict(st.session_state)
         run_time = 0
         yield_val = None
         error_msg = None
@@ -728,7 +730,7 @@ class BasePage:
             # extract outputs from local state
             output = {
                 k: v
-                for k, v in st.session_state.items()
+                for k, v in local_state.items()
                 if k in self.ResponseModel.__fields__
             }
             # send updates to streamlit
@@ -736,13 +738,11 @@ class BasePage:
                 redis_key, updates | output, expire=datetime.timedelta(hours=2)
             )
             # save to db
-            self.run_doc_ref(run_id, uid).set(
-                self.state_to_doc(updates | st.session_state)
-            )
+            self.run_doc_ref(run_id, uid).set(self.state_to_doc(updates | local_state))
 
         try:
             save()
-            gen = self.run(st.session_state)
+            gen = self.run(local_state)
             while True:
                 # record time
                 start_time = time()
@@ -755,7 +755,7 @@ class BasePage:
                 # run completed
                 except StopIteration:
                     run_time += time() - start_time
-                    self.deduct_credits()
+                    self.deduct_credits(local_state)
                     break
                 # render errors nicely
                 except Exception as e:
@@ -1150,18 +1150,18 @@ class BasePage:
 
         return True
 
-    def deduct_credits(self):
-        user = st.session_state.get("_current_user")
+    def deduct_credits(self, state: dict):
+        user = state.get("_current_user")
         if not user:
             return
         # don't allow fractional pricing for now, min 1 credit
-        amount = self.get_price_roundoff()
+        amount = self.get_price_roundoff(state)
         db.update_user_balance(user.uid, -abs(amount), f"gooey_in_{uuid.uuid1()}")
 
-    def get_price_roundoff(self) -> int:
-        return max(1, math.ceil(self.get_raw_price()))
+    def get_price_roundoff(self, state: dict) -> int:
+        return max(1, math.ceil(self.get_raw_price(state)))
 
-    def get_raw_price(self) -> float:
+    def get_raw_price(self, state: dict) -> float:
         return self.price
 
     def get_example_response_body(
