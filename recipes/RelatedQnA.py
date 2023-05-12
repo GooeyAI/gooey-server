@@ -5,7 +5,6 @@ import streamlit as st
 from furl import furl
 from pydantic import BaseModel
 
-from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
@@ -15,10 +14,6 @@ from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_pick
 from daras_ai_v2.search_ref import SearchReference, render_text_with_refs
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
-
-
-class RelatedQuery(GoogleGPTPage.ResponseModel):
-    search_query: str
 
 
 class RelatedQnAPage(BasePage):
@@ -69,8 +64,14 @@ class RelatedQnAPage(BasePage):
         scaleserp_locations: list[str] | None
 
     class ResponseModel(BaseModel):
+        output_text: list[dict]
+
+        scaleserp_results_related_questions: list[dict]
         scaleserp_results: list[dict]
-        output_queries: list[dict]
+        # search_urls: list[str]
+        # summarized_urls: list[dict]
+        references: list[dict]
+        final_prompts: list[dict]
 
     def render_description(self) -> str:
         return "This workflow gets the related queries for your Google search, searches your custom domain and builds answers using the results and GPT."
@@ -86,6 +87,13 @@ class RelatedQnAPage(BasePage):
 
     def render_output(self):
         render_outputs(st.session_state, 300)
+        return
+        with st.expander("Sources"):
+            for idx, ref in enumerate(st.session_state.get("references", [])):
+
+                st.write(
+                    f"{idx + 1}. [{ref['title']}]({ref['url']}) \\\n*{ref['snippet']}*"
+                )
 
     def render_example(self, state: dict):
         st.write("**Search Query**")
@@ -158,59 +166,143 @@ class RelatedQnAPage(BasePage):
                 st.json(scaleserp_results, expanded=False)
             else:
                 st.empty()
-        st.write("**Related Queries**")
-        st.write(st.session_state.get("output_queries", []))
+
+        # with col2:
+        #     search_urls = st.session_state.get("search_urls")
+        #     if search_urls:
+        #         st.write("**Search URLs**")
+        #         st.json(search_urls, expanded=False)
+        #     else:
+        #         st.empty()
+
+        # summarized_urls = st.session_state.get("summarized_urls")
+        # if summarized_urls:
+        #     st.write("**Summarized URLs**")
+        #     st.json(summarized_urls, expanded=False)
+        # else:
+        #     st.empty()
+
+        final_prompt = st.session_state.get("final_prompt")
+        if final_prompt:
+            st.text_area(
+                "**Final Prompt**",
+                value=final_prompt,
+                height=400,
+                disabled=True,
+            )
+        else:
+            st.empty()
+
+        output_text: list = st.session_state.get("output_text", [])
+        for idx, text in enumerate(output_text):
+            st.text_area(
+                f"**Output Text**",
+                help=f"output {idx}",
+                disabled=True,
+                value=text,
+                height=200,
+            )
+
+        st.write("**References**")
+        st.json(st.session_state.get("references", []), expanded=False)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: RelatedQnAPage.RequestModel = self.RequestModel.parse_obj(state)
         search_query = request.search_query
+        state["scaleserp_results"] = []
+        state["references"] = []
+        state["final_prompts"] = []
+        state["output_text"] = []
         yield "Googling Related Questions..."
-        state["scaleserp_results"] = scaleserp_results_rq = call_scaleserp(
+        state[
+            "scaleserp_results_related_questions"
+        ] = scaleserp_related_questions_result = call_scaleserp(
             search_query,
             include_fields="related_questions",
             location=",".join(request.scaleserp_locations),
         )
-        state["output_queries"] = output_queries = []
-        for related_question in scaleserp_results_rq.get("related_questions", []):
-            related_query_dict = {}
-            search_query = related_query_dict["search_query"] = related_question.get(
-                "question"
+        yield "Googling Related Questions..."
+        for related_question in scaleserp_related_questions_result.get(
+            "related_questions", []
+        ):
+            question = related_question.get("question")
+            search_query = question
+            if request.site_filter:
+                f = furl(request.site_filter)
+                search_query = f"site:{f.host}{f.path} {search_query}"
+            scaleserp_results = call_scaleserp(
+                search_query,
+                include_fields=request.scaleserp_search_field,
+                location=",".join(request.scaleserp_locations),
             )
-            yield f"Running for {search_query}..."
-            gpt_run_state = state
-            gpt_run_state["search_query"] = search_query
+            state["scaleserp_results"].append(
+                {"question": question, "scaleserp_results": scaleserp_results}
+            )
 
-            yield from GoogleGPTPage().run(gpt_run_state)
-            output_queries.append(
-                {
-                    "search_query": search_query,
-                    "output_text": gpt_run_state["output_text"],
-                    "references": gpt_run_state["references"],
-                    "scaleserp_results": gpt_run_state["scaleserp_results"],
-                    "final_prompt": gpt_run_state["final_prompt"],
-                }
+            references = []
+
+            utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
+            task_instructions = request.task_instructions.replace(
+                "{{ datetime.utcnow }}", utcnow
             )
-        yield "Done!"
+            prompt = task_instructions.strip() + "\n\n"
+            prompt += "Search Results:\n"
+            ref_num = 1
+            for item in scaleserp_results.get(request.scaleserp_search_field, []):
+                try:
+                    url = item["link"]
+                    title = item["title"]
+                    snippet = item["snippet"]
+                except KeyError:
+                    break
+                prompt += f"[{ref_num}] {snippet}\n"
+                references.append(
+                    {"url": url, "title": title, "snippet": snippet, "score": 1.0}
+                )
+                if ref_num >= request.max_search_urls:
+                    break
+                ref_num += 1
+                state["references"].append(
+                    {"question": question, "references": references}
+                )
+
+            if not references:
+                raise ValueError(
+                    f"Your search - {request.search_query} - did not match any documents."
+                )
+            prompt += f"Question: {request.search_query}\nAnswer:"
+            state["final_prompts"].append({"question": question, "prompt": prompt})
+
+            yield f"Generating answer using [{LargeLanguageModels[request.selected_model].value}]..."
+            output_text = run_language_model(
+                model=request.selected_model,
+                quality=request.quality,
+                num_outputs=request.num_outputs,
+                temperature=request.sampling_temperature,
+                prompt=prompt,
+                max_tokens=request.max_tokens,
+                avoid_repetition=request.avoid_repetition,
+            )
+            state["output_text"].append({"question": question, "answer": output_text})
 
 
 def render_outputs(state, height):
-    output_queries = state.get("output_queries", [])
-    if output_queries:
-        for output in output_queries:
-            output_text = output.get("output_text", [])
-            if output_text:
-                st.write(f"**{output.get('search_query')}**")
-                st.write("**Answer**")
-            for text in output_text:
-                html = render_text_with_refs(text, output.get("references", []))
-                st.write(
-                    # language=html
-                    f"""<div style="max-height: {height}px;" class="gooey-output-text"><p>{html}</p></div>""",
-                    unsafe_allow_html=True,
-                )
-
-            with st.expander("Sources"):
-                for idx, ref in enumerate(output.get("references", [])):
-                    st.write(
-                        f"{idx + 1}. [{ref['title']}]({ref['url']}) \\\n*{ref['snippet']}*"
-                    )
+    # st.write(state.get("output_text"))
+    output_text = state.get("output_text", [])
+    if output_text:
+        for output in output_text:
+            st.write(f"**Answer** for {output['question']}")
+            html = render_text_with_refs(
+                output["answer"][0],
+                [
+                    question.get("references", [])
+                    if question.get("question") == output["question"]
+                    else {}
+                    for question in state.get("references", [])
+                ],
+            )
+            st.write(
+                # language=html
+                f"""<div style="max-height: {height}px;" class="gooey-output-text"><p>{html}</p></div>""",
+                unsafe_allow_html=True,
+            )
