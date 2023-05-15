@@ -42,7 +42,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "phonenumber_field",
     "django.forms",  # needed to override django admin templates
     "bots",
 ]

@@ -69,7 +69,7 @@ def image_input(idx, variables, state):
 
 
 # @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
-@st.cache_data
+# @st.cache_data
 def upload_file(uploaded_file: UploadedFile):
     img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
     img_bytes = resize_img_pad(img_bytes, (512, 512))
@@ -85,7 +85,7 @@ def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
 
 
 # @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
-@st.cache_data
+# @st.cache_data
 def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
     img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
     img_bytes = resize_img_scale(img_bytes, resize)
@@ -140,7 +140,7 @@ def resize_img_fit(img_bytes: bytes, size: (int, int)) -> bytes:
     return cv2_img_to_bytes(img_cv2)
 
 
-@st.cache_data
+# @st.cache_data
 def upload_st_file(f: UploadedFile) -> str:
     return upload_file_from_bytes(f.name, f.getvalue(), f.type)
 

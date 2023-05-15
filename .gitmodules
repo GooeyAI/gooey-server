@@ -1,0 +1,3 @@
+[submodule "django-bots"]
+	path = django-bots
+	url = git@github.com:dara-network/django-bots.git
