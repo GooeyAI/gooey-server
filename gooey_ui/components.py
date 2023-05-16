@@ -190,11 +190,13 @@ def text_area(
         name="textarea",
         style=dict(height=f"{height}px"),
         props=dict(
+            name=key,
             label=dedent(label),
-            value=value,
+            defaultValue=value,
             help=help,
             placeholder=placeholder,
             disabled=disabled,
+            slowdebounce="",
         ),
     ).mount()
     return value or ""
@@ -513,6 +515,7 @@ def text_input(
         label_visibility=label_visibility,
         maxLength=max_chars,
         placeholder=placeholder,
+        slowdebounce="",
     )
     return value or ""
 
