@@ -115,7 +115,11 @@ def columns(spec, *, gap: str = None) -> list[state.typing.ContextManager]:
         spec = [1] * spec
     total_weight = sum(spec)
     parent = state.RenderTreeNode(
-        name="columns",
+        name="div",
+        style=dict(
+            display="flex",
+            gap="1 rem",
+        ),
         children=[
             state.RenderTreeNode(
                 name="div",
@@ -281,7 +285,7 @@ def selectbox(
             )
             for option in options
         ],
-    )
+    ).mount()
     return value
 
 
