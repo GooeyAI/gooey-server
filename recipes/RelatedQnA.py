@@ -158,45 +158,8 @@ class RelatedQnAPage(BasePage):
                 st.json(scaleserp_results, expanded=False)
             else:
                 st.empty()
-
-        # with col2:
-        #     search_urls = st.session_state.get("search_urls")
-        #     if search_urls:
-        #         st.write("**Search URLs**")
-        #         st.json(search_urls, expanded=False)
-        #     else:
-        #         st.empty()
-
-        # summarized_urls = st.session_state.get("summarized_urls")
-        # if summarized_urls:
-        #     st.write("**Summarized URLs**")
-        #     st.json(summarized_urls, expanded=False)
-        # else:
-        #     st.empty()
-
-        final_prompt = st.session_state.get("final_prompt")
-        if final_prompt:
-            st.text_area(
-                "**Final Prompt**",
-                value=final_prompt,
-                height=400,
-                disabled=True,
-            )
-        else:
-            st.empty()
-
-        output_text: list = st.session_state.get("output_text", [])
-        for idx, text in enumerate(output_text):
-            st.text_area(
-                f"**Output Text**",
-                help=f"output {idx}",
-                disabled=True,
-                value=text,
-                height=200,
-            )
-
-        st.write("**References**")
-        st.json(st.session_state.get("references", []), expanded=False)
+        st.write("**Related Queries**")
+        st.write(st.session_state.get("output_queries", []))
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: RelatedQnAPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -208,12 +171,12 @@ class RelatedQnAPage(BasePage):
             location=",".join(request.scaleserp_locations),
         )
         state["output_queries"] = output_queries = []
-        yield f"Generating answer using [{LargeLanguageModels[request.selected_model].value}]..."
         for related_question in scaleserp_results_rq.get("related_questions", []):
             related_query_dict = {}
             search_query = related_query_dict["search_query"] = related_question.get(
                 "question"
             )
+            yield f"Running for {search_query}..."
             if request.site_filter:
                 f = furl(request.site_filter)
                 search_query = f"site:{f.host}{f.path} {search_query}"
@@ -268,6 +231,7 @@ class RelatedQnAPage(BasePage):
             related_query_dict["output_text"] = output_text
             # related_query: RelatedQuery = RelatedQuery.parse_obj(related_query_dict)
             output_queries.append(related_query_dict)
+        yield "Done!"
 
 
 def render_outputs(state, height):
