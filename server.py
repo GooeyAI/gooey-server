@@ -1,17 +1,17 @@
-from traceback import print_exc
-
 from gooeysite import wsgi
 
 assert wsgi
 
 import datetime
+import json
 import re
 import typing
 from time import time
+from traceback import print_exc
 
 import httpx
 import streamlit as st
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Form, Depends
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -21,10 +21,11 @@ from firebase_admin import auth, exceptions
 from furl import furl
 from google.cloud import firestore
 from lxml.html import HtmlElement
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ValidationError
 from pydantic.generics import GenericModel
 from pyquery import PyQuery as pq
 from sentry_sdk import capture_exception
+from starlette.datastructures import UploadFile, FormData
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
@@ -39,6 +40,7 @@ from auth_backend import (
     FIREBASE_SESSION_COOKIE,
 )
 from daras_ai.computer import run_compute_steps
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings, db
 from daras_ai_v2.all_pages import all_api_pages
 from daras_ai_v2.base import (
@@ -285,30 +287,88 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         __base__=ApiResponseModel[page_cls.ResponseModel],
     )
 
+    endpoint = furl(page_cls().endpoint)
+    if not endpoint.path.segments[-1]:
+        endpoint.path.segments.pop()
+
     @app.post(
-        page_cls().endpoint,
+        str(endpoint / "form"),
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModel}, 402: {}},
+        include_in_schema=False,
+    )
+    @app.post(
+        str(endpoint / "form/"),
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModel}, 402: {}},
+        include_in_schema=False,
+    )
+    def run_api_form(
+        request: Request,
+        user: auth.UserRecord = Depends(api_auth_header),
+        form_data=Depends(request_form_files),
+        page_request_json: str = Form(alias="json"),
+    ):
+        page_request_data = json.loads(page_request_json)
+        # fill in the file urls from the form data
+        form_data: FormData
+        for key in form_data.keys():
+            uf_list = form_data.getlist(key)
+            if not (uf_list and isinstance(uf_list[0], UploadFile)):
+                continue
+            urls = [
+                upload_file_from_bytes(uf.filename, uf.file.read(), uf.content_type)
+                for uf in uf_list
+            ]
+            try:
+                is_str = (
+                    page_cls.RequestModel.schema()["properties"][key]["type"]
+                    == "string"
+                )
+            except KeyError:
+                raise HTTPException(
+                    status_code=400, detail=f'Inavlid file field "{key}"'
+                )
+            if is_str:
+                page_request_data[key] = urls[0]
+            else:
+                page_request_data[key] = urls
+        # validate the request
+        try:
+            page_request = page_cls.RequestModel.parse_obj(page_request_data)
+        except ValidationError as e:
+            raise HTTPException(status_code=422, detail=e.errors())
+        # call regular json api
+        return run_api_json(request, page_request=page_request, user=user)
+
+    @app.post(
+        str(endpoint) + "/",
         response_model=response_model,
         responses={500: {"model": FailedReponseModel}, 402: {}},
         name=page_cls.title,
         operation_id=page_cls.slug_versions[0],
     )
-    def run_api(
+    @app.post(
+        str(endpoint),
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModel}, 402: {}},
+        include_in_schema=False,
+    )
+    def run_api_json(
         request: Request,
         user: auth.UserRecord = Depends(api_auth_header),
         page_request: page_cls.RequestModel = body_spec,
     ):
-        try:
-            return call_api(
-                page_cls=page_cls,
-                user=user,
-                request_body=page_request.dict(),
-                query_params=request.query_params,
-            )
-        except HTTPException as e:
-            return JSONResponse(
-                status_code=e.status_code,
-                content=e.detail,
-            )
+        return call_api(
+            page_cls=page_cls,
+            user=user,
+            request_body=page_request.dict(),
+            query_params=request.query_params,
+        )
+
+
+async def request_form_files(request: Request) -> FormData:
+    return await request.form()
 
 
 def call_api(

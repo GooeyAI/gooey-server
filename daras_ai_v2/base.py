@@ -1082,9 +1082,11 @@ class BasePage:
         )
         st.markdown(f"### [📖 API Docs]({api_docs_url})")
 
-        include_all = st.checkbox("Show all fields")
+        st.write("#### 📤 Example Request")
 
-        api_url = str(self._get_current_api_url())
+        include_all = st.checkbox("Show all fields")
+        upload_files = st.checkbox("Upload Files via Form Data")
+
         request_body = get_example_request_body(
             self.RequestModel, st.session_state, include_all=include_all
         )
@@ -1092,8 +1094,7 @@ class BasePage:
             st.session_state, include_all=include_all
         )
 
-        st.write("#### 📤 Example Request")
-        api_example_generator(api_url, request_body)
+        api_example_generator(self._get_current_api_url(), request_body, upload_files)
         st.write("")
 
         user = st.session_state.get("_current_user")

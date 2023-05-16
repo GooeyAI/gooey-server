@@ -85,6 +85,9 @@ video, img {
     font-size: 1.1rem;
 }
 
+.stCodeBlock {
+    margin-bottom: 1rem;
+}
 .stCodeBlock * code {
     white-space: pre-wrap !important;
 }
