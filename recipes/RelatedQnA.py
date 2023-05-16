@@ -177,60 +177,19 @@ class RelatedQnAPage(BasePage):
                 "question"
             )
             yield f"Running for {search_query}..."
-            if request.site_filter:
-                f = furl(request.site_filter)
-                search_query = f"site:{f.host}{f.path} {search_query}"
+            gpt_run_state = state
+            gpt_run_state["search_query"] = search_query
 
-            related_query_dict[
-                "scaleserp_results"
-            ] = scaleserp_results = call_scaleserp(
-                search_query,
-                include_fields=request.scaleserp_search_field,
-                location=",".join(request.scaleserp_locations),
+            yield from GoogleGPTPage().run(gpt_run_state)
+            output_queries.append(
+                {
+                    "search_query": search_query,
+                    "output_text": gpt_run_state["output_text"],
+                    "references": gpt_run_state["references"],
+                    "scaleserp_results": gpt_run_state["scaleserp_results"],
+                    "final_prompt": gpt_run_state["final_prompt"],
+                }
             )
-
-            related_query_dict["references"] = references = []
-
-            utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
-            task_instructions = request.task_instructions.replace(
-                "{{ datetime.utcnow }}", utcnow
-            )
-            prompt = task_instructions.strip() + "\n\n"
-            prompt += "Search Results:\n"
-            ref_num = 1
-            for item in scaleserp_results.get(request.scaleserp_search_field, []):
-                try:
-                    url = item["link"]
-                    title = item["title"]
-                    snippet = item["snippet"]
-                except KeyError:
-                    continue
-                prompt += f"[{ref_num}] {snippet}\n"
-                references.append(
-                    {"url": url, "title": title, "snippet": snippet, "score": 1.0}
-                )
-                if ref_num >= request.max_search_urls:
-                    break
-                ref_num += 1
-            if not references:
-                raise ValueError(
-                    f"Your search - {request.search_query} - did not match any documents."
-                )
-            prompt += f"Question: {request.search_query}\nAnswer:"
-            related_query_dict["final_prompt"] = prompt
-
-            output_text = run_language_model(
-                model=request.selected_model,
-                quality=request.quality,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                prompt=prompt,
-                max_tokens=request.max_tokens,
-                avoid_repetition=request.avoid_repetition,
-            )
-            related_query_dict["output_text"] = output_text
-            # related_query: RelatedQuery = RelatedQuery.parse_obj(related_query_dict)
-            output_queries.append(related_query_dict)
         yield "Done!"
 
 
