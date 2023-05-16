@@ -23,7 +23,7 @@ def get_filenames(request_body):
 
 
 def api_example_generator(api_url: furl, request_body: dict, upload_files: bool):
-    curl, python, js = st.tabs(["curl", "python", "node.js"])
+    curl, python, js = st.tabs(["`curl`", "`python`", "`node.js`"])
 
     filenames = []
     if upload_files:
@@ -47,133 +47,182 @@ export GOOEY_API_KEY=sk-xxxx
             st.write(
                 r"""
 ```bash
-curl %s \
-  -H "Authorization: %s $GOOEY_API_KEY" \
-  %s \
-  -F json=%s
+curl %(api_url)s \
+  -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY" \
+  %(files)s \
+  -F json=%(json)s
 ```
                 """
-                % (
-                    shlex.quote(api_url),
-                    auth_keyword,
-                    " \\\n  ".join(
+                % dict(
+                    api_url=shlex.quote(api_url),
+                    auth_keyword=auth_keyword,
+                    files=" \\\n  ".join(
                         f"-F {key}=@{shlex.quote(filename)}"
                         for key, filename in filenames
                     ),
-                    shlex.quote(json.dumps(request_body, indent=2)),
+                    json=shlex.quote(json.dumps(request_body, indent=2)),
                 )
             )
         else:
             st.write(
                 r"""
 ```bash
-curl %s \
+curl %(api_url)s \
+  -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY" \
   -H 'Content-Type: application/json' \
-  -H "Authorization: %s $GOOEY_API_KEY" \
-  -d %s
+  -d %(json)s
 ```
             """
-                % (
-                    shlex.quote(api_url),
-                    auth_keyword,
-                    shlex.quote(json.dumps(request_body, indent=2)),
+                % dict(
+                    api_url=shlex.quote(api_url),
+                    auth_keyword=auth_keyword,
+                    json=shlex.quote(json.dumps(request_body, indent=2)),
                 )
             )
 
     with python:
-        st.write(
-            r"""
-```bash
-$ python3 -m pip install requests
-$ export GOOEY_API_KEY=sk-xxxx
-```    
-             """
-        )
-
         if filenames:
             py_code = r"""
 import os
 import requests
 import json
 
-files = [%s,]
-data = %s
+files = [%(files)s,]
+payload = %(json)s
 
 response = requests.post(
-    "%s",
+    "%(api_url)s",
     headers={
-        "Authorization": "%s " + os.environ["GOOEY_API_KEY"],
+        "Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"],
     },
     files=files,
-    data={"json": json.dumps(data)},
+    data={"json": json.dumps(payload)},
 )
 
-data = response.json()
-print(response.status_code, data)
-            """ % (
-                ",".join(f'({key!r}, open({name!r}, "rb"))' for key, name in filenames),
-                repr(request_body),
-                api_url,
-                auth_keyword,
+result = response.json()
+print(response.status_code, result)
+            """ % dict(
+                files=",".join(
+                    f'({key!r}, open({name!r}, "rb"))' for key, name in filenames
+                ),
+                json=repr(request_body),
+                api_url=api_url,
+                auth_keyword=auth_keyword,
             )
         else:
             py_code = r"""
 import os
 import requests
 
+payload = %(json)s
+
 response = requests.post(
-    "%s",
+    "%(api_url)s",
     headers={
-        "Authorization": "%s " + os.environ["GOOEY_API_KEY"],
+        "Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"],
     },
-    json=%s,
+    json=payload,
 )
 
-data = response.json()
-print(response.status_code, data)
-            """ % (
-                api_url,
-                auth_keyword,
-                repr(request_body),
+result = response.json()
+print(response.status_code, result)
+            """ % dict(
+                api_url=api_url,
+                auth_keyword=auth_keyword,
+                json=repr(request_body),
             )
+
+        py_code = black.format_str(py_code, mode=black.FileMode())
         st.write(
-            f"""
+            rf"""
+```bash
+$ python3 -m pip install requests
+$ export GOOEY_API_KEY=sk-xxxx
+```    
+
 ```python
-{black.format_str(py_code, mode=black.FileMode())}
+%s
 ```
             """
+            % py_code
         )
 
     with js:
-        st.write(
-            r"""
-```
-$ npm install node-fetch
-```
-```js
-import fetch from 'node-fetch';
-```
-```js
-async function callApi() {
-  const response = await fetch("%s", {
+        if filenames:
+            js_code = """
+import fetch, { FormData, fileFrom } from 'node-fetch';
+
+const payload = %(json)s;
+
+async function gooeyAPI() {
+  const formData = new FormData()
+  formData.set('json', JSON.stringify(payload))
+%(files)s
+
+  const response = await fetch("%(api_url)s", {
     method: "POST",
     headers: {
-        "Authorization": "%s $GOOEY_API_KEY",
-        "Content-Type": "application/json",
+        "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
     },
-    body: JSON.stringify(%s),
+    body: formData,
   });
 
-  const data = await response.json();
-  console.log(response.status, data);
+  const result = await response.json();
+  console.log(response.status, result);
 }
 
-callApi();
+gooeyAPI();
+            """ % dict(
+                json=json.dumps(request_body, indent=2),
+                files=indent(
+                    "\n".join(
+                        "formData.append(%r, await fileFrom(%r)" % (key, name)
+                        for key, name in filenames
+                    ),
+                    " " * 2,
+                ),
+                api_url=api_url,
+                auth_keyword=auth_keyword,
+            )
+
+        else:
+            js_code = """
+import fetch from 'node-fetch';
+
+const payload = %(json)s;
+
+async function gooeyAPI() {
+  const response = await fetch("%(api_url)s", {
+    method: "POST",
+    headers: {
+        "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+        "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json();
+  console.log(response.status, result);
+}
+
+gooeyAPI();
+```
+            """ % dict(
+                api_url=api_url,
+                auth_keyword=auth_keyword,
+                json=json.dumps(request_body, indent=2),
+            )
+
+        st.write(
+            r"""
+```bash
+$ npm install node-fetch
+$ export GOOEY_API_KEY=sk-xxxx
+```
+
+```js
+%s
 ```
             """
-            % (
-                api_url,
-                auth_keyword,
-                indent(json.dumps(request_body, indent=2), " " * 4)[4:],
-            )
+            % js_code
         )
