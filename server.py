@@ -332,7 +332,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             if is_str:
                 page_request_data[key] = urls[0]
             else:
-                page_request_data[key] = urls
+                page_request_data.setdefault(key, []).extend(urls)
         # validate the request
         try:
             page_request = page_cls.RequestModel.parse_obj(page_request_data)
