@@ -22,15 +22,14 @@ def get_filenames(request_body):
             yield key, furl(item).path.segments[-1]
 
 
-def api_example_generator(api_url: furl, request_body: dict, upload_files: bool):
+def api_example_generator(api_url: furl, request_body: dict, as_form_data: bool):
     curl, python, js = st.tabs(["`curl`", "`python`", "`node.js`"])
 
     filenames = []
-    if upload_files:
+    if as_form_data:
         filenames = list(get_filenames(request_body))
         for key, _ in filenames:
             request_body.pop(key, None)
-    if filenames:
         api_url /= "form/"
     api_url = str(api_url)
 
@@ -43,7 +42,7 @@ export GOOEY_API_KEY=sk-xxxx
             """
         )
 
-        if filenames:
+        if as_form_data:
             st.write(
                 r"""
 ```bash
@@ -81,13 +80,13 @@ curl %(api_url)s \
             )
 
     with python:
-        if filenames:
+        if as_form_data:
             py_code = r"""
 import os
 import requests
 import json
 
-files = [%(files)s,]
+files = [%(files)s]
 payload = %(json)s
 
 response = requests.post(
@@ -148,7 +147,7 @@ $ export GOOEY_API_KEY=sk-xxxx
         )
 
     with js:
-        if filenames:
+        if as_form_data:
             js_code = """
 import fetch, { FormData, fileFrom } from 'node-fetch';
 

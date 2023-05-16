@@ -1085,7 +1085,7 @@ class BasePage:
         st.write("#### 📤 Example Request")
 
         include_all = st.checkbox("Show all fields")
-        upload_files = st.checkbox("Upload Files via Form Data")
+        as_form_data = st.checkbox("Upload Files via Form Data")
 
         request_body = get_example_request_body(
             self.RequestModel, st.session_state, include_all=include_all
@@ -1094,7 +1094,7 @@ class BasePage:
             st.session_state, include_all=include_all
         )
 
-        api_example_generator(self._get_current_api_url(), request_body, upload_files)
+        api_example_generator(self._get_current_api_url(), request_body, as_form_data)
         st.write("")
 
         user = st.session_state.get("_current_user")
