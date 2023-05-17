@@ -1,3 +1,4 @@
 [submodule "django-bots"]
 	path = django-bots
+	branch = main
 	url = git@github.com:dara-network/django-bots.git
