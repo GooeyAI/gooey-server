@@ -42,8 +42,7 @@ def init_scripts():
 
     query_params = gooey_get_query_params()
     _, _, uid = extract_query_params(query_params)
-    run_user: UserRecord = st.session_state.get("_run_user")
-    if uid and (not run_user or run_user.uid != uid):
+    if uid:
         if current_user.uid == uid:
             user = current_user
         else:

@@ -9,6 +9,7 @@ import pandas as pd
 from furl import furl
 
 from gooey_ui import state
+import json as _json
 
 T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]
@@ -280,7 +281,7 @@ def selectbox(
                 name="option",
                 props=dict(
                     label=dedent(str(format_func(option))),
-                    value=option,
+                    value=_json.dumps(option),
                     selected=value == option,
                 ),
             )

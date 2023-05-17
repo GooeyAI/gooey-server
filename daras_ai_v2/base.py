@@ -188,7 +188,10 @@ class BasePage:
         st.write("---")
         for name in tab_names:
             bgcolor = "gray" if name == selected_tab else "transparent"
-            url = self.app_url(tab_path=MenuTabs.paths[name])
+            url = self.app_url(
+                *extract_query_params(gooey_get_query_params()),
+                tab_path=MenuTabs.paths[name],
+            )
             st.markdown(
                 # language=html
                 f"""
@@ -992,36 +995,7 @@ class BasePage:
         col1, col2 = st.columns([2, 6])
 
         with col1:
-            if st.button("✏️ Tweak", help=f"Tweak {query_params}"):
-                # change url
-                gooey_reset_query_parm(**query_params)
-                # scroll to top
-                scroll_to_top()
-
-                # preserve cache
-                cache = {
-                    k: st.session_state[k]
-                    for k in [
-                        StateKeys.examples_cache,
-                        StateKeys.history_cache,
-                        StateKeys.query_params,
-                    ]
-                    if k in st.session_state
-                }
-                # clear state
-                st.session_state.clear()
-                # restore cache
-                st.session_state.update(cache)
-                # load example doc
-                self._update_session_state(doc)
-
-                # jump to run tab
-                st.session_state[StateKeys.option_menu_key] = get_random_doc_id()
-
-                # rerun
-                sleep(0.1)
-                st.experimental_rerun()
-
+            st.markdown(f"""[✏️ Tweak]({url})""")
             copy_to_clipboard_button("🔗 Copy URL", value=url)
 
             if allow_delete:
