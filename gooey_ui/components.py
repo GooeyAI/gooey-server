@@ -220,12 +220,12 @@ def multiselect(
         return None
     options = list(options)
     if key:
-        if key not in state.session_state:
-            state.session_state[key] = default
-        value = state.session_state[key]
+        assert not default, "only one of default or key can be provided"
     else:
-        value = None
-    value = value or default
+        key = hashlib.md5(
+            f"multiselect.{label}.{options}.{default}.{help}".encode()
+        ).hexdigest()
+    value = state.session_state.setdefault(key, default)
     state.RenderTreeNode(
         name="multiselect",
         props=dict(
@@ -259,17 +259,18 @@ def selectbox(
         return None
     options = list(options)
     if key:
-        if key not in state.session_state:
-            state.session_state[key] = options[index]
-        value = state.session_state[key]
+        assert not index, "only one of index or key can be provided"
     else:
-        value = None
-    value = value or options[index]
+        key = hashlib.md5(
+            f"select.{label}.{options}.{index}.{help}.{label_visibility}".encode()
+        ).hexdigest()
+    value = state.session_state.setdefault(key, options[index])
     if label_visibility != "visible":
         label = None
     state.RenderTreeNode(
         name="select",
         props=dict(
+            name=key,
             label=dedent(label),
             help=help,
             disabled=disabled,
@@ -280,7 +281,7 @@ def selectbox(
                 props=dict(
                     label=dedent(str(format_func(option))),
                     value=option,
-                    selected=value == options[index],
+                    selected=value == option,
                 ),
             )
             for option in options
@@ -473,12 +474,12 @@ def radio(
         return None
     options = list(options)
     if key:
-        if key not in state.session_state:
-            state.session_state[key] = options[index]
-        value = state.session_state[key]
+        assert not index, "only one of index or key can be provided"
     else:
-        value = None
-    value = value or options[index]
+        key = hashlib.md5(
+            f"radio.{label}.{options}.{index}.{help}.{label_visibility}".encode()
+        ).hexdigest()
+    value = state.session_state.setdefault(key, options[index])
     if label_visibility != "visible":
         label = None
     markdown(label)
@@ -625,9 +626,7 @@ def _input_widget(
         key = hashlib.md5(
             f"{input_type}.{label}.{help}.{label_visibility}".encode()
         ).hexdigest()
-    if key not in state.session_state:
-        state.session_state[key] = value
-    value = state.session_state.get(key)
+    value = state.session_state.setdefault(key, value)
     if label_visibility != "visible":
         label = None
     state.RenderTreeNode(
