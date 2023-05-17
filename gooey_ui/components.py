@@ -343,7 +343,7 @@ def file_uploader(
     if type:
         if isinstance(type, str):
             type = [type]
-        accept = ",".join(type)
+        accept = ",".join("." + t for t in type)
     else:
         accept = None
     state.RenderTreeNode(
