@@ -421,6 +421,7 @@ def _process_msg(
     except (KeyError, IndexError):
         response_audio = None
     raw_input_text = result["output"]["raw_input_text"]
+    output_text = result["output"]["output_text"][0]
     raw_output_text = result["output"]["raw_output_text"][0]
     response_text = result["output"]["output_text"][0]
     # save new messages for future context
@@ -429,11 +430,13 @@ def _process_msg(
             conversation=convo,
             role=CHATML_ROLE_USER,
             content=raw_input_text,
+            display_content=input_text,
         ),
         Message(
             conversation=convo,
             role=CHATML_ROLE_ASSISSTANT,
             content=raw_output_text,
+            display_content=output_text,
             saved_run=SavedRun.objects.get_or_create(
                 workflow=Workflow.VIDEOBOTS,
                 **furl(result.get("url", "")).query.params,
