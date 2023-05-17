@@ -70,7 +70,7 @@ class RelatedQnAPage(BasePage):
 
     class ResponseModel(BaseModel):
         scaleserp_results: list[dict]
-        output_queries: list[dict]
+        output_queries: list[RelatedQuery]
 
     def render_description(self) -> str:
         return "This workflow gets the related queries for your Google search, searches your custom domain and builds answers using the results and GPT."
@@ -171,25 +171,17 @@ class RelatedQnAPage(BasePage):
             location=",".join(request.scaleserp_locations),
         )
         state["output_queries"] = output_queries = []
+        output_queries: list[RelatedQuery]
         for related_question in scaleserp_results_rq.get("related_questions", []):
-            related_query_dict = {}
-            search_query = related_query_dict["search_query"] = related_question.get(
-                "question"
-            )
+            search_query = related_question.get("question")
             yield f"Running for {search_query}..."
             gpt_run_state = state
             gpt_run_state["search_query"] = search_query
 
             yield from GoogleGPTPage().run(gpt_run_state)
-            output_queries.append(
-                {
-                    "search_query": search_query,
-                    "output_text": gpt_run_state["output_text"],
-                    "references": gpt_run_state["references"],
-                    "scaleserp_results": gpt_run_state["scaleserp_results"],
-                    "final_prompt": gpt_run_state["final_prompt"],
-                }
-            )
+            gpt_resp = RelatedQuery.parse_obj(gpt_run_state).dict()
+            gpt_resp["search_query"] = search_query
+            output_queries.append(gpt_resp)
         yield "Done!"
 
 
@@ -200,9 +192,12 @@ def render_outputs(state, height):
             output_text = output.get("output_text", [])
             if output_text:
                 st.write(f"**{output.get('search_query')}**")
+
                 st.write("**Answer**")
             for text in output_text:
-                html = render_text_with_refs(text, output.get("references", []))
+                references = output.get("references", [])
+
+                html = render_text_with_refs(text, references)
                 st.write(
                     # language=html
                     f"""<div style="max-height: {height}px;" class="gooey-output-text"><p>{html}</p></div>""",
