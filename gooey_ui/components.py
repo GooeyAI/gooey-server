@@ -223,9 +223,7 @@ def multiselect(
     if key:
         assert not default, "only one of default or key can be provided"
     else:
-        key = hashlib.md5(
-            f"multiselect.{label}.{options}.{default}.{help}".encode()
-        ).hexdigest()
+        key = _md5("multiselect", label, options, default, help)
     value = state.session_state.setdefault(key, default)
     state.RenderTreeNode(
         name="multiselect",
@@ -262,9 +260,7 @@ def selectbox(
     if key:
         assert not index, "only one of index or key can be provided"
     else:
-        key = hashlib.md5(
-            f"select.{label}.{options}.{index}.{help}.{label_visibility}".encode()
-        ).hexdigest()
+        key = _md5("select", label, options, index, help, label_visibility)
     value = state.session_state.setdefault(key, options[index])
     if label_visibility != "visible":
         label = None
@@ -299,15 +295,20 @@ def button(
     type: state.typing.Literal["primary", "secondary"] = "secondary",
     disabled: bool = False,
 ) -> bool:
+    if not key:
+        key = _md5("button", label, help, type, disabled)
     state.RenderTreeNode(
         name="button",
         props=dict(
+            type="button",
+            name=key,
             label=dedent(label),
-            type=type,
+            # type=type,
             help=help,
             disabled=disabled,
         ),
     ).mount()
+    print(key, state.session_state.get(key))
     return False
 
 
@@ -477,9 +478,7 @@ def radio(
     if key:
         assert not index, "only one of index or key can be provided"
     else:
-        key = hashlib.md5(
-            f"radio.{label}.{options}.{index}.{help}.{label_visibility}".encode()
-        ).hexdigest()
+        key = _md5("radio", label, options, index, help, label_visibility)
     value = state.session_state.setdefault(key, options[index])
     if label_visibility != "visible":
         label = None
@@ -624,9 +623,7 @@ def _input_widget(
     if key:
         assert not value, "only one of value or key can be provided"
     else:
-        key = hashlib.md5(
-            f"{input_type}.{label}.{help}.{label_visibility}".encode()
-        ).hexdigest()
+        key = _md5("input", input_type, label, help, label_visibility)
     value = state.session_state.setdefault(key, value)
     if label_visibility != "visible":
         label = None
@@ -649,3 +646,8 @@ def dedent(text: str | None) -> str | None:
     if not text:
         return text
     return textwrap.dedent(text)
+
+
+def _md5(*values) -> str:
+    strval = ".".join(map(repr, values))
+    return hashlib.md5(strval.encode()).hexdigest()
