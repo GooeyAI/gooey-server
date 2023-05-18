@@ -36,10 +36,10 @@ class LargeLanguageModels(Enum):
     gpt_4 = "GPT 4"
     gpt_3_5_turbo = "ChatGPT (GPT-3.5-turbo)"
     text_davinci_003 = "Davinci (GPT-3.5)"
-    code_davinci_002 = "Code Davinci (Codex)"
     text_curie_001 = "Curie"
     text_babbage_001 = "Babbage"
     text_ada_001 = "Ada"
+    code_davinci_002 = "Codex (Deprecated)"
 
     def is_chat_model(self) -> bool:
         return self in [LargeLanguageModels.gpt_3_5_turbo, LargeLanguageModels.gpt_4]
