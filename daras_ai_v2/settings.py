@@ -42,9 +42,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.forms",  # needed to override django admin templates
     "bots",
     "django_extensions",
+    # the order matters, since we want to override the admin templates
+    "django.forms",  # needed to override admin forms
 ]
 
 MIDDLEWARE = [

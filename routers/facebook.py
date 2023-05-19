@@ -22,7 +22,7 @@ from bots.models import (
 )
 from daras_ai_v2 import settings, db
 from daras_ai_v2.all_pages import Workflow
-from daras_ai_v2.asr import AsrModels
+from daras_ai_v2.asr import AsrModels, run_google_translate
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot, BotInterface
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
@@ -39,7 +39,9 @@ PAGE_NOT_CONNECTED_ERROR = (
 RESET_KEYWORD = "reset"
 RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
 
-DEFAULT_RESPONSE = "🤔 Well that was Unexpected! I lost my train of thought. Could you please try again?."
+DEFAULT_RESPONSE = (
+    "🤔🤖 Well that was Unexpected! I seem to be lost. Could you please try again?."
+)
 
 INVALID_INPUT_FORMAT = (
     "⚠️ Sorry! I don't understand {} messsages. Please try with text or audio."
@@ -283,60 +285,64 @@ def _on_msg(bot: BotInterface):
         # reset convo state
         bot.convo.state = ConvoState.INITIAL
         bot.convo.save()
-        # don't save any messages
-        msgs_to_save = []
         # let the user know we've reset
-        response_text = RESET_MSG
-        response_audio = None
-        response_video = None
+        bot.send_msg(text=RESET_MSG)
     # handle feedback submitted
     elif bot.convo.state in [
         ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP,
         ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN,
     ]:
-        try:
-            last_feedback = Feedback.objects.filter(
-                message__conversation=bot.convo
-            ).latest()
-        except Feedback.DoesNotExist as e:
-            bot.send_msg(text=ERROR_MSG.format(e))
-            return
-        # save the feedback
-        last_feedback.text = input_text
-        last_feedback.save()
-        # send back a confimation msg
-        bot.show_feedback_buttons = False  # don't show feedback for this confirmation
-        bot_name = str(bot.convo.bot_integration.name)
-        response_text = FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name)
-        response_audio = None
-        response_video = None
-        # reset convo state
-        bot.convo.state = ConvoState.INITIAL
-        bot.convo.save()
-        # don't save any messages
-        msgs_to_save = []
+        _handle_feedback_msg(bot, input_text)
     else:
+        _process_and_send_msg(billing_account_user, bot, input_text)
+
+
+def _handle_feedback_msg(bot, input_text):
+    try:
+        last_feedback = Feedback.objects.filter(
+            message__conversation=bot.convo
+        ).latest()
+    except Feedback.DoesNotExist as e:
+        bot.send_msg(text=ERROR_MSG.format(e))
+        return
+    # save the feedback
+    last_feedback.text = input_text
+    last_feedback.save()
+    # send back a confimation msg
+    bot.show_feedback_buttons = False  # don't show feedback for this confirmation
+    bot_name = str(bot.convo.bot_integration.name)
+    # reset convo state
+    bot.convo.state = ConvoState.INITIAL
+    bot.convo.save()
+    # let the user know we've received their feedback
+    bot.send_msg(
+        text=FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name),
+        should_translate=True,
+    )
+
+
+def _process_and_send_msg(billing_account_user, bot, input_text):
+    try:
         # # mock testing
         # msgs_to_save, response_audio, response_text, response_video = _echo(
         #     bot, input_text
         # )
-        try:
-            # make API call to gooey bots to get the response
-            response_text, response_audio, response_video, msgs_to_save = _process_msg(
-                page_cls=bot.page_cls,
-                api_user=billing_account_user,
-                query_params=bot.query_params,
-                convo=bot.convo,
-                input_text=input_text,
-                user_language=bot.language,
-            )
-        except HTTPException as e:
-            traceback.print_exc()
-            capture_exception(e)
-            # send error msg as repsonse
-            bot.send_msg(text=ERROR_MSG.format(e))
-            return
-    # this really shouldn't happen, but just in case it does, we should have a nice message for the user
+        # make API call to gooey bots to get the response
+        response_text, response_audio, response_video, msgs_to_save = _process_msg(
+            page_cls=bot.page_cls,
+            api_user=billing_account_user,
+            query_params=bot.query_params,
+            convo=bot.convo,
+            input_text=input_text,
+            user_language=bot.language,
+        )
+    except HTTPException as e:
+        traceback.print_exc()
+        capture_exception(e)
+        # send error msg as repsonse
+        bot.send_msg(text=ERROR_MSG.format(e))
+        return
+    # this really shouldn't happen, but just in case it does, we should have a nice message
     response_text = response_text or DEFAULT_RESPONSE
     # send the response to the user
     msg_id = bot.send_msg(
@@ -350,6 +356,7 @@ def _on_msg(bot: BotInterface):
     # save the whatsapp message id for the sent message
     if bot.platform == Platform.WHATSAPP and msg_id:
         msgs_to_save[-1].wa_msg_id = msg_id
+    # save the messages
     for msg in msgs_to_save:
         msg.save()
 
@@ -380,7 +387,7 @@ def _handle_interactive_msg(bot: BotInterface):
             bot.convo.save()
         # handle skip
         case ButtonIds.action_skip:
-            bot.send_msg(text=TAPPED_SKIP_MSG)
+            bot.send_msg(text=TAPPED_SKIP_MSG, should_translate=True)
             # reset state
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
@@ -388,7 +395,10 @@ def _handle_interactive_msg(bot: BotInterface):
         # not sure what button was pressed, ignore
         case _:
             bot_name = str(bot.convo.bot_integration.name)
-            bot.send_msg(text=FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name))
+            bot.send_msg(
+                text=FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name),
+                should_translate=True,
+            )
             # reset state
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
@@ -396,7 +406,11 @@ def _handle_interactive_msg(bot: BotInterface):
     # save the feedback
     Feedback.objects.create(message=context_msg, rating=rating)
     # send a confirmation msg + post click buttons
-    bot.send_msg(text=response_text, buttons=_feedback_post_click_buttons())
+    bot.send_msg(
+        text=response_text,
+        buttons=_feedback_post_click_buttons(),
+        should_translate=True,
+    )
 
 
 def _handle_audio_msg(billing_account_user, bot):
