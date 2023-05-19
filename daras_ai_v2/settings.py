@@ -36,7 +36,6 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # Application definition
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -46,6 +45,7 @@ INSTALLED_APPS = [
     "django_extensions",
     # the order matters, since we want to override the admin templates
     "django.forms",  # needed to override admin forms
+    "django.contrib.admin",
 ]
 
 MIDDLEWARE = [
