@@ -18,6 +18,7 @@ from bots.models import (
     Conversation,
     Feedback,
     SavedRun,
+    ConvoState,
 )
 from daras_ai_v2 import settings, db
 from daras_ai_v2.all_pages import Workflow
@@ -30,7 +31,7 @@ from gooeysite.bg_db_conn import bg_db_task
 router = APIRouter()
 
 PAGE_NOT_CONNECTED_ERROR = (
-    "Looks like you haven't connected this page to a gooey.ai workflow. "
+    "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
     "Please go to the Integrations Tab and connect this page."
 )
 
@@ -45,7 +46,7 @@ INVALID_INPUT_FORMAT = (
 )
 
 AUDIO_ASR_CONFIRMATION = """
-I heard: “{}”
+🎧 I heard: “{}”
 Working on your answer…
 """.strip()
 
@@ -56,9 +57,13 @@ ERROR_MSG = """
 """.strip()
 
 
-FEEDBACK_MSG = (
+FEEDBACK_THUMBS_UP_MSG = "🎉 What did you like about my response?"
+FEEDBACK_THUMBS_DOWN_MSG = "🤔 What was the issue with the response? How could it be improved? Please send me an voice note or text me."
+FEEDBACK_CONFIRMED_MSG = (
     "🙏 Thanks! Your feedback helps us make {bot_name} better. How else can I help you?"
 )
+
+TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
 
 
 @router.get("/__/fb/connect/")
@@ -250,55 +255,11 @@ def _on_msg(bot: BotInterface):
     match bot.input_type:
         # handle button press
         case "interactive":
-            try:
-                button_id = bot.input_message["interactive"]["button_reply"]["id"]
-                context_msg_id = bot.input_message["context"]["id"]
-                context_msg = Message.objects.get(wa_msg_id=context_msg_id)
-            except (KeyError, Message.DoesNotExist) as e:
-                bot.send_msg(text=ERROR_MSG.format(e))
-                return
-            bot_name = str(context_msg.conversation.bot_integration)
-            match button_id:
-                case ButtonIds.feedback_thumbs_up:
-                    bot.send_msg(text=FEEDBACK_MSG.format(bot_name=bot_name))
-                    rating = Feedback.RATING_THUMBS_UP
-                case ButtonIds.feedback_thumbs_down:
-                    bot.send_msg(text=FEEDBACK_MSG.format(bot_name=bot_name))
-                    rating = Feedback.RATING_THUMBS_DOWN
-                case _:
-                    # not sure what button was pressed, ignore
-                    bot.send_msg(text=FEEDBACK_MSG.format(bot_name="this bot"))
-                    return
-            Feedback.objects.create(message=context_msg, rating=rating)
+            _handle_interactive_msg(bot)
             return
         case "audio":
             try:
-                from recipes.asr import AsrPage
-                from server import call_api
-
-                # run asr
-                asr_lang = None
-                match bot.language.lower():
-                    case "am":
-                        selected_model = AsrModels.usm.name
-                        asr_lang = "am-et"
-                    case "hi":
-                        selected_model = AsrModels.nemo_hindi.name
-                    case "te":
-                        selected_model = AsrModels.whisper_telugu_large_v2.name
-                    case _:
-                        selected_model = AsrModels.whisper_large_v2.name
-                result = call_api(
-                    page_cls=AsrPage,
-                    user=billing_account_user,
-                    request_body={
-                        "documents": [bot.get_input_audio()],
-                        "selected_model": selected_model,
-                        "google_translate_target": None,
-                        "asr_lang": asr_lang,
-                    },
-                    query_params={},
-                )
+                result = _handle_audio_msg(billing_account_user, bot)
             except HTTPException as e:
                 traceback.print_exc()
                 capture_exception(e)
@@ -319,11 +280,41 @@ def _on_msg(bot: BotInterface):
     if input_text.strip().lower() == RESET_KEYWORD:
         # clear saved messages
         bot.convo.messages.all().delete()
+        # reset convo state
+        bot.convo.state = ConvoState.INITIAL
+        bot.convo.save()
+        # don't save any messages
         msgs_to_save = []
         # let the user know we've reset
         response_text = RESET_MSG
         response_audio = None
         response_video = None
+    # handle feedback submitted
+    elif bot.convo.state in [
+        ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP,
+        ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN,
+    ]:
+        try:
+            last_feedback = Feedback.objects.filter(
+                message__conversation=bot.convo
+            ).latest()
+        except Feedback.DoesNotExist as e:
+            bot.send_msg(text=ERROR_MSG.format(e))
+            return
+        # save the feedback
+        last_feedback.text = input_text
+        last_feedback.save()
+        # send back a confimation msg
+        bot.show_feedback_buttons = False  # don't show feedback for this confirmation
+        bot_name = str(bot.convo.bot_integration.name)
+        response_text = FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name)
+        response_audio = None
+        response_video = None
+        # reset convo state
+        bot.convo.state = ConvoState.INITIAL
+        bot.convo.save()
+        # don't save any messages
+        msgs_to_save = []
     else:
         # # mock testing
         # msgs_to_save, response_audio, response_text, response_video = _echo(
@@ -352,22 +343,114 @@ def _on_msg(bot: BotInterface):
         text=response_text,
         audio=response_audio,
         video=response_video,
-        buttons=_feedback_buttons() if bot.show_feedback_buttons else None,
+        buttons=_feedback_start_buttons() if bot.show_feedback_buttons else None,
     )
     if not msgs_to_save:
         return
+    # save the whatsapp message id for the sent message
     if bot.platform == Platform.WHATSAPP and msg_id:
         msgs_to_save[-1].wa_msg_id = msg_id
     for msg in msgs_to_save:
         msg.save()
 
 
+def _handle_interactive_msg(bot: BotInterface):
+    try:
+        button_id = bot.input_message["interactive"]["button_reply"]["id"]
+        context_msg_id = bot.input_message["context"]["id"]
+    except (KeyError,) as e:
+        bot.send_msg(text=ERROR_MSG.format(e))
+        return
+    match button_id:
+        # handle feedback button press
+        case ButtonIds.feedback_thumbs_up | ButtonIds.feedback_thumbs_down:
+            try:
+                context_msg = Message.objects.get(wa_msg_id=context_msg_id)
+            except Message.DoesNotExist as e:
+                bot.send_msg(text=ERROR_MSG.format(e))
+                return
+            if button_id == ButtonIds.feedback_thumbs_up:
+                rating = Feedback.RATING_THUMBS_UP
+                bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
+                response_text = FEEDBACK_THUMBS_UP_MSG
+            else:
+                rating = Feedback.RATING_THUMBS_DOWN
+                bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
+                response_text = FEEDBACK_THUMBS_DOWN_MSG
+            bot.convo.save()
+        # handle skip
+        case ButtonIds.action_skip:
+            bot.send_msg(text=TAPPED_SKIP_MSG)
+            # reset state
+            bot.convo.state = ConvoState.INITIAL
+            bot.convo.save()
+            return
+        # not sure what button was pressed, ignore
+        case _:
+            bot_name = str(bot.convo.bot_integration.name)
+            bot.send_msg(text=FEEDBACK_CONFIRMED_MSG.format(bot_name=bot_name))
+            # reset state
+            bot.convo.state = ConvoState.INITIAL
+            bot.convo.save()
+            return
+    # save the feedback
+    Feedback.objects.create(message=context_msg, rating=rating)
+    # send a confirmation msg + post click buttons
+    bot.send_msg(text=response_text, buttons=_feedback_post_click_buttons())
+
+
+def _handle_audio_msg(billing_account_user, bot):
+    from recipes.asr import AsrPage
+    from server import call_api
+
+    # run asr
+    asr_lang = None
+    match bot.language.lower():
+        case "am":
+            selected_model = AsrModels.usm.name
+            asr_lang = "am-et"
+        case "hi":
+            selected_model = AsrModels.nemo_hindi.name
+        case "te":
+            selected_model = AsrModels.whisper_telugu_large_v2.name
+        case _:
+            selected_model = AsrModels.whisper_large_v2.name
+    result = call_api(
+        page_cls=AsrPage,
+        user=billing_account_user,
+        request_body={
+            "documents": [bot.get_input_audio()],
+            "selected_model": selected_model,
+            "google_translate_target": None,
+            "asr_lang": asr_lang,
+        },
+        query_params={},
+    )
+    return result
+
+
 class ButtonIds:
+    action_skip = "ACTION_SKIP"
     feedback_thumbs_up = "FEEDBACK_THUMBS_UP"
     feedback_thumbs_down = "FEEDBACK_THUMBS_DOWN"
 
 
-def _feedback_buttons():
+def _feedback_post_click_buttons():
+    """
+    Buttons to show after the user has clicked on a feedback button
+    """
+    return [
+        {
+            "type": "reply",
+            "reply": {"id": ButtonIds.action_skip, "title": "🔀 Skip"},
+        },
+    ]
+
+
+def _feedback_start_buttons():
+    """
+    Buttons to show for collecting feedback after the bot has sent a response
+    """
     return [
         {
             "type": "reply",
@@ -391,15 +474,16 @@ def _process_msg(
 ) -> tuple[str, str | None, str | None, list[Message]]:
     from server import call_api
 
-    # # mock testing
-    # result = _mock_api_output(input_text)
-
     # get latest messages for context (upto 100)
     saved_msgs = list(
         reversed(
             convo.messages.order_by("-created_at").values("role", "content")[:100],
         ),
     )
+
+    # # mock testing
+    # result = _mock_api_output(input_text)
+
     # call the api with provided input
     result = call_api(
         page_cls=page_cls,
@@ -411,6 +495,7 @@ def _process_msg(
         },
         query_params=query_params,
     )
+
     # extract response video/audio/text
     try:
         response_video = result["output"]["output_video"][0]
@@ -462,9 +547,11 @@ def _echo(bot, input_text):
 
 def _mock_api_output(input_text):
     return {
+        "url": "https://gooey.ai?example_id=mock-api-example",
         "output": {
+            "input_text": input_text,
             "raw_input_text": input_text,
-            "output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
             "raw_output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
-        }
+            "output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
+        },
     }
