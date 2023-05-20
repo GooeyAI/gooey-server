@@ -16,7 +16,7 @@ LabelVisibility = typing.Literal["visible", "collapsed"]
 
 
 def dummy(*args, **kwargs):
-    return state.NestingCtx(state._render_root)
+    return state.NestingCtx()
 
 
 spinner = dummy
