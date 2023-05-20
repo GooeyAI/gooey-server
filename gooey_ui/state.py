@@ -3,7 +3,7 @@ import typing
 
 from pydantic import BaseModel
 
-_local = threading.local()
+threadlocal = threading.local()
 
 
 def __getattr__(name):
@@ -13,12 +13,12 @@ def __getattr__(name):
         raise AttributeError(name)
 
 
-def get_query_params():
+def get_query_params() -> dict[str, str]:
     try:
-        return _local._query_params
+        return threadlocal.query_params
     except AttributeError:
-        _local._query_params = {}
-        return _local._query_params
+        threadlocal.query_params = {}
+        return threadlocal.query_params
 
 
 def set_query_params(params: dict[str, str]):
@@ -27,12 +27,12 @@ def set_query_params(params: dict[str, str]):
     old.update(params)
 
 
-def get_session_state():
+def get_session_state() -> dict[str, typing.Any]:
     try:
-        return _local._session_state
+        return threadlocal.session_state
     except AttributeError:
-        _local._session_state = {}
-        return _local._session_state
+        threadlocal.session_state = {}
+        return threadlocal.session_state
 
 
 def set_session_state(state: dict[str, typing.Any]):
@@ -51,26 +51,26 @@ class RenderTreeNode(BaseModel):
     style: Style = {}
 
     def mount(self) -> "RenderTreeNode":
-        _local._render_root.children.append(self)
+        threadlocal._render_root.children.append(self)
         return self
 
 
 class NestingCtx:
     def __init__(self, node: RenderTreeNode = None):
-        self.node = node or _local._render_root
+        self.node = node or threadlocal._render_root
         self.parent = None
 
     def __enter__(self):
         # global local._render_root
         try:
-            self.parent = _local._render_root
+            self.parent = threadlocal._render_root
         except AttributeError:
             pass
-        _local._render_root = self.node
+        threadlocal._render_root = self.node
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         # global local._render_root
-        _local._render_root = self.parent
+        threadlocal._render_root = self.parent
 
     def empty(self):
         """Empty the children of the node"""
@@ -81,9 +81,9 @@ class NestingCtx:
 def runner(
     fn: typing.Callable, state: dict = None, query_params: dict[str, str] = None
 ) -> dict:
+    set_query_params(query_params or {})
+    set_session_state(state or {})
     try:
-        set_query_params(query_params or {})
-        set_session_state(state or {})
         while True:
             try:
                 root = RenderTreeNode(name="root")
