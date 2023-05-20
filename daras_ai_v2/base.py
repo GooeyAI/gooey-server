@@ -135,7 +135,6 @@ class BasePage:
         self._user_disabled_check()
 
         # self._realtime_subscribe()
-        self._load_session_state()
         self._check_if_flagged()
 
         if st.session_state.get("show_report_workflow"):
@@ -365,27 +364,6 @@ class BasePage:
             sleep(2)
             st.session_state["show_report_workflow"] = False
             st.experimental_rerun()
-
-    def _load_session_state(self):
-        placeholder = st.div()
-
-        if st.session_state.get("__loaded__"):
-            return
-
-        with placeholder, st.spinner("Loading Settings..."):
-            doc = self.get_doc_from_query_params(gooey_get_query_params())
-
-            if doc is None:
-                st.write("### 404: We can't find this page!")
-                st.stop()
-
-            self._update_session_state(doc)
-
-    def _update_session_state(self, doc):
-        st.session_state.update(doc)
-        for k, v in self.sane_defaults.items():
-            st.session_state.setdefault(k, v)
-        st.session_state["__loaded__"] = True
 
     def _check_if_flagged(self):
         if not st.session_state.get("is_flagged"):

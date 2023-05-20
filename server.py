@@ -428,7 +428,6 @@ def st_page(
         state = page.get_doc_from_query_params(dict(request.query_params))
     if state is None:
         raise HTTPException(status_code=404)
-    state["__loaded__"] = True
     query_params = dict(request.query_params) | {"page_slug": page_slug, "tab": tab}
 
     return st.runner(Home.main, query_params=query_params, state=state)
