@@ -4,10 +4,6 @@ from .components import *
 from .state import *
 
 
-def stop():
-    exit(0)
-
-
 def cache_data(fn=None, *args, **kwargs):
     if not fn:
         return lru_cache

@@ -11,8 +11,9 @@ from firebase_admin.auth import UserRecord
 from furl import furl
 
 import gooey_ui as st
-from daras_ai_v2.copy_to_clipboard_button_widget import st_like_btn_css_html
-from daras_ai_v2.hidden_html_widget import hidden_html_nojs
+from daras_ai_v2.copy_to_clipboard_button_widget import (
+    copy_to_clipboard_scripts,
+)
 from daras_ai_v2.html_spinner_widget import html_spinner_css
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
@@ -26,7 +27,7 @@ def init_scripts():
     st.set_page_config(layout="wide")
 
     # remove fullscreen button and footer
-    hidden_html_nojs(st_like_btn_css_html + html_spinner_css)
+    st.html(html_spinner_css + copy_to_clipboard_scripts)
 
     # if "_current_user" not in st.session_state:
     st.session_state["_current_user"] = get_current_user() or get_anonymous_user()

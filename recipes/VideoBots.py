@@ -39,6 +39,7 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.search_ref import apply_response_template
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -772,18 +773,22 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
         if not integrations:
             return
 
-        query_params = dict(self._get_current_api_url().query.params)
+        example_id, run_id, uid = extract_query_params(
+            self._get_current_api_url().query.params
+        )
 
         for bi in integrations:
             is_connected = (
                 bi.saved_run
                 and Workflow(bi.saved_run.workflow) == Workflow.VIDEOBOTS
                 and (
-                    (
-                        query_params.get("run_id") == bi.saved_run.run_id
-                        and query_params.get("uid") == bi.saved_run.uid
+                    not (
+                        bi.saved_run.example_id
+                        or bi.saved_run.run_id
+                        or bi.saved_run.uid
                     )
-                    or (query_params.get("example_id") == bi.saved_run.example_id)
+                    or (run_id == bi.saved_run.run_id and uid == bi.saved_run.uid)
+                    or (example_id == bi.saved_run.example_id)
                 )
             )
             col1, col2, *_ = st.columns([1, 1, 2])
@@ -798,7 +803,7 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
             with col2:
                 pressed = st.button(
                     "🔌💔️ Disconnect" if is_connected else "🖇️ Connect",
-                    help=f"Update {bi} ({bi.id})",
+                    key=f"btn_connect_{bi.id}",
                 )
             if not pressed:
                 continue
@@ -807,11 +812,12 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
             else:
                 bi.saved_run = SavedRun.objects.get_or_create(
                     workflow=Workflow.VIDEOBOTS,
-                    **query_params,
+                    example_id=example_id or "",
+                    uid=uid or "",
+                    run_id=run_id or "",
                 )[0]
             bi.save()
-            with col2:
-                st.experimental_rerun()
+            st.experimental_rerun()
 
         st.write("---")
 

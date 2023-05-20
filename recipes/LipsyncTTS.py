@@ -113,7 +113,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         with col1:
             input_face = state.get("input_face")
             if not input_face:
-                st.empty()
+                pass
             elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
                 st.video(input_face, caption="Input Face (Video)")
             else:

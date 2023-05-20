@@ -35,18 +35,20 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
     table_area = st.div()
 
     if st.button("＋ Create new secret key"):
-        with st.spinner("Generating a new API key..."):
-            doc = _generate_new_key_doc()
-            doc["uid"] = user.uid
-            api_keys.append(doc)
-            db_collection.add(doc)
+        doc = _generate_new_key_doc()
+        doc["uid"] = user.uid
+        api_keys.append(doc)
+        db_collection.add(doc)
 
     with table_area:
         st.table(
             pd.DataFrame.from_records(
                 columns=["Secret Key (Preview)", "Created At"],
                 data=[
-                    (api_key["secret_key_preview"], api_key["created_at"])
+                    (
+                        api_key["secret_key_preview"],
+                        api_key["created_at"].strftime("%B %d, %Y at %I:%M:%S %p %Z"),
+                    )
                     for api_key in api_keys
                 ],
             ),
@@ -54,18 +56,12 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
 
 
 def _load_api_keys(db_collection, user):
-    api_keys = st.session_state.setdefault("__api_keys", [])
-    if not api_keys:
-        with st.spinner("Loading API Keys..."):
-            api_keys.extend(
-                [
-                    snap.to_dict()
-                    for snap in db_collection.where("uid", "==", user.uid)
-                    .order_by("created_at")
-                    .get()
-                ]
-            )
-    return api_keys
+    return [
+        snap.to_dict()
+        for snap in db_collection.where("uid", "==", user.uid)
+        .order_by("created_at")
+        .get()
+    ]
 
 
 def _generate_new_key_doc() -> dict:
@@ -76,7 +72,7 @@ def _generate_new_key_doc() -> dict:
 
     st.success(
         f"""
-##### API key generated
+<h5> API key generated </h5>
 
 Please save this secret key somewhere safe and accessible. 
 For security reasons, **you won't be able to view it again** through your account. 

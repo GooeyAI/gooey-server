@@ -31,17 +31,12 @@ from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
 from daras_ai_v2.db import USER_RUNS_COLLECTION, EXAMPLES_COLLECTION
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
-from daras_ai_v2.html_spinner_widget import (
-    scroll_to_top,
-)
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.perf_timer import perf_timer, start_perf_timer
-
-# from daras_ai_v2.patch_widgets import ensure_hidden_widgets_loaded
 from daras_ai_v2.query_params import (
     gooey_reset_query_parm,
     gooey_get_query_params,
@@ -74,19 +69,12 @@ class StateKeys:
     page_title = "__title"
     page_notes = "__notes"
 
-    option_menu_key = "__option_menu_key"
-
     updated_at = "updated_at"
 
     error_msg = "__error_msg"
     run_time = "__run_time"
     run_status = "__run_status"
     pressed_randomize = "__randomize"
-
-    examples_cache = "__examples_cache"
-    history_cache = "__history_cache"
-
-    query_params = QUERY_PARAMS_KEY
 
 
 class BasePage:
@@ -138,16 +126,6 @@ class BasePage:
         return f"/v2/{self.slug_versions[0]}/"
 
     def render(self):
-        try:
-            self._render()
-        except Exception as e:
-            sentry_sdk.capture_exception(e)
-            raise
-        finally:
-            pass
-            # ensure_hidden_widgets_loaded()
-
-    def _render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
@@ -289,15 +267,7 @@ class BasePage:
             )
             return page, state, preview_image
 
-        # if "__related_recipe_docs" not in st.session_state:
-        #     with st.spinner("Loading Related Recipes..."):
-        #         docs = map_parallel(
-        #             _build_page_tuple,
-        #             workflows,
-        #         )
-        #     st.session_state["__related_recipe_docs"] = docs
-        # related_recipe_docs = st.session_state.get("__related_recipe_docs")
-        related_recipe_docs = []
+        related_recipe_docs = map_parallel(_build_page_tuple, workflows)
 
         def _render(page_tuple):
             page, state, preview_image = page_tuple
@@ -859,15 +829,7 @@ class BasePage:
             if not doc_ref:
                 return
 
-            with st.spinner("Saving..."):
-                doc_ref.set(self.state_to_doc(st.session_state))
-
-                if new_example_id:
-                    st.session_state.get(StateKeys.examples_cache, []).insert(
-                        0, doc_ref.get()
-                    )
-                    st.experimental_rerun()
-
+            doc_ref.set(self.state_to_doc(st.session_state))
             st.success("Saved", icon="✅")
 
     def state_to_doc(self, state: dict):
@@ -947,20 +909,18 @@ class BasePage:
     def _history_tab(self):
         current_user = st.session_state.get("_current_user")
         uid = current_user.uid
-        run_history = st.session_state.get(StateKeys.history_cache, [])
 
-        with st.spinner("Loading History..."):
-            run_history.extend(
-                db.get_collection_ref(
-                    collection_id=USER_RUNS_COLLECTION,
-                    document_id=uid,
-                    sub_collection_id=self.doc_name,
-                )
-                .order_by(StateKeys.updated_at, direction="DESCENDING")
-                .offset(len(run_history))
-                .limit(20)
-                .get()
+        run_history = (
+            db.get_collection_ref(
+                collection_id=USER_RUNS_COLLECTION,
+                document_id=uid,
+                sub_collection_id=self.doc_name,
             )
+            .order_by(StateKeys.updated_at, direction="DESCENDING")
+            # .offset(len(run_history))
+            .limit(50)
+            .get()
+        )
 
         def _render(snapshot):
             run_id = snapshot.id
@@ -985,9 +945,8 @@ class BasePage:
 
         grid_layout(2, run_history, _render)
 
-        # if StateKeys.history_cache not in st.session_state or st.button("Load More"):
-        # st.session_state[StateKeys.history_cache] = run_history
-        # st.experimental_rerun()
+        # if st.button("Load More"):
+        #     st.experimental_rerun()
 
     def _render_doc_example(
         self, *, allow_delete: bool, doc: dict, url: str, query_params: dict
@@ -1022,7 +981,7 @@ class BasePage:
     def _example_delete_button(self, example_id):
         pressed_delete = st.button(
             "🗑️ Delete",
-            help=f"Delete example {example_id}",
+            key=f"delete_example_{example_id}",
         )
         if not pressed_delete:
             return
@@ -1031,12 +990,6 @@ class BasePage:
 
         with st.spinner("deleting..."):
             example.update({"__hidden": True})
-
-        example_docs = st.session_state.get(StateKeys.examples_cache, [])
-        for idx, snapshot in enumerate(example_docs):
-            if snapshot.id == example_id:
-                example_docs.pop(idx)
-                st.experimental_rerun()
 
     def render_example(self, state: dict):
         pass

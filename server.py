@@ -401,15 +401,7 @@ def call_api(
 
 @app.post("/__/gooey-ui/explore/", include_in_schema=False)
 def explore():
-    with st.main() as root:
-        try:
-            Home.main()
-        except SystemExit:
-            pass
-        return dict(
-            state=st.session_state,
-            children=root.children,
-        )
+    return st.runner(Home.main)
 
 
 async def request_json(request: Request):
@@ -436,20 +428,10 @@ def st_page(
         state = page.get_doc_from_query_params(dict(request.query_params))
     if state is None:
         raise HTTPException(status_code=404)
-
+    state["__loaded__"] = True
     query_params = dict(request.query_params) | {"page_slug": page_slug, "tab": tab}
-    with st.main(query_params=query_params) as root:
-        st.session_state.update(state)
-        st.session_state["__loaded__"] = True
-        try:
-            Home.main()
-        except SystemExit:
-            pass
-        pprint(st.session_state)
-        return dict(
-            state=st.session_state,
-            children=root.children,
-        )
+
+    return st.runner(Home.main, query_params=query_params, state=state)
     # iframe_url = furl(
     #     settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
     # )

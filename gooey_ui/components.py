@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import json as _json
 import os
 import textwrap
 import typing
@@ -9,26 +10,24 @@ import pandas as pd
 from furl import furl
 
 from gooey_ui import state
-import json as _json
 
 T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]
 
 
 def dummy(*args, **kwargs):
-    return state.nesting_ctx(state._render_root)
+    return state.NestingCtx(state._render_root)
 
 
 spinner = dummy
 set_page_config = dummy
-experimental_rerun = dummy
 form = dummy
 
 
 def div() -> state.typing.ContextManager:
     node = state.RenderTreeNode(name="div")
     node.mount()
-    return state.nesting_ctx(node)
+    return state.NestingCtx(node)
 
 
 def html(body: str, height: int = None, width: int = None):
@@ -63,7 +62,7 @@ def text(body: str, *, style: dict[str, str] = None, unsafe_allow_html=False):
     ).mount()
 
 
-def error(body: str, icon: str = None, *, unsafe_allow_html=False):
+def error(body: str, icon: str = "⚠️", *, unsafe_allow_html=False):
     markdown(
         # language="html",
         f"""
@@ -76,11 +75,11 @@ def error(body: str, icon: str = None, *, unsafe_allow_html=False):
     )
 
 
-def success(body: str, icon: str = None, *, unsafe_allow_html=False):
+def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
     markdown(
         # language="html",
         f"""
-<div style="background-color: green; padding: 16px; border-radius: 0.25rem; display: flex; gap: 0.5rem;">
+<div style="background-color: rgba(108, 255, 108, 0.2); padding: 16px; border-radius: 0.25rem; display: flex; gap: 0.5rem;">
 <span style="font-size: 1.25rem">{icon}</span>
 <div>{dedent(body)}</div>
 </div>
@@ -108,7 +107,7 @@ def tabs(labels: list[str]) -> list[state.typing.ContextManager]:
             for label in labels
         ],
     ).mount()
-    return [state.nesting_ctx(tab) for tab in parent.children]
+    return [state.NestingCtx(tab) for tab in parent.children]
 
 
 def columns(spec, *, gap: str = None) -> list[state.typing.ContextManager]:
@@ -131,7 +130,7 @@ def columns(spec, *, gap: str = None) -> list[state.typing.ContextManager]:
         ],
     )
     parent.mount()
-    return [state.nesting_ctx(tab) for tab in parent.children]
+    return [state.NestingCtx(tab) for tab in parent.children]
 
 
 def image(
@@ -278,7 +277,7 @@ def selectbox(
                 props=dict(
                     label=dedent(str(format_func(option))),
                     value=_json.dumps(option),
-                    selected=value == option,
+                    defaultValue=value == option,
                 ),
             )
             for option in options
@@ -300,16 +299,15 @@ def button(
     state.RenderTreeNode(
         name="button",
         props=dict(
-            type="button",
+            type="submit",
+            value="yes",
             name=key,
             label=dedent(label),
-            # type=type,
             help=help,
             disabled=disabled,
         ),
     ).mount()
-    print(key, state.session_state.get(key))
-    return False
+    return bool(state.session_state.pop(key, False))
 
 
 form_submit_button = button
@@ -324,7 +322,7 @@ def expander(label: str, *, expanded: bool = False):
         ),
     )
     node.mount()
-    return state.nesting_ctx(node)
+    return state.NestingCtx(node)
 
 
 def file_uploader(
