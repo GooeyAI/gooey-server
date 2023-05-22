@@ -229,7 +229,7 @@ class DeforumSDPage(BasePage):
         ), "Please make sure that Frame Count matches the Animation Prompts"
 
     def render_usage_guide(self):
-        youtube_video("DwhUJ6O_6E8")
+        youtube_video("sUvica6UuQU")
 
     def render_settings(self):
         col1, col2 = st.columns(2)
