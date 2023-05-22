@@ -1,5 +1,6 @@
 import datetime
 import typing
+from itertools import chain
 
 import streamlit as st
 from furl import furl
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
@@ -172,17 +174,23 @@ class RelatedQnAPage(BasePage):
         )
         state["output_queries"] = output_queries = []
         output_queries: list[RelatedQuery]
-        for related_question in scaleserp_results_rq.get("related_questions", []):
-            search_query = related_question.get("question")
-            yield f"Running for {search_query}..."
-            gpt_run_state = state
-            gpt_run_state["search_query"] = search_query
 
+        def run_google_gpt(related_question: dict) -> RelatedQuery:
+            search_query_rq = related_question.get("question")
+            yield f"Running for {search_query_rq}..."
+            gpt_run_state = state
+            gpt_run_state["search_query"] = search_query_rq
             yield from GoogleGPTPage().run(gpt_run_state)
             gpt_resp = RelatedQuery.parse_obj(gpt_run_state).dict()
-            gpt_resp["search_query"] = search_query
+            gpt_resp["search_query"] = search_query_rq
             output_queries.append(gpt_resp)
-        yield "Done!"
+
+        outputs = map_parallel(
+            run_google_gpt,
+            scaleserp_results_rq.get("related_questions", []),
+            max_workers=4,
+        )
+        yield from chain(*outputs)
 
 
 def render_outputs(state, height):
