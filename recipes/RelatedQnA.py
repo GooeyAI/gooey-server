@@ -25,7 +25,7 @@ class RelatedQnAPage(BasePage):
     title = "Realted QnA"
     slug_versions = ["related-qna-maker"]
 
-    price = 175
+    price = 500
 
     sane_defaults = dict(
         search_query="rugs",
