@@ -69,7 +69,7 @@ class RelatedQnAPage(BasePage):
         scaleserp_locations: list[str] | None
 
     class ResponseModel(BaseModel):
-        scaleserp_results: list[dict]
+        scaleserp_results: dict
         output_queries: list[RelatedQuery]
 
     def render_description(self) -> str:
