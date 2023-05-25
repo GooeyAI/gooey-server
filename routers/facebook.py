@@ -35,7 +35,6 @@ PAGE_NOT_CONNECTED_ERROR = (
     "Please go to the Integrations Tab and connect this page."
 )
 
-
 RESET_KEYWORD = "reset"
 RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
 
@@ -57,7 +56,6 @@ ERROR_MSG = """
 
 ⚠️ Sorry, I ran into an error while processing your request. Please try again, or type "Reset" to start over.
 """.strip()
-
 
 FEEDBACK_THUMBS_UP_MSG = "🎉 What did you like about my response?"
 FEEDBACK_THUMBS_DOWN_MSG = "🤔 What was the issue with the response? How could it be improved? Please send me an voice note or text me."
@@ -308,6 +306,8 @@ def _handle_feedback_msg(bot, input_text):
         return
     # save the feedback
     last_feedback.text = input_text
+    # translate feedback to english
+    last_feedback.text_english = " ".join(run_google_translate([input_text], "en"))
     last_feedback.save()
     # send back a confimation msg
     bot.show_feedback_buttons = False  # don't show feedback for this confirmation
@@ -378,11 +378,11 @@ def _handle_interactive_msg(bot: BotInterface):
                 bot.send_msg(text=ERROR_MSG.format(e))
                 return
             if button_id == ButtonIds.feedback_thumbs_up:
-                rating = Feedback.RATING_THUMBS_UP
+                rating = Feedback.Rating.RATING_THUMBS_UP
                 bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
                 response_text = FEEDBACK_THUMBS_UP_MSG
             else:
-                rating = Feedback.RATING_THUMBS_DOWN
+                rating = Feedback.Rating.RATING_THUMBS_DOWN
                 bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
                 response_text = FEEDBACK_THUMBS_DOWN_MSG
             bot.convo.save()
