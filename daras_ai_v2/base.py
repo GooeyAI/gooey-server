@@ -1,10 +1,12 @@
 import datetime
 import inspect
 import math
+import pickle
 import traceback
 import typing
 import uuid
 from copy import deepcopy
+from functools import lru_cache
 from random import Random
 from threading import Thread
 from time import time, sleep
@@ -34,13 +36,12 @@ from daras_ai_v2.db import USER_RUNS_COLLECTION, EXAMPLES_COLLECTION
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
 from daras_ai_v2.html_error_widget import html_error
-from daras_ai_v2.html_spinner_widget import html_spinner
+from daras_ai_v2.html_spinner_widget import html_spinner, scroll_to_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params import (
     gooey_reset_query_parm,
     gooey_get_query_params,
-    QUERY_PARAMS_KEY,
 )
 from daras_ai_v2.query_params_util import (
     extract_query_params,
@@ -52,7 +53,7 @@ from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
-from routers.realtime import realtime_subscribe, realtime_set
+from gooey_ui.pubsub import subscibe, get_redis, publish
 
 DEFAULT_META_IMG = (
     # Small
@@ -132,9 +133,16 @@ class BasePage:
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
-        self._user_disabled_check()
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
 
-        # self._realtime_subscribe()
+        if st.session_state.get(StateKeys.run_status):
+            channel = f"gooey-outputs/{self.doc_name}/{uid}/{run_id}"
+            output = subscibe([channel])[0]
+            # print("<<<", channel, output)
+            if output:
+                st.session_state.update(output)
+
+        self._user_disabled_check()
         self._check_if_flagged()
 
         if st.session_state.get("show_report_workflow"):
@@ -146,7 +154,6 @@ class BasePage:
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         root_url = self.app_url(example_id=example_id)
         st.write(
             f'## <a style="text-decoration: none;" target="_top" href="{root_url}">{st.session_state.get(StateKeys.page_title)}</a>',
@@ -154,11 +161,10 @@ class BasePage:
         )
         st.write(st.session_state.get(StateKeys.page_notes))
 
-        selected_tab_path = st.get_query_params().get("tab", "")
         try:
-            selected_tab = MenuTabs.paths_reverse[selected_tab_path]
+            selected_tab = MenuTabs.paths_reverse[self.tab]
         except KeyError:
-            st.error(f"## 404 - Tab {selected_tab_path!r} Not found")
+            st.error(f"## 404 - Tab {self.tab!r} Not found")
             return
 
         tab_names = self.get_tabs()
@@ -191,15 +197,6 @@ class BasePage:
             )
             st.error(msg, icon="😵")
             st.stop()
-
-    def _realtime_subscribe(self):
-        _, run_id, uid = extract_query_params(gooey_get_query_params())
-        redis_key = f"runs/{uid}/{run_id}"
-        updates = realtime_subscribe(redis_key)
-        if updates:
-            st.session_state.update(updates)
-        else:
-            st.session_state[StateKeys.run_status] = None
 
     def get_tabs(self):
         tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
@@ -258,13 +255,6 @@ class BasePage:
             """,
             unsafe_allow_html=True,
         )
-
-        def _build_page_tuple(page: typing.Type[BasePage]):
-            state = page().get_recipe_doc().to_dict()
-            preview_image = meta_preview_url(
-                page().preview_image(state), page().fallback_preivew_image()
-            )
-            return page, state, preview_image
 
         related_recipe_docs = map_parallel(_build_page_tuple, workflows)
 
@@ -494,7 +484,7 @@ class BasePage:
         try:
             self.validate_form_v2()
         except AssertionError as e:
-            st.error(e, icon="⚠️")
+            st.error(e)
             return False
         else:
             return True
@@ -605,16 +595,20 @@ class BasePage:
         st.session_state.update(updates)
 
     def create_new_run(self):
+        st.session_state[StateKeys.run_status] = "Running..."
+        st.session_state.pop(StateKeys.error_msg, None)
+        st.session_state.pop(StateKeys.run_time, None)
+        self._setup_rng_seed()
+        self.clear_outputs()
+
         current_user: auth.UserRecord = st.session_state["_current_user"]
 
         run_id = get_random_doc_id()
         example_id, *_ = extract_query_params(gooey_get_query_params())
         uid = current_user.uid
 
-        Thread(
-            target=self.run_doc_ref(run_id, uid).set,
-            args=[self.state_to_doc(st.session_state)],
-        ).start()
+        self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
+
         gooey_reset_query_parm(
             **self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
         )
@@ -630,17 +624,16 @@ class BasePage:
             submitted = True
 
         if submitted:
-            placeholder = st.div()
-            with placeholder:
-                html_spinner("Starting...")
-            run_id, uid = self._pre_run_checklist()
-            # scroll_to_spinner()
+            run_id, uid = self.create_new_run()
+            scroll_to_spinner()
             if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
-                placeholder.empty()
                 return
-            self._run_in_thread(run_id, uid)
-            sleep(0.1)
-            st.experimental_rerun()
+            channel = f"gooey-outputs/{self.doc_name}/{uid}/{run_id}"
+            Thread(
+                target=self._run_thread,
+                args=[run_id, uid, st.session_state, channel],
+            ).start()
+            subscibe([channel])
 
         run_status = st.session_state.get(StateKeys.run_status)
         if run_status:
@@ -653,66 +646,63 @@ class BasePage:
 
             # render errors
             if err_msg is not None:
-                st.error(err_msg, icon="⚠️")
+                st.error(err_msg)
             # render run time
             elif run_time:
-                st.success(
-                    f"Success! Run Time: `{run_time:.2f}` seconds. ",
-                    icon="✅",
-                )
+                st.success(f"Success! Run Time: `{run_time:.2f}` seconds. ")
 
         # render outputs
         self.render_output()
 
-        if run_status:
-            pass
-        else:
+        if not run_status:
             self._render_after_output()
 
-    def _run_in_thread(self, run_id, uid):
-        if st.session_state.get(StateKeys.run_status):
-            st.error("Already running, please wait or open in a new tab...")
-            return
-
-        t = Thread(
-            target=self._run_thread,
-            args=[run_id, uid, dict(st.session_state)],
-        )
-        t.start()
-
-    def _run_thread(self, run_id, uid, local_state):
-        redis_key = f"runs/{uid}/{run_id}"
+    def _run_thread(self, run_id, uid, state, channel):
+        st.set_session_state(state)
         run_time = 0
         yield_val = None
         error_msg = None
 
         def save(done=False):
-            updates = {
-                StateKeys.run_time: run_time,
-                StateKeys.error_msg: error_msg,
-            }
             if done:
                 # clear run status
-                updates[StateKeys.run_status] = None
+                run_status = None
             else:
                 # set run status to the yield value of generator
-                updates[StateKeys.run_status] = yield_val or "Running..."
-            # extract outputs from local state
-            output = {
-                k: v
-                for k, v in local_state.items()
-                if k in self.ResponseModel.__fields__
-            }
-            # send updates to streamlit
-            realtime_set(
-                redis_key, updates | output, expire=datetime.timedelta(hours=2)
+                run_status = yield_val or "Running..."
+            output = (
+                # set run status and run time
+                {
+                    StateKeys.run_time: run_time,
+                    StateKeys.error_msg: error_msg,
+                    StateKeys.run_status: run_status,
+                }
+                |
+                # extract outputs from local state
+                {
+                    k: v
+                    for k, v in st.session_state.items()
+                    if k in self.ResponseModel.__fields__
+                }
             )
+            # send outputs to ui
+            publish(channel, output)
             # save to db
-            self.run_doc_ref(run_id, uid).set(self.state_to_doc(updates | local_state))
+            self.run_doc_ref(run_id, uid).set(
+                self.state_to_doc(st.session_state | output)
+            )
+            # print(
+            #     "> pub",
+            #     channel,
+            #     {
+            #         StateKeys.run_time: run_time,
+            #         StateKeys.error_msg: error_msg,
+            #         StateKeys.run_status: run_status,
+            #     },
+            # )
 
         try:
-            save()
-            gen = self.run(local_state)
+            gen = self.run(st.session_state)
             while True:
                 # record time
                 start_time = time()
@@ -725,7 +715,7 @@ class BasePage:
                 # run completed
                 except StopIteration:
                     run_time += time() - start_time
-                    self.deduct_credits(local_state)
+                    self.deduct_credits(st.session_state)
                     break
                 # render errors nicely
                 except Exception as e:
@@ -738,15 +728,6 @@ class BasePage:
                     save()
         finally:
             save(done=True)
-
-    def _pre_run_checklist(self):
-        st.session_state.pop(StateKeys.run_status, None)
-        st.session_state.pop(StateKeys.error_msg, None)
-        st.session_state.pop(StateKeys.run_time, None)
-        # st.session_state.pop(StateKeys.run_doc_to_save, None)
-        self._setup_rng_seed()
-        self.clear_outputs()
-        return self.create_new_run()
 
     def _setup_rng_seed(self):
         seed = st.session_state.get("seed")
@@ -1167,3 +1148,12 @@ def is_admin():
     if email and email in settings.ADMIN_EMAILS:
         return True
     return False
+
+
+@lru_cache
+def _build_page_tuple(page: typing.Type[BasePage]):
+    state = page().get_recipe_doc().to_dict()
+    preview_image = meta_preview_url(
+        page().preview_image(state), page().fallback_preivew_image()
+    )
+    return page, state, preview_image

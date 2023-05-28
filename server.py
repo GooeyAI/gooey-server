@@ -1,31 +1,25 @@
-from pprint import pprint
-
-from daras_ai_v2.perf_timer import start_perf_timer, perf_timer
+from daras_ai_v2.meta_content import build_meta_tags
+from daras_ai_v2.query_params_util import extract_query_params
 from gooeysite import wsgi
 
 assert wsgi
 
 import datetime
-import os
 import json
 import re
 import typing
 from time import time
 from traceback import print_exc
 
-import httpx
 from fastapi import FastAPI, Form, Depends
 from fastapi import HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from firebase_admin import auth, exceptions
 from furl import furl
-from lxml.html import HtmlElement
 from pydantic import BaseModel, create_model, ValidationError
 from pydantic.generics import GenericModel
-from pyquery import PyQuery as pq
 from sentry_sdk import capture_exception
 from starlette.datastructures import UploadFile, FormData
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -37,7 +31,6 @@ from starlette.responses import (
     FileResponse,
 )
 
-import Home
 import gooey_ui as st
 from auth_backend import (
     SessionAuthBackend,
@@ -51,19 +44,12 @@ from daras_ai_v2.base import (
     err_msg_for_exc,
 )
 from daras_ai_v2.crypto import get_random_doc_id
-from daras_ai_v2.meta_content import (
-    meta_title_for_page,
-    meta_description_for_page,
-)
-from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from gooey_token_authentication1.token_authentication import api_auth_header
-from routers import billing, facebook, talkjs, realtime
+from routers import billing, facebook, talkjs
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 
-app.include_router(realtime.router, include_in_schema=False)
 app.include_router(billing.router, include_in_schema=False)
 app.include_router(talkjs.router, include_in_schema=False)
 app.include_router(facebook.router, include_in_schema=False)
@@ -108,58 +94,28 @@ async def favicon():
     return FileResponse("static/favicon.ico")
 
 
-@app.exception_handler(404)
-async def custom_404_handler(request: Request, exc):
-    url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
-    async with httpx.AsyncClient(base_url=settings.WIX_SITE_URL) as client:
-        resp = await client.request(
-            request.method,
-            url,
-            headers={"user-agent": request.headers.get("user-agent", "")},
-        )
+def TemplateResponse(name: str, context: dict):
+    try:
+        request = context["request"]
+    except KeyError as e:
+        raise ValueError('context must include a "request" key') from e
 
-    if resp.status_code == 404:
-        return templates.TemplateResponse(
-            "404.html",
-            {
-                "request": request,
-                "settings": settings,
-            },
-            status_code=404,
-        )
-
-    elif resp.status_code != 200 or "text/html" not in resp.headers["content-type"]:
-        return Response(content=resp.content, status_code=resp.status_code)
-
-    # convert links
-    d = pq(resp.content)
-    for el in d("a"):
-        el: HtmlElement
-        href = el.attrib.get("href", "")
-        if href == "https://app.gooey.ai":
-            href = "/explore/"
-        elif href.startswith(settings.WIX_SITE_URL):
-            href = href[len(settings.WIX_SITE_URL) :]
-            if not href.startswith("/"):
-                href = "/" + href
-        else:
-            continue
-        el.attrib["href"] = href
-
-    return templates.TemplateResponse(
-        "wix_site.html",
-        context={
-            "request": request,
-            "wix_site_html": d.outer_html(),
-            "settings": settings,
-        },
+    html = templates.get_template(name).render(
+        request=request,
+        settings=settings,
     )
 
+    def _main():
+        return st.html(html)
 
-@app.get("/login", include_in_schema=False)
-def authentication(request: Request):
+    return st.runner(_main, query_params=request.query_params)
+
+
+@app.get("/login/", include_in_schema=False)
+def login(request: Request):
+    print(request.headers)
     if request.user:
-        return RedirectResponse(url=request.query_params.get("next", "/"))
+        return RedirectResponse(url=request.query_params.get("next", "/explore/"))
     return templates.TemplateResponse(
         "login_options.html",
         context={
@@ -169,12 +125,13 @@ def authentication(request: Request):
     )
 
 
-async def request_body(request: Request):
-    return await request.body()
+async def form_id_token(request: Request):
+    form = await request.form()
+    return form.get("idToken", "")
 
 
-@app.post("/sessionLogin", include_in_schema=False)
-def authentication(request: Request, id_token: bytes = Depends(request_body)):
+@app.post("/login/", include_in_schema=False)
+def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
     ## Taken from https://firebase.google.com/docs/auth/admin/manage-cookies#create_session_cookie
 
     # To ensure that cookies are set only on recently signed in users, check auth_time in
@@ -186,7 +143,7 @@ def authentication(request: Request, id_token: bytes = Depends(request_body)):
             expires_in = datetime.timedelta(days=14)
             session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
             request.session[FIREBASE_SESSION_COOKIE] = session_cookie
-            return JSONResponse(content={"status": "success"})
+            return RedirectResponse(url=request.query_params.get("next", "/explore/"))
         # User did not sign in recently. To guard against ID token theft, require
         # re-authentication.
         return PlainTextResponse(status_code=401, content="Recent sign in required")
@@ -198,7 +155,7 @@ def authentication(request: Request, id_token: bytes = Depends(request_body)):
         )
 
 
-@app.get("/logout", include_in_schema=False)
+@app.get("/logout/", include_in_schema=False)
 async def logout(request: Request):
     request.session.pop(FIREBASE_SESSION_COOKIE, None)
     return RedirectResponse(url=request.query_params.get("next", "/"))
@@ -399,19 +356,20 @@ def call_api(
     }
 
 
-@app.post("/__/gooey-ui/explore/", include_in_schema=False)
-def explore():
-    return st.runner(Home.main)
-
-
 async def request_json(request: Request):
     return await request.json()
 
 
-@app.post("/__/gooey-ui/{page_slug}/", include_in_schema=False)
-@app.post("/__/gooey-ui/{page_slug}/{tab}/", include_in_schema=False)
+@app.post("/explore/", include_in_schema=False)
+def explore(request: Request, json_data: dict = Depends(request_json)):
+    return st.runner(lambda: main(request), **json_data)
+
+
+@app.post("/", include_in_schema=False)
+@app.post("/{page_slug}/", include_in_schema=False)
+@app.post("/{page_slug}/{tab}/", include_in_schema=False)
 def st_page(
-    request: Request, page_slug, tab="", json_data: dict = Depends(request_json)
+    request: Request, page_slug="", tab="", json_data: dict = Depends(request_json)
 ):
     lookup = normalize_slug(page_slug)
     try:
@@ -419,73 +377,69 @@ def st_page(
     except KeyError:
         raise HTTPException(status_code=404)
     latest_slug = page_cls.slug_versions[-1]
-    # if latest_slug != page_slug:
-    #     return RedirectResponse(request.url.replace(path=f"/{latest_slug}/"))
+    if latest_slug != page_slug:
+        return RedirectResponse(request.url.replace(path=f"/{latest_slug}/"))
     page = page_cls()
+    page.tab = tab
 
-    state = json_data.get("state")
+    example_id, run_id, uid = extract_query_params(request.query_params)
+
+    state = json_data.setdefault("state", {})
     if not state:
-        state = page.get_doc_from_query_params(dict(request.query_params))
+        state.update(page.get_firestore_state(example_id, run_id, uid))
     if state is None:
         raise HTTPException(status_code=404)
-    query_params = dict(request.query_params) | {"page_slug": page_slug, "tab": tab}
 
-    return st.runner(Home.main, query_params=query_params, state=state)
-    # iframe_url = furl(
-    #     settings.IFRAME_BASE_URL, query_params={"page_slug": page_cls.slug_versions[0]}
-    # )
-    # example_id, run_id, uid = extract_query_params(dict(request.query_params))
-    #
-    # return _st_page(
-    #     request,
-    #     str(iframe_url),
-    #     block_incognito=True,
-    #     context={
-    #         "title": meta_title_for_page(
-    #             page=page,
-    #             state=state,
-    #             run_id=run_id,
-    #             uid=uid,
-    #             example_id=example_id,
-    #         ),
-    #         "description": meta_description_for_page(
-    #             page=page,
-    #             state=state,
-    #             run_id=run_id,
-    #             uid=uid,
-    #             example_id=example_id,
-    #         ),
-    #         "image": meta_preview_url(
-    #             page.preview_image(state), page.fallback_preivew_image()
-    #         ),
-    #     },
-    # )
+    def _main():
+        main(request, page)
 
-
-def _st_page(
-    request: Request,
-    iframe_url: str,
-    *,
-    block_incognito: bool = False,
-    context: dict,
-):
-    f = furl(iframe_url)
-    f.query.params["embed"] = "true"
-    f.query.params["embed_options"] = "disable_scrolling"
-    f.query.params.update(**request.query_params)  # pass down query params
-
-    db.get_or_init_user_data(request)
-
-    return templates.TemplateResponse(
-        "st_page.html",
-        context={
-            "request": request,
-            "iframe_url": f.url,
-            "settings": settings,
-            "block_incognito": block_incognito,
-            **context,
-        },
+    ret = st.runner(
+        _main,
+        query_params=dict(request.query_params),
+        **json_data,
     )
+    ret |= {
+        "meta": build_meta_tags(
+            url=str(request.url),
+            page=page,
+            state=state,
+            run_id=run_id,
+            uid=uid,
+            example_id=example_id,
+        )
+        # + [
+        #     dict(tagName="link", rel="icon", href="/static/favicon.ico"),
+        #     dict(tagName="link", rel="stylesheet", href="/static/css/app.css"),
+        # ],
+    }
+    print(">>>", ret["state"].get("__run_status"))
+    return ret
+
+
+def main(request: Request, page: "BasePage" = None):
+    st.session_state["_current_user"] = request.user
+
+    context = {
+        "request": request,
+        "settings": settings,
+    }
+    st.html("""<link rel="stylesheet" href="/static/css/app.css">""")
+    st.html(templates.get_template("header.html").render(**context))
+    st.html(templates.get_template("login_container.html").render(**context))
+    st.html(templates.get_template("login_scripts.html").render(**context))
+
+    from daras_ai.init import init_scripts
+
+    init_scripts()
+
+    if not page:
+        import explore
+
+        page = explore
+
+    page.render()
+
+    st.html(templates.get_template("footer.html").render(**context))
 
 
 def normalize_slug(page_slug):

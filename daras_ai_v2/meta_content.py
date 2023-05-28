@@ -3,6 +3,57 @@ from firebase_admin.auth import UserNotFoundError
 
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.meta_preview_url import meta_preview_url
+
+
+def build_meta_tags(
+    *,
+    url: str,
+    page: BasePage,
+    state: dict,
+    run_id: str,
+    uid: str,
+    example_id: str,
+) -> list[dict]:
+    title = meta_title_for_page(
+        page=page,
+        state=state,
+        run_id=run_id,
+        uid=uid,
+        example_id=example_id,
+    )
+    description = meta_description_for_page(
+        page=page,
+        state=state,
+        run_id=run_id,
+        uid=uid,
+        example_id=example_id,
+    )
+    image = meta_preview_url(page.preview_image(state), page.fallback_preivew_image())
+
+    ret = [
+        dict(title=title),
+        dict(name="title", content=title),
+        dict(property="og:type", content="website"),
+        dict(property="og:url", content=url),
+        dict(property="og:title", content=title),
+        dict(property="twitter:card", content="summary_large_image"),
+        dict(property="twitter:url", content=url),
+        dict(property="twitter:title", content=title),
+    ]
+    if description:
+        ret += [
+            dict(name="description", content=description),
+            dict(property="og:description", content=description),
+            dict(property="twitter:description", content=description),
+        ]
+    if image:
+        ret += [
+            dict(name="image", content=image),
+            dict(property="og:image", content=image),
+            dict(property="twitter:image", content=image),
+        ]
+    return ret
 
 
 def meta_title_for_page(

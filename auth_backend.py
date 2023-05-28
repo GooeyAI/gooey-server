@@ -1,5 +1,6 @@
 import uuid
 from contextlib import contextmanager
+from time import time
 
 from firebase_admin import auth
 from firebase_admin.auth import UserRecord
@@ -42,7 +43,6 @@ class SessionAuthBackend(AuthenticationBackend):
             # Session cookie was invalid
             conn.session.pop(FIREBASE_SESSION_COOKIE, None)
             return AuthCredentials(), None
-
         return AuthCredentials(["authenticated"]), user
 
 

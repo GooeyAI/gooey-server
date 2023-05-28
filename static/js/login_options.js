@@ -27,7 +27,6 @@ const uiConfig = {
         },
         {
             provider: "apple.com",
-            buttonColor: "#ff",
         },
         // firebase.auth.FacebookAuthProvider.PROVIDER_ID,
         // firebase.auth.TwitterAuthProvider.PROVIDER_ID,

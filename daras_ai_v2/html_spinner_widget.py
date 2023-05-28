@@ -61,12 +61,15 @@ if (elem) {
 
 def scroll_to_spinner():
     hidden_html_js(
+        # language=HTML
         """
 <script>
-let elem = parent.document.querySelector('.gooey-spinner');
-if (elem) {
-    elem.scrollIntoView();
-}
+setTimeout(() => {
+    let elem = document.querySelector('.gooey-spinner');
+    if (elem) {
+        elem.scrollIntoView();
+    }
+}, 500);
 </script>
         """
     )

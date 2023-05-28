@@ -4,28 +4,32 @@
             {% if request.user.display_name %}
                 {{ request.user.display_name }}
             {% endif %}
-            <div class="login-id" >{{ request.user.email or request.user.phone_number }}</div>
+            <div class="login-id">{{ request.user.email or request.user.phone_number }}</div>
         </a>
     </div>
 {% else %}
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-    <div id="g_id_onload"
-         data-client_id="6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com"
-         data-callback="handleCredentialResponse"
-         data-auto_prompt="{{ enable_onetap or "true" }}">
+    <div class="login-container">
+        <div id="g_id_signin"></div>
+        <div style="height: 6px"></div>
+        <a href="/login/?next={{ request.path }}">or another way...</a>&nbsp;
     </div>
 
-    <div class="login-container">
-        <div class="g_id_signin"
-             data-type="button"
-             data-size="large"
-             data-theme="filled_black"
-             data-text="sign_in_with"
-             data-shape="pill"
-             data-logo_alignment="right">
-        </div>
-        <div style="height: 6px"></div>
-        <a style="font-size: 10px; color: wheat" href="/login?next={{ request.path }}">or another way...</a>&nbsp;
-    </div>
+    <script>
+        window.addEventListener('load', function () {
+            const CLIENT_ID = "6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com";
+            google.accounts.id.initialize({
+                client_id: CLIENT_ID,
+                callback: handleCredentialResponse
+            });
+            google.accounts.id.renderButton(
+                document.getElementById("g_id_signin"),
+                {
+                    shape: "pill",
+                }
+            );
+            google.accounts.id.prompt();
+        });
+    </script>
 {% endif %}

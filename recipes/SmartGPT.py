@@ -1,9 +1,9 @@
 import typing
 
 import jinja2.sandbox
-import streamlit as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai_v2.GoogleGPT import render_outputs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import map_parallel

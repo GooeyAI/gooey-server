@@ -17,7 +17,8 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.html_spinner_widget import html_spinner_css
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
-from daras_ai_v2.st_session_cookie import get_current_user, get_anonymous_user
+
+# from daras_ai_v2.st_session_cookie import get_current_user, get_anonymous_user
 
 
 def init_scripts():
@@ -30,7 +31,7 @@ def init_scripts():
     st.html(html_spinner_css + copy_to_clipboard_scripts)
 
     # if "_current_user" not in st.session_state:
-    st.session_state["_current_user"] = get_current_user() or get_anonymous_user()
+    # st.session_state["_current_user"] = get_current_user() or get_anonymous_user()
     # else:
     #     st.session_state["_current_user"] = auth.UserRecord(
     #         st.session_state["_current_user"]

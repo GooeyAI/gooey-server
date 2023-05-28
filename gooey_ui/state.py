@@ -3,6 +3,11 @@ import typing
 
 from pydantic import BaseModel
 
+from gooey_ui.pubsub import (
+    subscibe,
+    get_subscriptions,
+)
+
 threadlocal = threading.local()
 
 
@@ -22,9 +27,7 @@ def get_query_params() -> dict[str, str]:
 
 
 def set_query_params(params: dict[str, str]):
-    old = get_query_params()
-    old.clear()
-    old.update(params)
+    threadlocal.query_params = params
 
 
 def get_session_state() -> dict[str, typing.Any]:
@@ -36,9 +39,7 @@ def get_session_state() -> dict[str, typing.Any]:
 
 
 def set_session_state(state: dict[str, typing.Any]):
-    old = get_session_state()
-    old.clear()
-    old.update(state)
+    threadlocal.session_state = state
 
 
 Style = dict[str, str | None]
@@ -61,7 +62,6 @@ class NestingCtx:
         self.parent = None
 
     def __enter__(self):
-        # global local._render_root
         try:
             self.parent = threadlocal._render_root
         except AttributeError:
@@ -69,7 +69,6 @@ class NestingCtx:
         threadlocal._render_root = self.node
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # global local._render_root
         threadlocal._render_root = self.parent
 
     def empty(self):
@@ -79,30 +78,30 @@ class NestingCtx:
 
 
 def runner(
-    fn: typing.Callable, state: dict = None, query_params: dict[str, str] = None
+    fn: typing.Callable,
+    state: dict[str, typing.Any] = None,
+    query_params: dict[str, str] = None,
+    channels: dict[str, typing.Any] = None,
 ) -> dict:
-    set_query_params(query_params or {})
     set_session_state(state or {})
-    try:
-        while True:
+    set_query_params(query_params or {})
+    subscibe(channels or {})
+    while True:
+        try:
+            root = RenderTreeNode(name="root")
             try:
-                root = RenderTreeNode(name="root")
-                try:
-                    with NestingCtx(root):
-                        fn()
-                except StopException:
-                    pass
-                # print(root.children)
-                return dict(
-                    state=get_session_state().copy(),
-                    query_params=get_query_params().copy(),
-                    children=root.children,
-                )
-            except RerunException:
-                continue
-    finally:
-        set_query_params({})
-        set_session_state({})
+                with NestingCtx(root):
+                    fn()
+            except StopException:
+                pass
+            return dict(
+                children=root.children,
+                state=get_session_state(),
+                query_params=get_query_params(),
+                channels=get_subscriptions(),
+            )
+        except RerunException:
+            continue
 
 
 def experimental_rerun():

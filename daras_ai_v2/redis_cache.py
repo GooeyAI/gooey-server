@@ -1,15 +1,14 @@
 import hashlib
 import pickle
 import typing
-from functools import wraps
+from functools import wraps, lru_cache
 
 import redis
-import streamlit as st
 
 from daras_ai_v2 import settings
 
 
-@st.cache_resource
+@lru_cache
 def get_redis_cache():
     return redis.Redis.from_url(settings.REDIS_CACHE_URL)
 

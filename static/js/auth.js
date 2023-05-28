@@ -20,24 +20,15 @@ window.addEventListener('load', function () {
 
 function onSignIn(user) {
     if (!user) return;
-
     // Get the user's ID token as it is needed to exchange for a session cookie.
     user.getIdToken().then(idToken => {
-        // Session login endpoint is queried and the session cookie is set.
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", '/sessionLogin', true);
-
-        // Send the proper header information along with the request
-        xhr.setRequestHeader("Content-Type", "application/json");
-
-        xhr.onreadystatechange = () => { // Call a function when the state changes.
-            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                // Request finished. Do processing here.
-                const next = new URLSearchParams(window.location.search).get("next") || window.location;
-                window.location = next;
-            }
-        }
-        xhr.send(idToken);
+        const form = document.body.appendChild(document.createElement('form'));
+        let input = form.appendChild(document.createElement('input'));
+        form.method = "POST";
+        input.type = "hidden";
+        input.name = "idToken";
+        input.value = idToken;
+        form.submit();
     });
 }
 

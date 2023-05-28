@@ -1,5 +1,4 @@
 import base64
-import hashlib
 import json as _json
 import os
 import textwrap
@@ -10,6 +9,7 @@ import pandas as pd
 from furl import furl
 
 from gooey_ui import state
+from gooey_ui.pubsub import md5_values
 
 T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]
@@ -22,6 +22,8 @@ def dummy(*args, **kwargs):
 spinner = dummy
 set_page_config = dummy
 form = dummy
+plotly_chart = dummy
+dataframe = dummy
 
 
 def div() -> state.typing.ContextManager:
@@ -63,6 +65,8 @@ def text(body: str, *, style: dict[str, str] = None, unsafe_allow_html=False):
 
 
 def error(body: str, icon: str = "⚠️", *, unsafe_allow_html=False):
+    if not isinstance(body, str):
+        body = repr(body)
     markdown(
         # language="html",
         f"""
@@ -222,7 +226,7 @@ def multiselect(
     if key:
         assert not default, "only one of default or key can be provided"
     else:
-        key = _md5("multiselect", label, options, default, help)
+        key = md5_values("multiselect", label, options, default, help)
     value = state.session_state.setdefault(key, default)
     state.RenderTreeNode(
         name="multiselect",
@@ -259,7 +263,7 @@ def selectbox(
     if key:
         assert not index, "only one of index or key can be provided"
     else:
-        key = _md5("select", label, options, index, help, label_visibility)
+        key = md5_values("select", label, options, index, help, label_visibility)
     value = state.session_state.setdefault(key, options[index])
     if label_visibility != "visible":
         label = None
@@ -295,7 +299,7 @@ def button(
     disabled: bool = False,
 ) -> bool:
     if not key:
-        key = _md5("button", label, help, type, disabled)
+        key = md5_values("button", label, help, type, disabled)
     state.RenderTreeNode(
         name="button",
         props=dict(
@@ -349,7 +353,7 @@ def file_uploader(
         name="input",
         props=dict(
             type="file",
-            name=upload_key or key,
+            # name=upload_key or key,
             label=dedent(label),
             help=help,
             disabled=disabled,
@@ -476,7 +480,7 @@ def radio(
     if key:
         assert not index, "only one of index or key can be provided"
     else:
-        key = _md5("radio", label, options, index, help, label_visibility)
+        key = md5_values("radio", label, options, index, help, label_visibility)
     value = state.session_state.setdefault(key, options[index])
     if label_visibility != "visible":
         label = None
@@ -621,7 +625,7 @@ def _input_widget(
     if key:
         assert not value, "only one of value or key can be provided"
     else:
-        key = _md5("input", input_type, label, help, label_visibility)
+        key = md5_values("input", input_type, label, help, label_visibility)
     value = state.session_state.setdefault(key, value)
     if label_visibility != "visible":
         label = None
@@ -644,8 +648,3 @@ def dedent(text: str | None) -> str | None:
     if not text:
         return text
     return textwrap.dedent(text)
-
-
-def _md5(*values) -> str:
-    strval = ".".join(map(repr, values))
-    return hashlib.md5(strval.encode()).hexdigest()
