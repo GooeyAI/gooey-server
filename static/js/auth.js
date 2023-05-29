@@ -44,9 +44,8 @@ function onSignIn(user) {
         input.value = idToken;
 
         form.submit();
-
-        document.getElementById('replace-login-text').innerHTML = "<h3>Logging in...</h3>";
     });
+    showLoginProgress();
 }
 
 function handleCredentialResponse(response) {
@@ -58,4 +57,12 @@ function handleCredentialResponse(response) {
     firebase.auth().signInWithCredential(credential).then(authResult => {
         onSignIn(authResult.user);
     });
+
+    showLoginProgress();
+}
+
+function showLoginProgress() {
+    let elem = document.getElementById("replace-login-spinner");
+    if (!elem) return;
+    elem.innerHTML = "<h3>Logging you in...</h3>";
 }

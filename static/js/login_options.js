@@ -12,6 +12,11 @@ const uiConfig = {
             onSignIn(authResult.user);
             return false;
         },
+        uiShown: function () {
+            // The widget is rendered.
+            // Hide the loader.
+            document.getElementById('firebaseui-spinner').style.display = 'none';
+        }
     },
     signInOptions: [
         // Leave the lines as is for the providers you want to offer your users.
