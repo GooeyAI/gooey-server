@@ -172,8 +172,9 @@ def output_resolution_setting():
                 st.session_state["__orientation"] = orientation
                 break
 
-    selected_model = st.session_state.get(
-        "selected_model", st.session_state.get("selected_models", "")
+    selected_model = (
+        st.session_state.get("selected_model", st.session_state.get("selected_models"))
+        or ""
     )
     if "jack_qiao" in selected_model or "sd_1_4" in selected_model:
         pixel_options = [512]

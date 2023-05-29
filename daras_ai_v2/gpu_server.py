@@ -94,8 +94,8 @@ def call_gooey_gpu(
     content_type: str,
     pipeline: dict,
     inputs: dict,
-    num_outputs: int,
     filename: str,
+    num_outputs: int = 1,
 ) -> list[str]:
     blobs = [
         storage_blob_for(f"gooey.ai - {filename} ({i + 1}).png")
