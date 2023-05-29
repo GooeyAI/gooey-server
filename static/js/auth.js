@@ -44,6 +44,8 @@ function onSignIn(user) {
         input.value = idToken;
 
         form.submit();
+
+        document.getElementById('replace-login-text').innerHTML = "<h3>Logging in...</h3>";
     });
 }
 
