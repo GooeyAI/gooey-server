@@ -22,7 +22,7 @@ function onSignIn(user) {
     if (!user) return;
     // Get the user's ID token as it is needed to exchange for a session cookie.
     user.getIdToken().then(idToken => {
-        const action = "/login/";
+        let action = "/login/";
 
         const windowUrl = new URL(window.location.href);
         // redirect back to the page that sent the user here
