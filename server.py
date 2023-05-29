@@ -66,6 +66,9 @@ app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+DEFAULT_LOGIN_REDIRECT = "/explore/"
+DEFAULT_LOGOUT_REDIRECT = "/"
+
 
 @app.get("/sitemap.xml/", include_in_schema=False)
 async def get_sitemap():
@@ -95,27 +98,12 @@ async def favicon():
     return FileResponse("static/favicon.ico")
 
 
-def TemplateResponse(name: str, context: dict):
-    try:
-        request = context["request"]
-    except KeyError as e:
-        raise ValueError('context must include a "request" key') from e
-
-    html = templates.get_template(name).render(
-        request=request,
-        settings=settings,
-    )
-
-    def _main():
-        return st.html(html)
-
-    return st.runner(_main, query_params=request.query_params)
-
-
 @app.get("/login/", include_in_schema=False)
 def login(request: Request):
     if request.user:
-        return RedirectResponse(url=request.query_params.get("next", "/explore/"))
+        return RedirectResponse(
+            request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
+        )
     return templates.TemplateResponse(
         "login_options.html",
         context={
@@ -144,7 +132,7 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
             session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
             request.session[FIREBASE_SESSION_COOKIE] = session_cookie
             return RedirectResponse(
-                request.query_params.get("next", "/explore/"),
+                request.query_params.get("next", DEFAULT_LOGIN_REDIRECT),
                 status_code=303,
             )
         # User did not sign in recently. To guard against ID token theft, require
@@ -161,7 +149,7 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
 @app.get("/logout/", include_in_schema=False)
 async def logout(request: Request):
     request.session.pop(FIREBASE_SESSION_COOKIE, None)
-    return RedirectResponse(request.query_params.get("next", "/"))
+    return RedirectResponse(request.query_params.get("next", DEFAULT_LOGOUT_REDIRECT))
 
 
 class FailedReponseModel(BaseModel):

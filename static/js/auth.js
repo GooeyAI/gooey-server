@@ -19,16 +19,28 @@ window.addEventListener('load', function () {
 
 
 function onSignIn(user) {
+    const loginPath = "/login/";
+
     if (!user) return;
     // Get the user's ID token as it is needed to exchange for a session cookie.
     user.getIdToken().then(idToken => {
+        const windowUrl = new URL(window.location.href);
+        // redirect back to the page that sent the user here
+        let next = windowUrl.searchParams.get("next");
+        // if no next param, redirect to the current page (but not the login page)
+        if (!next && windowUrl.pathname !== loginPath) {
+            next = windowUrl.pathname + windowUrl.search + windowUrl.hash;
+        }
+        const action = loginPath + "?" + new URLSearchParams({next}).toString();
+
         const form = document.body.appendChild(document.createElement('form'));
         let input = form.appendChild(document.createElement('input'));
         form.method = "POST";
-        form.action = "/login" + window.location.search;
+        form.action = action;
         input.type = "hidden";
         input.name = "idToken";
         input.value = idToken;
+
         form.submit();
     });
 }
