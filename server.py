@@ -29,6 +29,7 @@ from starlette.responses import (
     PlainTextResponse,
     Response,
     FileResponse,
+    HTMLResponse,
 )
 
 import gooey_ui as st
@@ -113,7 +114,6 @@ def TemplateResponse(name: str, context: dict):
 
 @app.get("/login/", include_in_schema=False)
 def login(request: Request):
-    print(request.headers)
     if request.user:
         return RedirectResponse(url=request.query_params.get("next", "/explore/"))
     return templates.TemplateResponse(
@@ -143,7 +143,10 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
             expires_in = datetime.timedelta(days=14)
             session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
             request.session[FIREBASE_SESSION_COOKIE] = session_cookie
-            return RedirectResponse(url=request.query_params.get("next", "/explore/"))
+            return RedirectResponse(
+                request.query_params.get("next", "/explore/"),
+                status_code=303,
+            )
         # User did not sign in recently. To guard against ID token theft, require
         # re-authentication.
         return PlainTextResponse(status_code=401, content="Recent sign in required")
@@ -158,7 +161,7 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
 @app.get("/logout/", include_in_schema=False)
 async def logout(request: Request):
     request.session.pop(FIREBASE_SESSION_COOKIE, None)
-    return RedirectResponse(url=request.query_params.get("next", "/"))
+    return RedirectResponse(request.query_params.get("next", "/"))
 
 
 class FailedReponseModel(BaseModel):

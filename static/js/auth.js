@@ -25,6 +25,7 @@ function onSignIn(user) {
         const form = document.body.appendChild(document.createElement('form'));
         let input = form.appendChild(document.createElement('input'));
         form.method = "POST";
+        form.action = "/login" + window.location.search;
         input.type = "hidden";
         input.name = "idToken";
         input.value = idToken;

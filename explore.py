@@ -59,10 +59,10 @@ def render():
         gui.markdown(
             # language=html
             f"""
-    <a style="font-size: 24px" href="{page.app_url()}" target = "_top">
-        <h2>{page.title}</h2>
-    </a>
-                """,
+<a style="font-size: 24px" href="{page.app_url()}" target = "_top">
+    <h2>{page.title}</h2>
+</a>
+            """,
             unsafe_allow_html=True,
         )
 
