@@ -209,6 +209,11 @@ class DeforumSDPage(BasePage):
                 step=10,
                 key="max_frames",
             )
+            st.caption(
+                """
+Pro-tip: The more frames you add, the longer it will take to render the animation. Test your prompts before adding more frames. 
+            """
+            )
 
     def additional_notes(self) -> str | None:
         return """
@@ -229,7 +234,7 @@ class DeforumSDPage(BasePage):
         ), "Please make sure that Frame Count matches the Animation Prompts"
 
     def render_usage_guide(self):
-        youtube_video("DwhUJ6O_6E8")
+        youtube_video("sUvica6UuQU")
 
     def render_settings(self):
         col1, col2 = st.columns(2)
@@ -324,44 +329,54 @@ Choose fps for the video.
         return DEFAULT_ANIMATION_META_IMG
 
     def preview_description(self, state: dict) -> str:
-        return "Inspired by deforum.art, create AI-generated Animation for free without complex CoLab notebooks. Input your text prompts with keyframe numbers and animate using Stable Diffusion's Deforum."
+        return "Create AI-generated Animation without relying on complex CoLab notebooks.  Input your prompts + keyframes and bring your ideas to life using the animation capabilities of Gooey & Stable Diffusion's Deforum."
 
     def render_description(self):
         st.markdown(
-            """
-Animation Length: You can indicate how long you want your animation to be by increasing or decreasing your frame count. 
-
-FPS: Every Animation is set at 12 frames per second by default. You can change this default frame rate/ frames per second (FPS) on the Settings menu. 
-
-Prompts: Within your sequence you can input multiple text Prompts for your visuals. Each prompt can be defined for a specific keyframe number. 
-
-##### What are keyframes? 
-
-Keyframes define the transition points from one prompt to the next, or the start and end points of a prompted action set in between the total frame count or sequence. These keyframes or markers are necessary to establish smooth transitions or jump cuts, whatever you prefer.
-
-Use the Camera Settings to generate animations with depth and other 3D parameters.  
-            """
-        )
-        st.markdown(
             f"""
-            ##### How can you construct the visual prompts?
-            
-            - What is the Medium of the stills in your animation? 
-            eg. It is a painting, a sculpture, an old photograph, portrait, 3D render, etc.
-            - What/Who are the Subject(s) or Main Object(s)?
-            eg. A human, an animal, an identity like gender, race, or occupation like dancer, astronaut etc. 
-            - What is the Style?
-            eg. Is it Analogue photography, a watercolor, a line drawing, digital painting etc. 
-            - What are the Details?
-            eg. facial features or expressions, the space and landscape, lighting or the colours etc. 
+            - Every Submit will require approximately 3-5 minutes to render.  
 
-            [Example]({furl(settings.APP_BASE_URL).add(path='animation-generator').add({"example_id": "czvtn7du"}).url})
-            
+            - Animation is complex: Please watch the video and review our decks to help you. 
+
+            - Test your image prompts BEFORE adding lots of frames e.g. Tweak key frame images with just 10 frames between them AND then increase the FPS or frame count between them once you like the outputs. This will save you time and credits. 
+
+            - No lost work! All your animations or previously generated versions are in the History tab. If they don't appear here, it likely means they aren't done rendering yet. 
+
             """
         )
         st.markdown(
             """
-            Pro-tip:
+            #### Resources:
+
+            [Animation slides](https://docs.google.com/presentation/d/1XkW2nHmHS0SAKpYmivO-0D15iqmp1YWMLldIEUC2du0/edit?usp=sharing)
+
+            [Gooey Guide to Prompting](https://docs.google.com/presentation/d/1RaoMP0l7FnBZovDAR42zVmrUND9W5DW6eWet-pi6kiE/edit?usp=sharing)
+
+            Here’s a comprehensive style guide to assist you with different stylized animation prompts:
+
+            [StableDiffusion CheatSheet](https://supagruen.github.io/StableDiffusion-CheatSheet/)
+            
+            """
+        )
+        st.write("---")
+        st.markdown(
+            """
+            Animation Length: You can indicate how long you want your animation to be by increasing or decreasing your frame count. 
+
+            FPS: Every Animation is set at 12 frames per second by default. You can change this default frame rate/ frames per second (FPS) on the Settings menu. 
+
+            Prompts: Within your sequence you can input multiple text Prompts for your visuals. Each prompt can be defined for a specific keyframe number. 
+
+            ##### What are keyframes? 
+
+            Keyframes define the transition points from one prompt to the next, or the start and end points of a prompted action set in between the total frame count or sequence. These keyframes or markers are necessary to establish smooth transitions or jump cuts, whatever you prefer.
+
+            Use the Camera Settings to generate animations with depth and other 3D parameters.  
+            """
+        )
+        st.markdown(
+            """
+            Prompt Construction Tip:
 
             Changing Elements transition better from a visual prompt that is artefact or object heavy to another busy visual prompt. For example: Prompt 1: a busy street transitions to Prompt 2: a busy interior of a park. This transition will render interesting and beautiful imagery.
 
