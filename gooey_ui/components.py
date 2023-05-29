@@ -565,6 +565,7 @@ def number_input(
 ) -> float:
     value = _input_widget(
         input_type="number",
+        inputMode="decimal",
         label=label,
         value=value,
         key=key,
