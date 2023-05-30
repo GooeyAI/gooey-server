@@ -409,7 +409,3 @@ def get_photo_for_twitter_handle(twitter_handle):
         )
         doc_ref.set({"photo_url": photo_url})
         return photo_url
-
-
-if __name__ == "__main__":
-    EmailFaceInpaintingPage().render()

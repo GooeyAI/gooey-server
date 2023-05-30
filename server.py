@@ -1,8 +1,13 @@
-from daras_ai_v2.meta_content import build_meta_tags
-from daras_ai_v2.query_params_util import extract_query_params
 from gooeysite import wsgi
 
 assert wsgi
+
+import os.path
+
+from app_users.models import AppUser
+from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
+from daras_ai_v2.meta_content import build_meta_tags
+from daras_ai_v2.query_params_util import extract_query_params
 
 import datetime
 import json
@@ -29,7 +34,6 @@ from starlette.responses import (
     PlainTextResponse,
     Response,
     FileResponse,
-    HTMLResponse,
 )
 
 import gooey_ui as st
@@ -38,7 +42,7 @@ from auth_backend import (
     FIREBASE_SESSION_COOKIE,
 )
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2 import settings, db
+from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
 from daras_ai_v2.base import (
     BasePage,
@@ -68,6 +72,17 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 DEFAULT_LOGIN_REDIRECT = "/explore/"
 DEFAULT_LOGOUT_REDIRECT = "/"
+
+
+@app.middleware("http")
+async def logger(request: Request, call_next):
+    start_time = time()
+    response: Response = await call_next(request)
+    response_time = (time() - start_time) * 1000
+    print(
+        f"{request.method} {request.url} {response.status_code} {response.headers.get('content-length', '-')} - {response_time:.3f} ms"
+    )
+    return response
 
 
 @app.get("/sitemap.xml/", include_in_schema=False)
@@ -100,16 +115,21 @@ async def favicon():
 
 @app.get("/login/", include_in_schema=False)
 def login(request: Request):
-    if request.user:
+    if request.user and not request.user.is_anonymous:
         return RedirectResponse(
             request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
         )
+    context = {
+        "request": request,
+        "settings": settings,
+    }
+    if request.user and request.user.is_anonymous:
+        context["anonymous_user_token"] = auth.create_custom_token(
+            request.user.uid
+        ).decode()
     return templates.TemplateResponse(
         "login_options.html",
-        context={
-            "request": request,
-            "settings": settings,
-        },
+        context=context,
     )
 
 
@@ -131,6 +151,15 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
             expires_in = datetime.timedelta(days=14)
             session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
             request.session[FIREBASE_SESSION_COOKIE] = session_cookie
+            uid = decoded_claims["uid"]
+            # upgrade an anonymous account to a permanent account
+            try:
+                existing_user = AppUser.objects.get(uid=uid)
+                if existing_user.is_anonymous:
+                    existing_user.copy_from_firebase_user(auth.get_user(uid))
+                    existing_user.save()
+            except AppUser.DoesNotExist:
+                pass
             return RedirectResponse(
                 request.query_params.get("next", DEFAULT_LOGIN_REDIRECT),
                 status_code=303,
@@ -195,7 +224,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     )
     def run_api_form(
         request: Request,
-        user: auth.UserRecord = Depends(api_auth_header),
+        user: AppUser = Depends(api_auth_header),
         form_data=Depends(request_form_files),
         page_request_json: str = Form(alias="json"),
     ):
@@ -246,7 +275,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     )
     def run_api_json(
         request: Request,
-        user: auth.UserRecord = Depends(api_auth_header),
+        user: AppUser = Depends(api_auth_header),
         page_request: page_cls.RequestModel = body_spec,
     ):
         return call_api(
@@ -264,13 +293,13 @@ async def request_form_files(request: Request) -> FormData:
 def call_api(
     *,
     page_cls: typing.Type[BasePage],
-    user: auth.UserRecord,
+    user: AppUser,
     request_body: dict,
     query_params,
 ) -> dict:
     created_at = datetime.datetime.utcnow().isoformat()
     # init a new page for every request
-    page = page_cls()
+    page = page_cls(request=Request(dict(user=user)))
 
     # get saved state from db
     state = page.get_doc_from_query_params(query_params)
@@ -287,15 +316,12 @@ def call_api(
     # remove None values & insert request data
     request_dict = {k: v for k, v in request_body.items() if v is not None}
     state.update(request_dict)
-    # set the current user
-    state["_current_user"] = user
 
     # set streamlit session state
     st.session_state = state
 
     # check the balance
-    balance = db.get_doc_field(db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0)
-    if balance <= 0:
+    if user.balance <= 0:
         account_url = furl(settings.APP_BASE_URL) / "account"
         raise HTTPException(
             status_code=402,
@@ -352,8 +378,10 @@ async def request_json(request: Request):
 
 
 @app.post("/explore/", include_in_schema=False)
-def explore(request: Request, json_data: dict = Depends(request_json)):
-    return st.runner(lambda: main(request), **json_data)
+def explore_page(request: Request, json_data: dict = Depends(request_json)):
+    import explore
+
+    return st.runner(lambda: page_wrapper(request, explore.render), **json_data)
 
 
 @app.post("/", include_in_schema=False)
@@ -362,18 +390,20 @@ def explore(request: Request, json_data: dict = Depends(request_json)):
 def st_page(
     request: Request, page_slug="", tab="", json_data: dict = Depends(request_json)
 ):
-    lookup = normalize_slug(page_slug)
     try:
-        page_cls = page_map[lookup]
+        page_cls = page_map[normalize_slug(page_slug)]
     except KeyError:
         raise HTTPException(status_code=404)
+    # ensure the latest slug is used
     latest_slug = page_cls.slug_versions[-1]
     if latest_slug != page_slug:
-        return RedirectResponse(request.url.replace(path=f"/{latest_slug}/"))
-    page = page_cls()
-    page.tab = tab
+        return RedirectResponse(
+            request.url.replace(path=os.path.join("/", latest_slug, tab, ""))
+        )
 
     example_id, run_id, uid = extract_query_params(request.query_params)
+
+    page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
 
     state = json_data.setdefault("state", {})
     if not state:
@@ -381,11 +411,8 @@ def st_page(
     if state is None:
         raise HTTPException(status_code=404)
 
-    def _main():
-        main(request, page)
-
     ret = st.runner(
-        _main,
+        lambda: page_wrapper(request, page.render),
         query_params=dict(request.query_params),
         **json_data,
     )
@@ -403,32 +430,39 @@ def st_page(
         #     dict(tagName="link", rel="stylesheet", href="/static/css/app.css"),
         # ],
     }
-    print(">>>", ret["state"].get("__run_status"))
     return ret
 
 
-def main(request: Request, page: "BasePage" = None):
-    st.session_state["_current_user"] = request.user
+def get_run_user(request, uid) -> AppUser | None:
+    if not uid:
+        return
+    if request.user and request.user.uid == uid:
+        return request.user
+    try:
+        return AppUser.objects.get(uid=uid)
+    except AppUser.DoesNotExist:
+        pass
 
+
+def page_wrapper(request: Request, render_fn: typing.Callable[[], None]):
     context = {
         "request": request,
         "settings": settings,
+        "block_incognito": True,
     }
+    if request.user and request.user.is_anonymous:
+        context["anonymous_user_token"] = auth.create_custom_token(
+            request.user.uid
+        ).decode()
+
     st.html("""<link rel="stylesheet" href="/static/css/app.css">""")
     st.html(templates.get_template("header.html").render(**context))
     st.html(templates.get_template("login_container.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))
+    st.html(copy_to_clipboard_scripts)
 
-    from daras_ai.init import init_scripts
-
-    init_scripts()
-
-    if not page:
-        import explore
-
-        page = explore
-
-    page.render()
+    with st.div(id="main-content"):
+        render_fn()
 
     st.html(templates.get_template("footer.html").render(**context))
 

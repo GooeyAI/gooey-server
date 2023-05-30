@@ -490,7 +490,3 @@ def _extract_search_urls(
     gooey_rng.shuffle(search_urls)
 
     return search_urls
-
-
-if __name__ == "__main__":
-    SEOSummaryPage().render()

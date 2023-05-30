@@ -201,7 +201,3 @@ class Img2ImgPage(BasePage):
                 return 20
             case _:
                 return 5
-
-
-if __name__ == "__main__":
-    Img2ImgPage().render()

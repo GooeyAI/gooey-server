@@ -11,6 +11,7 @@ from starlette.background import BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response
 
+from app_users.models import AppUser
 from bots.models import (
     BotIntegration,
     Platform,
@@ -63,7 +64,7 @@ FEEDBACK_MSG = (
 
 @router.get("/__/fb/connect/")
 def fb_connect_redirect(request: Request):
-    if not request.user:
+    if not request.user or request.user.is_anonymous:
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
@@ -245,7 +246,9 @@ def _on_msg(bot: BotInterface):
     # mark message as read
     bot.mark_read()
     # get the attached billing account
-    billing_account_user = auth.get_user(bot.billing_account_uid)
+    billing_account_user = AppUser.objects.get_or_create_from_uid(
+        bot.billing_account_uid
+    )[0]
     # get the user's input
     match bot.input_type:
         # handle button press
@@ -383,7 +386,7 @@ def _feedback_buttons():
 def _process_msg(
     *,
     page_cls,
-    api_user: auth.UserRecord,
+    api_user: AppUser,
     query_params: dict,
     convo: Conversation,
     input_text: str,

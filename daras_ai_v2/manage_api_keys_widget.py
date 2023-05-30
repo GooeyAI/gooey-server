@@ -4,6 +4,7 @@ import pandas as pd
 import gooey_ui as st
 from firebase_admin import auth
 
+from app_users.models import AppUser
 from daras_ai_v2 import db
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
@@ -16,7 +17,7 @@ from daras_ai_v2.crypto import (
 from daras_ai_v2.hidden_html_widget import hidden_html_nojs
 
 
-def manage_api_keys(user: auth.UserRecord):
+def manage_api_keys(user: AppUser):
     st.write(
         """
 Your secret API keys are listed below. 
@@ -29,7 +30,7 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
         """
     )
 
-    db_collection = db._db.collection(db.API_KEYS_COLLECTION)
+    db_collection = db.client.collection(db.API_KEYS_COLLECTION)
     api_keys = _load_api_keys(db_collection, user)
 
     table_area = st.div()

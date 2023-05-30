@@ -495,12 +495,6 @@ Use this for prompting GPT to use the document search results.
 
         # consturct the system prompt
         if system_message:
-            # # replace current user's name
-            # current_user = st.session_state.get("_current_user")
-            # if current_user and current_user.display_name:
-            #     system_message = system_message.format(
-            #         username=current_user.display_name
-            #     )
             # add time to prompt
             utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
             system_message = system_message.replace("{{ datetime.utcnow }}", utcnow)
@@ -673,14 +667,7 @@ Use this for prompting GPT to use the document search results.
         super().render_selected_tab(selected_tab)
 
         if selected_tab == MenuTabs.integrations:
-            user = st.session_state.get("_current_user")
-            if not user or hasattr(user, "_is_anonymous"):
-                st.write(
-                    "**Please Login to connect this workflow to Your Website, Instagram, Whatsapp & More**"
-                )
-                return
-
-            self.messenger_bot_integration(user)
+            self.messenger_bot_integration()
 
             st.markdown(
                 """
@@ -730,7 +717,7 @@ Use this for prompting GPT to use the document search results.
 
         show_landbot_widget()
 
-    def messenger_bot_integration(self, user):
+    def messenger_bot_integration(self):
         from bots.models import BotIntegration, Platform
         from routers.facebook import ig_connect_url, fb_connect_url
         from daras_ai_v2.all_pages import Workflow
@@ -768,7 +755,7 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
         st.button("🔄 Refresh")
 
         integrations = BotIntegration.objects.filter(
-            billing_account_uid=user.uid
+            billing_account_uid=self.request.user.uid
         ).order_by("platform")
         if not integrations:
             return

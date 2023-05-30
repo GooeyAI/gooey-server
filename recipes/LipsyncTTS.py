@@ -142,7 +142,3 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     def render_output(self):
         self.render_example(st.session_state)
-
-
-if __name__ == "__main__":
-    LipsyncTTSPage().render()

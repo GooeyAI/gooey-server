@@ -30,9 +30,11 @@
                            target="_blank">Traffic Dashboard</a></li>
                     <li><a href="https://sentry.io/organizations/dara-network/issues/?project=4504338635423744"
                            target="_blank">Sentry</a></li>
-                    <li><a href="https://analytics.google.com/analytics/web/#/p342900654/reports/reportinghub?params=_u..nav%3Dmaui "
+                    <li>
+                        <a href="https://analytics.google.com/analytics/web/#/p342900654/reports/reportinghub?params=_u..nav%3Dmaui "
                            target="_blank">Analytics Summary</a></li>
-                    <li><a href="https://analytics.google.com/analytics/web/#/p342900654/reports/explorer?params=_u..nav%3Dmaui%26_u.date00%3D20221115%26_u.date01%3D20230108%26_u.comparisonOption%3Ddisabled%26_r.explorerCard..seldim%3D%5B%22unifiedPagePathScreen%22%5D%26_r.explorerCard..rowsPerPage%3D25%26_r.explorerCard..startRow%3D0%26_r.explorerCard..selmet%3D%5B%22screenPageViews%22,%22activeUsers%22%5D%26_r.explorerCard..sortKey%3DscreenPageViews&r=4354450696&ruid=all-pages-and-screens,life-cycle,engagement&collectionId=4354433299"
+                    <li>
+                        <a href="https://analytics.google.com/analytics/web/#/p342900654/reports/explorer?params=_u..nav%3Dmaui%26_u.date00%3D20221115%26_u.date01%3D20230108%26_u.comparisonOption%3Ddisabled%26_r.explorerCard..seldim%3D%5B%22unifiedPagePathScreen%22%5D%26_r.explorerCard..rowsPerPage%3D25%26_r.explorerCard..startRow%3D0%26_r.explorerCard..selmet%3D%5B%22screenPageViews%22,%22activeUsers%22%5D%26_r.explorerCard..sortKey%3DscreenPageViews&r=4354450696&ruid=all-pages-and-screens,life-cycle,engagement&collectionId=4354433299"
                            target="_blank">Most Popular Pages</a></li>
                 </ul>
             </div>
@@ -91,17 +93,16 @@
             <div class="billing-button-container">
                 <h2>Billing</h2>
                 <div class="billing-button-container-row">
-                    <form action="/__/stripe/create-portal-session" method="POST">
-                        <button class="btn-outline-dark" id="portal-button" type="submit">Manage your billing
-                            information
-                        </button>
-                    </form>
-
                     <form action="/__/stripe/cancel-subscription" method="POST">
                         <button class="btn-outline-cancel" id="cancel-button" type="submit">Cancel Subscription</button>
                     </form>
                 </div>
             </div>
         {% endif %}
+        <form action="/__/stripe/create-portal-session" method="POST">
+            <button class="btn-outline-dark" id="portal-button" type="submit">Manage your billing
+                information
+            </button>
+        </form>
     </div>
 {% endblock content %}

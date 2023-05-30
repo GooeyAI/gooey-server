@@ -1,7 +1,6 @@
 import datetime
 import inspect
 import math
-import pickle
 import traceback
 import typing
 import uuid
@@ -14,15 +13,16 @@ from time import time, sleep
 import requests
 import sentry_sdk
 from firebase_admin import auth
-from firebase_admin.auth import UserRecord
 from furl import furl
 from google.cloud import firestore
 from pydantic import BaseModel
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
+from starlette.requests import Request
 
 import gooey_ui as st
+from app_users.models import AppUser
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -32,11 +32,15 @@ from daras_ai_v2.copy_to_clipboard_button_widget import (
 from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
-from daras_ai_v2.db import USER_RUNS_COLLECTION, EXAMPLES_COLLECTION
+from daras_ai_v2.db import (
+    USER_RUNS_COLLECTION,
+    EXAMPLES_COLLECTION,
+    ANONYMOUS_USER_COOKIE,
+)
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
 from daras_ai_v2.html_error_widget import html_error
-from daras_ai_v2.html_spinner_widget import html_spinner, scroll_to_spinner
+from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params import (
@@ -53,7 +57,7 @@ from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
-from gooey_ui.pubsub import subscibe, get_redis, publish
+from gooey_ui.pubsub import subscibe, publish
 
 DEFAULT_META_IMG = (
     # Small
@@ -87,6 +91,13 @@ class BasePage:
     ResponseModel: typing.Type[BaseModel]
 
     price = settings.CREDITS_TO_DEDUCT_PER_RUN
+
+    def __init__(
+        self, tab: str = "", request: Request = None, run_user: AppUser = None
+    ):
+        self.tab = tab
+        self.request = request
+        self.run_user = run_user
 
     @property
     def doc_name(self) -> str:
@@ -186,11 +197,11 @@ class BasePage:
         st.write("---")
 
         self.render_selected_tab(selected_tab)
+
         render_js_dynamic_dates()
 
     def _user_disabled_check(self):
-        run_user: UserRecord = st.session_state.get("_run_user")
-        if run_user and run_user.disabled:
+        if self.run_user and self.run_user.is_disabled:
             msg = (
                 "This Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
                 "Contact us at support@gooey.ai if you think this is a mistake."
@@ -200,8 +211,7 @@ class BasePage:
 
     def get_tabs(self):
         tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
-        current_user: UserRecord = st.session_state.get("_current_user")
-        if not hasattr(current_user, "_is_anonymous"):
+        if self.request.user:
             tabs.extend([MenuTabs.history])
         return tabs
 
@@ -259,14 +269,14 @@ class BasePage:
         related_recipe_docs = map_parallel(_build_page_tuple, workflows)
 
         def _render(page_tuple):
-            page, state, preview_image = page_tuple
+            page_cls, state, preview_image = page_tuple
             st.markdown(
                 f"""
-                <a href="{page().app_url()}" style="text-decoration:none;color:white">
+                <a href="{page_cls().app_url()}" style="text-decoration:none;color:white">
                     <p>
                             <div style="width:100%;height:150px;background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
-                            <h5>{page().title}</h5>
-                            <p style="color:grey;font-size:16px">{page().preview_description(state)}</p>
+                            <h5>{page_cls().title}</h5>
+                            <p style="color:grey;font-size:16px">{page_cls().preview_description(state)}</p>
                     </p>
                 </a>
                 <br/>
@@ -333,12 +343,10 @@ class BasePage:
                 return
 
             with st.spinner("Reporting..."):
-                current_user: UserRecord = st.session_state.get("_current_user")
-
                 example_id, run_id, uid = extract_query_params(gooey_get_query_params())
 
                 send_reported_run_email(
-                    user=current_user,
+                    user=self.request.user,
                     run_uid=uid,
                     url=self._get_current_app_url(),
                     recipe_name=self.title,
@@ -350,7 +358,7 @@ class BasePage:
                 if report_type == inappropriate_radio_text:
                     self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
 
-            st.success("Reported.", icon="✅")
+            st.success("Reported.")
             sleep(2)
             st.session_state["show_report_workflow"] = False
             st.experimental_rerun()
@@ -361,7 +369,7 @@ class BasePage:
 
         st.error("### This Content has been Flagged")
 
-        if is_admin():
+        if self.is_current_user_admin():
             unflag_pressed = st.button("UnFlag")
             if not unflag_pressed:
                 return
@@ -428,36 +436,32 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
-    def _render_author(self, user):
+    def render_author(self):
+        if not self.run_user or (
+            not self.run_user.photo_url and not self.run_user.display_name
+        ):
+            return
+
         html = "<div style='display:flex; align-items:center; padding-bottom:16px'>"
-        if user.photo_url:
+        if self.run_user.photo_url:
             html += f"""
-                <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{user.photo_url}">
+                <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{self.run_user.photo_url}">
                 <div style="width:8px;"></div>
             """
-        if user.display_name:
-            html += f"<div>{user.display_name}</div>"
+        if self.run_user.display_name:
+            html += f"<div>{self.run_user.display_name}</div>"
         html += "</div>"
         st.markdown(
             html,
             unsafe_allow_html=True,
         )
 
-    def render_author(self):
-        if "_run_user" not in st.session_state:
-            return
-        user = st.session_state.get("_run_user")
-        if not user.photo_url and not user.display_name:
-            return
-        self._render_author(user)
-
     def render_form(self) -> bool:
         self.render_form_v2()
         return self.render_submit_button()
 
     def get_credits_click_url(self):
-        current_user: UserRecord = st.session_state.get("_current_user")
-        if hasattr(current_user, "_is_anonymous"):
+        if self.request.user and self.request.user.is_anonymous:
             return "/pricing/"
         else:
             return "/account/"
@@ -538,12 +542,9 @@ class BasePage:
         raise NotImplementedError
 
     def _render_report_button(self):
-        current_user: UserRecord = st.session_state.get("_current_user")
-
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-
-        if not (current_user and run_id and uid):
-            # ONLY RUNS CAN BE REPORTED
+        # only logged in users can report a run (but not explamples/default runs)
+        if not (self.request.user and run_id and uid):
             return
 
         reported = st.button("❗Report")
@@ -601,11 +602,18 @@ class BasePage:
         self._setup_rng_seed()
         self.clear_outputs()
 
-        current_user: auth.UserRecord = st.session_state["_current_user"]
+        assert self.request, "request is not set for current session"
+        if self.request.user:
+            uid = self.request.user.uid
+        else:
+            uid = auth.create_user().uid
+            self.request.scope["user"] = AppUser.objects.create(
+                uid=uid, is_anonymous=True, balance=settings.ANON_USER_FREE_CREDITS
+            )
+            self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
 
         run_id = get_random_doc_id()
         example_id, *_ = extract_query_params(gooey_get_query_params())
-        uid = current_user.uid
 
         self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
 
@@ -625,8 +633,9 @@ class BasePage:
 
         if submitted:
             run_id, uid = self.create_new_run()
-            scroll_to_spinner()
             if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
+                st.session_state[StateKeys.run_status] = None
+                self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
                 return
             channel = f"gooey-outputs/{self.doc_name}/{uid}/{run_id}"
             Thread(
@@ -745,7 +754,6 @@ class BasePage:
     def _render_after_output(self):
         if "seed" in self.RequestModel.schema_json():
             seed = st.session_state.get("seed")
-            # st.write("is_admin" + str(is_admin()))
             col1, col2, col3 = st.columns([1.5, 2, 1.5])
             with col1:
                 st.caption(f"*Seed\\\n`{seed}`*")
@@ -760,7 +768,7 @@ class BasePage:
             self._render_report_button()
 
     def _render_save_options(self):
-        if not is_admin():
+        if not self.is_current_user_admin():
             return
 
         new_example_id = None
@@ -838,10 +846,8 @@ class BasePage:
                 return updated_at.timestamp()
 
             example_docs.sort(key=sort_key, reverse=True)
-        # st.session_state[StateKeys.examples_cache] = example_docs
-        # example_docs = st.session_state.get(StateKeys.examples_cache)
 
-        allow_delete = is_admin()
+        allow_delete = self.is_current_user_admin()
 
         def _render(snapshot):
             example_id = snapshot.id
@@ -866,8 +872,8 @@ class BasePage:
         grid_layout(2, example_docs, _render)
 
     def _history_tab(self):
-        current_user = st.session_state.get("_current_user")
-        uid = current_user.uid
+        assert self.request, "request must be set to render history tab"
+        uid = self.request.user.uid
 
         run_history = (
             db.get_collection_ref(
@@ -1003,53 +1009,49 @@ class BasePage:
         api_example_generator(self._get_current_api_url(), request_body, as_form_data)
         st.write("")
 
-        user = st.session_state.get("_current_user")
-        if hasattr(user, "_is_anonymous"):
-            st.write("**Please Login to generate the `$GOOEY_API_KEY`**")
-            return
-
         st.write("#### 🎁 Example Response")
         st.json(response_body, expanded=True)
+
+        if self.request.user and self.request.user.is_anonymous:
+            st.write("**Please Login to generate the `$GOOEY_API_KEY`**")
+            return
 
         st.write("---")
         st.write("### 🔐 API keys")
 
-        manage_api_keys(user)
+        manage_api_keys(self.request.user)
 
     def check_credits(self) -> bool:
-        user = st.session_state.get("_current_user")
-        if not user:
-            return True
+        assert self.request, "request must be set to check credits"
+        assert self.request.user, "request.user must be set to check credits"
 
-        balance = db.get_doc_field(
-            db.get_user_doc_ref(user.uid), db.USER_BALANCE_FIELD, 0
-        )
-
-        if balance <= 0:
+        if self.request.user.balance <= 0:
             account_url = furl(settings.APP_BASE_URL) / "account/"
 
-            if getattr(user, "_is_anonymous", False):
+            if self.request.user.is_anonymous:
                 account_url.query.params["next"] = self._get_current_app_url()
+                # language=HTML
                 error = f"""
-                <p>
-                Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
-                </p>
-                                
-                You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs). 
-                You can <a href="/pricing/" target="_blank">purchase more</a> if you run out of credits.
+<p>
+Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
+</p>
+    
+You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs). 
+You can <a href="/pricing/" target="_blank">purchase more</a> if you run out of credits.
                 """
             else:
+                # language=HTML
                 error = f"""
-                <p>
-                Doh! You’re out of Gooey.AI credits.
-                </p>
-                                
-                <p>
-                Please <a href="{settings.GRANT_URL}" target="_blank">apply for a grant</a> or 
-                <a href="{account_url}" target="_blank">buy more</a> to run more workflows.
-                </p>
-                                
-                We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discord</a> if you’ve got any questions.
+<p>
+Doh! You’re out of Gooey.AI credits.
+</p>
+            
+<p>
+Please <a href="{settings.GRANT_URL}" target="_blank">apply for a grant</a> or 
+<a href="{account_url}" target="_blank">buy more</a> to run more workflows.
+</p>
+            
+We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discord</a> if you’ve got any questions.
                 """
 
             html_error(error)
@@ -1058,14 +1060,14 @@ class BasePage:
         return True
 
     def deduct_credits(self, state: dict):
-        user = state.get("_current_user")
-        if not user:
-            return
-        # don't allow fractional pricing for now, min 1 credit
+        assert self.request, "request must be set to deduct credits"
+        assert self.request.user, "request.user must be set to deduct credits"
+
         amount = self.get_price_roundoff(state)
-        db.update_user_balance(user.uid, -abs(amount), f"gooey_in_{uuid.uuid1()}")
+        self.request.user.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
 
     def get_price_roundoff(self, state: dict) -> int:
+        # don't allow fractional pricing for now, min 1 credit
         return max(1, math.ceil(self.get_raw_price(state)))
 
     def get_raw_price(self, state: dict) -> float:
@@ -1090,6 +1092,12 @@ class BasePage:
 
     def additional_notes(self) -> str | None:
         pass
+
+    def is_current_user_admin(self) -> bool:
+        if not self.request or not self.request.user:
+            return False
+        email = self.request.user.email
+        return email and email in settings.ADMIN_EMAILS
 
 
 def get_example_request_body(
@@ -1140,20 +1148,10 @@ def err_msg_for_exc(e):
         return f"{type(e).__name__}: {e}"
 
 
-def is_admin():
-    if "_current_user" not in st.session_state:
-        return False
-    current_user: UserRecord = st.session_state["_current_user"]
-    email = current_user.email
-    if email and email in settings.ADMIN_EMAILS:
-        return True
-    return False
-
-
 @lru_cache
-def _build_page_tuple(page: typing.Type[BasePage]):
-    state = page().get_recipe_doc().to_dict()
+def _build_page_tuple(page_cls: typing.Type[BasePage]):
+    state = page_cls().get_recipe_doc().to_dict()
     preview_image = meta_preview_url(
-        page().preview_image(state), page().fallback_preivew_image()
+        page_cls().preview_image(state), page_cls().fallback_preivew_image()
     )
-    return page, state, preview_image
+    return page_cls, state, preview_image

@@ -1,208 +1,234 @@
 h1,
 h2,
 h3 {
-    margin: 0;
+  margin: 0;
 }
 
 a {
-    text-decoration: none;
-    /*color: #03dac5;*/
-    font-size: 17px;
-    /* font-weight: 600; */
+  text-decoration: none;
+  /*color: #03dac5;*/
+  font-size: 17px;
+  /* font-weight: 600; */
 }
 
 a:visited {
-    /*color: #03dac5;*/
+  /*color: #03dac5;*/
 }
 
 a:hover {
-    /*color: #acd9d6;*/
+  /*color: #acd9d6;*/
 }
 
 hr {
-    margin-top: var(--default-top-padding);
-    border-style: solid;
-    border-width: 0.5px;
+  margin-top: var(--default-top-padding);
+  border-style: solid;
+  border-width: 0.5px;
 }
 
 ul {
-    list-style: none;
+  list-style: none;
 }
 
-
 .logo {
-    width: 150px;
-    padding-top: 20px;
-    padding-bottom: 10px;
+  width: 150px;
+  padding-top: 20px;
+  padding-bottom: 10px;
 }
 
 .header-links a {
-    padding-right: 10px;
+  padding-right: 10px;
 }
 
 #profile-picture {
-    border-radius: 15px;
+  border-radius: 15px;
 }
 
 .user-info {
-    display: flex;
-    align-items: center;
-    padding-top: var(--default-top-padding);
+  display: flex;
+  align-items: center;
+  padding-top: var(--default-top-padding);
 }
 
 .user-info-text-box {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 20px;
 }
 
 .credits-container {
-    display: flex;
-    flex-direction: column;
-    padding: var(--default-top-padding) 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--default-top-padding) 0;
 }
 
-.btn-outline-dark,
-.btn-outline-cancel {
-    color: white;
-    background-color: transparent;
-    background-image: none;
-    border-color: #585b61;
-    border-style: solid;
-    border-width: 2.0px;
-}
+/*.btn-outline-dark,*/
+/*.btn-outline-cancel {*/
+/*  color: white;*/
+/*  background-color: transparent;*/
+/*  background-image: none;*/
+/*  border-color: #585b61;*/
+/*  border-style: solid;*/
+/*  border-width: 2px;*/
+/*}*/
 
-.btn-outline-dark:hover {
-    color: white;
-    background-color: transparent;
-    background-image: none;
-    border-color: white;
-    cursor: pointer;
-    border-style: solid;
-}
+/*.btn-outline-dark:hover {*/
+/*  color: white;*/
+/*  background-color: transparent;*/
+/*  background-image: none;*/
+/*  border-color: white;*/
+/*  cursor: pointer;*/
+/*  border-style: solid;*/
+/*}*/
 
-
-.btn-outline-cancel:hover {
-    color: white;
-    background-color: transparent;
-    background-image: none;
-    border-color: red;
-    cursor: pointer;
-    border-style: solid;
-}
+/*.btn-outline-cancel:hover {*/
+/*  color: white;*/
+/*  background-color: transparent;*/
+/*  background-image: none;*/
+/*  border-color: red;*/
+/*  cursor: pointer;*/
+/*  border-style: solid;*/
+/*}*/
 
 .billing-button-container {
-    display: flex;
-    flex-direction: column;
-    padding-top: var(--default-top-padding);
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--default-top-padding);
 }
 
 .billing-button-container-row {
-    display: flex;
-    flex-direction: row;
-    padding-top: 10px;
+  display: flex;
+  flex-direction: row;
+  padding-top: 10px;
 }
 
 .plans-container {
-    display: flex;
+  display: flex;
 }
 
 .product {
-    display: flex;
-    flex-direction: column;
-    padding-inline-start: 10px
+  display: flex;
+  flex-direction: column;
+  padding-inline-start: 10px;
 }
 
 .buy-credits-container {
-    padding-top: var(--default-top-padding);
+  padding-top: var(--default-top-padding);
 }
 
 #cancel-button {
-    margin-left: 20px;
+  margin-left: 20px;
 }
 
 #add-on-text {
-    padding-top: 10px;
+  padding-top: 10px;
 }
 
 ::-webkit-scrollbar {
-    background: transparent;
-    color: white;
-    width: 6px;
+  background: transparent;
+  color: white;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: gray;
-    border-radius: 100px;
+  background: gray;
+  border-radius: 100px;
 }
 
 iframe {
-    overflow-y: scroll;
-    border: 0;
-    margin: 0;
-    padding: 0;
-    width: 100%;
+  overflow-y: scroll;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  width: 100%;
 }
 
 .login-container {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    text-align: right;
-    font-size: 15px;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  text-align: right;
+  font-size: 15px;
 }
 
 .login-name {
-    font-size: 1rem;
+  font-size: 1rem;
 }
 
 .login-id {
-    /*color: white;*/
-    font-size: .8rem;
+  /*color: white;*/
+  font-size: 0.8rem;
 }
 
 .admin-div {
-    padding: var(--default-top-padding) 0;
+  padding: var(--default-top-padding) 0;
 }
 
 .admin-div ul {
-    padding: 0 20px;
-    list-style: disc;
+  padding: 0 20px;
+  list-style: disc;
 }
 
 .align-header {
-    padding-left: 1rem;
+  padding-left: 1rem;
 }
 
 @media (min-width: 576px) {
-    .align-header {
-        padding-left: 5rem;
-        padding-right: 5rem;
-    }
+  .align-header {
+    padding-left: 5rem;
+    padding-right: 5rem;
+  }
 
-    .login-container {
-        right: 5rem;
-    }
+  .login-container {
+    right: 5rem;
+  }
 }
 
 /* https://css-tricks.com/couple-takes-sticky-footer/#aa-there-is-flexbox */
 html,
 body {
-    height: 100%;
+  height: 100%;
 }
 
 body {
-    display: flex;
-    flex-direction: column;
+  display: flex;
+  flex-direction: column;
 }
 
 .content {
-    flex: 1 0 auto;
+  flex: 1 0 auto;
 }
 
 .footer {
-    flex-shrink: 0;
-    text-align: center;
-    padding-bottom: 30px;
+  flex-shrink: 0;
+  text-align: center;
+  padding-bottom: 30px;
+}
+
+.gooey-spinner {
+  scroll-margin: 20px;
+  display: inline-block;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top: 4px solid #03dac5;
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.gooey-spinner-text {
+  padding-left: 8px;
+  padding-top: 2px;
+  vertical-align: top;
+  display: inline-block;
+  font-size: 1.1rem;
 }

@@ -445,7 +445,3 @@ def _reflect(img_cv2, opacity):
     result = np.vstack((img_cv2, flip))
 
     return result
-
-
-if __name__ == "__main__":
-    ImageSegmentationPage().render()

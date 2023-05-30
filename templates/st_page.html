@@ -3,7 +3,7 @@
 {% block content %}
     {% include 'login_container.html' %}
 
-    {% if not request.user and block_incognito %}
+    {% if block_incognito and (not request.user or request.user.is_anonymous) %}
         <script src="https://cdn.jsdelivr.net/gh/Joe12387/detectIncognito@main/detectIncognito.min.js"></script>
         <script>
         document.

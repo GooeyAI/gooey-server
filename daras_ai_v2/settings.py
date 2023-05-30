@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.forms",  # needed to override django admin templates
     "bots",
+    "app_users",
 ]
 
 MIDDLEWARE = [

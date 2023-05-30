@@ -248,7 +248,3 @@ def get_profile_for_email(email_address):
         return
 
     return person
-
-
-if __name__ == "__main__":
-    SocialLookupEmailPage().render()

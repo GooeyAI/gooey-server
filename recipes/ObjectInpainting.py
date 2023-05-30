@@ -331,7 +331,3 @@ class ObjectInpaintingPage(BasePage):
                 return 20
             case _:
                 return 5
-
-
-if __name__ == "__main__":
-    ObjectInpaintingPage().render()

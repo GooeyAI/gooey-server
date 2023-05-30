@@ -461,7 +461,3 @@ Use the Camera Settings to generate animations with depth and other 3D parameter
         r.raise_for_status()
 
         state["output_video"] = blob.public_url
-
-
-if __name__ == "__main__":
-    DeforumSDPage().render()

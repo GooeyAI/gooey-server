@@ -26,8 +26,8 @@ plotly_chart = dummy
 dataframe = dummy
 
 
-def div() -> state.typing.ContextManager:
-    node = state.RenderTreeNode(name="div")
+def div(**attrs) -> state.typing.ContextManager:
+    node = state.RenderTreeNode(name="div", props=attrs)
     node.mount()
     return state.NestingCtx(node)
 

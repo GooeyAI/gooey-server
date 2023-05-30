@@ -133,7 +133,3 @@ class ChyronPlantPage(BasePage):
             st.write(state.get("midi_translation", ""))
         with col2:
             st.write(state.get("chyron_output", ""))
-
-
-if __name__ == "__main__":
-    ChyronPlantPage().render()

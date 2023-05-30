@@ -229,7 +229,3 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
     def preview_description(self, state: dict) -> str:
         return "Enter a Google Image Search query + your Img2Img text prompt describing how to alter the result to create a unique, relevant ai generated images for any search query."
-
-
-if __name__ == "__main__":
-    GoogleImageGenPage().render()

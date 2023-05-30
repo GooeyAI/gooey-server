@@ -125,7 +125,3 @@ class LipsyncPage(BasePage):
 
     def render_usage_guide(self):
         youtube_video("J87EtK7ZVz0")
-
-
-if __name__ == "__main__":
-    LipsyncPage().render()

@@ -365,7 +365,3 @@ class LetterWriterPage(BasePage):
             disabled=True,
             height=300,
         )
-
-
-if __name__ == "__main__":
-    LetterWriterPage().render()

@@ -273,7 +273,3 @@ class CompareText2ImgPage(BasePage):
                 case _:
                     total += 2
         return total
-
-
-if __name__ == "__main__":
-    CompareText2ImgPage().render()

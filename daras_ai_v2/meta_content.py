@@ -1,6 +1,6 @@
 from firebase_admin import auth
-from firebase_admin.auth import UserNotFoundError
 
+from app_users.models import AppUser
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.meta_preview_url import meta_preview_url
@@ -73,8 +73,8 @@ def meta_title_for_page(
     if run_id and uid:
         parts.append(prompt)
         try:
-            user = auth.get_user(uid)
-        except UserNotFoundError:
+            user = AppUser.objects.get_or_create_from_uid(uid)[0]
+        except auth.UserNotFoundError:
             user = None
         if user and user.display_name:
             parts.append(user_name_possesive(user.display_name) + " " + end_suffix)

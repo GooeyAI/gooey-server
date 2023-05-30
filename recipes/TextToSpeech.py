@@ -238,7 +238,3 @@ class TextToSpeechPage(BasePage):
             audio_url = state.get("audio_url")
             if audio_url:
                 st.audio(audio_url)
-
-
-if __name__ == "__main__":
-    TextToSpeechPage().render()

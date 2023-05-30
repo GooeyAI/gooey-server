@@ -16,11 +16,11 @@ client = TestClient(app)
 
 
 @pytest.mark.parametrize("page_cls", all_test_pages)
-def test_apis_basic(page_cls: typing.Type[BasePage], test_auth_user):
+def test_apis_basic(page_cls: typing.Type[BasePage]):
     page = page_cls()
     state = db.get_or_create_doc(db.get_doc_ref(page.doc_name)).to_dict()
 
-    with force_authentication(test_auth_user):
+    with force_authentication():
         r = client.post(
             page.endpoint,
             json=get_example_request_body(page.RequestModel, state),
