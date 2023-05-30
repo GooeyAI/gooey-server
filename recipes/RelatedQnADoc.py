@@ -193,6 +193,7 @@ class RelatedQnADocPage(BasePage):
         related_questions.extend(scaleserp_results_rq.get("related_questions", []))
         state["output_queries"] = output_queries = []
         output_queries: list[RelatedQuery]
+
         # if not related_questions:
         #     yield "No related questions found"
         #     return
