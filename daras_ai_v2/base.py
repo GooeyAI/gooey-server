@@ -1,6 +1,7 @@
 import datetime
 import inspect
 import math
+import os
 import traceback
 import typing
 import uuid
@@ -107,13 +108,13 @@ class BasePage:
         return f"{self.slug_versions[0]}#{self.version}"
 
     @classmethod
-    def app_url(cls, example_id=None, run_id=None, uid=None, tab_path=None) -> str:
+    def app_url(cls, example_id=None, run_id=None, uid=None, tab_name=None) -> str:
         query_params = cls.clean_query_params(example_id, run_id, uid)
         f = furl(settings.APP_BASE_URL, query_params=query_params) / (
             cls.slug_versions[-1] + "/"
         )
-        if tab_path:
-            f /= tab_path
+        if tab_name:
+            f /= tab_name + "/"
         return str(f)
 
     @classmethod
@@ -184,7 +185,7 @@ class BasePage:
             bgcolor = "gray" if name == selected_tab else "transparent"
             url = self.app_url(
                 *extract_query_params(gooey_get_query_params()),
-                tab_path=MenuTabs.paths[name],
+                tab_name=MenuTabs.paths[name],
             )
             st.markdown(
                 # language=html
