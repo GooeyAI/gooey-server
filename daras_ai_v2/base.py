@@ -58,7 +58,8 @@ from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
-from gooey_ui.pubsub import use_state, set_state
+from gooey_ui import realtime_clear_subs
+from gooey_ui.pubsub import realtime_pull, realtime_push
 
 DEFAULT_META_IMG = (
     # Small
@@ -149,9 +150,11 @@ class BasePage:
 
         if st.session_state.get(StateKeys.run_status):
             channel = f"gooey-outputs/{self.doc_name}/{uid}/{run_id}"
-            output = use_state([channel])[0]
+            output = realtime_pull([channel])[0]
             if output:
                 st.session_state.update(output)
+        if not st.session_state.get(StateKeys.run_status):
+            realtime_clear_subs()
 
         self._user_disabled_check()
         self._check_if_flagged()
@@ -691,7 +694,7 @@ class BasePage:
                 }
             )
             # send outputs to ui
-            set_state(channel, output)
+            realtime_push(channel, output)
             # save to db
             self.run_doc_ref(run_id, uid).set(
                 self.state_to_doc(st.session_state | output)

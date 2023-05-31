@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from gooey_ui.pubsub import (
     get_subscriptions,
-    clear_subscriptions,
+    realtime_clear_subs,
 )
 
 threadlocal = threading.local()
@@ -86,7 +86,7 @@ def runner(
 ) -> dict:
     set_session_state(state or {})
     set_query_params(query_params or {})
-    clear_subscriptions()
+    realtime_clear_subs()
     # subscibe(channels or {})
     # pubsub.threadlocal.session_id = session_id
     while True:

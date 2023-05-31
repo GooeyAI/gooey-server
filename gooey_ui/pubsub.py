@@ -21,7 +21,7 @@ def get_redis():
 T = typing.TypeVar("T")
 
 
-def clear_subscriptions():
+def realtime_clear_subs():
     threadlocal.channels = []
 
 
@@ -33,7 +33,7 @@ def get_subscriptions() -> list[str]:
         return threadlocal.channels
 
 
-def use_state(channels: list[str]) -> list[typing.Any]:
+def realtime_pull(channels: list[str]) -> list[typing.Any]:
     channels = [f"gooey-gui/state/{channel}" for channel in channels]
     threadlocal.channels = channels
     r = get_redis()
@@ -43,7 +43,7 @@ def use_state(channels: list[str]) -> list[typing.Any]:
     return out
 
 
-def set_state(channel: str, value: typing.Any = "ping"):
+def realtime_push(channel: str, value: typing.Any = "ping"):
     channel = f"gooey-gui/state/{channel}"
     r = get_redis()
     msg = json.dumps(jsonable_encoder(value))
