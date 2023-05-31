@@ -204,7 +204,7 @@ def text_area(
             help=help,
             placeholder=placeholder,
             disabled=disabled,
-            slowdebounce="",
+            slow_debounce="",
         ),
     ).mount()
     return value or ""
@@ -522,7 +522,7 @@ def text_input(
         label_visibility=label_visibility,
         maxLength=max_chars,
         placeholder=placeholder,
-        slowdebounce="",
+        slow_debounce="",
     )
     return value or ""
 
