@@ -667,6 +667,12 @@ Use this for prompting GPT to use the document search results.
         super().render_selected_tab(selected_tab)
 
         if selected_tab == MenuTabs.integrations:
+            if not self.request.user or self.request.user.is_anonymous:
+                st.write(
+                    "**Please Login to connect this workflow to Your Website, Instagram, Whatsapp & More**"
+                )
+                return
+
             self.messenger_bot_integration()
 
             st.markdown(

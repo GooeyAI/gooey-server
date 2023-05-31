@@ -997,7 +997,7 @@ class BasePage:
         st.write("#### 🎁 Example Response")
         st.json(response_body, expanded=True)
 
-        if self.request.user and self.request.user.is_anonymous:
+        if not self.request.user or self.request.user.is_anonymous:
             st.write("**Please Login to generate the `$GOOEY_API_KEY`**")
             return
 
