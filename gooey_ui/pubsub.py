@@ -49,6 +49,7 @@ def set_state(channel: str, value: typing.Any = "ping"):
     msg = json.dumps(jsonable_encoder(value))
     r.set(channel, msg)
     r.publish(channel, json.dumps(time()))
+    print("publish", channel, time())
 
 
 # def use_state(
