@@ -475,7 +475,6 @@ def page_wrapper(request: Request, render_fn: typing.Callable[[], None]):
             request.user.uid
         ).decode()
 
-    st.html("""<link rel="stylesheet" href="/static/css/app.css">""")
     st.html(templates.get_template("header.html").render(**context))
     st.html(templates.get_template("login_container.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))
