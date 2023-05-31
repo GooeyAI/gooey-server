@@ -1,5 +1,4 @@
-import asyncio
-
+from asgiref.sync import sync_to_async
 from django.db import reset_queries, close_old_connections
 
 from gooeysite import wsgi
@@ -92,13 +91,12 @@ async def logger(request: Request, call_next):
 @app.middleware("http")
 async def django_db(request: Request, call_next):
     """middleware to ensure that the request runs safely with django db connections."""
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, reset_queries)
-    await loop.run_in_executor(None, close_old_connections)
+    await sync_to_async(reset_queries)()
+    await sync_to_async(close_old_connections)()
     try:
         response: Response = await call_next(request)
     finally:
-        await loop.run_in_executor(None, close_old_connections)
+        await sync_to_async(close_old_connections)()
     return response
 
 
