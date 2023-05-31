@@ -1,9 +1,9 @@
 import hashlib
 import json
 import threading
-import traceback
 import typing
 from functools import lru_cache
+from time import time
 
 import redis
 from fastapi.encoders import jsonable_encoder
@@ -21,6 +21,10 @@ def get_redis():
 T = typing.TypeVar("T")
 
 
+def clear_subscriptions():
+    threadlocal.channels = []
+
+
 def get_subscriptions() -> list[str]:
     try:
         return threadlocal.channels
@@ -29,21 +33,22 @@ def get_subscriptions() -> list[str]:
         return threadlocal.channels
 
 
-def subscibe(channels: list[str]) -> list[typing.Any]:
-    channels = [f"gooey-gui/{channel}" for channel in channels]
+def use_state(channels: list[str]) -> list[typing.Any]:
+    channels = [f"gooey-gui/state/{channel}" for channel in channels]
     threadlocal.channels = channels
     r = get_redis()
-    return [
+    out = [
         json.loads(value) if (value := r.get(channel)) else None for channel in channels
     ]
+    return out
 
 
-def publish(channel: str, value: typing.Any = "ping"):
-    channel = f"gooey-gui/{channel}"
+def set_state(channel: str, value: typing.Any = "ping"):
+    channel = f"gooey-gui/state/{channel}"
     r = get_redis()
     msg = json.dumps(jsonable_encoder(value))
-    r.publish(channel, msg)
     r.set(channel, msg)
+    r.publish(channel, json.dumps(time()))
 
 
 # def use_state(

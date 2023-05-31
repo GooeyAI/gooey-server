@@ -1,9 +1,9 @@
 import typing
 
-import gooey_ui as st
 from furl import furl
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect

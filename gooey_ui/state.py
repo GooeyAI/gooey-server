@@ -4,8 +4,8 @@ import typing
 from pydantic import BaseModel
 
 from gooey_ui.pubsub import (
-    subscibe,
     get_subscriptions,
+    clear_subscriptions,
 )
 
 threadlocal = threading.local()
@@ -81,11 +81,14 @@ def runner(
     fn: typing.Callable,
     state: dict[str, typing.Any] = None,
     query_params: dict[str, str] = None,
-    channels: dict[str, typing.Any] = None,
+    # channels: list[str] = None,
+    # session_id: str = None,
 ) -> dict:
     set_session_state(state or {})
     set_query_params(query_params or {})
-    subscibe(channels or {})
+    clear_subscriptions()
+    # subscibe(channels or {})
+    # pubsub.threadlocal.session_id = session_id
     while True:
         try:
             root = RenderTreeNode(name="root")
@@ -97,7 +100,7 @@ def runner(
             return dict(
                 children=root.children,
                 state=get_session_state(),
-                query_params=get_query_params(),
+                # query_params=get_query_params(),
                 channels=get_subscriptions(),
             )
         except RerunException:

@@ -58,7 +58,7 @@ from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
-from gooey_ui.pubsub import subscibe, publish
+from gooey_ui.pubsub import use_state, set_state
 
 DEFAULT_META_IMG = (
     # Small
@@ -149,8 +149,7 @@ class BasePage:
 
         if st.session_state.get(StateKeys.run_status):
             channel = f"gooey-outputs/{self.doc_name}/{uid}/{run_id}"
-            output = subscibe([channel])[0]
-            # print("<<<", channel, output)
+            output = use_state([channel])[0]
             if output:
                 st.session_state.update(output)
 
@@ -618,10 +617,6 @@ class BasePage:
 
         self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
 
-        gooey_reset_query_parm(
-            **self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
-        )
-
         return run_id, uid
 
     def _render_output_col(self, submitted: bool):
@@ -643,7 +638,7 @@ class BasePage:
                 target=self._run_thread,
                 args=[run_id, uid, st.session_state, channel],
             ).start()
-            subscibe([channel])
+            gooey_reset_query_parm(run_id=run_id, uid=uid)
 
         run_status = st.session_state.get(StateKeys.run_status)
         if run_status:
@@ -696,20 +691,11 @@ class BasePage:
                 }
             )
             # send outputs to ui
-            publish(channel, output)
+            set_state(channel, output)
             # save to db
             self.run_doc_ref(run_id, uid).set(
                 self.state_to_doc(st.session_state | output)
             )
-            # print(
-            #     "> pub",
-            #     channel,
-            #     {
-            #         StateKeys.run_time: run_time,
-            #         StateKeys.error_msg: error_msg,
-            #         StateKeys.run_status: run_status,
-            #     },
-            # )
 
         try:
             gen = self.run(st.session_state)
@@ -782,23 +768,26 @@ class BasePage:
             with col1:
                 if st.button("⭐️ Save Workflow & Settings"):
                     doc_ref = db.get_doc_ref(self.doc_name)
+                    doc_ref.set(self.state_to_doc(st.session_state))
 
             with col2:
                 if st.button("🔖 Add as Example"):
                     new_example_id = get_random_doc_id()
                     doc_ref = self.example_doc_ref(new_example_id)
+                    doc_ref.set(self.state_to_doc(st.session_state))
                     gooey_reset_query_parm(example_id=new_example_id)
 
             with col3:
                 if example_id and st.button("💾 Save Example & Settings"):
                     doc_ref = self.example_doc_ref(example_id)
+                    doc_ref.set(self.state_to_doc(st.session_state))
                     gooey_reset_query_parm(example_id=example_id)
 
-            if not doc_ref:
-                return
+            # if not doc_ref:
+            #     return
 
-            doc_ref.set(self.state_to_doc(st.session_state))
-            st.success("Saved", icon="✅")
+            ## TODO: how to model this?
+            # st.success("Saved", icon="✅")
 
     def state_to_doc(self, state: dict):
         ret = {
