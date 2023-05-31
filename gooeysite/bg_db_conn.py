@@ -6,7 +6,7 @@ from django.db import reset_queries, close_old_connections
 F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
 
 
-def bg_db_task(fn: F) -> F:
+def django_db_safe(fn: F) -> F:
     """Decorator to ensure the `fn` runs safely in a background task with a new database connection."""
 
     @wraps(fn)

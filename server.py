@@ -1,7 +1,8 @@
-from asgiref.sync import sync_to_async
-from django.db import reset_queries, close_old_connections
+from fastapi.routing import APIRoute
+from starlette._utils import is_async_callable
 
 from gooeysite import wsgi
+from gooeysite.bg_db_conn import django_db_safe
 
 assert wsgi
 
@@ -88,16 +89,6 @@ async def logger(request: Request, call_next):
     return response
 
 
-@app.middleware("http")
-async def django_db(request: Request, call_next):
-    """middleware to ensure that the request runs safely with django db connections."""
-    await sync_to_async(reset_queries)()
-    await sync_to_async(close_old_connections)()
-    try:
-        response: Response = await call_next(request)
-    finally:
-        await sync_to_async(close_old_connections)()
-    return response
 
 
 @app.get("/sitemap.xml/", include_in_schema=False)
@@ -499,3 +490,8 @@ def setup_pages():
 
 
 setup_pages()
+
+# monkey patch to make django db work with fastapi
+for route in app.routes:
+    if isinstance(route, APIRoute) and not is_async_callable(route.endpoint):
+        route.endpoint = django_db_safe(route.endpoint)
