@@ -1,3 +1,7 @@
+import asyncio
+
+from django.db import reset_queries, close_old_connections
+
 from gooeysite import wsgi
 
 assert wsgi
@@ -82,6 +86,19 @@ async def logger(request: Request, call_next):
     print(
         f"{request.method} {request.url} {response.status_code} {response.headers.get('content-length', '-')} - {response_time:.3f} ms"
     )
+    return response
+
+
+@app.middleware("http")
+async def django_db(request: Request, call_next):
+    """middleware to ensure that the request runs safely with django db connections."""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, reset_queries)
+    await loop.run_in_executor(None, close_old_connections)
+    try:
+        response: Response = await call_next(request)
+    finally:
+        await loop.run_in_executor(None, close_old_connections)
     return response
 
 
