@@ -43,11 +43,12 @@ def set_session_state(state: dict[str, typing.Any]):
 
 
 Style = dict[str, str | None]
+Props = dict[str, typing.Any]
 
 
 class RenderTreeNode(BaseModel):
     name: str
-    props: dict[str, typing.Any] = {}
+    props: Props = {}
     children: list["RenderTreeNode"] = []
     style: Style = {}
 

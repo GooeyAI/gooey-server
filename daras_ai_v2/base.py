@@ -181,25 +181,17 @@ class BasePage:
             st.error(f"## 404 - Tab {self.tab!r} Not found")
             return
 
-        tab_names = self.get_tabs()
-        st.write("---")
-        for name in tab_names:
-            bgcolor = "gray" if name == selected_tab else "transparent"
-            url = self.app_url(
-                *extract_query_params(gooey_get_query_params()),
-                tab_name=MenuTabs.paths[name],
-            )
-            st.markdown(
-                # language=html
-                f"""
-<a href="{url}" 
-    style="font-size: 1.25rem; background-color: {bgcolor}">
-{name}
-</a>""",
-            )
-        st.write("---")
-
-        self.render_selected_tab(selected_tab)
+        with st.nav_tabs():
+            tab_names = self.get_tabs()
+            for name in tab_names:
+                url = self.app_url(
+                    *extract_query_params(gooey_get_query_params()),
+                    tab_name=MenuTabs.paths[name],
+                )
+                with st.nav_item(url, active=name == selected_tab):
+                    st.html(name)
+        with st.nav_tab_content():
+            self.render_selected_tab(selected_tab)
 
         render_js_dynamic_dates()
 

@@ -9,6 +9,7 @@ import pandas as pd
 from furl import furl
 
 from gooey_ui import state
+from gooey_ui.state import Style, Props
 from gooey_ui.pubsub import md5_values
 
 T = typing.TypeVar("T")
@@ -26,8 +27,26 @@ plotly_chart = dummy
 dataframe = dummy
 
 
-def div(**attrs) -> state.typing.ContextManager:
-    node = state.RenderTreeNode(name="div", props=attrs)
+def nav_tabs():
+    return tag("nav-tabs")
+
+
+def nav_item(href: str, *, active: bool):
+    return tag("nav-item", props=dict(href=href, active=active))
+
+
+def nav_tab_content():
+    return tag("nav-tab-content")
+
+
+def div(*, style: Style = None, **attrs) -> state.typing.ContextManager:
+    return tag("div", style=style, props=attrs)
+
+
+def tag(
+    name: str, *, style: Style = None, props: Props = None
+) -> state.typing.ContextManager:
+    node = state.RenderTreeNode(name=name, props=props or {}, style=style or {})
     node.mount()
     return state.NestingCtx(node)
 
