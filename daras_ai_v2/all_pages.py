@@ -4,6 +4,8 @@ from django.db import models
 
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.base import BasePage
+from recipes.RelatedQnA import RelatedQnAPage
+from recipes.RelatedQnADoc import RelatedQnADocPage
 from recipes.SmartGPT import SmartGPTPage
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
@@ -52,6 +54,8 @@ all_home_pages = [
     ImageSegmentationPage,
     CompareLLMPage,
     SmartGPTPage,
+    RelatedQnAPage,
+    RelatedQnADocPage,
 ]
 
 # exposed as API
