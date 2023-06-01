@@ -1,5 +1,6 @@
 import datetime
 import inspect
+import json
 import math
 import traceback
 import typing
@@ -1101,9 +1102,14 @@ class BasePage:
         if hasattr(user, "_is_anonymous"):
             st.write("**Please Login to generate the `$GOOEY_API_KEY`**")
             return
-
-        st.write("#### 🎁 Example Response")
-        st.json(response_body)
+        st.write(
+            f"""
+#### 🎁 Example Response
+```json
+{json.dumps(response_body, indent=2)}
+```
+            """
+        )
 
         st.write("---")
         st.write("### 🔐 API keys")

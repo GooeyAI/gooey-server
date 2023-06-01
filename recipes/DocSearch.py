@@ -171,7 +171,7 @@ class DocSearchPage(BasePage):
             else:
                 st.empty()
 
-        render_step(
+        render_doc_search_step(
             st.session_state.get("final_prompt"),
             st.session_state.get("output_text", []),
             st.session_state.get("references", []),
@@ -640,7 +640,11 @@ def render_documents(state, label="**Documents**", *, key="documents"):
         st.write(f"🔗[*{filename}*]({doc})")
 
 
-def render_step(final_prompt: str, output_text: list[str], references: list[dict]):
+def render_doc_search_step(
+    final_prompt: str, output_text: list[str], references: list[dict]
+):
+    st.write("**References**")
+    st.json(references, expanded=False)
     if final_prompt:
         st.text_area(
             "**Final Prompt**",
@@ -660,5 +664,3 @@ def render_step(final_prompt: str, output_text: list[str], references: list[dict
             value=text,
             height=200,
         )
-    st.write("**References**")
-    st.json(references, expanded=False)

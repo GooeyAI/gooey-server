@@ -6,17 +6,17 @@ from pydantic import BaseModel
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.google_search import call_scaleserp
+from daras_ai_v2.google_search import call_scaleserp, call_scaleserp_rq
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
-from recipes.DocSearch import render_step
+from recipes.DocSearch import render_doc_search_step
 from recipes.RelatedQnADoc import render_qna_outputs
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
 
 
-class RelatedQuery(GoogleGPTPage.ResponseModel):
+class RelatedGoogleGPTResponse(GoogleGPTPage.ResponseModel):
     search_query: str
 
 
@@ -47,8 +47,8 @@ class RelatedQnAPage(BasePage):
         scaleserp_locations: list[str] | None
 
     class ResponseModel(BaseModel):
+        output_queries: list[RelatedGoogleGPTResponse]
         scaleserp_results: dict
-        output_queries: list[RelatedQuery]
 
     def render_description(self) -> str:
         return "This workflow gets the related queries for your Google search, searches your custom domain and builds answers using the results and GPT."
@@ -127,50 +127,46 @@ class RelatedQnAPage(BasePage):
             if scaleserp_results:
                 st.write("**ScaleSERP Results**")
                 st.json(scaleserp_results, expanded=False)
-            else:
-                st.empty()
-        st.write("**Related Queries**")
+
         output_queries = st.session_state.get("output_queries", [])
-        if output_queries:
-            for output_query in output_queries:
-                st.write(f"{output_query.get('search_query')}")
-                render_step(
-                    output_query.get("final_prompt"),
-                    output_query.get("output_text", []),
-                    output_query.get("references", []),
-                )
+        for i, result in enumerate(output_queries):
+            st.write("---")
+            st.write(f"##### {i+1}. _{result.get('search_query')}_")
+            scaleserp_results = result.get("scaleserp_results")
+            if scaleserp_results:
+                st.write("**ScaleSERP Results**")
+                st.json(scaleserp_results, expanded=False)
+            render_doc_search_step(
+                result.get("final_prompt", ""),
+                result.get("output_text", []),
+                result.get("references", []),
+            )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: RelatedQnAPage.RequestModel = self.RequestModel.parse_obj(state)
         search_query = request.search_query
+
         yield "Googling Related Questions..."
-        state["scaleserp_results"] = scaleserp_results_rq = call_scaleserp(
+        scaleserp_results, related_questions = call_scaleserp_rq(
             search_query,
-            include_fields="related_questions",
             location=",".join(request.scaleserp_locations),
         )
-        related_questions = [
-            search_query,  # add the original search query
-            *[
-                rq["question"]
-                for rq in scaleserp_results_rq.get("related_questions", [])
-            ],
-        ]
+        # add the original search query
+        related_questions.insert(0, search_query)
+        # save the results
+        state["scaleserp_results"] = scaleserp_results
+        state["related_questions"] = related_questions
 
-        state["output_queries"] = output_queries = []
-        output_queries: list[RelatedQuery]
         yield f"Generating answers using [{LargeLanguageModels[request.selected_model].value}]..."
-
-        def run_google_gpt(related_question: str):
-            gpt_run_state = state.copy()
-            gpt_run_state["search_query"] = related_question
-            list(GoogleGPTPage().run(gpt_run_state))
-            gpt_resp = RelatedQuery.parse_obj(gpt_run_state).dict()
-            gpt_resp["search_query"] = related_question
-            output_queries.append(gpt_resp)
-
-        map_parallel(
-            run_google_gpt,
+        state["output_queries"] = map_parallel(
+            lambda ques: run_google_gpt(state.copy(), ques),
             related_questions,
             max_workers=4,
         )
+
+
+def run_google_gpt(state: dict, related_question: str):
+    state["search_query"] = related_question
+    for _ in GoogleGPTPage().run(state):
+        pass
+    return RelatedGoogleGPTResponse.parse_obj(state).dict()
