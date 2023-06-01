@@ -35,7 +35,8 @@ CHATML_ROLE_USER = "user"
 class LargeLanguageModels(Enum):
     gpt_4 = "GPT 4"
     gpt_3_5_turbo = "ChatGPT (GPT-3.5-turbo)"
-    text_davinci_003 = "Davinci (GPT-3.5)"
+    text_davinci_003 = "Davinci-3 (GPT-3.5)"
+    text_davinci_002 = "Davinci-2 (GPT-3)"
     text_curie_001 = "Curie"
     text_babbage_001 = "Babbage"
     text_ada_001 = "Ada"
@@ -49,6 +50,7 @@ engine_names = {
     LargeLanguageModels.gpt_4: "gpt-4",
     LargeLanguageModels.gpt_3_5_turbo: "gpt-3.5-turbo",
     LargeLanguageModels.text_davinci_003: "text-davinci-003",
+    LargeLanguageModels.text_davinci_002: "text-davinci-002",
     LargeLanguageModels.code_davinci_002: "code-davinci-002",
     LargeLanguageModels.text_curie_001: "text-curie-001",
     LargeLanguageModels.text_babbage_001: "text-babbage-001",
@@ -60,6 +62,7 @@ model_max_tokens = {
     LargeLanguageModels.gpt_4: 8192,
     LargeLanguageModels.gpt_3_5_turbo: 4096,
     LargeLanguageModels.text_davinci_003: 4097,
+    LargeLanguageModels.text_davinci_002: 4097,
     LargeLanguageModels.code_davinci_002: 8001,
     LargeLanguageModels.text_curie_001: 2049,
     LargeLanguageModels.text_babbage_001: 2049,
