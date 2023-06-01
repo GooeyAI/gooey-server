@@ -201,5 +201,13 @@ def render_qna_outputs(state, height):
         for output in output_queries:
             output_text = output.get("output_text", [])
             if output_text:
+                references = output.get("references", [])
                 st.write(f"**{output.get('search_query')}**")
-                render_outputs({"output_text": output_text}, height)
+                render_outputs(
+                    {"output_text": output_text, "references": references}, height
+                )
+                with st.expander("Sources"):
+                    for idx, ref in enumerate(references):
+                        st.write(
+                            f"{idx + 1}. [{ref['title']}]({ref['url']}) \\\n*{ref['snippet']}*"
+                        )
