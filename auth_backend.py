@@ -7,6 +7,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app_users.models import AppUser
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE, ANONYMOUS_USER_COOKIE
+from gooeysite.bg_db_conn import django_db_safe
 
 # quick and dirty way to bypass authentication for testing
 _forced_auth_user = []
@@ -27,6 +28,7 @@ class SessionAuthBackend(AuthenticationBackend):
         return await run_in_threadpool(authenticate, conn)
 
 
+@django_db_safe
 def authenticate(conn):
     if _forced_auth_user:
         return AuthCredentials(["authenticated"]), _forced_auth_user[0]
