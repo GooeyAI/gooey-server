@@ -90,7 +90,7 @@ class RelatedQnADocPage(BasePage):
         site_filter = state.get("site_filter")
         if site_filter:
             st.write(f"**Site** \\\n{site_filter}")
-        render_qna_outputs(state, 200)
+        render_qna_outputs(state, 200, show_count=1)
 
     def render_settings(self):
         st.text_area(
@@ -188,9 +188,9 @@ def run_doc_search(state: dict, related_question: str):
     return RelatedDocSearchResponse.parse_obj(state).dict()
 
 
-def render_qna_outputs(state, height):
+def render_qna_outputs(state, height, show_count=None):
     output_queries = state.get("output_queries", [])
-    for output in output_queries:
+    for output in output_queries[:show_count]:
         output_text = output.get("output_text", [])
         if not output_text:
             continue
