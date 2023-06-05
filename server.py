@@ -89,8 +89,6 @@ async def logger(request: Request, call_next):
     return response
 
 
-
-
 @app.get("/sitemap.xml/", include_in_schema=False)
 async def get_sitemap():
     my_sitemap = """<?xml version="1.0" encoding="UTF-8"?>
@@ -417,6 +415,8 @@ def st_page(
     state = json_data.setdefault("state", {})
     if not state:
         state.update(page.get_firestore_state(example_id, run_id, uid))
+        for k, v in page.sane_defaults.items():
+            state.setdefault(k, v)
     if state is None:
         raise HTTPException(status_code=404)
 

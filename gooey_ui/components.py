@@ -1,5 +1,4 @@
 import base64
-import json as _json
 import os
 import textwrap
 import typing
@@ -9,8 +8,8 @@ import pandas as pd
 from furl import furl
 
 from gooey_ui import state
-from gooey_ui.state import Style, Props
 from gooey_ui.pubsub import md5_values
+from gooey_ui.state import Style, Props
 
 T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]
@@ -39,13 +38,13 @@ def nav_tab_content():
     return tag("nav-tab-content")
 
 
-def div(*, style: Style = None, **attrs) -> state.typing.ContextManager:
+def div(*, style: Style = None, **attrs) -> typing.ContextManager:
     return tag("div", style=style, props=attrs)
 
 
 def tag(
     name: str, *, style: Style = None, props: Props = None
-) -> state.typing.ContextManager:
+) -> typing.ContextManager:
     node = state.RenderTreeNode(name=name, props=props or {}, style=style or {})
     node.mount()
     return state.NestingCtx(node)
@@ -59,7 +58,7 @@ def html(body: str, height: int = None, width: int = None):
     ).mount()
 
 
-def write(*objs: state.typing.Any, unsafe_allow_html=False):
+def write(*objs: typing.Any, unsafe_allow_html=False):
     for obj in objs:
         markdown(
             obj if isinstance(obj, str) else repr(obj),
@@ -119,7 +118,7 @@ def option_menu(*args, options, **kwargs):
     return tabs(options)
 
 
-def tabs(labels: list[str]) -> list[state.typing.ContextManager]:
+def tabs(labels: list[str]) -> list[typing.ContextManager]:
     parent = state.RenderTreeNode(
         name="tabs",
         children=[
@@ -133,7 +132,7 @@ def tabs(labels: list[str]) -> list[state.typing.ContextManager]:
     return [state.NestingCtx(tab) for tab in parent.children]
 
 
-def columns(spec, *, gap: str = None) -> list[state.typing.ContextManager]:
+def columns(spec, *, gap: str = None) -> list[typing.ContextManager]:
     if isinstance(spec, int):
         spec = [1] * spec
     total_weight = sum(spec)
@@ -223,7 +222,6 @@ def text_area(
             help=help,
             placeholder=placeholder,
             disabled=disabled,
-            slow_debounce="",
         ),
     ).mount()
     return value or ""
@@ -231,30 +229,31 @@ def text_area(
 
 def multiselect(
     label: str,
-    options: typing.Iterable[T],
-    default: typing.Iterable[T] = None,
-    format_func: state.typing.Callable[[T], state.typing.Any] = str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = str,
     key: str = None,
     help: str = None,
     *,
     disabled: bool = False,
-) -> T:
+) -> list[T]:
     if not options:
-        return None
+        return []
     options = list(options)
-    if key:
-        assert not default, "only one of default or key can be provided"
-    else:
-        key = md5_values("multiselect", label, options, default, help)
-    value = state.session_state.setdefault(key, default)
+    if not key:
+        key = md5_values("multiselect", label, options, help)
+    value = state.session_state.get(key) or []
+    value = [o if o in options else options[0] for o in value]
+    state.session_state.setdefault(key, value)
     state.RenderTreeNode(
-        name="multiselect",
+        name="select",
         props=dict(
-            label=dedent(label),
-            disabled=disabled,
             name=key,
+            label=dedent(label),
+            help=help,
+            isDisabled=disabled,
+            isMulti=True,
             defaultValue=[
-                {"value": item, "label": str(format_func(item))} for item in value or []
+                {"value": option, "label": str(format_func(option))} for option in value
             ],
             options=[
                 {"value": option, "label": str(format_func(option))}
@@ -267,44 +266,38 @@ def multiselect(
 
 def selectbox(
     label: str,
-    options: typing.Iterable[T],
-    index: int = 0,
-    format_func: state.typing.Callable[[T], state.typing.Any] = str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = str,
     key: str = None,
     help: str = None,
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
-):
+) -> T | None:
     if not options:
         return None
-    options = list(options)
-    if key:
-        assert not index, "only one of index or key can be provided"
-    else:
-        key = md5_values("select", label, options, index, help, label_visibility)
-    value = state.session_state.setdefault(key, options[index])
     if label_visibility != "visible":
         label = None
+    options = list(options)
+    if not key:
+        key = md5_values("select", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if value not in options:
+        value = options[0]
+    state.session_state.setdefault(key, value)
     state.RenderTreeNode(
         name="select",
         props=dict(
             name=key,
             label=dedent(label),
             help=help,
-            disabled=disabled,
+            isDisabled=disabled,
+            defaultValue={"value": value, "label": str(format_func(value))},
+            options=[
+                {"value": option, "label": str(format_func(option))}
+                for option in options
+            ],
         ),
-        children=[
-            state.RenderTreeNode(
-                name="option",
-                props=dict(
-                    label=dedent(str(format_func(option))),
-                    value=_json.dumps(option),
-                    defaultValue=value == option,
-                ),
-            )
-            for option in options
-        ],
     ).mount()
     return value
 
@@ -314,7 +307,7 @@ def button(
     key: str = None,
     help: str = None,
     *,
-    type: state.typing.Literal["primary", "secondary"] = "secondary",
+    type: typing.Literal["primary", "secondary"] = "secondary",
     disabled: bool = False,
 ) -> bool:
     if not key:
@@ -422,7 +415,7 @@ def _render_preview(file: list | state.UploadedFile | str | None):
                 image(file)
 
 
-def json(value: state.typing.Any, expanded: bool = False):
+def json(value: typing.Any, expanded: bool = False):
     state.RenderTreeNode(
         name="json",
         props=dict(
@@ -484,23 +477,23 @@ def table(df: pd.DataFrame):
 
 def radio(
     label: str,
-    options: typing.Iterable[T],
-    index: int = 0,
-    format_func: state.typing.Callable[[T], state.typing.Any] = str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = str,
     key: str = None,
     help: str = None,
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
-) -> state.typing.Optional[T]:
+) -> T | None:
     if not options:
         return None
     options = list(options)
-    if key:
-        assert not index, "only one of index or key can be provided"
-    else:
-        key = md5_values("radio", label, options, index, help, label_visibility)
-    value = state.session_state.setdefault(key, options[index])
+    if not key:
+        key = md5_values("radio", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if value not in options:
+        value = options[0]
+    state.session_state.setdefault(key, value)
     if label_visibility != "visible":
         label = None
     markdown(label)
@@ -541,7 +534,6 @@ def text_input(
         label_visibility=label_visibility,
         maxLength=max_chars,
         placeholder=placeholder,
-        slow_debounce="",
     )
     return value or ""
 
@@ -634,14 +626,14 @@ def _input_widget(
     *,
     input_type: str,
     label: str,
-    value: state.typing.Any = None,
+    value: typing.Any = None,
     key: str = None,
     help: str = None,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     default_value_attr: str = "defaultValue",
     **kwargs,
-) -> state.typing.Any:
+) -> typing.Any:
     if key:
         assert not value, "only one of value or key can be provided"
     else:
