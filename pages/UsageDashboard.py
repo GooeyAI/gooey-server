@@ -63,7 +63,7 @@ def main():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        last_n_days = st.number_input("Last n Days", min_value=1, value=14)
+        last_n_days = st.number_input("Last n Days", min_value=1, value=1)
     with col2:
         time_axis = st.selectbox("Frequency", options=["1D", "1W"])
     with col3:
@@ -197,7 +197,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
     )
 
     total_runs = (
-        counts_df.sum()
+        counts_df.sum(numeric_only=True)
         .rename("Total Runs")
         .to_frame()
         .reset_index(names=["slug"])
