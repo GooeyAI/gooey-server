@@ -5,12 +5,14 @@ from multiprocessing.pool import ThreadPool
 import pandas as pd
 import plotly.express as px
 import pytz
+import streamlit as st
 from firebase_admin import auth
 from google.cloud import firestore
 
-import gooey_ui as st
 from daras_ai_v2 import db
 from daras_ai_v2.base import USER_RUNS_COLLECTION
+
+st.set_page_config(layout="wide")
 
 
 team_emails = [
@@ -61,7 +63,7 @@ def main():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        last_n_days = st.number_input("Last n Days", min_value=1, value=90)
+        last_n_days = st.number_input("Last n Days", min_value=1, value=14)
     with col2:
         time_axis = st.selectbox("Frequency", options=["1D", "1W"])
     with col3:
@@ -83,11 +85,8 @@ def main():
 
     now = datetime.datetime.now(pytz.timezone(timezone))
     today = datetime.datetime.date(now)
-    time_offset = (
-        (today - pd.offsets.Day(last_n_days - 1))
-        .to_pydatetime()
-        .astimezone(pytz.timezone(timezone))
-    )
+    time_offset = today - pd.offsets.Day(last_n_days - 1)
+    print(time_offset)
 
     doc_users = get_all_doc_users()
 
@@ -149,10 +148,9 @@ def main():
     runs_df["updated_at"] = pd.to_datetime(runs_df["updated_at"]).dt.tz_convert(
         timezone
     )
-    runs_df = runs_df.sort_values("updated_at").set_index("updated_at")[time_offset:]
+    runs_df = runs_df.sort_values("updated_at").set_index("updated_at")
 
-    runs_df.to_csv("user_runs.csv")
-    return
+    # st.write(runs_df)
 
     st.write(
         """
@@ -199,7 +197,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
     )
 
     total_runs = (
-        counts_df.sum()
+        counts_df.sum(numeric_only=True)
         .rename("Total Runs")
         .to_frame()
         .reset_index(names=["slug"])
@@ -282,7 +280,7 @@ Pro Tip: double click on any recipe to drill-down
     )
 
 
-# @st.cache_resource
+@st.cache_resource
 def fetch_balances(user_ids: typing.Iterable[str]):
     return dict(
         pool.map(
@@ -320,7 +318,7 @@ def get_filtered_auth_users(
     return {user.uid: user for user in auth_users}
 
 
-# @st.cache_resource
+@st.cache_resource
 def get_auth_users(user_ids: list[str]) -> list[auth.UserRecord]:
     return map_paginated(
         pool,
@@ -329,14 +327,14 @@ def get_auth_users(user_ids: list[str]) -> list[auth.UserRecord]:
     )
 
 
-# @st.cache_resource
+@st.cache_resource
 def get_all_doc_users() -> list[firestore.DocumentReference]:
     doc_users = list(db.get_collection_ref("user_runs").list_documents())
     print("doc users:", len(doc_users))
     return doc_users
 
 
-# @st.cache_resource
+@st.cache_resource
 def fetch_runs(
     *,
     user_ids: set[str],
@@ -356,7 +354,7 @@ def fetch_runs(
     return runs
 
 
-# @st.cache_resource
+@st.cache_resource
 def fetch_page_runs(user_ids: set[str]) -> list[firestore.CollectionReference]:
     page_runs = flat_map(
         pool,
@@ -389,4 +387,4 @@ def firebase_timestamp_to_datetime(timestamp, timezone):
 
 if __name__ == "__main__":
     with ThreadPool(1000) as pool:
-        st.runner(main)
+        main()

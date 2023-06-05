@@ -2,6 +2,7 @@ import datetime
 import heapq
 import io
 import os
+import random
 import re
 import subprocess
 import tempfile
@@ -170,29 +171,11 @@ class DocSearchPage(BasePage):
             else:
                 st.div()
 
-        final_prompt = st.session_state.get("final_prompt")
-        if final_prompt:
-            st.text_area(
-                "**Final Prompt**",
-                value=final_prompt,
-                height=400,
-                disabled=True,
-            )
-        else:
-            st.div()
-
-        output_text: list = st.session_state.get("output_text", [])
-        for idx, text in enumerate(output_text):
-            st.text_area(
-                f"**Output Text**",
-                help=f"output {idx}",
-                disabled=True,
-                value=text,
-                height=200,
-            )
-
-        st.write("**References**")
-        st.json(st.session_state.get("references", []), expanded=False)
+        render_doc_search_step(
+            st.session_state.get("final_prompt"),
+            st.session_state.get("output_text", []),
+            st.session_state.get("references", []),
+        )
 
     def render_usage_guide(self):
         youtube_video("Xe4L_dQ2KvU")
@@ -655,3 +638,29 @@ def render_documents(state, label="**Documents**", *, key="documents"):
         else:
             filename = doc
         st.write(f"🔗[*{filename}*]({doc})")
+
+
+def render_doc_search_step(
+    final_prompt: str, output_text: list[str], references: list[dict]
+):
+    st.write("**References**")
+    st.json(references, expanded=False)
+    if final_prompt:
+        st.text_area(
+            "**Final Prompt**",
+            key=random.random(),
+            value=final_prompt,
+            height=400,
+            disabled=True,
+        )
+    else:
+        st.empty()
+    for idx, text in enumerate(output_text):
+        st.text_area(
+            f"**Output Text**",
+            key=random.random(),
+            help=f"output {idx}",
+            disabled=True,
+            value=text,
+            height=200,
+        )
