@@ -140,14 +140,10 @@ class RelatedQnADocPage(BasePage):
         return 'This workflow finds the related queries (aka "People also ask") for a Google search, searches your doc, pdf or file (from a URL or via an upload) and then generates answers using vector DB results from your docs.'
 
     def render_steps(self):
-        col1, col2 = st.columns(2)
-        with col1:
-            scaleserp_results = st.session_state.get("scaleserp_results")
-            if scaleserp_results:
-                st.write("**ScaleSERP Results**")
-                st.json(scaleserp_results, expanded=False)
-            else:
-                st.empty()
+        scaleserp_results = st.session_state.get("scaleserp_results")
+        if scaleserp_results:
+            st.write("**ScaleSERP Results**")
+            st.json(scaleserp_results, expanded=False)
         output_queries = st.session_state.get("output_queries", [])
         for i, result in enumerate(output_queries):
             st.write("---")

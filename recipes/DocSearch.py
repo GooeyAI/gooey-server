@@ -653,8 +653,6 @@ def render_doc_search_step(
             height=400,
             disabled=True,
         )
-    else:
-        st.empty()
     for idx, text in enumerate(output_text):
         st.text_area(
             f"**Output Text**",
