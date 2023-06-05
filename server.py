@@ -2,7 +2,7 @@ from fastapi.routing import APIRoute
 from starlette._utils import is_async_callable
 
 from gooeysite import wsgi
-from gooeysite.bg_db_conn import django_db_safe
+from gooeysite.bg_db_conn import db_middleware
 
 assert wsgi
 
@@ -494,4 +494,4 @@ setup_pages()
 # monkey patch to make django db work with fastapi
 for route in app.routes:
     if isinstance(route, APIRoute) and not is_async_callable(route.endpoint):
-        route.endpoint = django_db_safe(route.endpoint)
+        route.endpoint = db_middleware(route.endpoint)

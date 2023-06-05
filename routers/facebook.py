@@ -136,7 +136,6 @@ async def request_json(request: Request):
 
 
 @router.post("/__/fb/webhook/")
-@db_middleware
 def fb_webhook(
     background_tasks: BackgroundTasks,
     data: dict = Depends(request_json),
