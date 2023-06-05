@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.express as px
 import pytz
 import streamlit as st
+from decouple import config
 from firebase_admin import auth
 from google.cloud import firestore
 
@@ -54,7 +55,21 @@ def flat_map(pool, func, iterable):
     return flatten(pool.map(func, iterable))
 
 
+def password_check():
+    password_entered = st.text_input("Password", type="password")
+    if not password_entered:
+        return False
+    if password_entered == config("GOOEY_AI_PASSWORD", default=""):
+        return True
+    else:
+        st.error("Incorrect Password")
+        return False
+
+
 def main():
+    if not password_check():
+        st.stop()
+
     st.write(
         """
 ### User Selection
