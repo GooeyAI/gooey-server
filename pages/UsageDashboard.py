@@ -63,7 +63,7 @@ def main():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        last_n_days = st.number_input("Last n Days", min_value=1, value=1)
+        last_n_days = st.number_input("Last n Days", min_value=1, value=14)
     with col2:
         time_axis = st.selectbox("Frequency", options=["1D", "1W"])
     with col3:
