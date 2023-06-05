@@ -86,6 +86,7 @@ def main():
     now = datetime.datetime.now(pytz.timezone(timezone))
     today = datetime.datetime.date(now)
     time_offset = today - pd.offsets.Day(last_n_days - 1)
+    print(time_offset)
 
     doc_users = get_all_doc_users()
 
@@ -147,7 +148,7 @@ def main():
     runs_df["updated_at"] = pd.to_datetime(runs_df["updated_at"]).dt.tz_convert(
         timezone
     )
-    runs_df = runs_df.sort_values("updated_at").set_index("updated_at")[time_offset:]
+    runs_df = runs_df.sort_values("updated_at").set_index("updated_at")
 
     # st.write(runs_df)
 
