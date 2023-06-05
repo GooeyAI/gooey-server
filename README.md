@@ -1,10 +1,26 @@
 ## Setup
-1. Install [poetry](https://python-poetry.org/docs/)
-2. Run `poetry install --with dev`
-3. Active virtualenv (likely `poetry shell`)
-4. Copy `.env.example` -> `.env` (have someone send you the contents and then paste into the .env file)
-5. Save `serviceAccountKey.json` to project root (copy from Dara server project)
-6. run `pip install --upgrade -r requirements.txt` to get all the latest packages
+1. Install [Pyenv](https://github.com/pyenv/pyenv) & install python 3.10
+2. Install [poetry](https://python-poetry.org/docs/)
+4. Create & active a virtualenv (likely `poetry shell`)
+5. Run `poetry install --with dev`
+6. (12factor app) Copy `.env.example` -> `.env` (have someone send you the contents and then paste into the .env file)
+7. Save `serviceAccountKey.json` to project root (copy from Dara server project)
+8. Install `nginx` (homebrew)
+
+### Run
+
+```bash
+./scripts/run-dev.sh
+```
+
+Open `localhost:8080` in your browser
+
+```
+./manage.py runserver
+```
+
+Open `localhost:8000` in your browser
+
 
 ### Install imagemagick
 
@@ -23,16 +39,6 @@ Needed for uniform formatting - https://pypi.org/project/black
 
 Black IDE integration
 Guide: [Pycharm](https://black.readthedocs.io/en/stable/integrations/editors.html#pycharm-intellij-idea)
-
-### Run
-
-```
-streamlit run Home.py
-```
-
-```
-uvicorn server:app --reload
-```
 
 ### Our Colors
 
