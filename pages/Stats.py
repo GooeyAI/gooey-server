@@ -15,6 +15,9 @@ def convert_df(df):
     return df.to_csv(index=True).encode("utf-8")
 
 
+START_DATE = datetime.datetime(2023, 5, 1).date()  # 1st May 20223
+
+
 def main():
     if not password_check():
         st.stop()
@@ -24,7 +27,7 @@ def main():
         options=[b for b in bots],
         format_func=lambda b: f"{b}",
     )
-    start_date = st.date_input("Start date", datetime.date.today())
+    start_date = st.date_input("Start date", START_DATE)
     if bot and start_date:
         with st.spinner("Loading stats..."):
             delta = datetime.timedelta(days=1)
