@@ -26,7 +26,7 @@ class RelatedQnADocPage(BasePage):
     title = '"People Also Ask" Answers from a Doc'
     slug_versions = ["related-qna-maker-doc"]
 
-    price = 175
+    price = 100
 
     class RequestModel(BaseModel):
         search_query: str

@@ -26,53 +26,54 @@ def main():
     )
     start_date = st.date_input("Start date", datetime.date.today())
     if bot and start_date:
-        delta = datetime.timedelta(days=1)
-        data = []
-        dates = []
-        while start_date <= datetime.date.today():
-            messages_received = Message.objects.filter(
-                created_at__date=start_date
-            ).filter(conversation__bot_integration=bot, role=CHATML_ROLE_USER)
-            unique_senders = (
-                messages_received.values_list("conversation__id", flat=True)
-                .distinct()
-                .order_by()
-            ).count()
-            positive_feedbacks = Feedback.objects.filter(
-                message__conversation__bot_integration=bot,
-                rating=Feedback.Rating.RATING_THUMBS_UP,
-                created_at__date=start_date,
-            ).count()
-            negative_feedbacks = Feedback.objects.filter(
-                message__conversation__bot_integration=bot,
-                rating=Feedback.Rating.RATING_THUMBS_DOWN,
-                created_at__date=start_date,
-            ).count()
-            unique_feedback_givers = (
-                Feedback.objects.filter(
+        with st.spinner("Loading stats..."):
+            delta = datetime.timedelta(days=1)
+            data = []
+            dates = []
+            while start_date <= datetime.date.today():
+                messages_received = Message.objects.filter(
+                    created_at__date=start_date
+                ).filter(conversation__bot_integration=bot, role=CHATML_ROLE_USER)
+                unique_senders = (
+                    messages_received.values_list("conversation__id", flat=True)
+                    .distinct()
+                    .order_by()
+                ).count()
+                positive_feedbacks = Feedback.objects.filter(
                     message__conversation__bot_integration=bot,
+                    rating=Feedback.Rating.RATING_THUMBS_UP,
                     created_at__date=start_date,
+                ).count()
+                negative_feedbacks = Feedback.objects.filter(
+                    message__conversation__bot_integration=bot,
+                    rating=Feedback.Rating.RATING_THUMBS_DOWN,
+                    created_at__date=start_date,
+                ).count()
+                unique_feedback_givers = (
+                    Feedback.objects.filter(
+                        message__conversation__bot_integration=bot,
+                        created_at__date=start_date,
+                    )
+                    .distinct()
+                    .count()
                 )
-                .distinct()
-                .count()
-            )
-            try:
-                messages_per_unique_sender = "{:.2f}".format(
-                    len(messages_received) / unique_senders
-                )
-            except ZeroDivisionError:
-                messages_per_unique_sender = 0
-            ctx = {
-                "messages_received": len(messages_received),
-                "unique_senders": unique_senders,
-                "positive_feedbacks": positive_feedbacks,
-                "negative_feedbacks": negative_feedbacks,
-                "unique_feedback_givers": unique_feedback_givers,
-                "messages_per_unique_sender": messages_per_unique_sender,
-            }
-            data.append(ctx)
-            dates.append(start_date)
-            start_date += delta
+                try:
+                    messages_per_unique_sender = "{:.2f}".format(
+                        len(messages_received) / unique_senders
+                    )
+                except ZeroDivisionError:
+                    messages_per_unique_sender = 0
+                ctx = {
+                    "messages_received": len(messages_received),
+                    "unique_senders": unique_senders,
+                    "positive_feedbacks": positive_feedbacks,
+                    "negative_feedbacks": negative_feedbacks,
+                    "unique_feedback_givers": unique_feedback_givers,
+                    "messages_per_unique_sender": messages_per_unique_sender,
+                }
+                data.append(ctx)
+                dates.append(start_date)
+                start_date += delta
 
         df = pd.DataFrame(
             data,
