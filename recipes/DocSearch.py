@@ -648,7 +648,6 @@ def render_doc_search_step(
     if final_prompt:
         st.text_area(
             "**Final Prompt**",
-            key=random.random(),
             value=final_prompt,
             height=400,
             disabled=True,
@@ -656,7 +655,6 @@ def render_doc_search_step(
     for idx, text in enumerate(output_text):
         st.text_area(
             f"**Output Text**",
-            key=random.random(),
             help=f"output {idx}",
             disabled=True,
             value=text,
