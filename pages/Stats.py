@@ -2,7 +2,6 @@ import datetime
 import pandas as pd
 
 import streamlit as st
-from decouple import config
 
 from bots.models import BotIntegration, Message, CHATML_ROLE_USER, Feedback
 from pages.UsageDashboard import password_check
@@ -10,20 +9,27 @@ from pages.UsageDashboard import password_check
 st.set_page_config(layout="wide")
 
 
-@st.experimental_memo
+@st.cache_data
 def convert_df(df):
     return df.to_csv(index=True).encode("utf-8")
 
 
 START_DATE = datetime.datetime(2023, 5, 1).date()  # 1st May 20223
+DEFAULT_BOT_ID = 8  # Telugu bot id is 8
 
 
 def main():
     if not password_check():
         st.stop()
     bots = BotIntegration.objects.all()
+    default_bot_index = 0
+    for index, bot in enumerate(bots):
+        if bot.id == DEFAULT_BOT_ID:
+            default_bot_index = index
+
     bot = st.selectbox(
         "Select Bot",
+        index=default_bot_index,
         options=[b for b in bots],
         format_func=lambda b: f"{b}",
     )
