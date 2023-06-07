@@ -1,9 +1,9 @@
 import typing
 
-import gooey_ui as st
 from jinja2.lexer import whitespace_re
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai_v2.asr import (
     AsrModels,
     google_translate_language_selector,
@@ -15,7 +15,6 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
-    validate_upload_documents,
 )
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.face_restoration import map_parallel
@@ -71,7 +70,7 @@ class AsrPage(BasePage):
 
     def render_form_v2(self):
         document_uploader(
-            "##### Audio Files", type=("wav", "ogg", "mp3", "aac", "opus")
+            "##### Audio Files", accept=(".wav", ".ogg", ".mp3", ".aac", ".opus")
         )
         st.write("---")
         enum_selector(AsrModels, label="###### ASR Model", key="selected_model")
@@ -85,7 +84,7 @@ class AsrPage(BasePage):
         )
 
     def validate_form_v2(self):
-        validate_upload_documents()
+        assert st.session_state.get("documents"), "Please provide at least 1 Audio File"
 
     def render_output(self):
         text_outputs("**Transcription**", key="output_text", height=300)

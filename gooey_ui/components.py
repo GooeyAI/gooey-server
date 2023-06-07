@@ -343,7 +343,7 @@ def expander(label: str, *, expanded: bool = False):
 
 def file_uploader(
     label: str,
-    type: str | list[str] = None,
+    accept: list[str] = None,
     accept_multiple_files=False,
     key: str = None,
     upload_key: str = None,
@@ -352,67 +352,30 @@ def file_uploader(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
 ):
-    value = state.session_state.get(key)
     if label_visibility != "visible":
         label = None
-    if type:
-        if isinstance(type, str):
-            type = [type]
-        accept = ",".join("." + t for t in type)
-    else:
-        accept = None
+    key = upload_key or key
+    value = state.session_state.get(key)
+    if not value:
+        if accept_multiple_files:
+            value = []
+        else:
+            value = ""
+    state.session_state[key] = value
     state.RenderTreeNode(
         name="input",
         props=dict(
             type="file",
-            # name=upload_key or key,
+            name=key,
             label=dedent(label),
             help=help,
             disabled=disabled,
             accept=accept,
             multiple=accept_multiple_files,
+            defaultValue=value,
         ),
     ).mount()
-    _render_preview(value)
     return value or ""
-
-
-def _render_preview(file: list | state.UploadedFile | str | None):
-    from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
-
-    if isinstance(file, list):
-        for item in file:
-            _render_preview(item)
-        return
-
-    is_local = isinstance(file, state.UploadedFile)
-    is_uploaded = isinstance(file, str)
-
-    # determine appropriate filename
-    if is_local:
-        filename = file.name
-    elif is_uploaded:
-        # show only the filename for user uploaded files
-        if is_user_uploaded_url(file):
-            f = furl(file)
-            filename = f.path.segments[-1]
-        else:
-            filename = file
-    else:
-        return
-
-    _, col, _ = columns([1, 2, 1])
-    with col:
-        # if uploaded file, display a link to it
-        if is_uploaded:
-            markdown(f"🔗[*{filename}*]({file})")
-        # render preview as video/image
-        ext = os.path.splitext(filename)[-1].lower()
-        match ext:
-            case ".mp4" | ".mov" | ".ogg":
-                video(file)
-            case ".png" | ".jpg" | ".jpeg" | ".gif" | ".webp" | ".tiff":
-                image(file)
 
 
 def json(value: typing.Any, expanded: bool = False):

@@ -64,21 +64,6 @@ class RelatedQnADocPage(BasePage):
         assert st.session_state.get(
             "search_query", ""
         ).strip(), "Please enter a search query"
-
-        search_query = st.session_state.get("search_query", "").strip()
-        assert search_query, "Please enter a Search Query"
-
-        document_files: list[UploadedFile] | None = st.session_state.get(
-            "__documents_files"
-        )
-        if document_files:
-            uploaded = []
-            for f in document_files:
-                if f.name == "urls.txt":
-                    uploaded.extend(f.getvalue().decode().splitlines())
-                else:
-                    uploaded.append(upload_st_file(f))
-            st.session_state["documents"] = uploaded
         assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_output(self):

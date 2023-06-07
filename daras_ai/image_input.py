@@ -132,7 +132,7 @@ def img_exists(img) -> bool:
         return bool(img)
 
 
-FILENAME_WHITELIST = re.compile(r"[ A-z0-9\-_.]")
+FILENAME_WHITELIST = re.compile(r"[ a-zA-Z0-9\-_.]")
 
 
 def safe_filename(filename: str):

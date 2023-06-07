@@ -58,8 +58,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             Upload a video/image that contains faces to use
             *Recommended - mp4 / mov / png / jpg*
             """,
-            key="face_file",
-            upload_key="input_face",
+            key="input_face",
         )
         st.text_area(
             """
@@ -70,11 +69,9 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         )
 
     def validate_form_v2(self):
-        assert st.session_state["text_prompt"], "Text input cannot be empty"
-
-        face_file = st.session_state.get("face_file")
-        if face_file:
-            st.session_state["input_face"] = upload_st_file(face_file)
+        assert st.session_state.get(
+            "text_prompt", ""
+        ).strip(), "Text input cannot be empty"
         assert st.session_state.get("input_face"), "Please provide an Input Face"
 
     def preview_image(self, state: dict) -> str | None:

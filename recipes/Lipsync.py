@@ -34,8 +34,7 @@ class LipsyncPage(BasePage):
             Upload a video/image that contains faces to use  
             *Recommended - mp4 / mov / png / jpg* 
             """,
-            key="face_file",
-            upload_key="input_face",
+            key="input_face",
         )
 
         st.file_uploader(
@@ -44,19 +43,11 @@ class LipsyncPage(BasePage):
             Upload the video/audio file to use as audio source for lipsyncing  
             *Recommended - wav / mp3*
             """,
-            key="audio_file",
-            upload_key="input_audio",
+            key="input_audio",
         )
 
     def validate_form_v2(self):
-        audio_file = st.session_state.get("audio_file")
-        if audio_file:
-            st.session_state["input_audio"] = upload_st_file(audio_file)
         assert st.session_state.get("input_audio"), "Please provide an Audio file"
-
-        face_file = st.session_state.get("face_file")
-        if face_file:
-            st.session_state["input_face"] = upload_st_file(face_file)
         assert st.session_state.get("input_face"), "Please provide an Input Face"
 
     def render_settings(self):

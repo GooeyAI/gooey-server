@@ -98,24 +98,17 @@ class ObjectInpaintingPage(BasePage):
             ### Object Photo
             Give us a photo of anything
             """,
-            key="input_file",
-            upload_key="input_image",
+            key="input_image",
         )
 
     def validate_form_v2(self):
-        text_prompt = st.session_state.get("text_prompt")
-        input_file = st.session_state.get("input_file")
+        text_prompt = st.session_state.get("text_prompt", "").strip()
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_file or input_image
+        assert text_prompt and input_image, "Please provide a Prompt and a Object Photo"
 
-        # form validation
-        assert (
-            text_prompt and input_image_or_file
-        ), "Please provide a Prompt and a Object Photo"
-
-        # upload input file
-        if input_file:
-            st.session_state["input_image"] = upload_file_hq(input_file)
+        # # upload input file
+        # if input_file:
+        #     st.session_state["input_image"] = upload_file_hq(input_file)
 
     def render_description(self):
         st.write(

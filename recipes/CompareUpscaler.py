@@ -33,8 +33,7 @@ class CompareUpscalerPage(BasePage):
             """
             ### Input Image
             """,
-            key="input_file",
-            upload_key="input_image",
+            key="input_image",
         )
 
         enum_multiselect(
@@ -46,16 +45,12 @@ class CompareUpscalerPage(BasePage):
     def validate_form_v2(self):
         assert st.session_state["selected_models"], "Please select at least one model"
 
-        input_file = st.session_state.get("input_file")
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_file or input_image
-        assert input_image_or_file, "Please provide an Input Image"
+        assert input_image, "Please provide an Input Image"
 
-        # upload input file
-        if input_file:
-            st.session_state["input_image"] = upload_file_hq(
-                input_file, resize=IMG_MAX_SIZE
-            )
+        # st.session_state["input_image"] = upload_file_hq(
+        #         input_file, resize=IMG_MAX_SIZE
+        #     )
 
     def render_settings(self):
         st.slider(

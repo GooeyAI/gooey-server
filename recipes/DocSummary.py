@@ -109,18 +109,6 @@ Prompt for merging several outputs together
     def validate_form_v2(self):
         search_query = st.session_state.get("task_instructions", "").strip()
         assert search_query, "Please enter the Instructions"
-
-        document_files: list[UploadedFile] | None = st.session_state.get(
-            "__documents_files"
-        )
-        if document_files:
-            uploaded = []
-            for f in document_files:
-                if f.name == "urls.txt":
-                    uploaded.extend(f.getvalue().decode().splitlines())
-                else:
-                    uploaded.append(upload_st_file(f))
-            st.session_state["documents"] = uploaded
         assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_output(self):

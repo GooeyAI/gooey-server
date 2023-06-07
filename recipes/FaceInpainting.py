@@ -109,24 +109,18 @@ class FaceInpaintingPage(BasePage):
             ### Face Photo
             Give us a photo of yourself, or anyone else
             """,
-            key="input_file",
-            upload_key="input_image",
+            key="input_image",
+            accept=["image/*"],
         )
 
     def validate_form_v2(self):
         text_prompt = st.session_state.get("text_prompt")
-        input_file = st.session_state.get("input_file")
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_file or input_image
-
-        # form validation
-        assert (
-            text_prompt and input_image_or_file
-        ), "Please provide a Prompt and a Face Photo"
+        assert text_prompt and input_image, "Please provide a Prompt and a Face Photo"
 
         # upload input file
-        if input_file:
-            st.session_state["input_image"] = upload_file_hq(input_file)
+        # if input_file:
+        #     st.session_state["input_image"] = upload_file_hq(input_file)
 
     def render_settings(self):
         img_model_settings(InpaintingModels)

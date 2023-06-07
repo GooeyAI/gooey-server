@@ -271,28 +271,6 @@ Enable document search, to use custom documents as information sources.
 """
         )
 
-    def validate_form_v2(self):
-        # assert st.session_state["input_prompt"], "Please type in a Messsage"
-        # assert st.session_state["bot_script"], "Please provide the Bot Script"
-
-        face_file = st.session_state.get("face_file")
-        if face_file:
-            st.session_state["input_face"] = upload_st_file(face_file)
-        # assert st.session_state.get("input_face"), "Please provide the Input Face"
-
-        document_files: list[UploadedFile] | None = st.session_state.get(
-            "__documents_files"
-        )
-        if document_files:
-            uploaded = []
-            for f in document_files:
-                if f.name == "urls.txt":
-                    uploaded.extend(f.getvalue().decode().splitlines())
-                else:
-                    uploaded.append(upload_st_file(f))
-            st.session_state["documents"] = uploaded
-        # assert st.session_state.get("documents"), "Please provide at least 1 Document"
-
     def render_usage_guide(self):
         youtube_video("-j2su1r8pEg")
 
@@ -341,8 +319,7 @@ Enable document search, to use custom documents as information sources.
                     Upload a video/image that contains faces to use  
                     *Recommended - mp4 / mov / png / jpg / gif* 
                     """,
-                    key="face_file",
-                    upload_key="input_face",
+                    key="input_face",
                 )
                 lipsync_settings()
                 st.write("---")
