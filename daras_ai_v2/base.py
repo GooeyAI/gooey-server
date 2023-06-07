@@ -671,6 +671,10 @@ class BasePage:
             else:
                 # set run status to the yield value of generator
                 run_status = yield_val or "Running..."
+            if isinstance(run_status, tuple):
+                run_status, extra_output = run_status
+            else:
+                extra_output = {}
             output = (
                 # set run status and run time
                 {
@@ -685,6 +689,7 @@ class BasePage:
                     for k, v in st.session_state.items()
                     if k in self.ResponseModel.__fields__
                 }
+                | extra_output
             )
             # send outputs to ui
             realtime_push(channel, output)

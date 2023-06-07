@@ -388,10 +388,13 @@ Use this for prompting GPT to use the document search results.
                 for entry in messages:
                     display_name = entry.get("display_name") or entry["role"]
                     display_name = display_name.capitalize()
-                    st.caption(f'**_{display_name}_**\\\n{entry["content"]}')
+                    st.caption(f'**_{display_name}_** \\\n{entry["content"]}')
 
+        references = st.session_state.get("references", [])
+        if not references:
+            return
         with st.expander("💁‍♀️ Sources"):
-            for idx, ref in enumerate(st.session_state.get("references", [])):
+            for idx, ref in enumerate(references):
                 st.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
                 text_output(
                     "Source Document",
@@ -444,11 +447,6 @@ Use this for prompting GPT to use the document search results.
                 st.audio(audio_url)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        # clear message history if requested
-        clear_msgs = bool(state.get("__clear_msgs"))
-        if clear_msgs:
-            state.get("messages", []).clear()
-
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
         user_input = request.input_prompt.strip()
@@ -458,6 +456,11 @@ Use this for prompting GPT to use the document search results.
         is_chat_model = model.is_chat_model()
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
+
+        # clear message history if requested
+        clear_msgs = bool(state.get("__clear_msgs"))
+        if clear_msgs:
+            saved_msgs.clear()
 
         # translate input text
         if request.user_language and request.user_language != "en":
@@ -598,10 +601,9 @@ Use this for prompting GPT to use the document search results.
                 },
             ]
         )
-        # save message history
-        if not clear_msgs:
-            st.session_state["messages"] = state["messages"] = saved_msgs
         state["raw_output_text"] = output_text.copy()
+        # save message history
+        yield "Saving messages...", {"messages": saved_msgs}
 
         # translate response text
         if request.user_language and request.user_language != "en":
