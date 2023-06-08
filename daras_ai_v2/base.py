@@ -272,7 +272,7 @@ class BasePage:
                     <p>
                             <div style="width:100%;height:150px;background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
                             <h5>{page_cls().title}</h5>
-                            <p style="color:grey;font-size:16px">{page_cls().preview_description(state)}</p>
+                            <p style="color:grey;">{page_cls().preview_description(state)}</p>
                     </p>
                 </a>
                 <br/>
