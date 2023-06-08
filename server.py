@@ -465,11 +465,11 @@ def page_wrapper(request: Request, render_fn: typing.Callable[[], None]):
         ).decode()
 
     st.html(templates.get_template("header.html").render(**context))
-    st.html(templates.get_template("login_container.html").render(**context))
+    # st.html(templates.get_template("login_container.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))
     st.html(copy_to_clipboard_scripts)
 
-    with st.div(id="main-content"):
+    with st.div(id="main-content", className="container mt-5"):
         render_fn()
 
     st.html(templates.get_template("footer.html").render(**context))

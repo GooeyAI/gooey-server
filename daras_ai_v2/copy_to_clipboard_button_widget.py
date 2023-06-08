@@ -1,4 +1,4 @@
-from gooey_ui import html
+import gooey_ui as gui
 
 # language="html"
 copy_to_clipboard_scripts = """
@@ -11,7 +11,7 @@ function copyToClipboard(button) {
         button.textContent = old;
      }, 2000);
 }
-</script>    
+</script>
 """
 
 
@@ -20,17 +20,17 @@ def copy_to_clipboard_button(
     *,
     value: str,
     style: str = "",
-    height: int = 35,
 ):
-    html(
+    return gui.html(
         # language="html"
         f"""
 <button 
-    type="button" 
-    onclick="copyToClipboard(this)" 
-    data-clipboard-text={value!r} 
-    style="{style}; height: {height}px">
+    type="button"
+    class="btn btn-theme" 
+    onclick="copyToClipboard(this)"
+    style="{style}" 
+    data-clipboard-text={value!r}> 
     {label}
 </button>
-        """
+        """,
     )

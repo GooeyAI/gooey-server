@@ -43,14 +43,13 @@ def set_session_state(state: dict[str, typing.Any]):
 
 
 Style = dict[str, str | None]
-Props = dict[str, typing.Any]
+ReactHTMLProps = dict[str, typing.Any]
 
 
 class RenderTreeNode(BaseModel):
     name: str
-    props: Props = {}
+    props: ReactHTMLProps = {}
     children: list["RenderTreeNode"] = []
-    style: Style = {}
 
     def mount(self) -> "RenderTreeNode":
         threadlocal._render_root.children.append(self)

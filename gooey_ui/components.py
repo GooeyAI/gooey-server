@@ -1,5 +1,4 @@
 import base64
-import os
 import textwrap
 import typing
 
@@ -9,7 +8,6 @@ from furl import furl
 
 from gooey_ui import state
 from gooey_ui.pubsub import md5_values
-from gooey_ui.state import Style, Props
 
 T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]
@@ -31,30 +29,27 @@ def nav_tabs():
 
 
 def nav_item(href: str, *, active: bool):
-    return tag("nav-item", props=dict(href=href, active=active))
+    return tag("nav-item", to=href, active="true" if active else None)
 
 
 def nav_tab_content():
     return tag("nav-tab-content")
 
 
-def div(*, style: Style = None, **attrs) -> typing.ContextManager:
-    return tag("div", style=style, props=attrs)
+def div(**props) -> state.NestingCtx:
+    return tag("div", **props)
 
 
-def tag(
-    name: str, *, style: Style = None, props: Props = None
-) -> typing.ContextManager:
-    node = state.RenderTreeNode(name=name, props=props or {}, style=style or {})
+def tag(name: str, **props) -> state.NestingCtx:
+    node = state.RenderTreeNode(name=name, props=props)
     node.mount()
     return state.NestingCtx(node)
 
 
-def html(body: str, height: int = None, width: int = None):
+def html(body: str, **props):
     state.RenderTreeNode(
         name="html",
-        style=dict(height=f"{height}px", width=f"{width}px"),
-        props=dict(body=body),
+        props=dict(body=body, **props),
     ).mount()
 
 
@@ -66,19 +61,17 @@ def write(*objs: typing.Any, unsafe_allow_html=False):
         )
 
 
-def markdown(body: str, *, style: dict[str, str] = None, unsafe_allow_html=False):
+def markdown(body: str, *, unsafe_allow_html=False, **props):
     state.RenderTreeNode(
         name="markdown",
-        style=style or {},
-        props=dict(body=dedent(body), unsafe_allow_html=unsafe_allow_html),
+        props=dict(body=dedent(body), **props),
     ).mount()
 
 
-def text(body: str, *, style: dict[str, str] = None, unsafe_allow_html=False):
+def text(body: str, *, unsafe_allow_html=False, **props):
     state.RenderTreeNode(
         name="pre",
-        style=style or {},
-        props=dict(body=dedent(body), unsafe_allow_html=unsafe_allow_html),
+        props=dict(body=dedent(body), **props),
     ).mount()
 
 
@@ -118,7 +111,7 @@ def option_menu(*args, options, **kwargs):
     return tabs(options)
 
 
-def tabs(labels: list[str]) -> list[typing.ContextManager]:
+def tabs(labels: list[str]) -> list[state.NestingCtx]:
     parent = state.RenderTreeNode(
         name="tabs",
         children=[
@@ -132,31 +125,25 @@ def tabs(labels: list[str]) -> list[typing.ContextManager]:
     return [state.NestingCtx(tab) for tab in parent.children]
 
 
-def columns(spec, *, gap: str = None) -> list[typing.ContextManager]:
+def columns(
+    spec, *, gap: str = None, responsive: bool = True
+) -> list[state.NestingCtx]:
     if isinstance(spec, int):
         spec = [1] * spec
     total_weight = sum(spec)
-    parent = state.RenderTreeNode(
-        name="div",
-        style=dict(
-            display="flex",
-            gap="1 rem",
-        ),
-        children=[
-            state.RenderTreeNode(
-                name="div",
-                style={"width": p, "flexBasis": p},
-            )
+    with div(className="row"):
+        return [
+            div(className=f"col-lg-{p} {'col-12' if responsive else f'col-{p}'}")
             for w in spec
-            if (p := f"{w / total_weight * 100:.2f}%")
-        ],
-    )
-    parent.mount()
-    return [state.NestingCtx(tab) for tab in parent.children]
+            if (p := f"{round(w / total_weight * 12)}")
+        ]
 
 
 def image(
-    src: str | np.ndarray, caption: str = None, alt: str = None, width: int = None
+    src: str | np.ndarray,
+    caption: str = None,
+    alt: str = None,
+    width: int = None,
 ):
     if isinstance(src, np.ndarray):
         from daras_ai.image_input import cv2_img_to_bytes
@@ -169,8 +156,12 @@ def image(
         return
     state.RenderTreeNode(
         name="img",
-        style=dict(width=f"{width}px"),
-        props=dict(src=src, caption=caption, alt=alt),
+        props=dict(
+            src=src,
+            caption=caption,
+            alt=alt or caption,
+            style=dict(width=f"{width}px"),
+        ),
     ).mount()
 
 
@@ -214,7 +205,6 @@ def text_area(
         label = None
     state.RenderTreeNode(
         name="textarea",
-        style=dict(height=f"{height}px"),
         props=dict(
             name=key,
             label=dedent(label),
@@ -222,6 +212,7 @@ def text_area(
             help=help,
             placeholder=placeholder,
             disabled=disabled,
+            style=dict(height=f"{height}px"),
         ),
     ).mount()
     return value or ""
@@ -309,11 +300,12 @@ def button(
     *,
     type: typing.Literal["primary", "secondary"] = "secondary",
     disabled: bool = False,
+    **props,
 ) -> bool:
     if not key:
         key = md5_values("button", label, help, type, disabled)
     state.RenderTreeNode(
-        name="button",
+        name="gui-button",
         props=dict(
             type="submit",
             value="yes",
@@ -321,6 +313,7 @@ def button(
             label=dedent(label),
             help=help,
             disabled=disabled,
+            **props,
         ),
     ).mount()
     return bool(state.session_state.pop(key, False))

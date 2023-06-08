@@ -1,12 +1,7 @@
 {% if request.user and not request.user.is_anonymous %}
-    <div class="login-container">
-        <a href="/account" class="login-name">
-            {% if request.user.display_name %}
-                {{ request.user.display_name }}
-            {% endif %}
-            <div class="login-id">{{ request.user.email or request.user.phone_number }}</div>
-        </a>
-    </div>
+    <a href="/account" class="p-2 text-nowrap">
+        Hi, {{ request.user.first_name()  or request.user.email or request.user.phone_number }}
+    </a>
 {% else %}
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 

@@ -92,8 +92,7 @@ If you lose this secret key, you'll need to generate a new one.
         copy_to_clipboard_button(
             "📎 Copy Secret Key",
             value=new_api_key,
-            style="padding: 6px",
-            height=55,
+            style="padding: 10px; height: 55px",
         )
 
     return {

@@ -60,6 +60,11 @@ class AppUser(models.Model):
     def __str__(self):
         return f"{self.display_name} ({self.email or self.phone_number or self.uid})"
 
+    def first_name(self):
+        if not self.display_name:
+            return ""
+        return self.display_name.split(" ")[0]
+
     def add_balance(self, amount: int, invoice_id: str, **invoice_items):
         @firestore.transactional
         def _update_user_balance_in_txn(txn: Transaction):

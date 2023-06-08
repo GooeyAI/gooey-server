@@ -463,7 +463,7 @@ class BasePage:
             return "/account/"
 
     def render_submit_button(self, key="--submit-1"):
-        col1, col2 = st.columns([2, 1])
+        col1, col2 = st.columns([2, 1], responsive=False)
         with col1:
             st.caption(
                 f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ \\\n"
@@ -559,8 +559,7 @@ class BasePage:
         if not url:
             return
 
-        col1, col2 = st.columns([2, 1])
-
+        col1, col2 = st.columns([2, 1], responsive=False)
         with col1:
             st.text_input(
                 "recipe url",
@@ -568,13 +567,11 @@ class BasePage:
                 disabled=True,
                 value=url,
             )
-
         with col2:
             copy_to_clipboard_button(
                 "🔗 Copy URL",
                 value=url,
-                style="padding: 6px",
-                height=55,
+                style="margin-top: 10px; height: 55px",
             )
 
     def _get_current_app_url(self) -> str | None:
@@ -742,7 +739,7 @@ class BasePage:
     def _render_after_output(self):
         if "seed" in self.RequestModel.schema_json():
             seed = st.session_state.get("seed")
-            col1, col2, col3 = st.columns([1.5, 2, 1.5])
+            col1, col2, col3 = st.columns([1, 1, 1])
             with col1:
                 st.caption(f"*Seed\\\n`{seed}`*")
             with col2:
@@ -907,10 +904,13 @@ class BasePage:
     def _render_doc_example(
         self, *, allow_delete: bool, doc: dict, url: str, query_params: dict
     ):
-        col1, col2 = st.columns([2, 6])
+        col1, col2 = st.columns([1, 3], responsive=False)
 
         with col1:
-            st.markdown(f"""[✏️ Tweak]({url})""")
+            st.html(
+                # language=HTML
+                f"""<a href="{url}"><button type="button" class="btn btn-theme">✏️ Tweak</button></a>"""
+            )
             copy_to_clipboard_button("🔗 Copy URL", value=url)
 
             if allow_delete:
@@ -938,6 +938,7 @@ class BasePage:
         pressed_delete = st.button(
             "🗑️ Delete",
             key=f"delete_example_{example_id}",
+            style={"color": "red"},
         )
         if not pressed_delete:
             return

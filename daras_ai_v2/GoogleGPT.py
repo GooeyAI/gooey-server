@@ -11,6 +11,7 @@ from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
+from daras_ai_v2.scrollable_html_widget import scrollable_html
 from daras_ai_v2.search_ref import SearchReference, render_text_with_refs
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
@@ -267,8 +268,4 @@ def render_outputs(state, height):
         st.write("**Answer**")
     for text in output_text:
         html = render_text_with_refs(text, state.get("references", []))
-        st.write(
-            # language=html
-            f"""<div style="max-height: {height}px;" class="gooey-output-text"><p>{html}</p></div>""",
-            unsafe_allow_html=True,
-        )
+        scrollable_html(html)
