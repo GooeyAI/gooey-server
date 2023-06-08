@@ -1,6 +1,6 @@
 import typing
 
-import streamlit as st
+import gooey_ui as st
 from pydantic import BaseModel
 
 from daras_ai_v2.GoogleGPT import GoogleGPTPage

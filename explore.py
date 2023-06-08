@@ -1,5 +1,3 @@
-import streamlit
-
 import gooey_ui as gui
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.face_restoration import map_parallel

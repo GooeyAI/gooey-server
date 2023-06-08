@@ -1,15 +1,13 @@
 import typing
 
-import streamlit as st
 from pydantic import BaseModel
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from daras_ai.image_input import upload_st_file
+import gooey_ui as st
 from daras_ai_v2.GoogleGPT import render_outputs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.google_search import call_scaleserp, call_scaleserp_rq
+from daras_ai_v2.google_search import call_scaleserp_rq
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker

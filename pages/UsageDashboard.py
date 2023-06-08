@@ -5,7 +5,7 @@ from multiprocessing.pool import ThreadPool
 import pandas as pd
 import plotly.express as px
 import pytz
-import streamlit as st
+import gooey_ui as st
 from firebase_admin import auth
 from google.cloud import firestore
 
