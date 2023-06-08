@@ -268,7 +268,7 @@ class BasePage:
             page_cls, state, preview_image = page_tuple
             st.markdown(
                 f"""
-                <a href="{page_cls().app_url()}" style="text-decoration:none;color:white">
+                <a href="{page_cls().app_url()}" style="text-decoration:none;">
                     <p>
                             <div style="width:100%;height:150px;background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
                             <h5>{page_cls().title}</h5>
