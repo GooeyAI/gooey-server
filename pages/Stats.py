@@ -143,6 +143,13 @@ def main():
                 df,
                 x="date",
                 y=[
+                    "messages_received",
+                ],
+            )
+            st.line_chart(
+                df,
+                x="date",
+                y=[
                     "unique_senders",
                     "unique_feedback_givers",
                     "positive_feedbacks",
