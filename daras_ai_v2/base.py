@@ -466,8 +466,8 @@ class BasePage:
         col1, col2 = st.columns([2, 1], responsive=False)
         with col1:
             st.caption(
-                f"Run cost = *[{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()})* \\\n",
-                f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ "
+                f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()}) \\\n"
+                f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ ",
             )
             additional_notes = self.additional_notes()
             if additional_notes:
