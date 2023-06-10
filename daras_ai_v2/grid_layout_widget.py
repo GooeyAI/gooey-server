@@ -3,14 +3,12 @@ import typing
 import gooey_ui as st
 
 
-def _default_sep():
-    st.write("---")
-
-
-def grid_layout(column_spec, iterable: typing.Iterable, render, separator=_default_sep):
+def grid_layout(column_spec, iterable: typing.Iterable, render, separator=True):
     it = iter(iterable)
     while True:
         for col in st.columns(column_spec):
+            if separator:
+                col.node.props["className"] += " border-bottom mb-4 pb-2"
             with col:
                 while True:
                     try:
@@ -26,8 +24,6 @@ def grid_layout(column_spec, iterable: typing.Iterable, render, separator=_defau
                     else:
                         # render next item in next col
                         break
-        if separator:
-            separator()
 
 
 class SkipIteration(Exception):

@@ -1,8 +1,10 @@
+from html_sanitizer import Sanitizer
+
 import gooey_ui as gui
 
 
 def scrollable_html(
-    text: str,
+    body: str,
     *,
     height=500,
 ):
@@ -10,5 +12,4 @@ def scrollable_html(
         style=dict(maxHeight=height),
         className="gooey-output-text",
     ):
-        with gui.tag("p"):
-            gui.html(text)
+        gui.html(Sanitizer().sanitize(body))

@@ -1,3 +1,4 @@
+import json
 import math
 
 import gooey_ui as st
@@ -119,28 +120,28 @@ def num_outputs_setting(selected_model: str = None):
 
 RESOLUTIONS = {
     512: {
-        (512, 512): "square",
-        (576, 448): "A4",
-        (640, 384): "laptop",
-        (768, 320): "smartphone",
-        (960, 256): "cinema",
-        (1024, 256): "panorama",
+        "512, 512": "square",
+        "576, 448": "A4",
+        "640, 384": "laptop",
+        "768, 320": "smartphone",
+        "960, 256": "cinema",
+        "1024, 256": "panorama",
     },
     768: {
-        (768, 768): "square",
-        (896, 640): "A4",
-        (1024, 576): "laptop",
-        (1024, 512): "smartphone",
-        (1152, 512): "cinema",
-        (1536, 384): "panorama",
+        "768, 768": "square",
+        "896, 640": "A4",
+        "1024, 576": "laptop",
+        "1024, 512": "smartphone",
+        "1152, 512": "cinema",
+        "1536, 384": "panorama",
     },
     1024: {
-        (1024, 1024): "square",
-        (1024, 768): "A4",
-        (1280, 768): "laptop",
-        (1536, 512): "smartphone",
-        (1792, 512): "cinema",
-        (2048, 512): "panorama",
+        "1024, 1024": "square",
+        "1024, 768": "A4",
+        "1280, 768": "laptop",
+        "1536, 512": "smartphone",
+        "1792, 512": "cinema",
+        "2048, 512": "panorama",
     },
 }
 
@@ -194,9 +195,11 @@ def output_resolution_setting():
         res = st.selectbox(
             "##### Resolution",
             key="__res",
-            format_func=lambda x: f"{x[0]} x {x[1]} ({RESOLUTIONS[pixels][x]})",
-            options=RESOLUTIONS[pixels].keys(),
+            format_func=lambda r: f"{r.split(', ')[0]} x {r.split(', ')[1]} ({RESOLUTIONS[pixels][r]})",
+            options=list(RESOLUTIONS[pixels].keys()),
         )
+        res = tuple(map(int, res.split(", ")))
+
     if res[0] != res[1]:
         with col3:
             orientation = st.selectbox(

@@ -80,7 +80,7 @@ For security reasons, **you won't be able to view it again** through your accoun
 If you lose this secret key, you'll need to generate a new one.
             """
     )
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([3, 1], responsive=False)
     with col1:
         st.text_input(
             "recipe url",

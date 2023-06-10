@@ -81,7 +81,7 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2 = st.columns([4, 1])
+        col1, col2 = st.columns([4, 1], responsive=False)
         with col1:
             st.text_area(
                 label="*Prompt*",

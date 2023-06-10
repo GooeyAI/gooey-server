@@ -25,32 +25,33 @@ dataframe = dummy
 
 
 def nav_tabs():
-    return tag("nav-tabs")
+    return _node("nav-tabs")
 
 
 def nav_item(href: str, *, active: bool):
-    return tag("nav-item", to=href, active="true" if active else None)
+    return _node("nav-item", to=href, active="true" if active else None)
 
 
 def nav_tab_content():
-    return tag("nav-tab-content")
+    return _node("nav-tab-content")
 
 
 def div(**props) -> state.NestingCtx:
     return tag("div", **props)
 
 
-def tag(name: str, **props) -> state.NestingCtx:
-    node = state.RenderTreeNode(name=name, props=props)
-    node.mount()
-    return state.NestingCtx(node)
+def link(*, to: str, **props) -> state.NestingCtx:
+    return _node("Link", to=to, **props)
+
+
+def tag(tag_name: str, **props) -> state.NestingCtx:
+    props["__reactjsxelement"] = tag_name
+    return _node("tag", **props)
 
 
 def html(body: str, **props):
-    state.RenderTreeNode(
-        name="html",
-        props=dict(body=body, **props),
-    ).mount()
+    props["className"] = props.get("className", "") + " gui-html-container"
+    return _node("html", body=body, **props)
 
 
 def write(*objs: typing.Any, unsafe_allow_html=False):
@@ -62,10 +63,16 @@ def write(*objs: typing.Any, unsafe_allow_html=False):
 
 
 def markdown(body: str, *, unsafe_allow_html=False, **props):
-    state.RenderTreeNode(
-        name="markdown",
-        props=dict(body=dedent(body), **props),
-    ).mount()
+    props["className"] = (
+        props.get("className", "") + " gui-html-container gui-md-container"
+    )
+    return _node("markdown", body=dedent(body), **props)
+
+
+def _node(name: str, **props):
+    node = state.RenderTreeNode(name=name, props=props)
+    node.mount()
+    return state.NestingCtx(node)
 
 
 def text(body: str, *, unsafe_allow_html=False, **props):
@@ -103,8 +110,8 @@ def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
     )
 
 
-def caption(body: str):
-    markdown(body, style={"fontSize": "0.75rem"})
+def caption(body: str, **props):
+    markdown(body, style={"fontSize": "0.9rem"}, className="text-muted", **props)
 
 
 def option_menu(*args, options, **kwargs):
@@ -126,17 +133,22 @@ def tabs(labels: list[str]) -> list[state.NestingCtx]:
 
 
 def columns(
-    spec, *, gap: str = None, responsive: bool = True
-) -> list[state.NestingCtx]:
+    spec,
+    *,
+    gap: str = None,
+    responsive: bool = True,
+    **props,
+) -> tuple[state.NestingCtx, ...]:
     if isinstance(spec, int):
         spec = [1] * spec
     total_weight = sum(spec)
-    with div(className="row"):
-        return [
+    props.setdefault("className", "row")
+    with div(**props):
+        return tuple(
             div(className=f"col-lg-{p} {'col-12' if responsive else f'col-{p}'}")
             for w in spec
             if (p := f"{round(w / total_weight * 12)}")
-        ]
+        )
 
 
 def image(
@@ -200,7 +212,9 @@ def text_area(
 ) -> str:
     if key:
         assert not value, "only one of value or key can be provided"
-        value = state.session_state.get(key)
+    else:
+        key = md5_values("textarea", label, height, help, placeholder, label_visibility)
+    value = state.session_state.setdefault(key, value)
     if label_visibility != "visible":
         label = None
     state.RenderTreeNode(
@@ -243,9 +257,7 @@ def multiselect(
             help=help,
             isDisabled=disabled,
             isMulti=True,
-            defaultValue=[
-                {"value": option, "label": str(format_func(option))} for option in value
-            ],
+            defaultValue=value,
             options=[
                 {"value": option, "label": str(format_func(option))}
                 for option in options
@@ -283,7 +295,7 @@ def selectbox(
             label=dedent(label),
             help=help,
             isDisabled=disabled,
-            defaultValue={"value": value, "label": str(format_func(value))},
+            defaultValue=value,
             options=[
                 {"value": option, "label": str(format_func(option))}
                 for option in options
@@ -303,7 +315,7 @@ def button(
     **props,
 ) -> bool:
     if not key:
-        key = md5_values("button", label, help, type, disabled)
+        key = md5_values("button", label, help, type, props)
     state.RenderTreeNode(
         name="gui-button",
         props=dict(
@@ -324,7 +336,7 @@ form_submit_button = button
 
 def expander(label: str, *, expanded: bool = False):
     node = state.RenderTreeNode(
-        name="details",
+        name="expander",
         props=dict(
             label=dedent(label),
             open=expanded,
@@ -348,6 +360,15 @@ def file_uploader(
     if label_visibility != "visible":
         label = None
     key = upload_key or key
+    if not key:
+        key = md5_values(
+            "file_uploader",
+            label,
+            accept,
+            accept_multiple_files,
+            help,
+            label_visibility,
+        )
     value = state.session_state.get(key)
     if not value:
         if accept_multiple_files:
