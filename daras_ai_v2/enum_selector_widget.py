@@ -31,7 +31,7 @@ def enum_multiselect(
             else:
                 selected.discard(e.name)
 
-        grid_layout(2, enum_cls, render, separator=None)
+        grid_layout(2, enum_cls, render, separator=False)
         st.session_state[key] = list(selected)
 
         return selected

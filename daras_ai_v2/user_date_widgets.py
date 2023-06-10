@@ -1,17 +1,13 @@
 import datetime
 
-from gooey_ui import markdown
+import gooey_ui as gui
 
 from daras_ai_v2.hidden_html_widget import hidden_html_js
 
 
 def js_dynamic_date(dt: datetime.datetime):
     timestamp_ms = dt.timestamp() * 1000
-    markdown(
-        # language=HTML
-        f'<span style="padding-left: 4px" data-id-dynamic-date="{timestamp_ms}"></span>',
-        unsafe_allow_html=True,
-    )
+    gui.caption("Loading...", **{"data-id-dynamic-date": str(timestamp_ms)})
 
 
 def render_js_dynamic_dates():
@@ -29,19 +25,18 @@ const timeOptions = {
     hour12: true,
     minute: "numeric",
 };
-
-parent.document.querySelectorAll("[data-id-dynamic-date]").forEach(elem => {
-    let date = new Date(parseFloat(elem.getAttribute("data-id-dynamic-date")));
-    let yearToShow = "";
-    if (date.getFullYear() != new Date().getFullYear()) {
-        yearToShow = " " + date.getFullYear().toString();
-    } 
-    elem.innerHTML = `
-        <i>
-            ${date.toLocaleDateString("en-IN", dateOptions)}${yearToShow},
-            ${date.toLocaleTimeString("en-IN", timeOptions).toUpperCase()}
-        </i> 
-    `;
+window.addEventListener("load", () => {
+    document.querySelectorAll("[data-id-dynamic-date]").forEach(elem => {
+        let date = new Date(parseFloat(elem.getAttribute("data-id-dynamic-date")));
+        let yearToShow = "";
+        if (date.getFullYear() != new Date().getFullYear()) {
+            yearToShow = " " + date.getFullYear().toString();
+        } 
+        elem.children[0].innerHTML = `
+                ${date.toLocaleDateString("en-IN", dateOptions)}${yearToShow},
+                ${date.toLocaleTimeString("en-IN", timeOptions).toUpperCase()}
+        `;
+    });
 });
 </script>
         """,

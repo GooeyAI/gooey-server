@@ -111,7 +111,9 @@ class BasePage:
 
     @classmethod
     def app_url(cls, example_id=None, run_id=None, uid=None, tab_name=None) -> str:
-        query_params = cls.clean_query_params(example_id, run_id, uid)
+        query_params = cls.clean_query_params(
+            example_id=example_id, run_id=run_id, uid=uid
+        )
         f = furl(settings.APP_BASE_URL, query_params=query_params) / (
             cls.slug_versions[-1] + "/"
         )
@@ -120,7 +122,7 @@ class BasePage:
         return str(f)
 
     @classmethod
-    def clean_query_params(cls, example_id, run_id, uid) -> dict:
+    def clean_query_params(cls, *, example_id, run_id, uid) -> dict:
         query_params = {}
         if run_id and uid:
             query_params |= dict(run_id=run_id, uid=uid)
@@ -241,6 +243,7 @@ class BasePage:
                 self.render_related_workflows()
 
             case MenuTabs.examples:
+                st.json({"hello": "world"})
                 self._examples_tab()
 
             case MenuTabs.history:
@@ -464,6 +467,7 @@ class BasePage:
 
     def render_submit_button(self, key="--submit-1"):
         col1, col2 = st.columns([2, 1], responsive=False)
+        col2.node.props["className"] += " d-flex justify-content-end align-items-center"
         with col1:
             st.caption(
                 f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()}) \\\n"
@@ -610,7 +614,7 @@ class BasePage:
 
         self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
 
-        return run_id, uid
+        return example_id, run_id, uid
 
     def _render_output_col(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
@@ -621,7 +625,7 @@ class BasePage:
             submitted = True
 
         if submitted:
-            run_id, uid = self.create_new_run()
+            example_id, run_id, uid = self.create_new_run()
             if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
                 st.session_state[StateKeys.run_status] = None
                 self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
@@ -631,7 +635,9 @@ class BasePage:
                 target=self._run_thread,
                 args=[run_id, uid, st.session_state, channel],
             ).start()
-            gooey_reset_query_parm(run_id=run_id, uid=uid)
+            gooey_reset_query_parm(
+                **self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
+            )
 
         run_status = st.session_state.get(StateKeys.run_status)
         if run_status:
@@ -737,9 +743,13 @@ class BasePage:
             st.session_state.pop(field_name, None)
 
     def _render_after_output(self):
+        col1, col2, col3 = st.columns([1, 1, 1], responsive=False)
+        col2.node.props[
+            "className"
+        ] += " d-flex justify-content-center align-items-center"
+        col3.node.props["className"] += " d-flex justify-content-end align-items-center"
         if "seed" in self.RequestModel.schema_json():
             seed = st.session_state.get("seed")
-            col1, col2, col3 = st.columns([1, 1, 1])
             with col1:
                 st.caption(f"*Seed\\\n`{seed}`*")
             with col2:
@@ -747,9 +757,7 @@ class BasePage:
                 if randomize:
                     st.session_state[StateKeys.pressed_randomize] = True
                     st.experimental_rerun()
-            with col3:
-                self._render_report_button()
-        else:
+        with col3:
             self._render_report_button()
 
     def _render_save_options(self):
@@ -857,7 +865,7 @@ class BasePage:
                 query_params=dict(example_id=example_id),
             )
 
-        grid_layout(2, example_docs, _render)
+        grid_layout(3, example_docs, _render)
 
     def _history_tab(self):
         assert self.request, "request must be set to render history tab"
@@ -896,7 +904,7 @@ class BasePage:
                 query_params=dict(run_id=run_id, uid=uid),
             )
 
-        grid_layout(2, run_history, _render)
+        grid_layout(3, run_history, _render)
 
         # if st.button("Load More"):
         #     st.experimental_rerun()
@@ -904,35 +912,30 @@ class BasePage:
     def _render_doc_example(
         self, *, allow_delete: bool, doc: dict, url: str, query_params: dict
     ):
-        col1, col2 = st.columns([1, 3], responsive=False)
+        st.html(
+            # language=HTML
+            f"""<a href="{url}"><button type="button" class="btn btn-theme">✏️ Tweak</button></a>"""
+        )
+        copy_to_clipboard_button("🔗 Copy URL", value=url)
+        if allow_delete:
+            self._example_delete_button(**query_params)
 
-        with col1:
-            st.html(
-                # language=HTML
-                f"""<a href="{url}"><button type="button" class="btn btn-theme">✏️ Tweak</button></a>"""
-            )
-            copy_to_clipboard_button("🔗 Copy URL", value=url)
+        updated_at = doc.get("updated_at")
+        if updated_at and isinstance(updated_at, datetime.datetime):
+            js_dynamic_date(updated_at)
 
-            if allow_delete:
-                self._example_delete_button(**query_params)
+        title = doc.get(StateKeys.page_title)
+        if title and title.strip() != self.title.strip():
+            st.write("#### " + title)
 
-            updated_at = doc.get("updated_at")
-            if updated_at and isinstance(updated_at, datetime.datetime):
-                js_dynamic_date(updated_at)
+        notes = doc.get(StateKeys.page_notes)
+        if (
+            notes
+            and notes.strip() != self.preview_description(st.session_state).strip()
+        ):
+            st.write(notes)
 
-        with col2:
-            title = doc.get(StateKeys.page_title)
-            if title and title.strip() != self.title.strip():
-                st.write("#### " + title)
-
-            notes = doc.get(StateKeys.page_notes)
-            if (
-                notes
-                and notes.strip() != self.preview_description(st.session_state).strip()
-            ):
-                st.write(notes)
-
-            self.render_example(doc)
+        self.render_example(doc)
 
     def _example_delete_button(self, example_id):
         pressed_delete = st.button(
