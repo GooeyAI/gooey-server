@@ -27,6 +27,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="feedback",
             name="rating",
-            field=models.IntegerField(choices=[(1, "👍🏾"), (2, "👎🏾")]),
+            field=models.IntegerField(choices=[(1, "👍🏾"), (2, "👎🏽")]),
         ),
     ]

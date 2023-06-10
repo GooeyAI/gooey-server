@@ -475,7 +475,7 @@ def _feedback_start_buttons():
         },
         {
             "type": "reply",
-            "reply": {"id": ButtonIds.feedback_thumbs_down, "title": "👎🏾"},
+            "reply": {"id": ButtonIds.feedback_thumbs_down, "title": "👎🏽"},
         },
     ]
 
