@@ -80,12 +80,14 @@ class Img2ImgPage(BasePage):
         ]
 
     def render_form_v2(self):
+        print(st.session_state)
         st.file_uploader(
             """
             ### Input Image
             """,
             key="input_image",
         )
+        print(st.session_state)
 
         if st.session_state.get("selected_model") != InpaintingModels.dall_e.name:
             st.text_area(
