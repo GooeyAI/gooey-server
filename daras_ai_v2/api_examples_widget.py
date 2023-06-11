@@ -23,7 +23,7 @@ def get_filenames(request_body):
 
 
 def api_example_generator(api_url: furl, request_body: dict, as_form_data: bool):
-    curl, python, js = st.tabs(["`curl`", "`python`", "`node.js`"])
+    js, python, curl = st.tabs(["`node.js`", "`python`", "`curl`"])
 
     filenames = []
     if as_form_data:

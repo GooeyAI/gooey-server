@@ -243,7 +243,6 @@ class BasePage:
                 self.render_related_workflows()
 
             case MenuTabs.examples:
-                st.json({"hello": "world"})
                 self._examples_tab()
 
             case MenuTabs.history:
@@ -987,7 +986,10 @@ class BasePage:
             )
             / "docs"
         )
-        st.markdown(f"### [📖 API Docs]({api_docs_url})")
+
+        st.markdown(
+            f"📖 To learn more, take a look at our [complete API]({api_docs_url})"
+        )
 
         st.write("#### 📤 Example Request")
 
