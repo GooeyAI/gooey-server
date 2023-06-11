@@ -243,7 +243,6 @@ class BasePage:
                 self.render_related_workflows()
 
             case MenuTabs.examples:
-                st.json({"hello": "world"})
                 self._examples_tab()
 
             case MenuTabs.history:
