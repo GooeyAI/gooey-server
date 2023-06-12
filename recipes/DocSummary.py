@@ -1,12 +1,10 @@
 import typing
 from enum import Enum
 
-import gooey_ui as st
 from llama_index.langchain_helpers.text_splitter import SentenceSplitter
 from pydantic import BaseModel
-from gooey_ui import UploadedFile
 
-from daras_ai.image_input import upload_st_file
+import gooey_ui as st
 from daras_ai_v2.GoogleGPT import render_outputs, GoogleGPTPage
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage

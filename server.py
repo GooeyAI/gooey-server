@@ -1,3 +1,6 @@
+import subprocess
+import tempfile
+
 from fastapi.routing import APIRoute
 from starlette._utils import is_async_callable
 
@@ -295,6 +298,46 @@ def script_to_api(page_cls: typing.Type[BasePage]):
 
 async def request_form_files(request: Request) -> FormData:
     return await request.form()
+
+
+@app.post("/__/file-upload/")
+def file_upload(request: Request, form_data: FormData = Depends(request_form_files)):
+    if not request.user:
+        raise HTTPException(status_code=401, detail="Not logged in")
+
+    from wand.image import Image
+
+    file = form_data["file"]
+    data = file.file.read()
+    filename = file.filename
+    content_type = file.content_type
+
+    if content_type.startswith("audio/"):
+        with tempfile.NamedTemporaryFile(
+            suffix="." + filename,
+        ) as infile, tempfile.NamedTemporaryFile(
+            suffix=".wav",
+        ) as outfile:
+            infile.write(data)
+
+            args = ["ffmpeg", "-y", "-i", infile.name, "-ac", "1", outfile.name]
+            print("\t$", " ".join(args))
+            subprocess.check_call(args)
+
+            filename += ".wav"
+            content_type = "audio/wav"
+            data = outfile.read()
+
+    if content_type.startswith("image/"):
+        with Image(blob=data) as img:
+            if img.format not in ["png", "jpeg", "gif"]:
+                img.format = "png"
+                content_type = "image/png"
+                filename += ".png"
+            img.transform(resize=form_data.get("resize", f"{1024**2}@>"))
+            data = img.make_blob()
+
+    return {"url": upload_file_from_bytes(filename, data, content_type)}
 
 
 def call_api(

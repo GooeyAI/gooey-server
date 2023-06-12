@@ -21,7 +21,7 @@ from daras_ai_v2.scaleserp_location_picker_widget import (
 from daras_ai_v2.stable_diffusion import (
     img2img,
     Img2ImgModels,
-    IMG_MAX_SIZE,
+    SD_IMG_MAX_SIZE,
     instruct_pix2pix,
 )
 
@@ -126,7 +126,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             try:
                 selected_image_bytes = requests.get(selected_image_url).content
                 selected_image_bytes = resize_img_scale(
-                    selected_image_bytes, IMG_MAX_SIZE
+                    selected_image_bytes, SD_IMG_MAX_SIZE
                 )
             except (IOError, ConnectionError, ValueError):
                 continue

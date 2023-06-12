@@ -2,12 +2,11 @@ import typing
 
 import cv2
 import requests
-import gooey_ui as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai.image_input import (
     upload_file_from_bytes,
-    upload_file_hq,
     resize_img_scale,
     bytes_to_cv2_img,
     cv2_img_to_bytes,
@@ -105,10 +104,6 @@ class ObjectInpaintingPage(BasePage):
         text_prompt = st.session_state.get("text_prompt", "").strip()
         input_image = st.session_state.get("input_image")
         assert text_prompt and input_image, "Please provide a Prompt and a Object Photo"
-
-        # # upload input file
-        # if input_file:
-        #     st.session_state["input_image"] = upload_file_hq(input_file)
 
     def render_description(self):
         st.write(

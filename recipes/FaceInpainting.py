@@ -3,14 +3,13 @@ from functools import partial
 
 import cv2
 import requests
-import gooey_ui as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai.extract_face import extract_and_reposition_face_cv2
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
-    upload_file_hq,
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
@@ -19,7 +18,7 @@ from daras_ai_v2.face_restoration import map_parallel, gfpgan
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
-from daras_ai_v2.loom_video_widget import loom_video, youtube_video
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
@@ -117,10 +116,6 @@ class FaceInpaintingPage(BasePage):
         text_prompt = st.session_state.get("text_prompt")
         input_image = st.session_state.get("input_image")
         assert text_prompt and input_image, "Please provide a Prompt and a Face Photo"
-
-        # upload input file
-        # if input_file:
-        #     st.session_state["input_image"] = upload_file_hq(input_file)
 
     def render_settings(self):
         img_model_settings(InpaintingModels)

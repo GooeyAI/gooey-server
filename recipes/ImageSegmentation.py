@@ -9,7 +9,6 @@ import gooey_ui as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import (
-    upload_file_hq,
     upload_file_from_bytes,
     cv2_img_to_bytes,
     bytes_to_cv2_img,
@@ -84,6 +83,7 @@ class ImageSegmentationPage(BasePage):
             Give us a photo of anything
             """,
             key="input_image",
+            upload_meta=dict(resize=f"{2048**2}@>"),
         )
 
     def validate_form_v2(self):

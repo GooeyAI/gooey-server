@@ -2,7 +2,6 @@ import datetime
 import heapq
 import io
 import os
-import random
 import re
 import subprocess
 import tempfile
@@ -13,15 +12,14 @@ import numpy as np
 import pandas as pd
 import pdftotext
 import requests
-import gooey_ui as st
 from furl import furl
 from googleapiclient.errors import HttpError
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pydantic import BaseModel
-from gooey_ui import UploadedFile
 
+import gooey_ui as st
 from daras_ai.face_restoration import map_parallel
-from daras_ai.image_input import upload_st_file, upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.GoogleGPT import SearchReference, render_outputs, GoogleGPTPage
 from daras_ai_v2.asr import AsrModels, run_asr, run_google_translate
 from daras_ai_v2.base import BasePage

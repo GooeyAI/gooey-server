@@ -359,6 +359,7 @@ def file_uploader(
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
+    upload_meta: dict = None,
 ):
     if label_visibility != "visible":
         label = None
@@ -390,6 +391,7 @@ def file_uploader(
             accept=accept,
             multiple=accept_multiple_files,
             defaultValue=value,
+            uploadMeta=upload_meta,
         ),
     ).mount()
     return value or ""

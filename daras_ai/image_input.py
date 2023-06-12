@@ -9,17 +9,15 @@ import numpy as np
 from PIL import Image, ImageOps
 from firebase_admin import storage
 
-import gooey_ui as st
 from daras_ai_v2 import settings
-from gooey_ui import UploadedFile
 
 
 # @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 # @st.cache_data
-def upload_file(uploaded_file: UploadedFile):
-    img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
-    img_bytes = resize_img_pad(img_bytes, (512, 512))
-    return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
+# def upload_file(uploaded_file: UploadedFile):
+#     img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
+#     img_bytes = resize_img_pad(img_bytes, (512, 512))
+#     return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
 
 
 def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
@@ -32,30 +30,30 @@ def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
 
 # @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 # @st.cache_data
-def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
-    img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
-    img_bytes = resize_img_scale(img_bytes, resize)
-    return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
+# def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
+#     img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
+#     img_bytes = resize_img_scale(img_bytes, resize)
+#     return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
 
 
-def uploaded_file_get_value(uploaded_file):
-    img_bytes = uploaded_file.read()
-    filename = uploaded_file.name
-    content_type = uploaded_file.type
-    if filename.endswith("HEIC"):
-        img_bytes = _heic_to_png(img_bytes)
-        filename += ".png"
-        content_type = "image/png"
-    return img_bytes, safe_filename(filename), content_type
+# def uploaded_file_get_value(uploaded_file):
+#     img_bytes = uploaded_file.read()
+#     filename = uploaded_file.name
+#     content_type = uploaded_file.type
+#     if filename.endswith("HEIC"):
+#         img_bytes = _heic_to_png(img_bytes)
+#         filename += ".png"
+#         content_type = "image/png"
+#     return img_bytes, safe_filename(filename), content_type
 
 
-def _heic_to_png(img_bytes: bytes) -> bytes:
-    from wand.image import Image
-
-    with Image(blob=img_bytes) as original:
-        with original.convert("png") as converted:
-            img_bytes = converted.make_blob()
-    return img_bytes
+# def _heic_to_png(img_bytes: bytes) -> bytes:
+#     from wand.image import Image
+#
+#     with Image(blob=img_bytes) as original:
+#         with original.transform(resize="1024@>").convert("png") as converted:
+#             img_bytes = converted.make_blob()
+#     return img_bytes
 
 
 def resize_img_scale(img_bytes: bytes, size: (int, int)) -> bytes:
@@ -87,8 +85,8 @@ def resize_img_fit(img_bytes: bytes, size: (int, int)) -> bytes:
 
 
 # @st.cache_data
-def upload_st_file(f: UploadedFile) -> str:
-    return upload_file_from_bytes(f.name, f.getvalue(), f.type)
+# def upload_st_file(f: UploadedFile) -> str:
+#     return upload_file_from_bytes(f.name, f.getvalue(), f.type)
 
 
 def upload_file_from_bytes(

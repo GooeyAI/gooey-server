@@ -10,7 +10,6 @@ from pydantic import BaseModel
 import gooey_ui as st
 from daras_ai.image_input import (
     truncate_text_words,
-    upload_st_file,
 )
 from daras_ai_v2.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
@@ -46,7 +45,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
 )
-from gooey_ui import UploadedFile
 from recipes.DocSearch import (
     get_top_k_references,
     DocSearchPage,
@@ -125,8 +123,8 @@ def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
 
 
 class VideoBotsPage(BasePage):
-    title = "Copilot for your Enterprise" #  "Create Interactive Video Bots"
-    slug_versions = ["video-bots","bots","copilot"]
+    title = "Copilot for your Enterprise"  #  "Create Interactive Video Bots"
+    slug_versions = ["video-bots", "bots", "copilot"]
 
     sane_defaults = {
         "messages": [],
@@ -232,7 +230,7 @@ class VideoBotsPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return "Create customized chatbots from your own docs/PDF/webpages. Craft your own bot prompts using the creative GPT3, fast GPT 3.5-turbo or powerful GPT4 & optionally prevent hallucinations by constraining all answers to just your citations. Available as Facebook, Instagram, WhatsApp bots or via API. Add multi-lingual speech recognition and text-to-speech in 100+ languages and even video responses. Collect 👍🏾 👎🏽 feedback + see usage & retention graphs too! This is the workflow that powers https://Farmer.CHAT and it's yours to tweak."
-        #return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
+        # return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
 
     def render_description(self):
         st.write(

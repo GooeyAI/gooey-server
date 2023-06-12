@@ -1,10 +1,10 @@
 import typing
 from pathlib import Path
 
-import gooey_ui as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_from_bytes, safe_filename, upload_st_file
+import gooey_ui as st
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.lipsync_api import wav2lip
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
