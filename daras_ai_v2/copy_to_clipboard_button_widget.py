@@ -11,30 +11,6 @@ function copyToClipboard(button) {
         button.textContent = old;
      }, 2000);
 }
-
-// get all disabled textareas
-const disabledTextareas = Array.from(document.querySelectorAll('textarea:disabled'));
-
-disabledTextareas.forEach((textarea) => {
-    // create a wrapper div
-    const wrapper = document.createElement('div');
-    wrapper.className = 'textarea-wrapper';
-
-    // create a copy button
-    const button = document.createElement('button');
-    button.textContent = 'Copy';
-    button.addEventListener('click', () => {
-        navigator.clipboard.writeText(textarea.value)
-            .then(() => console.log('Copied to clipboard'))
-            .catch(err => console.error('Failed to copy text: ', err));
-    });
-
-    // wrap textarea with div
-    textarea.parentNode.insertBefore(wrapper, textarea);
-    wrapper.appendChild(textarea);
-    // add copy button into the wrapper
-    wrapper.appendChild(button);
-});
 </script>
 """
 

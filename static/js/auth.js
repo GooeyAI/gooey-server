@@ -1,3 +1,6 @@
+const CLIENT_ID =
+  "6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com";
+
 const firebaseConfig = {
   apiKey: "AIzaSyC7j8WI-P_BZQogR809B2QbaH_aP1KsVeM",
   authDomain: "dara-c1b52.firebaseapp.com",
@@ -9,7 +12,7 @@ const firebaseConfig = {
   measurementId: "G-09W5N835PE",
 };
 
-window.addEventListener("load", function () {
+window.addEventListener("DOMContentLoaded", async function () {
   // Initialize Firebase
   const app = firebase.initializeApp(firebaseConfig);
 
@@ -78,7 +81,7 @@ async function handleAuthResult({ user }) {
 function showLoginProgress() {
   let elem = document.getElementById("replace-login-spinner");
   if (!elem) return;
-  elem.innerHTML = "<h3>Logging you in...</h3>";
+  elem.innerHTML = "<h5>Logging you in...</h5>";
 }
 
 async function loadAnonymousUser() {

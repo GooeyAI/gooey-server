@@ -1,7 +1,4 @@
-const CLIENT_ID =
-  "6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com";
-
-window.addEventListener("load", async () => {
+window.addEventListener("DOMContentLoaded", async () => {
   // load anonymous user before initializing FirebaseUI
   await loadAnonymousUser();
   // Initialize the FirebaseUI Widget using Firebase.

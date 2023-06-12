@@ -1,47 +1,61 @@
 {% if request.user and not request.user.is_anonymous %}
-    <a href="/account" class="p-2 text-nowrap">
+    <a class="pe-2" href="/account">
         Hi, {{ request.user.first_name()  or request.user.email or request.user.phone_number }}
     </a>
 {% else %}
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-    <div id="replace-login-spinner" class="login-container">
-        <div id="g_id_signin"></div>
-        <div style="height: 6px"></div>
-        <a href="/login/?next={{ request.path }}">or another way...</a>&nbsp;
-    </div>
-
     <script>
-        window.addEventListener('load', function () {
-            const CLIENT_ID = "6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com";
-            google.accounts.id.initialize({
-                client_id: CLIENT_ID,
-                callback: handleCredentialResponse
-            });
-            google.accounts.id.renderButton(
-                document.getElementById("g_id_signin"),
-                {
-                    shape: "pill",
+        const hydrationPromise = new Promise((resolve) => {
+                if (window.hydrated) {
+                    resolve();
+                } else {
+                    window.addEventListener("hydrated", resolve);
                 }
-            );
-            google.accounts.id.prompt();
-        });
+            }
+        );
     </script>
 
     {% if block_incognito %}
-        <script src="https://cdn.jsdelivr.net/gh/Joe12387/detectIncognito@v1.3.0/dist/es5/detectIncognito.min.js"></script>
         <script>
-            window.addEventListener("load", function () {
-                detectIncognito().then((result) => {
-                    if (!result.isPrivate) return;
-                    let elem = document.getElementById("main-content");
-                    if (!elem) return;
-                    elem.innerHTML =
-                        `<h3 style='text-align: center; padding: 20px'>
+            async function hideIfIncognito() {
+                await hydrationPromise;
+                let result = await detectIncognito();
+                if (!result.isPrivate) return;
+                let elem = document.getElementById("main-content");
+                if (!elem) return;
+                elem.innerHTML =
+                    `<h3 style='text-align: center; padding: 20px'>
                         Sorry! We can't let you use this app in incognito mode. Please login to continue.
                     </h3>`;
-                });
-            });
+
+            };
         </script>
+        <script src="https://cdn.jsdelivr.net/gh/Joe12387/detectIncognito@v1.3.0/dist/es5/detectIncognito.min.js"
+                async defer
+                onload="hideIfIncognito()"></script>
     {% endif %}
+
+    <a class="pe-2" href="/login/?next={{ request.path }}">
+        Sign in
+    </a>
+
+    <span class="pe-2" style="height: 44px; width: 200px" id="replace-login-spinner">
+        <span id="g_id_signin"></span>
+    </span>
+
+    <script>
+        window.addEventListener("DOMContentLoaded", async function () {
+            await hydrationPromise;
+            google.accounts.id.initialize({
+                client_id: CLIENT_ID,
+                callback: handleCredentialResponse,
+            });
+            google.accounts.id.renderButton(document.getElementById("g_id_signin"), {
+                shape: "rectangular",
+                width: 200,
+                text: "continue_with",
+            });
+            google.accounts.id.prompt();
+        });
+    </script>
+    <script src="https://accounts.google.com/gsi/client" defer></script>
 {% endif %}

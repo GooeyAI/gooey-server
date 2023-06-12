@@ -25,7 +25,7 @@ const timeOptions = {
     hour12: true,
     minute: "numeric",
 };
-window.addEventListener("load", () => {
+window.addEventListener("hydrated", () => {
     document.querySelectorAll("[data-id-dynamic-date]").forEach(elem => {
         let date = new Date(parseFloat(elem.getAttribute("data-id-dynamic-date")));
         let yearToShow = "";

@@ -464,15 +464,15 @@ def page_wrapper(request: Request, render_fn: typing.Callable[[], None]):
             request.user.uid
         ).decode()
 
-    # st.html(templates.get_template("gtag.html").render(**context))
+    st.html(templates.get_template("gtag.html").render(**context))
     st.html(templates.get_template("header.html").render(**context))
-    st.html(templates.get_template("login_scripts.html").render(**context))
     st.html(copy_to_clipboard_scripts)
 
-    with st.div(id="main-content", className="container mt-5"):
+    with st.div(id="main-content", className="container"):
         render_fn()
 
     st.html(templates.get_template("footer.html").render(**context))
+    st.html(templates.get_template("login_scripts.html").render(**context))
 
 
 def normalize_slug(page_slug):
