@@ -522,8 +522,7 @@ class BasePage:
                 )
 
         with st.expander(
-            f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**",
-            expanded=False,
+            f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**"
         ):
             st.markdown(
                 """
@@ -986,7 +985,10 @@ class BasePage:
             )
             / "docs"
         )
-        st.markdown(f"### [📖 API Docs]({api_docs_url})")
+
+        st.markdown(
+            f"📖 To learn more, take a look at our [complete API]({api_docs_url})"
+        )
 
         st.write("#### 📤 Example Request")
 

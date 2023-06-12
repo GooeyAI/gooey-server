@@ -205,7 +205,6 @@ async function gooeyAPI() {
 }
 
 gooeyAPI();
-```
             """ % dict(
                 api_url=api_url,
                 auth_keyword=auth_keyword,
