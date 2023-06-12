@@ -125,8 +125,8 @@ def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
 
 
 class VideoBotsPage(BasePage):
-    title = "Create Interactive Video Bots"
-    slug_versions = ["video-bots"]
+    title = "Copilot for your Enterprise" #  "Create Interactive Video Bots"
+    slug_versions = ["video-bots","bots","copilot"]
 
     sane_defaults = {
         "messages": [],
@@ -231,14 +231,17 @@ class VideoBotsPage(BasePage):
         ]
 
     def preview_description(self, state: dict) -> str:
-        return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
+        return "Create customized chatbots from your own docs/PDF/webpages. Craft your own bot prompts using the creative GPT3, fast GPT 3.5-turbo or powerful GPT4 & optionally prevent halucinations by constraining all answers to just your citations. Avaiable as Facebook, Instagram, WhatsApp bots or an API. Add multi-lingual speech recognition and text-to-speech in 100+ languages and even video responses. Collect 👍🏾 👎🏽 feedback + see usage & retention graphs too! This is the workflow that powers Farmer.CHAT(https://Farmer.CHAT) and it's yours to tweak."
+        #return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
 
     def render_description(self):
         st.write(
             """
-Have you ever wanted to create a character that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots? This is how. 
+Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how. 
 
-This workflow takes a dialog script describing your character (with some sample questions you expect folks to ask), a video clip of your character’s face and finally voice settings to build a videobot that anyone can speak to about anything and you can host directly in your own site or app. 
+This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot’s face and  voice settings. 
+ 
+We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page. 
 
 How It Works:
 1. Appends the user's question to the bottom of your dialog script. 
@@ -247,7 +250,7 @@ How It Works:
 4. Lip syncs the face video clip to the voice clip
 5. Shows the resulting video to the user
 
-PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing.
+PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers. 
         """
         )
 
