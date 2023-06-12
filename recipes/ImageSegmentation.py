@@ -77,36 +77,18 @@ class ImageSegmentationPage(BasePage):
             CompareText2ImgPage,
         ]
 
-    def render_form(self) -> bool:
-        with st.form("my_form"):
-            st.file_uploader(
-                """
-                ### Input Photo
-                Give us a photo of anything
-                """,
-                key="input_file",
-            )
+    def render_form_v2(self):
+        st.file_uploader(
+            """
+            ### Input Photo
+            Give us a photo of anything
+            """,
+            key="input_image",
+        )
 
-            submitted = st.form_submit_button("🏃‍ Submit")
-
-        input_file = st.session_state.get("input_file")
+    def validate_form_v2(self):
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_file or input_image
-
-        # form validation
-        if submitted and not input_image_or_file:
-            st.error("Please provide an Input Photo", icon="⚠️")
-            return False
-
-        # upload input file if submitted
-        if submitted:
-            input_file = st.session_state.get("input_file")
-            if input_file:
-                st.session_state["input_image"] = upload_file_hq(
-                    input_file, resize=(2048, 2048)
-                )
-
-        return submitted
+        assert input_image, "Please provide an Input Photo"
 
     def render_settings(self):
         enum_selector(

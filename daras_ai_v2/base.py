@@ -219,16 +219,14 @@ class BasePage:
                 input_col, output_col = st.columns([3, 2], gap="medium")
                 with input_col:
                     self.render_author()
-                    submitted1 = self.render_form()
+                    self.render_form_v2()
                     with st.expander("⚙️ Settings"):
                         self.render_settings()
                         st.write("---")
                         st.write("##### 🖌️ Personalize")
                         st.text_input("Title", key=StateKeys.page_title)
                         st.text_area("Notes", key=StateKeys.page_notes)
-                        st.write("---")
-                        submitted2 = self.render_submit_button(key="--submit-2")
-                    submitted = submitted1 or submitted2
+                    submitted = self.render_submit_button()
                 with output_col:
                     self._render_output_col(submitted)
 
@@ -454,10 +452,6 @@ class BasePage:
             unsafe_allow_html=True,
         )
 
-    def render_form(self) -> bool:
-        self.render_form_v2()
-        return self.render_submit_button()
-
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
             return "/pricing/"
@@ -573,7 +567,7 @@ class BasePage:
             copy_to_clipboard_button(
                 "🔗 Copy URL",
                 value=url,
-                style="margin-top: 10px; height: 55px",
+                style="height: 3.2rem",
             )
 
     def _get_current_app_url(self) -> str | None:

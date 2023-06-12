@@ -78,32 +78,28 @@ class LetterWriterPage(BasePage):
             """
         )
 
-    def render_form(self) -> bool:
-        with st.form("my_form"):
-            st.text_input(
-                "### Action ID",
-                key="action_id",
+    def render_form_v2(self):
+        st.text_input(
+            "### Action ID",
+            key="action_id",
+        )
+
+        col1, col2 = st.columns(2, gap="medium")
+        with col1:
+            st.slider(
+                label="Number of Outputs",
+                key="num_outputs",
+                min_value=1,
+                max_value=4,
             )
-
-            col1, col2 = st.columns(2, gap="medium")
-            with col1:
-                st.slider(
-                    label="Number of Outputs",
-                    key="num_outputs",
-                    min_value=1,
-                    max_value=4,
-                )
-            with col2:
-                st.slider(
-                    label="Quality",
-                    key="quality",
-                    min_value=1.0,
-                    max_value=5.0,
-                    step=0.1,
-                )
-
-            submitted = st.form_submit_button("🏃‍ Submit")
-            return submitted
+        with col2:
+            st.slider(
+                label="Quality",
+                key="quality",
+                min_value=1.0,
+                max_value=5.0,
+                step=0.1,
+            )
 
     def render_settings(self):
         st.write("### Model Settings")

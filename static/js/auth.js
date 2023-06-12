@@ -79,9 +79,11 @@ async function handleAuthResult({ user }) {
 }
 
 function showLoginProgress() {
-  let elem = document.getElementById("replace-login-spinner");
-  if (!elem) return;
-  elem.innerHTML = "<h5>Logging you in...</h5>";
+  for (const elem of document.querySelectorAll(
+    "[data-replace-login-spinner]"
+  )) {
+    elem.innerHTML = "<h5>Logging you in...</h5>";
+  }
 }
 
 async function loadAnonymousUser() {
