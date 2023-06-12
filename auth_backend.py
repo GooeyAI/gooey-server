@@ -6,6 +6,7 @@ from starlette.authentication import AuthCredentials, AuthenticationBackend
 from starlette.concurrency import run_in_threadpool
 
 from app_users.models import AppUser
+from daras_ai_v2.crypto import get_random_string, get_random_doc_id
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE, ANONYMOUS_USER_COOKIE
 from gooeysite.bg_db_conn import db_middleware
 
@@ -15,7 +16,9 @@ _forced_auth_user = []
 
 @contextmanager
 def force_authentication():
-    user = AppUser.objects.create(is_anonymous=True, balance=1000)
+    user = AppUser.objects.create(
+        is_anonymous=True, uid=get_random_doc_id(), balance=10**9
+    )
     try:
         _forced_auth_user.append(user)
         yield

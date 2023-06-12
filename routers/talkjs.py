@@ -86,17 +86,3 @@ async def talkjs_webhook(request: Request):
                     ],
                 )
                 r.raise_for_status()
-
-
-@router.get("/v1/chat-widget.js")
-def talkjs_widget(request: Request):
-    params = dict(request.query_params)
-    params.setdefault("display", "popup")
-    context = {
-        "appId": settings.TALK_JS_APP_ID,
-        **params,
-    }
-    config = "const gooeyTalkJSConfig = %s;\n" % json.dumps(context)
-    with open("static/js/chat-widget.js") as f:
-        js = config + f.read()
-    return Response(js, media_type="application/javascript")

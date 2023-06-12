@@ -4,7 +4,6 @@ import glom
 import requests
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
-from firebase_admin import auth
 from furl import furl
 from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
@@ -418,7 +417,7 @@ def _handle_interactive_msg(bot: BotInterface):
 
 def _handle_audio_msg(billing_account_user, bot):
     from recipes.asr import AsrPage
-    from server import call_api
+    from routers.api import call_api
 
     # run asr
     asr_lang = None
@@ -489,7 +488,7 @@ def _process_msg(
     input_text: str,
     user_language: str,
 ) -> tuple[str, str | None, str | None, list[Message]]:
-    from server import call_api
+    from routers.api import call_api
 
     # get latest messages for context (upto 100)
     saved_msgs = list(

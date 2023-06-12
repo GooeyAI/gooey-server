@@ -23,7 +23,8 @@ def text_training_data(label1: str, label2: str, *, key: str):
 
             with col1:
                 btn_area = st.div()
-                pressed_delete = btn_area.button(f"🗑", help=f"Delete {key} {idx + 1}")
+                # pressed_delete = btn_area.button(f"🗑", help=f"Delete {key} {idx + 1}")
+                pressed_delete = False
                 if pressed_delete:
                     training_data.pop(idx)
                     btn_area.empty()
