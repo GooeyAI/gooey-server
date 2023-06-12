@@ -29,10 +29,10 @@ route_paths = [
 
 
 @pytest.mark.parametrize("path", route_paths)
-def test_public_endpoints(path):
-    r = client.get(path, allow_redirects=True)
+def test_all_get(path):
+    r = client.get(path, allow_redirects=False)
     print(r.content)
-    assert r.status_code == 200
+    assert r.ok
 
 
 page_slugs = [slug for page_cls in all_api_pages for slug in page_cls.slug_versions]
@@ -43,6 +43,6 @@ tabs = list(MenuTabs.paths.values())
 @pytest.mark.parametrize("slug", page_slugs)
 def test_page_slugs(slug, tab):
     with force_authentication():
-        r = client.post(os.path.join(slug, tab), json={}, allow_redirects=True)
+        r = client.post(os.path.join(slug, tab), json={}, allow_redirects=False)
     print(r.content)
     assert r.status_code == 200

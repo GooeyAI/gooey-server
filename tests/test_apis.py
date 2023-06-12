@@ -25,7 +25,8 @@ def test_apis_basic(page_cls: typing.Type[BasePage]):
             page.endpoint,
             json=get_example_request_body(page.RequestModel, state),
             headers={"Authorization": f"Token None"},
+            allow_redirects=False,
         )
 
     print(r.content)
-    assert r.ok
+    assert r.status_code == 200
