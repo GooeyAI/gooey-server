@@ -148,7 +148,7 @@ $ export GOOEY_API_KEY=sk-xxxx
 
     with js:
         if as_form_data:
-            js_code = """
+            js_code = """\
 import fetch, { FormData, fileFrom } from 'node-fetch';
 
 const payload = %(json)s;
@@ -185,7 +185,7 @@ gooeyAPI();
             )
 
         else:
-            js_code = """
+            js_code = """\
 import fetch from 'node-fetch';
 
 const payload = %(json)s;
