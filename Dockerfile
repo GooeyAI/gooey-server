@@ -32,8 +32,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # copy poetry files
 COPY ./pyproject.toml ./poetry.lock ./
-# copy submodules
-COPY django-bots /app/django-bots
 # install python dependencies
 RUN pip install -U poetry pip && poetry install --only main --no-interaction
 
