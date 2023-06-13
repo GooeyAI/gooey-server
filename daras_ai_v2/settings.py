@@ -188,7 +188,7 @@ else:
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
-os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", None)
+os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", "")
 
 GS_BUCKET_NAME = config("GS_BUCKET_NAME")
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
