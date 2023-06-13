@@ -1,18 +1,20 @@
 import datetime
-import pandas as pd
 
+import pandas as pd
 import streamlit as st
 from django.db.models import Count
 
+from Home import check_password
 from bots.models import (
     BotIntegration,
     Message,
     CHATML_ROLE_USER,
     Feedback,
 )
-from pages.UsageDashboard import password_check
 
 st.set_page_config(layout="wide")
+if not check_password():
+    st.stop()
 
 
 @st.cache_data
@@ -30,8 +32,6 @@ def main():
         # Gooey.AI Bot Stats
         """
     )
-    if not password_check():
-        st.stop()
     bots = BotIntegration.objects.all()
     default_bot_index = 0
     for index, bot in enumerate(bots):
