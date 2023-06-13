@@ -1,17 +1,14 @@
 import datetime
-import math
 import typing
 import uuid
 
 import requests
-import gooey_ui as st
-from furl import furl
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai.image_input import storage_blob_for
-from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.gpu_server import GpuEndpoints, call_gooey_gpu
+from daras_ai_v2.gpu_server import GpuEndpoints
 from daras_ai_v2.loom_video_widget import youtube_video
 
 
@@ -392,8 +389,6 @@ Choose fps for the video.
         if output_video:
             st.write("Output Video")
             st.video(output_video)
-        else:
-            st.div()
 
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
@@ -411,31 +406,6 @@ Choose fps for the video.
     def run(self, state: dict):
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
-
-        state["output_video"] = call_gooey_gpu(
-            endpoint=GpuEndpoints.defourm_sd,
-            filename=str(request.animation_prompts),
-            content_type="video/mp4",
-            pipeline=dict(
-                model_id="Protogen_V2.2.ckpt",
-                seed=request.seed,
-            ),
-            inputs=dict(
-                animation_mode=request.animation_mode,
-                animation_prompts={
-                    fp["frame"]: fp["prompt"] for fp in request.animation_prompts
-                },
-                max_frames=request.max_frames,
-                zoom=request.zoom,
-                translation_x=request.translation_x,
-                translation_y=request.translation_y,
-                rotation_3d_x=request.rotation_3d_x,
-                rotation_3d_y=request.rotation_3d_y,
-                rotation_3d_z=request.rotation_3d_z,
-                translation_z="0:(0)",
-                fps=request.fps,
-            ),
-        )
 
         blob = storage_blob_for(f"gooey.ai animation {request.animation_prompts}.mp4")
 
