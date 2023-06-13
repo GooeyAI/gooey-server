@@ -58,7 +58,6 @@ gunicorn = "^20.1.0"
 psycopg2-binary = "^2.9.6"
 whitenoise = "^6.4.0"
 black = "^23.3.0"
-django-bots = {path = "django-bots", develop = true}
 django-extensions = "^3.2.1"
 pytest-django = "^4.5.2"
 

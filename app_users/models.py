@@ -1,8 +1,9 @@
 import datetime
+import mimetypes
 
+import requests
 import stripe
 from django.db import models, IntegrityError, transaction
-from django.db.models import F
 from django.utils import timezone
 from firebase_admin import auth
 from google.cloud import firestore
@@ -10,6 +11,7 @@ from google.cloud.firestore_v1.transaction import Transaction
 from phonenumber_field.modelfields import PhoneNumberField
 
 from bots.custom_fields import CustomURLField
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings, db
 
 
@@ -101,10 +103,18 @@ class AppUser(models.Model):
         self.display_name = user.display_name or ""
         self.email = user.email
         self.phone_number = user.phone_number
-        self.photo_url = user.photo_url or ""
         self.created_at = timezone.datetime.fromtimestamp(
             user.user_metadata.creation_timestamp / 1000
         )
+
+        # retrieve photo from firebase and upload to cloud storage
+        if user.photo_url:
+            response = requests.get(user.photo_url)
+            if response.ok:
+                ext = mimetypes.guess_extension(response.headers["Content-Type"]) or ""
+                self.photo_url = upload_file_from_bytes(
+                    f"user_photo_{user.uid}{ext}", response.content
+                )
 
         # firebase doesnt provide is_anonymous field, so we have to infer it
         is_anonymous_now = not (user.display_name or user.email or user.phone_number)
@@ -142,6 +152,8 @@ class AppUser(models.Model):
         return customer
 
     def search_stripe_customer(self) -> stripe.Customer | None:
+        if not self.uid:
+            return None
         if self.stripe_customer_id:
             return stripe.Customer.retrieve(self.stripe_customer_id)
         try:

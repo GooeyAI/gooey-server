@@ -5,16 +5,17 @@ from multiprocessing.pool import ThreadPool
 import pandas as pd
 import plotly.express as px
 import pytz
-import gooey_ui as st
-from decouple import config
+import streamlit as st
 from firebase_admin import auth
 from google.cloud import firestore
 
+from Home import check_password
 from daras_ai_v2 import db
 from daras_ai_v2.base import USER_RUNS_COLLECTION
 
 st.set_page_config(layout="wide")
-
+if not check_password():
+    st.stop()
 
 team_emails = [
     "devxpy@gmail.com",
@@ -55,21 +56,7 @@ def flat_map(pool, func, iterable):
     return flatten(pool.map(func, iterable))
 
 
-def password_check():
-    password_entered = st.text_input("Password", type="password")
-    if not password_entered:
-        return False
-    if password_entered == config("GOOEY_AI_PASSWORD", default=""):
-        return True
-    else:
-        st.error("Incorrect Password")
-        return False
-
-
 def main():
-    if not password_check():
-        st.stop()
-
     st.write(
         """
 ### User Selection

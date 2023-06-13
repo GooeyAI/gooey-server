@@ -24,9 +24,12 @@ from starlette.templating import Jinja2Templates
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config("SECRET_KEY")
+DEBUG = config("DEBUG", cast=bool, default=True)
 
-DEBUG = config("DEBUG", cast=bool)
+if DEBUG:
+    SECRET_KEY = "xxxx"
+else:
+    SECRET_KEY = config("SECRET_KEY")
 
 ALLOWED_HOSTS = ["*"]
 INTERNAL_IPS = ["127.0.0.1"]
@@ -188,10 +191,10 @@ else:
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
-os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", None)
+os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
-GS_BUCKET_NAME = config("GS_BUCKET_NAME")
-GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
+GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
+# GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
 UBERDUCK_KEY = config("UBERDUCK_KEY", None)
 UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 
@@ -247,3 +250,7 @@ TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
 
 PINECONE_API_KEY = config("PINECONE_API_KEY", "")
 PINECONE_ENVIRONMENT = config("PINECONE_ENVIRONMENT", "us-east1-gcp")
+
+# only for the streamlit app
+
+GOOEY_AI_PASSWORD = config("GOOEY_AI_PASSWORD", default="").strip()
