@@ -144,9 +144,6 @@ async def logout(request: Request):
 
 @app.post("/__/file-upload/")
 def file_upload(request: Request, form_data: FormData = Depends(request_form_files)):
-    if not request.user:
-        raise HTTPException(status_code=401, detail="Not logged in")
-
     from wand.image import Image
 
     file = form_data["file"]
