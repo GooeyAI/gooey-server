@@ -152,6 +152,8 @@ class AppUser(models.Model):
         return customer
 
     def search_stripe_customer(self) -> stripe.Customer | None:
+        if not self.uid:
+            return None
         if self.stripe_customer_id:
             return stripe.Customer.retrieve(self.stripe_customer_id)
         try:
