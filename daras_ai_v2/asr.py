@@ -17,7 +17,7 @@ from daras_ai_v2.gpu_server import GpuEndpoints
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
-    whisper_telugu_large_v2 = "Whisper Telgu Large v2 (Bhashini)"
+    whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     usm = "USM (Google)"
