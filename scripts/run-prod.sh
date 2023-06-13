@@ -2,6 +2,12 @@
 
 set -ex
 
+if [ "$DUMP_DATABASE" ] && [ "$PGDATABASE" ]; then
+  dropdb $PGDATABASE || true
+  createdb -T template0 $PGDATABASE
+  pg_dump $DUMP_DATABASE | psql -q $PGDATABASE
+fi
+
 if [ "$RUN_DJANGO" ]; then
   ./manage.py migrate
   ./manage.py collectstatic
