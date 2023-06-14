@@ -192,7 +192,11 @@ class FeedbackInline(admin.TabularInline):
 @admin.register(models.Message)
 class MessageAdmin(admin.ModelAdmin):
     autocomplete_fields = ["conversation"]
-    list_filter = ["conversation__bot_integration"]
+    list_filter = [
+        "role",
+        "conversation__bot_integration",
+        "created_at",
+    ]
     search_fields = [
         "role",
         "content",
