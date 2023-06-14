@@ -102,7 +102,7 @@ def main():
                     created_at__date__lt=date + delta,
                 ).count()
 
-                unique_feedback_givers = (
+                unique_feedbacks = (
                     Feedback.objects.filter(
                         message__conversation__bot_integration=bot,
                         created_at__date__gte=date,
@@ -121,12 +121,12 @@ def main():
 
                 ctx = {
                     "date": date,
-                    "messages_received": len(messages_received),
-                    "negative_feedbacks": negative_feedbacks,
-                    "positive_feedbacks": positive_feedbacks,
-                    "unique_senders": unique_senders,
-                    "unique_feedback_givers": unique_feedback_givers,
-                    "messages_per_unique_sender": messages_per_unique_sender,
+                    "Messages_Sent": len(messages_received),
+                    "Neg_feedback": negative_feedbacks,
+                    "Pos_feedback": positive_feedbacks,
+                    "Senders": unique_senders,
+                    "Unique_feedbacks": unique_feedbacks,
+                    "Msgs_per_sender": messages_per_unique_sender,
                 }
                 data.append(ctx)
                 date += delta
@@ -143,18 +143,18 @@ def main():
                 df,
                 x="date",
                 y=[
-                    "messages_received",
+                    "Messages_Sent",
                 ],
             )
             st.line_chart(
                 df,
                 x="date",
                 y=[
-                    "unique_senders",
-                    "unique_feedback_givers",
-                    "positive_feedbacks",
-                    "negative_feedbacks",
-                    "messages_per_unique_sender",
+                    "Senders",
+                    "Unique_feedbacks",
+                    "Pos_feedback",
+                    "Neg_feedback",
+                    "Msgs_per_sender",
                 ],
             )
 
