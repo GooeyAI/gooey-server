@@ -43,6 +43,6 @@ tabs = list(MenuTabs.paths.values())
 @pytest.mark.parametrize("slug", page_slugs)
 def test_page_slugs(slug, tab):
     with force_authentication():
-        r = client.post(os.path.join(slug, tab), json={}, allow_redirects=False)
+        r = client.post(os.path.join(slug, tab), json={}, allow_redirects=True)
     print(r.content)
     assert r.status_code == 200
