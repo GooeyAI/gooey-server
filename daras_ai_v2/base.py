@@ -1,8 +1,6 @@
 import datetime
 import inspect
-import json
 import math
-import os
 import traceback
 import typing
 import uuid
@@ -56,7 +54,6 @@ from daras_ai_v2.query_params_util import (
     USER_ID_QUERY_PARAM,
 )
 from daras_ai_v2.send_email import send_reported_run_email
-from daras_ai_v2.settings import EXPLORE_URL
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
 from gooey_ui import realtime_clear_subs
@@ -196,8 +193,6 @@ class BasePage:
         with st.nav_tab_content():
             self.render_selected_tab(selected_tab)
 
-        render_js_dynamic_dates()
-
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
             msg = (
@@ -242,9 +237,11 @@ class BasePage:
 
             case MenuTabs.examples:
                 self._examples_tab()
+                render_js_dynamic_dates()
 
             case MenuTabs.history:
                 self._history_tab()
+                render_js_dynamic_dates()
 
             case MenuTabs.run_as_api:
                 self.run_as_api_tab()
@@ -253,32 +250,25 @@ class BasePage:
         workflows = self.related_workflows()
         if not workflows:
             return
-        st.markdown(
-            f"""
-            <a style="text-decoration:none" href="{EXPLORE_URL}" target = "_top">
-                <h2>Related Workflows</h2>
-            </a>
-            """,
-            unsafe_allow_html=True,
-        )
+
+        with st.link(to="/explore/"):
+            st.html("<h2>Related Workflows</h2>")
 
         related_recipe_docs = map_parallel(_build_page_tuple, workflows)
 
         def _render(page_tuple):
             page_cls, state, preview_image = page_tuple
-            st.markdown(
-                f"""
-                <a href="{page_cls().app_url()}" style="text-decoration:none;">
-                    <p>
-                            <div style="width:100%;height:150px;background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
-                            <h5>{page_cls().title}</h5>
-                            <p style="color:grey;">{page_cls().preview_description(state)}</p>
-                    </p>
-                </a>
-                <br/>
-                """,
-                unsafe_allow_html=True,
-            )
+            page = page_cls()
+
+            with st.link(to=page.app_url()):
+                st.markdown(
+                    # language=html
+                    f"""
+<div class="w-100 mb-2" style="height:150px; background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
+                    """
+                )
+                st.markdown(f"###### {page.title}")
+            st.caption(page.preview_description(state))
 
         grid_layout(4, related_recipe_docs, _render)
 
@@ -904,10 +894,11 @@ class BasePage:
     def _render_doc_example(
         self, *, allow_delete: bool, doc: dict, url: str, query_params: dict
     ):
-        st.html(
-            # language=HTML
-            f"""<a href="{url}"><button type="button" class="btn btn-theme">✏️ Tweak</button></a>"""
-        )
+        with st.link(to=url):
+            st.html(
+                # language=HTML
+                f"""<button type="button" class="btn btn-theme">✏️ Tweak</button>"""
+            )
         copy_to_clipboard_button("🔗 Copy URL", value=url)
         if allow_delete:
             self._example_delete_button(**query_params)

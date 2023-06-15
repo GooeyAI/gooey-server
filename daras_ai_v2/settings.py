@@ -80,6 +80,8 @@ TEMPLATES = [
     },
 ]
 
+templates = Jinja2Templates(directory="templates")
+
 # needed to override django admin templates
 FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
@@ -232,8 +234,6 @@ GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
 
 SEON_API_KEY = config("SEON_API_KEY", None)
 
-templates = Jinja2Templates(directory="templates")
-
 FB_APP_ID = config("FB_APP_ID", "")
 FB_APP_SECRET = config("FB_APP_SECRET", "")
 FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
@@ -249,7 +249,3 @@ TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
 
 PINECONE_API_KEY = config("PINECONE_API_KEY", "")
 PINECONE_ENVIRONMENT = config("PINECONE_ENVIRONMENT", "us-east1-gcp")
-
-# only for the streamlit app
-
-GOOEY_AI_PASSWORD = config("GOOEY_AI_PASSWORD", default="").strip()

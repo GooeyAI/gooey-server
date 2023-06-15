@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import os.path
 import re
@@ -21,7 +22,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
 )
-from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
@@ -67,26 +67,42 @@ BOT_SCRIPT_RE = re.compile(
 def show_landbot_widget():
     landbot_url = st.session_state.get("landbot_url")
     if not landbot_url:
+        st.html("", **{"data-landbot-config-url": ""})
         return
 
     f = furl(landbot_url)
     config_path = os.path.join(f.host, *f.path.segments[:2])
     config_url = f"https://storage.googleapis.com/{config_path}/index.json"
 
-    hidden_html_js(
+    st.html(
+        # language=HTML
         """
 <script>
-// destroy existing instance
-if (top.myLandbot) {
-top.myLandbot.destroy();
+function updateLandbotWidget() {
+    if (window.myLandbot) {
+        try {
+            window.myLandbot.destroy();
+        } catch (e) {}
+    }
+    const configUrl = document.querySelector("[data-landbot-config-url]")?.getAttribute("data-landbot-config-url");
+    if (configUrl) {
+        window.myLandbot = new Landbot.Livechat({ configUrl });
+    }
 }
-// create new instance
-top.myLandbot = new top.Landbot.Livechat({
-configUrl: %r,
-});
+if (typeof Landbot === "undefined") {
+    const script = document.createElement("script");
+    script.src = "https://cdn.landbot.io/landbot-3/landbot-3.0.0.js";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+        window.waitUntilHydrated.then(updateLandbotWidget);
+        window.addEventListener("hydrated", updateLandbotWidget);
+    };
+    document.body.appendChild(script);
+}
 </script>
-        """
-        % config_url
+        """,
+        **{"data-landbot-config-url": config_url},
     )
 
 

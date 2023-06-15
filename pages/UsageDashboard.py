@@ -9,13 +9,10 @@ import streamlit as st
 from firebase_admin import auth
 from google.cloud import firestore
 
-from Home import check_password
 from daras_ai_v2 import db
 from daras_ai_v2.base import USER_RUNS_COLLECTION
 
 st.set_page_config(layout="wide")
-if not check_password():
-    st.stop()
 
 team_emails = [
     "devxpy@gmail.com",

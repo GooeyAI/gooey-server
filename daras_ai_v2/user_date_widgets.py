@@ -2,8 +2,6 @@ import datetime
 
 import gooey_ui as gui
 
-from daras_ai_v2.hidden_html_widget import hidden_html_js
-
 
 def js_dynamic_date(dt: datetime.datetime):
     timestamp_ms = dt.timestamp() * 1000
@@ -11,21 +9,21 @@ def js_dynamic_date(dt: datetime.datetime):
 
 
 def render_js_dynamic_dates():
-    hidden_html_js(
+    gui.html(
         # language=HTML
         """
 <script>
-const dateOptions = {
-    weekday: "short",
-    day: "numeric",
-    month:  "short",
-};
-const timeOptions = {
-    hour: "numeric",
-    hour12: true,
-    minute: "numeric",
-};
-window.addEventListener("hydrated", () => {
+async function render_js_dynamic_dates() {
+    const dateOptions = {
+        weekday: "short",
+        day: "numeric",
+        month:  "short",
+    };
+    const timeOptions = {
+        hour: "numeric",
+        hour12: true,
+        minute: "numeric",
+    };
     document.querySelectorAll("[data-id-dynamic-date]").forEach(elem => {
         let date = new Date(parseFloat(elem.getAttribute("data-id-dynamic-date")));
         let yearToShow = "";
@@ -37,8 +35,9 @@ window.addEventListener("hydrated", () => {
                 ${date.toLocaleTimeString("en-IN", timeOptions).toUpperCase()}
         `;
     });
-});
+}
+window.waitUntilHydrated.then(render_js_dynamic_dates);
+window.addEventListener("hydrated", render_js_dynamic_dates);
 </script>
         """,
-        is_static=True,
     )

@@ -1,6 +1,6 @@
 <div class="header">
     <nav class="navbar navbar-expand-xl bg-transparent p-0 m-0">
-        <div class="container p-2">
+        <div class="container my-2">
             <a href="/">
                 <img width="300" height="142"
                      src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
@@ -8,7 +8,7 @@
             </a>
             <div class="mt-2 gap-2 d-flex justify-content-md-end flex-grow-1 justify-content-evenly flex-wrap align-items-center">
                 <a class="pe-2" href="/">Home</a>
-                <a class="pe-2" href="/explore/">Explore</a>
+                <a data-internal-link class="pe-2" href="/explore/">Explore</a>
                 {% if not request.user %}
                 <a href="https://help.gooey.ai/pricing/">Pricing</a>
                 {% endif %}

@@ -3,21 +3,10 @@
         Hi, {{ request.user.first_name()  or request.user.email or request.user.phone_number }}
     </a>
 {% else %}
-    <script>
-        const hydrationPromise = new Promise((resolve) => {
-                if (window.hydrated) {
-                    resolve();
-                } else {
-                    window.addEventListener("hydrated", resolve);
-                }
-            }
-        );
-    </script>
-
     {% if block_incognito %}
         <script>
-            async function hideIfIncognito() {
-                await hydrationPromise;
+            window.addEventListener("DOMContentLoaded", async function () {
+                await window.waitUntilHydrated;
                 let result = await detectIncognito();
                 if (!result.isPrivate) return;
                 let elem = document.getElementById("main-content");
@@ -27,11 +16,10 @@
                         Sorry! We can't let you use this app in incognito mode. Please login to continue.
                     </h3>`;
 
-            };
+            });
         </script>
         <script src="https://cdn.jsdelivr.net/gh/Joe12387/detectIncognito@v1.3.0/dist/es5/detectIncognito.min.js"
-                async defer
-                onload="hideIfIncognito()"></script>
+                defer></script>
     {% endif %}
 
     <a class="pe-2" href="/login/?next={{ request.path }}">
@@ -44,7 +32,7 @@
 
     <script>
         window.addEventListener("DOMContentLoaded", async function () {
-            await hydrationPromise;
+            await window.waitUntilHydrated;
             google.accounts.id.initialize({
                 client_id: CLIENT_ID,
                 callback: handleCredentialResponse,
@@ -57,5 +45,5 @@
             google.accounts.id.prompt();
         });
     </script>
-    <script src="https://accounts.google.com/gsi/client" defer></script>
+    <script defer src="https://accounts.google.com/gsi/client"></script>
 {% endif %}

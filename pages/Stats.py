@@ -4,7 +4,6 @@ import pandas as pd
 import streamlit as st
 from django.db.models import Count
 
-from Home import check_password
 from bots.models import (
     BotIntegration,
     Message,
@@ -13,8 +12,6 @@ from bots.models import (
 )
 
 st.set_page_config(layout="wide")
-if not check_password():
-    st.stop()
 
 
 @st.cache_data

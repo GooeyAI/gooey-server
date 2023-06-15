@@ -5,11 +5,11 @@ copy_to_clipboard_scripts = """
 <script>
 function copyToClipboard(button) {
     navigator.clipboard.writeText(button.getAttribute("data-clipboard-text"));
-    let old = button.textContent;
+    const original = button.textContent;
     button.textContent = "✅ Copied";
     setTimeout(() => {
-        button.textContent = old;
-     }, 2000);
+        button.textContent = original;
+    }, 2000);
 }
 </script>
 """
@@ -26,8 +26,8 @@ def copy_to_clipboard_button(
         f"""
 <button 
     type="button"
-    class="btn btn-theme" 
-    onclick="copyToClipboard(this)"
+    class="btn btn-theme"
+    onClick="copyToClipboard(this);"
     style="{style}" 
     data-clipboard-text={value!r}> 
     {label}
