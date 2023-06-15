@@ -505,6 +505,7 @@ def text_input(
     placeholder: str = None,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
+    **props,
 ) -> str:
     value = _input_widget(
         input_type="text",
@@ -516,6 +517,7 @@ def text_input(
         label_visibility=label_visibility,
         maxLength=max_chars,
         placeholder=placeholder,
+        **props,
     )
     return value or ""
 

@@ -219,7 +219,7 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
         """
 
     def get_raw_price(self, state: dict) -> float:
-        return state.get("max_frames", 100) * 0.25
+        return state.get("max_frames", 100) * 1.5
 
     def validate_form_v2(self):
         prompt_list = st.session_state.get("animation_prompts")

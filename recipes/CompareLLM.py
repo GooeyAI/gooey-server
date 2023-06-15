@@ -117,7 +117,6 @@ class CompareLLMPage(BasePage):
                 )
 
     def get_raw_price(self, state: dict) -> int:
-        return 20
         selected_models = state.get("selected_models", [])
         total = 0
         for name in selected_models:

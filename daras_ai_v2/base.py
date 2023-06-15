@@ -545,15 +545,13 @@ class BasePage:
         if not url:
             return
 
-        col1, col2 = st.columns([2, 1], responsive=False)
-        with col1:
+        with st.div(className="d-flex gap-1"):
             st.text_input(
                 "recipe url",
                 label_visibility="collapsed",
                 disabled=True,
-                value=url,
+                value=url.split("://")[1].rstrip("/"),
             )
-        with col2:
             copy_to_clipboard_button(
                 "🔗 Copy URL",
                 value=url,
@@ -621,12 +619,13 @@ class BasePage:
                 **self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
             )
 
+        self._render_before_output()
+
         run_status = st.session_state.get(StateKeys.run_status)
         if run_status:
+            st.caption("Your changes are saved in the above URL. ")
             html_spinner(run_status)
         else:
-            self._render_before_output()
-
             err_msg = st.session_state.get(StateKeys.error_msg)
             run_time = st.session_state.get(StateKeys.run_time, 0)
 
@@ -1006,7 +1005,7 @@ class BasePage:
         assert self.request, "request must be set to check credits"
         assert self.request.user, "request.user must be set to check credits"
 
-        if self.request.user.balance <= 0:
+        if self.request.user.balance < self.get_price_roundoff(st.session_state):
             account_url = furl(settings.APP_BASE_URL) / "account/"
 
             if self.request.user.is_anonymous:
