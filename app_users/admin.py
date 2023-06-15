@@ -18,11 +18,20 @@ class AppUserAdmin(admin.ModelAdmin):
         "is_anonymous",
         "is_disabled",
         "created_at",
+        "upgraded_from_anonymous_at",
+    ]
+    search_fields = [
+        "uid",
+        "display_name",
+        "email",
+        "phone_number",
+        "stripe_customer_id",
     ]
     list_filter = [
         "is_anonymous",
         "is_disabled",
         "created_at",
+        "upgraded_from_anonymous_at",
     ]
     readonly_fields = [
         "created_at",
