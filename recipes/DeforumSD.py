@@ -19,6 +19,8 @@ class _AnimationPrompt(typing.TypedDict):
 
 AnimationPrompts = list[_AnimationPrompt]
 
+CREDITS_PER_FRAME = 1.5
+
 
 def input_prompt_to_animation_prompts(input_prompt: str):
     animation_prompts = []
@@ -213,13 +215,13 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
             )
 
     def additional_notes(self) -> str | None:
-        return """
-*Cost ≈ 0.25 credits per frame* \\
+        return f"""
+*Cost ≈ {CREDITS_PER_FRAME} credits per frame* \\
 *Process Run Time ≈ 5 seconds per frame*
         """
 
     def get_raw_price(self, state: dict) -> float:
-        return state.get("max_frames", 100) * 1.5
+        return state.get("max_frames", 100) * CREDITS_PER_FRAME
 
     def validate_form_v2(self):
         prompt_list = st.session_state.get("animation_prompts")
