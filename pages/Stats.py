@@ -1,3 +1,7 @@
+from gooeysite import wsgi
+
+assert wsgi
+
 import datetime
 
 import pandas as pd

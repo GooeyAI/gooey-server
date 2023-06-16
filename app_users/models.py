@@ -96,7 +96,7 @@ class AppUser(models.Model):
 
         _update_user_balance_in_txn(db.client.transaction())
 
-    def copy_from_firebase_user(self, user: auth.UserRecord):
+    def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
         # copy data from firebase user
         self.uid = user.uid
         self.is_disabled = user.disabled
@@ -137,6 +137,8 @@ class AppUser(models.Model):
                 else settings.LOGIN_USER_FREE_CREDITS
             ),
         )
+
+        return self
 
     def get_or_create_stripe_customer(self) -> stripe.Customer:
         customer = self.search_stripe_customer()

@@ -1,3 +1,7 @@
+from gooeysite import wsgi
+
+assert wsgi
+
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
