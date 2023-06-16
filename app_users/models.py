@@ -54,7 +54,7 @@ class AppUser(models.Model):
 
     stripe_customer_id = models.CharField(max_length=255, default="", blank=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
     upgraded_from_anonymous_at = models.DateTimeField(null=True, blank=True)
 
     objects = AppUserQuerySet.as_manager()
