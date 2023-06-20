@@ -93,7 +93,7 @@ class TextToSpeechPage(BasePage):
         text_to_speech_settings()
 
     def render_usage_guide(self):
-        youtube_video("pZ9ldun8aXo")
+        youtube_video("aD4N-g9qqhc")
         # loom_video("2d853b7442874b9cbbf3f27b98594add")
 
     def render_output(self):

@@ -115,4 +115,4 @@ class LipsyncPage(BasePage):
         return [DeforumSDPage, LipsyncTTSPage, AsrPage, VideoBotsPage]
 
     def render_usage_guide(self):
-        youtube_video("J87EtK7ZVz0")
+        youtube_video("EJdtC0USujM")
