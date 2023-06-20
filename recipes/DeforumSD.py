@@ -328,7 +328,7 @@ Choose fps for the video.
         return DEFAULT_ANIMATION_META_IMG
 
     def preview_description(self, state: dict) -> str:
-        return "Create AI-generated Animation without relying on complex CoLab notebooks.  Input your prompts + keyframes and bring your ideas to life using the animation capabilities of Gooey & Stable Diffusion's Deforum."
+        return "Create AI-generated Animation without relying on complex CoLab notebooks. Input your prompts + keyframes and bring your ideas to life using the animation capabilities of Gooey & Stable Diffusion's Deforum. For more help on how to use the tool visit https://www.help.gooey.ai/learn-animation"
 
     def render_description(self):
         st.markdown(
