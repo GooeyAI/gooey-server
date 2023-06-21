@@ -90,7 +90,7 @@ def call_sd_multi(
     inputs["num_inference_steps"] = [inputs["num_inference_steps"], 50, 75]
     inputs["guidance_scale"] = [inputs["guidance_scale"], 4, 9]
     return call_gooey_gpu(
-        endpoint=base / endpoint,
+        endpoint=base / "/text2img/",
         content_type="image/png",
         pipeline=pipeline,
         inputs=inputs,
