@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     libboost-dev \
     libmagickwand-dev \
-    libgl1-mesa-glx
+    libgl1-mesa-glx \
+	&& rm -rf /var/lib/apt/lists/*
 RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.05.0.tar.xz' | tar -xJ \
     && cd poppler-23.05.0 \
     && cmake . \
@@ -22,18 +23,17 @@ RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.05.0.tar.xz' | tar -xJ
     && rm -rf poppler-23.05.0
 
 # app dependencies
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-opencv \
     pandoc \
     postgresql-client \
-	ffmpeg
-
-RUN rm -rf /var/lib/apt/lists/*
+	ffmpeg \
+	&& rm -rf /var/lib/apt/lists/*
 
 # copy poetry files
 COPY ./pyproject.toml ./poetry.lock ./
 # install python dependencies
-RUN pip install -U poetry pip && poetry install --only main --no-interaction
+RUN pip install --no-cache-dir -U poetry pip && poetry install --no-cache --only main --no-interaction
 
 # copy the code into the container
 COPY . .
