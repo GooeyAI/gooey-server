@@ -8,7 +8,7 @@ from pydantic import BaseModel
 import gooey_ui as st
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.gpu_server import GpuEndpoints
+from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 
 
@@ -409,42 +409,27 @@ Choose fps for the video.
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        blob = storage_blob_for(f"gooey.ai animation {request.animation_prompts}.mp4")
-
-        r = requests.post(
-            GpuEndpoints.defourm_sd,
-            json={
-                "pipeline": dict(
-                    model_id="Protogen_V2.2.ckpt",
-                    seed=request.seed,
-                    upload_urls=[
-                        blob.generate_signed_url(
-                            version="v4",
-                            # This URL is valid for 15 minutes
-                            expiration=datetime.timedelta(minutes=60),
-                            # Allow PUT requests using this URL.
-                            method="PUT",
-                            content_type="video/mp4",
-                        )
-                    ],
-                ),
-                "inputs": dict(
-                    animation_mode=request.animation_mode,
-                    animation_prompts={
-                        fp["frame"]: fp["prompt"] for fp in request.animation_prompts
-                    },
-                    max_frames=request.max_frames,
-                    zoom=request.zoom,
-                    translation_x=request.translation_x,
-                    translation_y=request.translation_y,
-                    rotation_3d_x=request.rotation_3d_x,
-                    rotation_3d_y=request.rotation_3d_y,
-                    rotation_3d_z=request.rotation_3d_z,
-                    translation_z="0:(0)",
-                    fps=request.fps,
-                ),
-            },
-        )
-        r.raise_for_status()
-
-        state["output_video"] = blob.public_url
+        state["output_video"] = call_celery_task_outfile(
+            "deforum",
+            pipeline=dict(
+                model_id="Protogen_V2.2.ckpt",
+                seed=request.seed,
+            ),
+            inputs=dict(
+                animation_mode=request.animation_mode,
+                animation_prompts={
+                    fp["frame"]: fp["prompt"] for fp in request.animation_prompts
+                },
+                max_frames=request.max_frames,
+                zoom=request.zoom,
+                translation_x=request.translation_x,
+                translation_y=request.translation_y,
+                rotation_3d_x=request.rotation_3d_x,
+                rotation_3d_y=request.rotation_3d_y,
+                rotation_3d_z=request.rotation_3d_z,
+                translation_z="0:(0)",
+                fps=request.fps,
+            ),
+            content_type="video/mp4",
+            filename=f"gooey.ai animation {request.animation_prompts}.mp4",
+        )[0]

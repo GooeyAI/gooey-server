@@ -1,12 +1,7 @@
 import logging
-import contextlib
-from asyncio import sleep
+import random
 from http.client import HTTPConnection  # py3
 from threading import Thread
-
-import requests
-
-from daras_ai_v2.gpu_server import GpuEndpoints
 
 HTTPConnection.debuglevel = 1
 
@@ -16,7 +11,6 @@ requests_log = logging.getLogger("requests.packages.urllib3")
 requests_log.setLevel(logging.DEBUG)
 requests_log.propagate = True
 
-import os
 import string
 
 import numpy as np
@@ -76,6 +70,7 @@ blank_img_bytes = cv2_img_to_bytes(np.zeros((768, 768, 3), dtype=np.uint8))
 #         t.start()
 #     t.join()
 # exit()
+tasks = []
 
 for model in Img2ImgModels:
     if model in [
@@ -85,14 +80,19 @@ for model in Img2ImgModels:
     ]:
         continue
     print(model)
-    img2img(
-        selected_model=model.name,
-        prompt=get_random_string(100, string.ascii_letters),
-        num_outputs=4,
-        num_inference_steps=10,
-        init_image=random_img,
-        init_image_bytes=blank_img_bytes,
-        guidance_scale=7,
+    tasks.append(
+        (
+            img2img,
+            dict(
+                selected_model=model.name,
+                prompt=get_random_string(100, string.ascii_letters),
+                num_outputs=4,
+                num_inference_steps=10,
+                init_image=random_img,
+                init_image_bytes=blank_img_bytes,
+                guidance_scale=7,
+            ),
+        )
     )
     for controlnet_model in ControlNetModels:
         if model in [
@@ -100,14 +100,19 @@ for model in Img2ImgModels:
         ]:
             continue
         print(controlnet_model)
-        controlnet(
-            selected_model=model.name,
-            selected_controlnet_model=controlnet_model.name,
-            prompt=get_random_string(100, string.ascii_letters),
-            num_outputs=4,
-            init_image=random_img,
-            num_inference_steps=1,
-            guidance_scale=7,
+        tasks.append(
+            (
+                controlnet,
+                dict(
+                    selected_model=model.name,
+                    selected_controlnet_model=controlnet_model.name,
+                    prompt=get_random_string(100, string.ascii_letters),
+                    num_outputs=4,
+                    init_image=random_img,
+                    num_inference_steps=1,
+                    guidance_scale=7,
+                ),
+            )
         )
 
 for model in Text2ImgModels:
@@ -117,29 +122,53 @@ for model in Text2ImgModels:
     ]:
         continue
     print(model)
-    text2img(
-        selected_model=model.name,
-        prompt=get_random_string(100, string.ascii_letters),
-        num_outputs=4,
-        num_inference_steps=1,
-        width=768,
-        height=768,
-        guidance_scale=7,
+    tasks.append(
+        (
+            text2img,
+            dict(
+                selected_model=model.name,
+                prompt=get_random_string(100, string.ascii_letters),
+                num_outputs=4,
+                num_inference_steps=10,
+                width=768,
+                height=768,
+                guidance_scale=7,
+            ),
+        )
     )
 
+tasks.append(
+    (
+        instruct_pix2pix,
+        dict(
+            prompt=get_random_string(100, string.ascii_letters),
+            num_outputs=4,
+            num_inference_steps=10,
+            images=[random_img],
+            guidance_scale=7,
+            image_guidance_scale=2,
+        ),
+    )
+)
 
-instruct_pix2pix(
-    prompt=get_random_string(100, string.ascii_letters),
-    num_outputs=4,
-    num_inference_steps=10,
-    images=[random_img],
-    guidance_scale=7,
-    image_guidance_scale=2,
+tasks.append(
+    (
+        sd_upscale,
+        dict(
+            prompt=get_random_string(100, string.ascii_letters),
+            num_outputs=1,
+            num_inference_steps=1,
+            guidance_scale=7,
+            image=random_img,
+        ),
+    )
 )
-sd_upscale(
-    prompt=get_random_string(100, string.ascii_letters),
-    num_outputs=1,
-    num_inference_steps=1,
-    guidance_scale=7,
-    image=random_img,
-)
+
+
+def call(fn, kwargs):
+    print(fn.__name__, fn(**kwargs))
+
+
+random.shuffle(tasks)
+for args in tasks:
+    Thread(target=call, args=args).start()

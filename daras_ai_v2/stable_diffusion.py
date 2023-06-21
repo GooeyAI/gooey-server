@@ -37,6 +37,7 @@ class Text2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+    dream_shaper = "DreamShaper (Lykon)"
     openjourney = "Open Journey (PromptHero)"
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
@@ -57,6 +58,7 @@ text2img_model_ids = {
     Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Text2ImgModels.rodent_diffusion_1_5: "devxpy/rodent-diffusion-1-5",
+    Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Text2ImgModels.deepfloyd_if: [
         "DeepFloyd/IF-I-XL-v1.0",
         "DeepFloyd/IF-II-L-v1.0",
@@ -70,6 +72,7 @@ class Img2ImgModels(Enum):
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+    dream_shaper = "DreamShaper (Lykon)"
     openjourney = "Open Journey (PromptHero)"
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
@@ -83,6 +86,7 @@ class Img2ImgModels(Enum):
 img2img_model_ids = {
     Img2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
     Img2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
+    Img2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Img2ImgModels.openjourney: "prompthero/openjourney",
     Img2ImgModels.openjourney_2: "prompthero/openjourney-v2",
     Img2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
@@ -126,7 +130,7 @@ def sd_upscale(
     seed: int = 42,
 ):
     return call_sd_multi(
-        "upscale",
+        "diffusion.upscale",
         pipeline={
             "model_id": "stabilityai/stable-diffusion-x4-upscaler",
             # "scheduler": "UniPCMultistepScheduler",
@@ -156,7 +160,7 @@ def instruct_pix2pix(
     seed: int = 42,
 ):
     return call_sd_multi(
-        "instruct_pix2pix",
+        "diffusion.instruct_pix2pix",
         pipeline={
             "model_id": "timbrooks/instruct-pix2pix",
             # "scheduler": "UniPCMultistepScheduler",
@@ -219,7 +223,7 @@ def text2img(
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
             return call_sd_multi(
-                "text2img",
+                "diffusion.text2img",
                 pipeline={
                     "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
                     # "scheduler": "EulerDiscreteScheduler",
@@ -313,7 +317,7 @@ def img2img(
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
             return call_sd_multi(
-                "img2img",
+                "diffusion.img2img",
                 pipeline={
                     "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
                     # "scheduler": "UniPCMultistepScheduler",
@@ -350,7 +354,7 @@ def controlnet(
 ):
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
-        "controlnet",
+        "diffusion.controlnet",
         pipeline={
             "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
             "seed": seed,
