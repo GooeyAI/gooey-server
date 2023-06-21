@@ -81,7 +81,7 @@ def call_sd_multi(
             pipeline=pipeline,
             inputs=inputs,
             content_type="image/png",
-            filename=f"gooey.ai - {prompt} ({{n}}).png",
+            filename=f"gooey.ai - {prompt}.png",
             num_outputs=num_outputs,
         )
 
@@ -140,7 +140,7 @@ def call_celery_task_outfile(
     filename: str,
     num_outputs: int = 1,
 ):
-    blobs = [storage_blob_for(filename.format(n=i + 1)) for i in range(num_outputs)]
+    blobs = [storage_blob_for(filename) for i in range(num_outputs)]
     pipeline["upload_urls"] = [
         blob.generate_signed_url(
             version="v4",

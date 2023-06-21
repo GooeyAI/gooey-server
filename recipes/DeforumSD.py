@@ -44,7 +44,11 @@ def animation_prompts_to_st_list(animation_prompts: AnimationPrompts):
 
 
 def st_list_to_animation_prompt(prompt_st_list) -> AnimationPrompts:
-    return [{"frame": fp["frame"], "prompt": fp["prompt"]} for fp in prompt_st_list]
+    return [
+        {"frame": fp["frame"], "prompt": prompt}
+        for fp in prompt_st_list
+        if (prompt := fp["prompt"].strip())
+    ]
 
 
 def animation_prompts_editor(
