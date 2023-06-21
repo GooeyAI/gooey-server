@@ -66,11 +66,6 @@ def call_gpu_server(*, endpoint: str, input_data: dict) -> typing.Any:
     return r.json()["output"]
 
 
-app = Celery()
-app.conf.broker_url = "amqp://rabbit:XweifafT2pvz@0.0.0.0:5674"
-app.conf.result_backend = "redis://:C8WV9uS4VcQBhYdo5YqAdvbuTCYXgNSjctTU74Y8ftXh2quJXZiQ7uBr5ZXvM4KoUpW23Q8grLh2xQ1WFMVuZnJWtEiDfKjXd2fTJmiKDkrAhDXwQNM1CLx1SZtH9Ech@localhost:63791"
-
-
 def call_sd_multi(
     endpoint: str,
     pipeline: dict,
@@ -136,9 +131,6 @@ def call_gooey_gpu(
     return [blob.public_url for blob in blobs]
 
 
-QUEUE_PREFIX = config("GPU_QUEUE_PREFIX", default="gooey-gpu")
-
-
 def call_celery_task_outfile(
     task_name: str,
     *,
@@ -162,6 +154,13 @@ def call_celery_task_outfile(
     ]
     call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
     return [blob.public_url for blob in blobs]
+
+
+app = Celery()
+app.conf.broker_url = settings.CELERY_BROKER_URL
+app.conf.result_backend = settings.CELERY_RESULT_BACKEND
+
+QUEUE_PREFIX = config("GPU_QUEUE_PREFIX", default="gooey-gpu")
 
 
 def call_celery_task(
