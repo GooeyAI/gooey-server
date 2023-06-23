@@ -74,12 +74,15 @@ class StateKeys:
     page_title = "__title"
     page_notes = "__notes"
 
+    created_at = "created_at"
     updated_at = "updated_at"
 
     error_msg = "__error_msg"
     run_time = "__run_time"
     run_status = "__run_status"
     pressed_randomize = "__randomize"
+
+    hidden = "__hidden"
 
 
 class BasePage:
@@ -634,7 +637,7 @@ class BasePage:
                 st.error(err_msg)
             # render run time
             elif run_time:
-                st.success(f"Success! Run Time: `{run_time:.2f}` seconds. ")
+                st.success(f"Success! Run Time: {run_time:.2f} seconds.")
 
         # render outputs
         self.render_output()
@@ -745,33 +748,30 @@ class BasePage:
         if not self.is_current_user_admin():
             return
 
-        new_example_id = None
-        doc_ref = None
         example_id, *_ = extract_query_params(gooey_get_query_params())
 
         with st.expander("🛠️ Admin Options"):
-            col1, col2, col3 = st.columns(3)
+            if st.button("⭐️ Save Workflow"):
+                doc_ref = db.get_doc_ref(self.doc_name)
+                doc_ref.set(self.state_to_doc(st.session_state))
 
-            with col1:
-                if st.button("⭐️ Save Workflow & Settings"):
-                    doc_ref = db.get_doc_ref(self.doc_name)
-                    doc_ref.set(self.state_to_doc(st.session_state))
+            if st.button("🔖 Create new Example"):
+                new_example_id = get_random_doc_id()
+                doc_ref = self.example_doc_ref(new_example_id)
+                doc_ref.set(self.state_to_doc(st.session_state))
+                gooey_reset_query_parm(example_id=new_example_id)
 
-            with col2:
-                if st.button("🔖 Add as Example"):
-                    new_example_id = get_random_doc_id()
-                    doc_ref = self.example_doc_ref(new_example_id)
-                    doc_ref.set(self.state_to_doc(st.session_state))
-                    gooey_reset_query_parm(example_id=new_example_id)
+            if example_id and st.button("💾 Save this Example"):
+                doc_ref = self.example_doc_ref(example_id)
+                doc_ref.set(self.state_to_doc(st.session_state))
+                gooey_reset_query_parm(example_id=example_id)
 
-            with col3:
-                if example_id and st.button("💾 Save Example & Settings"):
-                    doc_ref = self.example_doc_ref(example_id)
-                    doc_ref.set(self.state_to_doc(st.session_state))
-                    gooey_reset_query_parm(example_id=example_id)
-
-            # if not doc_ref:
-            #     return
+            if example_id:
+                hidden = st.session_state.get(StateKeys.hidden)
+                if st.button("👁️ Make Public" if hidden else "🙈️ Hide"):
+                    self.set_hidden(
+                        example_id=example_id, doc=st.session_state, hidden=not hidden
+                    )
 
             ## TODO: how to model this?
             # st.success("Saved", icon="✅")
@@ -784,6 +784,10 @@ class BasePage:
         }
         ret |= {
             StateKeys.updated_at: datetime.datetime.utcnow(),
+            StateKeys.created_at: ret.get(
+                StateKeys.created_at, datetime.datetime.utcnow()
+            ),
+            StateKeys.hidden: ret.get(StateKeys.hidden, False),
         }
 
         title = state.get(StateKeys.page_title)
@@ -804,6 +808,7 @@ class BasePage:
         ] + [
             StateKeys.error_msg,
             StateKeys.run_status,
+            StateKeys.run_time,
         ]
 
     def _examples_tab(self):
@@ -830,7 +835,7 @@ class BasePage:
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
-            if doc.get("__hidden"):
+            if doc.get(StateKeys.hidden):
                 raise SkipIteration()
 
             url = str(
@@ -900,7 +905,7 @@ class BasePage:
             )
         copy_to_clipboard_button("🔗 Copy URL", value=url)
         if allow_delete:
-            self._example_delete_button(**query_params)
+            self._example_delete_button(**query_params, doc=doc)
 
         updated_at = doc.get("updated_at")
         if updated_at and isinstance(updated_at, datetime.datetime):
@@ -919,19 +924,25 @@ class BasePage:
 
         self.render_example(doc)
 
-    def _example_delete_button(self, example_id):
+    def _example_delete_button(self, example_id, doc):
         pressed_delete = st.button(
-            "🗑️ Delete",
+            "🙈️ Hide",
             key=f"delete_example_{example_id}",
             style={"color": "red"},
         )
         if not pressed_delete:
             return
+        self.set_hidden(example_id=example_id, doc=doc, hidden=True)
 
-        example = self.example_doc_ref(example_id)
+    def set_hidden(self, *, example_id, doc, hidden: bool):
+        doc_ref = self.example_doc_ref(example_id)
 
-        with st.spinner("deleting..."):
-            example.update({"__hidden": True})
+        with st.spinner("Hiding..."):
+            field_updates = {StateKeys.hidden: hidden}
+            doc_ref.update(field_updates)
+            doc.update(field_updates)
+
+        st.experimental_rerun()
 
     def render_example(self, state: dict):
         pass
