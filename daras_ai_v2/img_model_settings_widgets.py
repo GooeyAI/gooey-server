@@ -282,6 +282,28 @@ def prompt_strength_setting(selected_model: str = None):
     )
 
 
+def controlnet_weight_setting(
+    control_effect: str = "make the qr code darker and background lighter (contrast helps qr readers)",
+    model_type: str = "Brightness",
+    scale=(0.0, 0.7),
+):
+    st.slider(
+        label=f"""
+        ##### Generation Constraint
+        (*{model_type.capitalize()} Control Weight*)
+
+        This will encourage the AI to {control_effect}.
+
+        `{scale[0]}` will keep the original image intact.\\
+        `{scale[1]}` will control the {model_type.lower()} very tightly. 
+        """,
+        key="control_weight_{model_type}}",
+        min_value=scale[0],
+        max_value=scale[1],
+        step=0.05,
+    )
+
+
 def negative_prompt_setting(selected_model: str = None):
     if selected_model in [Text2ImgModels.dall_e.name, InpaintingModels.runway_ml.name]:
         return
