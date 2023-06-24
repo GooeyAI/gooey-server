@@ -23,16 +23,17 @@ Open `localhost:8000` in your browser
 ### To run & save recipes 
 
 1. Save `serviceAccountKey.json` to project root (copy from Dara server project)
+
 2. To connect to prod GPU cluster -
-Connect to k8s cluster -
+### Connect to k8s cluster -
 ```bash
 gcloud container clusters get-credentials cluster-5 --zone us-central1-a
 ```
-Port-forward the rabbitmq and redis services -
+### Port-forward the rabbitmq and redis services -
 ```bash
 kubectl port-forward rabbitmq-1-rabbitmq-0 15674:15672 5674:5672 & kubectl port-forward redis-ha-1-server-0 63791:
 ```
-3. Add the following to `.env` file -
+### Add the following to `.env` file -
 ```
 CELERY_BROKER_URL="amqp://rabbit:<password>@localhost:5674"
 CELERY_RESULT_BACKEND="redis://:<password>@localhost:63791"
