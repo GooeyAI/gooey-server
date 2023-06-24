@@ -48,6 +48,7 @@ def enum_selector(
     label: str = "",
     allow_none: bool = False,
     use_selectbox: bool = False,
+    default: str = None,
     **kwargs,
 ) -> str:
     label = label or enum_cls.__name__
@@ -58,6 +59,9 @@ def enum_selector(
         widget = st.selectbox
     else:
         widget = st.radio
+    if default is not None:
+        options.remove(default.name)
+        options.insert(0, default.name)
     return widget(
         **kwargs,
         options=options,

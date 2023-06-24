@@ -6,7 +6,7 @@ from pydantic import BaseModel
 import gooey_ui as st
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_multiselect
+from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.img_model_settings_widgets import (
     guidance_scale_setting,
     output_resolution_setting,
@@ -14,7 +14,6 @@ from daras_ai_v2.img_model_settings_widgets import (
     sd_2_upscaling_setting,
     controlnet_weight_setting,
 )
-from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
     text2img,
@@ -86,6 +85,13 @@ class QRCodeGeneratorPage(BasePage):
             key="text_prompt",
             placeholder="https://www.gooey.ai",
         )
+        st.file_uploader(
+            """
+            -- OR -- Upload an existing qr code. It will be reformatted and cleaned.
+            """,
+            key="qr_code_input",
+            accept=["image/*"],
+        )
         st.text_area(
             """
             ### 👩‍💻 Prompt
@@ -94,6 +100,13 @@ class QRCodeGeneratorPage(BasePage):
             key="text_prompt",
             placeholder="Bright sunshine coming through the cracks of a wet, cave wall of big rocks",
         )
+        st.file_uploader(
+            """
+            -- OPTIONAL -- Upload an initial image to blend the qr code into. This can help the AI understand what your prompt means instead of generating everything from scratch.
+            """,
+            key="initial_image_input",
+            accept=["image/*"],
+        )
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
@@ -101,8 +114,8 @@ class QRCodeGeneratorPage(BasePage):
     def render_description(self):
         st.markdown(
             """
-            This recipe takes any text and renders an image using multiple Text2Image engines.
-            Use it to understand which image generator e.g. DallE or Stable Diffusion is best for your particular prompt.
+            Enter your URL (or text) and an image prompt and we'll generate an arty QR code with your artistic style and content in about 30 seconds. This is a rad way to advertise your website in IRL or print on a poster.
+            It is made possible by the open source [Control Net](https://github.com/lllyasviel/ControlNet).
 
             #### Prompting 101: 
 
@@ -162,6 +175,8 @@ class QRCodeGeneratorPage(BasePage):
         st.session_state["edit_instruction"] = st.session_state.get(
             "__edit_instruction"
         )
+        if st.session_state.get("edit_instruction"):
+            instruct_pix2pix_settings()
         st.text_area(
             """
             ##### 🧽 Negative Prompt
@@ -174,10 +189,17 @@ class QRCodeGeneratorPage(BasePage):
         sd_2_upscaling_setting()
         col1, col2 = st.columns(2)
         with col1:
-            guidance_scale_setting()
+            enum_selector(
+                Text2ImgModels,
+                label="""
+                ##### 🤖 Generative Model
+                Choose the model responsible for generating the content around the qr code.
+                """,
+                key="selected_models",
+                default=Text2ImgModels.dream_shaper,
+            )
         with col2:
-            if st.session_state.get("edit_instruction"):
-                instruct_pix2pix_settings()
+            guidance_scale_setting()
             controlnet_weight_setting(
                 control_effect="make the qr code darker and background lighter (contrast helps qr readers)",
                 model_type="Brightness",
@@ -190,7 +212,12 @@ class QRCodeGeneratorPage(BasePage):
             )
 
     def render_output(self):
-        self._render_outputs(st.session_state)
+        state = st.session_state
+        selected_models = state.get("selected_models", [])
+        for key in selected_models:
+            output_images: dict = state.get("output_images", {}).get(key, [])
+            for img in output_images:
+                st.image(img, caption=Text2ImgModels[key].value)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareText2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -249,13 +276,6 @@ class QRCodeGeneratorPage(BasePage):
             st.markdown("```properties\n" + state.get("text_prompt", "") + "\n```")
         with col2:
             self._render_outputs(state)
-
-    def _render_outputs(self, state):
-        selected_models = state.get("selected_models", [])
-        for key in selected_models:
-            output_images: dict = state.get("output_images", {}).get(key, [])
-            for img in output_images:
-                st.image(img, caption=Text2ImgModels[key].value)
 
     def preview_description(self, state: dict) -> str:
         return "Enter your URL (or text) and an image prompt and we'll generate an arty QR code with your artistic style and content in about 30 seconds. This is a rad way to advertise your website in IRL or print on a poster."
