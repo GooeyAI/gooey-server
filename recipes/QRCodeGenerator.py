@@ -10,15 +10,12 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.img_model_settings_widgets import (
     guidance_scale_setting,
     output_resolution_setting,
-    instruct_pix2pix_settings,
     sd_2_upscaling_setting,
     controlnet_weight_setting,
 )
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
     text2img,
-    instruct_pix2pix,
-    sd_upscale,
 )
 
 
@@ -44,19 +41,12 @@ class QRCodeGeneratorPage(BasePage):
         output_width: int | None
         output_height: int | None
 
-        num_outputs: int | None
-        quality: int | None
-
         guidance_scale: float | None
         seed: int | None
-        sd_2_upscaling: bool | None
 
         selected_models: list[
             typing.Literal[tuple(e.name for e in Text2ImgModels)]
         ] | None
-
-        edit_instruction: str | None
-        image_guidance_scale: float | None
 
     class ResponseModel(BaseModel):
         output_images: dict[
@@ -159,24 +149,6 @@ class QRCodeGeneratorPage(BasePage):
             Customize the qr code output for your text prompt with these Settings. 
             """
         )
-        st.caption(
-            """
-            You can also enable ‘Edit Instructions’ to use InstructPix2Pix that allows you to change your generated output with a follow-up written instruction.
-            """
-        )
-        if st.checkbox("📝 Edit Instructions"):
-            st.text_area(
-                """
-                Describe how you want to change the generated qr code using [InstructPix2Pix](https://www.timothybrooks.com/instruct-pix2pix).
-                """,
-                key="__edit_instruction",
-                placeholder="make the qr code blend in more with the background",
-            )
-        st.session_state["edit_instruction"] = st.session_state.get(
-            "__edit_instruction"
-        )
-        if st.session_state.get("edit_instruction"):
-            instruct_pix2pix_settings()
         st.text_area(
             """
             ##### 🧽 Negative Prompt
@@ -220,7 +192,7 @@ class QRCodeGeneratorPage(BasePage):
                 st.image(img, caption=Text2ImgModels[key].value)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: CompareText2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
 
         state["output_images"] = output_images = {}
 
@@ -238,37 +210,6 @@ class QRCodeGeneratorPage(BasePage):
                 seed=request.seed,
                 negative_prompt=request.negative_prompt,
             )
-
-            if request.edit_instruction:
-                yield f"Running InstructPix2Pix..."
-
-                output_images[selected_model] = instruct_pix2pix(
-                    prompt=request.edit_instruction,
-                    num_outputs=1,
-                    num_inference_steps=request.quality,
-                    negative_prompt=request.negative_prompt,
-                    guidance_scale=request.guidance_scale,
-                    seed=request.seed,
-                    images=output_images[selected_model],
-                    image_guidance_scale=request.image_guidance_scale,
-                )
-
-            if request.sd_2_upscaling:
-                yield "Upscaling..."
-
-                output_images[selected_model] = [
-                    upscaled
-                    for image in output_images[selected_model]
-                    for upscaled in sd_upscale(
-                        prompt=request.text_prompt,
-                        num_outputs=1,
-                        num_inference_steps=10,
-                        negative_prompt=request.negative_prompt,
-                        guidance_scale=request.guidance_scale,
-                        seed=request.seed,
-                        image=image,
-                    )
-                ]
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
