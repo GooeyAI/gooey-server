@@ -226,7 +226,7 @@ def guidance_scale_setting(selected_model: str = None):
         Text2ImgModels.dall_e.name,
         Text2ImgModels.jack_qiao,
     ]:
-        st.number_input(
+        st.slider(
             label="""
             ##### 🎨️ Artistic Pressure
             ([*Text Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter)) \\
