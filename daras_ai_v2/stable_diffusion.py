@@ -6,6 +6,7 @@ import openai
 import replicate
 import requests
 from PIL import Image
+from django.db import models
 
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -119,6 +120,47 @@ controlnet_model_ids = {
 }
 
 
+class Schedulers(models.TextChoices):
+    singlestep_dpm_solver = (
+        "DPM",
+        "DPMSolverSinglestepScheduler",
+    )
+    multistep_dpm_solver = "DPM Multistep", "DPMSolverMultistepScheduler"
+    dpm_sde = (
+        "DPM SDE",
+        "DPMSolverSDEScheduler",
+    )
+    dpm_discrete = (
+        "DPM Discrete",
+        "KDPM2DiscreteScheduler",
+    )
+    dpm_discrete_ancestral = (
+        "DPM Anscetral",
+        "KDPM2AncestralDiscreteScheduler",
+    )
+    unipc = "UniPC", "UniPCMultistepScheduler"
+    lms_discrete = (
+        "LMS",
+        "LMSDiscreteScheduler",
+    )
+    heun = (
+        "Heun",
+        "HeunDiscreteScheduler",
+    )
+    euler = "Euler", "EulerDiscreteScheduler"
+    euler_ancestral = (
+        "Euler ancestral",
+        "EulerAncestralDiscreteScheduler",
+    )
+    pndm = "PNDM", "PNDMScheduler"
+    ddpm = "DDPM", "DDPMScheduler"
+    ddim = "DDIM", "DDIMScheduler"
+    deis = (
+        "DEIS",
+        "DEISMultistepScheduler",
+    )
+
+
 def sd_upscale(
     *,
     prompt: str,
@@ -192,6 +234,7 @@ def text2img(
     seed: int = 42,
     guidance_scale: float = None,
     negative_prompt: str = None,
+    scheduler: str = None,
 ):
     _resolution_check(width, height, max_size=(1024, 1024))
 
@@ -226,7 +269,7 @@ def text2img(
                 "diffusion.text2img",
                 pipeline={
                     "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
-                    # "scheduler": "EulerDiscreteScheduler",
+                    "scheduler": Schedulers[scheduler].label if scheduler else None,
                     "disable_safety_checker": True,
                     "seed": seed,
                 },
