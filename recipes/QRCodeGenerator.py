@@ -185,6 +185,9 @@ class QRCodeGeneratorPage(BasePage):
 
     def render_output(self):
         state = st.session_state
+        self._render_outputs(state)
+
+    def _render_outputs(self, state: dict):
         selected_models = state.get("selected_models", [])
         for key in selected_models:
             output_images: dict = state.get("output_images", {}).get(key, [])
