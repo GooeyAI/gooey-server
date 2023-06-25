@@ -549,12 +549,13 @@ class BasePage:
             return
 
         with st.div(className="d-flex gap-1"):
-            st.text_input(
-                "recipe url",
-                label_visibility="collapsed",
-                disabled=True,
-                value=url.split("://")[1].rstrip("/"),
-            )
+            with st.div(className="flex-grow-1"):
+                st.text_input(
+                    "recipe url",
+                    label_visibility="collapsed",
+                    disabled=True,
+                    value=url.split("://")[1].rstrip("/"),
+                )
             copy_to_clipboard_button(
                 "🔗 Copy URL",
                 value=url,
