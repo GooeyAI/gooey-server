@@ -6,9 +6,9 @@ def html_spinner(text: str, scroll_into_view=True):
         # language=HTML
         script = """
 <script>
-window.waitUntilHydrated.then(() => {{
+window.waitUntilHydrated.then(() => {
     document.querySelector(".gooey-spinner-top").scrollIntoView();
-}});
+});
 </script>
         """
     else:
