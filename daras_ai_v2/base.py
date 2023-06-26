@@ -58,6 +58,7 @@ from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
 from gooey_ui import realtime_clear_subs
 from gooey_ui.pubsub import realtime_pull, realtime_push
+from gooeysite.bg_db_conn import db_middleware
 
 DEFAULT_META_IMG = (
     # Small
@@ -646,6 +647,7 @@ class BasePage:
         if not run_status:
             self._render_after_output()
 
+    @db_middleware
     def _run_thread(self, run_id, uid, state, channel):
         st.set_session_state(state)
         run_time = 0
