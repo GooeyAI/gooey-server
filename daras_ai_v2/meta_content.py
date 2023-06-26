@@ -81,7 +81,7 @@ def meta_title_for_page(
         else:
             parts.append(end_suffix)
     elif example_id:
-        parts.append(prompt)
+        # DO NOT SHOW PROMPT FOR EXAMPLES
         parts.append(end_suffix)
     else:
         parts.append(page.title)
