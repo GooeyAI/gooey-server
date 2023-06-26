@@ -53,6 +53,7 @@ class Img2ImgPage(BasePage):
 
         guidance_scale: float | None
         prompt_strength: float | None
+        controlnet_conditioning_scale: float | None
 
         # sd_2_upscaling: bool | None
 
@@ -163,6 +164,7 @@ class Img2ImgPage(BasePage):
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
+                controlnet_conditioning_scale=request.controlnet_conditioning_scale,
             )
         else:
             state["output_images"] = img2img(

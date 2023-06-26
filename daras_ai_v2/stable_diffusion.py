@@ -105,6 +105,12 @@ class ControlNetModels(Enum):
     sd_controlnet_openpose = "Human Pose"
     sd_controlnet_scribble = "Scribble"
     sd_controlnet_seg = "Image Segmentation"
+    sd_controlnet_inpaint = "Inpainting"
+    sd_controlnet_tile = "Tiling"
+    sd_controlnet_qr15 = "QR Code (15)"
+    sd_controlnet_qr21 = "QR Code (21)"
+    sd_controlnet_illumination = "Illumination"
+    sd_controlnet_brightness = "Brightness"
 
 
 controlnet_model_ids = {
@@ -116,6 +122,12 @@ controlnet_model_ids = {
     ControlNetModels.sd_controlnet_openpose: "lllyasviel/sd-controlnet-openpose",
     ControlNetModels.sd_controlnet_scribble: "lllyasviel/sd-controlnet-scribble",
     ControlNetModels.sd_controlnet_seg: "lllyasviel/sd-controlnet-seg",
+    ControlNetModels.sd_controlnet_inpaint: "lllyasviel/control_v11p_sd15_inpaint",
+    ControlNetModels.sd_controlnet_tile: "lllyasviel/control_v11f1e_sd15_tile",
+    ControlNetModels.sd_controlnet_qr15: "DionTimmer/controlnet_qrcode-control_v1p_sd15",
+    ControlNetModels.sd_controlnet_qr21: "DionTimmer/controlnet_qrcode-control_v11p_sd21",
+    ControlNetModels.sd_controlnet_illumination: "ioclab/control_v1u_sd15_illumination",
+    ControlNetModels.sd_controlnet_brightness: "ioclab/control_v1p_sd15_brightness",
 }
 
 
@@ -351,6 +363,7 @@ def controlnet(
     negative_prompt: str = None,
     guidance_scale: float,
     seed: int = 42,
+    controlnet_conditioning_scale: float = 1.0,
 ):
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
@@ -371,6 +384,7 @@ def controlnet(
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
             "image": [init_image],
+            "controlnet_conditioning_scale": controlnet_conditioning_scale,
             # "strength": prompt_strength,
         },
     )

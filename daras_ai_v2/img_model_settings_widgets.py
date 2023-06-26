@@ -40,6 +40,12 @@ def img_model_settings(models_enum, render_model_selector=True):
             prompt_strength_setting(selected_model)
         if selected_model == Img2ImgModels.instruct_pix2pix.name:
             instruct_pix2pix_settings()
+        if st.session_state.get("selected_controlnet_model"):
+            controlnet_weight_setting(
+                control_effect="makes a QR Code",
+                model_type="QR Code",
+                scale=(0.0, 2.0),
+            )
 
     return selected_model
 
@@ -297,7 +303,7 @@ def controlnet_weight_setting(
         `{scale[0]}` will keep the original image intact.\\
         `{scale[1]}` will control the {model_type.lower()} very tightly. 
         """,
-        key="control_weight_{model_type}}",
+        key="controlnet_conditioning_scale",
         min_value=scale[0],
         max_value=scale[1],
         step=0.05,
