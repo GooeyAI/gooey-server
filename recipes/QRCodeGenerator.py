@@ -1,6 +1,9 @@
 import typing
 
 import qrcode
+import numpy as np
+import urllib
+import cv2
 import PIL.Image as Image
 import base64
 import io
@@ -116,13 +119,13 @@ class QRCodeGeneratorPage(BasePage):
             key="qr_code_input",
             placeholder="https://www.gooey.ai",
         )
-        # st.file_uploader(
-        #     """
-        #     -- OR -- Upload an existing qr code. It will be reformatted and cleaned (only used if URL field is empty).
-        #     """,
-        #     key="qr_code_input_image",
-        #     accept=["image/*"],
-        # )
+        st.file_uploader(
+            """
+            -- OR -- Upload an existing qr code. It will be reformatted and cleaned (only used if URL field is empty).
+            """,
+            key="qr_code_input_image",
+            accept=["image/*"],
+        )
         st.text_area(
             """
             ### 👩‍💻 Prompt
@@ -234,13 +237,9 @@ class QRCodeGeneratorPage(BasePage):
         for key, val in state.items():
             state[key] = tuple(val) if isinstance(val, list) else val
 
-        print(state)
-
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
         request.width = state.get("size", 512)
         request.height = state.get("size", 512)
-
-        print(request)
 
         state["output_images"] = []
 
@@ -280,14 +279,16 @@ class QRCodeGeneratorPage(BasePage):
         qr_code_input_image = state.get("qr_code_input_image")
         size = state.get("size", 512)
         if not qr_code_input:
-            # (
-            #     retval,
-            #     decoded_info,
-            #     points,
-            #     straight_qrcode,
-            # ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
-            # qr_code_input = decoded_info[0]
-            pass
+            req = urllib.request.urlopen(qr_code_input_image)
+            arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
+            img = cv2.imdecode(arr, -1)
+            (
+                retval,
+                decoded_info,
+                points,
+                straight_qrcode,
+            ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
+            qr_code_input = decoded_info[0]
         qr = qrcode.QRCode(
             error_correction=qrcode.constants.ERROR_CORRECT_H,
             box_size=11,

@@ -61,7 +61,9 @@ black = "^23.3.0"
 django-extensions = "^3.2.1"
 pytest-django = "^4.5.2"
 celery = "^5.3.1"
-qrcode="7.4.2"
+qrcode = "7.4.2"
+opencv-python = "4.7.0.72"
+numpy = "1.25.0"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"
