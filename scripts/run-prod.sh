@@ -18,5 +18,5 @@ elif [ "$RUN_DJANGO" ]; then
 elif [ "$RUN_STREAMLIT" ]; then
   SENTRY_ENVIRONMENT="streamlit" streamlit run Home.py --server.address=0.0.0.0 --server.port=8000
 else
-  SENTRY_ENVIRONMENT="fastapi" uvicorn server:app --host 0.0.0.0 --port 8000
+  SENTRY_ENVIRONMENT="fastapi" uvicorn server:app --host 0.0.0.0 --workers 1 --port 8000
 fi
