@@ -114,7 +114,7 @@ class QRCodeGeneratorPage(BasePage):
         st.text_area(
             """
             ### 🔗 URL
-            Enter your URL, link or text. Generally shorter is better. URLs are automatically shortened.
+            Enter your URL, link or text. Generally shorter is better. We recommend using a URL shortener like bit.ly.
             """,
             key="qr_code_input",
             placeholder="https://www.gooey.ai",
@@ -198,12 +198,12 @@ class QRCodeGeneratorPage(BasePage):
                 """
             )
             return
-        st.markdown(
-            f"""
-            #### Shorten the URL
-            For more aesthetic and reliable QR codes with fewer black squares, we automatically shorten the URL: {"[INSERT SHORTENED URL HERE]"}
-            """
-        )
+        # st.markdown(
+        #     f"""
+        #     #### Shorten the URL
+        #     For more aesthetic and reliable QR codes with fewer black squares, we automatically shorten the URL: {"[INSERT SHORTENED URL HERE]"}
+        #     """
+        # )
         st.markdown(
             """
             #### Generate clean QR code
