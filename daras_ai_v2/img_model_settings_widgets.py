@@ -94,11 +94,7 @@ def model_selector(models_enum, same_line=True):
 def controlnet_settings(controlnet_model_explanations):
     for model in st.session_state.get("selected_controlnet_model", []):
         model = ControlNetModels[model]
-        scale = (0.0, 1.0)
-        if model == ControlNetModels.sd_controlnet_tile:
-            scale = (0.0, 2.0)
-        elif model == ControlNetModels.sd_controlnet_brightness:
-            scale = (0.0, 0.7)
+        scale = (0.0, 2.0)
         key = f"controlnet_conditioning_scale_{model.name}"
         st.session_state.setdefault(key, (scale[0] + scale[1]) / 2)
         controlnet_weight_setting(
