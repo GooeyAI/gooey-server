@@ -16,6 +16,7 @@ from daras_ai_v2.stable_diffusion import (
     controlnet,
     ControlNetModels,
     controlnet_model_explanations,
+    text2img,
 )
 
 controlnet_qr_model_explanations = {
@@ -103,13 +104,13 @@ class QRCodeGeneratorPage(BasePage):
             key="qr_code_input_text",
             placeholder="https://www.gooey.ai",
         )
-        st.file_uploader(
-            """
-            -- OR -- Upload an existing qr code. It will be reformatted and cleaned.
-            """,
-            key="qr_code_input_image",
-            accept=["image/*"],
-        )
+        # st.file_uploader(
+        #     """
+        #     -- OR -- Upload an existing qr code. It will be reformatted and cleaned.
+        #     """,
+        #     key="qr_code_input_image",
+        #     accept=["image/*"],
+        # )
         st.text_area(
             """
             ### 👩‍💻 Prompt
@@ -247,4 +248,11 @@ class QRCodeGeneratorPage(BasePage):
         return "Enter your URL (or text) and an image prompt and we'll generate an arty QR code with your artistic style and content in about 30 seconds. This is a rad way to advertise your website in IRL or print on a poster."
 
     def get_raw_price(self, state: dict) -> int:
-        return 5
+        selected_model = state.get("selected_model", Text2ImgModels.dream_shaper.name)
+        total = 5
+        match selected_model:
+            case Text2ImgModels.deepfloyd_if.name:
+                total += 3
+            case Text2ImgModels.dall_e.name:
+                total += 10
+        return total
