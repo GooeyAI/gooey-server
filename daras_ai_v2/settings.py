@@ -147,6 +147,10 @@ USE_TZ = True
 
 DATETIME_FORMAT = "N j, D, Y, h:i:s A"
 
+from django.conf.locale.en import formats as es_formats
+
+es_formats.DATETIME_FORMAT = DATETIME_FORMAT
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
