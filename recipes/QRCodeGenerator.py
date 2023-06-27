@@ -24,7 +24,6 @@ from daras_ai_v2.stable_diffusion import (
     controlnet,
     ControlNetModels,
     controlnet_model_explanations,
-    text2img,
     text2img_model_ids,
 )
 
@@ -96,6 +95,7 @@ class QRCodeGeneratorPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_images: list[str]
+        raw_images: list[str]
 
     def related_workflows(self) -> list:
         from recipes.CompareText2Img import CompareText2ImgPage
@@ -190,6 +190,44 @@ class QRCodeGeneratorPage(BasePage):
             """
         )
 
+    def render_steps(self):
+        if not st.session_state.get("output_images"):
+            st.markdown(
+                """
+                #### Generate the QR Code to see steps
+                """
+            )
+            return
+        st.markdown(
+            f"""
+            #### Shorten the URL
+            For more aesthetic and reliable QR codes with fewer black squares, we automatically shorten the URL: {"[INSERT SHORTENED URL HERE]"}
+            """
+        )
+        st.markdown(
+            """
+            #### Generate clean QR code
+            Having consistend padding, formatting, and using high error correction in the QR Code encoding makes the QR code more readable and robust to damage and thus yields more reliable results with the model.
+            """
+        )
+        st.image(st.session_state.get("image", [])[0])
+        st.markdown(
+            """
+            #### Generate the QR Codes
+            Use the model and controlnet constraints to generate QR codes that blend the prompt with the cleaned QR Code.
+            """
+        )
+        for imgsrc in st.session_state.get("raw_images", []):
+            st.image(imgsrc)
+        st.markdown(
+            """
+            #### Run quality control
+            We programatically scan the QR Codes to make sure they are readable and only use the clean ones.
+            """
+        )
+        for imgsrc in st.session_state["output_images"]:
+            st.image(imgsrc)
+
     def render_settings(self):
         st.write(
             """
@@ -246,11 +284,11 @@ class QRCodeGeneratorPage(BasePage):
         selected_model = request.selected_model
         yield f"Running {Text2ImgModels[selected_model].value}..."
 
-        state["output_images"] = controlnet(
+        state["raw_images"] = controlnet(
             selected_model=selected_model,
             selected_controlnet_models=request.selected_controlnet_model,
             prompt=request.text_prompt,
-            num_outputs=1,
+            num_outputs=2,
             init_image=request.image,
             num_inference_steps=request.num_inference_steps,
             negative_prompt=request.negative_prompt,
@@ -262,17 +300,21 @@ class QRCodeGeneratorPage(BasePage):
             selected_models_ids=text2img_model_ids,
         )
 
-        # output_images += text2img(
-        #     selected_model=selected_model,
-        #     prompt=request.text_prompt,
-        #     num_outputs=1,
-        #     num_inference_steps=request.num_inference_steps,
-        #     width=request.width,
-        #     height=request.height,
-        #     guidance_scale=request.guidance_scale,
-        #     seed=request.seed,
-        #     negative_prompt=request.negative_prompt,
-        # )
+        for src in state["raw_images"]:
+            req = urllib.request.urlopen(src)
+            arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
+            img = cv2.imdecode(arr, -1)
+            (
+                retval,
+                decoded_info,
+                points,
+                straight_qrcode,
+            ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
+            if retval and decoded_info[0] == state.get("qr_code_input"):
+                state["output_images"].append(src)
+
+        if len(state["output_images"]) == 0:  # TODO: generate safe qr code instead
+            state["output_images"] == state["raw_images"]
 
     def preprocess_qr_code(self, state: dict):
         qr_code_input = state.get("qr_code_input")
@@ -302,6 +344,7 @@ class QRCodeGeneratorPage(BasePage):
         qrcode_image = pillow_image_to_dataURL(
             qrcode_image.resize((size, size), Image.LANCZOS)
         )
+        state["qr_code_input"] = qr_code_input
         state["image"] = [qrcode_image] * len(
             state.get("selected_controlnet_model", [])
         )
