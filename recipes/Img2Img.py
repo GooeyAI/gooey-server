@@ -43,7 +43,7 @@ class Img2ImgPage(BasePage):
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
         selected_controlnet_model: typing.Tuple[
             typing.Literal[tuple(e.name for e in ControlNetModels)], ...
-        ]
+        ] | typing.Literal[tuple(e.name for e in ControlNetModels)] | None
         negative_prompt: str | None
 
         num_outputs: int | None
@@ -139,6 +139,10 @@ class Img2ImgPage(BasePage):
         for key, val in state.items():
             state[key] = tuple(val) if isinstance(val, list) else val
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
+        if request.selected_controlnet_model is None:
+            request.selected_controlnet_model = tuple()
+        elif type(request.selected_controlnet_model) is not tuple:
+            request.selected_controlnet_model = (request.selected_controlnet_model,)
 
         init_image = request.input_image
         init_image_bytes = requests.get(init_image).content

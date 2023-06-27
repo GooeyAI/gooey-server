@@ -74,8 +74,7 @@ class QRCodeGeneratorPage(BasePage):
             typing.Literal[tuple(e.name for e in ControlNetModels)], ...
         ]
 
-        width: int | None
-        height: int | None
+        size: int | None
 
         guidance_scale: float | None
         controlnet_conditioning_scale: typing.List[float]
@@ -238,8 +237,6 @@ class QRCodeGeneratorPage(BasePage):
             state[key] = tuple(val) if isinstance(val, list) else val
 
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
-        request.width = state.get("size", 512)
-        request.height = state.get("size", 512)
 
         state["output_images"] = []
 
