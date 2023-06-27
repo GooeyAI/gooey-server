@@ -55,7 +55,7 @@ class QRCodeGeneratorPage(BasePage):
         "guidance_scale": 9,
         "controlnet_conditioning_scale": [0.25, 0.45],
         "seed": 1331,
-        "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw",
+        "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words",
         "use_image_input": False,
     }
 
