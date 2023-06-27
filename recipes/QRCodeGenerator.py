@@ -5,14 +5,14 @@ import numpy as np
 import urllib
 import cv2
 import PIL.Image as Image
-import base64
+from daras_ai.image_input import upload_file_from_bytes
 import io
 
 from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
-from daras_ai_v2 import settings
+from daras_ai_v2 import settings, db
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import (
     guidance_scale_setting,
@@ -32,14 +32,6 @@ controlnet_qr_model_explanations = {
     ControlNetModels.sd_controlnet_brightness: "make the qr code darker and background lighter (contrast helps qr readers)",
 }
 controlnet_model_explanations.update(controlnet_qr_model_explanations)
-
-
-def pillow_image_to_dataURL(img):
-    buffered = io.BytesIO()
-    img.save(buffered, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode(
-        "utf-8"
-    )
 
 
 class QRCodeGeneratorPage(BasePage):
@@ -210,7 +202,9 @@ class QRCodeGeneratorPage(BasePage):
             Having consistend padding, formatting, and using high error correction in the QR Code encoding makes the QR code more readable and robust to damage and thus yields more reliable results with the model.
             """
         )
-        st.image(st.session_state.get("image", [])[0])
+        imgs = st.session_state.get("image")
+        if imgs:
+            st.image(imgs[0])
         st.markdown(
             """
             #### Generate the QR Codes
@@ -331,6 +325,22 @@ class QRCodeGeneratorPage(BasePage):
                 straight_qrcode,
             ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
             qr_code_input = decoded_info[0]
+        qrcode_image = self.upload_qr_code(qr_code_input, size=size)
+        state["qr_code_input"] = qr_code_input
+        state["image"] = [qrcode_image] * len(
+            state.get("selected_controlnet_model", [])
+        )
+
+    @st.cache_data()
+    def upload_qr_code(self, qr_code_input: str, size: int = 512):
+        doc_ref = db.get_doc_ref(
+            qr_code_input.replace("/", "_"), collection_id="qr_code_clean"
+        )
+        doc = db.get_or_create_doc(doc_ref).to_dict()
+        photo_url = doc.get("photo_url" + str(size))
+        if photo_url:
+            return photo_url
+
         qr = qrcode.QRCode(
             error_correction=qrcode.constants.ERROR_CORRECT_H,
             box_size=11,
@@ -341,13 +351,17 @@ class QRCodeGeneratorPage(BasePage):
         qrcode_image = qr.make_image(fill_color="black", back_color="white").convert(
             "RGB"
         )
-        qrcode_image = pillow_image_to_dataURL(
-            qrcode_image.resize((size, size), Image.LANCZOS)
+        qrcode_image = qrcode_image.resize((size, size), Image.LANCZOS)
+
+        open_cv_image = np.array(qrcode_image)
+        open_cv_image = open_cv_image[:, :, ::-1].copy()
+        bytes = cv2.imencode(".png", open_cv_image)[1].tobytes()
+        photo_url = upload_file_from_bytes(
+            "cleaned_qr.png", bytes, content_type="image/png"
         )
-        state["qr_code_input"] = qr_code_input
-        state["image"] = [qrcode_image] * len(
-            state.get("selected_controlnet_model", [])
-        )
+        doc_ref.set({"photo_url" + str(size): photo_url})
+
+        return photo_url
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
