@@ -1,24 +1,25 @@
 import typing
 
+
 import qrcode
 import numpy as np
 import urllib
 import cv2
 import PIL.Image as Image
 from daras_ai.image_input import upload_file_from_bytes
-import io
 
 from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
-from daras_ai_v2 import settings, db
+from daras_ai_v2 import db
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import (
     guidance_scale_setting,
     model_selector,
     controlnet_settings,
 )
+from daras_ai_v2.descriptions import prompting101
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
     controlnet,
@@ -145,42 +146,9 @@ class QRCodeGeneratorPage(BasePage):
             """
             Enter your URL (or text) and an image prompt and we'll generate an arty QR code with your artistic style and content in about 30 seconds. This is a rad way to advertise your website in IRL or print on a poster.
             It is made possible by the open source [Control Net](https://github.com/lllyasviel/ControlNet).
-
-            #### Prompting 101: 
-
-            ###### Step 1: Create an idea or visualization in your mind. 
-            `I want an image of an astronaut in a space suit walking on the streets of Mumbai.`
             """
         )
-        st.markdown(
-            """
-            ###### Step 2: Think about your descriptors and break it down as follows: 
-
-            - What is the Medium of this image? \\
-            eg. It is a painting, a sculpture, an old photograph, portrait, 3D render, etc.\n
-            - What/Who are the Subject(s) or Main Object(s) in the image? \\
-            eg. A human, an animal, an identity like gender, race, or occupation like dancer, astronaut etc. \n
-            - What is the Style? \\
-            eg. Is it Analogue photography, a watercolor, a line drawing, digital painting etc. \n
-            - What are the Details? \\
-            eg. facial features or expressions, the space and landscape, lighting or the colours etc. 
-            """
-        )
-        st.markdown(
-            f"""
-            ###### Step 3: Construct your prompt:
-            `An analogue film still of an astronaut in a space suit walking on the busy streets of Mumbai, golden light on the astronaut, 4k`
-            [example]({furl(settings.APP_BASE_URL).add(path='compare-ai-image-generators').add({"example_id": "s9nmzy34"}).url})
-            """
-        )
-        st.markdown(
-            """
-            You can keep editing your prompt until you have your desired output. Consider AI generators as a collaborative tool. 
-            ##### What is the difference between Submit and Regenerate? 
-            Each AI generation has a unique Seed number. A random seed is created when you initiate the first run on clicking the Submit button. The seed is maintained as you continue editing the image with different setting options on each subsequent Submit click.\n
-            However, by clicking the Regenerate button, the AI will generate a new Seed and a completely new/different set of outputs.
-            """
-        )
+        prompting101()
 
     def render_steps(self):
         if not st.session_state.get("output_images"):
@@ -199,7 +167,7 @@ class QRCodeGeneratorPage(BasePage):
         st.markdown(
             """
             #### Generate clean QR code
-            Having consistend padding, formatting, and using high error correction in the QR Code encoding makes the QR code more readable and robust to damage and thus yields more reliable results with the model.
+            Having consistent padding, formatting, and using high error correction in the QR Code encoding makes the QR code more readable and robust to damage and thus yields more reliable results with the model.
             """
         )
         imgs = st.session_state.get("image")
@@ -216,7 +184,7 @@ class QRCodeGeneratorPage(BasePage):
         st.markdown(
             """
             #### Run quality control
-            We programatically scan the QR Codes to make sure they are readable and only use the clean ones.
+            We programatically scan the QR Codes to make sure they are readable and only use the working ones.
             """
         )
         for imgsrc in st.session_state["output_images"]:
