@@ -44,8 +44,8 @@ def img_model_settings(models_enum, render_model_selector=True):
             instruct_pix2pix_settings()
         if st.session_state.get("selected_controlnet_model"):
             controlnet_weight_setting(
-                control_effect="makes a QR Code",
-                model_type="QR Code",
+                control_effect="to honor the controlnet conditioning more",
+                model_type="Model",
                 scale=(0.0, 2.0),
             )
 
@@ -57,7 +57,6 @@ def model_selector(models_enum, same_line=True):
     with ExitStack() as stack:
         if same_line:
             col1 = stack.enter_context(col1)
-            col2 = stack.enter_context(col2)
 
         selected_model = enum_selector(
             models_enum,
@@ -66,6 +65,9 @@ def model_selector(models_enum, same_line=True):
             use_selectbox=True,
             allow_none=True,
         )
+
+        if same_line:
+            col2 = stack.enter_context(col2)
 
         if models_enum is Img2ImgModels or models_enum is Text2ImgModels:
             if st.session_state.get("selected_model") is None or st.session_state.get(

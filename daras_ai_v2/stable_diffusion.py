@@ -23,6 +23,8 @@ from daras_ai_v2.gpu_server import (
     call_sd_multi,
 )
 
+E = typing.TypeVar("E", bound=typing.Type[Enum])
+
 SD_IMG_MAX_SIZE = (768, 768)
 
 
@@ -369,7 +371,7 @@ def img2img(
 def controlnet(
     *,
     selected_model: str,
-    selected_controlnet_model: str,
+    selected_controlnet_models: typing.List[str],
     prompt: str,
     num_outputs: int,
     init_image: str,
@@ -378,17 +380,21 @@ def controlnet(
     guidance_scale: float,
     seed: int = 42,
     controlnet_conditioning_scale: float = 1.0,
+    scheduler: str = "UniPCMultistepScheduler",
+    selected_models_enum: E = Img2ImgModels,
+    selected_models_ids: dict[E, str] = img2img_model_ids,
 ):
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
         "diffusion.controlnet",
         pipeline={
-            "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
+            "model_id": selected_models_ids[selected_models_enum[selected_model]],
             "seed": seed,
-            "scheduler": "UniPCMultistepScheduler",
+            "scheduler": scheduler,
             "disable_safety_checker": True,
-            "controlnet_model_id": controlnet_model_ids[
-                ControlNetModels[selected_controlnet_model]
+            "controlnet_model_ids": [
+                controlnet_model_ids[ControlNetModels[model]]
+                for model in selected_controlnet_models
             ],
         },
         inputs={
@@ -397,7 +403,7 @@ def controlnet(
             "num_images_per_prompt": num_outputs,
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
-            "image": [init_image],
+            "image": init_image,
             "controlnet_conditioning_scale": controlnet_conditioning_scale,
             # "strength": prompt_strength,
         },

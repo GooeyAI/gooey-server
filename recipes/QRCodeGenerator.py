@@ -1,5 +1,10 @@
 import typing
 
+import qrcode
+import PIL.Image as Image
+import base64
+import io
+
 from furl import furl
 from pydantic import BaseModel
 
@@ -17,6 +22,7 @@ from daras_ai_v2.stable_diffusion import (
     ControlNetModels,
     controlnet_model_explanations,
     text2img,
+    text2img_model_ids,
 )
 
 controlnet_qr_model_explanations = {
@@ -24,6 +30,14 @@ controlnet_qr_model_explanations = {
     ControlNetModels.sd_controlnet_brightness: "make the qr code darker and background lighter (contrast helps qr readers)",
 }
 controlnet_model_explanations.update(controlnet_qr_model_explanations)
+
+
+def pillow_image_to_dataURL(img):
+    buffered = io.BytesIO()
+    img.save(buffered, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode(
+        "utf-8"
+    )
 
 
 class QRCodeGeneratorPage(BasePage):
@@ -42,12 +56,12 @@ class QRCodeGeneratorPage(BasePage):
             ControlNetModels.sd_controlnet_brightness.name,
         ],
         "size": 512,
-        "num_images": 5,
         "num_inference_steps": 100,
         "guidance_scale": 9,
         "controlnet_conditioning_scale_sd_controlnet_tile": 0.25,
         "controlnet_conditioning_scale_sd_controlnet_brightness": 0.45,
         "seed": 1331,
+        "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw",
     }
 
     def __init__(self, *args, **kwargs):
@@ -55,14 +69,14 @@ class QRCodeGeneratorPage(BasePage):
         self.__dict__.update(self.sane_defaults)
 
     class RequestModel(BaseModel):
-        image: str
+        image: typing.List[str]
 
         text_prompt: str | None
         negative_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
-        selected_controlnet_model: typing.Literal[
-            tuple(e.name for e in ControlNetModels)
+        selected_controlnet_model: typing.Tuple[
+            typing.Literal[tuple(e.name for e in ControlNetModels)], ...
         ]
 
         width: int | None
@@ -78,9 +92,7 @@ class QRCodeGeneratorPage(BasePage):
         seed: int | None
 
     class ResponseModel(BaseModel):
-        output_images: dict[
-            typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
-        ]
+        output_images: list[str]
 
     def related_workflows(self) -> list:
         from recipes.CompareText2Img import CompareText2ImgPage
@@ -101,12 +113,12 @@ class QRCodeGeneratorPage(BasePage):
             ### 🔗 URL
             Enter your URL, link or text. Generally shorter is better. URLs are automatically shortened.
             """,
-            key="qr_code_input_text",
+            key="qr_code_input",
             placeholder="https://www.gooey.ai",
         )
         # st.file_uploader(
         #     """
-        #     -- OR -- Upload an existing qr code. It will be reformatted and cleaned.
+        #     -- OR -- Upload an existing qr code. It will be reformatted and cleaned (only used if URL field is empty).
         #     """,
         #     key="qr_code_input_image",
         #     accept=["image/*"],
@@ -129,9 +141,8 @@ class QRCodeGeneratorPage(BasePage):
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
-        assert (
-            st.session_state["qr_code_input_text"]
-            or st.session_state["qr_code_input_image"]
+        assert st.session_state.get("qr_code_input") or st.session_state.get(
+            "qr_code_input_image"
         ), "Please provide either a qr code image or text"
 
     def render_description(self):
@@ -211,36 +222,98 @@ class QRCodeGeneratorPage(BasePage):
         self._render_outputs(state)
 
     def _render_outputs(self, state: dict):
-        selected_models = state.get("selected_models", [])
-        for key in selected_models:
-            output_images: dict = state.get("output_images", {}).get(key, [])
-            for img in output_images:
-                st.image(img, caption=Text2ImgModels[key].value)
+        for img in state.get("output_images", []):
+            st.image(img, caption=state.get("qr_code_input"))
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
+        self.preprocess_qr_code(state)
+        state["controlnet_conditioning_scale"] = [
+            state.get(f"controlnet_conditioning_scale_{model}", 0.5)
+            for model in state.get("selected_controlnet_model")
+        ]
+        for key, val in state.items():
+            state[key] = tuple(val) if isinstance(val, list) else val
+
+        print(state)
+
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
+        request.width = state.get("size", 512)
+        request.height = state.get("size", 512)
 
-        state["output_images"] = output_images = {}
+        print(request)
 
-        for selected_model in request.selected_models:
-            yield f"Running {Text2ImgModels[selected_model].value}..."
+        state["output_images"] = []
 
-            output_images[selected_model] = text2img(
-                selected_model=selected_model,
-                prompt=request.text_prompt,
-                num_outputs=request.num_outputs,
-                num_inference_steps=request.quality,
-                width=request.output_width,
-                height=request.output_height,
-                guidance_scale=request.guidance_scale,
-                seed=request.seed,
-                negative_prompt=request.negative_prompt,
-            )
+        selected_model = request.selected_model
+        yield f"Running {Text2ImgModels[selected_model].value}..."
+
+        state["output_images"] = controlnet(
+            selected_model=selected_model,
+            selected_controlnet_models=request.selected_controlnet_model,
+            prompt=request.text_prompt,
+            num_outputs=1,
+            init_image=request.image,
+            num_inference_steps=request.num_inference_steps,
+            negative_prompt=request.negative_prompt,
+            guidance_scale=request.guidance_scale,
+            seed=request.seed,
+            controlnet_conditioning_scale=request.controlnet_conditioning_scale,
+            scheduler=request.scheduler,
+            selected_models_enum=Text2ImgModels,
+            selected_models_ids=text2img_model_ids,
+        )
+
+        # output_images += text2img(
+        #     selected_model=selected_model,
+        #     prompt=request.text_prompt,
+        #     num_outputs=1,
+        #     num_inference_steps=request.num_inference_steps,
+        #     width=request.width,
+        #     height=request.height,
+        #     guidance_scale=request.guidance_scale,
+        #     seed=request.seed,
+        #     negative_prompt=request.negative_prompt,
+        # )
+
+    def preprocess_qr_code(self, state: dict):
+        qr_code_input = state.get("qr_code_input")
+        qr_code_input_image = state.get("qr_code_input_image")
+        size = state.get("size", 512)
+        if not qr_code_input:
+            # (
+            #     retval,
+            #     decoded_info,
+            #     points,
+            #     straight_qrcode,
+            # ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
+            # qr_code_input = decoded_info[0]
+            pass
+        qr = qrcode.QRCode(
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=11,
+            border=9,
+        )
+        qr.add_data(qr_code_input)
+        qr.make(fit=True)
+        qrcode_image = qr.make_image(fill_color="black", back_color="white").convert(
+            "RGB"
+        )
+        qrcode_image = pillow_image_to_dataURL(
+            qrcode_image.resize((size, size), Image.LANCZOS)
+        )
+        state["image"] = [qrcode_image] * len(
+            state.get("selected_controlnet_model", [])
+        )
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("```properties\n" + state.get("text_prompt", "") + "\n```")
+            st.markdown(
+                f"""
+                ```Prompt: {state.get("text_prompt", "")}```
+                ```QR Content: {state.get("qr_code_input", "")}```
+                """
+            )
         with col2:
             self._render_outputs(state)
 

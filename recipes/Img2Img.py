@@ -32,16 +32,17 @@ class Img2ImgPage(BasePage):
         # "sd_2_upscaling": False,
         "seed": 42,
         "image_guidance_scale": 1.2,
-        "selected_controlnet_model": None,
+        "selected_controlnet_model": [],
+        "controlnet_conditioning_scale": 1.0,
     }
 
     class RequestModel(BaseModel):
-        input_image: str
+        input_image: typing.List[str] | str
         text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
-        selected_controlnet_model: typing.Literal[
-            tuple(e.name for e in ControlNetModels)
+        selected_controlnet_model: typing.Tuple[
+            typing.Literal[tuple(e.name for e in ControlNetModels)], ...
         ]
         negative_prompt: str | None
 
@@ -135,6 +136,8 @@ class Img2ImgPage(BasePage):
             st.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
+        for key, val in state.items():
+            state[key] = tuple(val) if isinstance(val, list) else val
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
 
         init_image = request.input_image
@@ -153,13 +156,13 @@ class Img2ImgPage(BasePage):
                 images=[init_image],
                 image_guidance_scale=request.image_guidance_scale,
             )
-        elif request.selected_controlnet_model:
+        elif len(request.selected_controlnet_model) > 0:
             state["output_images"] = controlnet(
                 selected_model=request.selected_model,
-                selected_controlnet_model=request.selected_controlnet_model,
+                selected_controlnet_models=request.selected_controlnet_model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
-                init_image=init_image,
+                init_image=[init_image] * len(request.selected_controlnet_model),
                 num_inference_steps=request.quality,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
