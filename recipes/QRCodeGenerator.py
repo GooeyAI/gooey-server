@@ -314,7 +314,7 @@ class QRCodeGeneratorPage(BasePage):
                 state["output_images"].append(src)
 
         if len(state["output_images"]) == 0:  # TODO: generate safe qr code instead
-            state["output_images"] == state["raw_images"]
+            state["output_images"] = state["raw_images"]
 
     def preprocess_qr_code(self, state: dict):
         qr_code_input = state.get("qr_code_input")
