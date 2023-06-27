@@ -12,6 +12,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.routing import APIRouter
 from firebase_admin import auth, exceptions
 from furl import furl
+from starlette.background import BackgroundTasks
 from starlette.datastructures import FormData
 from starlette.requests import Request
 from starlette.responses import (
@@ -30,6 +31,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
 from daras_ai_v2.base import (
     BasePage,
+    RedirectException,
 )
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.meta_content import build_meta_tags
@@ -194,7 +196,11 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
 @app.post("/{page_slug}/")
 @app.post("/{page_slug}/{tab}/")
 def st_page(
-    request: Request, page_slug="", tab="", json_data: dict = Depends(request_json)
+    request: Request,
+    background_tasks: BackgroundTasks,
+    page_slug="",
+    tab="",
+    json_data: dict = Depends(request_json),
 ):
     try:
         page_cls = page_map[normalize_slug(page_slug)]
@@ -219,11 +225,16 @@ def st_page(
     if state is None:
         raise HTTPException(status_code=404)
 
-    ret = st.runner(
-        lambda: page_wrapper(request, page.render),
-        query_params=dict(request.query_params),
-        **json_data,
-    )
+    try:
+        ret = st.runner(
+            lambda: page_wrapper(
+                request, page.render, background_tasks=background_tasks
+            ),
+            query_params=dict(request.query_params),
+            **json_data,
+        )
+    except RedirectException as e:
+        return RedirectResponse(e.url, status_code=e.status_code)
     ret |= {
         "meta": build_meta_tags(
             url=str(request.url),
@@ -252,7 +263,7 @@ def get_run_user(request, uid) -> AppUser | None:
         pass
 
 
-def page_wrapper(request: Request, render_fn: typing.Callable[[], None]):
+def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
     context = {
         "request": request,
         "settings": settings,
@@ -268,7 +279,7 @@ def page_wrapper(request: Request, render_fn: typing.Callable[[], None]):
     st.html(copy_to_clipboard_scripts)
 
     with st.div(id="main-content", className="container"):
-        render_fn()
+        render_fn(**kwargs)
 
     st.html(templates.get_template("footer.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))
