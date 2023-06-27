@@ -1,9 +1,11 @@
 import json
 import math
 
+from contextlib import ExitStack
+
 import gooey_ui as st
 
-from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.enum_selector_widget import enum_selector, enum_multiselect
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
     InpaintingModels,
@@ -50,9 +52,13 @@ def img_model_settings(models_enum, render_model_selector=True):
     return selected_model
 
 
-def model_selector(models_enum):
+def model_selector(models_enum, same_line=True):
     col1, col2 = st.columns(2)
-    with col1:
+    with ExitStack() as stack:
+        if same_line:
+            col1 = stack.enter_context(col1)
+            col2 = stack.enter_context(col2)
+
         selected_model = enum_selector(
             models_enum,
             label="#### Model",
@@ -60,8 +66,8 @@ def model_selector(models_enum):
             use_selectbox=True,
             allow_none=True,
         )
-    with col2:
-        if models_enum is Img2ImgModels:
+
+        if models_enum is Img2ImgModels or models_enum is Text2ImgModels:
             if st.session_state.get("selected_model") is None or st.session_state.get(
                 "selected_model"
             ) in [
@@ -70,19 +76,37 @@ def model_selector(models_enum):
                 Img2ImgModels.jack_qiao.name,
                 Img2ImgModels.sd_2.name,
             ]:
-                st.session_state["selected_controlnet_model"] = None
+                st.session_state["selected_controlnet_model"] = []
             else:
-                enum_selector(
+                enum_multiselect(
                     ControlNetModels,
                     label="""
-#### Control Net
-Choose any [conditioning model](https://huggingface.co/lllyasviel?search=controlnet).
+                    #### Control Net
+                    Choose any [conditioning model(s)](https://huggingface.co/lllyasviel?search=controlnet).
                     """,
                     key="selected_controlnet_model",
-                    allow_none=True,
-                    use_selectbox=True,
                 )
     return selected_model
+
+
+def controlnet_settings(controlnet_model_explanations):
+    for model in st.session_state.get("selected_controlnet_model", []):
+        model = ControlNetModels[model]
+        scale = (0.0, 1.0)
+        if model == ControlNetModels.sd_controlnet_tile:
+            scale = (0.0, 2.0)
+        elif model == ControlNetModels.sd_controlnet_brightness:
+            scale = (0.0, 0.7)
+        key = f"controlnet_conditioning_scale_{model.name}"
+        st.session_state.setdefault(key, (scale[0] + scale[1]) / 2)
+        controlnet_weight_setting(
+            control_effect=controlnet_model_explanations.get(
+                model, "use conditioning for better results"
+            ),
+            model_type=model.value,
+            scale=scale,
+            key=key,
+        )
 
 
 def num_outputs_setting(selected_model: str = None):
@@ -292,6 +316,7 @@ def controlnet_weight_setting(
     control_effect: str = "make the qr code darker and background lighter (contrast helps qr readers)",
     model_type: str = "Brightness",
     scale=(0.0, 0.7),
+    key: str = "controlnet_conditioning_scale",
 ):
     st.slider(
         label=f"""
@@ -303,7 +328,7 @@ def controlnet_weight_setting(
         `{scale[0]}` will keep the original image intact.\\
         `{scale[1]}` will control the {model_type.lower()} very tightly. 
         """,
-        key="controlnet_conditioning_scale",
+        key=key,
         min_value=scale[0],
         max_value=scale[1],
         step=0.05,

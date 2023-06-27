@@ -6,17 +6,23 @@ from pydantic import BaseModel
 import gooey_ui as st
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.img_model_settings_widgets import (
     guidance_scale_setting,
-    output_resolution_setting,
-    sd_2_upscaling_setting,
-    controlnet_weight_setting,
+    model_selector,
+    controlnet_settings,
 )
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
-    text2img,
+    controlnet,
+    ControlNetModels,
+    controlnet_model_explanations,
 )
+
+controlnet_qr_model_explanations = {
+    ControlNetModels.sd_controlnet_tile: "preserve small details mainly in the qr code which makes it more readable",
+    ControlNetModels.sd_controlnet_brightness: "make the qr code darker and background lighter (contrast helps qr readers)",
+}
+controlnet_model_explanations.update(controlnet_qr_model_explanations)
 
 
 class QRCodeGeneratorPage(BasePage):
@@ -28,25 +34,47 @@ class QRCodeGeneratorPage(BasePage):
     ]
 
     sane_defaults = {
-        "guidance_scale": 7.5,
-        "seed": 42,
-        "sd_2_upscaling": False,
-        "image_guidance_scale": 1.2,
+        "scheduler": "EulerAncestralDiscreteScheduler",
+        "selected_model": Text2ImgModels.dream_shaper.name,
+        "selected_controlnet_model": [
+            ControlNetModels.sd_controlnet_tile.name,
+            ControlNetModels.sd_controlnet_brightness.name,
+        ],
+        "size": 512,
+        "num_images": 5,
+        "num_inference_steps": 100,
+        "guidance_scale": 9,
+        "controlnet_conditioning_scale_sd_controlnet_tile": 0.25,
+        "controlnet_conditioning_scale_sd_controlnet_brightness": 0.45,
+        "seed": 1331,
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__dict__.update(self.sane_defaults)
+
     class RequestModel(BaseModel):
-        text_prompt: str
+        image: str
+
+        text_prompt: str | None
         negative_prompt: str | None
 
-        output_width: int | None
-        output_height: int | None
+        selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
+        selected_controlnet_model: typing.Literal[
+            tuple(e.name for e in ControlNetModels)
+        ]
+
+        width: int | None
+        height: int | None
 
         guidance_scale: float | None
-        seed: int | None
+        controlnet_conditioning_scale: typing.List[float]
 
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in Text2ImgModels)]
-        ] | None
+        num_images: int | None
+        num_inference_steps: int | None
+        scheduler: str | None
+
+        seed: int | None
 
     class ResponseModel(BaseModel):
         output_images: dict[
@@ -72,14 +100,14 @@ class QRCodeGeneratorPage(BasePage):
             ### 🔗 URL
             Enter your URL, link or text. Generally shorter is better. URLs are automatically shortened.
             """,
-            key="text_prompt",
+            key="qr_code_input_text",
             placeholder="https://www.gooey.ai",
         )
         st.file_uploader(
             """
             -- OR -- Upload an existing qr code. It will be reformatted and cleaned.
             """,
-            key="qr_code_input",
+            key="qr_code_input_image",
             accept=["image/*"],
         )
         st.text_area(
@@ -90,16 +118,20 @@ class QRCodeGeneratorPage(BasePage):
             key="text_prompt",
             placeholder="Bright sunshine coming through the cracks of a wet, cave wall of big rocks",
         )
-        st.file_uploader(
-            """
-            -- OPTIONAL -- Upload an initial image to blend the qr code into. This can help the AI understand what your prompt means instead of generating everything from scratch.
-            """,
-            key="initial_image_input",
-            accept=["image/*"],
-        )
+        # st.file_uploader(
+        #     """
+        #     -- OPTIONAL -- Upload an initial image to blend the qr code into. This can help the AI understand what your prompt means instead of generating everything from scratch.
+        #     """,
+        #     key="initial_image_input",
+        #     accept=["image/*"],
+        # )
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
+        assert (
+            st.session_state["qr_code_input_text"]
+            or st.session_state["qr_code_input_image"]
+        ), "Please provide either a qr code image or text"
 
     def render_description(self):
         st.markdown(
@@ -157,31 +189,21 @@ class QRCodeGeneratorPage(BasePage):
             key="negative_prompt",
             placeholder="ugly, disfigured, low quality, blurry, nsfw",
         )
-        output_resolution_setting()
-        sd_2_upscaling_setting()
         col1, col2 = st.columns(2)
         with col1:
-            enum_selector(
+            st.caption(
+                """
+            ### 🤖 Generative Model
+            Choose the model responsible for generating the content around the qr code.
+            """
+            )
+            model_selector(
                 Text2ImgModels,
-                label="""
-                ##### 🤖 Generative Model
-                Choose the model responsible for generating the content around the qr code.
-                """,
-                key="selected_models",
-                default=Text2ImgModels.dream_shaper,
+                same_line=False,
             )
         with col2:
             guidance_scale_setting()
-            controlnet_weight_setting(
-                control_effect="make the qr code darker and background lighter (contrast helps qr readers)",
-                model_type="Brightness",
-                scale=(0.0, 0.7),
-            )
-            controlnet_weight_setting(
-                control_effect="preserve small details mainly in the qr code which makes it more readable",
-                model_type="Tiles",
-                scale=(0.0, 2.0),
-            )
+            controlnet_settings(controlnet_model_explanations)
 
     def render_output(self):
         state = st.session_state
