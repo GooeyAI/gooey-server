@@ -1,6 +1,6 @@
 import typing
 
-
+import requests
 import qrcode
 import numpy as np
 import urllib
@@ -308,6 +308,14 @@ class QRCodeGeneratorPage(BasePage):
                 straight_qrcode,
             ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
             qr_code_input = decoded_info[0]
+        if qr_code_input.startswith("http"):
+            qr_code_input = (
+                requests.get(
+                    "https://is.gd/create.php?format=simple&url=" + qr_code_input,
+                    timeout=2.50,
+                ).text
+                or qr_code_input
+            )
         qrcode_image = self.upload_qr_code(qr_code_input, size=size)
         image = [qrcode_image] * len(request.get("selected_controlnet_model", []))
         return image, qr_code_input
