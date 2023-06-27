@@ -92,12 +92,16 @@ def model_selector(models_enum, same_line=True):
 
 
 def controlnet_settings(controlnet_model_explanations):
-    for model in st.session_state.get("selected_controlnet_model", []):
+    models = st.session_state.get("selected_controlnet_model", [])
+    controlnet_conditioning_scale = st.session_state.get(
+        "controlnet_conditioning_scale", [1.0] * len(models)
+    )
+    for i, model in enumerate(models):
         model = ControlNetModels[model]
         scale = (0.0, 2.0)
         key = f"controlnet_conditioning_scale_{model.name}"
-        st.session_state.setdefault(key, (scale[0] + scale[1]) / 2)
-        controlnet_weight_setting(
+        st.session_state.setdefault(key, controlnet_conditioning_scale[i])
+        controlnet_conditioning_scale[i] = controlnet_weight_setting(
             control_effect=controlnet_model_explanations.get(
                 model, "use conditioning for better results"
             ),
@@ -105,6 +109,7 @@ def controlnet_settings(controlnet_model_explanations):
             scale=scale,
             key=key,
         )
+    st.session_state["controlnet_conditioning_scale"] = controlnet_conditioning_scale
 
 
 def num_outputs_setting(selected_model: str = None):
@@ -318,7 +323,7 @@ def controlnet_weight_setting(
     scale=(0.0, 0.7),
     key: str = "controlnet_conditioning_scale",
 ):
-    st.slider(
+    return st.slider(
         label=f"""
         ##### Generation Constraint
         (*{model_type.capitalize()} Control Weight*)

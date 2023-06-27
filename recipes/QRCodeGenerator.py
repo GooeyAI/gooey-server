@@ -53,8 +53,7 @@ class QRCodeGeneratorPage(BasePage):
         "size": 512,
         "num_inference_steps": 100,
         "guidance_scale": 9,
-        "controlnet_conditioning_scale_sd_controlnet_tile": 0.25,
-        "controlnet_conditioning_scale_sd_controlnet_brightness": 0.45,
+        "controlnet_conditioning_scale": [0.25, 0.45],
         "seed": 1331,
         "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw",
         "use_image_input": False,
@@ -251,10 +250,6 @@ class QRCodeGeneratorPage(BasePage):
             st.image(img, caption=state.get("qr_code_input"))
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        state["controlnet_conditioning_scale"] = [
-            state.get(f"controlnet_conditioning_scale_{model}", 0.5)
-            for model in state.get("selected_controlnet_model")
-        ]
         for key, val in state.items():
             state[key] = tuple(val) if isinstance(val, list) else val
 
