@@ -84,7 +84,7 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2 = st.columns([4, 1], responsive=False)
+        col1, col2 = st.columns([8, 3], responsive=False)
         with col1:
             st.text_area(
                 label="*Prompt*",
@@ -202,13 +202,13 @@ class DeforumSDPage(BasePage):
 
         col1, col2 = st.columns(2)
         with col1:
-            st.number_input(
+            st.slider(
                 """
                 #### Frame Count
                 Choose the number of frames in your animation.
                 """,
                 min_value=10,
-                max_value=1000,
+                max_value=500,
                 step=10,
                 key="max_frames",
             )

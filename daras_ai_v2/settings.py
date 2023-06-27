@@ -104,6 +104,7 @@ try:
             "PASSWORD": PGPASSWORD,
             "HOST": PGHOST,
             "PORT": PGPORT,
+            "CONN_MAX_AGE": None,
         }
     }
 except UndefinedValueError:
@@ -145,6 +146,11 @@ USE_I18N = True
 
 USE_TZ = True
 
+DATETIME_FORMAT = "N j, D, Y, h:i:s A"
+
+from django.conf.locale.en import formats as es_formats
+
+es_formats.DATETIME_FORMAT = DATETIME_FORMAT
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -250,5 +256,5 @@ TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
 PINECONE_API_KEY = config("PINECONE_API_KEY", "")
 PINECONE_ENVIRONMENT = config("PINECONE_ENVIRONMENT", "us-east1-gcp")
 
-CELERY_BROKER_URL = config("CELERY_BROKER_URL", "amqp://localhost")
-CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", "redis://localhost:6379")
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", "amqp://")
+CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", "redis://")

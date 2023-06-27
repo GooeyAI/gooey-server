@@ -287,6 +287,7 @@ def send_wa_msgs_raw(
             headers=WHATSAPP_AUTH_HEADER,
             json=body,
         )
+        r.raise_for_status()
         confirmation = r.json()
         print("send_wa_msgs_raw:", r.status_code, confirmation)
         try:

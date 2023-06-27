@@ -3,15 +3,14 @@ import datetime
 from django import forms
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.humanize.templatetags import humanize
-from django.db.models import Max, Subquery, Count, F, DurationField
+from django.db.models import Max, Count, F
 from django.http import HttpResponse
 from django.utils import dateformat
 from django.utils.timesince import timesince
 
 from bots import models
 from bots.admin_links import list_related_html_url, open_in_new_tab, change_obj_url
-from bots.models import FeedbackComment
+from bots.models import FeedbackComment, CHATML_ROLE_ASSISSTANT
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
@@ -211,7 +210,14 @@ class MessageAdmin(admin.ModelAdmin):
         "wa_msg_id",
         "saved_run",
     ]
-    list_display = ["__str__", "local_lang", "role", "created_at", "feedbacks"]
+    list_display = [
+        "__str__",
+        "local_lang",
+        "role",
+        "created_at",
+        "feedbacks",
+        "wa_delivered",
+    ]
     ordering = ["created_at"]
 
     inlines = [FeedbackInline]
@@ -220,6 +226,17 @@ class MessageAdmin(admin.ModelAdmin):
         return msg.feedbacks.count() or None
 
     feedbacks.short_description = "Feedbacks"
+
+    def wa_delivered(self, msg: models.Message):
+        if (
+            msg.role != CHATML_ROLE_ASSISSTANT
+            or msg.conversation.bot_integration.platform != models.Platform.WHATSAPP
+        ):
+            raise models.Message.DoesNotExist
+        return bool(msg.wa_msg_id)
+
+    wa_delivered.short_description = "Delivered"
+    wa_delivered.boolean = True
 
 
 class FeedbackCommentInline(admin.StackedInline):
