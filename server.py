@@ -1,3 +1,8 @@
+import os
+
+import anyio
+from decouple import config
+
 from gooeysite import wsgi
 
 assert wsgi
@@ -46,6 +51,14 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 for route in app.routes:
     if isinstance(route, APIRoute) and not is_async_callable(route.endpoint):
         route.endpoint = db_middleware(route.endpoint)
+
+
+@app.on_event("startup")
+async def startup():
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    limiter.total_tokens = config(
+        "WEB_CONCURRENCY", default=limiter.total_tokens, cast=int
+    )
 
 
 @app.add_middleware

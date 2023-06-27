@@ -3,11 +3,12 @@ import inspect
 import math
 import traceback
 import typing
+import urllib
+import urllib.parse
 import uuid
 from copy import deepcopy
 from functools import lru_cache
 from random import Random
-from threading import Thread
 from time import time, sleep
 
 import requests
@@ -19,6 +20,7 @@ from pydantic import BaseModel
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
+from starlette.background import BackgroundTasks
 from starlette.requests import Request
 
 import gooey_ui as st
@@ -44,7 +46,6 @@ from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params import (
-    gooey_reset_query_parm,
     gooey_get_query_params,
 )
 from daras_ai_v2.query_params_util import (
@@ -143,7 +144,11 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
-    def render(self):
+    background_tasks: BackgroundTasks = None
+
+    def render(self, background_tasks: BackgroundTasks = None):
+        self.background_tasks = background_tasks
+
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
@@ -616,12 +621,14 @@ class BasePage:
                 self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
                 return
             channel = f"gooey-outputs/{self.doc_name}/{uid}/{run_id}"
-            Thread(
-                target=self._run_thread,
-                args=[run_id, uid, st.session_state, channel],
-            ).start()
-            gooey_reset_query_parm(
-                **self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
+            assert (
+                self.background_tasks
+            ), "background_tasks is not set for current session"
+            self.background_tasks.add_task(
+                self._run_thread, run_id, uid, st.session_state, channel
+            )
+            raise QueryParamsRedirectException(
+                self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
             )
 
         self._render_before_output()
@@ -762,12 +769,12 @@ class BasePage:
                 new_example_id = get_random_doc_id()
                 doc_ref = self.example_doc_ref(new_example_id)
                 doc_ref.set(self.state_to_doc(st.session_state))
-                gooey_reset_query_parm(example_id=new_example_id)
+                raise QueryParamsRedirectException(dict(example_id=new_example_id))
 
             if example_id and st.button("💾 Save this Example"):
                 doc_ref = self.example_doc_ref(example_id)
                 doc_ref.set(self.state_to_doc(st.session_state))
-                gooey_reset_query_parm(example_id=example_id)
+                raise QueryParamsRedirectException(dict(example_id=example_id))
 
             if example_id:
                 hidden = st.session_state.get(StateKeys.hidden)
@@ -1149,3 +1156,15 @@ def _build_page_tuple(page_cls: typing.Type[BasePage]):
         page_cls().preview_image(state), page_cls().fallback_preivew_image()
     )
     return page_cls, state, preview_image
+
+
+class RedirectException(Exception):
+    def __init__(self, url, status_code=302):
+        self.url = url
+        self.status_code = status_code
+
+
+class QueryParamsRedirectException(RedirectException):
+    def __init__(self, query_params: dict, status_code=303):
+        url = "?" + urllib.parse.urlencode(query_params)
+        super().__init__(url, status_code)
