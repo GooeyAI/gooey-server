@@ -349,16 +349,7 @@ class QRCodeGeneratorPage(BasePage):
         image = [qrcode_image] * len(request.get("selected_controlnet_model", []))
         return image, qr_code_input
 
-    @st.cache_data()
     def upload_qr_code(self, qr_code_input: str, size: int = 512):
-        doc_ref = db.get_doc_ref(
-            qr_code_input.replace("/", "_"), collection_id="qr_code_clean"
-        )
-        doc = db.get_or_create_doc(doc_ref).to_dict()
-        photo_url = doc.get("photo_url" + str(size))
-        if photo_url:
-            return photo_url
-
         qr = qrcode.QRCode(
             error_correction=qrcode.constants.ERROR_CORRECT_H,
             box_size=11,
@@ -377,8 +368,6 @@ class QRCodeGeneratorPage(BasePage):
         photo_url = upload_file_from_bytes(
             "cleaned_qr.png", bytes, content_type="image/png"
         )
-        doc_ref.set({"photo_url" + str(size): photo_url})
-
         return photo_url
 
     def render_example(self, state: dict):
