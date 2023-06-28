@@ -1,4 +1,4 @@
-import streamlit as st
+import gooey_ui as st
 
 from pydantic import BaseModel
 
@@ -11,19 +11,20 @@ class TrainingDataModel(BaseModel):
 def text_training_data(label1: str, label2: str, *, key: str):
     training_data = st.session_state.get(key, [])
 
-    data_area = st.empty()
+    data_area = st.div()
 
     add = st.button("Add an example", help=f"Add {key}")
     if add:
         training_data.append({"prompt": "", "completion": ""})
 
-    with data_area.container():
+    with data_area:
         for idx, value in enumerate(training_data):
             col1, col2 = st.columns([1, 10])
 
             with col1:
-                btn_area = st.empty()
-                pressed_delete = btn_area.button(f"🗑", help=f"Delete {key} {idx + 1}")
+                btn_area = st.div()
+                # pressed_delete = btn_area.button(f"🗑", help=f"Delete {key} {idx + 1}")
+                pressed_delete = False
                 if pressed_delete:
                     training_data.pop(idx)
                     btn_area.empty()

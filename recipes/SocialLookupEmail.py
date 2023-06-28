@@ -3,7 +3,7 @@ import typing
 import requests
 
 from pydantic import BaseModel
-import streamlit as st
+import gooey_ui as st
 
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage
@@ -110,49 +110,45 @@ class SocialLookupEmailPage(BasePage):
             max_value=4096,
         )
 
-    def render_form(self) -> bool:
-        with st.form("my_form"):
-            st.text_input(
-                """
-                ### Email Address
-                Give us an email address and we'll try to get determine the profile data associated with it
-                """,
-                key="email_address",
-                placeholder="john@appleseed.com",
-            )
-            st.caption(
-                "By providing an email address, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)"
-            )
+    def render_form_v2(self):
+        st.text_input(
+            """
+            ### Email Address
+            Give us an email address and we'll try to get determine the profile data associated with it
+            """,
+            key="email_address",
+            placeholder="john@appleseed.com",
+        )
+        st.caption(
+            "By providing an email address, you agree to Gooey.AI's [Privacy Policy](https://gooey.ai/privacy)"
+        )
 
-            st.text_area(
-                """
-                ### Email Body
-                """,
-                key="input_email_body",
-                height=200,
-            )
+        st.text_area(
+            """
+            ### Email Body
+            """,
+            key="input_email_body",
+            height=200,
+        )
 
-            st.text_input("URL 1", key="url1")
-            st.text_input("URL 2", key="url2")
-            st.text_input("Company", key="company")
-            st.text_input("Article Title", key="article_title")
-            st.text_input("Domain", key="domain")
-            st.text_input("Key Words", key="key_words")
+        st.text_input("URL 1", key="url1")
+        st.text_input("URL 2", key="url2")
+        st.text_input("Company", key="company")
+        st.text_input("Article Title", key="article_title")
+        st.text_input("Domain", key="domain")
+        st.text_input("Key Words", key="key_words")
 
-            submitted = st.form_submit_button("🏃‍ Submit")
+    def validate_form_v2(self):
+        text_prompt = st.session_state.get("input_email_body")
+        email_address = st.session_state.get("email_address")
 
-        if submitted:
-            text_prompt = st.session_state.get("input_email_body")
-            email_address = st.session_state.get("email_address")
-            if not (text_prompt and email_address):
-                st.error("Please provide a Prompt and an Email Address", icon="⚠️")
-                return False
+        assert (
+            text_prompt and email_address
+        ), "Please provide a Prompt and an Email Address"
 
-            if not re.fullmatch(email_regex, email_address):
-                st.error("Please provide a valid Email Address", icon="⚠️")
-                return False
-
-        return submitted
+        assert re.fullmatch(
+            email_regex, email_address
+        ), "Please provide a valid Email Address"
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: SocialLookupEmailPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -211,7 +207,7 @@ class SocialLookupEmailPage(BasePage):
                 expanded=False,
             )
         else:
-            st.empty()
+            st.div()
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
@@ -222,7 +218,7 @@ class SocialLookupEmailPage(BasePage):
                 height=200,
             )
         else:
-            st.empty()
+            st.div()
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
@@ -248,7 +244,3 @@ def get_profile_for_email(email_address):
         return
 
     return person
-
-
-if __name__ == "__main__":
-    SocialLookupEmailPage().render()

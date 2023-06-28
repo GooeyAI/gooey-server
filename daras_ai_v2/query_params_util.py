@@ -3,10 +3,10 @@ RUN_ID_QUERY_PARAM = "run_id"
 USER_ID_QUERY_PARAM = "uid"
 
 
-def extract_query_params(query_params):
-    example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM)
-    run_id = query_params.get(RUN_ID_QUERY_PARAM)
-    uid = query_params.get(USER_ID_QUERY_PARAM)
+def extract_query_params(query_params, default=None):
+    example_id = query_params.get(EXAMPLE_ID_QUERY_PARAM, default)
+    run_id = query_params.get(RUN_ID_QUERY_PARAM, default)
+    uid = query_params.get(USER_ID_QUERY_PARAM, default)
 
     if isinstance(example_id, list):
         example_id = example_id[0]

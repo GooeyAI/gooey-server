@@ -1,12 +1,12 @@
 import typing
 
-import streamlit as st
 from furl import furl
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_multiselect
+from daras_ai_v2.enum_selector_widget import enum_multiselect, enum_selector
 from daras_ai_v2.img_model_settings_widgets import (
     negative_prompt_setting,
     guidance_scale_setting,
@@ -21,6 +21,7 @@ from daras_ai_v2.stable_diffusion import (
     text2img,
     instruct_pix2pix,
     sd_upscale,
+    Schedulers,
 )
 
 
@@ -56,6 +57,7 @@ class CompareText2ImgPage(BasePage):
         selected_models: list[
             typing.Literal[tuple(e.name for e in Text2ImgModels)]
         ] | None
+        scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
 
         edit_instruction: str | None
         image_guidance_scale: float | None
@@ -186,6 +188,13 @@ class CompareText2ImgPage(BasePage):
         col1, col2 = st.columns(2)
         with col1:
             guidance_scale_setting()
+            enum_selector(
+                Schedulers,
+                label="##### Scheduler",
+                allow_none=True,
+                use_selectbox=True,
+                key="scheduler",
+            )
         with col2:
             if st.session_state.get("edit_instruction"):
                 instruct_pix2pix_settings()
@@ -211,6 +220,7 @@ class CompareText2ImgPage(BasePage):
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
                 negative_prompt=request.negative_prompt,
+                scheduler=request.scheduler,
             )
 
             if request.edit_instruction:
@@ -273,7 +283,3 @@ class CompareText2ImgPage(BasePage):
                 case _:
                     total += 2
         return total
-
-
-if __name__ == "__main__":
-    CompareText2ImgPage().render()

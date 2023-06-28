@@ -5,11 +5,10 @@ import PIL
 import cv2
 import numpy as np
 import requests
-import streamlit as st
+import gooey_ui as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import (
-    upload_file_hq,
     upload_file_from_bytes,
     cv2_img_to_bytes,
     bytes_to_cv2_img,
@@ -77,36 +76,19 @@ class ImageSegmentationPage(BasePage):
             CompareText2ImgPage,
         ]
 
-    def render_form(self) -> bool:
-        with st.form("my_form"):
-            st.file_uploader(
-                """
-                ### Input Photo
-                Give us a photo of anything
-                """,
-                key="input_file",
-            )
+    def render_form_v2(self):
+        st.file_uploader(
+            """
+            ### Input Photo
+            Give us a photo of anything
+            """,
+            key="input_image",
+            upload_meta=dict(resize=f"{2048**2}@>"),
+        )
 
-            submitted = st.form_submit_button("🏃‍ Submit")
-
-        input_file = st.session_state.get("input_file")
+    def validate_form_v2(self):
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_file or input_image
-
-        # form validation
-        if submitted and not input_image_or_file:
-            st.error("Please provide an Input Photo", icon="⚠️")
-            return False
-
-        # upload input file if submitted
-        if submitted:
-            input_file = st.session_state.get("input_file")
-            if input_file:
-                st.session_state["input_image"] = upload_file_hq(
-                    input_file, resize=(2048, 2048)
-                )
-
-        return submitted
+        assert input_image, "Please provide an Input Photo"
 
     def render_settings(self):
         enum_selector(
@@ -328,34 +310,34 @@ class ImageSegmentationPage(BasePage):
             if input_image:
                 st.image(input_image, caption="Input Photo")
             else:
-                st.empty()
+                st.div()
 
         with col2:
             output_image = st.session_state.get("output_image")
             if output_image:
                 st.image(output_image, caption=f"Segmentation Mask")
             else:
-                st.empty()
+                st.div()
 
         with col3:
             resized_image = st.session_state.get("resized_image")
             if resized_image:
                 st.image(resized_image, caption=f"Resized Image")
             else:
-                st.empty()
+                st.div()
 
             resized_mask = st.session_state.get("resized_mask")
             if resized_mask:
                 st.image(resized_mask, caption=f"Resized Mask")
             else:
-                st.empty()
+                st.div()
 
         with col4:
             cutout_image = st.session_state.get("cutout_image")
             if cutout_image:
                 st.image(cutout_image, caption=f"Cutout Image")
             else:
-                st.empty()
+                st.div()
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
@@ -365,14 +347,14 @@ class ImageSegmentationPage(BasePage):
             if input_image:
                 st.image(input_image, caption="Input Photo")
             else:
-                st.empty()
+                st.div()
 
         with col2:
             cutout_image = state.get("cutout_image")
             if cutout_image:
                 st.image(cutout_image, caption=f"Cutout Image")
             else:
-                st.empty()
+                st.div()
 
     def preview_description(self, state: dict) -> str:
         return "Use Dichotomous Image Segmentation to remove unwanted backgrounds from your images and correct perspective. Awesome when used with other Gooey.AI steps."
@@ -445,7 +427,3 @@ def _reflect(img_cv2, opacity):
     result = np.vstack((img_cv2, flip))
 
     return result
-
-
-if __name__ == "__main__":
-    ImageSegmentationPage().render()

@@ -58,7 +58,9 @@ class BotInterface:
     def _unpack_bot_integration(self, bi: BotIntegration):
         self.page_cls = Workflow(bi.saved_run.workflow).page_cls
         self.query_params = self.page_cls.clean_query_params(
-            bi.saved_run.example_id, bi.saved_run.run_id, bi.saved_run.uid
+            example_id=bi.saved_run.example_id,
+            run_id=bi.saved_run.run_id,
+            uid=bi.saved_run.uid,
         )
         self.billing_account_uid = bi.billing_account_uid
         self.language = bi.user_language
@@ -285,6 +287,7 @@ def send_wa_msgs_raw(
             headers=WHATSAPP_AUTH_HEADER,
             json=body,
         )
+        r.raise_for_status()
         confirmation = r.json()
         print("send_wa_msgs_raw:", r.status_code, confirmation)
         try:

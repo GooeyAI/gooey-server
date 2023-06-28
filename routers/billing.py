@@ -4,11 +4,10 @@ import stripe
 from fastapi import APIRouter, Depends
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
-from firebase_admin.auth import UserRecord
 from furl import furl
 from starlette.datastructures import FormData
 
-from daras_ai_v2 import db
+from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.settings import templates
 
@@ -108,19 +107,18 @@ available_subscriptions = {
 
 @router.get("/account/", include_in_schema=False)
 def account(request: Request):
-    if not request.user:
+    if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
         redirect_url = furl("/login", query_params={"next": next_url})
         return RedirectResponse(str(redirect_url))
 
-    user_data = db.get_or_init_user_data(request)
     is_admin = request.user.email in settings.ADMIN_EMAILS
 
     context = {
         "request": request,
         "settings": settings,
         "available_subscriptions": available_subscriptions,
-        "user_credits": user_data.get(db.USER_BALANCE_FIELD, 0),
+        "user_credits": request.user.balance,
         "subscription": get_user_subscription(request.user),
         "is_admin": is_admin,
     }
@@ -163,7 +161,7 @@ def create_checkout_session(
         mode=mode,
         success_url=payment_success_url,
         cancel_url=account_url,
-        customer=get_or_create_stripe_customer(request.user),
+        customer=request.user.get_or_create_stripe_customer(),
         metadata=metadata,
         subscription_data=subscription_data,
         invoice_creation=invoice_creation,
@@ -174,8 +172,8 @@ def create_checkout_session(
 
 
 @router.post("/__/stripe/create-portal-session")
-async def customer_portal(request: Request):
-    customer = get_or_create_stripe_customer(request.user)
+def customer_portal(request: Request):
+    customer = request.user.get_or_create_stripe_customer()
     portal_session = stripe.billing_portal.Session.create(
         customer=customer,
         return_url=account_url,
@@ -239,20 +237,23 @@ def _handle_invoice_paid(uid: str, invoice_data):
         "/v1/invoices/{invoice}/lines".format(invoice=quote_plus(invoice_id)),
     )
     amount = line_items.data[0].quantity
-    db.update_user_balance(uid, amount, invoice_id)
+    user = AppUser.objects.get_or_create_from_uid(uid)[0]
+    user.add_balance(amount, invoice_id)
 
 
 @router.post("/__/stripe/cancel-subscription")
 def cancel_subscription(request: Request):
-    customer = get_or_create_stripe_customer(request.user)
+    customer = request.user.get_or_create_stripe_customer()
     subscriptions = stripe.Subscription.list(customer=customer).data
     for sub in subscriptions:
         stripe.Subscription.delete(sub.id)
     return RedirectResponse("/account/", status_code=303)
 
 
-def get_user_subscription(user: UserRecord):
-    customer = get_or_create_stripe_customer(user)
+def get_user_subscription(user: AppUser):
+    customer = user.search_stripe_customer()
+    if not customer:
+        return
     subscriptions = stripe.Subscription.list(customer=customer).data
     for sub in subscriptions:
         try:
@@ -260,15 +261,3 @@ def get_user_subscription(user: UserRecord):
             return available_subscriptions[lookup_key]
         except KeyError:
             pass
-
-
-def get_or_create_stripe_customer(user: UserRecord):
-    try:
-        return stripe.Customer.search(query=f'metadata["uid"]:"{user.uid}"').data[0]
-    except IndexError:
-        return stripe.Customer.create(
-            name=user.display_name,
-            email=user.email,
-            phone=user.phone_number,
-            metadata={"uid": user.uid},
-        )

@@ -1,3 +1,7 @@
+from gooeysite import wsgi
+
+assert wsgi
+
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
@@ -13,7 +17,6 @@ from daras_ai_v2 import db
 from daras_ai_v2.base import USER_RUNS_COLLECTION
 
 st.set_page_config(layout="wide")
-
 
 team_emails = [
     "devxpy@gmail.com",
@@ -86,6 +89,7 @@ def main():
     now = datetime.datetime.now(pytz.timezone(timezone))
     today = datetime.datetime.date(now)
     time_offset = today - pd.offsets.Day(last_n_days - 1)
+    print(time_offset)
 
     doc_users = get_all_doc_users()
 
@@ -147,7 +151,7 @@ def main():
     runs_df["updated_at"] = pd.to_datetime(runs_df["updated_at"]).dt.tz_convert(
         timezone
     )
-    runs_df = runs_df.sort_values("updated_at").set_index("updated_at")[time_offset:]
+    runs_df = runs_df.sort_values("updated_at").set_index("updated_at")
 
     # st.write(runs_df)
 
@@ -196,7 +200,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
     )
 
     total_runs = (
-        counts_df.sum()
+        counts_df.sum(numeric_only=True)
         .rename("Total Runs")
         .to_frame()
         .reset_index(names=["slug"])

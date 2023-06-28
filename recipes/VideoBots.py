@@ -1,17 +1,16 @@
 import datetime
+import json
 import os
 import os.path
 import re
 import typing
 
-import streamlit as st
 from furl import furl
 from pydantic import BaseModel
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
+import gooey_ui as st
 from daras_ai.image_input import (
     truncate_text_words,
-    upload_st_file,
 )
 from daras_ai_v2.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
@@ -23,7 +22,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
 )
-from daras_ai_v2.hidden_html_widget import hidden_html_js
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
@@ -40,6 +38,7 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.search_ref import apply_response_template
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -68,26 +67,42 @@ BOT_SCRIPT_RE = re.compile(
 def show_landbot_widget():
     landbot_url = st.session_state.get("landbot_url")
     if not landbot_url:
+        st.html("", **{"data-landbot-config-url": ""})
         return
 
     f = furl(landbot_url)
     config_path = os.path.join(f.host, *f.path.segments[:2])
     config_url = f"https://storage.googleapis.com/{config_path}/index.json"
 
-    hidden_html_js(
+    st.html(
+        # language=HTML
         """
 <script>
-// destroy existing instance
-if (top.myLandbot) {
-top.myLandbot.destroy();
+function updateLandbotWidget() {
+    if (window.myLandbot) {
+        try {
+            window.myLandbot.destroy();
+        } catch (e) {}
+    }
+    const configUrl = document.querySelector("[data-landbot-config-url]")?.getAttribute("data-landbot-config-url");
+    if (configUrl) {
+        window.myLandbot = new Landbot.Livechat({ configUrl });
+    }
 }
-// create new instance
-top.myLandbot = new top.Landbot.Livechat({
-configUrl: %r,
-});
+if (typeof Landbot === "undefined") {
+    const script = document.createElement("script");
+    script.src = "https://cdn.landbot.io/landbot-3/landbot-3.0.0.js";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+        window.waitUntilHydrated.then(updateLandbotWidget);
+        window.addEventListener("hydrated", updateLandbotWidget);
+    };
+    document.body.appendChild(script);
+}
 </script>
-        """
-        % config_url
+        """,
+        **{"data-landbot-config-url": config_url},
     )
 
 
@@ -124,8 +139,8 @@ def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
 
 
 class VideoBotsPage(BasePage):
-    title = "Create Interactive Video Bots"
-    slug_versions = ["video-bots"]
+    title = "Copilot for your Enterprise"  #  "Create Interactive Video Bots"
+    slug_versions = ["video-bots", "bots", "copilot"]
 
     sane_defaults = {
         "messages": [],
@@ -230,14 +245,17 @@ class VideoBotsPage(BasePage):
         ]
 
     def preview_description(self, state: dict) -> str:
-        return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
+        return "Create customized chatbots from your own docs/PDF/webpages. Craft your own bot prompts using the creative GPT3, fast GPT 3.5-turbo or powerful GPT4 & optionally prevent hallucinations by constraining all answers to just your citations. Available as Facebook, Instagram, WhatsApp bots or via API. Add multi-lingual speech recognition and text-to-speech in 100+ languages and even video responses. Collect 👍🏾 👎🏽 feedback + see usage & retention graphs too! This is the workflow that powers https://Farmer.CHAT and it's yours to tweak."
+        # return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
 
     def render_description(self):
         st.write(
             """
-        Have you ever wanted to create a character that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots? This is how. 
+Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how. 
 
-This workflow takes a dialog script describing your character (with some sample questions you expect folks to ask), a video clip of your character’s face and finally voice settings to build a videobot that anyone can speak to about anything and you can host directly in your own site or app. 
+This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot’s face and  voice settings. 
+ 
+We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page. 
 
 How It Works:
 1. Appends the user's question to the bottom of your dialog script. 
@@ -246,7 +264,7 @@ How It Works:
 4. Lip syncs the face video clip to the voice clip
 5. Shows the resulting video to the user
 
-PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing.
+PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers. 
         """
         )
 
@@ -269,28 +287,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 Enable document search, to use custom documents as information sources.
 """
         )
-
-    def validate_form_v2(self):
-        # assert st.session_state["input_prompt"], "Please type in a Messsage"
-        # assert st.session_state["bot_script"], "Please provide the Bot Script"
-
-        face_file = st.session_state.get("face_file")
-        if face_file:
-            st.session_state["input_face"] = upload_st_file(face_file)
-        # assert st.session_state.get("input_face"), "Please provide the Input Face"
-
-        document_files: list[UploadedFile] | None = st.session_state.get(
-            "__documents_files"
-        )
-        if document_files:
-            uploaded = []
-            for f in document_files:
-                if f.name == "urls.txt":
-                    uploaded.extend(f.getvalue().decode().splitlines())
-                else:
-                    uploaded.append(upload_st_file(f))
-            st.session_state["documents"] = uploaded
-        # assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_usage_guide(self):
         youtube_video("-j2su1r8pEg")
@@ -320,7 +316,7 @@ Enable document search, to use custom documents as information sources.
         enable_audio = st.checkbox("Enable Audio Ouput?", key="__enable_audio")
         if not enable_audio:
             st.write("---")
-            st.session_state["tts_provider"] = None
+            st.session_state.pop("tts_provider", None)
         else:
             text_to_speech_settings()
             st.write("---")
@@ -332,7 +328,7 @@ Enable document search, to use custom documents as information sources.
             enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
             if not enable_video:
                 st.write("---")
-                st.session_state["input_face"] = None
+                st.session_state.pop("input_face", None)
             else:
                 st.file_uploader(
                     """
@@ -340,8 +336,7 @@ Enable document search, to use custom documents as information sources.
                     Upload a video/image that contains faces to use  
                     *Recommended - mp4 / mov / png / jpg / gif* 
                     """,
-                    key="face_file",
-                    upload_key="input_face",
+                    key="input_face",
                 )
                 lipsync_settings()
                 st.write("---")
@@ -410,10 +405,13 @@ Use this for prompting GPT to use the document search results.
                 for entry in messages:
                     display_name = entry.get("display_name") or entry["role"]
                     display_name = display_name.capitalize()
-                    st.caption(f'**_{display_name}_**\\\n{entry["content"]}')
+                    st.caption(f'**_{display_name}_** \\\n{entry["content"]}')
 
+        references = st.session_state.get("references", [])
+        if not references:
+            return
         with st.expander("💁‍♀️ Sources"):
-            for idx, ref in enumerate(st.session_state.get("references", [])):
+            for idx, ref in enumerate(references):
                 st.write(f"**{idx + 1}**. [{ref['title']}]({ref['url']})")
                 text_output(
                     "Source Document",
@@ -466,11 +464,6 @@ Use this for prompting GPT to use the document search results.
                 st.audio(audio_url)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        # clear message history if requested
-        clear_msgs = bool(state.get("__clear_msgs"))
-        if clear_msgs:
-            state.get("messages", []).clear()
-
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
         user_input = request.input_prompt.strip()
@@ -480,6 +473,11 @@ Use this for prompting GPT to use the document search results.
         is_chat_model = model.is_chat_model()
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
+
+        # clear message history if requested
+        clear_msgs = bool(state.get("__clear_msgs"))
+        if clear_msgs:
+            saved_msgs.clear()
 
         # translate input text
         if request.user_language and request.user_language != "en":
@@ -494,12 +492,6 @@ Use this for prompting GPT to use the document search results.
 
         # consturct the system prompt
         if system_message:
-            # # replace current user's name
-            # current_user = st.session_state.get("_current_user")
-            # if current_user and current_user.display_name:
-            #     system_message = system_message.format(
-            #         username=current_user.display_name
-            #     )
             # add time to prompt
             utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
             system_message = system_message.replace("{{ datetime.utcnow }}", utcnow)
@@ -626,10 +618,9 @@ Use this for prompting GPT to use the document search results.
                 },
             ]
         )
-        # save message history
-        if not clear_msgs:
-            st.session_state["messages"] = state["messages"] = saved_msgs
         state["raw_output_text"] = output_text.copy()
+        # save message history
+        yield "Saving messages...", {"messages": saved_msgs}
 
         # translate response text
         if request.user_language and request.user_language != "en":
@@ -672,14 +663,13 @@ Use this for prompting GPT to use the document search results.
         super().render_selected_tab(selected_tab)
 
         if selected_tab == MenuTabs.integrations:
-            user = st.session_state.get("_current_user")
-            if not user or hasattr(user, "_is_anonymous"):
+            if not self.request.user or self.request.user.is_anonymous:
                 st.write(
                     "**Please Login to connect this workflow to Your Website, Instagram, Whatsapp & More**"
                 )
                 return
 
-            self.messenger_bot_integration(user)
+            self.messenger_bot_integration()
 
             st.markdown(
                 """
@@ -729,7 +719,7 @@ Use this for prompting GPT to use the document search results.
 
         show_landbot_widget()
 
-    def messenger_bot_integration(self, user):
+    def messenger_bot_integration(self):
         from bots.models import BotIntegration, Platform
         from routers.facebook import ig_connect_url, fb_connect_url
         from daras_ai_v2.all_pages import Workflow
@@ -767,23 +757,27 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
         st.button("🔄 Refresh")
 
         integrations = BotIntegration.objects.filter(
-            billing_account_uid=user.uid
+            billing_account_uid=self.request.user.uid
         ).order_by("platform")
         if not integrations:
             return
 
-        query_params = dict(self._get_current_api_url().query.params)
+        example_id, run_id, uid = extract_query_params(
+            self._get_current_api_url().query.params
+        )
 
         for bi in integrations:
             is_connected = (
                 bi.saved_run
                 and Workflow(bi.saved_run.workflow) == Workflow.VIDEOBOTS
                 and (
-                    (
-                        query_params.get("run_id") == bi.saved_run.run_id
-                        and query_params.get("uid") == bi.saved_run.uid
+                    not (
+                        bi.saved_run.example_id
+                        or bi.saved_run.run_id
+                        or bi.saved_run.uid
                     )
-                    or (query_params.get("example_id") == bi.saved_run.example_id)
+                    or (run_id == bi.saved_run.run_id and uid == bi.saved_run.uid)
+                    or (example_id == bi.saved_run.example_id)
                 )
             )
             col1, col2, *_ = st.columns([1, 1, 2])
@@ -798,7 +792,7 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
             with col2:
                 pressed = st.button(
                     "🔌💔️ Disconnect" if is_connected else "🖇️ Connect",
-                    help=f"Update {bi} ({bi.id})",
+                    key=f"btn_connect_{bi.id}",
                 )
             if not pressed:
                 continue
@@ -807,11 +801,12 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
             else:
                 bi.saved_run = SavedRun.objects.get_or_create(
                     workflow=Workflow.VIDEOBOTS,
-                    **query_params,
+                    example_id=example_id or "",
+                    uid=uid or "",
+                    run_id=run_id or "",
                 )[0]
             bi.save()
-            with col2:
-                st.experimental_rerun()
+            st.experimental_rerun()
 
         st.write("---")
 

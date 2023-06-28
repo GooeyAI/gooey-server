@@ -3,7 +3,7 @@ import typing
 
 import glom
 import requests
-import streamlit as st
+import gooey_ui as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import upload_file_from_bytes
@@ -237,7 +237,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         if st.session_state.get("email_sent"):
             st.write(f"✅ Email sent to {st.session_state.get('email_address')}")
         else:
-            st.empty()
+            st.div()
 
     def run(self, state: dict):
         request: EmailFaceInpaintingPage.RequestModel = self.RequestModel.parse_obj(
@@ -409,7 +409,3 @@ def get_photo_for_twitter_handle(twitter_handle):
         )
         doc_ref.set({"photo_url": photo_url})
         return photo_url
-
-
-if __name__ == "__main__":
-    EmailFaceInpaintingPage().render()

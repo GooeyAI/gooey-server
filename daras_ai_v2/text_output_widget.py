@@ -1,6 +1,6 @@
 import random
 
-import streamlit as st
+import gooey_ui as st
 
 
 def text_outputs(
@@ -25,7 +25,7 @@ def text_outputs(
                     value=text,
                 )
         case _:
-            st.empty()
+            st.div()
 
 
 def text_output(label: str, *, value: str, height: int = 200, idx: int = 0, **kwargs):

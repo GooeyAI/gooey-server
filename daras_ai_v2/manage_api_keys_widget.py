@@ -1,9 +1,10 @@
 import datetime
 
 import pandas as pd
-import streamlit as st
+import gooey_ui as st
 from firebase_admin import auth
 
+from app_users.models import AppUser
 from daras_ai_v2 import db
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
@@ -13,10 +14,9 @@ from daras_ai_v2.crypto import (
     safe_preview,
     get_random_api_key,
 )
-from daras_ai_v2.hidden_html_widget import hidden_html_nojs
 
 
-def manage_api_keys(user: auth.UserRecord):
+def manage_api_keys(user: AppUser):
     st.write(
         """
 Your secret API keys are listed below. 
@@ -29,53 +29,39 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
         """
     )
 
-    db_collection = db._db.collection(db.API_KEYS_COLLECTION)
+    db_collection = db.client.collection(db.API_KEYS_COLLECTION)
     api_keys = _load_api_keys(db_collection, user)
 
-    table_area = st.container()
+    table_area = st.div()
 
     if st.button("＋ Create new secret key"):
-        with st.spinner("Generating a new API key..."):
-            doc = _generate_new_key_doc()
-            doc["uid"] = user.uid
-            api_keys.append(doc)
-            db_collection.add(doc)
+        doc = _generate_new_key_doc()
+        doc["uid"] = user.uid
+        api_keys.append(doc)
+        db_collection.add(doc)
 
     with table_area:
         st.table(
             pd.DataFrame.from_records(
                 columns=["Secret Key (Preview)", "Created At"],
                 data=[
-                    (api_key["secret_key_preview"], api_key["created_at"])
+                    (
+                        api_key["secret_key_preview"],
+                        api_key["created_at"].strftime("%B %d, %Y at %I:%M:%S %p %Z"),
+                    )
                     for api_key in api_keys
                 ],
             ),
         )
-        # hide table index
-        hidden_html_nojs(
-            """
-            <style>
-            table {font-family:"Source Code Pro", monospace}
-            thead tr th:first-child {display:none}
-            tbody th {display:none}
-            </style>
-            """
-        )
 
 
 def _load_api_keys(db_collection, user):
-    api_keys = st.session_state.setdefault("__api_keys", [])
-    if not api_keys:
-        with st.spinner("Loading API Keys..."):
-            api_keys.extend(
-                [
-                    snap.to_dict()
-                    for snap in db_collection.where("uid", "==", user.uid)
-                    .order_by("created_at")
-                    .get()
-                ]
-            )
-    return api_keys
+    return [
+        snap.to_dict()
+        for snap in db_collection.where("uid", "==", user.uid)
+        .order_by("created_at")
+        .get()
+    ]
 
 
 def _generate_new_key_doc() -> dict:
@@ -86,14 +72,14 @@ def _generate_new_key_doc() -> dict:
 
     st.success(
         f"""
-##### API key generated
+<h5> API key generated </h5>
 
 Please save this secret key somewhere safe and accessible. 
 For security reasons, **you won't be able to view it again** through your account. 
 If you lose this secret key, you'll need to generate a new one.
             """
     )
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([3, 1], responsive=False)
     with col1:
         st.text_input(
             "recipe url",
@@ -105,8 +91,7 @@ If you lose this secret key, you'll need to generate a new one.
         copy_to_clipboard_button(
             "📎 Copy Secret Key",
             value=new_api_key,
-            style="padding: 6px",
-            height=55,
+            style="height: 3.2rem",
         )
 
     return {

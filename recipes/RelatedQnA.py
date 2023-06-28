@@ -1,6 +1,6 @@
 import typing
 
-import streamlit as st
+import gooey_ui as st
 from pydantic import BaseModel
 
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
@@ -24,7 +24,7 @@ class RelatedQnAPage(BasePage):
     title = "Related QnA"
     slug_versions = ["related-qna-maker"]
 
-    price = 500
+    price = 75
 
     class RequestModel(BaseModel):
         search_query: str

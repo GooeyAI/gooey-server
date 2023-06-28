@@ -1,12 +1,9 @@
 import typing
 
 import requests
-import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import (
-    upload_file_hq,
-)
+import gooey_ui as st
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -14,7 +11,7 @@ from daras_ai_v2.stable_diffusion import (
     InpaintingModels,
     Img2ImgModels,
     img2img,
-    IMG_MAX_SIZE,
+    SD_IMG_MAX_SIZE,
     instruct_pix2pix,
     controlnet,
     ControlNetModels,
@@ -84,8 +81,8 @@ class Img2ImgPage(BasePage):
             """
             ### Input Image
             """,
-            key="input_file",
-            upload_key="input_image",
+            key="input_image",
+            upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
         )
 
         if st.session_state.get("selected_model") != InpaintingModels.dall_e.name:
@@ -99,18 +96,8 @@ class Img2ImgPage(BasePage):
             )
 
     def validate_form_v2(self):
-        input_file = st.session_state.get("input_file")
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_file or input_image
-
-        # form validation
-        assert input_image_or_file, "Please provide an Input Image"
-
-        # upload input file
-        if input_file:
-            st.session_state["input_image"] = upload_file_hq(
-                input_file, resize=IMG_MAX_SIZE
-            )
+        assert input_image, "Please provide an Input Image"
 
     def render_description(self):
         st.write(
@@ -201,7 +188,3 @@ class Img2ImgPage(BasePage):
                 return 20
             case _:
                 return 5
-
-
-if __name__ == "__main__":
-    Img2ImgPage().render()

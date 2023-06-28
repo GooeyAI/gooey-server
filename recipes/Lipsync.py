@@ -1,10 +1,10 @@
 import typing
 from pathlib import Path
 
-import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_from_bytes, safe_filename, upload_st_file
+import gooey_ui as st
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.lipsync_api import wav2lip
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -34,8 +34,7 @@ class LipsyncPage(BasePage):
             Upload a video/image that contains faces to use  
             *Recommended - mp4 / mov / png / jpg* 
             """,
-            key="face_file",
-            upload_key="input_face",
+            key="input_face",
         )
 
         st.file_uploader(
@@ -44,19 +43,11 @@ class LipsyncPage(BasePage):
             Upload the video/audio file to use as audio source for lipsyncing  
             *Recommended - wav / mp3*
             """,
-            key="audio_file",
-            upload_key="input_audio",
+            key="input_audio",
         )
 
     def validate_form_v2(self):
-        audio_file = st.session_state.get("audio_file")
-        if audio_file:
-            st.session_state["input_audio"] = upload_st_file(audio_file)
         assert st.session_state.get("input_audio"), "Please provide an Audio file"
-
-        face_file = st.session_state.get("face_file")
-        if face_file:
-            st.session_state["input_face"] = upload_st_file(face_file)
         assert st.session_state.get("input_face"), "Please provide an Input Face"
 
     def render_settings(self):
@@ -89,7 +80,7 @@ class LipsyncPage(BasePage):
         with col1:
             input_face = state.get("input_face")
             if not input_face:
-                st.empty()
+                st.div()
             elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
                 st.write("Input Face (Video)")
                 st.video(input_face)
@@ -102,7 +93,7 @@ class LipsyncPage(BasePage):
                 st.write("Input Audio")
                 st.audio(input_audio)
             else:
-                st.empty()
+                st.div()
 
         with col2:
             output_video = state.get("output_video")
@@ -110,7 +101,7 @@ class LipsyncPage(BasePage):
                 st.write("Output Video")
                 st.video(output_video)
             else:
-                st.empty()
+                st.div()
 
     def render_output(self):
         self.render_example(st.session_state)
@@ -124,8 +115,4 @@ class LipsyncPage(BasePage):
         return [DeforumSDPage, LipsyncTTSPage, AsrPage, VideoBotsPage]
 
     def render_usage_guide(self):
-        youtube_video("J87EtK7ZVz0")
-
-
-if __name__ == "__main__":
-    LipsyncPage().render()
+        youtube_video("EJdtC0USujM")

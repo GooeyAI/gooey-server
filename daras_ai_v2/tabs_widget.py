@@ -1,13 +1,24 @@
-import streamlit as st
-from streamlit_option_menu import option_menu
+import gooey_ui as st
+
+# from streamlit_option_menu import option_menu
+from gooey_ui import option_menu
 
 
 class MenuTabs:
     run = "🏃‍♀️Run"
     examples = "🔖 Examples"
-    run_as_api = "🚀 Run as API"
+    run_as_api = "🚀 API"
     history = "📖 History"
     integrations = "🔌 Integrations"
+
+    paths = {
+        run: "",
+        examples: "examples",
+        run_as_api: "api",
+        history: "history",
+        integrations: "integrations",
+    }
+    paths_reverse = {v: k for k, v in paths.items()}
 
 
 def page_tabs(*, tabs, key=None):

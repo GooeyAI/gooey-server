@@ -1,9 +1,8 @@
 import typing
 
-import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_from_bytes, upload_st_file
+import gooey_ui as st
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 
@@ -58,8 +57,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             Upload a video/image that contains faces to use
             *Recommended - mp4 / mov / png / jpg*
             """,
-            key="face_file",
-            upload_key="input_face",
+            key="input_face",
         )
         st.text_area(
             """
@@ -70,11 +68,9 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         )
 
     def validate_form_v2(self):
-        assert st.session_state["text_prompt"], "Text input cannot be empty"
-
-        face_file = st.session_state.get("face_file")
-        if face_file:
-            st.session_state["input_face"] = upload_st_file(face_file)
+        assert st.session_state.get(
+            "text_prompt", ""
+        ).strip(), "Text input cannot be empty"
         assert st.session_state.get("input_face"), "Please provide an Input Face"
 
     def preview_image(self, state: dict) -> str | None:
@@ -113,7 +109,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         with col1:
             input_face = state.get("input_face")
             if not input_face:
-                st.empty()
+                pass
             elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
                 st.video(input_face, caption="Input Face (Video)")
             else:
@@ -124,7 +120,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
                 st.write("**Input Text**")
                 st.write(input_text)
             else:
-                st.empty()
+                st.div()
 
             # input_audio = state.get("input_audio")
             # if input_audio:
@@ -138,11 +134,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             if output_video:
                 st.video(output_video, caption="Output Video")
             else:
-                st.empty()
+                st.div()
 
     def render_output(self):
         self.render_example(st.session_state)
-
-
-if __name__ == "__main__":
-    LipsyncTTSPage().render()

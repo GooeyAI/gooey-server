@@ -24,14 +24,16 @@ from starlette.templating import Jinja2Templates
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config("SECRET_KEY")
+DEBUG = config("DEBUG", cast=bool, default=True)
 
-DEBUG = config("DEBUG", cast=bool)
+if DEBUG:
+    SECRET_KEY = "xxxx"
+else:
+    SECRET_KEY = config("SECRET_KEY")
 
 ALLOWED_HOSTS = ["*"]
 INTERNAL_IPS = ["127.0.0.1"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
 
 # Application definition
 
@@ -46,6 +48,7 @@ INSTALLED_APPS = [
     # the order matters, since we want to override the admin templates
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
+    "app_users",
 ]
 
 MIDDLEWARE = [
@@ -77,6 +80,8 @@ TEMPLATES = [
     },
 ]
 
+templates = Jinja2Templates(directory="templates")
+
 # needed to override django admin templates
 FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
@@ -99,6 +104,8 @@ try:
             "PASSWORD": PGPASSWORD,
             "HOST": PGHOST,
             "PORT": PGPORT,
+            "CONN_HEALTH_CHECKS": True,
+            "CONN_MAX_AGE": None,
         }
     }
 except UndefinedValueError:
@@ -140,6 +147,11 @@ USE_I18N = True
 
 USE_TZ = True
 
+DATETIME_FORMAT = "N j, D, Y, h:i:s A"
+
+from django.conf.locale.en import formats as es_formats
+
+es_formats.DATETIME_FORMAT = DATETIME_FORMAT
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -188,21 +200,20 @@ else:
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
-os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", None)
+os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
-GS_BUCKET_NAME = config("GS_BUCKET_NAME")
-GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
-UBERDUCK_KEY = config("UBERDUCK_KEY")
-UBERDUCK_SECRET = config("UBERDUCK_SECRET")
+GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
+# GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
+UBERDUCK_KEY = config("UBERDUCK_KEY", None)
+UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 
-OPENAI_API_KEY = config("OPENAI_API_KEY")
+OPENAI_API_KEY = config("OPENAI_API_KEY", None)
 
-POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN")
+POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 
 APP_BASE_URL = config("APP_BASE_URL", "/")
 API_BASE_URL = config("API_BASE_URL", "/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
-IFRAME_BASE_URL = config("IFRAME_BASE_URL", "/__/st/")
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 GPU_SERVER_2 = furl(config("GPU_SERVER_2", "http://gpu-2.gooey.ai"))
@@ -230,8 +241,6 @@ GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
 
 SEON_API_KEY = config("SEON_API_KEY", None)
 
-templates = Jinja2Templates(directory="templates")
-
 FB_APP_ID = config("FB_APP_ID", "")
 FB_APP_SECRET = config("FB_APP_SECRET", "")
 FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
@@ -245,5 +254,7 @@ REDIS_URL = config("REDIS_URL", "redis://localhost:6379")
 REDIS_CACHE_URL = config("REDIS_CACHE_URL", "redis://localhost:6379")
 TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
 
-PINECONE_API_KEY = config("PINECONE_API_KEY", "")
-PINECONE_ENVIRONMENT = config("PINECONE_ENVIRONMENT", "us-east1-gcp")
+GPU_CELERY_BROKER_URL = config("GPU_CELERY_BROKER_URL", "amqp://localhost:5674")
+GPU_CELERY_RESULT_BACKEND = config("GPU_CELERY_RESULT_BACKEND", "redis://locahost:6374")
+
+LOCAL_CELERY_BROKER_URL = config("LOCAL_CELERY_BROKER_URL", "amqp://")

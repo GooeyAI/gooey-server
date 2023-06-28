@@ -1,5 +1,5 @@
 import requests
-import streamlit as st
+import gooey_ui as st
 from furl import furl
 
 from daras_ai_v2 import settings

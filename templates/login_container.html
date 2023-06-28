@@ -1,31 +1,49 @@
-{% if request.user %}
-    <div class="login-container">
-        <a href="/account" class="login-name">
-            {% if request.user.display_name %}
-                {{ request.user.display_name }}
-            {% endif %}
-            <div class="login-id" >{{ request.user.email or request.user.phone_number }}</div>
-        </a>
-    </div>
+{% if request.user and not request.user.is_anonymous %}
+    <a class="pe-2" href="/account">
+        Hi, {{ request.user.first_name()  or request.user.email or request.user.phone_number }}
+    </a>
 {% else %}
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    {% if block_incognito %}
+        <script>
+            window.addEventListener("DOMContentLoaded", async function () {
+                await window.waitUntilHydrated;
+                let result = await detectIncognito();
+                if (!result.isPrivate) return;
+                let elem = document.getElementById("main-content");
+                if (!elem) return;
+                elem.innerHTML =
+                    `<h3 style='text-align: center; padding: 20px'>
+                        Sorry! We can't let you use this app in incognito mode. Please login to continue.
+                    </h3>`;
 
-    <div id="g_id_onload"
-         data-client_id="6678571001-hirtjjutehsmoi1jl0c0290kobdk8t8r.apps.googleusercontent.com"
-         data-callback="handleCredentialResponse"
-         data-auto_prompt="{{ enable_onetap or "true" }}">
-    </div>
+            });
+        </script>
+        <script src="https://cdn.jsdelivr.net/gh/Joe12387/detectIncognito@v1.3.0/dist/es5/detectIncognito.min.js"
+                defer></script>
+    {% endif %}
 
-    <div class="login-container">
-        <div class="g_id_signin"
-             data-type="button"
-             data-size="large"
-             data-theme="filled_black"
-             data-text="sign_in_with"
-             data-shape="pill"
-             data-logo_alignment="right">
-        </div>
-        <div style="height: 6px"></div>
-        <a style="font-size: 10px; color: wheat" href="/login?next={{ request.path }}">or another way...</a>&nbsp;
-    </div>
+    <a class="pe-2" href="/login/?next={{ request.path }}">
+        Sign in
+    </a>
+
+    <span class="pe-2" style="height: 44px; width: 200px" data-replace-login-spinner>
+        <span id="g_id_signin"></span>
+    </span>
+
+    <script>
+        window.addEventListener("DOMContentLoaded", async function () {
+            await window.waitUntilHydrated;
+            google.accounts.id.initialize({
+                client_id: CLIENT_ID,
+                callback: handleCredentialResponse,
+            });
+            google.accounts.id.renderButton(document.getElementById("g_id_signin"), {
+                shape: "rectangular",
+                width: 200,
+                text: "continue_with",
+            });
+            google.accounts.id.prompt();
+        });
+    </script>
+    <script defer src="https://accounts.google.com/gsi/client"></script>
 {% endif %}

@@ -1,13 +1,12 @@
 import typing
 
-import streamlit as st
 from pydantic import BaseModel
 
-from daras_ai.image_input import upload_file_hq
+import gooey_ui as st
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.face_restoration import UpscalerModels, run_upscaler_model
-from daras_ai_v2.stable_diffusion import IMG_MAX_SIZE
+from daras_ai_v2.stable_diffusion import SD_IMG_MAX_SIZE
 
 DEFAULT_COMPARE_UPSCALER_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/COMPARE%20IMAGE%20UPSCALERS.jpg"
 
@@ -33,8 +32,8 @@ class CompareUpscalerPage(BasePage):
             """
             ### Input Image
             """,
-            key="input_file",
-            upload_key="input_image",
+            key="input_image",
+            upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
         )
 
         enum_multiselect(
@@ -46,16 +45,8 @@ class CompareUpscalerPage(BasePage):
     def validate_form_v2(self):
         assert st.session_state["selected_models"], "Please select at least one model"
 
-        input_file = st.session_state.get("input_file")
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_file or input_image
-        assert input_image_or_file, "Please provide an Input Image"
-
-        # upload input file
-        if input_file:
-            st.session_state["input_image"] = upload_file_hq(
-                input_file, resize=IMG_MAX_SIZE
-            )
+        assert input_image, "Please provide an Input Image"
 
     def render_settings(self):
         st.slider(

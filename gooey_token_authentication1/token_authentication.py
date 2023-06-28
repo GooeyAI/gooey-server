@@ -1,7 +1,7 @@
 from fastapi import Header
 from fastapi.exceptions import HTTPException
-from firebase_admin import auth
 
+from app_users.models import AppUser
 from auth_backend import _forced_auth_user
 from daras_ai_v2 import db
 from daras_ai_v2.crypto import PBKDF2PasswordHasher
@@ -14,14 +14,14 @@ def api_auth_header(
         alias="Authorization",
         description=f"{auth_keyword} $GOOEY_API_KEY",
     ),
-):
+) -> AppUser:
     if _forced_auth_user:
         return _forced_auth_user[0]
 
     return authenticate(authorization)
 
 
-def authenticate(auth_token: str):
+def authenticate(auth_token: str) -> AppUser:
     auth = auth_token.split()
     if not auth or auth[0].lower() != auth_keyword.lower():
         msg = "Invalid Authorization header."
@@ -35,8 +35,8 @@ def authenticate(auth_token: str):
     return authenticate_credentials(auth[1])
 
 
-def authenticate_credentials(token: str) -> auth.UserRecord:
-    db_collection = db._db.collection(db.API_KEYS_COLLECTION)
+def authenticate_credentials(token: str) -> AppUser:
+    db_collection = db.client.collection(db.API_KEYS_COLLECTION)
     hasher = PBKDF2PasswordHasher()
     secret_key_hash = hasher.encode(token)
 
@@ -55,10 +55,10 @@ def authenticate_credentials(token: str) -> auth.UserRecord:
         )
 
     uid = doc.get("uid")
-    user = auth.get_user(uid)
-    if user.disabled:
+    user = AppUser.objects.get_or_create_from_uid(uid)[0]
+    if user.is_disabled:
         msg = (
-            "Your Gooey.AI account has been disabled for violating our [Terms of Service](/terms). "
+            "Your Gooey.AI account has been disabled for violating our Terms of Service. "
             "Contact us at support@gooey.ai if you think this is a mistake."
         )
         raise HTTPException(status_code=401, detail={"error": msg})

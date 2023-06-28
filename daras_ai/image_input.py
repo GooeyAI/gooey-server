@@ -6,74 +6,18 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import streamlit as st
 from PIL import Image, ImageOps
 from firebase_admin import storage
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from daras_ai.core import daras_ai_step_config, daras_ai_step_io
 from daras_ai_v2 import settings
-
-
-@daras_ai_step_config("Image input", is_input=True)
-def image_input(idx, variables, state):
-    var_name = st.text_input(
-        "Variable Name",
-        value=state.get("var_name", "image_input"),
-        help=f"Image name {idx}",
-    )
-    state.update({"var_name": var_name})
-
-    # col1, col2 = st.columns(2)
-    # with col1:
-    #     resize_width = int(
-    #         st.number_input(
-    #             "Resize Width",
-    #             step=1,
-    #             value=state.get("resize_width", 512),
-    #             help=f"Resize Width {idx}",
-    #         )
-    #     )
-    #     state.update({"resize_width": resize_width})
-    # with col2:
-    #     resize_height = int(
-    #         st.number_input(
-    #             "Resize Height",
-    #             step=1,
-    #             value=state.get("resize_height", 512),
-    #             help=f"Resize Width {idx}",
-    #         )
-    #     )
-    #     state.update({"resize_height": resize_height})
-    #
-
-
-@daras_ai_step_io
-def image_input(idx, variables, state):
-    var_name = state.get("var_name", "")
-    # resize_width = state["resize_width"]
-    # resize_height = state["resize_height"]
-    if not var_name:
-        return
-    if var_name not in variables:
-        variables[var_name] = None
-
-    uploaded_file = st.file_uploader(var_name, help=f"Image input {var_name} {idx + 1}")
-    if uploaded_file:
-        image_url = upload_file(uploaded_file)
-        variables[var_name] = image_url
-
-    image_url = variables.get(var_name)
-    if image_url:
-        st.image(variables[var_name], width=300)
 
 
 # @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 # @st.cache_data
-def upload_file(uploaded_file: UploadedFile):
-    img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
-    img_bytes = resize_img_pad(img_bytes, (512, 512))
-    return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
+# def upload_file(uploaded_file: UploadedFile):
+#     img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
+#     img_bytes = resize_img_pad(img_bytes, (512, 512))
+#     return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
 
 
 def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
@@ -86,30 +30,30 @@ def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
 
 # @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
 # @st.cache_data
-def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
-    img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
-    img_bytes = resize_img_scale(img_bytes, resize)
-    return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
+# def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
+#     img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
+#     img_bytes = resize_img_scale(img_bytes, resize)
+#     return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
 
 
-def uploaded_file_get_value(uploaded_file):
-    img_bytes = uploaded_file.read()
-    filename = uploaded_file.name
-    content_type = uploaded_file.type
-    if filename.endswith("HEIC"):
-        img_bytes = _heic_to_png(img_bytes)
-        filename += ".png"
-        content_type = "image/png"
-    return img_bytes, safe_filename(filename), content_type
+# def uploaded_file_get_value(uploaded_file):
+#     img_bytes = uploaded_file.read()
+#     filename = uploaded_file.name
+#     content_type = uploaded_file.type
+#     if filename.endswith("HEIC"):
+#         img_bytes = _heic_to_png(img_bytes)
+#         filename += ".png"
+#         content_type = "image/png"
+#     return img_bytes, safe_filename(filename), content_type
 
 
-def _heic_to_png(img_bytes: bytes) -> bytes:
-    from wand.image import Image
-
-    with Image(blob=img_bytes) as original:
-        with original.convert("png") as converted:
-            img_bytes = converted.make_blob()
-    return img_bytes
+# def _heic_to_png(img_bytes: bytes) -> bytes:
+#     from wand.image import Image
+#
+#     with Image(blob=img_bytes) as original:
+#         with original.transform(resize="1024@>").convert("png") as converted:
+#             img_bytes = converted.make_blob()
+#     return img_bytes
 
 
 def resize_img_scale(img_bytes: bytes, size: (int, int)) -> bytes:
@@ -141,8 +85,8 @@ def resize_img_fit(img_bytes: bytes, size: (int, int)) -> bytes:
 
 
 # @st.cache_data
-def upload_st_file(f: UploadedFile) -> str:
-    return upload_file_from_bytes(f.name, f.getvalue(), f.type)
+# def upload_st_file(f: UploadedFile) -> str:
+#     return upload_file_from_bytes(f.name, f.getvalue(), f.type)
 
 
 def upload_file_from_bytes(
@@ -186,7 +130,7 @@ def img_exists(img) -> bool:
         return bool(img)
 
 
-FILENAME_WHITELIST = re.compile(r"[ A-z0-9\-_.]")
+FILENAME_WHITELIST = re.compile(r"[ a-zA-Z0-9\-_.]")
 
 
 def safe_filename(filename: str):

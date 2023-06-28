@@ -2,7 +2,6 @@ import datetime
 import heapq
 import io
 import os
-import random
 import re
 import subprocess
 import tempfile
@@ -13,15 +12,14 @@ import numpy as np
 import pandas as pd
 import pdftotext
 import requests
-import streamlit as st
 from furl import furl
 from googleapiclient.errors import HttpError
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pydantic import BaseModel
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
+import gooey_ui as st
 from daras_ai.face_restoration import map_parallel
-from daras_ai.image_input import upload_st_file, upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.GoogleGPT import SearchReference, render_outputs, GoogleGPTPage
 from daras_ai_v2.asr import AsrModels, run_asr, run_google_translate
 from daras_ai_v2.base import BasePage
@@ -101,18 +99,6 @@ class DocSearchPage(BasePage):
     def validate_form_v2(self):
         search_query = st.session_state.get("search_query", "").strip()
         assert search_query, "Please enter a Search Query"
-
-        document_files: list[UploadedFile] | None = st.session_state.get(
-            "__documents_files"
-        )
-        if document_files:
-            uploaded = []
-            for f in document_files:
-                if f.name == "urls.txt":
-                    uploaded.extend(f.getvalue().decode().splitlines())
-                else:
-                    uploaded.append(upload_st_file(f))
-            st.session_state["documents"] = uploaded
         assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def related_workflows(self) -> list:
@@ -169,7 +155,7 @@ class DocSearchPage(BasePage):
                 st.write("**ScaleSERP Results**")
                 st.json(scaleserp_results, expanded=False)
             else:
-                st.empty()
+                st.div()
 
         render_doc_search_step(
             st.session_state.get("final_prompt"),
@@ -648,17 +634,13 @@ def render_doc_search_step(
     if final_prompt:
         st.text_area(
             "**Final Prompt**",
-            key=random.random(),
             value=final_prompt,
             height=400,
             disabled=True,
         )
-    else:
-        st.empty()
     for idx, text in enumerate(output_text):
         st.text_area(
             f"**Output Text**",
-            key=random.random(),
             help=f"output {idx}",
             disabled=True,
             value=text,

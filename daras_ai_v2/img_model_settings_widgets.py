@@ -1,6 +1,7 @@
+import json
 import math
 
-import streamlit as st
+import gooey_ui as st
 
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.stable_diffusion import (
@@ -114,33 +115,33 @@ def num_outputs_setting(selected_model: str = None):
                 """
             )
         else:
-            st.empty()
+            st.div()
 
 
 RESOLUTIONS = {
     512: {
-        (512, 512): "square",
-        (576, 448): "A4",
-        (640, 384): "laptop",
-        (768, 320): "smartphone",
-        (960, 256): "cinema",
-        (1024, 256): "panorama",
+        "512, 512": "square",
+        "576, 448": "A4",
+        "640, 384": "laptop",
+        "768, 320": "smartphone",
+        "960, 256": "cinema",
+        "1024, 256": "panorama",
     },
     768: {
-        (768, 768): "square",
-        (896, 640): "A4",
-        (1024, 576): "laptop",
-        (1024, 512): "smartphone",
-        (1152, 512): "cinema",
-        (1536, 384): "panorama",
+        "768, 768": "square",
+        "896, 640": "A4",
+        "1024, 576": "laptop",
+        "1024, 512": "smartphone",
+        "1152, 512": "cinema",
+        "1536, 384": "panorama",
     },
     1024: {
-        (1024, 1024): "square",
-        (1024, 768): "A4",
-        (1280, 768): "laptop",
-        (1536, 512): "smartphone",
-        (1792, 512): "cinema",
-        (2048, 512): "panorama",
+        "1024, 1024": "square",
+        "1024, 768": "A4",
+        "1280, 768": "laptop",
+        "1536, 512": "smartphone",
+        "1792, 512": "cinema",
+        "2048, 512": "panorama",
     },
 }
 
@@ -165,22 +166,25 @@ def output_resolution_setting():
             orientation = LANDSCAPE
         for pixels, spec in RESOLUTIONS.items():
             for res in spec.keys():
-                if res != saved:
+                if res != f"{int(saved[0])}, {int(saved[1])}":
                     continue
                 st.session_state["__pixels"] = pixels
                 st.session_state["__res"] = res
                 st.session_state["__orientation"] = orientation
                 break
 
-    selected_model = st.session_state.get(
-        "selected_model", st.session_state.get("selected_models", "")
+    selected_models = (
+        st.session_state.get("selected_model", st.session_state.get("selected_models"))
+        or ""
     )
-    if "jack_qiao" in selected_model or "sd_1_4" in selected_model:
+    if not isinstance(selected_models, list):
+        selected_models = [selected_models]
+    if "jack_qiao" in selected_models or "sd_1_4" in selected_models:
         pixel_options = [512]
-    elif "deepfloyd_if" in selected_model:
+    elif selected_models == ["deepfloyd_if"]:
         pixel_options = [1024]
     else:
-        pixel_options = [768, 1024]
+        pixel_options = [512, 768]
 
     with col1:
         pixels = st.selectbox(
@@ -193,9 +197,11 @@ def output_resolution_setting():
         res = st.selectbox(
             "##### Resolution",
             key="__res",
-            format_func=lambda x: f"{x[0]} x {x[1]} ({RESOLUTIONS[pixels][x]})",
-            options=RESOLUTIONS[pixels].keys(),
+            format_func=lambda r: f"{r.split(', ')[0]} x {r.split(', ')[1]} ({RESOLUTIONS[pixels][r]})",
+            options=list(RESOLUTIONS[pixels].keys()),
         )
+        res = tuple(map(int, res.split(", ")))
+
     if res[0] != res[1]:
         with col3:
             orientation = st.selectbox(
@@ -220,7 +226,7 @@ def guidance_scale_setting(selected_model: str = None):
         Text2ImgModels.dall_e.name,
         Text2ImgModels.jack_qiao,
     ]:
-        st.number_input(
+        st.slider(
             label="""
             ##### 🎨️ Artistic Pressure
             ([*Text Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter)) \\

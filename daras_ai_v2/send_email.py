@@ -7,7 +7,9 @@ from os.path import basename
 import requests
 from decouple import config
 from firebase_admin.auth import UserRecord
-from streamlit.runtime.uploaded_file_manager import UploadedFile
+
+from app_users.models import AppUser
+from gooey_ui import UploadedFile
 
 from daras_ai_v2 import settings
 from daras_ai_v2.settings import templates
@@ -15,7 +17,7 @@ from daras_ai_v2.settings import templates
 
 def send_reported_run_email(
     *,
-    user: UserRecord,
+    user: AppUser,
     run_uid: str,
     url: str,
     recipe_name: str,

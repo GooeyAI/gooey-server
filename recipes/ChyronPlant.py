@@ -1,5 +1,5 @@
 import openai
-import streamlit as st
+import gooey_ui as st
 from decouple import config
 from pydantic import BaseModel
 
@@ -30,18 +30,13 @@ class ChyronPlantPage(BasePage):
         midi_translation: str
         chyron_output: str
 
-    def render_form(self):
-        with st.form("my_form"):
-            st.text_input(
-                """
-                ### Input Midi notes
-                """,
-                key="midi_notes",
-            )
-
-            submitted = st.form_submit_button("🏃‍ Submit")
-
-        return submitted
+    def render_form_v2(self):
+        st.text_input(
+            """
+            ### Input Midi notes
+            """,
+            key="midi_notes",
+        )
 
     def render_output(self):
         st.text_area(
@@ -133,7 +128,3 @@ class ChyronPlantPage(BasePage):
             st.write(state.get("midi_translation", ""))
         with col2:
             st.write(state.get("chyron_output", ""))
-
-
-if __name__ == "__main__":
-    ChyronPlantPage().render()

@@ -1,7 +1,7 @@
 import random
 import typing
 
-import streamlit as st
+import gooey_ui as st
 from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage
@@ -147,7 +147,3 @@ class CompareLLMPage(BasePage):
             VideoBotsPage,
             LipsyncTTSPage,
         ]
-
-
-if __name__ == "__main__":
-    CompareLLMPage().render()

@@ -4,7 +4,7 @@ import time
 import typing
 
 import requests
-import streamlit as st
+import gooey_ui as st
 from google.cloud import texttospeech
 from pydantic import BaseModel
 
@@ -93,7 +93,7 @@ class TextToSpeechPage(BasePage):
         text_to_speech_settings()
 
     def render_usage_guide(self):
-        youtube_video("pZ9ldun8aXo")
+        youtube_video("aD4N-g9qqhc")
         # loom_video("2d853b7442874b9cbbf3f27b98594add")
 
     def render_output(self):
@@ -102,7 +102,7 @@ class TextToSpeechPage(BasePage):
         if audio_url:
             st.audio(audio_url)
         else:
-            st.empty()
+            st.div()
 
     def run(self, state: dict):
         text = state["text_prompt"].strip()
@@ -238,7 +238,3 @@ class TextToSpeechPage(BasePage):
             audio_url = state.get("audio_url")
             if audio_url:
                 st.audio(audio_url)
-
-
-if __name__ == "__main__":
-    TextToSpeechPage().render()

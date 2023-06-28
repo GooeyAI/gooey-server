@@ -4,7 +4,7 @@ import tempfile
 from enum import Enum
 
 import requests
-import streamlit as st
+import gooey_ui as st
 import typing_extensions
 from furl import furl
 from google.cloud import speech_v1p1beta1
@@ -17,7 +17,7 @@ from daras_ai_v2.gpu_server import GpuEndpoints
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
-    whisper_telugu_large_v2 = "Whisper Telgu Large v2 (Bhashini)"
+    whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     usm = "USM (Google)"

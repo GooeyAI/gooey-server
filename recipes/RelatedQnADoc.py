@@ -1,15 +1,13 @@
 import typing
 
-import streamlit as st
 from pydantic import BaseModel
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from daras_ai.image_input import upload_st_file
+import gooey_ui as st
 from daras_ai_v2.GoogleGPT import render_outputs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.google_search import call_scaleserp, call_scaleserp_rq
+from daras_ai_v2.google_search import call_scaleserp_rq
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
@@ -26,7 +24,7 @@ class RelatedQnADocPage(BasePage):
     title = '"People Also Ask" Answers from a Doc'
     slug_versions = ["related-qna-maker-doc"]
 
-    price = 175
+    price = 100
 
     class RequestModel(BaseModel):
         search_query: str
@@ -64,21 +62,6 @@ class RelatedQnADocPage(BasePage):
         assert st.session_state.get(
             "search_query", ""
         ).strip(), "Please enter a search query"
-
-        search_query = st.session_state.get("search_query", "").strip()
-        assert search_query, "Please enter a Search Query"
-
-        document_files: list[UploadedFile] | None = st.session_state.get(
-            "__documents_files"
-        )
-        if document_files:
-            uploaded = []
-            for f in document_files:
-                if f.name == "urls.txt":
-                    uploaded.extend(f.getvalue().decode().splitlines())
-                else:
-                    uploaded.append(upload_st_file(f))
-            st.session_state["documents"] = uploaded
         assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_output(self):
@@ -140,14 +123,10 @@ class RelatedQnADocPage(BasePage):
         return 'This workflow finds the related queries (aka "People also ask") for a Google search, searches your doc, pdf or file (from a URL or via an upload) and then generates answers using vector DB results from your docs.'
 
     def render_steps(self):
-        col1, col2 = st.columns(2)
-        with col1:
-            scaleserp_results = st.session_state.get("scaleserp_results")
-            if scaleserp_results:
-                st.write("**ScaleSERP Results**")
-                st.json(scaleserp_results, expanded=False)
-            else:
-                st.empty()
+        scaleserp_results = st.session_state.get("scaleserp_results")
+        if scaleserp_results:
+            st.write("**ScaleSERP Results**")
+            st.json(scaleserp_results, expanded=False)
         output_queries = st.session_state.get("output_queries", [])
         for i, result in enumerate(output_queries):
             st.write("---")

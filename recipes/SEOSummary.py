@@ -5,7 +5,7 @@ from functools import partial
 
 import readability
 import requests
-import streamlit as st
+import gooey_ui as st
 from bs4 import BeautifulSoup
 from furl import furl
 from html_sanitizer import Sanitizer
@@ -220,7 +220,7 @@ SearchSEO > Page Parsing > GPT3
                     )
 
         else:
-            st.empty()
+            st.div()
 
     def render_steps(self):
         col1, col2 = st.columns(2)
@@ -231,7 +231,7 @@ SearchSEO > Page Parsing > GPT3
                 st.write("**ScaleSERP Results**")
                 st.json(scaleserp_results, expanded=False)
             else:
-                st.empty()
+                st.div()
 
         with col2:
             search_urls = st.session_state.get("search_urls")
@@ -239,14 +239,14 @@ SearchSEO > Page Parsing > GPT3
                 st.write("**Search URLs**")
                 st.json(search_urls, expanded=False)
             else:
-                st.empty()
+                st.div()
 
         summarized_urls = st.session_state.get("summarized_urls")
         if summarized_urls:
             st.write("**Summarized URLs**")
             st.json(summarized_urls, expanded=False)
         else:
-            st.empty()
+            st.div()
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
@@ -257,7 +257,7 @@ SearchSEO > Page Parsing > GPT3
                 disabled=True,
             )
         else:
-            st.empty()
+            st.div()
 
     def render_example(self, state: dict):
         st.write(
@@ -490,7 +490,3 @@ def _extract_search_urls(
     gooey_rng.shuffle(search_urls)
 
     return search_urls
-
-
-if __name__ == "__main__":
-    SEOSummaryPage().render()

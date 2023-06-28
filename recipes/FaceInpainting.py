@@ -3,14 +3,13 @@ from functools import partial
 
 import cv2
 import requests
-import streamlit as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai.extract_face import extract_and_reposition_face_cv2
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
-    upload_file_hq,
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
@@ -19,7 +18,7 @@ from daras_ai_v2.face_restoration import map_parallel, gfpgan
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
-from daras_ai_v2.loom_video_widget import loom_video, youtube_video
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
@@ -109,24 +108,14 @@ class FaceInpaintingPage(BasePage):
             ### Face Photo
             Give us a photo of yourself, or anyone else
             """,
-            key="input_file",
-            upload_key="input_image",
+            key="input_image",
+            accept=["image/*"],
         )
 
     def validate_form_v2(self):
         text_prompt = st.session_state.get("text_prompt")
-        input_file = st.session_state.get("input_file")
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_file or input_image
-
-        # form validation
-        assert (
-            text_prompt and input_image_or_file
-        ), "Please provide a Prompt and a Face Photo"
-
-        # upload input file
-        if input_file:
-            st.session_state["input_image"] = upload_file_hq(input_file)
+        assert text_prompt and input_image, "Please provide a Prompt and a Face Photo"
 
     def render_settings(self):
         img_model_settings(InpaintingModels)
@@ -215,7 +204,7 @@ class FaceInpaintingPage(BasePage):
                     caption="```" + text_prompt.replace("\n", "") + "```",
                 )
         else:
-            st.empty()
+            st.div()
 
     def render_steps(self):
         input_file = st.session_state.get("input_file")
@@ -229,20 +218,20 @@ class FaceInpaintingPage(BasePage):
             if input_image_or_file:
                 st.image(input_image_or_file, caption="Input Image")
             else:
-                st.empty()
+                st.div()
 
         with col2:
             resized_image = st.session_state.get("resized_image")
             if resized_image:
                 st.image(resized_image, caption="Repositioned Face")
             else:
-                st.empty()
+                st.div()
 
             face_mask = st.session_state.get("face_mask")
             if face_mask:
                 st.image(face_mask, caption="Face Mask")
             else:
-                st.empty()
+                st.div()
 
         with col3:
             diffusion_images = st.session_state.get("diffusion_images")
@@ -250,17 +239,17 @@ class FaceInpaintingPage(BasePage):
                 for url in diffusion_images:
                     st.image(url, caption="Generated Image")
             else:
-                st.empty()
+                st.div()
 
         with col4:
             if output_images:
                 for url in output_images:
                     st.image(url, caption="gfpgan - Face Restoration")
             else:
-                st.empty()
+                st.div()
 
     def render_usage_guide(self):
-        youtube_video("L-yHhIq3sE0")
+        youtube_video("To4Oc_d4Nus")
         # loom_video("788dfdee763a4e329e28e749239f9810")
 
     def run(self, state: dict):
@@ -350,7 +339,3 @@ class FaceInpaintingPage(BasePage):
                 return 20
             case _:
                 return 5
-
-
-if __name__ == "__main__":
-    FaceInpaintingPage().render()

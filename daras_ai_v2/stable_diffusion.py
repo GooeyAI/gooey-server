@@ -6,6 +6,7 @@ import openai
 import replicate
 import requests
 from PIL import Image
+from django.db import models
 
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -23,7 +24,7 @@ from daras_ai_v2.gpu_server import (
     call_sd_multi,
 )
 
-IMG_MAX_SIZE = (768, 768)
+SD_IMG_MAX_SIZE = (768, 768)
 
 
 class InpaintingModels(Enum):
@@ -37,6 +38,7 @@ class Text2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+    dream_shaper = "DreamShaper (Lykon)"
     openjourney = "Open Journey (PromptHero)"
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
@@ -57,6 +59,7 @@ text2img_model_ids = {
     Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Text2ImgModels.rodent_diffusion_1_5: "devxpy/rodent-diffusion-1-5",
+    Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Text2ImgModels.deepfloyd_if: [
         "DeepFloyd/IF-I-XL-v1.0",
         "DeepFloyd/IF-II-L-v1.0",
@@ -70,6 +73,7 @@ class Img2ImgModels(Enum):
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+    dream_shaper = "DreamShaper (Lykon)"
     openjourney = "Open Journey (PromptHero)"
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
@@ -83,6 +87,7 @@ class Img2ImgModels(Enum):
 img2img_model_ids = {
     Img2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
     Img2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
+    Img2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Img2ImgModels.openjourney: "prompthero/openjourney",
     Img2ImgModels.openjourney_2: "prompthero/openjourney-v2",
     Img2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
@@ -115,6 +120,47 @@ controlnet_model_ids = {
 }
 
 
+class Schedulers(models.TextChoices):
+    singlestep_dpm_solver = (
+        "DPM",
+        "DPMSolverSinglestepScheduler",
+    )
+    multistep_dpm_solver = "DPM Multistep", "DPMSolverMultistepScheduler"
+    dpm_sde = (
+        "DPM SDE",
+        "DPMSolverSDEScheduler",
+    )
+    dpm_discrete = (
+        "DPM Discrete",
+        "KDPM2DiscreteScheduler",
+    )
+    dpm_discrete_ancestral = (
+        "DPM Anscetral",
+        "KDPM2AncestralDiscreteScheduler",
+    )
+    unipc = "UniPC", "UniPCMultistepScheduler"
+    lms_discrete = (
+        "LMS",
+        "LMSDiscreteScheduler",
+    )
+    heun = (
+        "Heun",
+        "HeunDiscreteScheduler",
+    )
+    euler = "Euler", "EulerDiscreteScheduler"
+    euler_ancestral = (
+        "Euler ancestral",
+        "EulerAncestralDiscreteScheduler",
+    )
+    pndm = "PNDM", "PNDMScheduler"
+    ddpm = "DDPM", "DDPMScheduler"
+    ddim = "DDIM", "DDIMScheduler"
+    deis = (
+        "DEIS",
+        "DEISMultistepScheduler",
+    )
+
+
 def sd_upscale(
     *,
     prompt: str,
@@ -126,7 +172,7 @@ def sd_upscale(
     seed: int = 42,
 ):
     return call_sd_multi(
-        "upscale",
+        "diffusion.upscale",
         pipeline={
             "model_id": "stabilityai/stable-diffusion-x4-upscaler",
             # "scheduler": "UniPCMultistepScheduler",
@@ -156,7 +202,7 @@ def instruct_pix2pix(
     seed: int = 42,
 ):
     return call_sd_multi(
-        "instruct_pix2pix",
+        "diffusion.instruct_pix2pix",
         pipeline={
             "model_id": "timbrooks/instruct-pix2pix",
             # "scheduler": "UniPCMultistepScheduler",
@@ -188,6 +234,7 @@ def text2img(
     seed: int = 42,
     guidance_scale: float = None,
     negative_prompt: str = None,
+    scheduler: str = None,
 ):
     _resolution_check(width, height, max_size=(1024, 1024))
 
@@ -219,10 +266,10 @@ def text2img(
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
             return call_sd_multi(
-                "text2img",
+                "diffusion.text2img",
                 pipeline={
                     "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
-                    # "scheduler": "EulerDiscreteScheduler",
+                    "scheduler": Schedulers[scheduler].label if scheduler else None,
                     "disable_safety_checker": True,
                     "seed": seed,
                 },
@@ -313,7 +360,7 @@ def img2img(
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
             return call_sd_multi(
-                "img2img",
+                "diffusion.img2img",
                 pipeline={
                     "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
                     # "scheduler": "UniPCMultistepScheduler",
@@ -350,7 +397,7 @@ def controlnet(
 ):
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
-        "controlnet",
+        "diffusion.controlnet",
         pipeline={
             "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
             "seed": seed,
@@ -526,7 +573,7 @@ def _recomposite_inpainting_outputs(
     return ret
 
 
-def _resolution_check(width, height, max_size=IMG_MAX_SIZE):
+def _resolution_check(width, height, max_size=SD_IMG_MAX_SIZE):
     if get_downscale_factor(im_size=(width, height), max_size=max_size):
         raise ValueError(
             f"Maximum size is {max_size[0]}x{max_size[1]} pixels, because of memory limits. "

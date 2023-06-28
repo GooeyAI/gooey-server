@@ -1,7 +1,7 @@
 import enum
 from typing import TypeVar, Type
 
-import streamlit as st
+import gooey_ui as st
 
 from daras_ai_v2.grid_layout_widget import grid_layout
 
@@ -31,7 +31,7 @@ def enum_multiselect(
             else:
                 selected.discard(e.name)
 
-        grid_layout(2, enum_cls, render, separator=None)
+        grid_layout(2, enum_cls, render, separator=False)
         st.session_state[key] = list(selected)
 
         return selected

@@ -4,13 +4,13 @@ import glom
 import requests
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
-from firebase_admin import auth
 from furl import furl
 from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response
 
+from app_users.models import AppUser
 from bots.models import (
     BotIntegration,
     Platform,
@@ -68,7 +68,7 @@ TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
 
 @router.get("/__/fb/connect/")
 def fb_connect_redirect(request: Request):
-    if not request.user:
+    if not request.user or request.user.is_anonymous:
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
@@ -135,7 +135,6 @@ async def request_json(request: Request):
 
 
 @router.post("/__/fb/webhook/")
-@db_middleware
 def fb_webhook(
     background_tasks: BackgroundTasks,
     data: dict = Depends(request_json),
@@ -251,7 +250,9 @@ def _on_msg(bot: BotInterface):
     # mark message as read
     bot.mark_read()
     # get the attached billing account
-    billing_account_user = auth.get_user(bot.billing_account_uid)
+    billing_account_user = AppUser.objects.get_or_create_from_uid(
+        bot.billing_account_uid
+    )[0]
     # get the user's input
     match bot.input_type:
         # handle button press
@@ -416,7 +417,7 @@ def _handle_interactive_msg(bot: BotInterface):
 
 def _handle_audio_msg(billing_account_user, bot):
     from recipes.asr import AsrPage
-    from server import call_api
+    from routers.api import call_api
 
     # run asr
     asr_lang = None
@@ -473,7 +474,7 @@ def _feedback_start_buttons():
         },
         {
             "type": "reply",
-            "reply": {"id": ButtonIds.feedback_thumbs_down, "title": "👎🏾"},
+            "reply": {"id": ButtonIds.feedback_thumbs_down, "title": "👎🏽"},
         },
     ]
 
@@ -481,13 +482,13 @@ def _feedback_start_buttons():
 def _process_msg(
     *,
     page_cls,
-    api_user: auth.UserRecord,
+    api_user: AppUser,
     query_params: dict,
     convo: Conversation,
     input_text: str,
     user_language: str,
 ) -> tuple[str, str | None, str | None, list[Message]]:
-    from server import call_api
+    from routers.api import call_api
 
     # get latest messages for context (upto 100)
     saved_msgs = list(

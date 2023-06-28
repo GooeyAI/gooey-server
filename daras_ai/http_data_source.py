@@ -2,7 +2,7 @@ import json
 from locale import format
 
 import requests
-import streamlit as st
+import gooey_ui as st
 
 from daras_ai.core import daras_ai_step_config, daras_ai_step_computer
 from daras_ai.text_format import daras_ai_format_str

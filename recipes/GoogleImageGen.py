@@ -1,7 +1,7 @@
 import typing
 
 import requests
-import streamlit as st
+import gooey_ui as st
 from pydantic import BaseModel
 
 from daras_ai.image_input import (
@@ -21,7 +21,7 @@ from daras_ai_v2.scaleserp_location_picker_widget import (
 from daras_ai_v2.stable_diffusion import (
     img2img,
     Img2ImgModels,
-    IMG_MAX_SIZE,
+    SD_IMG_MAX_SIZE,
     instruct_pix2pix,
 )
 
@@ -126,7 +126,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             try:
                 selected_image_bytes = requests.get(selected_image_url).content
                 selected_image_bytes = resize_img_scale(
-                    selected_image_bytes, IMG_MAX_SIZE
+                    selected_image_bytes, SD_IMG_MAX_SIZE
                 )
             except (IOError, ConnectionError, ValueError):
                 continue
@@ -199,7 +199,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             for img in out_imgs:
                 st.image(img, caption="Generated Image")
         else:
-            st.empty()
+            st.div()
 
     def render_steps(self):
         image_urls = st.session_state.get("image_urls")
@@ -207,13 +207,13 @@ The result is a fantastic, one of kind image that's relevant to your search (and
             st.write("**Image URLs**")
             st.json(image_urls, expanded=False)
         else:
-            st.empty()
+            st.div()
 
         selected_image = st.session_state.get("selected_image")
         if selected_image:
             st.image(selected_image, caption="Selected Image")
         else:
-            st.empty()
+            st.div()
 
     def render_example(self, state: dict):
         st.write(
@@ -229,7 +229,3 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
     def preview_description(self, state: dict) -> str:
         return "Enter a Google Image Search query + your Img2Img text prompt describing how to alter the result to create a unique, relevant ai generated images for any search query."
-
-
-if __name__ == "__main__":
-    GoogleImageGenPage().render()

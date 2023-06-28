@@ -1,8 +1,8 @@
-streamlit run Home.py \
-  --client.showErrorDetails true \
-  --server.enableXsrfProtection false \
-  --server.headless true \
-  --server.port 8501
-python scripts/uvicorn_run_dev.py
-nginx -c $PWD/nginx.dev.conf &
+#!/usr/bin/env bash
+
+set -ex
+
+streamlit run Home.py --server.headless true --server.port 8501 &
+python3 manage.py runserver 0.0.0.0:8000 &
+uvicorn server:app --host 0.0.0.0 --port 8080 --reload &
 wait

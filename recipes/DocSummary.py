@@ -1,12 +1,10 @@
 import typing
 from enum import Enum
 
-import streamlit as st
 from llama_index.langchain_helpers.text_splitter import SentenceSplitter
 from pydantic import BaseModel
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from daras_ai.image_input import upload_st_file
+import gooey_ui as st
 from daras_ai_v2.GoogleGPT import render_outputs, GoogleGPTPage
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
@@ -109,18 +107,6 @@ Prompt for merging several outputs together
     def validate_form_v2(self):
         search_query = st.session_state.get("task_instructions", "").strip()
         assert search_query, "Please enter the Instructions"
-
-        document_files: list[UploadedFile] | None = st.session_state.get(
-            "__documents_files"
-        )
-        if document_files:
-            uploaded = []
-            for f in document_files:
-                if f.name == "urls.txt":
-                    uploaded.extend(f.getvalue().decode().splitlines())
-                else:
-                    uploaded.append(upload_st_file(f))
-            st.session_state["documents"] = uploaded
         assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_output(self):
@@ -147,7 +133,7 @@ Prompt for merging several outputs together
                 disabled=True,
             )
         else:
-            st.empty()
+            st.div()
 
         output_text: list = st.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):

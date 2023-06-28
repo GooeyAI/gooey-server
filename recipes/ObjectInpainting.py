@@ -2,12 +2,11 @@ import typing
 
 import cv2
 import requests
-import streamlit as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai.image_input import (
     upload_file_from_bytes,
-    upload_file_hq,
     resize_img_scale,
     bytes_to_cv2_img,
     cv2_img_to_bytes,
@@ -98,24 +97,13 @@ class ObjectInpaintingPage(BasePage):
             ### Object Photo
             Give us a photo of anything
             """,
-            key="input_file",
-            upload_key="input_image",
+            key="input_image",
         )
 
     def validate_form_v2(self):
-        text_prompt = st.session_state.get("text_prompt")
-        input_file = st.session_state.get("input_file")
+        text_prompt = st.session_state.get("text_prompt", "").strip()
         input_image = st.session_state.get("input_image")
-        input_image_or_file = input_file or input_image
-
-        # form validation
-        assert (
-            text_prompt and input_image_or_file
-        ), "Please provide a Prompt and a Object Photo"
-
-        # upload input file
-        if input_file:
-            st.session_state["input_image"] = upload_file_hq(input_file)
+        assert text_prompt and input_image, "Please provide a Prompt and a Object Photo"
 
     def render_description(self):
         st.write(
@@ -217,7 +205,7 @@ class ObjectInpaintingPage(BasePage):
             for url in output_images:
                 st.image(url, caption=f"{text_prompt}")
         else:
-            st.empty()
+            st.div()
 
     def render_steps(self):
         input_file = st.session_state.get("input_file")
@@ -229,20 +217,20 @@ class ObjectInpaintingPage(BasePage):
             if input_image_or_file:
                 st.image(input_image_or_file, caption="Input Image")
             else:
-                st.empty()
+                st.div()
 
         with col2:
             resized_image = st.session_state.get("resized_image")
             if resized_image:
                 st.image(resized_image, caption="Repositioned Object")
             else:
-                st.empty()
+                st.div()
 
             obj_mask = st.session_state.get("obj_mask")
             if obj_mask:
                 st.image(obj_mask, caption="Object Mask")
             else:
-                st.empty()
+                st.div()
 
         with col3:
             diffusion_images = st.session_state.get("output_images")
@@ -250,7 +238,7 @@ class ObjectInpaintingPage(BasePage):
                 for url in diffusion_images:
                     st.image(url, caption=f"Generated Image")
             else:
-                st.empty()
+                st.div()
 
     def run(self, state: dict):
         request: ObjectInpaintingPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -331,7 +319,3 @@ class ObjectInpaintingPage(BasePage):
                 return 20
             case _:
                 return 5
-
-
-if __name__ == "__main__":
-    ObjectInpaintingPage().render()
