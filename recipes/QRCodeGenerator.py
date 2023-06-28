@@ -8,7 +8,6 @@ import cv2
 import PIL.Image as Image
 from daras_ai.image_input import upload_file_from_bytes
 
-from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -36,7 +35,7 @@ controlnet_model_explanations.update(controlnet_qr_model_explanations)
 
 
 class QRCodeGeneratorPage(BasePage):
-    title = "Create AI Art QR Codes...FAST"
+    title = "AI Art QR Code"
     slug_versions = [
         "art-qr-code",
         "qr",
