@@ -141,7 +141,7 @@ class Img2ImgPage(BasePage):
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
         if request.selected_controlnet_model is None:
             request.selected_controlnet_model = tuple()
-        elif type(request.selected_controlnet_model) is not tuple:
+        elif not isinstance(request.selected_controlnet_model, tuple):
             request.selected_controlnet_model = (request.selected_controlnet_model,)
 
         init_image = request.input_image

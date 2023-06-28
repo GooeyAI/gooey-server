@@ -98,7 +98,7 @@ def controlnet_settings(extra_controlnet_model_explanations=None):
     controlnet_conditioning_scale = st.session_state.get(
         "controlnet_conditioning_scale", [1.0] * len(models)
     )
-    if not type(controlnet_conditioning_scale) == list:
+    if not isinstance(controlnet_conditioning_scale, list):
         controlnet_conditioning_scale = [controlnet_conditioning_scale]
     controlnet_conditioning_scale.extend(
         [1.0] * (len(models) - len(controlnet_conditioning_scale))
