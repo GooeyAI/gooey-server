@@ -58,6 +58,7 @@ class QRCodeGeneratorPage(BasePage):
         "seed": 1331,
         "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words",
         "use_image_input": False,
+        "use_url_shortener": True,
     }
 
     def __init__(self, *args, **kwargs):
@@ -68,6 +69,8 @@ class QRCodeGeneratorPage(BasePage):
         qr_code_input: str | None
         qr_code_input_image: str | None
         use_image_input: bool | None
+
+        use_url_shortener: bool | None
 
         text_prompt: str | None
         negative_prompt: str | None
@@ -246,8 +249,17 @@ class QRCodeGeneratorPage(BasePage):
                 Text2ImgModels,
                 same_line=False,
             )
-        with col2:
             guidance_scale_setting()
+        with col2:
+            st.checkbox(
+                """
+                ### 🔗 URL Shortener
+                """,
+                key="use_url_shortener",
+            )
+            st.caption(
+                "Check to automatically shorten URLs that start with http or https."
+            )
             controlnet_settings(controlnet_model_explanations)
 
     def render_output(self):
@@ -264,7 +276,7 @@ class QRCodeGeneratorPage(BasePage):
 
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
         image, qr_code_input = self.preprocess_qr_code(request.dict())
-        if qr_code_input.startswith("http"):
+        if request.get("use_url_shortener", True) and qr_code_input.startswith("http"):
             state["shortened_url"] = qr_code_input
         state["cleaned_qr_code"] = image[0]
 
@@ -323,7 +335,7 @@ class QRCodeGeneratorPage(BasePage):
                 straight_qrcode,
             ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
             qr_code_input = decoded_info[0]
-        if qr_code_input.startswith("http"):
+        if request.get("use_url_shortener", True) and qr_code_input.startswith("http"):
             qr_code_input = (
                 requests.get(
                     "https://is.gd/create.php?format=simple&url=" + qr_code_input,
