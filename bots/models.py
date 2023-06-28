@@ -160,7 +160,8 @@ class BotIntegrationQuerySet(models.QuerySet):
 
 class BotIntegration(models.Model):
     name = models.CharField(
-        max_length=1024, help_text="The name of the bot (for display purposes)"
+        max_length=1024,
+        help_text="The name of the bot (for display purposes)",
     )
     saved_run = models.ForeignKey(
         "bots.SavedRun",
@@ -180,7 +181,8 @@ class BotIntegration(models.Model):
         help_text="The response language (same as user language in video bots)",
     )
     show_feedback_buttons = models.BooleanField(
-        default=False, help_text="Show 👍/👎 buttons with every response"
+        default=False,
+        help_text="Show 👍/👎 buttons with every response",
     )
     platform = models.IntegerField(
         choices=Platform.choices,
@@ -230,6 +232,11 @@ class BotIntegration(models.Model):
         null=True,
         unique=True,
         help_text="Bot's WhatsApp phone number id (required if platform is WhatsApp)",
+    )
+    analysis_url = models.TextField(
+        blank=True,
+        default="",
+        help_text="The analysis copilot that the bot uses to categorize responses",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

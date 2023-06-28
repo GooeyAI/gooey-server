@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import Message
+from .models import Message, BotIntegration
 import os
 import requests
 from .tasks import save_JSON_to_queue, confirm_message_answered_content
@@ -25,17 +25,22 @@ def run_after_message_save(sender, instance, created, **kwargs):
         elif instance.role == "assistant":
             INPUT_PROMPT += "\nassistant: " + instance.content
 
+            # Access the associated BotIntegration instance
+            BOT_INTEGRATION = instance.conversation.bot_integration
+
+            # Access the analysis_url of the BotIntegration instance
+            ANALYSIS_URL = BOT_INTEGRATION.analysis_url
+
             payload = {"input_prompt": INPUT_PROMPT}
 
             response = requests.post(
-                "https://api.gooey.ai/v2/video-bots/?run_id=uflky8xk&uid=vkbEEF3tEHSTIVvvirBYDS9jP5w2",
+                ANALYSIS_URL,
                 headers={
                     "Authorization": "Bearer " + GOOEY_API_KEY,
                 },
                 json=payload,
             )
 
-            # https://api.gooey.ai/v2/video-bots/?example_id=5jm4z523
             result = response.json()
 
             result_json = result.get("output").get("output_text")[0]
@@ -46,7 +51,6 @@ def run_after_message_save(sender, instance, created, **kwargs):
 
             print(str(response.status_code) + "\n", result_json)
             result_dict = json.loads(result_json)
-            print(result_dict["assistant"]["answer"])
 
             question_answered(result_dict, message_id)
             question_subject(result_dict, message_id)
