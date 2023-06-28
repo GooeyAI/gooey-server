@@ -210,6 +210,8 @@ class MessageAdmin(admin.ModelAdmin):
         "created_at",
         "wa_msg_id",
         "saved_run",
+        "question_answered",
+        "question_subject",
     ]
     list_display = ["__str__", "local_lang", "role", "created_at", "feedbacks"]
     ordering = ["created_at"]

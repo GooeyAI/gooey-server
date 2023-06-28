@@ -413,6 +413,18 @@ class Message(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    question_answered = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's ability to answer given question",
+    )
+
+    question_subject = models.TextField(
+        blank=True,
+        default="",
+        help_text="Subject of given question"
+    )
+    
     class Meta:
         ordering = ("-created_at",)
         get_latest_by = "created_at"
