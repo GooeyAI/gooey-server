@@ -276,7 +276,9 @@ class QRCodeGeneratorPage(BasePage):
 
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
         image, qr_code_input = self.preprocess_qr_code(request.dict())
-        if request.get("use_url_shortener", True) and qr_code_input.startswith("http"):
+        if request.dict().get("use_url_shortener", True) and qr_code_input.startswith(
+            "http"
+        ):
             state["shortened_url"] = qr_code_input
         state["cleaned_qr_code"] = image[0]
 
