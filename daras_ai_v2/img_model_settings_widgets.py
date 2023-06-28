@@ -87,6 +87,7 @@ def model_selector(models_enum, same_line=True):
                     Choose any [conditioning model(s)](https://huggingface.co/lllyasviel?search=controlnet).
                     """,
                     key="selected_controlnet_model",
+                    checkboxes=False,
                 )
     return selected_model
 
@@ -96,6 +97,10 @@ def controlnet_settings(controlnet_model_explanations):
     controlnet_conditioning_scale = st.session_state.get(
         "controlnet_conditioning_scale", [1.0] * len(models)
     )
+    controlnet_conditioning_scale.extend(
+        [1.0] * (len(models) - len(controlnet_conditioning_scale))
+    )
+    print(models)
     for i, model in enumerate(models):
         model = ControlNetModels[model]
         scale = (0.0, 2.0)

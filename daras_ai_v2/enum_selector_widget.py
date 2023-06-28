@@ -41,6 +41,7 @@ def enum_multiselect(
             options=[e.name for e in enum_cls],
             format_func=lambda k: enum_cls[k].value,
             label=label,
+            key=key,
         )
 
 
