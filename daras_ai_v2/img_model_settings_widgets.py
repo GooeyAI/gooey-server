@@ -11,6 +11,7 @@ from daras_ai_v2.stable_diffusion import (
     InpaintingModels,
     Img2ImgModels,
     ControlNetModels,
+    controlnet_model_explanations,
 )
 
 
@@ -43,11 +44,7 @@ def img_model_settings(models_enum, render_model_selector=True):
         if selected_model == Img2ImgModels.instruct_pix2pix.name:
             instruct_pix2pix_settings()
         if st.session_state.get("selected_controlnet_model"):
-            controlnet_weight_setting(
-                control_effect="to honor the controlnet conditioning more",
-                model_type="Model",
-                scale=(0.0, 2.0),
-            )
+            controlnet_settings()
 
     return selected_model
 
@@ -92,11 +89,17 @@ def model_selector(models_enum, same_line=True):
     return selected_model
 
 
-def controlnet_settings(controlnet_model_explanations):
+def controlnet_settings(extra_controlnet_model_explanations=None):
+    if extra_controlnet_model_explanations is None:
+        extra_controlnet_model_explanations = {}
+    controlnet_model_explanations_combined = controlnet_model_explanations
+    controlnet_model_explanations_combined.update(extra_controlnet_model_explanations)
     models = st.session_state.get("selected_controlnet_model", [])
     controlnet_conditioning_scale = st.session_state.get(
         "controlnet_conditioning_scale", [1.0] * len(models)
     )
+    if not type(controlnet_conditioning_scale) == list:
+        controlnet_conditioning_scale = [controlnet_conditioning_scale]
     controlnet_conditioning_scale.extend(
         [1.0] * (len(models) - len(controlnet_conditioning_scale))
     )
@@ -106,7 +109,7 @@ def controlnet_settings(controlnet_model_explanations):
         key = f"controlnet_conditioning_scale_{model.name}"
         st.session_state.setdefault(key, controlnet_conditioning_scale[i])
         controlnet_conditioning_scale[i] = controlnet_weight_setting(
-            control_effect=controlnet_model_explanations.get(
+            control_effect=controlnet_model_explanations_combined.get(
                 model, "use conditioning for better results"
             ),
             model_type=model.value,

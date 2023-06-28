@@ -27,11 +27,10 @@ from daras_ai_v2.stable_diffusion import (
     text2img_model_ids,
 )
 
-controlnet_qr_model_explanations = {
+controlnet_model_explanations = {
     ControlNetModels.sd_controlnet_tile: "preserve small details mainly in the qr code which makes it more readable",
     ControlNetModels.sd_controlnet_brightness: "make the qr code darker and background lighter (contrast helps qr readers)",
 }
-controlnet_model_explanations.update(controlnet_qr_model_explanations)
 
 
 ATTEMPTS = 2
