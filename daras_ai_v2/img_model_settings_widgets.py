@@ -100,7 +100,6 @@ def controlnet_settings(controlnet_model_explanations):
     controlnet_conditioning_scale.extend(
         [1.0] * (len(models) - len(controlnet_conditioning_scale))
     )
-    print(models)
     for i, model in enumerate(models):
         model = ControlNetModels[model]
         scale = (0.0, 2.0)
