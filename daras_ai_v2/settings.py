@@ -104,6 +104,8 @@ try:
             "PASSWORD": PGPASSWORD,
             "HOST": PGHOST,
             "PORT": PGPORT,
+            "CONN_HEALTH_CHECKS": True,
+            "CONN_MAX_AGE": None,
         }
     }
 except UndefinedValueError:
