@@ -1,5 +1,3 @@
-import os
-
 import anyio
 from decouple import config
 
@@ -56,9 +54,7 @@ for route in app.routes:
 @app.on_event("startup")
 async def startup():
     limiter = anyio.to_thread.current_default_thread_limiter()
-    limiter.total_tokens = config(
-        "WEB_CONCURRENCY", default=limiter.total_tokens, cast=int
-    )
+    limiter.total_tokens = config("MAX_THREADS", default=limiter.total_tokens, cast=int)
 
 
 @app.add_middleware

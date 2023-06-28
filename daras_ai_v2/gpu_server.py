@@ -157,8 +157,8 @@ def call_celery_task_outfile(
 
 
 app = Celery()
-app.conf.broker_url = settings.CELERY_BROKER_URL
-app.conf.result_backend = settings.CELERY_RESULT_BACKEND
+app.conf.broker_url = settings.GPU_CELERY_BROKER_URL
+app.conf.result_backend = settings.GPU_CELERY_RESULT_BACKEND
 
 QUEUE_PREFIX = config("GPU_QUEUE_PREFIX", default="gooey-gpu")
 
@@ -173,4 +173,4 @@ def call_celery_task(
     result = app.send_task(
         task_name, kwargs=dict(pipeline=pipeline, inputs=inputs), queue=queue
     )
-    return result.get()
+    return result.get(disable_sync_subtasks=False)

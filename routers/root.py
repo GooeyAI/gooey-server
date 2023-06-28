@@ -197,7 +197,6 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
 @app.post("/{page_slug}/{tab}/")
 def st_page(
     request: Request,
-    background_tasks: BackgroundTasks,
     page_slug="",
     tab="",
     json_data: dict = Depends(request_json),
@@ -227,9 +226,7 @@ def st_page(
 
     try:
         ret = st.runner(
-            lambda: page_wrapper(
-                request, page.render, background_tasks=background_tasks
-            ),
+            lambda: page_wrapper(request, page.render),
             query_params=dict(request.query_params),
             **json_data,
         )
