@@ -18,7 +18,7 @@ elif [ "$RUN_DJANGO" ]; then
 elif [ "$RUN_STREAMLIT" ]; then
   SENTRY_ENVIRONMENT="streamlit" streamlit run Home.py --server.address=0.0.0.0 --server.port=8000
 elif [ "$RUN_CELERY" ]; then
-  SENTRY_ENVIRONMENT="celery" celery -A celeryapp worker -c ${MAX_THREADS:-1} -P threads
+  SENTRY_ENVIRONMENT="celery" celery -A celeryapp worker -c ${MAX_THREADS:-1} -P threads -l info
 else
   SENTRY_ENVIRONMENT="fastapi" uvicorn server:app --host 0.0.0.0 --port 8000
 fi
