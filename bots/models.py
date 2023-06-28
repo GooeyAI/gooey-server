@@ -422,9 +422,9 @@ class Message(models.Model):
     question_subject = models.TextField(
         blank=True,
         default="",
-        help_text="Subject of given question"
+        help_text="Subject of given question",
     )
-    
+
     class Meta:
         ordering = ("-created_at",)
         get_latest_by = "created_at"
