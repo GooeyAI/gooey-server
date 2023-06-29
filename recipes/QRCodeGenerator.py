@@ -323,7 +323,7 @@ class QRCodeGeneratorPage(BasePage):
 
         if len(state["output_images"]) == 0:  # TODO: generate safe qr code instead
             raise ValueError(
-                "Could not generate a working QR codes with the allotted attempts. Please try with stricter tiling constraints or a different prompt."
+                "Could not generate a working QR code with the allotted attempts. Please try with stricter tiling constraints (control net) or a different prompt."
             )
 
     def preprocess_qr_code(self, request: dict):
