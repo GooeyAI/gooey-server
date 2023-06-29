@@ -7,6 +7,9 @@ import replicate
 import requests
 from PIL import Image
 from django.db import models
+import numpy as np
+import cv2
+import urllib
 
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -433,8 +436,12 @@ def controlnet(
         selected_controlnet_models, list
     ):
         selected_controlnet_models = (selected_controlnet_models,)
-    width = width or init_image.width
-    height = height or init_image.height
+    if not width or not height:
+        req = urllib.request.urlopen(init_image)
+        arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
+        img = cv2.imdecode(arr, -1)
+        print(img.shape)
+        width, height = img.shape[:2]
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
         "diffusion.controlnet",

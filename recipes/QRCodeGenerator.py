@@ -172,7 +172,9 @@ class QRCodeGeneratorPage(BasePage):
                 points,
                 straight_qrcode,
             ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
-            assert retval, "Please upload a valid QR Code image that is readable"
+            assert (
+                retval and decoded_info[0]
+            ), "Please upload a valid QR Code image that is readable"
 
     def render_description(self):
         st.markdown(

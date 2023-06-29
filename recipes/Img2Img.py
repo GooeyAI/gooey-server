@@ -137,8 +137,8 @@ class Img2ImgPage(BasePage):
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         # non primitive list needs to be converted to tuple to be parsable by pydantic
-        val = state["selected_controlnet_models"]
-        state["selected_controlnet_models"] = (
+        val = state["selected_controlnet_model"]
+        state["selected_controlnet_model"] = (
             tuple(val) if isinstance(val, list) else val
         )
 
