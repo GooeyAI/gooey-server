@@ -288,7 +288,7 @@ class QRCodeGeneratorPage(BasePage):
         selected_model = request.selected_model
         yield f"Running {Text2ImgModels[selected_model].value}..."
 
-        for _ in range(ATTEMPTS):
+        for i in range(ATTEMPTS):
             attempt = controlnet(
                 selected_model=selected_model,
                 selected_controlnet_models=request.selected_controlnet_model,
@@ -300,7 +300,7 @@ class QRCodeGeneratorPage(BasePage):
                 num_inference_steps=request.num_inference_steps,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
-                seed=request.seed,
+                seed=request.seed + i,
                 controlnet_conditioning_scale=request.controlnet_conditioning_scale,
                 scheduler=request.scheduler,
                 selected_models_enum=Text2ImgModels,
@@ -317,7 +317,7 @@ class QRCodeGeneratorPage(BasePage):
                 points,
                 straight_qrcode,
             ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
-            if retval and decoded_info[0] == qr_code_data:
+            if retval and (decoded_info[0] == qr_code_data or i == ATTEMPTS - 1):
                 state["output_image"] = attempt
                 break  # don't keep trying once we have a working QR code
 
