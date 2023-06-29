@@ -66,24 +66,23 @@ class QRCodeGeneratorPage(BasePage):
         self.__dict__.update(self.sane_defaults)
 
     class RequestModel(BaseModel):
-        qr_code_input: str | None
+        qr_code_data: str | None
         qr_code_input_image: str | None
-        use_image_input: bool | None
 
         use_url_shortener: bool | None
 
-        text_prompt: str | None
+        text_prompt: str
         negative_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
         selected_controlnet_model: typing.Tuple[
             typing.Literal[tuple(e.name for e in ControlNetModels)], ...
-        ]
+        ] | None
 
         size: int | None
 
         guidance_scale: float | None
-        controlnet_conditioning_scale: typing.List[float]
+        controlnet_conditioning_scale: typing.List[float] | None
 
         num_images: int | None
         num_inference_steps: int | None
@@ -117,7 +116,7 @@ class QRCodeGeneratorPage(BasePage):
                 ### 🔗 URL
                 Enter your URL, link or text. Generally shorter is better. We automatically shorten URLs that start with http or https.
                 """,
-                key="qr_code_input",
+                key="qr_code_data",
                 placeholder="https://www.gooey.ai",
             )
         if st.checkbox(
@@ -131,6 +130,7 @@ class QRCodeGeneratorPage(BasePage):
                 key="qr_code_input_image",
                 accept=["image/*"],
             )
+            st.session_state["qr_code_data"] = None
         st.text_area(
             """
             ### 👩‍💻 Prompt
@@ -149,14 +149,12 @@ class QRCodeGeneratorPage(BasePage):
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
-        use_image_input = st.session_state.get("use_image_input", False)
-        assert use_image_input or st.session_state.get(
-            "qr_code_input"
-        ), "Please provide QR Code URL or text content"
-        assert not use_image_input or st.session_state.get(
+        assert st.session_state.get("qr_code_data") or st.session_state.get(
             "qr_code_input_image"
-        ), "You have checked the image upload option. Please upload a QR Code image"
-        if use_image_input:
+        ), "Please provide QR Code URL, text content, or upload an image"
+        if not st.session_state.get("qr_code_data") and st.session_state.get(
+            "qr_code_input_image"
+        ):
             req = urllib.request.urlopen(st.session_state.get("qr_code_input_image"))
             arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
             img = cv2.imdecode(arr, -1)
@@ -268,19 +266,19 @@ class QRCodeGeneratorPage(BasePage):
 
     def _render_outputs(self, state: dict):
         for img in state.get("output_images", []):
-            st.image(img, caption=state.get("qr_code_input"))
+            st.image(img, caption=state.get("qr_code_data"))
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         for key, val in state.items():
             state[key] = tuple(val) if isinstance(val, list) else val
 
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
-        image, qr_code_input = self.preprocess_qr_code(request.dict())
-        if request.dict().get("use_url_shortener", True) and qr_code_input.startswith(
+        image, qr_code_data = self.preprocess_qr_code(request.dict())
+        if request.dict().get("use_url_shortener", True) and qr_code_data.startswith(
             "http"
         ):
-            state["shortened_url"] = qr_code_input
-        state["cleaned_qr_code"] = image[0]
+            state["shortened_url"] = qr_code_data
+        state["cleaned_qr_code"] = image
 
         state["output_images"] = []
         state["raw_images"] = []
@@ -315,18 +313,20 @@ class QRCodeGeneratorPage(BasePage):
                 points,
                 straight_qrcode,
             ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
-            if retval and decoded_info[0] == qr_code_input:
+            if retval and decoded_info[0] == qr_code_data:
                 state["output_images"].append(attempt)
                 break  # don't keep trying once we have a working QR code
 
         if len(state["output_images"]) == 0:  # TODO: generate safe qr code instead
-            state["output_images"] = [image, state["raw_images"][0]]
+            raise ValueError(
+                "Could not generate a working QR codes with the allotted attempts. Please try with stricter tiling constraints or a different prompt."
+            )
 
     def preprocess_qr_code(self, request: dict):
-        qr_code_input = request.get("qr_code_input")
+        qr_code_data = request.get("qr_code_data")
         qr_code_input_image = request.get("qr_code_input_image")
         size = request.get("size", 512)
-        if request.get("use_image_input", False):
+        if not qr_code_data:
             req = urllib.request.urlopen(qr_code_input_image)
             arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
             img = cv2.imdecode(arr, -1)
@@ -336,26 +336,30 @@ class QRCodeGeneratorPage(BasePage):
                 points,
                 straight_qrcode,
             ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
-            qr_code_input = decoded_info[0]
-        if request.get("use_url_shortener", True) and qr_code_input.startswith("http"):
-            qr_code_input = (
-                requests.get(
-                    "https://is.gd/create.php?format=simple&url=" + qr_code_input,
+            qr_code_data = decoded_info[0]
+        if request.get("use_url_shortener", True) and qr_code_data.startswith("http"):
+            try:
+                shortened = requests.get(
+                    "https://is.gd/create.php?format=simple&url="
+                    + urllib.parse.quote_plus(qr_code_data),
                     timeout=2.50,
-                ).text
-                or qr_code_input
-            )
-        qrcode_image = self.upload_qr_code(qr_code_input, size=size)
-        image = [qrcode_image] * len(request.get("selected_controlnet_model", []))
-        return image, qr_code_input
+                )
+                if shortened.ok and shortened.text.startswith(
+                    "http"
+                ):  # make sure we got back a url
+                    qr_code_data = shortened.text or qr_code_data
+            except:  # Timeout, connection, etc.
+                pass  # We can keep going without the shortened url and just use the original url
+        qrcode_image = self.upload_qr_code(qr_code_data, size=size)
+        return qrcode_image, qr_code_data
 
-    def upload_qr_code(self, qr_code_input: str, size: int = 512):
+    def upload_qr_code(self, qr_code_data: str, size: int = 512):
         qr = qrcode.QRCode(
             error_correction=qrcode.constants.ERROR_CORRECT_H,
             box_size=11,
             border=9,
         )
-        qr.add_data(qr_code_input)
+        qr.add_data(qr_code_data)
         qr.make(fit=True)
         qrcode_image = qr.make_image(fill_color="black", back_color="white").convert(
             "RGB"
@@ -376,7 +380,7 @@ class QRCodeGeneratorPage(BasePage):
             st.markdown(
                 f"""
                 ```Prompt: {state.get("text_prompt", "")}```
-                ```QR Content: {state.get("qr_code_input", "")}```
+                ```QR Content: {state.get("qr_code_data", "")}```
                 """
             )
         with col2:

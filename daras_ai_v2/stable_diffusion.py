@@ -414,7 +414,11 @@ def img2img(
 def controlnet(
     *,
     selected_model: str,
-    selected_controlnet_models: typing.List[str],
+    selected_controlnet_models: typing.Tuple[
+        typing.Literal[tuple(e.name for e in ControlNetModels)], ...
+    ]
+    | typing.Literal[tuple(e.name for e in ControlNetModels)]
+    | None,
     prompt: str,
     num_outputs: int,
     init_image: str,
@@ -422,11 +426,17 @@ def controlnet(
     negative_prompt: str = None,
     guidance_scale: float,
     seed: int = 42,
-    controlnet_conditioning_scale: float = 1.0,
+    controlnet_conditioning_scale: typing.List[float] | float = 1.0,
     scheduler: str = "UniPCMultistepScheduler",
     selected_models_enum: E = Img2ImgModels,
     selected_models_ids: dict[E, str] = img2img_model_ids,
 ):
+    if selected_controlnet_models is None:
+        selected_controlnet_models = tuple()
+    elif not isinstance(selected_controlnet_models, tuple) and not isinstance(
+        selected_controlnet_models, list
+    ):
+        selected_controlnet_models = (selected_controlnet_models,)
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
         "diffusion.controlnet",
@@ -446,7 +456,7 @@ def controlnet(
             "num_images_per_prompt": num_outputs,
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
-            "image": init_image,
+            "image": [init_image] * len(selected_controlnet_models),
             "controlnet_conditioning_scale": controlnet_conditioning_scale,
             # "strength": prompt_strength,
         },

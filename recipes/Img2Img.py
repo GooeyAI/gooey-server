@@ -54,7 +54,7 @@ class Img2ImgPage(BasePage):
 
         guidance_scale: float | None
         prompt_strength: float | None
-        controlnet_conditioning_scale: float | None
+        controlnet_conditioning_scale: typing.List[float] | float | None
 
         # sd_2_upscaling: bool | None
 
@@ -136,13 +136,13 @@ class Img2ImgPage(BasePage):
             st.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        for key, val in state.items():
-            state[key] = tuple(val) if isinstance(val, list) else val
+        # non primitive list needs to be converted to tuple to be parsable by pydantic
+        val = state["selected_controlnet_models"]
+        state["selected_controlnet_models"] = (
+            tuple(val) if isinstance(val, list) else val
+        )
+
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
-        if request.selected_controlnet_model is None:
-            request.selected_controlnet_model = tuple()
-        elif not isinstance(request.selected_controlnet_model, tuple):
-            request.selected_controlnet_model = (request.selected_controlnet_model,)
 
         init_image = request.input_image
         init_image_bytes = requests.get(init_image).content
@@ -160,13 +160,13 @@ class Img2ImgPage(BasePage):
                 images=[init_image],
                 image_guidance_scale=request.image_guidance_scale,
             )
-        elif len(request.selected_controlnet_model) > 0:
+        elif request.selected_controlnet_model:
             state["output_images"] = controlnet(
                 selected_model=request.selected_model,
                 selected_controlnet_models=request.selected_controlnet_model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
-                init_image=[init_image] * len(request.selected_controlnet_model),
+                init_image=init_image,
                 num_inference_steps=request.quality,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
