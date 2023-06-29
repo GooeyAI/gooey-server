@@ -95,7 +95,7 @@ class QRCodeGeneratorPage(BasePage):
         seed: int | None
 
     class ResponseModel(BaseModel):
-        output_images: list[str]
+        output_image: str
         raw_images: list[str]
         shortened_url: str | None
         cleaned_qr_code: str
@@ -180,7 +180,7 @@ class QRCodeGeneratorPage(BasePage):
         prompting101()
 
     def render_steps(self):
-        if not st.session_state.get("output_images"):
+        if not st.session_state.get("raw_images"):
             st.markdown(
                 """
                 #### Generate the QR Code to see steps
@@ -222,7 +222,7 @@ class QRCodeGeneratorPage(BasePage):
             Here is the final output:
             """
         )
-        for imgsrc in st.session_state["output_images"]:
+        for imgsrc in [st.session_state["output_image"]]:
             st.image(imgsrc)
 
     def render_settings(self):
@@ -267,7 +267,7 @@ class QRCodeGeneratorPage(BasePage):
         self._render_outputs(state)
 
     def _render_outputs(self, state: dict):
-        for img in state.get("output_images", []):
+        for img in [state.get("output_image")]:
             st.image(img, caption=state.get("qr_code_data"))
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
@@ -282,7 +282,7 @@ class QRCodeGeneratorPage(BasePage):
             state["shortened_url"] = qr_code_data
         state["cleaned_qr_code"] = image
 
-        state["output_images"] = []
+        state["output_image"] = None
         state["raw_images"] = []
 
         selected_model = request.selected_model
@@ -318,10 +318,10 @@ class QRCodeGeneratorPage(BasePage):
                 straight_qrcode,
             ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
             if retval and decoded_info[0] == qr_code_data:
-                state["output_images"].append(attempt)
+                state["output_image"] = attempt
                 break  # don't keep trying once we have a working QR code
 
-        if len(state["output_images"]) == 0:  # TODO: generate safe qr code instead
+        if not state["output_image"]:  # TODO: generate safe qr code instead
             raise ValueError(
                 "Could not generate a working QR code with the allotted attempts. Please try with stricter tiling constraints (control net) or a different prompt."
             )
