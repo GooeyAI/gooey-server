@@ -436,7 +436,7 @@ class Message(models.Model):
         blank=True,
         default=None,
         null=True,
-        help_text="The saved audio run that generated this message"
+        help_text="The saved audio run that generated this message",
     )
 
     class Meta:
