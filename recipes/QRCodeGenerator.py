@@ -62,6 +62,7 @@ class QRCodeGeneratorPage(BasePage):
         "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words",
         "use_image_input": False,
         "use_url_shortener": True,
+        "text_prompt": "",
     }
 
     def __init__(self, *args, **kwargs):
@@ -323,7 +324,6 @@ class QRCodeGeneratorPage(BasePage):
                 points,
                 straight_qrcode,
             ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
-            print(retval, decoded_info)
             if retval and (decoded_info[0] == qr_code_data or i == ATTEMPTS - 1):
                 state["output_image"] = attempt
                 break  # don't keep trying once we have a working QR code
