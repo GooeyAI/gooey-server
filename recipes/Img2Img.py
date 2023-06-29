@@ -37,7 +37,7 @@ class Img2ImgPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_image: typing.List[str] | str
+        input_image: str
         text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None

@@ -241,6 +241,7 @@ def multiselect(
     format_func: typing.Callable[[T], typing.Any] = str,
     key: str = None,
     help: str = None,
+    allow_none: bool = False,
     *,
     disabled: bool = False,
 ) -> list[T]:
@@ -251,7 +252,9 @@ def multiselect(
         key = md5_values("multiselect", label, options, help)
     value = state.session_state.get(key) or []
     value = [o if o in options else options[0] for o in value]
-    state.session_state.setdefault(key, value)
+    if not allow_none and not value:
+        value = [options[0]]
+    state.session_state[key] = value
     state.RenderTreeNode(
         name="select",
         props=dict(
@@ -261,6 +264,7 @@ def multiselect(
             isDisabled=disabled,
             isMulti=True,
             defaultValue=value,
+            allow_none=allow_none,
             options=[
                 {"value": option, "label": str(format_func(option))}
                 for option in options
