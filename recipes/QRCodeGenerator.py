@@ -114,6 +114,10 @@ class QRCodeGeneratorPage(BasePage):
         ]
 
     def render_form_v2(self):
+        if not st.session_state.get("qr_code_data", False) and st.session_state.get(
+            "qr_code_input_image", False
+        ):
+            st.session_state["use_image_input"] = True
         if not st.session_state.get("use_image_input", False):
             st.text_area(
                 """
@@ -317,14 +321,13 @@ class QRCodeGeneratorPage(BasePage):
                 points,
                 straight_qrcode,
             ) = cv2.QRCodeDetector().detectAndDecodeMulti(img)
+            print(retval, decoded_info)
             if retval and (decoded_info[0] == qr_code_data or i == ATTEMPTS - 1):
                 state["output_image"] = attempt
                 break  # don't keep trying once we have a working QR code
 
         if not state["output_image"]:  # TODO: generate safe qr code instead
-            raise ValueError(
-                "Could not generate a working QR code with the allotted attempts. Please try with stricter tiling constraints (control net) or a different prompt."
-            )
+            state["output_image"] = state["raw_images"][0]
 
     def preprocess_qr_code(self, request: dict):
         qr_code_data = request.get("qr_code_data")
