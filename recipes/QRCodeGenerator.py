@@ -248,10 +248,7 @@ class QRCodeGeneratorPage(BasePage):
             Choose the model responsible for generating the content around the qr code.
             """
             )
-            model_selector(
-                Text2ImgModels,
-                same_line=False,
-            )
+            model_selector(Text2ImgModels, same_line=False, require_controlnet=True)
             guidance_scale_setting()
         with col2:
             st.checkbox(

@@ -49,7 +49,7 @@ def img_model_settings(models_enum, render_model_selector=True):
     return selected_model
 
 
-def model_selector(models_enum, same_line=True):
+def model_selector(models_enum, same_line=True, require_controlnet=False):
     col1, col2 = st.columns(2)
     with ExitStack() as stack:
         if same_line:
@@ -85,6 +85,7 @@ def model_selector(models_enum, same_line=True):
                     """,
                     key="selected_controlnet_model",
                     checkboxes=False,
+                    allow_none=not require_controlnet,
                 )
     return selected_model
 

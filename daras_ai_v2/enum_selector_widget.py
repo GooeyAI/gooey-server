@@ -14,6 +14,7 @@ def enum_multiselect(
     key: str,
     label: str = "",
     checkboxes=True,
+    allow_none=True,
 ):
     if checkboxes:
         if label:
@@ -42,7 +43,7 @@ def enum_multiselect(
             format_func=lambda k: enum_cls[k].value,
             label=label,
             key=key,
-            allow_none=True,
+            allow_none=allow_none,
         )
 
 
