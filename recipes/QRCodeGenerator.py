@@ -17,6 +17,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     guidance_scale_setting,
     model_selector,
     controlnet_settings,
+    output_resolution_setting,
 )
 from daras_ai_v2.descriptions import prompting101
 from daras_ai_v2.stable_diffusion import (
@@ -34,6 +35,7 @@ controlnet_model_explanations = {
 
 
 ATTEMPTS = 2
+DEFAULT_SIZE = 512
 
 
 class QRCodeGeneratorPage(BasePage):
@@ -51,7 +53,8 @@ class QRCodeGeneratorPage(BasePage):
             ControlNetModels.sd_controlnet_tile.name,
             ControlNetModels.sd_controlnet_brightness.name,
         ],
-        "size": 512,
+        "output_width": DEFAULT_SIZE,
+        "output_height": DEFAULT_SIZE,
         "num_inference_steps": 100,
         "guidance_scale": 9,
         "controlnet_conditioning_scale": [0.25, 0.45],
@@ -79,7 +82,8 @@ class QRCodeGeneratorPage(BasePage):
             typing.Literal[tuple(e.name for e in ControlNetModels)], ...
         ] | None
 
-        size: int | None
+        output_width: int | None
+        output_height: int | None
 
         guidance_scale: float | None
         controlnet_conditioning_scale: typing.List[float] | None
@@ -235,6 +239,7 @@ class QRCodeGeneratorPage(BasePage):
             key="negative_prompt",
             placeholder="ugly, disfigured, low quality, blurry, nsfw",
         )
+        output_resolution_setting()
         col1, col2 = st.columns(2)
         with col1:
             st.caption(
@@ -293,6 +298,8 @@ class QRCodeGeneratorPage(BasePage):
                 prompt=request.text_prompt,
                 num_outputs=1,
                 init_image=image,
+                width=request.output_width,
+                height=request.output_height,
                 num_inference_steps=request.num_inference_steps,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
@@ -325,8 +332,13 @@ class QRCodeGeneratorPage(BasePage):
     def preprocess_qr_code(self, request: dict):
         qr_code_data = request.get("qr_code_data")
         qr_code_input_image = request.get("qr_code_input_image")
-        size = request.get("size", 512)
+        width = request.get("output_width", DEFAULT_SIZE)
+        height = request.get("output_height", DEFAULT_SIZE)
         if not qr_code_data:
+            if not qr_code_input_image:
+                raise ValueError(
+                    "Please provide QR Code URL, text content, or an image"
+                )
             req = urllib.request.urlopen(qr_code_input_image)
             arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
             img = cv2.imdecode(arr, -1)
@@ -350,10 +362,11 @@ class QRCodeGeneratorPage(BasePage):
                     qr_code_data = shortened.text or qr_code_data
             except:  # Timeout, connection, etc.
                 pass  # We can keep going without the shortened url and just use the original url
-        qrcode_image = self.upload_qr_code(qr_code_data, size=size)
+        qrcode_image = self.upload_qr_code(qr_code_data, size=(width, height))
         return qrcode_image, qr_code_data
 
-    def upload_qr_code(self, qr_code_data: str, size: int = 512):
+    def upload_qr_code(self, qr_code_data: str, size=(DEFAULT_SIZE, DEFAULT_SIZE)):
+        qr_size = min(size)
         qr = qrcode.QRCode(
             error_correction=qrcode.constants.ERROR_CORRECT_H,
             box_size=11,
@@ -364,7 +377,8 @@ class QRCodeGeneratorPage(BasePage):
         qrcode_image = qr.make_image(fill_color="black", back_color="white").convert(
             "RGB"
         )
-        qrcode_image = qrcode_image.resize((size, size), Image.LANCZOS)
+        qrcode_image = qrcode_image.resize((qr_size, qr_size), Image.LANCZOS)
+        qrcode_image = self.pad_image(qrcode_image, target_size=size)
 
         open_cv_image = np.array(qrcode_image)
         open_cv_image = open_cv_image[:, :, ::-1].copy()
@@ -373,6 +387,19 @@ class QRCodeGeneratorPage(BasePage):
             "cleaned_qr.png", bytes, content_type="image/png"
         )
         return photo_url
+
+    def pad_image(
+        self,
+        pil_img: Image,
+        target_size=(DEFAULT_SIZE, DEFAULT_SIZE),
+        rgb=(255, 255, 255),
+    ):
+        width, height = pil_img.size
+        left = (target_size[0] - width) // 2
+        top = (target_size[1] - height) // 2
+        result = Image.new(pil_img.mode, target_size, rgb)
+        result.paste(pil_img, (left, top))
+        return result
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)

@@ -414,11 +414,13 @@ def controlnet(
     | typing.Literal[tuple(e.name for e in ControlNetModels)]
     | None,
     prompt: str,
-    num_outputs: int,
     init_image: str,
-    num_inference_steps: int,
+    num_outputs: int = 1,
+    width: int = None,
+    height: int = None,
+    num_inference_steps: int = 50,
     negative_prompt: str = None,
-    guidance_scale: float,
+    guidance_scale: float = 7.5,
     seed: int = 42,
     controlnet_conditioning_scale: typing.List[float] | float = 1.0,
     scheduler: str = "UniPCMultistepScheduler",
@@ -431,6 +433,8 @@ def controlnet(
         selected_controlnet_models, list
     ):
         selected_controlnet_models = (selected_controlnet_models,)
+    width = width or init_image.width
+    height = height or init_image.height
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
         "diffusion.controlnet",
@@ -451,6 +455,8 @@ def controlnet(
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
             "image": [init_image] * len(selected_controlnet_models),
+            "width": width,
+            "height": height,
             "controlnet_conditioning_scale": controlnet_conditioning_scale,
             # "strength": prompt_strength,
         },
