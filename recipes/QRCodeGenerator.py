@@ -84,7 +84,7 @@ class QRCodeGeneratorPage(BasePage):
         guidance_scale: float | None
         controlnet_conditioning_scale: typing.List[float] | None
 
-        num_images: int | None
+        # num_images: int | None
         num_inference_steps: int | None
         scheduler: str | None
 

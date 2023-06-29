@@ -110,8 +110,6 @@ class ControlNetModels(Enum):
     sd_controlnet_seg = "Image Segmentation"
     sd_controlnet_inpaint = "Inpainting"
     sd_controlnet_tile = "Tiling"
-    sd_controlnet_qr15 = "QR Code"
-    sd_controlnet_illumination = "Illumination"
     sd_controlnet_brightness = "Brightness"
 
 
@@ -126,8 +124,6 @@ controlnet_model_explanations = {
     ControlNetModels.sd_controlnet_seg: "use Image segmentation",
     ControlNetModels.sd_controlnet_inpaint: "use Inpainting",
     ControlNetModels.sd_controlnet_tile: "use Tiling to preserve small details",
-    ControlNetModels.sd_controlnet_qr15: "use QR Code specific conditioning that emphasizes the QR code",
-    ControlNetModels.sd_controlnet_illumination: "use Illumination",
     ControlNetModels.sd_controlnet_brightness: "use Brightness conditioning to increase contrast naturally",
 }
 
