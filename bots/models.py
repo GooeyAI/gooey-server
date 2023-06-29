@@ -432,6 +432,13 @@ class Message(models.Model):
         help_text="Subject of given question",
     )
 
+    speech_run = models.TextField(
+        blank=True,
+        default=None,
+        null=True,
+        help_text="The saved audio run that generated this message"
+    )
+
     class Meta:
         ordering = ("-created_at",)
         get_latest_by = "created_at"
