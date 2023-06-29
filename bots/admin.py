@@ -207,11 +207,12 @@ class MessageAdmin(admin.ModelAdmin):
         "role",
         "content",
         "display_content",
+        "question_answered",
+        "question_subject",
         "created_at",
         "wa_msg_id",
         "saved_run",
-        "question_answered",
-        "question_subject",
+        #save speech run
     ]
     list_display = ["__str__", "local_lang", "role", "created_at", "feedbacks"]
     ordering = ["created_at"]
