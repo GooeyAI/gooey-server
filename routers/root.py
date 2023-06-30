@@ -226,9 +226,11 @@ def st_page(
 
     state = json_data.setdefault("state", {})
     if not state:
-        state.update(page.get_firestore_state(example_id, run_id, uid))
-        for k, v in page.sane_defaults.items():
-            state.setdefault(k, v)
+        firestore_state = page.get_firestore_state(example_id, run_id, uid)
+        if firestore_state is not None:
+            state.update(firestore_state)
+            for k, v in page.sane_defaults.items():
+                state.setdefault(k, v)
     if state is None:
         raise HTTPException(status_code=404)
 
