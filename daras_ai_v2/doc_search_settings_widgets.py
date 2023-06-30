@@ -24,7 +24,8 @@ def document_uploader(
             value="\n".join(documents),
             height=150,
             style={
-                "whiteSpace": "nowrap",
+                "whiteSpace": "pre",
+                "overflow-wrap": "normal",
                 "overflow-x": "scroll",
                 "fontFamily": "monospace",
             },
