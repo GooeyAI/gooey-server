@@ -31,6 +31,7 @@ class EmbeddingModels(models.TextChoices):
 class EmbeddingsPage(BasePage):
     title = "Embeddings"
     slug_versions = ["embeddings", "embed", "text-embedings"]
+    price = 1
 
     class RequestModel(BaseModel):
         texts: list[str]
@@ -68,7 +69,15 @@ class EmbeddingsPage(BasePage):
             st.json(embedding, depth=0)
 
     def render_example(self, state: dict):
-        super().render_example(state)
+        texts = st.session_state.setdefault("texts", [""])
+        for i, text in enumerate(texts):
+            texts[i] = st.text_area(f"`texts[{i}]`", value=text, disabled=True)
+
+    def fields_to_save(self) -> [str]:
+        to_save = super().fields_to_save()
+        # dont save the embeddings they are too big + firebase doesn't support 2d array
+        to_save.remove("embeddings")
+        return to_save
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: EmbeddingsPage.RequestModel = self.RequestModel.parse_obj(state)
