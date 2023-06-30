@@ -10,6 +10,8 @@ from gooey_ui.pubsub import (
 
 threadlocal = threading.local()
 
+session_state: dict[str, typing.Any]
+
 
 def __getattr__(name):
     if name == "session_state":

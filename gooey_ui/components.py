@@ -400,13 +400,13 @@ def file_uploader(
     return value or ""
 
 
-def json(value: typing.Any, expanded: bool = False):
+def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     state.RenderTreeNode(
         name="json",
         props=dict(
             value=value,
             expanded=expanded,
-            defaultInspectDepth=3 if expanded else 1,
+            defaultInspectDepth=3 if expanded else depth,
         ),
     ).mount()
 

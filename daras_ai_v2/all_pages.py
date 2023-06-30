@@ -29,6 +29,7 @@ from recipes.Text2Audio import Text2AudioPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
+from recipes.embeddings_page import EmbeddingsPage
 
 # note: the ordering here matters!
 all_home_pages = [
@@ -56,6 +57,7 @@ all_home_pages = [
     SmartGPTPage,
     RelatedQnAPage,
     RelatedQnADocPage,
+    EmbeddingsPage,
 ]
 
 # exposed as API
