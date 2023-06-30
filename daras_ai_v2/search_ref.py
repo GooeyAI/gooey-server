@@ -25,7 +25,10 @@ def render_text_with_refs(text: str, references: list[SearchReference]):
         if not refs:
             continue
         ref_html = ", ".join(
-            [f'<a href="{ref["url"]}">{ref_num}</a>' for ref_num, ref in refs.items()]
+            [
+                f'<a target="_blank" href="{ref["url"]}">{ref_num}</a>'
+                for ref_num, ref in refs.items()
+            ]
         )
         html += f"<sup>[{ref_html}]</sup>"
     # convert newlines to <br> and paragraphs
