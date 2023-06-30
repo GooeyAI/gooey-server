@@ -72,9 +72,10 @@ class EmbeddingsPage(BasePage):
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: EmbeddingsPage.RequestModel = self.RequestModel.parse_obj(state)
+        model = EmbeddingModels[request.selected_model]
         state["embeddings"] = call_celery_task(
             "text_embeddings",
-            pipeline={"model_id": request.selected_model},
+            pipeline={"model_id": model.label},
             inputs={"texts": request.texts},
         )
         yield
