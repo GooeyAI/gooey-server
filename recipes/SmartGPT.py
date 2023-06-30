@@ -4,7 +4,7 @@ import jinja2.sandbox
 from pydantic import BaseModel
 
 import gooey_ui as st
-from daras_ai_v2.GoogleGPT import render_outputs
+from daras_ai_v2.GoogleGPT import render_output_with_refs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
@@ -170,12 +170,12 @@ class SmartGPTPage(BasePage):
         state["output_text"] = dera_outputs
 
     def render_output(self):
-        render_outputs(st.session_state, 300)
+        render_output_with_refs(st.session_state, 300)
 
     def render_example(self, state: dict):
         st.write("**Prompt**")
         st.write("```properties\n" + state.get("input_prompt", "") + "\n```")
-        render_outputs(state, 200)
+        render_output_with_refs(state, 200)
 
     def render_steps(self):
         prompt_tree = st.session_state.get("prompt_tree", {})

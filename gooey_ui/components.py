@@ -3,7 +3,7 @@ import textwrap
 import typing
 
 import numpy as np
-import pandas as pd
+
 from furl import furl
 
 from gooey_ui import state
@@ -212,7 +212,10 @@ def text_area(
     placeholder: str = None,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
+    **props,
 ) -> str:
+    style = props.setdefault("style", {})
+    style.setdefault("height", f"{height}px"),
     if key:
         assert not value, "only one of value or key can be provided"
     else:
@@ -229,7 +232,7 @@ def text_area(
             help=help,
             placeholder=placeholder,
             disabled=disabled,
-            style=dict(height=f"{height}px"),
+            **props,
         ),
     ).mount()
     return value or ""
@@ -408,7 +411,7 @@ def json(value: typing.Any, expanded: bool = False):
     ).mount()
 
 
-def table(df: pd.DataFrame):
+def table(df: "pd.DataFrame"):
     state.RenderTreeNode(
         name="table",
         children=[

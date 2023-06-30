@@ -13,7 +13,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 from pathlib import Path
 
-import firebase_admin
 import sentry_sdk
 import stripe
 from decouple import config, UndefinedValueError, Csv
@@ -197,6 +196,8 @@ else:
     with open(service_account_key_path, "w") as f:
         f.write(_json)
 
+import firebase_admin
+
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
@@ -207,7 +208,8 @@ GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
 UBERDUCK_KEY = config("UBERDUCK_KEY", None)
 UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 
-OPENAI_API_KEY = config("OPENAI_API_KEY", None)
+OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 

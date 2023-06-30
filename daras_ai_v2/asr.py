@@ -1,17 +1,21 @@
+import json
 import os.path
 import subprocess
 import tempfile
 from enum import Enum
 
 import requests
-import gooey_ui as st
 import typing_extensions
 from furl import furl
-from google.cloud import speech_v1p1beta1
-from google.cloud import translate, translate_v2
 
+import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.gpu_server import GpuEndpoints
+from daras_ai_v2.gpu_server import (
+    GpuEndpoints,
+    call_celery_task,
+)
+
+SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
 
 class AsrModels(Enum):
@@ -78,6 +82,8 @@ def google_translate_languages() -> dict[str, str]:
     Get list of supported languages for Google Translate.
     :return: Dictionary of language codes and display names.
     """
+    from google.cloud import translate
+
     parent = f"projects/dara-c1b52/locations/global"
     client = translate.TranslationServiceClient()
     supported_languages = client.get_supported_languages(
@@ -99,6 +105,8 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
     Returns:
         list[str]: Translated text.
     """
+    from google.cloud import translate_v2
+
     translate_client = translate_v2.Client()
     result = translate_client.translate(
         texts, target_language=google_translate_target, format_="text"
@@ -122,15 +130,18 @@ def run_asr(
     Returns:
         str: Transcribed text.
     """
+    from google.cloud import speech_v1p1beta1
+
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
     is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
     if is_youtube_url:
-        audio_url = download_youtube_to_wav(audio_url)
+        audio_url, size = download_youtube_to_wav(audio_url)
+    else:
+        audio_url, size = audio_to_wav(audio_url)
+    is_short = size < SHORT_FILE_CUTOFF
     # call usm model
     if selected_model == AsrModels.usm:
-        if not is_youtube_url:
-            audio_url = audio_to_wav(audio_url)
         # Initialize request argument(s)
         config = speech_v1p1beta1.RecognitionConfig()
         config.language_code = language
@@ -151,31 +162,28 @@ def run_asr(
             result.alternatives[0].transcript for result in response.results
         )
     # check if we should use the fast queue
-    # use_fast = _should_use_fast(audio_url)
-    use_fast = False
     # call one of the self-hosted models
     if "whisper" in selected_model.name:
         if language:
             language = language.split("-")[0]
         elif "hindi" in selected_model.name:
             language = "hi"
-        r = requests.post(
-            str(GpuEndpoints.whisper_fast if use_fast else GpuEndpoints.whisper),
-            json={
-                "pipeline": dict(
-                    model_id=asr_model_ids[selected_model],
-                ),
-                "inputs": {
-                    "audio": audio_url,
-                    "task": "transcribe",
-                    "language": language,
-                    "return_timestamps": output_format != AsrOutputFormat.text,
-                },
-            },
+        data = call_celery_task(
+            "whisper",
+            pipeline=dict(
+                model_id=asr_model_ids[selected_model],
+            ),
+            inputs=dict(
+                audio=audio_url,
+                task="transcribe",
+                language=language,
+                return_timestamps=output_format != AsrOutputFormat.text,
+            ),
+            queue_prefix="gooey-gpu/short" if is_short else "gooey-gpu/long",
         )
     else:
         r = requests.post(
-            str(GpuEndpoints.nemo_asr_fast if use_fast else GpuEndpoints.nemo_asr),
+            str(GpuEndpoints.nemo_asr),
             json={
                 "pipeline": dict(
                     model_id=asr_model_ids[selected_model],
@@ -185,8 +193,8 @@ def run_asr(
                 },
             },
         )
-    r.raise_for_status()
-    data = r.json()
+        r.raise_for_status()
+        data = r.json()
     match output_format:
         case AsrOutputFormat.text:
             return data["text"]
@@ -202,14 +210,11 @@ def run_asr(
             raise ValueError(f"Invalid output format: {output_format}")
 
 
-def _should_use_fast(audio_url, min_size=5 * 1024 * 1024):
-    r = requests.head(audio_url)
-    r.raise_for_status()
-    print(r.headers)
-    return int(r.headers["Content-Length"]) < min_size
+# 16kHz, 16-bit, mono
+FFMPEG_WAV_ARGS = ["-vn", "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000"]
 
 
-def download_youtube_to_wav(youtube_url: str) -> str:
+def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
     """
     Convert a youtube video to wav audio file.
     Returns:
@@ -228,32 +233,57 @@ def download_youtube_to_wav(youtube_url: str) -> str:
             infile,
             youtube_url,
         ]
-        print("\t$", " ".join(args))
+        print("\t$ " + " ".join(args))
         subprocess.check_call(args)
         # convert audio to single channel wav
-        args = ["ffmpeg", "-y", "-i", infile, "-ac", "1", outfile]
-        print("\t$", " ".join(args))
+        args = ["ffmpeg", "-y", "-i", infile, *FFMPEG_WAV_ARGS, outfile]
+        print("\t$ " + " ".join(args))
         subprocess.check_call(args)
         # read wav file into memory
         with open(outfile, "rb") as f:
             wavdata = f.read()
     # upload the wav file
-    return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav")
+    return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
 
 
-def audio_to_wav(audio_url: str) -> str:
-    with (
-        tempfile.NamedTemporaryFile() as infile,
-        tempfile.NamedTemporaryFile(suffix=".wav") as outfile,
-    ):
+def audio_to_wav(audio_url: str) -> tuple[str, int]:
+    with tempfile.NamedTemporaryFile() as infile:
         infile.write(requests.get(audio_url).content)
         infile.flush()
-        args = ["ffmpeg", "-y", "-i", infile.name, "-ac", "1", outfile.name]
-        print("\t$", " ".join(args))
-        subprocess.check_call(args)
-        wavdata = outfile.read()
-    filename = furl(audio_url).path.segments[-1] + ".wav"
-    return upload_file_from_bytes(filename, wavdata, "audio/wav")
+
+        if check_wav_audio_format(infile.name):
+            # already a wav file
+            return audio_url, os.path.getsize(infile.name)
+
+        with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
+            # convert audio to single channel wav
+            args = ["ffmpeg", "-y", "-i", infile.name, *FFMPEG_WAV_ARGS, outfile.name]
+            print("\t$ " + " ".join(args))
+            subprocess.check_call(args)
+            wavdata = outfile.read()
+
+    filename = furl(audio_url.strip("/")).path.segments[-1] + ".wav"
+    return upload_file_from_bytes(filename, wavdata, "audio/wav"), len(wavdata)
+
+
+def check_wav_audio_format(filename: str) -> bool:
+    args = [
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_streams",
+        filename,
+    ]
+    print("\t$ " + " ".join(args))
+    data = json.loads(subprocess.check_output(args))
+    return (
+        len(data["streams"]) == 1
+        and data["streams"][0]["codec_name"] == "pcm_s16le"
+        and data["streams"][0]["channels"] == 1
+        and data["streams"][0]["sample_rate"] == "16000"
+    )
 
 
 # code stolen from https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e067f8/whisper/utils.py#L239

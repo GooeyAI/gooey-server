@@ -70,7 +70,8 @@ class AsrPage(BasePage):
 
     def render_form_v2(self):
         document_uploader(
-            "##### Audio Files", accept=(".wav", ".ogg", ".mp3", ".aac", ".opus")
+            "##### Audio Files",
+            accept=(".wav", ".ogg", ".mp3", ".aac", ".opus", ".oga", ".mp4", ".webm"),
         )
         st.write("---")
         enum_selector(AsrModels, label="###### ASR Model", key="selected_model")

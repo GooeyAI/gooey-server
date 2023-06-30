@@ -2,7 +2,6 @@ import typing
 from pathlib import Path
 
 import PIL
-import cv2
 import numpy as np
 import requests
 import gooey_ui as st
@@ -170,6 +169,8 @@ class ImageSegmentationPage(BasePage):
                 key="obj_pos_y",
             )
 
+        import cv2
+
         # show an example image
         img_cv2 = cv2.imread("static/obj.png")
         mask_cv2 = cv2.imread("static/obj_mask.png")
@@ -217,6 +218,8 @@ class ImageSegmentationPage(BasePage):
 
         threshold_value = int(255 * request.mask_threshold)
         mask_cv2[mask_cv2 < threshold_value] = 0
+
+        import cv2
 
         kernel = np.ones((5, 5), np.float32) / 10
         mask_cv2 = cv2.filter2D(mask_cv2, -1, kernel)

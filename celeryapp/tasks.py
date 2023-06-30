@@ -20,7 +20,7 @@ def gui_runner(
     run_id: str,
     uid: str,
     state: dict,
-    channel: str
+    channel: str,
 ):
     self = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
 
@@ -28,6 +28,7 @@ def gui_runner(
     run_time = 0
     yield_val = None
     error_msg = None
+    url = self.app_url(run_id=run_id, uid=uid)
 
     def save(done=False):
         if done:
@@ -40,13 +41,14 @@ def gui_runner(
             run_status, extra_output = run_status
         else:
             extra_output = {}
+        # set run status and run time
+        status = {
+            StateKeys.run_time: run_time,
+            StateKeys.error_msg: error_msg,
+            StateKeys.run_status: run_status,
+        }
         output = (
-            # set run status and run time
-            {
-                StateKeys.run_time: run_time,
-                StateKeys.error_msg: error_msg,
-                StateKeys.run_status: run_status,
-            }
+            status
             |
             # extract outputs from local state
             {
@@ -61,8 +63,11 @@ def gui_runner(
         # save to db
         self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state | output))
 
+        print(f"{url} {status}")
+
     try:
         gen = self.run(st.session_state)
+        save()
         while True:
             # record time
             start_time = time()

@@ -2,7 +2,6 @@ import json
 import shlex
 from textwrap import indent
 
-import black
 import gooey_ui as st
 from furl import furl
 
@@ -130,6 +129,7 @@ print(response.status_code, result)
                 auth_keyword=auth_keyword,
                 json=repr(request_body),
             )
+        import black
 
         py_code = black.format_str(py_code, mode=black.FileMode())
         st.write(

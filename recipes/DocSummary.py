@@ -1,11 +1,10 @@
 import typing
 from enum import Enum
 
-from llama_index.langchain_helpers.text_splitter import SentenceSplitter
 from pydantic import BaseModel
 
 import gooey_ui as st
-from daras_ai_v2.GoogleGPT import render_outputs, GoogleGPTPage
+from daras_ai_v2.GoogleGPT import render_output_with_refs, GoogleGPTPage
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -20,9 +19,9 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.pt import PromptTree
+from daras_ai_v2.text_splitter import text_splitter
+from daras_ai_v2.vector_search import doc_url_to_text_pages, doc_url_to_metadata
 from recipes.DocSearch import (
-    doc_url_to_text_pages,
-    doc_url_to_metadata,
     DocSearchPage,
     render_documents,
 )
@@ -110,13 +109,13 @@ Prompt for merging several outputs together
         assert st.session_state.get("documents"), "Please provide at least 1 Document"
 
     def render_output(self):
-        render_outputs(st.session_state, 300)
+        render_output_with_refs(st.session_state, 300)
 
     def render_example(self, state: dict):
         render_documents(state)
         st.write("**Instructions**")
         st.write("```properties\n" + state.get("task_instructions", "") + "\n```")
-        render_outputs(state, 200)
+        render_output_with_refs(state, 200)
 
     def render_steps(self):
         prompt_tree = st.session_state.get("prompt_tree", {})
@@ -217,11 +216,11 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
 
     # logic: model max tokens = prompt + output + document chunk
     chunk_size = model_max_tokens[model] - (prompt_token_count + request.max_tokens)
-    text_splitter = SentenceSplitter(
+    docs = text_splitter(
+        full_text,
         chunk_size=chunk_size,
         chunk_overlap=chunk_size // 10,
     )
-    texts = text_splitter.split_text(full_text)
 
     def llm(p: str) -> str:
         return run_language_model(
@@ -236,9 +235,9 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
 
     state["prompt_tree"] = prompt_tree = []
     llm_prompts = []
-    for chunk in texts:
+    for doc in docs:
         prompt = MAP_REDUCE_PROMPT.format(
-            documents=documents_as_prompt([chunk]),
+            documents=documents_as_prompt([doc.text]),
             instructions=task_instructions,
         )
         llm_prompts.append(prompt)

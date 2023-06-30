@@ -1,6 +1,6 @@
 import datetime
 
-import pandas as pd
+
 import gooey_ui as st
 from firebase_admin import auth
 
@@ -29,7 +29,7 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
         """
     )
 
-    db_collection = db.client.collection(db.API_KEYS_COLLECTION)
+    db_collection = db.get_client().collection(db.API_KEYS_COLLECTION)
     api_keys = _load_api_keys(db_collection, user)
 
     table_area = st.div()
@@ -41,6 +41,8 @@ Gooey.AI may also automatically rotate any API key that we've found has leaked p
         db_collection.add(doc)
 
     with table_area:
+        import pandas as pd
+
         st.table(
             pd.DataFrame.from_records(
                 columns=["Secret Key (Preview)", "Created At"],

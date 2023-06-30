@@ -580,7 +580,7 @@ class BasePage:
         st.session_state.update(updates)
 
     def create_new_run(self):
-        st.session_state[StateKeys.run_status] = "Running..."
+        st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
         self._setup_rng_seed()
@@ -638,7 +638,7 @@ class BasePage:
 
         run_status = st.session_state.get(StateKeys.run_status)
         if run_status:
-            st.caption("Your changes are saved in the above URL. ")
+            st.caption("Your changes are saved in the above URL. Save it for later!")
             html_spinner(run_status)
         else:
             err_msg = st.session_state.get(StateKeys.error_msg)

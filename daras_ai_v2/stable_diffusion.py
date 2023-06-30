@@ -2,7 +2,6 @@ import io
 import typing
 from enum import Enum
 
-import openai
 import replicate
 import requests
 from PIL import Image
@@ -252,8 +251,7 @@ def text2img(
                 },
             )
         case Text2ImgModels.dall_e.name:
-            openai.api_key = settings.OPENAI_API_KEY
-            openai.api_base = "https://api.openai.com/v1"
+            import openai
 
             edge = _get_dalle_img_size(width, height)
             response = openai.Image.create(
@@ -340,8 +338,7 @@ def img2img(
                 },
             )
         case Img2ImgModels.dall_e.name:
-            openai.api_key = settings.OPENAI_API_KEY
-            openai.api_base = "https://api.openai.com/v1"
+            import openai
 
             edge = _get_dalle_img_size(width, height)
             image = resize_img_pad(init_image_bytes, (edge, edge))
@@ -488,8 +485,7 @@ def inpainting(
                 )
             ]
         case InpaintingModels.dall_e.name:
-            openai.api_key = settings.OPENAI_API_KEY
-            openai.api_base = "https://api.openai.com/v1"
+            import openai
 
             edge = _get_dalle_img_size(width, height)
             edit_image_bytes = resize_img_pad(edit_image_bytes, (edge, edge))

@@ -3,7 +3,7 @@ import typing
 from pydantic import BaseModel
 
 import gooey_ui as st
-from daras_ai_v2.GoogleGPT import render_outputs
+from daras_ai_v2.GoogleGPT import render_output_with_refs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.functional import map_parallel
@@ -11,6 +11,7 @@ from daras_ai_v2.google_search import call_scaleserp_rq
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
+from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import DocSearchPage, render_doc_search_step
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
@@ -152,7 +153,7 @@ class RelatedQnADocPage(BasePage):
         state["scaleserp_results"] = scaleserp_results
         state["related_questions"] = related_questions
 
-        yield f"Generating answers using [{LargeLanguageModels[request.selected_model].value}]..."
+        yield f"Generating answers using {LargeLanguageModels[request.selected_model].value}..."
         state["output_queries"] = map_parallel(
             lambda ques: run_doc_search(state.copy(), ques),
             related_questions,
@@ -175,10 +176,8 @@ def render_qna_outputs(state, height):
             continue
         references = output.get("references", [])
         st.write(f"**{output.get('search_query')}**")
-        render_outputs({"output_text": output_text, "references": references}, height)
-        with st.expander("Sources"):
-            for idx, ref in enumerate(references):
-                st.write(
-                    f"{idx + 1}. [{ref['title']}]({ref['url']}) \\\n*{ref['snippet']}*"
-                )
+        render_output_with_refs(
+            {"output_text": output_text, "references": references}, height
+        )
+        render_sources_widget(references)
         st.write("---")
