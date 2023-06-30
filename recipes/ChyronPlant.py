@@ -1,8 +1,6 @@
-import openai
-import gooey_ui as st
-from decouple import config
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai_v2 import settings
 from daras_ai_v2.base import (
     BasePage,
@@ -74,8 +72,6 @@ class ChyronPlantPage(BasePage):
         )
 
     def run(self, state: dict):
-        openai.api_key = settings.OPENAI_API_KEY
-
         yield "Translating MIDI..."
 
         state["midi_translation"] = self.run_midi_notes(state)
@@ -85,6 +81,8 @@ class ChyronPlantPage(BasePage):
         state["chyron_output"] = self.run_chyron(state)
 
     def run_midi_notes(self, state: dict):
+        import openai
+
         prompt = state.get("midi_notes_prompt", "").strip()
         prompt += "\nMIDI: " + state.get("midi_notes", "") + "\nEnglish:"
 
@@ -104,6 +102,8 @@ class ChyronPlantPage(BasePage):
         return ""
 
     def run_chyron(self, state: dict):
+        import openai
+
         prompt = state.get("chyron_prompt", "").strip()
         prompt += "\nUser: " + state.get("midi_translation", "").strip() + "\nChyron:"
 

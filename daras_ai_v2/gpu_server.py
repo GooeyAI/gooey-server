@@ -4,8 +4,6 @@ import os
 import typing
 
 import requests
-from celery import Celery
-from decouple import config
 from furl import furl
 
 from daras_ai.image_input import storage_blob_for
@@ -156,11 +154,19 @@ def call_celery_task_outfile(
     return [blob.public_url for blob in blobs]
 
 
-app = Celery()
-app.conf.broker_url = settings.CELERY_BROKER_URL
-app.conf.result_backend = settings.CELERY_RESULT_BACKEND
+_app = None
 
-QUEUE_PREFIX = config("GPU_QUEUE_PREFIX", default="gooey-gpu")
+
+def get_celery():
+    global _app
+    if _app is None:
+        from celery import Celery
+
+        _app = Celery()
+        _app.conf.broker_url = settings.GPU_CELERY_BROKER_URL
+        _app.conf.result_backend = settings.GPU_CELERY_RESULT_BACKEND
+
+    return _app
 
 
 def call_celery_task(
@@ -168,9 +174,10 @@ def call_celery_task(
     *,
     pipeline: dict,
     inputs: dict,
+    queue_prefix: str = "gooey-gpu",
 ):
-    queue = os.path.join(QUEUE_PREFIX, pipeline["model_id"].strip()).strip("/")
-    result = app.send_task(
+    queue = os.path.join(queue_prefix, pipeline["model_id"].strip()).strip("/")
+    result = get_celery().send_task(
         task_name, kwargs=dict(pipeline=pipeline, inputs=inputs), queue=queue
     )
-    return result.get()
+    return result.get(disable_sync_subtasks=False)

@@ -12,6 +12,7 @@ def language_model_settings(show_selector=True):
             LargeLanguageModels,
             label_visibility="collapsed",
             key="selected_model",
+            use_selectbox=True,
         )
 
     st.checkbox("Avoid Repetition", key="avoid_repetition")
@@ -30,13 +31,14 @@ How many completion choices to generate for each input
     if (
         show_selector
         and not LargeLanguageModels[
-            st.session_state.get("selected_model")
+            st.session_state.get("selected_model") or LargeLanguageModels.gpt_4
         ].is_chat_model()
     ):
         with col2:
             st.slider(
                 label="""
 ###### Quality
+Generate multiple responses and choose the best one.
             """,
                 key="quality",
                 min_value=1.0,
@@ -62,10 +64,10 @@ How many completion choices to generate for each input
             *(Sampling Temperature)*
     
             Higher values allow the model to take more risks.
-            Try 0.9 for more creative applications, 
-            and 0 for ones with a well-defined answer. 
+            Try values larger than `1` for more creative applications, 
+            or values close to `0` for a more well-defined answer. 
             """,
             key="sampling_temperature",
             min_value=0.0,
-            max_value=1.0,
+            max_value=2.0,
         )

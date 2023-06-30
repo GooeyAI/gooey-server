@@ -1,7 +1,6 @@
 import datetime
 import inspect
 import math
-import traceback
 import typing
 import urllib
 import urllib.parse
@@ -9,7 +8,8 @@ import uuid
 from copy import deepcopy
 from functools import lru_cache
 from random import Random
-from time import time, sleep
+from time import sleep
+from types import SimpleNamespace
 
 import requests
 import sentry_sdk
@@ -20,7 +20,6 @@ from pydantic import BaseModel
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
 )
-from starlette.background import BackgroundTasks
 from starlette.requests import Request
 
 import gooey_ui as st
@@ -58,8 +57,7 @@ from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
 from gooey_ui import realtime_clear_subs
-from gooey_ui.pubsub import realtime_pull, realtime_push
-from gooeysite.bg_db_conn import db_middleware
+from gooey_ui.pubsub import realtime_pull
 
 DEFAULT_META_IMG = (
     # Small
@@ -98,7 +96,10 @@ class BasePage:
     price = settings.CREDITS_TO_DEDUCT_PER_RUN
 
     def __init__(
-        self, tab: str = "", request: Request = None, run_user: AppUser = None
+        self,
+        tab: str = "",
+        request: Request | SimpleNamespace = None,
+        run_user: AppUser = None,
     ):
         self.tab = tab
         self.request = request
@@ -144,11 +145,7 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
-    background_tasks: BackgroundTasks = None
-
-    def render(self, background_tasks: BackgroundTasks = None):
-        self.background_tasks = background_tasks
-
+    def render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
@@ -583,7 +580,7 @@ class BasePage:
         st.session_state.update(updates)
 
     def create_new_run(self):
-        st.session_state[StateKeys.run_status] = "Running..."
+        st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
         self._setup_rng_seed()
@@ -616,17 +613,23 @@ class BasePage:
 
         if submitted:
             example_id, run_id, uid = self.create_new_run()
+
             if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
                 st.session_state[StateKeys.run_status] = None
                 self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
                 return
-            channel = f"gooey-outputs/{self.doc_name}/{uid}/{run_id}"
-            assert (
-                self.background_tasks
-            ), "background_tasks is not set for current session"
-            self.background_tasks.add_task(
-                self._run_thread, run_id, uid, st.session_state, channel
+
+            from celeryapp.tasks import gui_runner
+
+            gui_runner.delay(
+                page_cls=self.__class__,
+                user_id=self.request.user.id,
+                run_id=run_id,
+                uid=uid,
+                state=st.session_state,
+                channel=f"gooey-outputs/{self.doc_name}/{uid}/{run_id}",
             )
+
             raise QueryParamsRedirectException(
                 self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
             )
@@ -635,7 +638,7 @@ class BasePage:
 
         run_status = st.session_state.get(StateKeys.run_status)
         if run_status:
-            st.caption("Your changes are saved in the above URL. ")
+            st.caption("Your changes are saved in the above URL. Save it for later!")
             html_spinner(run_status)
         else:
             err_msg = st.session_state.get(StateKeys.error_msg)
@@ -653,75 +656,6 @@ class BasePage:
 
         if not run_status:
             self._render_after_output()
-
-    @db_middleware
-    def _run_thread(self, run_id, uid, state, channel):
-        st.set_session_state(state)
-        run_time = 0
-        yield_val = None
-        error_msg = None
-
-        def save(done=False):
-            if done:
-                # clear run status
-                run_status = None
-            else:
-                # set run status to the yield value of generator
-                run_status = yield_val or "Running..."
-            if isinstance(run_status, tuple):
-                run_status, extra_output = run_status
-            else:
-                extra_output = {}
-            output = (
-                # set run status and run time
-                {
-                    StateKeys.run_time: run_time,
-                    StateKeys.error_msg: error_msg,
-                    StateKeys.run_status: run_status,
-                }
-                |
-                # extract outputs from local state
-                {
-                    k: v
-                    for k, v in st.session_state.items()
-                    if k in self.ResponseModel.__fields__
-                }
-                | extra_output
-            )
-            # send outputs to ui
-            realtime_push(channel, output)
-            # save to db
-            self.run_doc_ref(run_id, uid).set(
-                self.state_to_doc(st.session_state | output)
-            )
-
-        try:
-            gen = self.run(st.session_state)
-            while True:
-                # record time
-                start_time = time()
-                try:
-                    # advance the generator (to further progress of run())
-                    yield_val = next(gen)
-                    # increment total time taken after every iteration
-                    run_time += time() - start_time
-                    continue
-                # run completed
-                except StopIteration:
-                    run_time += time() - start_time
-                    self.deduct_credits(st.session_state)
-                    break
-                # render errors nicely
-                except Exception as e:
-                    run_time += time() - start_time
-                    traceback.print_exc()
-                    sentry_sdk.capture_exception(e)
-                    error_msg = err_msg_for_exc(e)
-                    break
-                finally:
-                    save()
-        finally:
-            save(done=True)
 
     def _setup_rng_seed(self):
         seed = st.session_state.get("seed")
@@ -865,6 +799,11 @@ class BasePage:
 
     def _history_tab(self):
         assert self.request, "request must be set to render history tab"
+        if not self.request.user:
+            redirect_url = furl(
+                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
+            )
+            raise RedirectException(str(redirect_url))
         uid = self.request.user.uid
 
         run_history = (

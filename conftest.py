@@ -1,6 +1,14 @@
 import pytest
 
 
+@pytest.fixture(scope="session")
+def celery_config():
+    return {
+        "task_always_eager": True,
+        "result_backend": "rpc",
+    }
+
+
 @pytest.fixture(
     # add this fixture to all tests
     autouse=True

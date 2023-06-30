@@ -30,6 +30,7 @@ from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
 from recipes.QRCodeGenerator import QRCodeGeneratorPage
+from recipes.embeddings_page import EmbeddingsPage
 
 # note: the ordering here matters!
 all_home_pages = [
@@ -58,6 +59,7 @@ all_home_pages = [
     RelatedQnAPage,
     RelatedQnADocPage,
     QRCodeGeneratorPage,
+    EmbeddingsPage,
 ]
 
 # exposed as API

@@ -49,7 +49,7 @@ def realtime_push(channel: str, value: typing.Any = "ping"):
     msg = json.dumps(jsonable_encoder(value))
     r.set(channel, msg)
     r.publish(channel, json.dumps(time()))
-    print("publish", channel, time())
+    print(f"publish {channel!r}")
 
 
 # def use_state(

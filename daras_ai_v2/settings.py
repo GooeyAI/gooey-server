@@ -13,7 +13,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 from pathlib import Path
 
-import firebase_admin
 import sentry_sdk
 import stripe
 from decouple import config, UndefinedValueError, Csv
@@ -104,6 +103,8 @@ try:
             "PASSWORD": PGPASSWORD,
             "HOST": PGHOST,
             "PORT": PGPORT,
+            "CONN_HEALTH_CHECKS": True,
+            "CONN_MAX_AGE": None,
         }
     }
 except UndefinedValueError:
@@ -195,6 +196,8 @@ else:
     with open(service_account_key_path, "w") as f:
         f.write(_json)
 
+import firebase_admin
+
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
@@ -205,7 +208,8 @@ GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
 UBERDUCK_KEY = config("UBERDUCK_KEY", None)
 UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 
-OPENAI_API_KEY = config("OPENAI_API_KEY", None)
+OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 
@@ -252,8 +256,9 @@ REDIS_URL = config("REDIS_URL", "redis://localhost:6379")
 REDIS_CACHE_URL = config("REDIS_CACHE_URL", "redis://localhost:6379")
 TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
 
-PINECONE_API_KEY = config("PINECONE_API_KEY", "")
-PINECONE_ENVIRONMENT = config("PINECONE_ENVIRONMENT", "us-east1-gcp")
+GPU_CELERY_BROKER_URL = config("GPU_CELERY_BROKER_URL", "amqp://localhost:5674")
+GPU_CELERY_RESULT_BACKEND = config(
+    "GPU_CELERY_RESULT_BACKEND", "redis://localhost:6374"
+)
 
-CELERY_BROKER_URL = config("CELERY_BROKER_URL", "amqp://")
-CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", "redis://")
+LOCAL_CELERY_BROKER_URL = config("LOCAL_CELERY_BROKER_URL", "amqp://")

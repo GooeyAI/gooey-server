@@ -26,9 +26,10 @@ from app_users.models import AppUser
 from auth_backend import (
     FIREBASE_SESSION_COOKIE,
 )
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
+from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
 from daras_ai_v2.base import (
     BasePage,
     RedirectException,
@@ -155,19 +156,26 @@ def file_upload(request: Request, form_data: FormData = Depends(request_form_fil
 
     if content_type.startswith("audio/"):
         with tempfile.NamedTemporaryFile(
-            suffix="." + filename,
-        ) as infile, tempfile.NamedTemporaryFile(
-            suffix=".wav",
-        ) as outfile:
+            suffix="." + safe_filename(filename)
+        ) as infile:
             infile.write(data)
+            infile.flush()
+            if not check_wav_audio_format(infile.name):
+                with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
+                    args = [
+                        "ffmpeg",
+                        "-y",
+                        "-i",
+                        infile.name,
+                        *FFMPEG_WAV_ARGS,
+                        outfile.name,
+                    ]
+                    print("\t$ " + " ".join(args))
+                    subprocess.check_call(args)
 
-            args = ["ffmpeg", "-y", "-i", infile.name, "-ac", "1", outfile.name]
-            print("\t$", " ".join(args))
-            subprocess.check_call(args)
-
-            filename += ".wav"
-            content_type = "audio/wav"
-            data = outfile.read()
+                    filename += ".wav"
+                    content_type = "audio/wav"
+                    data = outfile.read()
 
     if content_type.startswith("image/"):
         with Image(blob=data) as img:
@@ -197,7 +205,6 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
 @app.post("/{page_slug}/{tab}/")
 def st_page(
     request: Request,
-    background_tasks: BackgroundTasks,
     page_slug="",
     tab="",
     json_data: dict = Depends(request_json),
@@ -219,17 +226,17 @@ def st_page(
 
     state = json_data.setdefault("state", {})
     if not state:
-        state.update(page.get_firestore_state(example_id, run_id, uid))
-        for k, v in page.sane_defaults.items():
-            state.setdefault(k, v)
+        firestore_state = page.get_firestore_state(example_id, run_id, uid)
+        if firestore_state is not None:
+            state.update(firestore_state)
+            for k, v in page.sane_defaults.items():
+                state.setdefault(k, v)
     if state is None:
         raise HTTPException(status_code=404)
 
     try:
         ret = st.runner(
-            lambda: page_wrapper(
-                request, page.render, background_tasks=background_tasks
-            ),
+            lambda: page_wrapper(request, page.render),
             query_params=dict(request.query_params),
             **json_data,
         )

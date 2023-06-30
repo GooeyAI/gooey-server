@@ -1,12 +1,13 @@
 import typing
 
-import gooey_ui as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.doc_search_settings_widgets import doc_search_settings
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.google_search import call_scaleserp, call_scaleserp_rq
+from daras_ai_v2.google_search import call_scaleserp_rq
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
@@ -25,6 +26,12 @@ class RelatedQnAPage(BasePage):
     slug_versions = ["related-qna-maker"]
 
     price = 75
+
+    sane_defaults = dict(
+        max_references=4,
+        max_context_words=200,
+        scroll_jump=5,
+    )
 
     class RequestModel(BaseModel):
         search_query: str
@@ -45,6 +52,10 @@ class RelatedQnAPage(BasePage):
 
         scaleserp_search_field: str | None
         scaleserp_locations: list[str] | None
+
+        max_references: int | None
+        max_context_words: int | None
+        scroll_jump: int | None
 
     class ResponseModel(BaseModel):
         output_queries: list[RelatedGoogleGPTResponse]
@@ -81,6 +92,7 @@ class RelatedQnAPage(BasePage):
         )
 
         language_model_settings()
+        doc_search_settings(asr_allowed=False)
 
         st.write("---")
 
@@ -157,7 +169,7 @@ class RelatedQnAPage(BasePage):
         state["scaleserp_results"] = scaleserp_results
         state["related_questions"] = related_questions
 
-        yield f"Generating answers using [{LargeLanguageModels[request.selected_model].value}]..."
+        yield f"Generating answers using {LargeLanguageModels[request.selected_model].value}..."
         state["output_queries"] = map_parallel(
             lambda ques: run_google_gpt(state.copy(), ques),
             related_questions,

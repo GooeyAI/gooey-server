@@ -14,9 +14,11 @@ if [ "$RUN_JUPYTER" ]; then
 elif [ "$RUN_DJANGO" ]; then
   ./manage.py migrate
   ./manage.py collectstatic
-  SENTRY_ENVIRONMENT="django" gunicorn gooeysite.wsgi --bind 0.0.0.0:8000 --threads "${WEB_CONCURRENCY:-1}"
+  SENTRY_ENVIRONMENT="django" gunicorn gooeysite.wsgi --bind 0.0.0.0:8000 --threads "${MAX_THREADS:-1}"
 elif [ "$RUN_STREAMLIT" ]; then
   SENTRY_ENVIRONMENT="streamlit" streamlit run Home.py --server.address=0.0.0.0 --server.port=8000
+elif [ "$RUN_CELERY" ]; then
+  SENTRY_ENVIRONMENT="celery" celery -A celeryapp worker -c ${MAX_THREADS:-1} -P threads -l info
 else
-  SENTRY_ENVIRONMENT="fastapi" uvicorn server:app --host 0.0.0.0 --workers 1 --port 8000
+  SENTRY_ENVIRONMENT="fastapi" uvicorn server:app --host 0.0.0.0 --port 8000
 fi

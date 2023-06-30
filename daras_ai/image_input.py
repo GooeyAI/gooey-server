@@ -4,10 +4,9 @@ import re
 import uuid
 from pathlib import Path
 
-import cv2
 import numpy as np
+import requests
 from PIL import Image, ImageOps
-from firebase_admin import storage
 
 from daras_ai_v2 import settings
 
@@ -94,6 +93,8 @@ def upload_file_from_bytes(
     data: bytes,
     content_type: str = None,
 ) -> str:
+    from firebase_admin import storage
+
     if not content_type:
         content_type = mimetypes.guess_type(filename)[0]
     content_type = content_type or "application/octet-stream"
@@ -105,7 +106,9 @@ def upload_file_from_bytes(
     return blob.public_url
 
 
-def storage_blob_for(filename: str) -> storage.storage.Blob:
+def storage_blob_for(filename: str) -> "storage.storage.Blob":
+    from firebase_admin import storage
+
     filename = safe_filename(filename)
     bucket = storage.bucket(settings.GS_BUCKET_NAME)
     blob = bucket.blob(f"daras_ai/media/{uuid.uuid1()}/{filename}")
@@ -113,10 +116,14 @@ def storage_blob_for(filename: str) -> storage.storage.Blob:
 
 
 def cv2_img_to_bytes(img):
+    import cv2
+
     return cv2.imencode(".png", img)[1].tobytes()
 
 
 def bytes_to_cv2_img(img_bytes: bytes):
+    import cv2
+
     img_cv2 = cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
     if not img_exists(img_cv2):
         raise ValueError("Bad Image")
@@ -159,3 +166,9 @@ def truncate_text_words(text: str, maxlen: int, sep: str = " …") -> str:
     else:
         trunc = text[: maxlen - len(sep)]
     return trunc + sep
+
+
+def guess_ext_from_response(response: requests.Response) -> str:
+    content_type = response.headers.get("Content-Type", "application/octet-stream")
+    mimetype = content_type.split(";")[0]
+    return mimetypes.guess_extension(mimetype) or ""

@@ -1,6 +1,5 @@
 import typing
 
-import cv2
 import requests
 from pydantic import BaseModel
 
@@ -156,6 +155,8 @@ class ObjectInpaintingPage(BasePage):
                 max_value=1.0,
                 key="obj_pos_y",
             )
+
+        import cv2
 
         # show an example image
         img_cv2 = cv2.imread("static/obj.png")

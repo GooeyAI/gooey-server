@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 
 from daras_ai.image_input import bytes_to_cv2_img, cv2_img_to_bytes
@@ -41,6 +40,8 @@ def reposition_object(
     out_pos_x: float = 4 / 9,
     out_pos_y: float = 3 / 9,
 ):
+    import cv2
+
     img_y, img_x, _ = orig_img.shape
     out_img_x, out_img_y = out_size
     out_img_shape = (out_img_y, out_img_x, orig_img.shape[-1])
