@@ -799,6 +799,11 @@ class BasePage:
 
     def _history_tab(self):
         assert self.request, "request must be set to render history tab"
+        if not self.request.user:
+            redirect_url = furl(
+                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
+            )
+            raise RedirectException(str(redirect_url))
         uid = self.request.user.uid
 
         run_history = (
