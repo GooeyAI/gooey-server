@@ -58,6 +58,8 @@ def reposition_object(
         re_ratio = (out_img_y / obj_height) * out_obj_scale
     else:
         re_ratio = (out_img_x / obj_width) * out_obj_scale
+    # reasonable bounds for the resize ratio
+    re_ratio = min(max(re_ratio, 0.1), 10.0)
 
     # resized image size
     re_img_x = int(img_x * re_ratio)
