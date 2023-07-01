@@ -1,8 +1,3 @@
-import json
-import math
-
-from contextlib import ExitStack
-
 import gooey_ui as st
 
 from daras_ai_v2.enum_selector_widget import enum_selector, enum_multiselect
@@ -16,10 +11,20 @@ from daras_ai_v2.stable_diffusion import (
 )
 
 
-def img_model_settings(models_enum, render_model_selector=True):
-    st.write("### Image Generation Settings")
+def img_model_settings(
+    models_enum,
+    render_model_selector=True,
+    show_scheduler=False,
+    require_controlnet=False,
+    extra_explanations: dict[ControlNetModels, str] = None,
+):
+    st.write("#### Image Generation Settings")
     if render_model_selector:
-        selected_model = model_selector(models_enum)
+        selected_model = model_selector(
+            models_enum,
+            require_controlnet=require_controlnet,
+            extra_explanations=extra_explanations,
+        )
     else:
         selected_model = st.session_state.get("selected_model")
 
@@ -44,13 +49,20 @@ def img_model_settings(models_enum, render_model_selector=True):
             prompt_strength_setting(selected_model)
         if selected_model == Img2ImgModels.instruct_pix2pix.name:
             instruct_pix2pix_settings()
-        if st.session_state.get("selected_controlnet_model"):
-            controlnet_settings()
+
+    if show_scheduler:
+        col1, col2 = st.columns(2)
+        with col1:
+            scheduler_setting(selected_model)
 
     return selected_model
 
 
-def model_selector(models_enum, require_controlnet=False):
+def model_selector(
+    models_enum,
+    require_controlnet=False,
+    extra_explanations: dict[ControlNetModels, str] = None,
+):
     controlnet_unsupported_models = [
         Img2ImgModels.instruct_pix2pix.name,
         Img2ImgModels.dall_e.name,
@@ -69,7 +81,6 @@ def model_selector(models_enum, require_controlnet=False):
             use_selectbox=True,
             exclude=controlnet_unsupported_models if require_controlnet else [],
         )
-    with col2:
         if (
             models_enum is Img2ImgModels
             and st.session_state.get("selected_model") in controlnet_unsupported_models
@@ -87,23 +98,28 @@ def model_selector(models_enum, require_controlnet=False):
                 checkboxes=False,
                 allow_none=not require_controlnet,
             )
+        with col2:
+            controlnet_settings(extra_explanations=extra_explanations)
     return selected_model
 
 
 CONTROLNET_CONDITIONING_SCALE_RANGE: tuple[float, float] = (0.0, 2.0)
 
 
-def controlnet_settings(
-    explanations: dict[ControlNetModels, str] = controlnet_model_explanations
-):
+def controlnet_settings(extra_explanations: dict[ControlNetModels, str] = None):
     models = st.session_state.get("selected_controlnet_model", [])
     if not models:
         return
+
+    if extra_explanations is None:
+        extra_explanations = {}
+    explanations = controlnet_model_explanations | extra_explanations
+
     state_values = st.session_state.get("controlnet_conditioning_scale", [])
     new_values = []
     st.write(
         """
-        ##### ⚖️ Control Net Strength
+        ##### ⚖️ Conditioning Scales
         """,
         className="gui-input",
     )
@@ -121,10 +137,8 @@ def controlnet_settings(
             pass
         new_values.append(
             controlnet_weight_setting(
-                selected_controlnet_model=model,
-                explanations=explanations,
-                key=key,
-            )
+                selected_controlnet_model=model, explanations=explanations, key=key
+            ),
         )
     st.session_state["controlnet_conditioning_scale"] = new_values
 
@@ -132,7 +146,7 @@ def controlnet_settings(
 def controlnet_weight_setting(
     *,
     selected_controlnet_model: str,
-    explanations: dict[ControlNetModels, str] = controlnet_model_explanations,
+    explanations: dict[ControlNetModels, str],
     key: str = "controlnet_conditioning_scale",
 ):
     model = ControlNetModels[selected_controlnet_model]

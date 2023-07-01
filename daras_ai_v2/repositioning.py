@@ -1,5 +1,6 @@
 import numpy as np
 
+import gooey_ui
 from daras_ai.image_input import bytes_to_cv2_img, cv2_img_to_bytes
 
 
@@ -39,6 +40,7 @@ def reposition_object(
     out_obj_scale: float = 0.2,
     out_pos_x: float = 4 / 9,
     out_pos_y: float = 3 / 9,
+    color=0,
 ):
     import cv2
 
@@ -54,7 +56,7 @@ def reposition_object(
     obj_width = abs(obj_xmax - obj_xmin)
 
     # image resize ratio
-    if obj_height > obj_width:
+    if obj_height > obj_width or (obj_height == obj_width and out_img_y < out_img_x):
         re_ratio = (out_img_y / obj_height) * out_obj_scale
     else:
         re_ratio = (out_img_x / obj_width) * out_obj_scale
@@ -106,8 +108,8 @@ def reposition_object(
         slice(0, 3),
     )
 
-    out_img = np.zeros(out_img_shape, dtype=np.uint8)
-    out_mask = np.zeros(out_img_shape, dtype=np.uint8)
+    out_img = np.ones(out_img_shape, dtype=np.uint8) * color
+    out_mask = np.ones(out_img_shape, dtype=np.uint8) * color
 
     # paste crop of resized image onto the crop of output image
     out_img[out_rect_cropper] = re_img[re_rect_cropper]
@@ -123,3 +125,44 @@ def get_mask_bounds(mask_cv2) -> (int, int, int, int):
     xmin = white_pixels[1].min()
     xmax = white_pixels[1].max()
     return xmin, xmax, ymin, ymax
+
+
+def repositioning_preview_widget(
+    *,
+    img_cv2: np.ndarray,
+    mask_cv2: np.ndarray,
+    out_size: tuple[int, int],
+    obj_scale: float,
+    pos_x: float,
+    pos_y: float,
+    color: int = 0,
+):
+    img, _ = reposition_object(
+        orig_img=img_cv2,
+        orig_mask=mask_cv2,
+        out_size=out_size,
+        out_obj_scale=obj_scale,
+        out_pos_x=pos_x,
+        out_pos_y=pos_y,
+        color=color,
+    )
+    repositioning_preview_img(img)
+
+
+def repositioning_preview_img(img: np.ndarray):
+    import cv2
+
+    # draw rule of 3rds
+    color = (200, 200, 200)
+    stroke = 2
+    img_y, img_x, _ = img.shape
+    for i in range(2):
+        pos = (img_y // 3) * (i + 1)
+        cv2.line(img, (0, pos), (img_x, pos), color, stroke)
+
+        pos = (img_x // 3) * (i + 1)
+        cv2.line(img, (pos, 0), (pos, img_y), color, stroke)
+
+        cv2.rectangle(img, (0, 0), (img_x, img_y), color, stroke)
+
+    gooey_ui.image(img, style=dict(maxWidth="300px", maxHeight="300px"))

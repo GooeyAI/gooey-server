@@ -1,7 +1,5 @@
-from pyzbar import pyzbar
 import typing
 
-import PIL.Image as Image
 import numpy as np
 import qrcode
 import requests
@@ -9,28 +7,25 @@ from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from furl import furl
 from pydantic import BaseModel
+from pyzbar import pyzbar
 
 import gooey_ui as st
 from daras_ai.image_input import (
     upload_file_from_bytes,
     bytes_to_cv2_img,
+    cv2_img_to_bytes,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.descriptions import prompting101
 from daras_ai_v2.img_model_settings_widgets import (
-    guidance_scale_setting,
-    controlnet_settings,
     output_resolution_setting,
-    negative_prompt_setting,
-    quality_setting,
-    scheduler_setting,
-    model_selector,
+    img_model_settings,
 )
+from daras_ai_v2.repositioning import reposition_object, repositioning_preview_widget
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
     controlnet,
     ControlNetModels,
-    controlnet_model_explanations,
     Img2ImgModels,
     Schedulers,
 )
@@ -40,11 +35,14 @@ ATTEMPTS = 1
 
 class QRCodeGeneratorPage(BasePage):
     title = "AI Art QR Code"
-    slug_versions = [
-        "art-qr-code",
-        "qr",
-        "qr-code",
-    ]
+    slug_versions = ["art-qr-code", "qr", "qr-code"]
+
+    sane_defaults = dict(
+        num_outputs=1,
+        obj_scale=0.65,
+        obj_pos_x=0.5,
+        obj_pos_y=0.5,
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -70,11 +68,15 @@ class QRCodeGeneratorPage(BasePage):
         guidance_scale: float | None
         controlnet_conditioning_scale: typing.List[float] | None
 
-        # num_images: int | None
+        num_outputs: int | None
         quality: int | None
         scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
 
         seed: int | None
+
+        obj_scale: float | None
+        obj_pos_x: float | None
+        obj_pos_y: float | None
 
     class ResponseModel(BaseModel):
         output_images: list[str]
@@ -200,30 +202,71 @@ Here is the final output:
             """
         )
 
-        output_resolution_setting()
-        model_selector(Img2ImgModels, require_controlnet=True)
-        negative_prompt_setting()
-
         st.checkbox("🔗 URL Shortener", key="use_url_shortener")
         st.caption("Enabling this will automatically shorten URLs")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            guidance_scale_setting()
-        with col2:
-            quality_setting()
+        img_model_settings(
+            Img2ImgModels,
+            show_scheduler=True,
+            require_controlnet=True,
+            extra_explanations={
+                ControlNetModels.sd_controlnet_tile: "Tiling: Preserves small details mainly in the qr code which makes it more readable",
+                ControlNetModels.sd_controlnet_brightness: "Brightness: Makes the qr code darker and background lighter (contrast helps qr readers)",
+            },
+        )
+        st.write("---")
 
-        col1, col2 = st.columns(2)
+        output_resolution_setting()
+
+        st.write(
+            """
+            ##### ⌖ Positioning
+            Use this to control where the QR code is placed in the image, and how big it should be.
+            """,
+            className="gui-input",
+        )
+        col1, _ = st.columns(2)
         with col1:
-            scheduler_setting()
-        with col2:
-            controlnet_settings(
-                controlnet_model_explanations
-                | {
-                    ControlNetModels.sd_controlnet_tile: "Tiling: Preserves small details mainly in the qr code which makes it more readable",
-                    ControlNetModels.sd_controlnet_brightness: "Brightness: Makes the qr code darker and background lighter (contrast helps qr readers)",
-                }
+            obj_scale = st.slider(
+                "Scale",
+                min_value=0.1,
+                max_value=1.0,
+                step=0.05,
+                key="obj_scale",
             )
+        col1, col2 = st.columns(2, responsive=False)
+        with col1:
+            pos_x = st.slider(
+                "Position X",
+                min_value=0.0,
+                max_value=1.0,
+                step=0.05,
+                key="obj_pos_x",
+            )
+        with col2:
+            pos_y = st.slider(
+                "Position Y",
+                min_value=0.0,
+                max_value=1.0,
+                step=0.05,
+                key="obj_pos_y",
+            )
+
+        img_cv2 = mask_cv2 = np.array(
+            qrcode.QRCode(border=0).make_image().convert("RGB")
+        )
+        repositioning_preview_widget(
+            img_cv2=img_cv2,
+            mask_cv2=mask_cv2,
+            obj_scale=obj_scale,
+            pos_x=pos_x,
+            pos_y=pos_y,
+            out_size=(
+                st.session_state["output_width"],
+                st.session_state["output_height"],
+            ),
+            color=255,
+        )
 
     def render_output(self):
         state = st.session_state
@@ -231,46 +274,45 @@ Here is the final output:
 
     def _render_outputs(self, state: dict):
         for img in state.get("output_images", []):
-            st.image(img, caption=state.get("qr_code_data"))
+            st.image(img)
+            st.caption(f'{state.get("qr_code_data")}')
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
 
         yield "Generating QR Code..."
-        image, qr_code_data, did_shorten = preprocess_qr_code(request)
+        image, qr_code_data, did_shorten = generate_and_upload_qr_code(request)
         if did_shorten:
             state["shortened_url"] = qr_code_data
         state["cleaned_qr_code"] = image
 
         state["raw_images"] = raw_images = []
 
-        attempt = None
-        for i in range(ATTEMPTS):
-            yield f"Running {Text2ImgModels[request.selected_model].value}..."
-            attempt = controlnet(
-                selected_model=request.selected_model,
-                selected_controlnet_model=request.selected_controlnet_model,
-                prompt=request.text_prompt,
-                init_image=image,
-                num_inference_steps=request.quality,
-                negative_prompt=request.negative_prompt,
-                guidance_scale=request.guidance_scale,
-                seed=request.seed + i,
-                controlnet_conditioning_scale=request.controlnet_conditioning_scale,
-                scheduler=request.scheduler,
-            )[0]
-            raw_images.append(attempt)
-            try:
-                assert download_qr_code_data(attempt) == qr_code_data
-            except InvalidQRCode:
-                continue
-            state["output_images"] = [attempt]
-            break
+        yield f"Running {Text2ImgModels[request.selected_model].value}..."
+        state["output_images"] = controlnet(
+            selected_model=request.selected_model,
+            selected_controlnet_model=request.selected_controlnet_model,
+            prompt=request.text_prompt,
+            init_image=image,
+            num_outputs=request.num_outputs,
+            num_inference_steps=request.quality,
+            negative_prompt=request.negative_prompt,
+            guidance_scale=request.guidance_scale,
+            seed=request.seed,
+            controlnet_conditioning_scale=request.controlnet_conditioning_scale,
+            scheduler=request.scheduler,
+        )
 
         # TODO: properly detect bad qr code
         # TODO: generate safe qr code instead
-        if attempt:
-            state["output_images"] = [attempt]
+        # for attempt in images:
+        #     raw_images.append(attempt)
+        #     try:
+        #         assert download_qr_code_data(attempt) == qr_code_data
+        #     except InvalidQRCode:
+        #         continue
+        #     state["output_images"] = [attempt]
+        #     break
         # raise RuntimeError(
         #     'Doh! That didn\'t work. Sometimes the AI produces bad QR codes. Please press "Regenerate" to try again.'
         # )
@@ -280,8 +322,9 @@ Here is the final output:
         with col1:
             st.markdown(
                 f"""
-                ```Prompt: {state.get("text_prompt", "")}```
-                ```QR Content: {state.get("qr_code_data", "")}```
+                ```text
+                {state.get("text_prompt", "")}
+                ```
                 """
             )
         with col2:
@@ -301,7 +344,7 @@ Here is the final output:
         return total
 
 
-def preprocess_qr_code(request: QRCodeGeneratorPage.RequestModel):
+def generate_and_upload_qr_code(request: QRCodeGeneratorPage.RequestModel):
     qr_code_data = request.qr_code_data
     if not qr_code_data:
         qr_code_input_image = request.qr_code_input_image
@@ -314,10 +357,26 @@ def preprocess_qr_code(request: QRCodeGeneratorPage.RequestModel):
     if should_shorten:
         qr_code_data, should_shorten = shorten_url(qr_code_data)
 
-    qrcode_image = upload_qr_code(
-        qr_code_data, size=(request.output_width, request.output_height)
+    img_cv2 = generate_qr_code(qr_code_data)
+
+    img_cv2, _ = reposition_object(
+        orig_img=img_cv2,
+        orig_mask=img_cv2,
+        out_size=(request.output_width, request.output_height),
+        out_obj_scale=request.obj_scale,
+        out_pos_x=request.obj_pos_x,
+        out_pos_y=request.obj_pos_y,
+        color=255,
     )
-    return qrcode_image, qr_code_data, should_shorten
+
+    img_url = upload_file_from_bytes("cleaned_qr.png", cv2_img_to_bytes(img_cv2))
+    return img_url, qr_code_data, should_shorten
+
+
+def generate_qr_code(qr_code_data: str) -> np.ndarray:
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, border=0)
+    qr.add_data(qr_code_data)
+    return np.array(qr.make_image().convert("RGB"))
 
 
 def shorten_url(qr_code_data: str) -> tuple[str, bool]:
@@ -343,37 +402,6 @@ def shorten_url(qr_code_data: str) -> tuple[str, bool]:
     return qr_code_data, False
 
 
-def upload_qr_code(qr_code_data: str, size: tuple[int, int]):
-    import cv2
-
-    qr_size = min(size)
-    qr = qrcode.QRCode(
-        error_correction=qrcode.constants.ERROR_CORRECT_H,
-        box_size=11,
-        border=9,
-    )
-    qr.add_data(qr_code_data)
-    qr.make(fit=True)
-    qrcode_image = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-    qrcode_image = qrcode_image.resize((qr_size, qr_size), Image.LANCZOS)
-    qrcode_image = pad_image(qrcode_image, size)
-
-    open_cv_image = np.array(qrcode_image)
-    open_cv_image = open_cv_image[:, :, ::-1].copy()
-    bytes = cv2.imencode(".png", open_cv_image)[1].tobytes()
-    photo_url = upload_file_from_bytes("cleaned_qr.png", bytes)
-    return photo_url
-
-
-def pad_image(pil_img: Image, size: tuple[int, int], rgb=(255, 255, 255)):
-    width, height = pil_img.size
-    left = (size[0] - width) // 2
-    top = (size[1] - height) // 2
-    result = Image.new(pil_img.mode, size, rgb)
-    result.paste(pil_img, (left, top))
-    return result
-
-
 def download_qr_code_data(url: str) -> str:
     r = requests.get(url)
     r.raise_for_status()
@@ -381,7 +409,7 @@ def download_qr_code_data(url: str) -> str:
     return extract_qr_code_data(img)
 
 
-def extract_qr_code_data(img):
+def extract_qr_code_data(img: np.ndarray) -> str:
     decoded = pyzbar.decode(img)
     if not (decoded and decoded[0]):
         raise InvalidQRCode("No QR code found in image")

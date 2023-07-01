@@ -6,6 +6,7 @@ import numpy as np
 
 from furl import furl
 
+from daras_ai.image_input import resize_img_scale
 from gooey_ui import state
 from gooey_ui.pubsub import md5_values
 
@@ -158,13 +159,16 @@ def image(
     src: str | np.ndarray,
     caption: str = None,
     alt: str = None,
-    width: int = None,
+    **props,
 ):
     if isinstance(src, np.ndarray):
         from daras_ai.image_input import cv2_img_to_bytes
 
-        # convert to base64 and set src
-        data = cv2_img_to_bytes(src)
+        if not src.shape:
+            return
+        # ensure image is not too large
+        data = resize_img_scale(cv2_img_to_bytes(src), (128, 128))
+        # convert to base64
         b64 = base64.b64encode(data).decode("utf-8")
         src = "data:image/png;base64," + b64
     if not src:
@@ -175,7 +179,7 @@ def image(
             src=src,
             caption=dedent(caption),
             alt=alt or caption,
-            style=dict(width=f"{width}px"),
+            **props,
         ),
     ).mount()
 

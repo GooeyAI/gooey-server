@@ -11,7 +11,7 @@ from PIL import Image, ImageOps
 from daras_ai_v2 import settings
 
 
-def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
+def resize_img_pad(img_bytes: bytes, size: tuple[int, int]) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
     img_pil = ImageOps.pad(img_pil, size)
@@ -19,7 +19,7 @@ def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
     return cv2_img_to_bytes(img_cv2)
 
 
-def resize_img_scale(img_bytes: bytes, size: (int, int)) -> bytes:
+def resize_img_scale(img_bytes: bytes, size: tuple[int, int]) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
     downscale_factor = get_downscale_factor(im_size=img_pil.size, max_size=size)
@@ -29,7 +29,9 @@ def resize_img_scale(img_bytes: bytes, size: (int, int)) -> bytes:
     return cv2_img_to_bytes(img_cv2)
 
 
-def get_downscale_factor(*, im_size: (int, int), max_size: (int, int)) -> float | None:
+def get_downscale_factor(
+    *, im_size: tuple[int, int], max_size: tuple[int, int]
+) -> float | None:
     downscale_factor = math.sqrt(
         (max_size[0] * max_size[1]) / (im_size[0] * im_size[1])
     )
@@ -39,17 +41,12 @@ def get_downscale_factor(*, im_size: (int, int), max_size: (int, int)) -> float 
         return None
 
 
-def resize_img_fit(img_bytes: bytes, size: (int, int)) -> bytes:
+def resize_img_fit(img_bytes: bytes, size: tuple[int, int]) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
     img_pil = ImageOps.fit(img_pil, size)
     img_cv2 = np.array(img_pil)
     return cv2_img_to_bytes(img_cv2)
-
-
-# @st.cache_data
-# def upload_st_file(f: UploadedFile) -> str:
-#     return upload_file_from_bytes(f.name, f.getvalue(), f.type)
 
 
 def upload_file_from_bytes(
@@ -79,13 +76,13 @@ def storage_blob_for(filename: str) -> "storage.storage.Blob":
     return blob
 
 
-def cv2_img_to_bytes(img):
+def cv2_img_to_bytes(img: np.ndarray) -> bytes:
     import cv2
 
     return cv2.imencode(".png", img)[1].tobytes()
 
 
-def bytes_to_cv2_img(img_bytes: bytes, greyscale=False):
+def bytes_to_cv2_img(img_bytes: bytes, greyscale=False) -> np.ndarray:
     import cv2
 
     if greyscale:
@@ -98,7 +95,7 @@ def bytes_to_cv2_img(img_bytes: bytes, greyscale=False):
     return img_cv2
 
 
-def img_exists(img) -> bool:
+def img_exists(img: np.ndarray | str) -> bool:
     if isinstance(img, np.ndarray):
         return bool(len(img))
     else:
@@ -108,7 +105,7 @@ def img_exists(img) -> bool:
 FILENAME_WHITELIST = re.compile(r"[ a-zA-Z0-9\-_.]")
 
 
-def safe_filename(filename: str):
+def safe_filename(filename: str) -> str:
     matches = FILENAME_WHITELIST.finditer(filename)
     filename = "".join(match.group(0) for match in matches)
     p = Path(filename)

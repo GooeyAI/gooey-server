@@ -24,6 +24,7 @@ from daras_ai_v2.polygon_fitter import (
 from daras_ai_v2.repositioning import (
     reposition_object,
     get_mask_bounds,
+    repositioning_preview_widget,
 )
 
 
@@ -175,28 +176,14 @@ class ImageSegmentationPage(BasePage):
         img_cv2 = cv2.imread("static/obj.png")
         mask_cv2 = cv2.imread("static/obj_mask.png")
 
-        # extract obj
-        img, mask = reposition_object(
-            orig_img=img_cv2,
-            orig_mask=mask_cv2,
+        repositioning_preview_widget(
+            img_cv2=img_cv2,
+            mask_cv2=mask_cv2,
+            obj_scale=obj_scale,
+            pos_x=pos_x,
+            pos_y=pos_y,
             out_size=(img_cv2.shape[1], img_cv2.shape[0]),
-            out_obj_scale=obj_scale,
-            out_pos_x=pos_x,
-            out_pos_y=pos_y,
         )
-
-        # draw rule of 3rds
-        color = (200, 200, 200)
-        stroke = 2
-        img_y, img_x, _ = img.shape
-        for i in range(2):
-            pos = (img_y // 3) * (i + 1)
-            cv2.line(img, (0, pos), (img_x, pos), color, stroke)
-
-            pos = (img_x // 3) * (i + 1)
-            cv2.line(img, (pos, 0), (pos, img_y), color, stroke)
-
-        st.image(img, width=300)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: ImageSegmentationPage.RequestModel = self.RequestModel.parse_obj(state)
