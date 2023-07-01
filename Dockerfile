@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pandoc \
     postgresql-client \
 	ffmpeg \
+    libzbar0 \
 	&& rm -rf /var/lib/apt/lists/*
 
 # copy poetry files

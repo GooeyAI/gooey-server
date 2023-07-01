@@ -32,7 +32,7 @@ class Img2ImgPage(BasePage):
         # "sd_2_upscaling": False,
         "seed": 42,
         "image_guidance_scale": 1.2,
-        "selected_controlnet_model": None,
+        "controlnet_conditioning_scale": [1.0],
     }
 
     class RequestModel(BaseModel):
@@ -40,9 +40,9 @@ class Img2ImgPage(BasePage):
         text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
-        selected_controlnet_model: typing.Literal[
-            tuple(e.name for e in ControlNetModels)
-        ] | None
+        selected_controlnet_model: list[
+            typing.Literal[tuple(e.name for e in ControlNetModels)]
+        ] | typing.Literal[tuple(e.name for e in ControlNetModels)] | None
         negative_prompt: str | None
 
         num_outputs: int | None
@@ -53,6 +53,7 @@ class Img2ImgPage(BasePage):
 
         guidance_scale: float | None
         prompt_strength: float | None
+        controlnet_conditioning_scale: list[float] | None
 
         # sd_2_upscaling: bool | None
 
@@ -163,6 +164,7 @@ class Img2ImgPage(BasePage):
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
+                controlnet_conditioning_scale=request.controlnet_conditioning_scale,
             )
         else:
             state["output_images"] = img2img(
