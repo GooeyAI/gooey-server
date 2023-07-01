@@ -12,6 +12,7 @@ from daras_ai_v2.stable_diffusion import (
     Img2ImgModels,
     ControlNetModels,
     controlnet_model_explanations,
+    Schedulers,
 )
 
 
@@ -49,75 +50,101 @@ def img_model_settings(models_enum, render_model_selector=True):
     return selected_model
 
 
-def model_selector(models_enum, same_line=True, require_controlnet=False):
+def model_selector(models_enum, require_controlnet=False):
+    controlnet_unsupported_models = [
+        Img2ImgModels.instruct_pix2pix.name,
+        Img2ImgModels.dall_e.name,
+        Img2ImgModels.jack_qiao.name,
+        Img2ImgModels.sd_2.name,
+    ]
     col1, col2 = st.columns(2)
-    with ExitStack() as stack:
-        if same_line:
-            col1 = stack.enter_context(col1)
-
+    with col1:
         selected_model = enum_selector(
-            models_enum,
-            label="#### Model",
+            Img2ImgModels,
+            label="""
+            ### 🤖 Generative Model
+            The model responsible for generating the content
+            """,
             key="selected_model",
             use_selectbox=True,
-            allow_none=True,
+            exclude=controlnet_unsupported_models if require_controlnet else [],
         )
-
-        if same_line:
-            col2 = stack.enter_context(col2)
-
-        if models_enum is Img2ImgModels or models_enum is Text2ImgModels:
-            if st.session_state.get("selected_model") is None or st.session_state.get(
-                "selected_model"
-            ) in [
-                Img2ImgModels.instruct_pix2pix.name,
-                Img2ImgModels.dall_e.name,
-                Img2ImgModels.jack_qiao.name,
-                Img2ImgModels.sd_2.name,
-            ]:
-                st.session_state["selected_controlnet_model"] = []
-            else:
-                enum_multiselect(
-                    ControlNetModels,
-                    label="""
-                    #### Control Net
-                    Choose any [conditioning model(s)](https://huggingface.co/lllyasviel?search=controlnet).
-                    """,
-                    key="selected_controlnet_model",
-                    checkboxes=False,
-                    allow_none=not require_controlnet,
-                )
+    with col2:
+        if (
+            models_enum is Img2ImgModels
+            and st.session_state.get("selected_model") in controlnet_unsupported_models
+        ):
+            if "selected_controlnet_model" in st.session_state:
+                st.session_state["selected_controlnet_model"] = None
+        else:
+            enum_multiselect(
+                ControlNetModels,
+                label="""
+                ### 🎛️ Control Net
+                The [control net models](https://huggingface.co/lllyasviel?search=controlnet) responsible for blending the prompt
+                """,
+                key="selected_controlnet_model",
+                checkboxes=False,
+                allow_none=not require_controlnet,
+            )
     return selected_model
 
 
-def controlnet_settings(extra_controlnet_model_explanations=None):
-    if extra_controlnet_model_explanations is None:
-        extra_controlnet_model_explanations = {}
-    controlnet_model_explanations_combined = controlnet_model_explanations
-    controlnet_model_explanations_combined.update(extra_controlnet_model_explanations)
+CONTROLNET_CONDITIONING_SCALE_RANGE: tuple[float, float] = (0.0, 2.0)
+
+
+def controlnet_settings(
+    explanations: dict[ControlNetModels, str] = controlnet_model_explanations
+):
     models = st.session_state.get("selected_controlnet_model", [])
-    controlnet_conditioning_scale = st.session_state.get(
-        "controlnet_conditioning_scale", [1.0] * len(models)
+    if not models:
+        return
+    state_values = st.session_state.get("controlnet_conditioning_scale", [])
+    new_values = []
+    st.write(
+        """
+        ##### ⚖️ Control Net Strength
+        """,
+        className="gui-input",
     )
-    if not isinstance(controlnet_conditioning_scale, list):
-        controlnet_conditioning_scale = [controlnet_conditioning_scale]
-    controlnet_conditioning_scale.extend(
-        [1.0] * (len(models) - len(controlnet_conditioning_scale))
+    st.caption(
+        f"""
+        `{int(CONTROLNET_CONDITIONING_SCALE_RANGE[0])}` will keep the original image intact.  
+        `{int(CONTROLNET_CONDITIONING_SCALE_RANGE[1])}` will apply the specific control tightly. 
+        """
     )
-    for i, model in enumerate(models):
-        model = ControlNetModels[model]
-        scale = (0.0, 2.0)
-        key = f"controlnet_conditioning_scale_{model.name}"
-        st.session_state.setdefault(key, controlnet_conditioning_scale[i])
-        controlnet_conditioning_scale[i] = controlnet_weight_setting(
-            control_effect=controlnet_model_explanations_combined.get(
-                model, "use conditioning for better results"
-            ),
-            model_type=model.value,
-            scale=scale,
-            key=key,
+    for i, model in enumerate(sorted(models)):
+        key = f"controlnet_conditioning_scale_{model}"
+        try:
+            st.session_state.setdefault(key, state_values[i])
+        except IndexError:
+            pass
+        new_values.append(
+            controlnet_weight_setting(
+                selected_controlnet_model=model,
+                explanations=explanations,
+                key=key,
+            )
         )
-    st.session_state["controlnet_conditioning_scale"] = controlnet_conditioning_scale
+    st.session_state["controlnet_conditioning_scale"] = new_values
+
+
+def controlnet_weight_setting(
+    *,
+    selected_controlnet_model: str,
+    explanations: dict[ControlNetModels, str] = controlnet_model_explanations,
+    key: str = "controlnet_conditioning_scale",
+):
+    model = ControlNetModels[selected_controlnet_model]
+    return st.slider(
+        label=f"""
+        {explanations[model]}.
+        """,
+        key=key,
+        min_value=CONTROLNET_CONDITIONING_SCALE_RANGE[0],
+        max_value=CONTROLNET_CONDITIONING_SCALE_RANGE[1],
+        step=0.05,
+    )
 
 
 def num_outputs_setting(selected_model: str = None):
@@ -139,24 +166,27 @@ def num_outputs_setting(selected_model: str = None):
             """
         )
     with col2:
-        if selected_model != InpaintingModels.dall_e.name:
-            st.slider(
-                label="""
-                ##### Quality
-                How precise, or focused do you want your output to be? 
-                """,
-                key="quality",
-                min_value=10,
-                max_value=200,
-                step=10,
-            )
-            st.caption(
-                """
-                An increase in output quality is comparable to a gradual progression in any drawing process that begins with a draft version and ends with a finished product. 
-                """
-            )
-        else:
-            st.div()
+        quality_setting(selected_model)
+
+
+def quality_setting(selected_model=None):
+    if selected_model in [InpaintingModels.dall_e.name]:
+        return
+    st.slider(
+        label="""
+        ##### Quality
+        How precise, or focused do you want your output to be? 
+        """,
+        key="quality",
+        min_value=10,
+        max_value=200,
+        step=10,
+    )
+    st.caption(
+        """
+        An increase in output quality is comparable to a gradual progression in any drawing process that begins with a draft version and ends with a finished product. 
+        """
+    )
 
 
 RESOLUTIONS = {
@@ -185,7 +215,6 @@ RESOLUTIONS = {
         "2048, 512": "panorama",
     },
 }
-
 LANDSCAPE = "Landscape"
 PORTRAIT = "Portrait"
 
@@ -262,28 +291,44 @@ def sd_2_upscaling_setting():
     st.caption("Note: Currently, only square images can be upscaled")
 
 
-def guidance_scale_setting(selected_model: str = None):
-    if selected_model not in [
+def scheduler_setting(selected_model: str = None):
+    if selected_model in [
         Text2ImgModels.dall_e.name,
         Text2ImgModels.jack_qiao,
     ]:
-        st.slider(
-            label="""
+        return
+    enum_selector(
+        Schedulers,
+        label="##### Scheduler",
+        allow_none=True,
+        use_selectbox=True,
+        key="scheduler",
+    )
+
+
+def guidance_scale_setting(selected_model: str = None):
+    if selected_model in [
+        Text2ImgModels.dall_e.name,
+        Text2ImgModels.jack_qiao,
+    ]:
+        return
+    st.slider(
+        label="""
             ##### 🎨️ Artistic Pressure
             ([*Text Guidance Scale*](https://getimg.ai/guides/interactive-guide-to-stable-diffusion-guidance-scale-parameter)) \\
             How pressurized should the AI feel to produce what you want?
             How much creative freedom do you want the AI to have when interpreting your prompt?
             """,
-            key="guidance_scale",
-            min_value=0.0,
-            max_value=25.0,
-            step=0.5,
-        )
-        st.caption(
-            """
+        key="guidance_scale",
+        min_value=0.0,
+        max_value=25.0,
+        step=0.5,
+    )
+    st.caption(
+        """
             At lower values the image will effectively be random. The standard value is between 6-8. Values that are too high can also distort the image.
             """
-        )
+    )
 
 
 def instruct_pix2pix_settings():
@@ -325,29 +370,6 @@ def prompt_strength_setting(selected_model: str = None):
     )
 
 
-def controlnet_weight_setting(
-    control_effect: str = "make the qr code darker and background lighter (contrast helps qr readers)",
-    model_type: str = "Brightness",
-    scale=(0.0, 0.7),
-    key: str = "controlnet_conditioning_scale",
-):
-    return st.slider(
-        label=f"""
-        ##### Generation Constraint
-        (*{model_type.capitalize()} Control Weight*)
-
-        This will encourage the AI to {control_effect}.
-
-        `{scale[0]}` will keep the original image intact.\\
-        `{scale[1]}` will control the {model_type.lower()} very tightly. 
-        """,
-        key=key,
-        min_value=scale[0],
-        max_value=scale[1],
-        step=0.05,
-    )
-
-
 def negative_prompt_setting(selected_model: str = None):
     if selected_model in [Text2ImgModels.dall_e.name, InpaintingModels.runway_ml.name]:
         return
@@ -359,9 +381,10 @@ def negative_prompt_setting(selected_model: str = None):
         Useful negative prompts can be found [here](https://www.youtube.com/watch?v=cWZsizoAwT4).
         """,
         key="negative_prompt",
+        placeholder="ugly, disfigured, low quality, blurry, nsfw",
     )
     st.caption(
         """
-        Text2Image engines can often generate disproportionate body parts, extra limbs or fingers, strange textures etc. Use negative prompting to avoid disfiguration or for creative outputs like avoiding certain colour schemes, elements or styles.
-    """
+        Image generation engines can often generate disproportionate body parts, extra limbs or fingers, strange textures etc. Use negative prompting to avoid disfiguration or for creative outputs like avoiding certain colour schemes, elements or styles.
+        """
     )

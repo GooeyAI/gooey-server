@@ -11,48 +11,12 @@ from PIL import Image, ImageOps
 from daras_ai_v2 import settings
 
 
-# @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
-# @st.cache_data
-# def upload_file(uploaded_file: UploadedFile):
-#     img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
-#     img_bytes = resize_img_pad(img_bytes, (512, 512))
-#     return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
-
-
 def resize_img_pad(img_bytes: bytes, size: (int, int)) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
     img_pil = Image.fromarray(img_cv2)
     img_pil = ImageOps.pad(img_pil, size)
     img_cv2 = np.array(img_pil)
     return cv2_img_to_bytes(img_cv2)
-
-
-# @st.cache(hash_funcs={UploadedFile: lambda uploaded_file: uploaded_file.id})
-# @st.cache_data
-# def upload_file_hq(uploaded_file: UploadedFile, *, resize: (int, int) = (1024, 1024)):
-#     img_bytes, filename, content_type = uploaded_file_get_value(uploaded_file)
-#     img_bytes = resize_img_scale(img_bytes, resize)
-#     return upload_file_from_bytes(filename, img_bytes, content_type=content_type)
-
-
-# def uploaded_file_get_value(uploaded_file):
-#     img_bytes = uploaded_file.read()
-#     filename = uploaded_file.name
-#     content_type = uploaded_file.type
-#     if filename.endswith("HEIC"):
-#         img_bytes = _heic_to_png(img_bytes)
-#         filename += ".png"
-#         content_type = "image/png"
-#     return img_bytes, safe_filename(filename), content_type
-
-
-# def _heic_to_png(img_bytes: bytes) -> bytes:
-#     from wand.image import Image
-#
-#     with Image(blob=img_bytes) as original:
-#         with original.transform(resize="1024@>").convert("png") as converted:
-#             img_bytes = converted.make_blob()
-#     return img_bytes
 
 
 def resize_img_scale(img_bytes: bytes, size: (int, int)) -> bytes:
@@ -121,10 +85,14 @@ def cv2_img_to_bytes(img):
     return cv2.imencode(".png", img)[1].tobytes()
 
 
-def bytes_to_cv2_img(img_bytes: bytes):
+def bytes_to_cv2_img(img_bytes: bytes, greyscale=False):
     import cv2
 
-    img_cv2 = cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if greyscale:
+        flags = cv2.IMREAD_GRAYSCALE
+    else:
+        flags = cv2.IMREAD_COLOR
+    img_cv2 = cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), flags=flags)
     if not img_exists(img_cv2):
         raise ValueError("Bad Image")
     return img_cv2

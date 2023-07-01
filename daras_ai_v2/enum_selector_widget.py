@@ -1,9 +1,7 @@
 import enum
 from typing import TypeVar, Type
-import typing
 
 import gooey_ui as st
-
 from daras_ai_v2.grid_layout_widget import grid_layout
 
 E = TypeVar("E", bound=Type[enum.Enum])
@@ -52,10 +50,13 @@ def enum_selector(
     label: str = "",
     allow_none: bool = False,
     use_selectbox: bool = False,
+    exclude: list[E] = None,
     **kwargs,
 ) -> str:
     label = label or enum_cls.__name__
     options = [e.name for e in enum_cls]
+    if exclude:
+        options = [o for o in options if o not in exclude]
     if allow_none:
         options.insert(0, None)
     if use_selectbox:

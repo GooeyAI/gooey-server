@@ -6,9 +6,6 @@ import replicate
 import requests
 from PIL import Image
 from django.db import models
-import numpy as np
-import cv2
-import urllib
 
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -17,7 +14,6 @@ from daras_ai.image_input import (
     resize_img_fit,
     get_downscale_factor,
 )
-from daras_ai_v2 import settings
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import (
     call_gpu_server_b64,
@@ -25,8 +21,6 @@ from daras_ai_v2.gpu_server import (
     b64_img_decode,
     call_sd_multi,
 )
-
-E = typing.TypeVar("E", bound=typing.Type[Enum])
 
 SD_IMG_MAX_SIZE = (768, 768)
 
@@ -110,23 +104,21 @@ class ControlNetModels(Enum):
     sd_controlnet_openpose = "Human Pose"
     sd_controlnet_scribble = "Scribble"
     sd_controlnet_seg = "Image Segmentation"
-    sd_controlnet_inpaint = "Inpainting"
     sd_controlnet_tile = "Tiling"
     sd_controlnet_brightness = "Brightness"
 
 
 controlnet_model_explanations = {
-    ControlNetModels.sd_controlnet_canny: "use Canny edge detection",
-    ControlNetModels.sd_controlnet_depth: "use Depth estimation",
-    ControlNetModels.sd_controlnet_hed: "use HED edge detection",
-    ControlNetModels.sd_controlnet_mlsd: "use M-LSD straight line detection",
-    ControlNetModels.sd_controlnet_normal: "use Normal map estimation",
-    ControlNetModels.sd_controlnet_openpose: "use Human pose estimation",
-    ControlNetModels.sd_controlnet_scribble: "use Scribble",
-    ControlNetModels.sd_controlnet_seg: "use Image segmentation",
-    ControlNetModels.sd_controlnet_inpaint: "use Inpainting",
-    ControlNetModels.sd_controlnet_tile: "use Tiling to preserve small details",
-    ControlNetModels.sd_controlnet_brightness: "use Brightness conditioning to increase contrast naturally",
+    ControlNetModels.sd_controlnet_canny: "Canny edge detection",
+    ControlNetModels.sd_controlnet_depth: "Depth estimation",
+    ControlNetModels.sd_controlnet_hed: "HED edge detection",
+    ControlNetModels.sd_controlnet_mlsd: "M-LSD straight line detection",
+    ControlNetModels.sd_controlnet_normal: "Normal map estimation",
+    ControlNetModels.sd_controlnet_openpose: "Human pose estimation",
+    ControlNetModels.sd_controlnet_scribble: "Scribble",
+    ControlNetModels.sd_controlnet_seg: "Image segmentation",
+    ControlNetModels.sd_controlnet_tile: "Tiling: to preserve small details",
+    ControlNetModels.sd_controlnet_brightness: "Brightness: to increase contrast naturally",
 }
 
 controlnet_model_ids = {
@@ -138,7 +130,6 @@ controlnet_model_ids = {
     ControlNetModels.sd_controlnet_openpose: "lllyasviel/sd-controlnet-openpose",
     ControlNetModels.sd_controlnet_scribble: "lllyasviel/sd-controlnet-scribble",
     ControlNetModels.sd_controlnet_seg: "lllyasviel/sd-controlnet-seg",
-    ControlNetModels.sd_controlnet_inpaint: "lllyasviel/control_v11p_sd15_inpaint",
     ControlNetModels.sd_controlnet_tile: "lllyasviel/control_v11f1e_sd15_tile",
     ControlNetModels.sd_controlnet_brightness: "ioclab/control_v1p_sd15_brightness",
 }
@@ -408,48 +399,32 @@ def img2img(
 def controlnet(
     *,
     selected_model: str,
-    selected_controlnet_models: typing.Tuple[
-        typing.Literal[tuple(e.name for e in ControlNetModels)], ...
-    ]
-    | typing.Literal[tuple(e.name for e in ControlNetModels)]
-    | None,
+    selected_controlnet_model: str | list[str],
+    scheduler: str = None,
     prompt: str,
-    init_image: str,
     num_outputs: int = 1,
-    width: int = None,
-    height: int = None,
+    init_image: str,
     num_inference_steps: int = 50,
     negative_prompt: str = None,
     guidance_scale: float = 7.5,
     seed: int = 42,
     controlnet_conditioning_scale: typing.List[float] | float = 1.0,
-    scheduler: str = "UniPCMultistepScheduler",
-    selected_models_enum: E = Img2ImgModels,
-    selected_models_ids: dict[E, str] = img2img_model_ids,
 ):
-    if selected_controlnet_models is None:
-        selected_controlnet_models = tuple()
-    elif not isinstance(selected_controlnet_models, tuple) and not isinstance(
-        selected_controlnet_models, list
-    ):
-        selected_controlnet_models = (selected_controlnet_models,)
-    if not width or not height:
-        req = urllib.request.urlopen(init_image)
-        arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
-        img = cv2.imdecode(arr, -1)
-        print(img.shape)
-        width, height = img.shape[:2]
+    if isinstance(selected_controlnet_model, str):
+        selected_controlnet_model = [selected_controlnet_model]
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
         "diffusion.controlnet",
         pipeline={
-            "model_id": selected_models_ids[selected_models_enum[selected_model]],
+            "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
             "seed": seed,
-            "scheduler": scheduler,
+            "scheduler": Schedulers[scheduler].label
+            if scheduler
+            else "UniPCMultistepScheduler",
             "disable_safety_checker": True,
-            "controlnet_model_ids": [
+            "controlnet_model_id": [
                 controlnet_model_ids[ControlNetModels[model]]
-                for model in selected_controlnet_models
+                for model in selected_controlnet_model
             ],
         },
         inputs={
@@ -458,9 +433,7 @@ def controlnet(
             "num_images_per_prompt": num_outputs,
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
-            "image": [init_image] * len(selected_controlnet_models),
-            "width": width,
-            "height": height,
+            "image": [init_image] * len(selected_controlnet_model),
             "controlnet_conditioning_scale": controlnet_conditioning_scale,
             # "strength": prompt_strength,
         },

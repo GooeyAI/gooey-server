@@ -64,7 +64,7 @@ def write(*objs: typing.Any, unsafe_allow_html=False, **props):
 
 
 def markdown(body: str, *, unsafe_allow_html=False, **props):
-    if not body:
+    if body is None:
         return _node("markdown", body="", **props)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
@@ -173,7 +173,7 @@ def image(
         name="img",
         props=dict(
             src=src,
-            caption=caption,
+            caption=dedent(caption),
             alt=alt or caption,
             style=dict(width=f"{width}px"),
         ),
@@ -190,7 +190,7 @@ def video(src: str, caption: str = None):
         src = f.url
     state.RenderTreeNode(
         name="video",
-        props=dict(src=src, caption=caption),
+        props=dict(src=src, caption=dedent(caption)),
     ).mount()
 
 
@@ -199,7 +199,7 @@ def audio(src: str, caption: str = None):
         return
     state.RenderTreeNode(
         name="audio",
-        props=dict(src=src, caption=caption),
+        props=dict(src=src, caption=dedent(caption)),
     ).mount()
 
 
@@ -254,6 +254,8 @@ def multiselect(
     if not key:
         key = md5_values("multiselect", label, options, help)
     value = state.session_state.get(key) or []
+    if not isinstance(value, list):
+        value = [value]
     value = [o if o in options else options[0] for o in value]
     if not allow_none and not value:
         value = [options[0]]

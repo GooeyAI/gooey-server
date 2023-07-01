@@ -14,6 +14,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     output_resolution_setting,
     instruct_pix2pix_settings,
     sd_2_upscaling_setting,
+    scheduler_setting,
 )
 from daras_ai_v2.descriptions import prompting101
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -156,13 +157,7 @@ class CompareText2ImgPage(BasePage):
         col1, col2 = st.columns(2)
         with col1:
             guidance_scale_setting()
-            enum_selector(
-                Schedulers,
-                label="##### Scheduler",
-                allow_none=True,
-                use_selectbox=True,
-                key="scheduler",
-            )
+            scheduler_setting()
         with col2:
             if st.session_state.get("edit_instruction"):
                 instruct_pix2pix_settings()

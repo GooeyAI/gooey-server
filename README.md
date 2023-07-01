@@ -52,13 +52,13 @@ gcloud container clusters get-credentials cluster-5 --zone us-central1-a
 
 * Port-forward the rabbitmq and redis services -
 ```bash
-kubectl port-forward rabbitmq-1-rabbitmq-0 15674:15672 5674:5672 & kubectl port-forward redis-ha-1-server-0 63791:
+kubectl port-forward rabbitmq-1-rabbitmq-0 15674:15672 5674:5672 & kubectl port-forward redis-ha-1-server-0 6374:6379
 ```
 
 * Add the following to `.env` file -
 ```
 GPU_CELERY_BROKER_URL="amqp://rabbit:<password>@localhost:5674"
-GPU_CELERY_RESULT_BACKEND="redis://:<password>@localhost:63791"
+GPU_CELERY_RESULT_BACKEND="redis://:<password>@localhost:6374"
 ```
 
 ### Install imagemagick

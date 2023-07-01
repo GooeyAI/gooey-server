@@ -32,8 +32,7 @@ class Img2ImgPage(BasePage):
         # "sd_2_upscaling": False,
         "seed": 42,
         "image_guidance_scale": 1.2,
-        "selected_controlnet_model": [],
-        "controlnet_conditioning_scale": 1.0,
+        "controlnet_conditioning_scale": [1.0],
     }
 
     class RequestModel(BaseModel):
@@ -41,8 +40,8 @@ class Img2ImgPage(BasePage):
         text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
-        selected_controlnet_model: typing.Tuple[
-            typing.Literal[tuple(e.name for e in ControlNetModels)], ...
+        selected_controlnet_model: list[
+            typing.Literal[tuple(e.name for e in ControlNetModels)]
         ] | typing.Literal[tuple(e.name for e in ControlNetModels)] | None
         negative_prompt: str | None
 
@@ -54,7 +53,7 @@ class Img2ImgPage(BasePage):
 
         guidance_scale: float | None
         prompt_strength: float | None
-        controlnet_conditioning_scale: typing.List[float] | float | None
+        controlnet_conditioning_scale: list[float] | None
 
         # sd_2_upscaling: bool | None
 
@@ -136,12 +135,6 @@ class Img2ImgPage(BasePage):
             st.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        # non primitive list needs to be converted to tuple to be parsable by pydantic
-        val = state["selected_controlnet_model"]
-        state["selected_controlnet_model"] = (
-            tuple(val) if isinstance(val, list) else val
-        )
-
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
 
         init_image = request.input_image
@@ -163,7 +156,7 @@ class Img2ImgPage(BasePage):
         elif request.selected_controlnet_model:
             state["output_images"] = controlnet(
                 selected_model=request.selected_model,
-                selected_controlnet_models=request.selected_controlnet_model,
+                selected_controlnet_model=request.selected_controlnet_model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
                 init_image=init_image,
