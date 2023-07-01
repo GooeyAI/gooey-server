@@ -229,7 +229,7 @@ class QRCodeGeneratorPage(BasePage):
             Here is the final output:
             """
         )
-        for imgsrc in [st.session_state["output_image"]]:
+        for imgsrc in [st.session_state.get("output_image")]:
             st.image(imgsrc)
 
     def render_settings(self):
