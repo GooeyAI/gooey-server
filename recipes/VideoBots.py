@@ -316,7 +316,7 @@ Enable document search, to use custom documents as information sources.
         enable_audio = st.checkbox("Enable Audio Ouput?", key="__enable_audio")
         if not enable_audio:
             st.write("---")
-            st.session_state.pop("tts_provider", None)
+            st.session_state["tts_provider"] = None
         else:
             text_to_speech_settings()
             st.write("---")
@@ -328,7 +328,7 @@ Enable document search, to use custom documents as information sources.
             enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
             if not enable_video:
                 st.write("---")
-                st.session_state.pop("input_face", None)
+                st.session_state["input_face"] = None
             else:
                 st.file_uploader(
                     """
