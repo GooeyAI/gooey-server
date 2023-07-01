@@ -102,7 +102,7 @@ class ImageSegmentationPage(BasePage):
             Helps to remove edge artifacts. `0` will turn this off. `0.9` will aggressively cut down edges. 
             """,
             min_value=0.0,
-            max_value=1.0,
+            max_value=0.9,
             key="mask_threshold",
         )
 
