@@ -13,7 +13,6 @@ from googleapiclient.errors import HttpError
 from pydantic import BaseModel
 
 import gooey_ui as gui
-from daras_ai.face_restoration import map_parallel
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
@@ -25,7 +24,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
-from daras_ai_v2.functional import flatten
+from daras_ai_v2.functional import flatmap_parallel
 from daras_ai_v2.gdrive_downloader import (
     gdrive_download,
     is_gdrive_url,
@@ -33,7 +32,7 @@ from daras_ai_v2.gdrive_downloader import (
     gdrive_metadata,
 )
 from daras_ai_v2.language_model import (
-    get_embeddings,
+    openai_embedding_create,
 )
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.search_ref import (
@@ -68,10 +67,10 @@ def get_top_k_references(
         the top k documents
     """
     yield f"Getting query embeddings..."
-    query_embeds = get_embeddings([request.search_query])[0]
+    query_embeds = openai_embedding_create([request.search_query])[0]
     yield "Getting document embeddings..."
     input_docs = request.documents or []
-    nested_embeds: list[list[tuple[SearchReference, list[float]]]] = map_parallel(
+    embeds: list[tuple[SearchReference, np.ndarray]] = flatmap_parallel(
         lambda f_url: doc_url_to_embeds(
             f_url=f_url,
             max_context_words=request.max_context_words,
@@ -81,14 +80,13 @@ def get_top_k_references(
         ),
         input_docs,
     )
-    embeds: list[tuple[SearchReference, list[float]]] = flatten(nested_embeds)
     yield f"Searching documents..."
     # get all matches above cutoff based on cosine similarity
     cutoff = 0.7
     candidates = [
         {**ref, "score": score}
         for ref, doc_embeds in embeds
-        if (score := vector_similarity(query_embeds, doc_embeds)) >= cutoff
+        if (score := query_embeds.dot(doc_embeds)) >= cutoff
     ]
     # get top_k best matches
     matches = heapq.nlargest(
@@ -127,7 +125,7 @@ def doc_url_to_embeds(
     scroll_jump: int,
     selected_asr_model: str = None,
     google_translate_target: str = None,
-) -> list[tuple[SearchReference, list[float]]]:
+) -> list[tuple[SearchReference, np.ndarray]]:
     """
     Get document embeddings for a given document url.
 
@@ -142,7 +140,7 @@ def doc_url_to_embeds(
         list of (SearchReference, embeddings vector) tuples
     """
     doc_meta = doc_url_to_metadata(f_url)
-    return _doc_url_to_embeds_cached(
+    return get_embeds_for_doc(
         f_url=f_url,
         doc_meta=doc_meta,
         max_context_words=max_context_words,
@@ -198,7 +196,7 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
 
 
 @redis_cache_decorator
-def _doc_url_to_embeds_cached(
+def get_embeds_for_doc(
     *,
     f_url: str,
     doc_meta: DocMetadata,
@@ -206,7 +204,7 @@ def _doc_url_to_embeds_cached(
     scroll_jump: int,
     google_translate_target: str = None,
     selected_asr_model: str = None,
-) -> list[tuple[SearchReference, list[float]]]:
+) -> list[tuple[SearchReference, np.ndarray]]:
     """
     Get document embeddings for a given document url.
 
@@ -221,6 +219,8 @@ def _doc_url_to_embeds_cached(
     Returns:
         list of (metadata, embeddings) tuples
     """
+    import pandas as pd
+
     pages = doc_url_to_text_pages(
         f_url=f_url,
         doc_meta=doc_meta,
@@ -230,8 +230,7 @@ def _doc_url_to_embeds_cached(
     chunk_size = int(max_context_words * 2)
     chunk_overlap = int(max_context_words * 2 / scroll_jump)
     metas: list[SearchReference]
-    import pandas as pd
-
+    # split the text into chunks
     if isinstance(pages, pd.DataFrame):
         metas = [
             {
@@ -267,7 +266,7 @@ def _doc_url_to_embeds_cached(
         # progress = int(i / len(texts) * 100)
         # print(f"Getting document embeddings ({progress}%)...")
         batch = texts[i : i + batch_size]
-        embeds.extend(get_embeddings(batch))
+        embeds.extend(openai_embedding_create(batch))
     return list(zip(metas, embeds))
 
 
@@ -352,15 +351,6 @@ def doc_url_to_text_pages(
     return pages
 
 
-def vector_similarity(x: list[float], y: list[float]) -> float:
-    """
-    Returns the similarity between two vectors.
-
-    Because OpenAI Embeddings are normalized to length 1, the cosine similarity is the same as the dot product.
-    """
-    return np.dot(np.array(x), np.array(y))
-
-
 def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
     import pdftotext
 
@@ -393,7 +383,7 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
             "--output",
             outfile.name,
         ]
-        print("\t$", " ".join(args))
+        print("\t$ " + " ".join(args))
         subprocess.check_call(args)
         return outfile.read()
 

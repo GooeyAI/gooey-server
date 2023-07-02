@@ -1,6 +1,6 @@
 import gooey_ui as gui
 from daras_ai_v2.all_pages import all_home_pages
-from daras_ai_v2.face_restoration import map_parallel
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.grid_layout_widget import grid_layout
 
 

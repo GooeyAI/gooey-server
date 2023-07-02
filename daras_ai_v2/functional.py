@@ -1,6 +1,8 @@
 import typing
 from concurrent.futures import ThreadPoolExecutor
 
+import numpy as np
+
 T = typing.TypeVar("T")
 R = typing.TypeVar("R")
 
@@ -22,3 +24,12 @@ def map_parallel(
     max_workers = max_workers or max(map(len, iterables))
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         return list(pool.map(fn, *iterables))
+
+
+def shape(seq: typing.Sequence | np.ndarray) -> tuple[int, ...]:
+    if isinstance(seq, np.ndarray):
+        return seq.shape
+    elif isinstance(seq, typing.Sequence):
+        return (len(seq),) + shape(seq[0])
+    else:
+        return ()

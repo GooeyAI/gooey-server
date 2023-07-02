@@ -13,7 +13,8 @@ from daras_ai.image_input import (
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.extract_face import extract_face_img_bytes
-from daras_ai_v2.face_restoration import map_parallel, gfpgan
+from daras_ai_v2.face_restoration import gfpgan
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )

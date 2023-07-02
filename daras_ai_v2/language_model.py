@@ -1,3 +1,5 @@
+import hashlib
+import io
 import re
 import threading
 import typing
@@ -5,14 +7,14 @@ from enum import Enum
 from functools import wraps
 from time import sleep
 
+import numpy as np
 import tiktoken
 import typing_extensions
-from decouple import config
 from jinja2.lexer import whitespace_re
 
-from daras_ai_v2 import settings
-from daras_ai_v2.gpu_server import call_gpu_server, GpuEndpoints
-from daras_ai_v2.redis_cache import redis_cache_decorator
+from daras_ai_v2.redis_cache import (
+    get_redis_cache,
+)
 
 _gpt2_tokenizer = None
 
@@ -112,7 +114,7 @@ F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
 
 
 def get_openai_error_cls():
-    import openai.error
+    import openai
 
     return (
         openai.error.Timeout,
@@ -150,23 +152,68 @@ def do_retry(
     return decorator
 
 
-@do_retry()
-def get_embeddings(
-    texts: list[str], engine: str = "text-embedding-ada-002"
-) -> list[list[float]]:
+def openai_embedding_create(texts: list[str]) -> list[np.ndarray]:
     # replace newlines, which can negatively affect performance.
     texts = [whitespace_re.sub(" ", text) for text in texts]
-    # create the embeddings
-    res = _openai_embedding_create(input=texts, engine=engine)
-    # return the embedding vectors
-    return [record["embedding"] for record in res["data"]]
+    # get the redis cache
+    redis_cache = get_redis_cache()
+    # load the embeddings from the cache
+    ret = [
+        np_loads(data) if (data := redis_cache.get(_embed_cache_key(text))) else None
+        for text in texts
+    ]
+    # list of embeddings that need to be created
+    misses = [i for i, c in enumerate(ret) if c is None]
+    if misses:
+        # create the embeddings in bulk
+        embeddings = _openai_embedding_create(input=[texts[i] for i in misses])
+        for i, embedding in zip(misses, embeddings):
+            # save the embedding to the cache
+            text = texts[i]
+            redis_cache.set(_embed_cache_key(text), np_dumps(embedding))
+            # fill in missing values
+            ret[i] = embedding
+    return ret
 
 
-@redis_cache_decorator
-def _openai_embedding_create(*args, **kwargs):
+def _embed_cache_key(text: str) -> str:
+    return "gooey/openai_ada2_embeddings_npy/v1/" + _sha256(text)
+
+
+def _sha256(text):
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def np_loads(data: bytes) -> np.ndarray:
+    return np.load(io.BytesIO(data))
+
+
+def np_dumps(a: np.ndarray) -> bytes:
+    f = io.BytesIO()
+    np.save(f, a)
+    return f.getvalue()
+
+
+@do_retry()
+def _openai_embedding_create(
+    *, input: list[str], model: str = "text-embedding-ada-002"
+) -> np.ndarray:
     import openai
 
-    return openai.Embedding.create(*args, **kwargs)
+    res = openai.Embedding.create(model=model, input=input)
+    ret = np.array([data["embedding"] for data in res["data"]])
+
+    # see - https://community.openai.com/t/text-embedding-ada-002-embeddings-sometime-return-nan/279664/5
+    if np.isnan(ret).any():
+        raise RuntimeError("NaNs detected in embedding")
+        # raise openai.error.APIError("NaNs detected in embedding")  # this lets us retry
+    expected = (len(input), 1536)
+    if ret.shape != expected:
+        raise RuntimeError(
+            f"Unexpected shape for embedding: {ret.shape} (expected {expected})"
+        )
+
+    return ret
 
 
 class ConversationEntry(typing_extensions.TypedDict):
