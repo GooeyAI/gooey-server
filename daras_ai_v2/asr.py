@@ -384,6 +384,8 @@ def run_translate(
     translate_target: str,
     api: typing.Literal[tuple(e.name for e in TranslateAPIs)],
 ) -> list[str]:
+    if not api:
+        api = st.session_state.get("translate_api")
     try:
         if api == TranslateAPIs.MinT:
             return run_MinT_translate(texts, translate_target)
@@ -413,7 +415,7 @@ def translate_api_selector(
 
 
 def translate_language_selector(
-    languages: dict[str, str],
+    languages: dict[str, str] = None,
     label="""
     ###### Translate (*optional*)
     """,
@@ -426,6 +428,10 @@ def translate_language_selector(
         label: the label to display
         key: the key to save the selected language to in the session state
     """
+    if not languages:
+        languages = translate_apis[
+            st.session_state.get("translate_api", TranslateAPIs.google_translate)
+        ]["languages"]
     options = list(languages.keys())
     options.insert(0, None)
     st.selectbox(

@@ -6,9 +6,10 @@ from pydantic import BaseModel
 import gooey_ui as st
 from daras_ai_v2.asr import (
     AsrModels,
-    google_translate_language_selector,
+    translate_api_selector,
+    translate_language_selector,
     run_asr,
-    run_google_translate,
+    run_translate,
     AsrOutputFormat,
     AsrOutputJson,
 )
@@ -34,6 +35,7 @@ class AsrPage(BasePage):
         language: str | None
         google_translate_target: str | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
+        translate_api: str | None
 
     class ResponseModel(BaseModel):
         raw_output_text: list[str] | None
@@ -78,7 +80,8 @@ class AsrPage(BasePage):
         st.text_input("###### Spoken Language _(optional)_", key="language")
 
     def render_settings(self):
-        google_translate_language_selector()
+        translate_api_selector()
+        translate_language_selector()
         st.write("---")
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
@@ -126,9 +129,9 @@ class AsrPage(BasePage):
             # Save the raw ASR text for details view
             state["raw_output_text"] = asr_output
             # Run Translation
-            state["output_text"] = run_google_translate(
+            state["output_text"] = run_translate(
                 asr_output,
-                google_translate_target=request.google_translate_target,
+                translate_target=request.google_translate_target,
             )
         else:
             # Save the raw ASR text for details view
