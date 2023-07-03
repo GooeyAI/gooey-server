@@ -5,6 +5,7 @@ import tempfile
 from enum import Enum
 
 import requests
+import typing
 import typing_extensions
 from furl import furl
 
@@ -14,6 +15,193 @@ from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
 )
+
+ISO_639_LANGUAGES = {
+    "ab": "Abkhaz",
+    "aa": "Afar",
+    "af": "Afrikaans",
+    "ak": "Akan",
+    "sq": "Albanian",
+    "am": "Amharic",
+    "ar": "Arabic",
+    "an": "Aragonese",
+    "hy": "Armenian",
+    "as": "Assamese",
+    "av": "Avaric",
+    "ae": "Avestan",
+    "ay": "Aymara",
+    "az": "Azerbaijani",
+    "bm": "Bambara",
+    "ba": "Bashkir",
+    "eu": "Basque",
+    "be": "Belarusian",
+    "bn": "Bengali",
+    "bh": "Bihari",
+    "bi": "Bislama",
+    "bs": "Bosnian",
+    "br": "Breton",
+    "bg": "Bulgarian",
+    "my": "Burmese",
+    "ca": "Catalan; Valencian",
+    "ch": "Chamorro",
+    "ce": "Chechen",
+    "ny": "Chichewa; Chewa; Nyanja",
+    "zh": "Chinese",
+    "cv": "Chuvash",
+    "kw": "Cornish",
+    "co": "Corsican",
+    "cr": "Cree",
+    "hr": "Croatian",
+    "cs": "Czech",
+    "da": "Danish",
+    "dv": "Divehi; Maldivian;",
+    "nl": "Dutch",
+    "dz": "Dzongkha",
+    "en": "English",
+    "eo": "Esperanto",
+    "et": "Estonian",
+    "ee": "Ewe",
+    "fo": "Faroese",
+    "fj": "Fijian",
+    "fi": "Finnish",
+    "fr": "French",
+    "ff": "Fula",
+    "gl": "Galician",
+    "ka": "Georgian",
+    "de": "German",
+    "el": "Greek, Modern",
+    "gn": "Guaraní",
+    "gu": "Gujarati",
+    "ht": "Haitian",
+    "ha": "Hausa",
+    "he": "Hebrew (modern)",
+    "hz": "Herero",
+    "hi": "Hindi",
+    "ho": "Hiri Motu",
+    "hu": "Hungarian",
+    "ia": "Interlingua",
+    "id": "Indonesian",
+    "ie": "Interlingue",
+    "ga": "Irish",
+    "ig": "Igbo",
+    "ik": "Inupiaq",
+    "io": "Ido",
+    "is": "Icelandic",
+    "it": "Italian",
+    "iu": "Inuktitut",
+    "ja": "Japanese",
+    "jv": "Javanese",
+    "kl": "Kalaallisut",
+    "kn": "Kannada",
+    "kr": "Kanuri",
+    "ks": "Kashmiri",
+    "kk": "Kazakh",
+    "km": "Khmer",
+    "ki": "Kikuyu, Gikuyu",
+    "rw": "Kinyarwanda",
+    "ky": "Kirghiz, Kyrgyz",
+    "kv": "Komi",
+    "kg": "Kongo",
+    "ko": "Korean",
+    "ku": "Kurdish",
+    "kj": "Kwanyama, Kuanyama",
+    "la": "Latin",
+    "lb": "Luxembourgish",
+    "lg": "Luganda",
+    "li": "Limburgish",
+    "ln": "Lingala",
+    "lo": "Lao",
+    "lt": "Lithuanian",
+    "lu": "Luba-Katanga",
+    "lv": "Latvian",
+    "gv": "Manx",
+    "mk": "Macedonian",
+    "mg": "Malagasy",
+    "ms": "Malay",
+    "ml": "Malayalam",
+    "mt": "Maltese",
+    "mi": "Māori",
+    "mr": "Marathi (Marāṭhī)",
+    "mh": "Marshallese",
+    "mn": "Mongolian",
+    "na": "Nauru",
+    "nv": "Navajo, Navaho",
+    "nb": "Norwegian Bokmål",
+    "nd": "North Ndebele",
+    "ne": "Nepali",
+    "ng": "Ndonga",
+    "nn": "Norwegian Nynorsk",
+    "no": "Norwegian",
+    "ii": "Nuosu",
+    "nr": "South Ndebele",
+    "oc": "Occitan",
+    "oj": "Ojibwe, Ojibwa",
+    "cu": "Old Church Slavonic",
+    "om": "Oromo",
+    "or": "Oriya",
+    "os": "Ossetian, Ossetic",
+    "pa": "Panjabi, Punjabi",
+    "pi": "Pāli",
+    "fa": "Persian",
+    "pl": "Polish",
+    "ps": "Pashto, Pushto",
+    "pt": "Portuguese",
+    "qu": "Quechua",
+    "rm": "Romansh",
+    "rn": "Kirundi",
+    "ro": "Romanian, Moldavan",
+    "ru": "Russian",
+    "sa": "Sanskrit (Saṁskṛta)",
+    "sc": "Sardinian",
+    "sd": "Sindhi",
+    "se": "Northern Sami",
+    "sm": "Samoan",
+    "sg": "Sango",
+    "sr": "Serbian",
+    "gd": "Scottish Gaelic",
+    "sn": "Shona",
+    "si": "Sinhala, Sinhalese",
+    "sk": "Slovak",
+    "sl": "Slovene",
+    "so": "Somali",
+    "st": "Southern Sotho",
+    "es": "Spanish; Castilian",
+    "su": "Sundanese",
+    "sw": "Swahili",
+    "ss": "Swati",
+    "sv": "Swedish",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "tg": "Tajik",
+    "th": "Thai",
+    "ti": "Tigrinya",
+    "bo": "Tibetan",
+    "tk": "Turkmen",
+    "tl": "Tagalog",
+    "tn": "Tswana",
+    "to": "Tonga",
+    "tr": "Turkish",
+    "ts": "Tsonga",
+    "tt": "Tatar",
+    "tw": "Twi",
+    "ty": "Tahitian",
+    "ug": "Uighur, Uyghur",
+    "uk": "Ukrainian",
+    "ur": "Urdu",
+    "uz": "Uzbek",
+    "ve": "Venda",
+    "vi": "Vietnamese",
+    "vo": "Volapük",
+    "wa": "Walloon",
+    "cy": "Welsh",
+    "wo": "Wolof",
+    "fy": "Western Frisian",
+    "xh": "Xhosa",
+    "yi": "Yiddish",
+    "yo": "Yoruba",
+    "za": "Zhuang, Chuang",
+    "zu": "Zulu",
+}
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -66,14 +254,7 @@ def google_translate_language_selector(
         key: the key to save the selected language to in the session state
     """
     languages = google_translate_languages()
-    options = list(languages.keys())
-    options.insert(0, None)
-    st.selectbox(
-        label=label,
-        key=key,
-        format_func=lambda k: languages[k] if k else "———",
-        options=options,
-    )
+    translate_language_selector(languages, label, key)
 
 
 @st.cache_data()
@@ -112,6 +293,147 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
         texts, target_language=google_translate_target, format_="text"
     )
     return [r["translatedText"] for r in result]
+
+
+def MinT_translate_language_selector(
+    label="""
+    ###### MinT Translate (*optional*)
+    """,
+    key="MinT_translate_target",
+):
+    """
+    Streamlit widget for selecting a language for MinT.
+    Args:
+        label: the label to display
+        key: the key to save the selected language to in the session state
+    """
+    languages = MinT_translate_languages()
+    translate_language_selector(languages, label, key)
+
+
+@st.cache_data()
+def MinT_translate_languages() -> dict[str, str]:
+    """
+    Get list of supported languages for MinT.
+    :return: Dictionary of language codes and display names.
+    """
+    res = requests.get("https://translate.wmcloud.org/api/languages")
+    res.raise_for_status()
+    languages = res.json()
+
+    return {code: ISO_639_LANGUAGES.get(code, code) for code in languages.keys()}
+
+
+def run_MinT_translate(texts: list[str], translate_target: str) -> list[str]:
+    """
+    Translate text using the MinT API.
+    Args:
+        texts (list[str]): Text to be translated.
+        translate_target (str): Language code to translate to.
+    Returns:
+        list[str]: Translated text.
+    """
+    translate_from = MinT_detectLanguage(texts)
+
+    if translate_from == translate_target:
+        return texts
+
+    res = requests.post(
+        f"https://translate.wmcloud.org/api/translate/{translate_from}/{translate_target}",
+        {"text": ".\n".join(texts)},
+    )
+    res.raise_for_status()
+
+    # e.g. {"model":"IndicTrans2_indec_en","sourcelanguage":"hi","targetlanguage":"en","translation":"hello","translationtime":0.8}
+    tanslation = res.json()
+
+    return tanslation.get("translation", []).split(".\n")
+
+
+def MinT_detectLanguage(texts: list[str]):
+    """
+    Return the language code of the texts.
+    """
+
+    for line in texts:
+        res = requests.post(
+            "https://translate.wmcloud.org/api/detectlang", {"text": line}
+        )
+        res.raise_for_status()
+        detection = res.json()  # e.g. {"language":"en","score":98}
+        if detection.get("score", -1) > 50:
+            # if the score is high enough, we make that our predicted language
+            return detection.get("language", "en")
+
+    raise ValueError("Could not identify a language in the provided text")
+
+
+class TranslateAPIs(Enum):
+    MinT = "MinT"
+    google_translate = "Google Translate"
+
+
+translate_apis = {
+    TranslateAPIs.MinT: {"languages": MinT_translate_languages()},
+    TranslateAPIs.google_translate: {"languages": google_translate_languages()},
+}
+
+
+def run_translate(
+    texts: list[str],
+    translate_target: str,
+    api: typing.Literal[tuple(e.name for e in TranslateAPIs)],
+) -> list[str]:
+    try:
+        if api == TranslateAPIs.MinT:
+            return run_MinT_translate(texts, translate_target)
+        elif api == TranslateAPIs.google_translate:
+            return run_google_translate(texts, translate_target)
+    except:
+        pass
+    return run_google_translate(
+        texts, translate_target
+    )  # fall back on Google Translate
+
+
+def translate_api_selector(
+    label="""
+    ###### Translate API (*optional*)
+    """,
+    key="translate_api",
+):
+    options = list(translate_apis.keys())
+    options.insert(0, None)
+    st.selectbox(
+        label=label,
+        key=key,
+        format_func=lambda k: k if k else "———",
+        options=options,
+    )
+
+
+def translate_language_selector(
+    languages: dict[str, str],
+    label="""
+    ###### Translate (*optional*)
+    """,
+    key="translate_target",
+):
+    """
+    Streamlit widget for selecting a language.
+    Args:
+        languages: dict mapping language codes to display names
+        label: the label to display
+        key: the key to save the selected language to in the session state
+    """
+    options = list(languages.keys())
+    options.insert(0, None)
+    st.selectbox(
+        label=label,
+        key=key,
+        format_func=lambda k: languages[k] if k else "———",
+        options=options,
+    )
 
 
 def run_asr(
