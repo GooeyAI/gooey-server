@@ -411,6 +411,16 @@ class Message(models.Model):
         help_text="WhatsApp message id (required if platform is WhatsApp)",
     )
 
+    speech_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.SET_NULL,
+        related_name="messages_speech",
+        null=True,
+        blank=True,
+        default=None,
+        help_text="The saved audio run the generated this message",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

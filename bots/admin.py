@@ -209,6 +209,7 @@ class MessageAdmin(admin.ModelAdmin):
         "created_at",
         "wa_msg_id",
         "saved_run",
+        "speech_run",
     ]
     list_display = [
         "__str__",
