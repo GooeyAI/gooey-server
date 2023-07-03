@@ -1,6 +1,5 @@
 import json
 import os.path
-
 import subprocess
 import tempfile
 from enum import Enum
