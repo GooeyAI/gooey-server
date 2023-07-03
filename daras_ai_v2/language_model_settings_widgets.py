@@ -28,6 +28,7 @@ How many completion choices to generate for each input
             min_value=1,
             max_value=4,
         )
+    print(st.session_state.get("selected_model"))
     if (
         show_selector
         and not LargeLanguageModels[
