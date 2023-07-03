@@ -614,7 +614,7 @@ def translate_language_selector(
     """
     if not languages:
         languages = translate_apis[
-            st.session_state.get("translate_api", TranslateAPIs.google_translate)
+            st.session_state.get("translate_api") or TranslateAPIs.google_translate
         ]["languages"]
     options = list(languages.keys())
     options.insert(0, None)

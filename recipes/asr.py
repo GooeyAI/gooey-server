@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import gooey_ui as st
 from daras_ai_v2.asr import (
     AsrModels,
+    TranslateAPIs,
     translate_api_selector,
     translate_language_selector,
     run_asr,
@@ -27,7 +28,9 @@ class AsrPage(BasePage):
     title = "Speech Recognition & Translation"
     slug_versions = ["asr", "speech"]
 
-    sane_defaults = dict(output_format=AsrOutputFormat.text.name)
+    sane_defaults = dict(
+        output_format=AsrOutputFormat.text.name, translate_api=TranslateAPIs.MinT
+    )
 
     class RequestModel(BaseModel):
         documents: list[str]
