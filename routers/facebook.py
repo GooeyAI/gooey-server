@@ -297,9 +297,9 @@ def _on_msg(bot: BotInterface):
         _handle_feedback_msg(bot, input_text)
     else:
         _process_and_send_msg(
-            billing_account_user,
-            bot,
-            input_text,
+            billing_account_user=billing_account_user,
+            bot=bot,
+            input_text=input_text,
             speech_run=speech_run,
         )
 
@@ -330,7 +330,13 @@ def _handle_feedback_msg(bot, input_text):
     )
 
 
-def _process_and_send_msg(billing_account_user, bot, input_text, speech_run):
+def _process_and_send_msg(
+    *,
+    billing_account_user: AppUser,
+    bot: BotInterface,
+    input_text: str,
+    speech_run: str,
+):
     try:
         # # mock testing
         # msgs_to_save, response_audio, response_text, response_video = _echo(
@@ -495,7 +501,7 @@ def _process_msg(
     convo: Conversation,
     input_text: str,
     user_language: str,
-    speech_run: str = "",
+    speech_run: str,
 ) -> tuple[str, str | None, str | None, list[Message]]:
     from routers.api import call_api
 
