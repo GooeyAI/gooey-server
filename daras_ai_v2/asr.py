@@ -15,6 +15,7 @@ from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
 )
+from daras_ai_v2.functional import map_parallel
 
 ISO_639_LANGUAGES = {
     "ab": "Abkhaz",
@@ -517,39 +518,37 @@ def run_MinT_translate(texts: list[str], translate_target: str) -> list[str]:
     Returns:
         list[str]: Translated text.
     """
-    translate_from = MinT_detectLanguage(texts)
+    return map_parallel(
+        lambda text: run_MinT_translate_one_text(text, translate_target), texts
+    )
+
+
+def run_MinT_translate_one_text(text: str, translate_target: str) -> str:
+    translate_from = MinT_detectLanguage(text)
 
     if translate_from == translate_target:
-        return texts
+        return text
 
     res = requests.post(
         f"https://translate.wmcloud.org/api/translate/{translate_from}/{translate_target}",
-        {"text": ".\n".join(texts)},
+        {"text": text},
     )
     res.raise_for_status()
 
     # e.g. {"model":"IndicTrans2_indec_en","sourcelanguage":"hi","targetlanguage":"en","translation":"hello","translationtime":0.8}
     tanslation = res.json()
 
-    return tanslation.get("translation", []).split(".\n")
+    return tanslation.get("translation", [])
 
 
-def MinT_detectLanguage(texts: list[str]):
+def MinT_detectLanguage(text: str):
     """
     Return the language code of the texts.
     """
-
-    for line in texts:
-        res = requests.post(
-            "https://translate.wmcloud.org/api/detectlang", {"text": line}
-        )
-        res.raise_for_status()
-        detection = res.json()  # e.g. {"language":"en","score":98}
-        if detection.get("score", -1) > 50:
-            # if the score is high enough, we make that our predicted language
-            return detection.get("language", "en")
-
-    raise ValueError("Could not identify a language in the provided text")
+    res = requests.post("https://translate.wmcloud.org/api/detectlang", {"text": text})
+    res.raise_for_status()
+    detection = res.json()  # e.g. {"language":"en","score":98}
+    detection.get("language", "en")
 
 
 class TranslateAPIs(Enum):
