@@ -134,6 +134,9 @@ class QRCodeGeneratorPage(BasePage):
             )
             st.session_state["qr_code_input_image"] = None
 
+        st.checkbox("🔗 URL Shortener", key="use_url_shortener")
+        st.caption("Enabling this will automatically shorten URLs")
+
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
 
@@ -201,9 +204,6 @@ Here is the final output:
             Customize the QR Code output for your text prompt with these Settings. 
             """
         )
-
-        st.checkbox("🔗 URL Shortener", key="use_url_shortener")
-        st.caption("Enabling this will automatically shorten URLs")
 
         img_model_settings(
             Img2ImgModels,
