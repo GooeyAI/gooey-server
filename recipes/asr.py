@@ -29,7 +29,7 @@ class AsrPage(BasePage):
     slug_versions = ["asr", "speech"]
 
     sane_defaults = dict(
-        output_format=AsrOutputFormat.text.name, translate_api=TranslateAPIs.MinT
+        output_format=AsrOutputFormat.text.name, translate_api=TranslateAPIs.MinT.name
     )
 
     class RequestModel(BaseModel):
@@ -38,7 +38,7 @@ class AsrPage(BasePage):
         language: str | None
         google_translate_target: str | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
-        translate_api: str | None
+        translate_api: typing.Literal[tuple(e.name for e in TranslateAPIs)] | None
 
     class ResponseModel(BaseModel):
         raw_output_text: list[str] | None

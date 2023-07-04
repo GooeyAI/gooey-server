@@ -557,8 +557,8 @@ class TranslateAPIs(Enum):
 
 
 translate_apis = {
-    TranslateAPIs.MinT: {"languages": MinT_translate_languages()},
-    TranslateAPIs.google_translate: {"languages": google_translate_languages()},
+    TranslateAPIs.MinT.name: {"languages": MinT_translate_languages()},
+    TranslateAPIs.google_translate.name: {"languages": google_translate_languages()},
 }
 
 
@@ -570,9 +570,9 @@ def run_translate(
     if not api:
         api = st.session_state.get("translate_api")
     try:
-        if api == TranslateAPIs.MinT:
+        if api == TranslateAPIs.MinT.name:
             return run_MinT_translate(texts, translate_target)
-        elif api == TranslateAPIs.google_translate:
+        elif api == TranslateAPIs.google_translate.name:
             return run_google_translate(texts, translate_target)
     except:
         pass
@@ -587,12 +587,14 @@ def translate_api_selector(
     """,
     key="translate_api",
 ):
-    options = list(translate_apis.keys())
+    options = [item.name for item in TranslateAPIs]
     options.insert(0, None)
     st.selectbox(
         label=label,
         key=key,
-        format_func=lambda k: k if k else "———",
+        format_func=lambda k: TranslateAPIs.__getattribute__(TranslateAPIs, k).value
+        if k
+        else "———",
         options=options,
     )
 
@@ -613,7 +615,7 @@ def translate_language_selector(
     """
     if not languages:
         languages = translate_apis[
-            st.session_state.get("translate_api") or TranslateAPIs.google_translate
+            st.session_state.get("translate_api") or TranslateAPIs.google_translate.name
         ]["languages"]
     options = list(languages.keys())
     options.insert(0, None)
