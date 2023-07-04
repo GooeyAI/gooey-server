@@ -296,7 +296,12 @@ def _on_msg(bot: BotInterface):
     ]:
         _handle_feedback_msg(bot, input_text)
     else:
-        _process_and_send_msg(billing_account_user, bot, input_text, speech_run=speech_run)
+        _process_and_send_msg(
+            billing_account_user,
+            bot,
+            input_text,
+            speech_run=speech_run,
+        )
 
 
 def _handle_feedback_msg(bot, input_text):
