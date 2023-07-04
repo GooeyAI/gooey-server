@@ -74,8 +74,6 @@ all_api_pages = all_home_pages.copy() + [
 all_test_pages = all_api_pages.copy()
 # deprecated
 all_test_pages.remove(LetterWriterPage)
-# too slow
-all_test_pages.remove(DeforumSDPage)
 
 
 class Workflow(models.IntegerChoices):
