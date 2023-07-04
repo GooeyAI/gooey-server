@@ -131,7 +131,13 @@ class YoutubeBotPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: YoutubeBotPage.RequestModel = self.RequestModel.parse_obj(state)
         youtube_urls = request.youtube_urls
-        playlist = Playlist(youtube_urls[0])
+        video_urls = []
+        for url in youtube_urls:
+            try:
+                playlist_video_urls = Playlist(url)
+                video_urls.extend(playlist_video_urls)
+            except KeyError:  # if the url is not a playlist
+                video_urls.append(url)
         worksheet = self.get_worksheet(request.sheet_url)
         all_values = worksheet.get_all_values()
         if len(all_values) == 0:
@@ -148,17 +154,18 @@ class YoutubeBotPage(BasePage):
                 ]
             )
         videos_in_sheet = [row[2] for row in all_values if row]
-        new_urls = [url for url in playlist if url not in videos_in_sheet]
+        new_urls = [url for url in video_urls if url not in videos_in_sheet]
         if new_urls:
             for url in new_urls:
                 yield f"Adding videos {url}"
                 worksheet.append_row(["", "", url, "", "", "", "", "0"])
 
-        yield f"Processing {len(playlist)} videos"
+        all_values = worksheet.get_all_values()
+        yield f"Processing videos..."
         unprocessed_cells = [row for row in all_values if row[7] == "0"]
         if unprocessed_cells:
             unprocessed_videos = [cell[2] for cell in unprocessed_cells]
-            res = map_parallel(
+            map_parallel(
                 lambda video_url: self.process_video(
                     video_url=video_url, worksheet=worksheet
                 ),
@@ -166,12 +173,12 @@ class YoutubeBotPage(BasePage):
                 max_workers=5,
             )
 
-        yield f"Transcribing {len(playlist)} videos"
+        yield f"Transcribing videos..."
+        all_values = worksheet.get_all_values()
         unprocessed_cells = [row for row in all_values if row[7] == "1"]
         if unprocessed_cells:
             not_transcribed_videos = [(cell[2], cell[3]) for cell in unprocessed_cells]
-            print(not_transcribed_videos)
-            res = map_parallel(
+            map_parallel(
                 lambda url: self.transcribe_video(
                     video_url=url[0],
                     audio_url=url[1],
@@ -183,13 +190,12 @@ class YoutubeBotPage(BasePage):
                 max_workers=5,
             )
 
-        yield f"Translating {len(playlist)} videos"
+        yield f"Translating videos..."
+        all_values = worksheet.get_all_values()
         unprocessed_cells = [row for row in all_values if row[7] == "2"]
-        print(unprocessed_cells)
         if unprocessed_cells:
             untranslated_videos = [(cell[4], cell[2]) for cell in unprocessed_cells]
-            print(untranslated_videos)
-            res = map_parallel(
+            map_parallel(
                 lambda arg: self.translate_video(
                     transcribed_text=arg[0],
                     video_url=arg[1],
@@ -201,10 +207,11 @@ class YoutubeBotPage(BasePage):
             )
 
         yield f"Extracting Facts..."
+        all_values = worksheet.get_all_values()
         unprocessed_cells = [row for row in all_values if row[7] == "3"]
         if unprocessed_cells:
             not_summarised_videos = [(cell[5], cell[2]) for cell in unprocessed_cells]
-            res = map_parallel(
+            map_parallel(
                 lambda arg: self.summarize(
                     translated_text=arg[0],
                     video_url=arg[1],
@@ -237,7 +244,6 @@ class YoutubeBotPage(BasePage):
         new_value = [run_asr(audio_url, selected_model, language)]
         new_value.extend(["", "", "2"])
         x = worksheet.find(video_url, case_sensitive=False)
-        print(x.row)
         cell_list = worksheet.range(f"E{x.row}:H{x.row}")
         for i, val in enumerate(new_value):  # gives us a tuple of an index and value
             cell_list[i].value = val
@@ -245,7 +251,6 @@ class YoutubeBotPage(BasePage):
 
     def translate_video(self, transcribed_text, video_url, worksheet, target_lang="en"):
         x = worksheet.find(video_url, case_sensitive=False)
-        print(x.row)
         new_value = run_google_translate(
             [transcribed_text],
             google_translate_target=target_lang,
