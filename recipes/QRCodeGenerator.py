@@ -346,7 +346,7 @@ Here is the final output:
                 total += 3
             case Text2ImgModels.dall_e.name:
                 total += 10
-        return total
+        return total * state.get("num_outputs", 1)
 
 
 def generate_and_upload_qr_code(request: QRCodeGeneratorPage.RequestModel):
