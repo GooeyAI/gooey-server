@@ -14,8 +14,10 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
-    run_google_translate,
-    google_translate_language_selector,
+    TranslateAPIs,
+    run_translate,
+    translate_api_selector,
+    translate_language_selector,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -214,6 +216,7 @@ class VideoBotsPage(BasePage):
         scroll_jump: int | None
 
         user_language: str | None
+        translate_api: typing.Literal[tuple(e.name for e in TranslateAPIs)] | None
 
     class ResponseModel(BaseModel):
         final_prompt: str
@@ -300,8 +303,9 @@ Enable document search, to use custom documents as information sources.
             key="bot_script",
             height=300,
         )
-        google_translate_language_selector(
-            """
+        translate_api_selector()
+        translate_language_selector(
+            label="""
             ###### 🔠 User Language
             If provided, the bot will translate input prompt to english, and the responses to this language.
             """,
@@ -482,7 +486,7 @@ Use this for prompting GPT to use the document search results.
         # translate input text
         if request.user_language and request.user_language != "en":
             yield f"Translating input to english..."
-            user_input = run_google_translate(
+            user_input = run_translate(
                 texts=[user_input],
                 google_translate_target="en",
             )[0]
@@ -625,7 +629,7 @@ Use this for prompting GPT to use the document search results.
         # translate response text
         if request.user_language and request.user_language != "en":
             yield f"Translating response to {request.user_language}..."
-            output_text = run_google_translate(
+            output_text = run_translate(
                 texts=output_text,
                 google_translate_target=request.user_language,
             )
