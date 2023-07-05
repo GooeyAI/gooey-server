@@ -509,7 +509,9 @@ def MinT_translate_languages() -> dict[str, str]:
     return {code: ISO_639_LANGUAGES.get(code, code) for code in languages.keys()}
 
 
-def run_MinT_translate(texts: list[str], translate_target: str) -> list[str]:
+def run_MinT_translate(
+    texts: list[str], translate_target: str, translate_from: str | None = None
+) -> list[str]:
     """
     Translate text using the MinT API.
     Args:
@@ -519,12 +521,18 @@ def run_MinT_translate(texts: list[str], translate_target: str) -> list[str]:
         list[str]: Translated text.
     """
     return map_parallel(
-        lambda text: run_MinT_translate_one_text(text, translate_target), texts
+        lambda text: run_MinT_translate_one_text(
+            text, translate_target, translate_from
+        ),
+        texts,
     )
 
 
-def run_MinT_translate_one_text(text: str, translate_target: str) -> str:
-    translate_from = MinT_detectLanguage(text)
+def run_MinT_translate_one_text(
+    text: str, translate_target: str, translate_from: str | None = None
+) -> str:
+    if not translate_from or translate_from not in MinT_translate_languages():
+        translate_from = MinT_detectLanguage(text)
 
     if translate_from == translate_target:
         return text
@@ -578,12 +586,13 @@ def run_translate(
     texts: list[str],
     translate_target: str,
     api: typing.Literal[tuple(e.name for e in TranslateAPIs)],
+    translate_from: str | None = None,
 ) -> list[str]:
     if not api:
         api = st.session_state.get("translate_api")
     try:
         if api == TranslateAPIs.MinT.name:
-            return run_MinT_translate(texts, translate_target)
+            return run_MinT_translate(texts, translate_target, translate_from)
         elif api == TranslateAPIs.google_translate.name:
             return run_google_translate(texts, translate_target)
     except:
