@@ -271,11 +271,13 @@ Here is the final output:
     def render_output(self):
         state = st.session_state
         self._render_outputs(state)
+        st.caption(f'URL: {state.get("qr_code_data")}')
+        if state.get("shortened_url", False):
+            st.caption(f'Shortened: {state.get("shortened_url")}')
 
     def _render_outputs(self, state: dict):
         for img in state.get("output_images", []):
             st.image(img)
-            st.caption(f'{state.get("qr_code_data")}')
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -327,6 +329,9 @@ Here is the final output:
                 ```
                 """
             )
+            st.caption(f'URL: {state.get("qr_code_data")}')
+            if state.get("shortened_url", False):
+                st.caption(f'Shortened: {state.get("shortened_url")}')
         with col2:
             self._render_outputs(state)
 
