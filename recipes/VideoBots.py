@@ -359,7 +359,7 @@ Use this for prompting GPT to use the document search results.
             )
             st.write("---")
 
-            doc_search_settings()
+            doc_search_settings()  # TODO: Add MinT translate to DOC search
             st.write("---")
 
         language_model_settings()

@@ -543,16 +543,24 @@ def run_MinT_translate_one_text(text: str, translate_target: str) -> str:
 
 def MinT_detectLanguage(text: str):
     """
-    Return the language code of the texts.
+    Return the language code of the text.
     """
     res = requests.post("https://translate.wmcloud.org/api/detectlang", {"text": text})
     res.raise_for_status()
     detection = res.json()  # e.g. {"language":"en","score":98}
     if detection.get("score", -1) < 50:
-        raise ValueError(
-            "Not certain enough about language. Raising error to fall back to Google Translate"
-        )
-    detection.get("language", "en")
+        from google.cloud import translate_v2 as translate
+
+        translate_client = translate.Client()
+        result = translate_client.detect_language(text)
+        score = result["confidence"]
+        language_code = result["language"]
+        if score < 50 or language_code not in MinT_translate_languages():
+            raise ValueError(
+                "Not certain enough about language or it is not supported. Raising error to fall back to Google Translate"
+            )
+        return language_code
+    return detection.get("language", "en")
 
 
 class TranslateAPIs(Enum):
