@@ -761,7 +761,9 @@ def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
 
 def audio_to_wav(audio_url: str) -> tuple[str, int]:
     with tempfile.NamedTemporaryFile() as infile:
-        infile.write(requests.get(audio_url).content)
+        r = requests.get(audio_url)
+        r.raise_for_status()
+        infile.write(r.content)
         infile.flush()
 
         if check_wav_audio_format(infile.name):

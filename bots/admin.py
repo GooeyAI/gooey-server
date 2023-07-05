@@ -201,6 +201,14 @@ class MessageAdmin(admin.ModelAdmin):
         "content",
         "display_content",
     ] + [f"conversation__{field}" for field in ConversationAdmin.search_fields]
+    list_display = [
+        "__str__",
+        "local_lang",
+        "role",
+        "created_at",
+        "feedbacks",
+        "wa_delivered",
+    ]
     readonly_fields = [
         "conversation",
         "role",
@@ -209,14 +217,9 @@ class MessageAdmin(admin.ModelAdmin):
         "created_at",
         "wa_msg_id",
         "saved_run",
-    ]
-    list_display = [
-        "__str__",
-        "local_lang",
-        "role",
-        "created_at",
-        "feedbacks",
-        "wa_delivered",
+        "prev_msg_content",
+        "prev_msg_display_content",
+        "prev_msg_saved_run",
     ]
     ordering = ["created_at"]
 
@@ -226,6 +229,47 @@ class MessageAdmin(admin.ModelAdmin):
         return msg.feedbacks.count() or None
 
     feedbacks.short_description = "Feedbacks"
+
+    def get_fieldsets(self, request, msg: models.Message = None):
+        fieldsets = [
+            (
+                None,
+                {
+                    "fields": [
+                        "conversation",
+                        "role",
+                        "created_at",
+                        "wa_msg_id",
+                    ]
+                },
+            ),
+        ]
+        if msg and msg.role == CHATML_ROLE_ASSISSTANT:
+            fieldsets.append(
+                (
+                    "User Message",
+                    {
+                        "fields": [
+                            "prev_msg_content",
+                            "prev_msg_display_content",
+                            "prev_msg_saved_run",
+                        ]
+                    },
+                )
+            )
+        fieldsets.append(
+            (
+                "Message",
+                {
+                    "fields": [
+                        "content",
+                        "display_content",
+                        "saved_run",
+                    ]
+                },
+            ),
+        )
+        return fieldsets
 
     def wa_delivered(self, msg: models.Message):
         if (
@@ -237,6 +281,24 @@ class MessageAdmin(admin.ModelAdmin):
 
     wa_delivered.short_description = "Delivered"
     wa_delivered.boolean = True
+
+    def prev_msg_content(self, message: models.Message):
+        prev_msg = message.get_previous_by_created_at()
+        return change_obj_url(prev_msg, label=prev_msg.content)
+
+    prev_msg_content.short_description = "User Message (English)"
+
+    def prev_msg_display_content(self, message: models.Message):
+        prev_msg = message.get_previous_by_created_at()
+        return change_obj_url(prev_msg, label=prev_msg.display_content)
+
+    prev_msg_display_content.short_description = "User Message (Original)"
+
+    def prev_msg_saved_run(self, message: models.Message):
+        prev_msg = message.get_previous_by_created_at()
+        return change_obj_url(prev_msg.saved_run)
+
+    prev_msg_saved_run.short_description = "Speech Run"
 
 
 class FeedbackCommentInline(admin.StackedInline):
