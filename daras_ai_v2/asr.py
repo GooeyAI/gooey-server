@@ -548,6 +548,10 @@ def MinT_detectLanguage(text: str):
     res = requests.post("https://translate.wmcloud.org/api/detectlang", {"text": text})
     res.raise_for_status()
     detection = res.json()  # e.g. {"language":"en","score":98}
+    if detection.get("score", -1) < 50:
+        raise ValueError(
+            "Not certain enough about language. Raising error to fall back to Google Translate"
+        )
     detection.get("language", "en")
 
 
