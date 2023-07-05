@@ -244,7 +244,7 @@ def _subscribe_to_page(fb_page: dict):
 
 @db_middleware
 def _on_msg(bot: BotInterface):
-    speech_run = ""
+    speech_run = None
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
@@ -263,7 +263,7 @@ def _on_msg(bot: BotInterface):
         case "audio":
             try:
                 result = _handle_audio_msg(billing_account_user, bot)
-                speech_run = result.get("url", "")
+                speech_run = result.get("url")
             except HTTPException as e:
                 traceback.print_exc()
                 capture_exception(e)
@@ -335,7 +335,7 @@ def _process_and_send_msg(
     billing_account_user: AppUser,
     bot: BotInterface,
     input_text: str,
-    speech_run: str,
+    speech_run: str | None,
 ):
     try:
         # # mock testing
@@ -501,7 +501,7 @@ def _process_msg(
     convo: Conversation,
     input_text: str,
     user_language: str,
-    speech_run: str,
+    speech_run: str | None,
 ) -> tuple[str, str | None, str | None, list[Message]]:
     from routers.api import call_api
 
@@ -548,9 +548,10 @@ def _process_msg(
             content=raw_input_text,
             display_content=input_text,
             saved_run=SavedRun.objects.get_or_create(
-                workflow=Workflow.ASR,
-                **furl(speech_run).query.params,
-            )[0],
+                workflow=Workflow.ASR, **furl(speech_run).query.params
+            )[0]
+            if speech_run
+            else None,
         ),
         Message(
             conversation=convo,
@@ -558,8 +559,7 @@ def _process_msg(
             content=raw_output_text,
             display_content=output_text,
             saved_run=SavedRun.objects.get_or_create(
-                workflow=Workflow.VIDEOBOTS,
-                **furl(result.get("url", "")).query.params,
+                workflow=Workflow.VIDEOBOTS, **furl(result.get("url", "")).query.params
             )[0],
         ),
     ]
