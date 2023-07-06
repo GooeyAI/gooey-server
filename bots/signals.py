@@ -1,9 +1,8 @@
-from django.db.models.signals import post_save
+""" from django.db.models.signals import post_save
 from django.dispatch import receiver
 from .models import Message, BotIntegration
 import os
 import requests
-from .tasks import save_JSON_to_queue, confirm_message_answered_content
 import json
 
 
@@ -72,3 +71,4 @@ def question_subject(
     q_subject = Message.objects.get(id=id)
     q_subject.question_subject = dict["user"]["subject"]
     q_subject.save()
+ """
