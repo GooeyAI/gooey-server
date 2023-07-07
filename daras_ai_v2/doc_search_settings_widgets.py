@@ -25,9 +25,10 @@ def document_uploader(
             height=150,
             style={
                 "whiteSpace": "pre",
-                "overflow-wrap": "normal",
-                "overflow-x": "scroll",
+                "overflowWrap": "normal",
+                "overflowX": "scroll",
                 "fontFamily": "monospace",
+                "fontSize": "0.9rem",
             },
         )
         st.session_state[key] = text_value.splitlines()
