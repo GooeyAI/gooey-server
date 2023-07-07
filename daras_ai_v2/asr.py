@@ -24,13 +24,23 @@ class AsrModels(Enum):
     whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
+    vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
     usm = "USM (Google)"
 
+
+forced_asr_languages = {
+    AsrModels.whisper_hindi_large_v2: "hi",
+    AsrModels.whisper_telugu_large_v2: "te",
+    AsrModels.vakyansh_bhojpuri: "bho",
+    AsrModels.nemo_english: "en",
+    AsrModels.nemo_hindi: "hi",
+}
 
 asr_model_ids = {
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
     AsrModels.whisper_hindi_large_v2: "vasista22/whisper-hindi-large-v2",
     AsrModels.whisper_telugu_large_v2: "vasista22/whisper-telugu-large-v2",
+    AsrModels.vakyansh_bhojpuri: "Harveenchadha/vakyansh-wav2vec2-bhojpuri-bhom-60",
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
 }
@@ -96,12 +106,17 @@ def google_translate_languages() -> dict[str, str]:
     }
 
 
-def run_google_translate(texts: list[str], google_translate_target: str) -> list[str]:
+def run_google_translate(
+    texts: list[str],
+    target_language: str,
+    source_language: str = None,
+) -> list[str]:
     """
     Translate text using the Google Translate API.
     Args:
         texts (list[str]): Text to be translated.
-        google_translate_target (str): Language code to translate to.
+        target_language (str): Language code to translate to.
+        source_language (str): Language code to translate from.
     Returns:
         list[str]: Translated text.
     """
@@ -109,7 +124,10 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
 
     translate_client = translate_v2.Client()
     result = translate_client.translate(
-        texts, target_language=google_translate_target, format_="text"
+        texts,
+        source_language=source_language,
+        target_language=target_language,
+        format_="text",
     )
     return [r["translatedText"] for r in result]
 
@@ -161,13 +179,35 @@ def run_asr(
         return "\n\n".join(
             result.alternatives[0].transcript for result in response.results
         )
+    elif "nemo" in selected_model.name:
+        r = requests.post(
+            str(GpuEndpoints.nemo_asr),
+            json={
+                "pipeline": dict(
+                    model_id=asr_model_ids[selected_model],
+                ),
+                "inputs": dict(
+                    audio=audio_url,
+                ),
+            },
+        )
+        r.raise_for_status()
+        data = r.json()
     # check if we should use the fast queue
     # call one of the self-hosted models
-    if "whisper" in selected_model.name:
-        if language:
-            language = language.split("-")[0]
-        elif "hindi" in selected_model.name:
-            language = "hi"
+    else:
+        kwargs = {}
+        if "vakyansh" in selected_model.name:
+            # fixes https://github.com/huggingface/transformers/issues/15275#issuecomment-1624879632
+            kwargs["decoder_kwargs"] = dict(skip_special_tokens=True)
+            kwargs["chunk_length_s"] = 15
+            kwargs["stride_length_s"] = (3, 0)
+            kwargs["batch_size"] = 32
+        elif "whisper" in selected_model.name:
+            if language:
+                kwargs["language"] = language.split("-")[0]
+            else:
+                kwargs["language"] = forced_asr_languages.get(selected_model)
         data = call_celery_task(
             "whisper",
             pipeline=dict(
@@ -176,25 +216,11 @@ def run_asr(
             inputs=dict(
                 audio=audio_url,
                 task="transcribe",
-                language=language,
                 return_timestamps=output_format != AsrOutputFormat.text,
+                **kwargs,
             ),
             queue_prefix="gooey-gpu/short" if is_short else "gooey-gpu/long",
         )
-    else:
-        r = requests.post(
-            str(GpuEndpoints.nemo_asr),
-            json={
-                "pipeline": dict(
-                    model_id=asr_model_ids[selected_model],
-                ),
-                "inputs": {
-                    "audio": audio_url,
-                },
-            },
-        )
-        r.raise_for_status()
-        data = r.json()
     match output_format:
         case AsrOutputFormat.text:
             return data["text"]
