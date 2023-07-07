@@ -17,6 +17,7 @@ from daras_ai_v2.gpu_server import (
 from daras_ai_v2.functional import map_parallel
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
+TRANSLITERATION_SUPPORTED = ["ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"]
 
 
 class AsrModels(Enum):
@@ -133,6 +134,7 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
 def _translate_text(
     text: str, language_code: str, google_translate_target: str, token: str
 ):
+    print(language_code.strip("-Latn"))
     res = requests.post(
         "https://translation.googleapis.com/v3/projects/dara-c1b52/locations/global:translateText",
         json.dumps(
@@ -143,6 +145,7 @@ def _translate_text(
                 "mime_type": "text/plain",
                 "transliteration_config": {
                     "enable_transliteration": language_code.endswith("-Latn")
+                    and language_code.strip("-Latn") in TRANSLITERATION_SUPPORTED
                 },
             }
         ),
