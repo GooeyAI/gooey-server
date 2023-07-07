@@ -200,8 +200,8 @@ def run_asr(
         if "vakyansh" in selected_model.name:
             # fixes https://github.com/huggingface/transformers/issues/15275#issuecomment-1624879632
             kwargs["decoder_kwargs"] = dict(skip_special_tokens=True)
-            kwargs["chunk_length_s"] = 15
-            kwargs["stride_length_s"] = (3, 0)
+            kwargs["chunk_length_s"] = 60
+            kwargs["stride_length_s"] = (6, 0)
             kwargs["batch_size"] = 32
         elif "whisper" in selected_model.name:
             if language:
