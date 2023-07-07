@@ -14,6 +14,7 @@ from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
 )
+from daras_ai_v2.functional import map_parallel
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -105,6 +106,7 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
     Returns:
         list[str]: Translated text.
     """
+    from google.cloud import translate_v2 as translate
     import google.auth
     import google.auth.transport.requests
 
@@ -115,18 +117,37 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
     auth_req = google.auth.transport.requests.Request()
     creds.refresh(auth_req)
 
+    translate_client = translate.Client()
+    detections = translate_client.detect_language(texts)
+    language_codes = [detection["language"] for detection in detections]
+
+    return map_parallel(
+        lambda text, code: _translate_text(
+            text, code, google_translate_target, creds.token
+        ),
+        texts,
+        language_codes,
+    )
+
+
+def _translate_text(
+    text: str, language_code: str, google_translate_target: str, token: str
+):
     res = requests.post(
-        "https://translation.googleapis.com/v3/projects/dara-c1b52/locations/us-central1:translateText",
+        "https://translation.googleapis.com/v3/projects/dara-c1b52/locations/global:translateText",
         json.dumps(
             {
+                "source_language_code": language_code.strip("-Latn"),
                 "target_language_code": google_translate_target,
-                "contents": texts,
+                "contents": text,
                 "mime_type": "text/plain",
-                "transliteration_config": {"enable_transliteration": True},
+                "transliteration_config": {
+                    "enable_transliteration": language_code.endswith("-Latn")
+                },
             }
         ),
         headers={
-            "Authorization": f"Bearer {creds.token}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         },
     )
@@ -135,7 +156,7 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
     return [
         translation.get("translatedText", "")
         for translation in res.json().get("translations")
-    ]
+    ][0]
 
 
 def run_asr(
