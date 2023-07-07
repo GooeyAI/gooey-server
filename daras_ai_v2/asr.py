@@ -105,13 +105,37 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
     Returns:
         list[str]: Translated text.
     """
-    from google.cloud import translate_v2
+    import google.auth
+    import google.auth.transport.requests
 
-    translate_client = translate_v2.Client()
-    result = translate_client.translate(
-        texts, target_language=google_translate_target, format_="text"
+    creds, project = google.auth.default(
+        scopes=["https://www.googleapis.com/auth/cloud-platform"]
     )
-    return [r["translatedText"] for r in result]
+
+    auth_req = google.auth.transport.requests.Request()
+    creds.refresh(auth_req)
+
+    res = requests.post(
+        "https://translation.googleapis.com/v3/projects/dara-c1b52/locations/us-central1:translateText",
+        json.dumps(
+            {
+                "target_language_code": google_translate_target,
+                "contents": texts,
+                "mime_type": "text/plain",
+                "transliteration_config": {"enable_transliteration": True},
+            }
+        ),
+        headers={
+            "Authorization": f"Bearer {creds.token}",
+            "Content-Type": "application/json",
+        },
+    )
+    res.raise_for_status()
+
+    return [
+        translation.get("translatedText", "")
+        for translation in res.json().get("translations")
+    ]
 
 
 def run_asr(
