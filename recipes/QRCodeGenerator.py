@@ -134,7 +134,7 @@ class QRCodeGeneratorPage(BasePage):
             )
             st.session_state["qr_code_input_image"] = None
 
-        st.checkbox("🔗 URL Shortener", key="use_url_shortener")
+        st.checkbox("🔗 Shorten URL", key="use_url_shortener")
         st.caption(
             'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
         )
