@@ -594,6 +594,7 @@ def MinT_detectLanguage(text: str):
 class TranslateAPIs(Enum):
     MinT = "MinT"
     google_translate = "Google Translate"
+    Auto = "Auto - use recommended API based on language"
 
 
 translate_apis = {
@@ -627,9 +628,11 @@ def translate_api_selector(
     ###### Translate API (*optional*)
     """,
     key="translate_api",
+    allow_none=True,
 ):
     options = [item.name for item in TranslateAPIs]
-    options.insert(0, None)
+    if allow_none:
+        options.insert(0, None)
     st.selectbox(
         label=label,
         key=key,

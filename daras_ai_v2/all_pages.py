@@ -31,6 +31,7 @@ from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
 from recipes.QRCodeGenerator import QRCodeGeneratorPage
 from recipes.embeddings_page import EmbeddingsPage
+from recipes.Translate import TranslationPage
 
 # note: the ordering here matters!
 all_home_pages = [
@@ -60,6 +61,7 @@ all_home_pages = [
     RelatedQnADocPage,
     QRCodeGeneratorPage,
     EmbeddingsPage,
+    TranslationPage,
 ]
 
 # exposed as API
@@ -100,6 +102,7 @@ class Workflow(models.IntegerChoices):
     LETTERWRITER = (23, LetterWriterPage.__name__)
     SMARTGPT = (24, SmartGPTPage.__name__)
     QRCODE = (25, QRCodeGeneratorPage.__name__)
+    TRANSLATE = (26, TranslationPage.__name__)
 
     @property
     def page_cls(self) -> typing.Type[BasePage]:
