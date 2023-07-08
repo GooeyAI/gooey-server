@@ -13,7 +13,7 @@ from daras_ai.image_input import (
     truncate_text_words,
 )
 from daras_ai_v2.GoogleGPT import SearchReference
-from daras_ai_v2.asr import (
+from daras_ai_v2.translate import (
     TranslateAPIs,
     run_translate,
     translate_api_selector,

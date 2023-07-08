@@ -1,7 +1,8 @@
 import gooey_ui as st
 
 from daras_ai_v2 import settings
-from daras_ai_v2.asr import AsrModels, google_translate_language_selector
+from daras_ai_v2.asr import AsrModels
+from daras_ai_v2.translate import google_translate_language_selector
 from daras_ai_v2.enum_selector_widget import enum_selector
 
 
