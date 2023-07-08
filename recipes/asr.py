@@ -9,6 +9,7 @@ from daras_ai_v2.asr import (
     run_asr,
     AsrOutputFormat,
     AsrOutputJson,
+    forced_asr_languages,
 )
 from daras_ai_v2.translate import (
     TranslateAPIs,
@@ -137,6 +138,9 @@ class AsrPage(BasePage):
             state["output_text"] = run_translate(
                 asr_output,
                 translate_target=request.google_translate_target,
+                translate_from=forced_asr_languages.get(
+                    selected_model, request.language
+                ),
             )
         else:
             # Save the raw ASR text for details view

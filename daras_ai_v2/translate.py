@@ -413,12 +413,17 @@ def google_translate_languages() -> dict[str, str]:
     }
 
 
-def run_google_translate(texts: list[str], google_translate_target: str) -> list[str]:
+def run_google_translate(
+    texts: list[str],
+    target_language: str,
+    source_language: str = None,
+) -> list[str]:
     """
     Translate text using the Google Translate API.
     Args:
         texts (list[str]): Text to be translated.
-        google_translate_target (str): Language code to translate to.
+        target_language (str): Language code to translate to.
+        source_language (str): Language code to translate from.
     Returns:
         list[str]: Translated text.
     """
@@ -426,7 +431,10 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
 
     translate_client = translate_v2.Client()
     result = translate_client.translate(
-        texts, target_language=google_translate_target, format_="text"
+        texts,
+        source_language=source_language,
+        target_language=target_language,
+        format_="text",
     )
     return [r["translatedText"] for r in result]
 
@@ -545,11 +553,11 @@ def run_translate(
         if api == TranslateAPIs.MinT.name:
             return run_MinT_translate(texts, translate_target, translate_from)
         elif api == TranslateAPIs.google_translate.name:
-            return run_google_translate(texts, translate_target)
+            return run_google_translate(texts, translate_target, translate_from)
     except:
         pass
     return run_google_translate(
-        texts, translate_target
+        texts, translate_target, translate_from
     )  # fall back on Google Translate
 
 

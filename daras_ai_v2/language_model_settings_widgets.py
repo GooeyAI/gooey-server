@@ -31,7 +31,7 @@ How many completion choices to generate for each input
     if (
         show_selector
         and not LargeLanguageModels[
-            st.session_state.get("selected_model") or LargeLanguageModels.gpt_4
+            st.session_state.get("selected_model") or LargeLanguageModels.gpt_4.name
         ].is_chat_model()
     ):
         with col2:
