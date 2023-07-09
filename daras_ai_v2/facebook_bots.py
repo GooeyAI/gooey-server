@@ -7,7 +7,7 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import Workflow
-from daras_ai_v2.translate import run_google_translate
+from daras_ai_v2.translate import run_translate, TranslateAPIs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.text_splitter import text_splitter
 
@@ -127,7 +127,7 @@ class WhatsappBot(BotInterface):
         should_translate: bool = False,
     ) -> str | None:
         if should_translate and self.language and self.language != "en":
-            text = run_google_translate([text], self.language)[0]
+            text = run_translate([text], self.language)[0]
         return send_wa_msg(
             bot_number=self.bot_id,
             user_number=self.user_id,
@@ -384,7 +384,7 @@ class FacebookBot(BotInterface):
         should_translate: bool = False,
     ) -> str | None:
         if should_translate and self.language and self.language != "en":
-            text = run_google_translate([text], self.language)[0]
+            text = run_translate([text], self.language)[0]
         return send_fb_msg(
             access_token=self._access_token,
             bot_id=self.bot_id,

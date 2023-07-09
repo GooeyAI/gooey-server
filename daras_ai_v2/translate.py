@@ -679,13 +679,15 @@ LANGUAGE_CODE_TYPE = typing.TypeVar(
 def run_translate(
     texts: list[str],
     translate_target: str,
-    api: TRANSLATE_API_TYPE,
+    api: TRANSLATE_API_TYPE = None,
     translate_from: str | None = None,
     romanize_translation: bool = False,
     enable_transliteration: bool = True,
 ) -> list[str]:
-    if not api:
-        api = st.session_state.get("translate_api")
+    if not api and st:
+        api = st.session_state.get("translate_api", TranslateAPIs.Auto.name)
+    elif not api:
+        api = TranslateAPIs.Auto.name
     if (
         enable_transliteration
         and api != TranslateAPIs.google_transliteration.name

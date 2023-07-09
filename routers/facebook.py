@@ -23,7 +23,7 @@ from bots.models import (
 from daras_ai_v2 import settings, db
 from daras_ai_v2.all_pages import Workflow
 from daras_ai_v2.asr import AsrModels
-from daras_ai_v2.translate import run_google_translate
+from daras_ai_v2.translate import run_translate
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot, BotInterface
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
@@ -316,7 +316,7 @@ def _handle_feedback_msg(bot, input_text):
     # save the feedback
     last_feedback.text = input_text
     # translate feedback to english
-    last_feedback.text_english = " ".join(run_google_translate([input_text], "en"))
+    last_feedback.text_english = " ".join(run_translate([input_text], "en"))
     last_feedback.save()
     # send back a confimation msg
     bot.show_feedback_buttons = False  # don't show feedback for this confirmation
