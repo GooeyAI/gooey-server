@@ -43,7 +43,7 @@ class TranslationPage(BasePage):
         romanize_translation: bool | None
 
     class ResponseModel(BaseModel):
-        output_textsfsfseesfse: list[str]
+        output_texts: list[str]
         output_docs: list[list[str]]
 
     def preview_description(self, state: dict):
@@ -134,8 +134,8 @@ class TranslationPage(BasePage):
 
     def _render_output(self, state):
         print(state.get("texts"))
-        print(state.get("output_textsfsfseesfse", "not yet"))
-        text_outputs("**Translations**", key="output_textsfsfseesfse")
+        print(state.get("output_texts", "not yet"))
+        text_outputs("**Translations**", key="output_texts")
         text_outputs("", value=state.get("output_docs"))
 
     def render_steps(self):
@@ -157,9 +157,9 @@ class TranslationPage(BasePage):
 
     def run(self, state: dict):
         # Parse Request
-        # request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
         yield f"Running...123"
-        state["output_textsfsfseesfse"] = ["why?!!"]
+        state["output_texts"] = ["why?!!"]
         # state["output_texts"] = run_translate(
         #     request.texts, request.translate_target, request.translate_api
         # )
