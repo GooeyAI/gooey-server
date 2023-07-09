@@ -43,7 +43,7 @@ class TranslationPage(BasePage):
         romanize_translation: bool | None
 
     class ResponseModel(BaseModel):
-        output_texts: list[str]
+        output_textsfsfseesfse: list[str]
         output_docs: list[list[str]]
 
     def preview_description(self, state: dict):
@@ -89,23 +89,29 @@ class TranslationPage(BasePage):
             for i in range(st.number_input("""##### Text Inputs""", 0, 100, 1, 1))
         ]
 
-        document_uploader(
-            "##### Text Files",
-            accept=(
-                ".pdf",
-                ".txt",
-                ".docx",
-                ".md",
-                ".html",
-                ".rtf",
-                ".epub",
-                ".odt",
-                ".csv",
-                ".xlsx",
-                ".tsv",
-                ".ods",
-            ),
-        )
+        if st.checkbox(
+            "Upload Text Files", value=bool(st.session_state.get("documents"))
+        ):
+            document_uploader(
+                "",
+                accept=(
+                    ".pdf",
+                    ".txt",
+                    ".docx",
+                    ".md",
+                    ".html",
+                    ".rtf",
+                    ".epub",
+                    ".odt",
+                    ".csv",
+                    ".xlsx",
+                    ".tsv",
+                    ".ods",
+                ),
+            )
+        else:
+            st.session_state["documents"] = []
+
         st.write("---")
         translate_settings(require_api=True, require_target=True)
 
@@ -127,8 +133,9 @@ class TranslationPage(BasePage):
         self._render_output(state)
 
     def _render_output(self, state):
-        print(state.get("output_texts"))
-        text_outputs("**Translations**", value=state.get("output_texts"))
+        print(state.get("texts"))
+        print(state.get("output_textsfsfseesfse", "not yet"))
+        text_outputs("**Translations**", key="output_textsfsfseesfse")
         text_outputs("", value=state.get("output_docs"))
 
     def render_steps(self):
@@ -150,10 +157,9 @@ class TranslationPage(BasePage):
 
     def run(self, state: dict):
         # Parse Request
-        request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
-        yield "Running..."
-        print("hi")
-        state["output_texts"] = ["why?!!"]
+        # request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
+        yield f"Running...123"
+        state["output_textsfsfseesfse"] = ["why?!!"]
         # state["output_texts"] = run_translate(
         #     request.texts, request.translate_target, request.translate_api
         # )
@@ -164,8 +170,9 @@ class TranslationPage(BasePage):
         """
 
     def get_raw_price(self, state: dict):
-        if state.get("translation_api") == TranslateAPIs.MinT:
-            return 1
-        texts = state.get("texts", [])
-        characters = sum([len(text) for text in texts])
-        return 0.002 * characters
+        # if state.get("translation_api") == TranslateAPIs.MinT:
+        #     return 1
+        # texts = state.get("texts", [])
+        # characters = sum([len(text) for text in texts])
+        # return 0.002 * characters
+        return 0
