@@ -565,7 +565,9 @@ def run_MinT_translate_one_text(
     text: str, translate_target: str, translate_from: str | None = None
 ) -> str:
     if not translate_from or translate_from not in MinT_translate_languages():
-        translate_from = MinT_detectLanguage(text)
+        translate_from = detectLanguage(text)
+    if translate_from not in MinT_translate_languages():
+        raise ValueError(f"MinT does not support translating from {translate_from}.")
 
     if translate_from == translate_target:
         return text
@@ -582,26 +584,16 @@ def run_MinT_translate_one_text(
     return tanslation.get("translation", [])
 
 
-def MinT_detectLanguage(text: str):
+def detectLanguage(text: str):
     """
     Return the language code of the text.
     """
-    res = requests.post("https://translate.wmcloud.org/api/detectlang", {"text": text})
-    res.raise_for_status()
-    detection = res.json()  # e.g. {"language":"en","score":98}
-    if detection.get("score", -1) < 50:
-        from google.cloud import translate_v2 as translate
+    from google.cloud import translate_v2 as translate
 
-        translate_client = translate.Client()
-        result = translate_client.detect_language(text)
-        score = result["confidence"]
-        language_code = result["language"]
-        if score < 50 or language_code not in MinT_translate_languages():
-            raise ValueError(
-                "Not certain enough about language or it is not supported. Raising error to fall back to Google Translate"
-            )
-        return language_code
-    return detection.get("language", "en")
+    translate_client = translate.Client()
+    result = translate_client.detect_language(text)
+    language_code = result["language"]
+    return language_code
 
 
 class TranslateAPIs(Enum):
@@ -787,9 +779,12 @@ def romanize(texts: list[str], language: LANGUAGE_CODE_TYPE) -> list[str]:
         },
     )
     res.raise_for_status()
-    print(res.json())
 
     return [
         rom.get("romanizedText", text)
         for rom, text in zip(res.json()["romanizations"], texts)
     ]
+
+
+def transliterate():
+    pass
