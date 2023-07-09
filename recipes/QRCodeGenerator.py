@@ -38,7 +38,7 @@ class QRCodeGeneratorPage(BasePage):
     slug_versions = ["art-qr-code", "qr", "qr-code"]
 
     sane_defaults = dict(
-        num_outputs=1,
+        num_outputs=2,
         obj_scale=0.65,
         obj_pos_x=0.5,
         obj_pos_y=0.5,
