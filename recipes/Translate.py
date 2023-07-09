@@ -1,5 +1,5 @@
 import gooey_ui as st
-from typing import Literal, Iterator
+from typing import Iterator
 from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage
@@ -10,7 +10,8 @@ from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 from daras_ai_v2.translate import (
     TranslateAPIs,
-    translate_languages,
+    TRANSLATE_API_TYPE,
+    LANGUAGE_CODE_TYPE,
     translate_settings,
     translate_advanced_settings,
     run_translate,
@@ -32,13 +33,9 @@ class TranslationPage(BasePage):
     class RequestModel(BaseModel):
         texts: list[str] | None
         documents: list[str] | None
-        translate_api: Literal[tuple(e.name for e in TranslateAPIs)] | None
-        translate_target: Literal[
-            tuple(code for code, language in translate_languages().items())
-        ] | None
-        translate_source: Literal[
-            tuple(code for code, language in translate_languages().items())
-        ] | None
+        translate_api: TRANSLATE_API_TYPE | None
+        translate_target: LANGUAGE_CODE_TYPE | None
+        translate_source: LANGUAGE_CODE_TYPE | None
 
         enable_transliteration: bool | None
         romanize_translation: bool | None

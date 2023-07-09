@@ -614,11 +614,19 @@ def translate_languages() -> dict[str, str]:
 
 translate_apis.update({TranslateAPIs.Auto.name: {"languages": translate_languages}})
 
+TRANSLATE_API_TYPE = typing.Literal[tuple(e.name for e in TranslateAPIs)]
+LANGUAGE_CODE_TYPE = typing.TypeVar(
+    "LANGUAGE_CODE_TYPE",
+    bound=typing.Literal[
+        tuple(code for code, language in translate_languages().items())
+    ],
+)
+
 
 def run_translate(
     texts: list[str],
     translate_target: str,
-    api: typing.Literal[tuple(e.name for e in TranslateAPIs)],
+    api: TRANSLATE_API_TYPE,
     translate_from: str | None = None,
 ) -> list[str]:
     if not api:
