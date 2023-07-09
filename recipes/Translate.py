@@ -1,5 +1,5 @@
 import gooey_ui as st
-from typing import Literal
+from typing import Literal, Iterator
 from pydantic import BaseModel
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -155,14 +155,11 @@ class TranslationPage(BasePage):
             """
         )
 
-    def run(self, state: dict):
+    def run(self, state: dict) -> Iterator[str | None]:
         # Parse Request
         request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
         yield f"Running...123"
         state["output_texts"] = ["why?!!"]
-        # state["output_texts"] = run_translate(
-        #     request.texts, request.translate_target, request.translate_api
-        # )
 
     def additional_notes(self) -> str | None:
         return """
