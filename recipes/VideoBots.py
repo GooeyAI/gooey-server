@@ -15,6 +15,8 @@ from daras_ai.image_input import (
 from daras_ai_v2.GoogleGPT import SearchReference
 from daras_ai_v2.translate import (
     TranslateAPIs,
+    LANGUAGE_CODE_TYPE,
+    TRANSLATE_API_TYPE,
     run_translate,
     translate_api_selector,
     translate_language_selector,
@@ -172,7 +174,7 @@ class VideoBotsPage(BasePage):
         "max_references": 3,
         "max_context_words": 200,
         "scroll_jump": 5,
-        "translate_api": TranslateAPIs.MinT.name,
+        "translate_api": TranslateAPIs.Auto.name,
     }
 
     class RequestModel(BaseModel):
@@ -216,8 +218,8 @@ class VideoBotsPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
-        user_language: str | None
-        translate_api: typing.Literal[tuple(e.name for e in TranslateAPIs)] | None
+        user_language: LANGUAGE_CODE_TYPE | None
+        translate_api: TRANSLATE_API_TYPE | None
 
     class ResponseModel(BaseModel):
         final_prompt: str
@@ -311,6 +313,7 @@ Enable document search, to use custom documents as information sources.
             If provided, the bot will translate input prompt to english, and the responses to this language.
             """,
             key="user_language",
+            use_source=True,
         )
         st.write("---")
 
