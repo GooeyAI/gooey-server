@@ -45,7 +45,9 @@ class TranslationPage(BasePage):
         output_docs: list[list[str]]
 
     def preview_description(self, state: dict):
-        return "Translate to any of 200+ languages using different APIs and models."
+        return (
+            "Translate between any of 200+ languages using different APIs and models."
+        )
 
     def run(self, state: dict) -> Iterator[str | None]:
         # Parse Request
