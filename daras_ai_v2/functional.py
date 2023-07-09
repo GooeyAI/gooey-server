@@ -22,6 +22,8 @@ def map_parallel(
 ) -> list[R]:
     assert iterables, "map_parallel() requires at least one iterable"
     max_workers = max_workers or max(map(len, iterables))
+    if not max_workers:
+        return []
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         return list(pool.map(fn, *iterables))
 
