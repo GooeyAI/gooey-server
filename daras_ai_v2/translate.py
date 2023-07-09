@@ -437,7 +437,7 @@ ISO_639_LANGUAGES = {
     "fy": "Western Frisian",
     "za": "Zhuang, Chuang",
 }
-TRANSLITERATION_SUPPORTED = ["ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"]
+TRANSLITERATION_SUPPORTED = ["ar", "bn", "gu", "hi", "ja", "kn", "ru", "ta", "te"]
 ROMANIZATION_SUPPORTED = [
     "ar",
     "am",
