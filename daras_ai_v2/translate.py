@@ -760,6 +760,9 @@ def translate_advanced_settings():
 
 
 def romanize(texts: list[str], language: LANGUAGE_CODE_TYPE) -> list[str]:
+    if language not in ROMANIZATION_SUPPORTED:
+        raise ValueError("Romanization not supported for this language")
+
     import google.auth
     import google.auth.transport.requests
 
