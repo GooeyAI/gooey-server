@@ -50,6 +50,18 @@ class TranslationPage(BasePage):
     def preview_description(self, state: dict):
         return "Translate to any of 200+ languages using different APIs and models."
 
+    def run(self, state: dict) -> Iterator[str | None]:
+        # Parse Request
+        request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
+        yield f"Running..."
+        state["output_texts"] = run_translate(
+            request.texts,
+            request.translate_target,
+            request.translate_api,
+            request.translate_source,
+        )
+        state["output_docs"] = [["test"]]
+
     def render_description(self):
         st.markdown(
             """
@@ -81,14 +93,18 @@ class TranslationPage(BasePage):
         ]
 
     def render_form_v2(self):
+        num_inputs = st.number_input("""##### Text Inputs""", 0, 100, 1, 1)
+        texts = st.session_state.get("texts", [])
         st.session_state["texts"] = [
             st.text_area(
                 f"""
                 Text Input {i + 1}
                 """,
-                key=f"text_{i}",
+                value=text,
             )
-            for i in range(st.number_input("""##### Text Inputs""", 0, 100, 1, 1))
+            for i, text in enumerate(
+                (texts + [""] * (num_inputs - len(texts)))[:num_inputs]
+            )
         ]
 
         if st.checkbox(
@@ -135,8 +151,9 @@ class TranslationPage(BasePage):
         self._render_output(state)
 
     def _render_output(self, state):
+        print(state.get("output_docs", "B"))
         text_outputs("**Translations**", key="output_texts")
-        text_outputs("", value=state.get("output_docs"))
+        text_outputs("", key="output_docs")
 
     def render_steps(self):
         st.markdown(
@@ -146,21 +163,19 @@ class TranslationPage(BasePage):
         )
         st.markdown(
             """
-            2. Translate with the selected API (for Auto, we look up the optimal API in a table).
+            2. Detect the source language if not provided.
             """
         )
         st.markdown(
             """
-            3. Apply romanization if requested and applicable.
+            3. Translate with the selected API (for Auto, we look up the optimal API in a table).
             """
         )
-
-    def run(self, state: dict) -> Iterator[str | None]:
-        # Parse Request
-        request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
-        yield f"Running..."
-        state["output_texts"] = ["why?!!"]
-        state["output_docs"] = ["what?!!"]
+        st.markdown(
+            """
+            4. Apply romanization if requested and applicable.
+            """
+        )
 
     def additional_notes(self) -> str | None:
         return """
