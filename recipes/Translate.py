@@ -56,6 +56,7 @@ class TranslationPage(BasePage):
             request.translate_target,
             request.translate_api,
             request.translate_source,
+            request.romanize_translation,
         )
         yield "Translating Documents..."
         state["output_docs"] = [
@@ -64,6 +65,7 @@ class TranslationPage(BasePage):
                 request.translate_target,
                 request.translate_api,
                 request.translate_source,
+                request.romanize_translation,
             )
             for doc in request.documents
         ]

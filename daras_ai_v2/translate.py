@@ -1,5 +1,6 @@
 import typing
 import requests
+import json
 from enum import Enum
 
 import gooey_ui as st
@@ -436,6 +437,18 @@ ISO_639_LANGUAGES = {
     "za": "Zhuang, Chuang",
 }
 TRANSLITERATION_SUPPORTED = ["ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"]
+ROMANIZATION_SUPPORTED = [
+    "ar",
+    "am",
+    "bn",
+    "be",
+    "hi",
+    "ja",
+    "uk",
+    "ru",
+    "sr",
+    "uk",
+]
 
 
 def google_translate_language_selector(
@@ -628,21 +641,28 @@ def run_translate(
     translate_target: str,
     api: TRANSLATE_API_TYPE,
     translate_from: str | None = None,
+    romanize_translation: bool = False,
 ) -> list[str]:
     if not api:
         api = st.session_state.get("translate_api")
     try:
         if api == TranslateAPIs.MinT.name:
-            return run_MinT_translate(texts, translate_target, translate_from)
+            result = run_MinT_translate(texts, translate_target, translate_from)
         elif api == TranslateAPIs.google_translate.name:
-            return run_google_translate(texts, translate_target, translate_from)
+            result = run_google_translate(texts, translate_target, translate_from)
         elif api == TranslateAPIs.Auto.name:
-            return run_google_translate(texts, translate_target, translate_from)  # TODO
+            result = run_google_translate(
+                texts, translate_target, translate_from
+            )  # TODO
+        else:
+            result = run_google_translate(
+                texts, translate_target, translate_from
+            )  # default to Google Translate
     except:
-        pass
-    return run_google_translate(
-        texts, translate_target, translate_from
-    )  # fall back on Google Translate
+        result = run_google_translate(
+            texts, translate_target, translate_from
+        )  # fall back on Google Translate
+    return romanize(result, translate_target) if romanize_translation else result
 
 
 def translate_api_selector(
@@ -737,3 +757,36 @@ def translate_advanced_settings():
         See [Romanization/Transliteration](https://guides.library.harvard.edu/mideast/romanization#:~:text=Romanization%%20refers%20to%20the%20process,converting%%20one%%20script%%20into%%20another.)
         """
     )
+
+
+def romanize(texts: list[str], language: LANGUAGE_CODE_TYPE) -> list[str]:
+    import google.auth
+    import google.auth.transport.requests
+
+    creds, project = google.auth.default(
+        scopes=["https://www.googleapis.com/auth/cloud-platform"]
+    )
+
+    auth_req = google.auth.transport.requests.Request()
+    creds.refresh(auth_req)
+
+    res = requests.post(
+        f"https://translate.googleapis.com/v3/projects/{project}/locations/global:romanizeText",
+        json.dumps(
+            {
+                "contents": texts,
+                "sourceLanguageCode": language,
+            }
+        ),
+        headers={
+            "Authorization": f"Bearer {creds.token}",
+            "Content-Type": "application/json",
+        },
+    )
+    res.raise_for_status()
+    print(res.json())
+
+    return [
+        rom.get("romanizedText", text)
+        for rom, text in zip(res.json()["romanizations"], texts)
+    ]
