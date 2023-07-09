@@ -53,14 +53,23 @@ class TranslationPage(BasePage):
     def run(self, state: dict) -> Iterator[str | None]:
         # Parse Request
         request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
-        yield f"Running..."
+        yield "Translating Text Inputs..."
         state["output_texts"] = run_translate(
             request.texts,
             request.translate_target,
             request.translate_api,
             request.translate_source,
         )
-        state["output_docs"] = [["test"]]
+        yield "Translating Documents..."
+        state["output_docs"] = [
+            run_translate(
+                download_text_doc(doc),
+                request.translate_target,
+                request.translate_api,
+                request.translate_source,
+            )
+            for doc in request.documents
+        ]
 
     def render_description(self):
         st.markdown(
@@ -151,9 +160,9 @@ class TranslationPage(BasePage):
         self._render_output(state)
 
     def _render_output(self, state):
-        print(state.get("output_docs", "B"))
         text_outputs("**Translations**", key="output_texts")
-        text_outputs("", key="output_docs")
+        if state.get("documents", False):
+            text_outputs("*Documents*", key="output_docs")
 
     def render_steps(self):
         st.markdown(
