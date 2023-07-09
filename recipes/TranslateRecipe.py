@@ -1,6 +1,7 @@
 import gooey_ui as st
 from typing import Literal, Iterator
 from pydantic import BaseModel
+
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
@@ -84,7 +85,8 @@ class TranslationPage(BasePage):
             st.text_area(
                 f"""
                 Text Input {i + 1}
-                """
+                """,
+                key=f"text_{i}",
             )
             for i in range(st.number_input("""##### Text Inputs""", 0, 100, 1, 1))
         ]
@@ -133,8 +135,6 @@ class TranslationPage(BasePage):
         self._render_output(state)
 
     def _render_output(self, state):
-        print(state.get("texts"))
-        print(state.get("output_texts", "not yet"))
         text_outputs("**Translations**", key="output_texts")
         text_outputs("", value=state.get("output_docs"))
 
@@ -158,8 +158,9 @@ class TranslationPage(BasePage):
     def run(self, state: dict) -> Iterator[str | None]:
         # Parse Request
         request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
-        yield f"Running...123"
+        yield f"Running..."
         state["output_texts"] = ["why?!!"]
+        state["output_docs"] = ["what?!!"]
 
     def additional_notes(self) -> str | None:
         return """

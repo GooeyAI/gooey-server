@@ -31,7 +31,7 @@ from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
 from recipes.QRCodeGenerator import QRCodeGeneratorPage
 from recipes.embeddings_page import EmbeddingsPage
-from recipes.Translate import TranslationPage
+from recipes.TranslateRecipe import TranslationPage
 
 # note: the ordering here matters!
 all_home_pages = [
