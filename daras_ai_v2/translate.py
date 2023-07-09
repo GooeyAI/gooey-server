@@ -6,6 +6,7 @@ from enum import Enum
 import gooey_ui as st
 from daras_ai_v2.functional import map_parallel
 
+GOOGLE_V3_ENDPOINT = "https://translate.googleapis.com/v3/projects/"
 ISO_639_LANGUAGES = {
     "aar": "Afar",
     "abk": "Abkhazian",
@@ -565,7 +566,7 @@ def run_MinT_translate_one_text(
     text: str, translate_target: str, translate_from: str | None = None
 ) -> str:
     if not translate_from or translate_from not in MinT_translate_languages():
-        translate_from = detectLanguage(text)
+        translate_from = detectLanguages([text])[0]
     if translate_from not in MinT_translate_languages():
         raise ValueError(f"MinT does not support translating from {translate_from}.")
 
@@ -584,27 +585,72 @@ def run_MinT_translate_one_text(
     return tanslation.get("translation", [])
 
 
-def detectLanguage(text: str):
+def detectLanguages(texts: list[str]):
     """
     Return the language code of the text.
     """
     from google.cloud import translate_v2 as translate
 
     translate_client = translate.Client()
-    result = translate_client.detect_language(text)
-    language_code = result["language"]
-    return language_code
+    result = translate_client.detect_language(texts)
+    return [r["language"] for r in result]
+
+
+def run_auto_translate(
+    texts: list[str],
+    translate_target: str,
+    translate_from: str | None = None,
+    enable_transliteration: bool = True,
+) -> list[str]:
+    return map_parallel(
+        lambda text: auto_translate_one_text(
+            text, translate_target, translate_from, enable_transliteration
+        ),
+        texts,
+    )
+
+
+def auto_translate_one_text(
+    text: str,
+    translate_target: str,
+    translate_from: str | None = None,
+    enable_transliteration: bool = True,
+) -> str:
+    if not translate_from:
+        translate_from = detectLanguages([text])[0]
+    if translate_from == translate_target:
+        return transliterate(text) if enable_transliteration else text
+    if translate_from in TRANSLITERATION_SUPPORTED and enable_transliteration:
+        return run_google_translate_with_transliteration(
+            [text], translate_target, translate_from, enable_transliteration
+        )[0]
+    if enable_transliteration:
+        text = transliterate(text)
+    if translate_from in google_translate_languages():
+        return run_google_translate([text], translate_target, translate_from)[0]
+    elif translate_from in MinT_translate_languages():
+        return run_MinT_translate([text], translate_target, translate_from)[0]
+    else:
+        raise ValueError(f"Translation from {translate_from} is not supported.")
 
 
 class TranslateAPIs(Enum):
     MinT = "MinT"
     google_translate = "Google Translate"
+    google_transliteration = "Google Transliteration Specialized Endpoint"
     Auto = "Auto - use recommended API based on language"
 
 
 translate_apis = {
     TranslateAPIs.MinT.name: {"languages": MinT_translate_languages},
     TranslateAPIs.google_translate.name: {"languages": google_translate_languages},
+    TranslateAPIs.google_transliteration.name: {
+        "source_languages": lambda: {
+            code: ISO_639_LANGUAGES.get(code, code)
+            for code in TRANSLITERATION_SUPPORTED
+        },
+        "languages": google_translate_languages,
+    },
 }
 
 
@@ -619,7 +665,9 @@ def translate_languages() -> dict[str, str]:
 
 translate_apis.update({TranslateAPIs.Auto.name: {"languages": translate_languages}})
 
-TRANSLATE_API_TYPE = typing.Literal[tuple(e.name for e in TranslateAPIs)]
+TRANSLATE_API_TYPE = typing.TypeVar(
+    "TRANSLATE_API_TYPE", bound=typing.Literal[tuple(e.name for e in TranslateAPIs)]
+)
 LANGUAGE_CODE_TYPE = typing.TypeVar(
     "LANGUAGE_CODE_TYPE",
     bound=typing.Literal[
@@ -634,18 +682,29 @@ def run_translate(
     api: TRANSLATE_API_TYPE,
     translate_from: str | None = None,
     romanize_translation: bool = False,
+    enable_transliteration: bool = True,
 ) -> list[str]:
     if not api:
         api = st.session_state.get("translate_api")
+    if (
+        enable_transliteration
+        and api != TranslateAPIs.google_transliteration.name
+        and api != TranslateAPIs.Auto.name
+    ):
+        texts = transliterate(texts)
     try:
         if api == TranslateAPIs.MinT.name:
             result = run_MinT_translate(texts, translate_target, translate_from)
         elif api == TranslateAPIs.google_translate.name:
             result = run_google_translate(texts, translate_target, translate_from)
+        elif api == TranslateAPIs.google_transliteration.name:
+            result = run_google_translate_with_transliteration(
+                texts, translate_target, translate_from, enable_transliteration
+            )
         elif api == TranslateAPIs.Auto.name:
-            result = run_google_translate(
-                texts, translate_target, translate_from
-            )  # TODO
+            result = run_auto_translate(
+                texts, translate_target, translate_from, enable_transliteration
+            )
         else:
             result = run_google_translate(
                 texts, translate_target, translate_from
@@ -682,6 +741,7 @@ def translate_language_selector(
     key="translate_target",
     api_key="translate_api",
     allow_none=True,
+    use_source=False,
 ):
     """
     Streamlit widget for selecting a language.
@@ -693,7 +753,11 @@ def translate_language_selector(
     if not languages:
         languages = translate_apis[
             st.session_state.get(api_key) or TranslateAPIs.google_translate.name
-        ]["languages"]()
+        ]
+        if use_source:
+            languages = languages.get("source_languages", languages["languages"])()
+        else:
+            languages = languages["languages"]()
     options = list(languages.keys())
     if allow_none:
         options.insert(0, None)
@@ -720,6 +784,7 @@ def translate_settings(
         key=key_source,
         api_key=key_apiselect,
         allow_none=not require_source,
+        use_source=True,
     )
     translate_language_selector(
         key=key_target, api_key=key_apiselect, allow_none=not require_target
@@ -751,10 +816,7 @@ def translate_advanced_settings():
     )
 
 
-def romanize(texts: list[str], language: LANGUAGE_CODE_TYPE) -> list[str]:
-    if language not in ROMANIZATION_SUPPORTED:
-        raise ValueError("Romanization not supported for this language")
-
+def getToken():
     import google.auth
     import google.auth.transport.requests
 
@@ -764,9 +826,17 @@ def romanize(texts: list[str], language: LANGUAGE_CODE_TYPE) -> list[str]:
 
     auth_req = google.auth.transport.requests.Request()
     creds.refresh(auth_req)
+    return project, creds.token
+
+
+def romanize(texts: list[str], language: LANGUAGE_CODE_TYPE) -> list[str]:
+    if language not in ROMANIZATION_SUPPORTED:
+        raise ValueError("Romanization not supported for this language")
+
+    project, token = getToken()
 
     res = requests.post(
-        f"https://translate.googleapis.com/v3/projects/{project}/locations/global:romanizeText",
+        f"{GOOGLE_V3_ENDPOINT}{project}/locations/global:romanizeText",
         json.dumps(
             {
                 "contents": texts,
@@ -774,7 +844,7 @@ def romanize(texts: list[str], language: LANGUAGE_CODE_TYPE) -> list[str]:
             }
         ),
         headers={
-            "Authorization": f"Bearer {creds.token}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         },
     )
@@ -786,5 +856,221 @@ def romanize(texts: list[str], language: LANGUAGE_CODE_TYPE) -> list[str]:
     ]
 
 
-def transliterate():
-    pass
+def run_google_translate_with_transliteration(
+    texts: list[str],
+    target_language: LANGUAGE_CODE_TYPE,
+    source_language: LANGUAGE_CODE_TYPE | None = None,
+    enable_transliteration: bool = True,
+) -> list[str]:
+    if source_language not in TRANSLITERATION_SUPPORTED:
+        raise ValueError("Transliteration not supported for this language")
+
+    project, token = getToken()
+
+    res = requests.post(
+        f"{GOOGLE_V3_ENDPOINT}{project}/locations/global:translateText",
+        json.dumps(
+            {
+                "contents": texts,
+                "mimeType": "text/plain",
+                "sourceLanguageCode": source_language,
+                "targetLanguageCode": target_language,
+                "transliterationConfig": {
+                    "enableTransliteration": enable_transliteration,
+                },
+            }
+        ),
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+    )
+    res.raise_for_status()
+
+    return [translation["translatedText"] for translation in res.json()["translations"]]
+
+
+# ==== Below follows general transliteration code using the deprecated Google API since the new API does not support transliteration without translation ===
+# Mutilated from https://github.com/NarVidhai/Google-Transliterate-API
+
+# ISO Language code to numeric script name
+LANG2SCRIPT = {
+    # Indo-Aryan
+    "as": "Bengali-Assamese",
+    "bn": "Bengali-Assamese",
+    "gu": "Gujarati",
+    "hi": "Devanagari",
+    "mr": "Devanagari",
+    "ne": "Devanagari",
+    "or": "Oriya",
+    "pa": "Gurmukhi",
+    "sa": "Devanagari",
+    "si": "Sinhala",
+    # Dravidian
+    "kn": "Kannada",
+    "ml": "Malayalam",
+    "ta": "Tamil",
+    "te": "Telugu",
+    # South-East Asia
+    "bo": "Tibetan",
+    "lo": "Lao",
+    "my": "Burmese",
+    "sat": "Ol Chiki",
+    "th": "Thai",
+    # Cyrllic
+    "be": "Greek-Upper",
+    "bg": "Greek-Upper",
+    "ru": "Greek-Upper",
+    "sr": "Greek-Upper",
+    "uk": "Greek-Upper",
+    # PersoArabic
+    "ar": "Central-Arabic",
+    "fa": "Eastern-Arabic",
+    "ur": "Eastern-Arabic",
+    # Chinese family
+    "ja": "Chinese",
+    "ko": "Chinese",
+    "yue-hant": "Chinese",
+    "zh-hant": "Chinese",
+    "zh": "Chinese",
+    # African
+    "am": "Geʽez",
+    "ti": "Geʽez",
+    # More scripts
+    "el": "Greek-Lower",
+    "he": "Hebrew",
+}
+
+EN_NUMERALS = "0123456789"
+
+NATIVE_NUMERALS = {
+    # Brahmic scripts
+    "Bengali-Assamese": "০১২৩৪৫৬৭৮৯",
+    "Burmese": "၀၁၂၃၄၅၆၇၈၉",
+    "Devanagari": "०१२३४५६७८९",
+    "Gujarati": "૦૧૨૩૪૫૬૭૮૯",
+    "Gurmukhi": "੦੧੨੩੪੫੬੭੮੯",
+    "Kannada": "೦೧೨೩೪೫೬೭೮೯",
+    "Lao": "໐໑໒໓໔໕໖໗໘໙",
+    "Malayalam": "൦൧൨൩൪൫൬൭൮൯",
+    "Ol Chiki": "᱐᱑᱒᱓᱔᱕᱖᱗᱘᱙",
+    "Oriya": "୦୧୨୩୪୫୬୭୮୯",
+    "Sinhala": "෦෧෨෩෪෫෬෭෮෯",
+    "Tamil": "௦௧௨௩௪௫௬௭௮௯",
+    "Telugu": "౦౧౨౩౪౫౬౭౮౯",
+    "Thai": "๐๑๒๓๔๕๖๗๘๙",
+    "Tibetan": "༠༡༢༣༤༥༦༧༨༩",
+    "Hindu-Arabic": EN_NUMERALS,
+    # Arabic
+    "Eastern-Arabic": "۰۱۲۳۴۵۶۷۸۹",
+    "Central-Arabic": "٠١٢٣٤٥٦٧٨٩",
+    "Hebrew": "0אבגדהוז‎חט",
+    # TODO: Add Macron diacritic on top?
+    "Greek-Lower": "0αβγδεϛζηθ",
+    "Greek-Upper": "0ΑΒΓΔΕϚΖΗΘ",
+    "Geʽez": "0፩፪፫፬፭፮፯፰፱",
+    "Chinese": "〇一二三四五六七八九",
+}
+
+NUMERAL_MAP = {
+    script: str.maketrans({en: l for en, l in zip(EN_NUMERALS, numerals)})
+    for script, numerals in NATIVE_NUMERALS.items()
+}
+
+
+def transliterate_numerals(text: str, lang_code: str) -> str:
+    """Convert standard Hindu-Arabic numerals in given text to native numerals
+
+    Args:
+        text (str): The text in which numeral digits should be transliterated.
+        lang_code (str): The target language's ISO639 code
+
+    Returns:
+        str: Returns transliterated text with numerals converted to native form.
+    """
+    if lang_code == "en":
+        return text
+    return text.translate(NUMERAL_MAP[LANG2SCRIPT[lang_code]])
+
+
+G_API_DEFAULT = "https://inputtools.google.com/request?text=%s&itc=%s-t-i0&num=%d"
+G_API_CHINESE = "https://inputtools.google.com/request?text=%s&itc=%s-t-i0-%s&num=%d"
+
+CHINESE_LANGS = {"yue-hant", "zh", "zh-hant"}
+
+
+def transliterate_word(
+    word: str, lang_code: str, max_suggestions: int = 6, input_scheme="pinyin"
+) -> list:
+    """Transliterate a given word to the required language.
+
+    Args:
+        word (str): The word to transliterate from Latin/Roman (English) script
+        lang_code (str): The target language's ISO639 code
+        max_suggestions (int, optional): Maximum number of suggestions to fetch. Defaults to 6.
+        input_scheme(str, optional): Romanization scheme (Only for Chinese)
+
+    Returns:
+        list: List of suggested transliterations.
+    """
+    if lang_code in CHINESE_LANGS:
+        api_url = G_API_CHINESE % (
+            word.lower(),
+            lang_code,
+            input_scheme,
+            max_suggestions,
+        )
+    else:
+        api_url = G_API_DEFAULT % (word.lower(), lang_code, max_suggestions)
+
+    response = requests.get(api_url, allow_redirects=False, timeout=5)
+    response.raise_for_status()
+    r = json.loads(response.text)
+    if "SUCCESS" not in r[0]:
+        raise requests.HTTPError(
+            "Request failed with status code: %d\nERROR: %s"
+            % (response.status_code, response.text),
+        )
+    return r[1][0][1]
+
+
+def transliterate_text(
+    text: str, lang_code: str, convert_numerals: bool = False
+) -> str:
+    """[Experimental] Transliterate a given sentence or text to the required language.
+
+    Args:
+        text (str): The text to transliterate from Latin/Roman (English) script.
+        lang_code (str): The target language's ISO639 code
+        convert_numerals (bool): Transliterate numerals. Defaults to False.
+
+    Returns:
+        str: Transliterated text.
+    """
+    try:
+        result = []
+        for word in text.split():
+            result.append(transliterate_word(word, lang_code, 1)[0])
+        result = " ".join(result)
+        if convert_numerals:
+            result = transliterate_numerals(result, lang_code)
+        return result
+    except:
+        return text
+
+
+def transliterate(
+    texts: list[str],
+    language: list[LANGUAGE_CODE_TYPE] | LANGUAGE_CODE_TYPE | None = None,
+) -> list[str]:
+    if not language:
+        language = detectLanguages(texts)
+    if not isinstance(language, list):
+        language = [language] * len(texts)
+    return map_parallel(
+        lambda text, language: transliterate_text(
+            text, language or detectLanguages([text])[0]
+        ),
+        texts,
+        language,
+    )
