@@ -170,9 +170,8 @@ class TranslationPage(BasePage):
         """
 
     def get_raw_price(self, state: dict):
-        # if state.get("translation_api") == TranslateAPIs.MinT:
-        #     return 1
-        # texts = state.get("texts", [])
-        # characters = sum([len(text) for text in texts])
-        # return 0.002 * characters
-        return 0
+        if state.get("translation_api") == TranslateAPIs.MinT:
+            return 1
+        texts = state.get("texts", [])
+        characters = sum([len(text) for text in texts])
+        return 0.002 * characters
