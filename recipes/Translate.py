@@ -1,4 +1,5 @@
 import gooey_ui as st
+from typing import Literal
 from pydantic import BaseModel
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -8,32 +9,45 @@ from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 from daras_ai_v2.translate import (
     TranslateAPIs,
-    translate_api_selector,
-    translate_language_selector,
+    translate_languages,
+    translate_settings,
+    translate_advanced_settings,
     run_translate,
 )
+from daras_ai_v2.vector_search import download_text_doc
 
 
 class TranslationPage(BasePage):
     title = "Translation"
     slug_versions = ["languages", "transliteration", "translate"]
 
-    sane_defaults = dict(translate_api=TranslateAPIs.MinT.name)
+    sane_defaults = dict(
+        translate_api=TranslateAPIs.Auto.name,
+        translate_target="en",
+        enable_transliteration=True,
+        romanize_translation=False,
+    )
 
     class RequestModel(BaseModel):
-        texts: list[str]
-        documents: list[str]
-        translate_target: str | None
-        translate_api: TranslateAPIs | None
+        texts: list[str] | None
+        documents: list[str] | None
+        translate_api: Literal[tuple(e.name for e in TranslateAPIs)] | None
+        translate_target: Literal[
+            tuple(code for code, language in translate_languages().items())
+        ] | None
+        translate_source: Literal[
+            tuple(code for code, language in translate_languages().items())
+        ] | None
 
-        enable_transliteration: bool
+        enable_transliteration: bool | None
+        romanize_translation: bool | None
 
     class ResponseModel(BaseModel):
         output_texts: list[str]
-        output_documents: list[str]
+        output_docs: list[list[str]]
 
     def preview_description(self, state: dict):
-        return "Translate to any (supported) language."
+        return "Translate to any of 200+ languages using different APIs and models."
 
     def render_description(self):
         st.markdown(
@@ -77,37 +91,72 @@ class TranslationPage(BasePage):
 
         document_uploader(
             "##### Text Files",
-            accept="text/*",
+            accept=(
+                ".pdf",
+                ".txt",
+                ".docx",
+                ".md",
+                ".html",
+                ".rtf",
+                ".epub",
+                ".odt",
+                ".csv",
+                ".xlsx",
+                ".tsv",
+                ".ods",
+            ),
         )
         st.write("---")
-        translate_api_selector()
-        translate_language_selector()
+        translate_settings(require_api=True, require_target=True)
 
     def render_settings(self):
-        st.checkbox(
-            """
-            Enable Transliteration
-            """,
-            False,
-        )
+        translate_advanced_settings()
 
     def validate_form_v2(self):
-        assert st.session_state.get("documents"), "Please provide at least 1 Audio File"
+        non_empty_text_inputs = [text for text in st.session_state.get("texts") if text]
+        assert non_empty_text_inputs or st.session_state.get(
+            "documents"
+        ), "Please provide at least 1 non-empty Text File or Input"
 
     def render_output(self):
-        self.render_example(st.session_state)
+        self._render_output(st.session_state)
 
     def render_example(self, state: dict):
+        text_outputs("Input Texts", value=state.get("texts"))
         render_documents(state)
-        text_outputs("**Transcription**", value=state.get("output_text"))
+        self._render_output(state)
+
+    def _render_output(self, state):
+        print(state.get("output_texts"))
+        text_outputs("**Translations**", value=state.get("output_texts"))
+        text_outputs("", value=state.get("output_docs"))
 
     def render_steps(self):
-        pass
+        st.markdown(
+            """
+            1. Apply Transliteration necessary.
+            """
+        )
+        st.markdown(
+            """
+            2. Translate with the selected API (for Auto, we look up the optimal API in a table).
+            """
+        )
+        st.markdown(
+            """
+            3. Apply romanization if requested and applicable.
+            """
+        )
 
     def run(self, state: dict):
         # Parse Request
         request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
-        yield f"Running..."
+        yield "Running..."
+        print("hi")
+        state["output_texts"] = ["why?!!"]
+        # state["output_texts"] = run_translate(
+        #     request.texts, request.translate_target, request.translate_api
+        # )
 
     def additional_notes(self) -> str | None:
         return """

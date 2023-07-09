@@ -598,9 +598,21 @@ class TranslateAPIs(Enum):
 
 
 translate_apis = {
-    TranslateAPIs.MinT.name: {"languages": MinT_translate_languages()},
-    TranslateAPIs.google_translate.name: {"languages": google_translate_languages()},
+    TranslateAPIs.MinT.name: {"languages": MinT_translate_languages},
+    TranslateAPIs.google_translate.name: {"languages": google_translate_languages},
 }
+
+
+@st.cache_data()
+def translate_languages() -> dict[str, str]:
+    dict = {}
+    for key, val in translate_apis.items():
+        if key != TranslateAPIs.Auto.name:
+            dict.update(val["languages"]())
+    return dict
+
+
+translate_apis.update({TranslateAPIs.Auto.name: {"languages": translate_languages}})
 
 
 def run_translate(
@@ -616,6 +628,8 @@ def run_translate(
             return run_MinT_translate(texts, translate_target, translate_from)
         elif api == TranslateAPIs.google_translate.name:
             return run_google_translate(texts, translate_target, translate_from)
+        elif api == TranslateAPIs.Auto.name:
+            return run_google_translate(texts, translate_target, translate_from)  # TODO
     except:
         pass
     return run_google_translate(
@@ -624,15 +638,14 @@ def run_translate(
 
 
 def translate_api_selector(
-    label="""
-    ###### Translate API (*optional*)
-    """,
+    label="###### Translate API",
     key="translate_api",
     allow_none=True,
 ):
     options = [item.name for item in TranslateAPIs]
     if allow_none:
         options.insert(0, None)
+        label += " (*optional*)"
     st.selectbox(
         label=label,
         key=key,
@@ -645,11 +658,10 @@ def translate_api_selector(
 
 def translate_language_selector(
     languages: dict[str, str] = None,
-    label="""
-    ###### Translate (*optional*)
-    """,
+    label="###### Translate Target Language",
     key="translate_target",
     api_key="translate_api",
+    allow_none=True,
 ):
     """
     Streamlit widget for selecting a language.
@@ -661,12 +673,59 @@ def translate_language_selector(
     if not languages:
         languages = translate_apis[
             st.session_state.get(api_key) or TranslateAPIs.google_translate.name
-        ]["languages"]
+        ]["languages"]()
     options = list(languages.keys())
-    options.insert(0, None)
+    if allow_none:
+        options.insert(0, None)
+        label += " (*optional*)"
     st.selectbox(
         label=label,
         key=key,
         format_func=lambda k: languages[k] if k else "———",
         options=options,
+    )
+
+
+def translate_settings(
+    require_api=False,
+    key_apiselect="translate_api",
+    require_target=False,
+    key_target="translate_target",
+    require_source=False,
+    key_source="translate_source",
+):
+    translate_api_selector(key=key_apiselect, allow_none=not require_api)
+    translate_language_selector(
+        label="###### Input Language",
+        key=key_source,
+        api_key=key_apiselect,
+        allow_none=not require_source,
+    )
+    translate_language_selector(
+        key=key_target, api_key=key_apiselect, allow_none=not require_target
+    )
+
+
+def translate_advanced_settings():
+    st.checkbox(
+        """
+        Enable Transliteration
+        """,
+        key="enable_transliteration",
+    )
+    st.caption(
+        "Detects romanized input text and transliterates it to non-Latin characters where neccessary (and supported) before passing it to the translation models."
+    )
+    st.checkbox(
+        """
+        Romanize Translation
+        """,
+        key="romanize_translation",
+    )
+    st.caption(
+        """
+        After translation, romanize non-Latin characters when supported.
+
+        See [Romanization/Transliteration](https://guides.library.harvard.edu/mideast/romanization#:~:text=Romanization%%20refers%20to%20the%20process,converting%%20one%%20script%%20into%%20another.)
+        """
     )

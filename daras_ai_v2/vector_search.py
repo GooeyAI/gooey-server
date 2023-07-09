@@ -425,3 +425,61 @@ def render_sources_widget(refs: list[SearchReference]):
             height=200,
             disabled=True,
         )
+
+
+def download_text_doc(f_url: str) -> list[str]:
+    """
+    Download document from url and convert to text pages.
+
+    Args:
+        f_url: url of document
+
+    Returns:
+        list of text pages
+    """
+    doc_meta = doc_url_to_metadata(f_url)
+    f = furl(f_url)
+    f_name = doc_meta.name
+    if is_gdrive_url(f):
+        # download from google drive
+        f_bytes, ext = gdrive_download(f, doc_meta.mime_type)
+    else:
+        # download from url
+        try:
+            r = requests.get(
+                f_url,
+                headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
+                timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+            )
+            r.raise_for_status()
+        except requests.RequestException as e:
+            print(f"ignore error while downloading {f_url}: {e}")
+            return []
+        f_bytes = r.content
+        # if it's a known encoding, standardize to utf-8
+        if r.encoding:
+            try:
+                codec = codecs.lookup(r.encoding)
+            except LookupError:
+                pass
+            else:
+                f_bytes = codec.decode(f_bytes)[0].encode()
+        ext = guess_ext_from_response(r)
+
+    # convert document to text pages
+    match ext:
+        case ".pdf":
+            pages = pdf_to_text_pages(io.BytesIO(f_bytes))
+        case ".docx" | ".md" | ".html" | ".rtf" | ".epub" | ".odt":
+            pages = [pandoc_to_text(f_name + ext, f_bytes)]
+        case ".txt":
+            pages = [f_bytes.decode()]
+        case ".csv" | ".xlsx" | ".tsv" | ".ods":
+            import pandas as pd
+
+            df = pd.read_csv(io.BytesIO(f_bytes), dtype=str).dropna()
+            pages = [",".join(df[col]) for col in df]
+        case _:
+            raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
+
+    return pages
