@@ -13,6 +13,8 @@ from daras_ai_v2.asr import (
 )
 from daras_ai_v2.translate import (
     TranslateAPIs,
+    TRANSLATE_API_TYPE,
+    LANGUAGE_CODE_TYPE,
     translate_api_selector,
     translate_language_selector,
     run_translate,
@@ -32,16 +34,16 @@ class AsrPage(BasePage):
     slug_versions = ["asr", "speech"]
 
     sane_defaults = dict(
-        output_format=AsrOutputFormat.text.name, translate_api=TranslateAPIs.MinT.name
+        output_format=AsrOutputFormat.text.name, translate_api=TranslateAPIs.Auto.name
     )
 
     class RequestModel(BaseModel):
         documents: list[str]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-        language: str | None
-        google_translate_target: str | None
+        language: LANGUAGE_CODE_TYPE | None
+        google_translate_target: LANGUAGE_CODE_TYPE | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
-        translate_api: typing.Literal[tuple(e.name for e in TranslateAPIs)] | None
+        translate_api: TRANSLATE_API_TYPE | None
 
     class ResponseModel(BaseModel):
         raw_output_text: list[str] | None
@@ -83,7 +85,9 @@ class AsrPage(BasePage):
         )
         st.write("---")
         enum_selector(AsrModels, label="###### ASR Model", key="selected_model")
-        st.text_input("###### Spoken Language _(optional)_", key="language")
+        translate_language_selector(
+            label="###### Spoken Language", key="language", use_source=True
+        )
 
     def render_settings(self):
         translate_api_selector()

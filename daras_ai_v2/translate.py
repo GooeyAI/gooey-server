@@ -724,7 +724,7 @@ def translate_api_selector(
     options = [item.name for item in TranslateAPIs]
     if allow_none:
         options.insert(0, None)
-        label += " (*optional*)"
+        label += " (_optional_)"
     st.selectbox(
         label=label,
         key=key,
@@ -761,7 +761,7 @@ def translate_language_selector(
     options = list(languages.keys())
     if allow_none:
         options.insert(0, None)
-        label += " (*optional*)"
+        label += " (_optional_)"
     st.selectbox(
         label=label,
         key=key,
