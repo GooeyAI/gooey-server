@@ -10,6 +10,7 @@ from app_users.models import AppUser
 from celeryapp.celeryconfig import app
 from daras_ai_v2.base import StateKeys, err_msg_for_exc, BasePage
 from gooey_ui.pubsub import realtime_push
+from gooey_ui.state import set_query_params
 
 
 @app.task
@@ -21,6 +22,7 @@ def gui_runner(
     uid: str,
     state: dict,
     channel: str,
+    example_id: str = None,
 ):
     self = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
 
@@ -29,6 +31,7 @@ def gui_runner(
     yield_val = None
     error_msg = None
     url = self.app_url(run_id=run_id, uid=uid)
+    set_query_params(dict(run_id=run_id, uid=uid, example_id=example_id))
 
     def save(done=False):
         if done:

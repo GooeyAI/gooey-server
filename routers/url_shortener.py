@@ -25,7 +25,7 @@ def redirect_via_short_url(shortened_guid):
     return response
 
 
-URL_PREFIX = "https://api.gooey.ai/l/"
+URL_PREFIX = "https://gooey.ai/l/"
 MIN_URL_LENGTH = 4
 MAX_URL_LENGTH = 8
 

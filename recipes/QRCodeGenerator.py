@@ -283,7 +283,9 @@ Here is the final output:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
 
         yield "Generating QR Code..."
-        image, qr_code_data, did_shorten = generate_and_upload_qr_code(request)
+        image, qr_code_data, did_shorten = generate_and_upload_qr_code(
+            request, self._get_current_api_url()
+        )
         if did_shorten:
             state["shortened_url"] = qr_code_data
         state["cleaned_qr_code"] = image
@@ -346,7 +348,18 @@ Here is the final output:
         return total
 
 
-def generate_and_upload_qr_code(request: QRCodeGeneratorPage.RequestModel):
+def is_url(url: str) -> bool:
+    try:
+        URLValidator(schemes=["http", "https", "localhost", "ftp", "ftps", "upi"])(url)
+    except ValidationError:
+        return False
+    else:
+        return True
+
+
+def generate_and_upload_qr_code(
+    request: QRCodeGeneratorPage.RequestModel, run_url: str = None
+) -> tuple[str, str, bool]:
     qr_code_data = request.qr_code_data
     if not qr_code_data:
         qr_code_input_image = request.qr_code_input_image
@@ -355,9 +368,9 @@ def generate_and_upload_qr_code(request: QRCodeGeneratorPage.RequestModel):
         qr_code_data = download_qr_code_data(qr_code_input_image)
     qr_code_data = qr_code_data.strip()
 
-    should_shorten = request.use_url_shortener and qr_code_data.startswith("http")
+    should_shorten = request.use_url_shortener and is_url(qr_code_data)
     if should_shorten:
-        qr_code_data, should_shorten = shorten_url(qr_code_data)
+        qr_code_data, should_shorten = shorten_url(qr_code_data, run_url)
 
     img_cv2 = generate_qr_code(qr_code_data)
 
@@ -381,22 +394,17 @@ def generate_qr_code(qr_code_data: str) -> np.ndarray:
     return np.array(qr.make_image().convert("RGB"))
 
 
-def shorten_url(qr_code_data: str) -> tuple[str, bool]:
+def shorten_url(qr_code_data: str, run_url: str = None) -> tuple[str, bool]:
     try:
-        # text = get_or_create_short_url(
-        #     "qr_code_data",
-        #     "http://localhost:3000/qr-code/?example_id=719t33xi",
-        #     Workflow.QRCODE,
-        # )
-        text = qr_code_data
+        text = get_or_create_short_url(
+            qr_code_data,
+            run_url,
+            Workflow.QRCODE,
+        )
         # Validate that the response is a URL
-        try:
-            URLValidator()(text)
-        except ValidationError:
-            pass
-        else:
+        if is_url(text):
             return text, True
-    except requests.RequestException as e:
+    except Exception:
         print(f"ignoring shortened url error: {e}")
         pass  # We can keep going without the shortened url and just use the original url
     return qr_code_data, False
