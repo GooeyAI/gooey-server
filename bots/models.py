@@ -51,6 +51,7 @@ class Workflow(models.IntegerChoices):
     CHYRONPLANT = (22, "ChyronPlant")
     LETTERWRITER = (23, "LetterWriter")
     SMARTGPT = (24, "SmartGPT")
+    QRCODE = (25, "QRCodeGenerator")
 
     def get_app_url(self, example_id: str, run_id: str, uid: str):
         """return the url to the gooey app"""
@@ -502,3 +503,31 @@ class FeedbackComment(models.Model):
     author = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
     comment = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ShortenedURLs(models.Model):
+    url = models.URLField()
+    shortened_url = models.URLField()
+    shortened_guid = models.CharField(max_length=10, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    run = models.ForeignKey(
+        SavedRun,
+        on_delete=models.SET_NULL,
+        related_name="shortened_urls",
+        null=True,
+        blank=True,
+        default=None,
+        help_text="The saved run that generated this shortened url",
+    )
+    clicks = models.IntegerField(default=0)
+    max_clicks = models.IntegerField(default=-1)
+    disabled = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ("-created_at",)
+        get_latest_by = "created_at"
+        indexes = [models.Index(fields=["url", "shortened_url", "shortened_guid"])]
+
+    def __str__(self):
+        return "Shortened URL: " + self.shortened_url + " for URL: " + self.url

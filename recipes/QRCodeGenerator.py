@@ -29,6 +29,8 @@ from daras_ai_v2.stable_diffusion import (
     Img2ImgModels,
     Schedulers,
 )
+from routers.url_shortener import get_or_create_short_url
+from bots.models import Workflow
 
 ATTEMPTS = 1
 
@@ -381,21 +383,19 @@ def generate_qr_code(qr_code_data: str) -> np.ndarray:
 
 def shorten_url(qr_code_data: str) -> tuple[str, bool]:
     try:
-        r = requests.get(
-            furl(
-                "https://is.gd/create.php",
-                query_params={"format": "simple", "url": qr_code_data},
-            ).url,
-            timeout=2.50,
-        )
-        r.raise_for_status()
+        # text = get_or_create_short_url(
+        #     "qr_code_data",
+        #     "http://localhost:3000/qr-code/?example_id=719t33xi",
+        #     Workflow.QRCODE,
+        # )
+        text = qr_code_data
         # Validate that the response is a URL
         try:
-            URLValidator()(r.text)
+            URLValidator()(text)
         except ValidationError:
             pass
         else:
-            return r.text, True
+            return text, True
     except requests.RequestException as e:
         print(f"ignoring shortened url error: {e}")
         pass  # We can keep going without the shortened url and just use the original url
