@@ -8,6 +8,7 @@ from django.core.validators import URLValidator
 from furl import furl
 from pydantic import BaseModel
 from pyzbar import pyzbar
+from urllib.parse import urlparse
 
 import gooey_ui as st
 from daras_ai.image_input import (
@@ -278,7 +279,9 @@ Here is the final output:
         for img in state.get("output_images", []):
             st.image(img)
             caption = f'{state.get("qr_code_data")}'
-            visits = get_visits(state.get("shortened_url"))
+            visits = get_visits(
+                str(urlparse(state.get("shortened_url")).path).replace("/", "")
+            )
             if visits is not None:
                 caption += f". \n\nViews: {visits}"
             st.caption(caption)
