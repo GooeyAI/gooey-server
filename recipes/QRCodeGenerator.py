@@ -350,7 +350,7 @@ Here is the final output:
 
 def is_url(url: str) -> bool:
     try:
-        URLValidator(schemes=["http", "https", "localhost", "ftp", "ftps", "upi"])(url)
+        URLValidator(schemes=["http", "https"])(url)
     except ValidationError:
         return False
     else:
@@ -404,7 +404,7 @@ def shorten_url(qr_code_data: str, run_url: str = None) -> tuple[str, bool]:
         # Validate that the response is a URL
         if is_url(text):
             return text, True
-    except Exception:
+    except Exception as e:
         print(f"ignoring shortened url error: {e}")
         pass  # We can keep going without the shortened url and just use the original url
     return qr_code_data, False

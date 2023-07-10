@@ -507,7 +507,6 @@ class FeedbackComment(models.Model):
 
 class ShortenedURLs(models.Model):
     url = models.URLField()
-    shortened_url = models.URLField()
     shortened_guid = models.CharField(max_length=10, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -524,10 +523,14 @@ class ShortenedURLs(models.Model):
     max_clicks = models.IntegerField(default=-1)
     disabled = models.BooleanField(default=False)
 
+    @property
+    def shortened_url(self):
+        return f"{settings.APP_BASE_URL}/q/{self.shortened_guid}"
+
     class Meta:
         ordering = ("-created_at",)
         get_latest_by = "created_at"
-        indexes = [models.Index(fields=["url", "shortened_url", "shortened_guid"])]
+        indexes = [models.Index(fields=["shortened_guid", "disabled"])]
 
     def __str__(self):
         return "Shortened URL: " + self.shortened_url + " for URL: " + self.url
