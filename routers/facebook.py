@@ -443,6 +443,8 @@ def _handle_audio_msg(billing_account_user, bot):
             selected_model = AsrModels.nemo_hindi.name
         case "te":
             selected_model = AsrModels.whisper_telugu_large_v2.name
+        case "bho":
+            selected_model = AsrModels.vakyansh_bhojpuri.name
         case _:
             selected_model = AsrModels.whisper_large_v2.name
     result = call_api(

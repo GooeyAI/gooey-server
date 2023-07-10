@@ -25,7 +25,7 @@ def url_to_gdrive_file_id(f: furl) -> str:
     return file_id
 
 
-def gdrive_download(f: furl, mime_type: str) -> (bytes, str):
+def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
     # get drive file id
     file_id = url_to_gdrive_file_id(f)
     # get metadata
@@ -49,7 +49,7 @@ def gdrive_download(f: furl, mime_type: str) -> (bytes, str):
     return f_bytes, ext
 
 
-def docs_export_mimetype(f: furl) -> (str, str):
+def docs_export_mimetype(f: furl) -> tuple[str, str]:
     """
     return the mimetype to export google docs - https://developers.google.com/drive/api/guides/ref-export-formats
 
