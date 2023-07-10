@@ -16,15 +16,17 @@ app = APIRouter()
 @app.get("/q/{shortened_guid}")
 @transaction.atomic
 def redirect_via_short_url(shortened_guid):
-    try:
-        shortened = (
-            ShortenedURLs.objects.select_for_update()  # acquire lock on the selected row (if any)
-            .filter(
-                Q(max_clicks__gt=F("clicks")) | Q(max_clicks=-1)
-            )  # max_clicks > clicks or max_clicks = -1
-            .get(shortened_guid=shortened_guid, disabled=False)
+    shortened = (
+        ShortenedURLs.objects.select_for_update()  # acquire lock on the selected row (if any)
+        .filter(
+            Q(max_clicks__gt=F("clicks"))
+            | Q(max_clicks=-1),  # max_clicks > clicks or max_clicks = -1
+            shortened_guid=shortened_guid,
+            disabled=False,
         )
-    except ShortenedURLs.DoesNotExist:
+        .first()
+    )
+    if not shortened:
         return HTTPException(status_code=404, detail="Shortened URL not found")
     shortened.clicks += 1
     shortened.save()
