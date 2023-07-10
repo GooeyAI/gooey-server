@@ -25,7 +25,7 @@ def main():
     shorturl = st.text_input("Short URL")
     longurl = st.text_input("Long URL")
     run = st.selectbox(
-        "Run (most recent 100 shown))",
+        "Run (most recent 100 shown)",
         options=[None]
         + list(
             SavedRun.objects.filter(
@@ -50,6 +50,7 @@ def main():
                 query = query.filter(url__icontains=longurl)
             if run:
                 query = query.filter(run=run)
+            query = query[:num_results]
             df_run = pd.DataFrame(
                 list(
                     SavedRun.objects.filter(
@@ -57,7 +58,7 @@ def main():
                     ).values()
                 )
             )
-            df = pd.DataFrame(list(query[:num_results].values())).merge(
+            df = pd.DataFrame(list(query.values())).merge(
                 df_run, how="left", left_on="run_id", right_on="id"
             )
             df.drop(columns=["run_id_x", "id_y"], inplace=True)
