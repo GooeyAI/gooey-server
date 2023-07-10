@@ -72,6 +72,7 @@ def main():
             )
             df.drop(columns=["run_id_x", "id_y"], inplace=True)
             df.rename(columns={"id_x": "id", "run_id_y": "run_id"}, inplace=True)
+            df["workflow"] = df["workflow"].apply(lambda w: Workflow(w).name)
             st.table(df)
             st.download_button(
                 "Download as csv", df.to_csv().encode("utf-8"), "file.csv", "text/csv"
