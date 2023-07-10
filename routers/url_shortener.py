@@ -83,3 +83,10 @@ def get_or_create_short_url(
     )
     shortened_url.save()
     return shortened_url.shortened_url
+
+
+def get_visits(shortened_guid: str) -> int | None:
+    shortened = ShortenedURLs.objects.filter(shortened_guid=shortened_guid).first()
+    if not shortened:
+        return None
+    return shortened.clicks

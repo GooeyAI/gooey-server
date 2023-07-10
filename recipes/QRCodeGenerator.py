@@ -29,7 +29,7 @@ from daras_ai_v2.stable_diffusion import (
     Img2ImgModels,
     Schedulers,
 )
-from routers.url_shortener import get_or_create_short_url
+from routers.url_shortener import get_or_create_short_url, get_visits
 from bots.models import Workflow
 
 ATTEMPTS = 1
@@ -277,7 +277,11 @@ Here is the final output:
     def _render_outputs(self, state: dict):
         for img in state.get("output_images", []):
             st.image(img)
-            st.caption(f'{state.get("qr_code_data")}')
+            caption = f'{state.get("qr_code_data")}'
+            visits = get_visits(state.get("shortened_url"))
+            if visits is not None:
+                caption += f". \n\nViews: {visits}"
+            st.caption(caption)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
