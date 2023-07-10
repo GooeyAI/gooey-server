@@ -36,8 +36,14 @@ def main():
         ),
         format_func=lambda r: str(r) if r else "---",
     )
+    if not run:
+        run_id = st.text_input("Run ID")
+        example_id = st.text_input("Example ID")
+    else:
+        run_id = None
+        example_id = None
     num_results = st.number_input("Max number of results", value=100)
-    if workflow or shorturl or longurl or run:
+    if workflow or shorturl or longurl or run or run_id or example_id:
         with st.spinner("Loading stats..."):
             query = ShortenedURLs.objects.all()
             if workflow:
@@ -50,7 +56,10 @@ def main():
                 query = query.filter(url__icontains=longurl)
             if run:
                 query = query.filter(run=run)
-            query = query[:num_results]
+            if run_id:
+                query = query.filter(run__run_id=run_id)
+            if example_id:
+                query = query.filter(run__example_id=example_id)
             df_run = pd.DataFrame(
                 list(
                     SavedRun.objects.filter(
@@ -58,7 +67,7 @@ def main():
                     ).values()
                 )
             )
-            df = pd.DataFrame(list(query.values())).merge(
+            df = pd.DataFrame(list(query[:num_results].values())).merge(
                 df_run, how="left", left_on="run_id", right_on="id"
             )
             df.drop(columns=["run_id_x", "id_y"], inplace=True)
