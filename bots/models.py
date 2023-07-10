@@ -530,7 +530,6 @@ class ShortenedURLs(models.Model):
     class Meta:
         ordering = ("-created_at",)
         get_latest_by = "created_at"
-        indexes = [models.Index(fields=["shortened_guid"])]
 
     def __str__(self):
         return "Shortened URL: " + self.shortened_url + " for URL: " + self.url
