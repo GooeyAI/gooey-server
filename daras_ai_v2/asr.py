@@ -15,6 +15,17 @@ from daras_ai_v2.gpu_server import (
     call_celery_task,
 )
 from daras_ai_v2.functional import map_parallel
+import google.auth
+from google.auth.transport.requests import AuthorizedSession
+
+creds, PROJECT = google.auth.default(
+    scopes=["https://www.googleapis.com/auth/cloud-platform"]
+)
+auth_req = google.auth.transport.requests.Request()
+creds.refresh(auth_req)
+authed_session = AuthorizedSession(
+    credentials=creds
+)  # takes care of refreshing the token and adding it to request headers
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 TRANSLITERATION_SUPPORTED = ["ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"]
@@ -108,34 +119,21 @@ def run_google_translate(texts: list[str], google_translate_target: str) -> list
         list[str]: Translated text.
     """
     from google.cloud import translate_v2 as translate
-    import google.auth
-    import google.auth.transport.requests
-
-    creds, project = google.auth.default(
-        scopes=["https://www.googleapis.com/auth/cloud-platform"]
-    )
-
-    auth_req = google.auth.transport.requests.Request()
-    creds.refresh(auth_req)
 
     translate_client = translate.Client()
     detections = translate_client.detect_language(texts)
     language_codes = [detection["language"] for detection in detections]
 
     return map_parallel(
-        lambda text, code: _translate_text(
-            text, code, google_translate_target, creds.token
-        ),
+        lambda text, code: _translate_text(text, code, google_translate_target),
         texts,
         language_codes,
     )
 
 
-def _translate_text(
-    text: str, language_code: str, google_translate_target: str, token: str
-):
-    res = requests.post(
-        "https://translation.googleapis.com/v3/projects/dara-c1b52/locations/global:translateText",
+def _translate_text(text: str, language_code: str, google_translate_target: str):
+    res = authed_session.post(
+        f"https://translation.googleapis.com/v3/projects/{PROJECT}/locations/global:translateText",
         json.dumps(
             {
                 "source_language_code": language_code.strip("-Latn"),
@@ -149,7 +147,6 @@ def _translate_text(
             }
         ),
         headers={
-            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         },
     )
