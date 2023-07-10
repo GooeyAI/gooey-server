@@ -214,8 +214,6 @@ class MessageAdmin(admin.ModelAdmin):
         "role",
         "content",
         "display_content",
-        "question_answered",
-        "question_subject",
         "created_at",
         "wa_msg_id",
         "saved_run",
@@ -270,6 +268,17 @@ class MessageAdmin(admin.ModelAdmin):
                     ]
                 },
             ),
+        )
+        fieldsets.append(
+            (
+                "Analysis",
+                {
+                    "fields": [
+                        "question_answered",
+                        "question_subject",
+                    ]
+                },
+            )
         )
         return fieldsets
 

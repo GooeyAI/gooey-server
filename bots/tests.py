@@ -57,7 +57,6 @@ class BotIntegrationTest(TestCase):
             platform=Platform.WHATSAPP,
             wa_phone_number="my_whatsapp_number",
             wa_phone_number_id="my_whatsapp_number_id",
-            analysis_url="https://api.gooey.ai/v2/video-bots/?run_id=uflky8xk&uid=vkbEEF3tEHSTIVvvirBYDS9jP5w2",
         )
 
         # Create a Conversation that uses the BotIntegration

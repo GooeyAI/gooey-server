@@ -9,7 +9,6 @@ from django.utils.text import Truncator
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
-
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
 
@@ -233,10 +232,10 @@ class BotIntegration(models.Model):
         unique=True,
         help_text="Bot's WhatsApp phone number id (required if platform is WhatsApp)",
     )
-    analysis_url = models.TextField(
-        blank=True,
-        default="",
-        help_text="The analysis copilot that the bot uses to categorize responses",
+
+    enable_analysis = models.BooleanField(
+        default=False,
+        help_text="Enable analysis for this bot",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -427,12 +426,13 @@ class Message(models.Model):
         default="",
         help_text="Bot's ability to answer given question",
     )
-
     question_subject = models.TextField(
         blank=True,
         default="",
         help_text="Subject of given question",
     )
+
+    _analysis_done = False
 
     class Meta:
         ordering = ("-created_at",)

@@ -7,3 +7,5 @@ class MessagesConfig(AppConfig):
 
     def ready(self):
         import bots.signals
+
+        assert bots.signals
