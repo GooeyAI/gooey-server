@@ -159,8 +159,8 @@ def _translate_text(text: str, language_code: str, google_translate_target: str)
                 "contents": text,
                 "mime_type": "text/plain",
                 "transliteration_config": {
-                    "enable_transliteration": language_code.endswith("-Latn")
-                    and language_code.strip("-Latn") in TRANSLITERATION_SUPPORTED
+                    "enable_transliteration": language_code.strip("-Latn")
+                    in TRANSLITERATION_SUPPORTED
                 },
             }
         ),
