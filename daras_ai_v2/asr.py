@@ -143,7 +143,7 @@ def run_google_translate(
         language_codes = [detection["language"] for detection in detections]
 
     return map_parallel(
-        lambda text, code: _translate_text(text, code, google_translate_target),
+        lambda text, code: _translate_text(text, code, target_language),
         texts,
         language_codes,
     )
