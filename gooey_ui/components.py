@@ -3,9 +3,10 @@ import textwrap
 import typing
 
 import numpy as np
-import pandas as pd
+
 from furl import furl
 
+from daras_ai.image_input import resize_img_scale
 from gooey_ui import state
 from gooey_ui.pubsub import md5_values
 
@@ -64,7 +65,7 @@ def write(*objs: typing.Any, unsafe_allow_html=False, **props):
 
 
 def markdown(body: str, *, unsafe_allow_html=False, **props):
-    if not body:
+    if body is None:
         return _node("markdown", body="", **props)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
@@ -158,13 +159,16 @@ def image(
     src: str | np.ndarray,
     caption: str = None,
     alt: str = None,
-    width: int = None,
+    **props,
 ):
     if isinstance(src, np.ndarray):
         from daras_ai.image_input import cv2_img_to_bytes
 
-        # convert to base64 and set src
-        data = cv2_img_to_bytes(src)
+        if not src.shape:
+            return
+        # ensure image is not too large
+        data = resize_img_scale(cv2_img_to_bytes(src), (128, 128))
+        # convert to base64
         b64 = base64.b64encode(data).decode("utf-8")
         src = "data:image/png;base64," + b64
     if not src:
@@ -173,9 +177,9 @@ def image(
         name="img",
         props=dict(
             src=src,
-            caption=caption,
+            caption=dedent(caption),
             alt=alt or caption,
-            style=dict(width=f"{width}px"),
+            **props,
         ),
     ).mount()
 
@@ -190,7 +194,7 @@ def video(src: str, caption: str = None):
         src = f.url
     state.RenderTreeNode(
         name="video",
-        props=dict(src=src, caption=caption),
+        props=dict(src=src, caption=dedent(caption)),
     ).mount()
 
 
@@ -199,7 +203,7 @@ def audio(src: str, caption: str = None):
         return
     state.RenderTreeNode(
         name="audio",
-        props=dict(src=src, caption=caption),
+        props=dict(src=src, caption=dedent(caption)),
     ).mount()
 
 
@@ -212,7 +216,10 @@ def text_area(
     placeholder: str = None,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
+    **props,
 ) -> str:
+    style = props.setdefault("style", {})
+    style.setdefault("height", f"{height}px"),
     if key:
         assert not value, "only one of value or key can be provided"
     else:
@@ -229,7 +236,7 @@ def text_area(
             help=help,
             placeholder=placeholder,
             disabled=disabled,
-            style=dict(height=f"{height}px"),
+            **props,
         ),
     ).mount()
     return value or ""
@@ -241,6 +248,7 @@ def multiselect(
     format_func: typing.Callable[[T], typing.Any] = str,
     key: str = None,
     help: str = None,
+    allow_none: bool = False,
     *,
     disabled: bool = False,
 ) -> list[T]:
@@ -250,8 +258,12 @@ def multiselect(
     if not key:
         key = md5_values("multiselect", label, options, help)
     value = state.session_state.get(key) or []
+    if not isinstance(value, list):
+        value = [value]
     value = [o if o in options else options[0] for o in value]
-    state.session_state.setdefault(key, value)
+    if not allow_none and not value:
+        value = [options[0]]
+    state.session_state[key] = value
     state.RenderTreeNode(
         name="select",
         props=dict(
@@ -261,6 +273,7 @@ def multiselect(
             isDisabled=disabled,
             isMulti=True,
             defaultValue=value,
+            allow_none=allow_none,
             options=[
                 {"value": option, "label": str(format_func(option))}
                 for option in options
@@ -397,18 +410,18 @@ def file_uploader(
     return value or ""
 
 
-def json(value: typing.Any, expanded: bool = False):
+def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     state.RenderTreeNode(
         name="json",
         props=dict(
             value=value,
             expanded=expanded,
-            defaultInspectDepth=3 if expanded else 1,
+            defaultInspectDepth=3 if expanded else depth,
         ),
     ).mount()
 
 
-def table(df: pd.DataFrame):
+def table(df: "pd.DataFrame"):
     state.RenderTreeNode(
         name="table",
         children=[

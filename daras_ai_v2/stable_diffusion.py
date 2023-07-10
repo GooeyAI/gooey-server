@@ -2,10 +2,10 @@ import io
 import typing
 from enum import Enum
 
-import openai
 import replicate
 import requests
 from PIL import Image
+from django.db import models
 
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -14,7 +14,6 @@ from daras_ai.image_input import (
     resize_img_fit,
     get_downscale_factor,
 )
-from daras_ai_v2 import settings
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import (
     call_gpu_server_b64,
@@ -37,6 +36,7 @@ class Text2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+    dream_shaper = "DreamShaper (Lykon)"
     openjourney = "Open Journey (PromptHero)"
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
@@ -57,6 +57,7 @@ text2img_model_ids = {
     Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Text2ImgModels.rodent_diffusion_1_5: "devxpy/rodent-diffusion-1-5",
+    Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Text2ImgModels.deepfloyd_if: [
         "DeepFloyd/IF-I-XL-v1.0",
         "DeepFloyd/IF-II-L-v1.0",
@@ -70,6 +71,7 @@ class Img2ImgModels(Enum):
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+    dream_shaper = "DreamShaper (Lykon)"
     openjourney = "Open Journey (PromptHero)"
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
@@ -83,6 +85,7 @@ class Img2ImgModels(Enum):
 img2img_model_ids = {
     Img2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
     Img2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
+    Img2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Img2ImgModels.openjourney: "prompthero/openjourney",
     Img2ImgModels.openjourney_2: "prompthero/openjourney-v2",
     Img2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
@@ -101,7 +104,22 @@ class ControlNetModels(Enum):
     sd_controlnet_openpose = "Human Pose"
     sd_controlnet_scribble = "Scribble"
     sd_controlnet_seg = "Image Segmentation"
+    sd_controlnet_tile = "Tiling"
+    sd_controlnet_brightness = "Brightness"
 
+
+controlnet_model_explanations = {
+    ControlNetModels.sd_controlnet_canny: "Canny edge detection",
+    ControlNetModels.sd_controlnet_depth: "Depth estimation",
+    ControlNetModels.sd_controlnet_hed: "HED edge detection",
+    ControlNetModels.sd_controlnet_mlsd: "M-LSD straight line detection",
+    ControlNetModels.sd_controlnet_normal: "Normal map estimation",
+    ControlNetModels.sd_controlnet_openpose: "Human pose estimation",
+    ControlNetModels.sd_controlnet_scribble: "Scribble",
+    ControlNetModels.sd_controlnet_seg: "Image segmentation",
+    ControlNetModels.sd_controlnet_tile: "Tiling: to preserve small details",
+    ControlNetModels.sd_controlnet_brightness: "Brightness: to increase contrast naturally",
+}
 
 controlnet_model_ids = {
     ControlNetModels.sd_controlnet_canny: "lllyasviel/sd-controlnet-canny",
@@ -112,7 +130,50 @@ controlnet_model_ids = {
     ControlNetModels.sd_controlnet_openpose: "lllyasviel/sd-controlnet-openpose",
     ControlNetModels.sd_controlnet_scribble: "lllyasviel/sd-controlnet-scribble",
     ControlNetModels.sd_controlnet_seg: "lllyasviel/sd-controlnet-seg",
+    ControlNetModels.sd_controlnet_tile: "lllyasviel/control_v11f1e_sd15_tile",
+    ControlNetModels.sd_controlnet_brightness: "ioclab/control_v1p_sd15_brightness",
 }
+
+
+class Schedulers(models.TextChoices):
+    singlestep_dpm_solver = (
+        "DPM",
+        "DPMSolverSinglestepScheduler",
+    )
+    multistep_dpm_solver = "DPM Multistep", "DPMSolverMultistepScheduler"
+    dpm_sde = (
+        "DPM SDE",
+        "DPMSolverSDEScheduler",
+    )
+    dpm_discrete = (
+        "DPM Discrete",
+        "KDPM2DiscreteScheduler",
+    )
+    dpm_discrete_ancestral = (
+        "DPM Anscetral",
+        "KDPM2AncestralDiscreteScheduler",
+    )
+    unipc = "UniPC", "UniPCMultistepScheduler"
+    lms_discrete = (
+        "LMS",
+        "LMSDiscreteScheduler",
+    )
+    heun = (
+        "Heun",
+        "HeunDiscreteScheduler",
+    )
+    euler = "Euler", "EulerDiscreteScheduler"
+    euler_ancestral = (
+        "Euler ancestral",
+        "EulerAncestralDiscreteScheduler",
+    )
+    pndm = "PNDM", "PNDMScheduler"
+    ddpm = "DDPM", "DDPMScheduler"
+    ddim = "DDIM", "DDIMScheduler"
+    deis = (
+        "DEIS",
+        "DEISMultistepScheduler",
+    )
 
 
 def sd_upscale(
@@ -126,7 +187,7 @@ def sd_upscale(
     seed: int = 42,
 ):
     return call_sd_multi(
-        "upscale",
+        "diffusion.upscale",
         pipeline={
             "model_id": "stabilityai/stable-diffusion-x4-upscaler",
             # "scheduler": "UniPCMultistepScheduler",
@@ -156,7 +217,7 @@ def instruct_pix2pix(
     seed: int = 42,
 ):
     return call_sd_multi(
-        "instruct_pix2pix",
+        "diffusion.instruct_pix2pix",
         pipeline={
             "model_id": "timbrooks/instruct-pix2pix",
             # "scheduler": "UniPCMultistepScheduler",
@@ -188,6 +249,7 @@ def text2img(
     seed: int = 42,
     guidance_scale: float = None,
     negative_prompt: str = None,
+    scheduler: str = None,
 ):
     _resolution_check(width, height, max_size=(1024, 1024))
 
@@ -205,8 +267,7 @@ def text2img(
                 },
             )
         case Text2ImgModels.dall_e.name:
-            openai.api_key = settings.OPENAI_API_KEY
-            openai.api_base = "https://api.openai.com/v1"
+            import openai
 
             edge = _get_dalle_img_size(width, height)
             response = openai.Image.create(
@@ -219,10 +280,10 @@ def text2img(
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
             return call_sd_multi(
-                "text2img",
+                "diffusion.text2img",
                 pipeline={
                     "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
-                    # "scheduler": "EulerDiscreteScheduler",
+                    "scheduler": Schedulers[scheduler].label if scheduler else None,
                     "disable_safety_checker": True,
                     "seed": seed,
                 },
@@ -293,8 +354,7 @@ def img2img(
                 },
             )
         case Img2ImgModels.dall_e.name:
-            openai.api_key = settings.OPENAI_API_KEY
-            openai.api_base = "https://api.openai.com/v1"
+            import openai
 
             edge = _get_dalle_img_size(width, height)
             image = resize_img_pad(init_image_bytes, (edge, edge))
@@ -313,7 +373,7 @@ def img2img(
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
             return call_sd_multi(
-                "img2img",
+                "diffusion.img2img",
                 pipeline={
                     "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
                     # "scheduler": "UniPCMultistepScheduler",
@@ -339,25 +399,32 @@ def img2img(
 def controlnet(
     *,
     selected_model: str,
-    selected_controlnet_model: str,
+    selected_controlnet_model: str | list[str],
+    scheduler: str = None,
     prompt: str,
-    num_outputs: int,
+    num_outputs: int = 1,
     init_image: str,
-    num_inference_steps: int,
+    num_inference_steps: int = 50,
     negative_prompt: str = None,
-    guidance_scale: float,
+    guidance_scale: float = 7.5,
     seed: int = 42,
+    controlnet_conditioning_scale: typing.List[float] | float = 1.0,
 ):
+    if isinstance(selected_controlnet_model, str):
+        selected_controlnet_model = [selected_controlnet_model]
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
-        "controlnet",
+        "diffusion.controlnet",
         pipeline={
-            "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
+            "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
             "seed": seed,
-            "scheduler": "UniPCMultistepScheduler",
+            "scheduler": Schedulers[scheduler].label
+            if scheduler
+            else "UniPCMultistepScheduler",
             "disable_safety_checker": True,
-            "controlnet_model_id": controlnet_model_ids[
-                ControlNetModels[selected_controlnet_model]
+            "controlnet_model_id": [
+                controlnet_model_ids[ControlNetModels[model]]
+                for model in selected_controlnet_model
             ],
         },
         inputs={
@@ -366,7 +433,8 @@ def controlnet(
             "num_images_per_prompt": num_outputs,
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
-            "image": [init_image],
+            "image": [init_image] * len(selected_controlnet_model),
+            "controlnet_conditioning_scale": controlnet_conditioning_scale,
             # "strength": prompt_strength,
         },
     )
@@ -441,8 +509,7 @@ def inpainting(
                 )
             ]
         case InpaintingModels.dall_e.name:
-            openai.api_key = settings.OPENAI_API_KEY
-            openai.api_base = "https://api.openai.com/v1"
+            import openai
 
             edge = _get_dalle_img_size(width, height)
             edit_image_bytes = resize_img_pad(edit_image_bytes, (edge, edge))

@@ -11,13 +11,14 @@ from daras_ai_v2.asr import (
     run_google_translate,
     AsrOutputFormat,
     AsrOutputJson,
+    forced_asr_languages,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
 )
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.face_restoration import map_parallel
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 
@@ -70,7 +71,8 @@ class AsrPage(BasePage):
 
     def render_form_v2(self):
         document_uploader(
-            "##### Audio Files", accept=(".wav", ".ogg", ".mp3", ".aac", ".opus")
+            "##### Audio Files",
+            accept=(".wav", ".ogg", ".mp3", ".aac", ".opus", ".oga", ".mp4", ".webm"),
         )
         st.write("---")
         enum_selector(AsrModels, label="###### ASR Model", key="selected_model")
@@ -127,7 +129,10 @@ class AsrPage(BasePage):
             # Run Translation
             state["output_text"] = run_google_translate(
                 asr_output,
-                google_translate_target=request.google_translate_target,
+                target_language=request.google_translate_target,
+                source_language=forced_asr_languages.get(
+                    selected_model, request.language
+                ),
             )
         else:
             # Save the raw ASR text for details view
@@ -135,7 +140,7 @@ class AsrPage(BasePage):
 
     def additional_notes(self) -> str | None:
         return """
-*Cost ≈ 1 credit for 25 words ≈ 0.04 credits per word*
+*Cost ≈ 1 credit for 12.5 words ≈ 0.08 credits per word*
               """
 
     def get_raw_price(self, state: dict):

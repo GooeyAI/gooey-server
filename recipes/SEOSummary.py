@@ -13,8 +13,8 @@ from lxml import etree
 from pydantic import BaseModel
 
 from daras_ai_v2.base import BasePage, gooey_rng
-from daras_ai_v2.face_restoration import map_parallel
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import (
     run_language_model,

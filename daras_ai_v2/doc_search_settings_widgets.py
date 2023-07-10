@@ -23,6 +23,13 @@ def document_uploader(
             label_visibility="collapsed",
             value="\n".join(documents),
             height=150,
+            style={
+                "whiteSpace": "pre",
+                "overflowWrap": "normal",
+                "overflowX": "scroll",
+                "fontFamily": "monospace",
+                "fontSize": "0.9rem",
+            },
         )
         st.session_state[key] = text_value.splitlines()
     else:
@@ -35,7 +42,7 @@ def document_uploader(
         )
 
 
-def doc_search_settings():
+def doc_search_settings(asr_allowed: bool = True):
     st.write("##### 🔎 Search Settings")
 
     st.number_input(
@@ -45,7 +52,7 @@ The maximum number of References to include from the source document.
 """,
         key="max_references",
         min_value=1,
-        max_value=10,
+        max_value=20,
     )
 
     st.number_input(
@@ -72,8 +79,11 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         max_value=50,
     )
 
+    if not asr_allowed:
+        return
+
     st.write("---")
-    st.write("##### 🎤 Speech Recognition Settings")
+    st.write("##### 🎤 Document Speech Recognition")
 
     enum_selector(
         AsrModels,

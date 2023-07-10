@@ -1,10 +1,11 @@
 import io
 
 import PIL
-import cv2
 
 
 def opencv_to_pil(img_cv2, mode="RGB") -> PIL.Image:
+    import cv2
+
     img_cv2 = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2RGB)
     return PIL.Image.fromarray(img_cv2, mode=mode)
 

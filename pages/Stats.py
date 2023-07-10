@@ -1,3 +1,7 @@
+from gooeysite import wsgi
+
+assert wsgi
+
 import datetime
 
 import pandas as pd
@@ -9,6 +13,7 @@ from bots.models import (
     Message,
     CHATML_ROLE_USER,
     Feedback,
+    Conversation,
 )
 
 st.set_page_config(layout="wide")
@@ -99,9 +104,10 @@ def main():
                     created_at__date__lt=date + delta,
                 ).count()
 
-                unique_feedbacks = (
-                    Feedback.objects.filter(
-                        message__conversation__bot_integration=bot,
+                unique_feedback_givers = (
+                    Conversation.objects.filter(
+                        bot_integration=bot,
+                        messages__feedbacks__isnull=False,
                         created_at__date__gte=date,
                         created_at__date__lt=date + delta,
                     )
@@ -122,7 +128,7 @@ def main():
                     "Neg_feedback": negative_feedbacks,
                     "Pos_feedback": positive_feedbacks,
                     "Senders": unique_senders,
-                    "Unique_feedbacks": unique_feedbacks,
+                    "Unique_feedback_givers": unique_feedback_givers,
                     "Msgs_per_sender": messages_per_unique_sender,
                 }
                 data.append(ctx)
@@ -148,7 +154,7 @@ def main():
                 x="date",
                 y=[
                     "Senders",
-                    "Unique_feedbacks",
+                    "Unique_feedback_givers",
                     "Pos_feedback",
                     "Neg_feedback",
                     "Msgs_per_sender",

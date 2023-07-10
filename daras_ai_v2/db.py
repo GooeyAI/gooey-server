@@ -1,8 +1,4 @@
-from firebase_admin import auth
 from google.cloud import firestore
-from starlette.requests import Request
-
-from daras_ai_v2 import settings
 
 FIREBASE_SESSION_COOKIE = "firebase_session"
 ANONYMOUS_USER_COOKIE = "anonymous_user"
@@ -20,8 +16,14 @@ USER_CHAT_HISTORY_COLLECTION = "user_chat_history"
 
 CONNECTED_BOTS_COLLECTION = "connected_bots"
 
+_client = None
 
-client = firestore.Client()
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = firestore.Client()
+    return _client
 
 
 def get_doc_field(doc_ref: firestore.DocumentReference, field: str, default=None):
@@ -69,7 +71,7 @@ def get_doc_ref(
     sub_collection_id: str = None,
     sub_document_id: str = None,
 ) -> firestore.DocumentReference:
-    db_collection = client.collection(collection_id)
+    db_collection = get_client().collection(collection_id)
     doc_ref = db_collection.document(document_id)
     if sub_collection_id:
         sub_collection = doc_ref.collection(sub_collection_id)

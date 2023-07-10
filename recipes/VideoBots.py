@@ -316,7 +316,7 @@ Enable document search, to use custom documents as information sources.
         enable_audio = st.checkbox("Enable Audio Ouput?", key="__enable_audio")
         if not enable_audio:
             st.write("---")
-            st.session_state.pop("tts_provider", None)
+            st.session_state["tts_provider"] = None
         else:
             text_to_speech_settings()
             st.write("---")
@@ -328,7 +328,7 @@ Enable document search, to use custom documents as information sources.
             enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
             if not enable_video:
                 st.write("---")
-                st.session_state.pop("input_face", None)
+                st.session_state["input_face"] = None
             else:
                 st.file_uploader(
                     """
@@ -484,7 +484,8 @@ Use this for prompting GPT to use the document search results.
             yield f"Translating input to english..."
             user_input = run_google_translate(
                 texts=[user_input],
-                google_translate_target="en",
+                source_language=request.user_language,
+                target_language="en",
             )[0]
 
         # parse the bot script
@@ -627,7 +628,8 @@ Use this for prompting GPT to use the document search results.
             yield f"Translating response to {request.user_language}..."
             output_text = run_google_translate(
                 texts=output_text,
-                google_translate_target=request.user_language,
+                source_language="en",
+                target_language=request.user_language,
             )
 
         if references:

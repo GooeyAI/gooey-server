@@ -12,6 +12,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.routing import APIRouter
 from firebase_admin import auth, exceptions
 from furl import furl
+from starlette.background import BackgroundTasks
 from starlette.datastructures import FormData
 from starlette.requests import Request
 from starlette.responses import (
@@ -25,11 +26,13 @@ from app_users.models import AppUser
 from auth_backend import (
     FIREBASE_SESSION_COOKIE,
 )
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
+from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
 from daras_ai_v2.base import (
     BasePage,
+    RedirectException,
 )
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.meta_content import build_meta_tags
@@ -153,23 +156,30 @@ def file_upload(request: Request, form_data: FormData = Depends(request_form_fil
 
     if content_type.startswith("audio/"):
         with tempfile.NamedTemporaryFile(
-            suffix="." + filename,
-        ) as infile, tempfile.NamedTemporaryFile(
-            suffix=".wav",
-        ) as outfile:
+            suffix="." + safe_filename(filename)
+        ) as infile:
             infile.write(data)
+            infile.flush()
+            if not check_wav_audio_format(infile.name):
+                with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
+                    args = [
+                        "ffmpeg",
+                        "-y",
+                        "-i",
+                        infile.name,
+                        *FFMPEG_WAV_ARGS,
+                        outfile.name,
+                    ]
+                    print("\t$ " + " ".join(args))
+                    subprocess.check_call(args)
 
-            args = ["ffmpeg", "-y", "-i", infile.name, "-ac", "1", outfile.name]
-            print("\t$", " ".join(args))
-            subprocess.check_call(args)
-
-            filename += ".wav"
-            content_type = "audio/wav"
-            data = outfile.read()
+                    filename += ".wav"
+                    content_type = "audio/wav"
+                    data = outfile.read()
 
     if content_type.startswith("image/"):
         with Image(blob=data) as img:
-            if img.format not in ["png", "jpeg", "gif"]:
+            if img.format not in ["png", "jpeg", "jpg", "gif"]:
                 img.format = "png"
                 content_type = "image/png"
                 filename += ".png"
@@ -194,7 +204,10 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
 @app.post("/{page_slug}/")
 @app.post("/{page_slug}/{tab}/")
 def st_page(
-    request: Request, page_slug="", tab="", json_data: dict = Depends(request_json)
+    request: Request,
+    page_slug="",
+    tab="",
+    json_data: dict = Depends(request_json),
 ):
     try:
         page_cls = page_map[normalize_slug(page_slug)]
@@ -213,17 +226,22 @@ def st_page(
 
     state = json_data.setdefault("state", {})
     if not state:
-        state.update(page.get_firestore_state(example_id, run_id, uid))
-        for k, v in page.sane_defaults.items():
-            state.setdefault(k, v)
+        firestore_state = page.get_firestore_state(example_id, run_id, uid)
+        if firestore_state is not None:
+            state.update(firestore_state)
+            for k, v in page.sane_defaults.items():
+                state.setdefault(k, v)
     if state is None:
         raise HTTPException(status_code=404)
 
-    ret = st.runner(
-        lambda: page_wrapper(request, page.render),
-        query_params=dict(request.query_params),
-        **json_data,
-    )
+    try:
+        ret = st.runner(
+            lambda: page_wrapper(request, page.render),
+            query_params=dict(request.query_params),
+            **json_data,
+        )
+    except RedirectException as e:
+        return RedirectResponse(e.url, status_code=e.status_code)
     ret |= {
         "meta": build_meta_tags(
             url=str(request.url),
@@ -252,7 +270,7 @@ def get_run_user(request, uid) -> AppUser | None:
         pass
 
 
-def page_wrapper(request: Request, render_fn: typing.Callable[[], None]):
+def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
     context = {
         "request": request,
         "settings": settings,
@@ -268,7 +286,7 @@ def page_wrapper(request: Request, render_fn: typing.Callable[[], None]):
     st.html(copy_to_clipboard_scripts)
 
     with st.div(id="main-content", className="container"):
-        render_fn()
+        render_fn(**kwargs)
 
     st.html(templates.get_template("footer.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))

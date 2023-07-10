@@ -1,7 +1,6 @@
 import typing
 from functools import partial
 
-import cv2
 import requests
 from pydantic import BaseModel
 
@@ -14,11 +13,13 @@ from daras_ai.image_input import (
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.extract_face import extract_face_img_bytes
-from daras_ai_v2.face_restoration import map_parallel, gfpgan
+from daras_ai_v2.face_restoration import gfpgan
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.repositioning import repositioning_preview_img
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 
@@ -134,7 +135,7 @@ class FaceInpaintingPage(BasePage):
 
         st.write(
             """
-            ### Face Repositioning Settings
+            #### Face Repositioning Settings
             """
         )
 
@@ -165,11 +166,12 @@ class FaceInpaintingPage(BasePage):
                 key="face_pos_y",
             )
 
+        import cv2
+
         # show an example image
         img_cv2 = cv2.imread("static/face.png")
-
         # extract face
-        img, mask = extract_and_reposition_face_cv2(
+        img, _ = extract_and_reposition_face_cv2(
             img_cv2,
             out_size=(
                 st.session_state["output_width"],
@@ -179,19 +181,7 @@ class FaceInpaintingPage(BasePage):
             out_pos_x=pos_x,
             out_pos_y=pos_y,
         )
-
-        # draw rule of 3rds
-        color = (200, 200, 200)
-        stroke = 2
-        img_y, img_x, _ = img.shape
-        for i in range(2):
-            pos = (img_y // 3) * (i + 1)
-            cv2.line(img, (0, pos), (img_x, pos), color, stroke)
-
-            pos = (img_x // 3) * (i + 1)
-            cv2.line(img, (pos, 0), (pos, img_y), color, stroke)
-
-        st.image(img, width=300)
+        repositioning_preview_img(img)
 
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")

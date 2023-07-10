@@ -8,7 +8,7 @@ from pydantic import BaseModel
 import gooey_ui as st
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.gpu_server import GpuEndpoints
+from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 
 
@@ -44,7 +44,11 @@ def animation_prompts_to_st_list(animation_prompts: AnimationPrompts):
 
 
 def st_list_to_animation_prompt(prompt_st_list) -> AnimationPrompts:
-    return [{"frame": fp["frame"], "prompt": fp["prompt"]} for fp in prompt_st_list]
+    return [
+        {"frame": fp["frame"], "prompt": prompt}
+        for fp in prompt_st_list
+        if (prompt := fp["prompt"].strip())
+    ]
 
 
 def animation_prompts_editor(
@@ -80,7 +84,7 @@ def animation_prompts_editor(
         if prompt_key not in st.session_state:
             st.session_state[prompt_key] = fp["prompt"]
 
-        col1, col2 = st.columns([4, 1], responsive=False)
+        col1, col2 = st.columns([8, 3], responsive=False)
         with col1:
             st.text_area(
                 label="*Prompt*",
@@ -198,13 +202,13 @@ class DeforumSDPage(BasePage):
 
         col1, col2 = st.columns(2)
         with col1:
-            st.number_input(
+            st.slider(
                 """
                 #### Frame Count
                 Choose the number of frames in your animation.
                 """,
                 min_value=10,
-                max_value=1000,
+                max_value=500,
                 step=10,
                 key="max_frames",
             )
@@ -409,42 +413,27 @@ Choose fps for the video.
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        blob = storage_blob_for(f"gooey.ai animation {request.animation_prompts}.mp4")
-
-        r = requests.post(
-            GpuEndpoints.defourm_sd,
-            json={
-                "pipeline": dict(
-                    model_id="Protogen_V2.2.ckpt",
-                    seed=request.seed,
-                    upload_urls=[
-                        blob.generate_signed_url(
-                            version="v4",
-                            # This URL is valid for 15 minutes
-                            expiration=datetime.timedelta(minutes=60),
-                            # Allow PUT requests using this URL.
-                            method="PUT",
-                            content_type="video/mp4",
-                        )
-                    ],
-                ),
-                "inputs": dict(
-                    animation_mode=request.animation_mode,
-                    animation_prompts={
-                        fp["frame"]: fp["prompt"] for fp in request.animation_prompts
-                    },
-                    max_frames=request.max_frames,
-                    zoom=request.zoom,
-                    translation_x=request.translation_x,
-                    translation_y=request.translation_y,
-                    rotation_3d_x=request.rotation_3d_x,
-                    rotation_3d_y=request.rotation_3d_y,
-                    rotation_3d_z=request.rotation_3d_z,
-                    translation_z="0:(0)",
-                    fps=request.fps,
-                ),
-            },
-        )
-        r.raise_for_status()
-
-        state["output_video"] = blob.public_url
+        state["output_video"] = call_celery_task_outfile(
+            "deforum",
+            pipeline=dict(
+                model_id="Protogen_V2.2.ckpt",
+                seed=request.seed,
+            ),
+            inputs=dict(
+                animation_mode=request.animation_mode,
+                animation_prompts={
+                    fp["frame"]: fp["prompt"] for fp in request.animation_prompts
+                },
+                max_frames=request.max_frames,
+                zoom=request.zoom,
+                translation_x=request.translation_x,
+                translation_y=request.translation_y,
+                rotation_3d_x=request.rotation_3d_x,
+                rotation_3d_y=request.rotation_3d_y,
+                rotation_3d_z=request.rotation_3d_z,
+                translation_z="0:(0)",
+                fps=request.fps,
+            ),
+            content_type="video/mp4",
+            filename=f"gooey.ai animation {request.animation_prompts}.mp4",
+        )[0]

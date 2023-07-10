@@ -1,5 +1,6 @@
 import base64
 import datetime
+import os
 import typing
 
 import requests
@@ -19,9 +20,9 @@ class GpuEndpoints:
     u2net = settings.GPU_SERVER_1.copy().set(port=5007)
     # deforum_sd = f"{settings.GPU_SERVER_2}:5008"
     sd_2 = settings.GPU_SERVER_1.copy().set(port=5011)
-    sd_multi = settings.GPU_SERVER_1.copy().set(port=5012)
+    # sd_multi = settings.GPU_SERVER_1.copy().set(port=5012)
     # real_esrgan = settings.GPU_SERVER_1furl().set(port=5013)
-    defourm_sd = settings.GPU_SERVER_2.copy().set(port=5014) / "deforum"
+    # defourm_sd = settings.GPU_SERVER_2.copy().set(port=5014) / "deforum"
 
     lavis = settings.GPU_SERVER_1.copy().set(port=5015)
     vqa = lavis / "vqa"
@@ -71,15 +72,23 @@ def call_sd_multi(
     prompt = inputs["prompt"]
     num_images_per_prompt = inputs["num_images_per_prompt"]
     num_outputs = len(prompt) * num_images_per_prompt
+    # sd
+    if not isinstance(pipeline["model_id"], list):
+        return call_celery_task_outfile(
+            endpoint,
+            pipeline=pipeline,
+            inputs=inputs,
+            content_type="image/png",
+            filename=f"gooey.ai - {prompt}.png",
+            num_outputs=num_outputs,
+        )
+
     # deepfloyd
-    if isinstance(pipeline["model_id"], list):
-        base = GpuEndpoints.deepfloyd_if
-        inputs["num_inference_steps"] = [inputs["num_inference_steps"], 50, 75]
-        inputs["guidance_scale"] = [inputs["guidance_scale"], 4, 9]
-    else:
-        base = GpuEndpoints.sd_multi
+    base = GpuEndpoints.deepfloyd_if
+    inputs["num_inference_steps"] = [inputs["num_inference_steps"], 50, 75]
+    inputs["guidance_scale"] = [inputs["guidance_scale"], 4, 9]
     return call_gooey_gpu(
-        endpoint=base / endpoint,
+        endpoint=base / "/text2img/",
         content_type="image/png",
         pipeline=pipeline,
         inputs=inputs,
@@ -105,7 +114,7 @@ def call_gooey_gpu(
         blob.generate_signed_url(
             version="v4",
             # This URL is valid for 15 minutes
-            expiration=datetime.timedelta(minutes=30),
+            expiration=datetime.timedelta(hours=12),
             # Allow PUT requests using this URL.
             method="PUT",
             content_type=content_type,
@@ -118,3 +127,57 @@ def call_gooey_gpu(
     )
     r.raise_for_status()
     return [blob.public_url for blob in blobs]
+
+
+def call_celery_task_outfile(
+    task_name: str,
+    *,
+    pipeline: dict,
+    inputs: dict,
+    content_type: str,
+    filename: str,
+    num_outputs: int = 1,
+):
+    blobs = [storage_blob_for(filename) for i in range(num_outputs)]
+    pipeline["upload_urls"] = [
+        blob.generate_signed_url(
+            version="v4",
+            # This URL is valid for 15 minutes
+            expiration=datetime.timedelta(hours=12),
+            # Allow PUT requests using this URL.
+            method="PUT",
+            content_type=content_type,
+        )
+        for blob in blobs
+    ]
+    call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
+    return [blob.public_url for blob in blobs]
+
+
+_app = None
+
+
+def get_celery():
+    global _app
+    if _app is None:
+        from celery import Celery
+
+        _app = Celery()
+        _app.conf.broker_url = settings.GPU_CELERY_BROKER_URL
+        _app.conf.result_backend = settings.GPU_CELERY_RESULT_BACKEND
+
+    return _app
+
+
+def call_celery_task(
+    task_name: str,
+    *,
+    pipeline: dict,
+    inputs: dict,
+    queue_prefix: str = "gooey-gpu",
+):
+    queue = os.path.join(queue_prefix, pipeline["model_id"].strip()).strip("/")
+    result = get_celery().send_task(
+        task_name, kwargs=dict(pipeline=pipeline, inputs=inputs), queue=queue
+    )
+    return result.get(disable_sync_subtasks=False)

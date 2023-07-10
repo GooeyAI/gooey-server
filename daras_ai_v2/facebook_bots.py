@@ -9,6 +9,9 @@ from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import Workflow
 from daras_ai_v2.asr import run_google_translate
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.text_splitter import text_splitter
+
+WA_MSG_MAX_SIZE = 1024
 
 WHATSAPP_AUTH_HEADER = {
     "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
@@ -147,6 +150,30 @@ def send_wa_msg(
     response_video: str = None,
     buttons: list = None,
 ) -> str | None:
+    # split text into chunks if too long
+    if len(response_text) > WA_MSG_MAX_SIZE:
+        splits = text_splitter(
+            response_text, chunk_size=WA_MSG_MAX_SIZE, length_function=len
+        )
+        # preserve last chunk for later
+        response_text = splits[-1].text
+        # send all but last chunk
+        send_wa_msgs_raw(
+            bot_number=bot_number,
+            user_number=user_number,
+            messages=[
+                # simple text msg
+                {
+                    "type": "text",
+                    "text": {
+                        "body": doc.text,
+                        "preview_url": True,
+                    },
+                }
+                for doc in splits[:-1]
+            ],
+        )
+
     if response_video:
         if buttons:
             messages = [
@@ -289,6 +316,7 @@ def send_wa_msgs_raw(
         )
         confirmation = r.json()
         print("send_wa_msgs_raw:", r.status_code, confirmation)
+        r.raise_for_status()
         try:
             msg_id = confirmation["messages"][0]["id"]
         except (KeyError, IndexError):

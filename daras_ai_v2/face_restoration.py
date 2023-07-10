@@ -83,8 +83,3 @@ def gfpgan(img: str, scale: int = 1) -> bytes:
             "scale": scale,
         },
     )[0]
-
-
-def map_parallel(fn, it):
-    with ThreadPoolExecutor(max_workers=len(it)) as pool:
-        return list(pool.map(fn, it))

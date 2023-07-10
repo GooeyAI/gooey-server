@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 
 from daras_ai.extract_face import extract_and_reposition_face_cv2
@@ -12,6 +11,8 @@ def extract_face_img_bytes(
     pos_x: float,
     pos_y: float,
 ) -> (bytes, bytes):
+    import cv2
+
     image_cv2 = bytes_to_cv2_img(img_bytes)
     image_cv2, face_mask_cv2 = extract_and_reposition_face_cv2(
         image_cv2,

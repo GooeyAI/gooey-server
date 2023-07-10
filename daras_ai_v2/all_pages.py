@@ -29,47 +29,59 @@ from recipes.Text2Audio import Text2AudioPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
+from recipes.QRCodeGenerator import QRCodeGeneratorPage
+from recipes.embeddings_page import EmbeddingsPage
 
 # note: the ordering here matters!
 all_home_pages = [
-    DocSearchPage,
-    DocSummaryPage,
-    GoogleGPTPage,
+    # top ones
     VideoBotsPage,
-    LipsyncTTSPage,
-    TextToSpeechPage,
-    AsrPage,
-    LipsyncPage,
     DeforumSDPage,
-    CompareText2ImgPage,
-    Text2AudioPage,
-    Img2ImgPage,
-    FaceInpaintingPage,
-    GoogleImageGenPage,
-    CompareUpscalerPage,
+    QRCodeGeneratorPage,
+    # SEO tools
+    GoogleGPTPage,
     SEOSummaryPage,
-    EmailFaceInpaintingPage,
-    SocialLookupEmailPage,
-    ObjectInpaintingPage,
-    ImageSegmentationPage,
-    CompareLLMPage,
-    SmartGPTPage,
     RelatedQnAPage,
+    # Image Tools
+    ObjectInpaintingPage,
+    CompareText2ImgPage,
+    Img2ImgPage,
+    # More Image
+    FaceInpaintingPage,
+    EmailFaceInpaintingPage,
+    GoogleImageGenPage,
+    # LipSync fun
+    TextToSpeechPage,
+    LipsyncPage,
+    LipsyncTTSPage,
+    # Text
+    CompareLLMPage,
+    DocSearchPage,
+    SmartGPTPage,
+    # Speech & Music
+    AsrPage,
+    # VideoPlayList,
+    Text2AudioPage,
+    # Other
+    DocSummaryPage,
     RelatedQnADocPage,
+    SocialLookupEmailPage,
+    # More
+    ImageSegmentationPage,
+    CompareUpscalerPage,
 ]
 
 # exposed as API
 all_api_pages = all_home_pages.copy() + [
     ChyronPlantPage,
     LetterWriterPage,
+    EmbeddingsPage,
 ]
 
 # pytest suite
 all_test_pages = all_api_pages.copy()
 # deprecated
 all_test_pages.remove(LetterWriterPage)
-# too slow
-all_test_pages.remove(DeforumSDPage)
 
 
 class Workflow(models.IntegerChoices):
@@ -97,6 +109,7 @@ class Workflow(models.IntegerChoices):
     CHYRONPLANT = (22, ChyronPlantPage.__name__)
     LETTERWRITER = (23, LetterWriterPage.__name__)
     SMARTGPT = (24, SmartGPTPage.__name__)
+    QRCODE = (25, QRCodeGeneratorPage.__name__)
 
     @property
     def page_cls(self) -> typing.Type[BasePage]:

@@ -4,8 +4,8 @@ import os
 import os.path
 import os.path
 import typing
-from argparse import Namespace
 from traceback import print_exc
+from types import SimpleNamespace
 
 from fastapi import APIRouter
 from fastapi import Body
@@ -156,7 +156,7 @@ def call_api(
 ) -> dict:
     created_at = datetime.datetime.utcnow().isoformat()
     # init a new page for every request
-    page = page_cls(request=Namespace(user=user))
+    page = page_cls(request=SimpleNamespace(user=user))
 
     # get saved state from db
     state = page.get_doc_from_query_params(query_params)

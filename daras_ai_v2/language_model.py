@@ -1,3 +1,5 @@
+import hashlib
+import io
 import re
 import threading
 import typing
@@ -5,21 +7,16 @@ from enum import Enum
 from functools import wraps
 from time import sleep
 
-import openai
-import openai.error
+import numpy as np
 import tiktoken
 import typing_extensions
-from decouple import config
 from jinja2.lexer import whitespace_re
 
-from daras_ai_v2 import settings
-from daras_ai_v2.gpu_server import call_gpu_server, GpuEndpoints
-from daras_ai_v2.redis_cache import redis_cache_decorator
+from daras_ai_v2.redis_cache import (
+    get_redis_cache,
+)
 
 _gpt2_tokenizer = None
-
-openai.api_key = settings.OPENAI_API_KEY
-openai.api_base = "https://api.openai.com/v1"
 
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
@@ -33,22 +30,29 @@ CHATML_ROLE_USER = "user"
 
 
 class LargeLanguageModels(Enum):
-    gpt_4 = "GPT 4"
+    gpt_4 = "GPT-4"
     gpt_3_5_turbo = "ChatGPT (GPT-3.5-turbo)"
-    text_davinci_003 = "Davinci-3 (GPT-3.5)"
-    text_davinci_002 = "Davinci-2 (GPT-3)"
+    gpt_3_5_turbo_16k = "ChatGPT+ (GPT-3.5-turbo-16k)"
+
+    text_davinci_003 = "GPT-3.5 (Davinci-3)"
+    text_davinci_002 = "GPT-3.5 (Davinci-2)"
     text_curie_001 = "Curie"
     text_babbage_001 = "Babbage"
     text_ada_001 = "Ada"
     code_davinci_002 = "Codex (Deprecated)"
 
     def is_chat_model(self) -> bool:
-        return self in [LargeLanguageModels.gpt_3_5_turbo, LargeLanguageModels.gpt_4]
+        return self in [
+            LargeLanguageModels.gpt_4,
+            LargeLanguageModels.gpt_3_5_turbo,
+            LargeLanguageModels.gpt_3_5_turbo_16k,
+        ]
 
 
 engine_names = {
     LargeLanguageModels.gpt_4: "gpt-4",
     LargeLanguageModels.gpt_3_5_turbo: "gpt-3.5-turbo",
+    LargeLanguageModels.gpt_3_5_turbo_16k: "gpt-3.5-turbo-16k",
     LargeLanguageModels.text_davinci_003: "text-davinci-003",
     LargeLanguageModels.text_davinci_002: "text-davinci-002",
     LargeLanguageModels.code_davinci_002: "code-davinci-002",
@@ -59,11 +63,15 @@ engine_names = {
 
 
 model_max_tokens = {
+    # https://platform.openai.com/docs/models/gpt-4
     LargeLanguageModels.gpt_4: 8192,
+    # https://platform.openai.com/docs/models/gpt-3-5
     LargeLanguageModels.gpt_3_5_turbo: 4096,
+    LargeLanguageModels.gpt_3_5_turbo_16k: 16_384,
     LargeLanguageModels.text_davinci_003: 4097,
     LargeLanguageModels.text_davinci_002: 4097,
     LargeLanguageModels.code_davinci_002: 8001,
+    # https://platform.openai.com/docs/models/gpt-3
     LargeLanguageModels.text_curie_001: 2049,
     LargeLanguageModels.text_babbage_001: 2049,
     LargeLanguageModels.text_ada_001: 2049,
@@ -105,16 +113,22 @@ def calc_gpt_tokens(
 F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
 
 
-def do_retry(
-    max_retries: int = 5,
-    retry_delay: float = 5,
-    error_cls=(
+def get_openai_error_cls():
+    import openai
+
+    return (
         openai.error.Timeout,
         openai.error.APIError,
         openai.error.APIConnectionError,
         openai.error.RateLimitError,
         openai.error.ServiceUnavailableError,
-    ),
+    )
+
+
+def do_retry(
+    max_retries: int = 5,
+    retry_delay: float = 5,
+    get_error_cls=get_openai_error_cls,
 ) -> typing.Callable[[F], F]:
     def decorator(fn):
         @wraps(fn)
@@ -123,7 +137,7 @@ def do_retry(
             while True:
                 try:
                     return fn(*args, **kwargs)
-                except error_cls as e:
+                except get_error_cls() as e:
                     if n < max_retries:
                         n += 1
                         print(
@@ -138,21 +152,68 @@ def do_retry(
     return decorator
 
 
-@do_retry()
-def get_embeddings(
-    texts: list[str], engine: str = "text-embedding-ada-002"
-) -> list[list[float]]:
+def openai_embedding_create(texts: list[str]) -> list[np.ndarray]:
     # replace newlines, which can negatively affect performance.
     texts = [whitespace_re.sub(" ", text) for text in texts]
-    # create the embeddings
-    res = _openai_embedding_create(input=texts, engine=engine)
-    # return the embedding vectors
-    return [record["embedding"] for record in res["data"]]
+    # get the redis cache
+    redis_cache = get_redis_cache()
+    # load the embeddings from the cache
+    ret = [
+        np_loads(data) if (data := redis_cache.get(_embed_cache_key(text))) else None
+        for text in texts
+    ]
+    # list of embeddings that need to be created
+    misses = [i for i, c in enumerate(ret) if c is None]
+    if misses:
+        # create the embeddings in bulk
+        embeddings = _openai_embedding_create(input=[texts[i] for i in misses])
+        for i, embedding in zip(misses, embeddings):
+            # save the embedding to the cache
+            text = texts[i]
+            redis_cache.set(_embed_cache_key(text), np_dumps(embedding))
+            # fill in missing values
+            ret[i] = embedding
+    return ret
 
 
-@redis_cache_decorator
-def _openai_embedding_create(*args, **kwargs):
-    return openai.Embedding.create(*args, **kwargs)
+def _embed_cache_key(text: str) -> str:
+    return "gooey/openai_ada2_embeddings_npy/v1/" + _sha256(text)
+
+
+def _sha256(text):
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def np_loads(data: bytes) -> np.ndarray:
+    return np.load(io.BytesIO(data))
+
+
+def np_dumps(a: np.ndarray) -> bytes:
+    f = io.BytesIO()
+    np.save(f, a)
+    return f.getvalue()
+
+
+@do_retry()
+def _openai_embedding_create(
+    *, input: list[str], model: str = "text-embedding-ada-002"
+) -> np.ndarray:
+    import openai
+
+    res = openai.Embedding.create(model=model, input=input)
+    ret = np.array([data["embedding"] for data in res["data"]])
+
+    # see - https://community.openai.com/t/text-embedding-ada-002-embeddings-sometime-return-nan/279664/5
+    if np.isnan(ret).any():
+        raise RuntimeError("NaNs detected in embedding")
+        # raise openai.error.APIError("NaNs detected in embedding")  # this lets us retry
+    expected = (len(input), 1536)
+    if ret.shape != expected:
+        raise RuntimeError(
+            f"Unexpected shape for embedding: {ret.shape} (expected {expected})"
+        )
+
+    return ret
 
 
 class ConversationEntry(typing_extensions.TypedDict):
@@ -171,6 +232,8 @@ def _run_chat_model(
     stop: list[str] = None,
     avoid_repetition: bool = False,
 ) -> list[dict]:
+    import openai
+
     r = openai.ChatCompletion.create(
         model=engine,
         messages=messages,
@@ -204,26 +267,12 @@ def run_language_model(
     stop: list[str] = None,
     avoid_repetition: bool = False,
 ) -> list[str]:
+    import openai
+
     assert bool(prompt) != bool(
         messages
     ), "Pleave provide exactly one of { prompt, messages }"
-    match api_provider:
-        case "openai":
-            openai.api_key = settings.OPENAI_API_KEY
-            openai.api_base = "https://api.openai.com/v1"
-        case "goose.ai":
-            openai.api_key = config("GOOSEAI_API_KEY")
-            openai.api_base = "https://api.goose.ai/v1"
-        case "flan-t5":
-            return call_gpu_server(
-                endpoint=GpuEndpoints.flan_t5,
-                input_data={
-                    "prompt": prompt,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                    "n": num_outputs,
-                },
-            )
+
     model = LargeLanguageModels[model]
     if model.is_chat_model():
         if messages:

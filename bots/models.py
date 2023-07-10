@@ -1,6 +1,5 @@
 import datetime
 
-import pandas as pd
 import pytz
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -9,6 +8,7 @@ from django.db.models import Q
 from django.utils.text import Truncator
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
+
 
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
@@ -261,7 +261,9 @@ class ConvoState(models.IntegerChoices):
 
 
 class ConversationQuerySet(models.QuerySet):
-    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> pd.DataFrame:
+    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
+        import pandas as pd
+
         qs = self.all()
         rows = []
         for convo in qs[:1000]:

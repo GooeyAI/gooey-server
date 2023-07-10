@@ -1,14 +1,15 @@
 import datetime
 import inspect
 import math
-import traceback
 import typing
+import urllib
+import urllib.parse
 import uuid
 from copy import deepcopy
 from functools import lru_cache
 from random import Random
-from threading import Thread
-from time import time, sleep
+from time import sleep
+from types import SimpleNamespace
 
 import requests
 import sentry_sdk
@@ -44,7 +45,6 @@ from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params import (
-    gooey_reset_query_parm,
     gooey_get_query_params,
 )
 from daras_ai_v2.query_params_util import (
@@ -57,7 +57,7 @@ from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
 from gooey_ui import realtime_clear_subs
-from gooey_ui.pubsub import realtime_pull, realtime_push
+from gooey_ui.pubsub import realtime_pull
 
 DEFAULT_META_IMG = (
     # Small
@@ -74,12 +74,15 @@ class StateKeys:
     page_title = "__title"
     page_notes = "__notes"
 
+    created_at = "created_at"
     updated_at = "updated_at"
 
     error_msg = "__error_msg"
     run_time = "__run_time"
     run_status = "__run_status"
     pressed_randomize = "__randomize"
+
+    hidden = "__hidden"
 
 
 class BasePage:
@@ -93,7 +96,10 @@ class BasePage:
     price = settings.CREDITS_TO_DEDUCT_PER_RUN
 
     def __init__(
-        self, tab: str = "", request: Request = None, run_user: AppUser = None
+        self,
+        tab: str = "",
+        request: Request | SimpleNamespace = None,
+        run_user: AppUser = None,
     ):
         self.tab = tab
         self.request = request
@@ -546,12 +552,13 @@ class BasePage:
             return
 
         with st.div(className="d-flex gap-1"):
-            st.text_input(
-                "recipe url",
-                label_visibility="collapsed",
-                disabled=True,
-                value=url.split("://")[1].rstrip("/"),
-            )
+            with st.div(className="flex-grow-1"):
+                st.text_input(
+                    "recipe url",
+                    label_visibility="collapsed",
+                    disabled=True,
+                    value=url.split("://")[1].rstrip("/"),
+                )
             copy_to_clipboard_button(
                 "🔗 Copy URL",
                 value=url,
@@ -573,7 +580,7 @@ class BasePage:
         st.session_state.update(updates)
 
     def create_new_run(self):
-        st.session_state[StateKeys.run_status] = "Running..."
+        st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
         self._setup_rng_seed()
@@ -606,24 +613,32 @@ class BasePage:
 
         if submitted:
             example_id, run_id, uid = self.create_new_run()
+
             if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
                 st.session_state[StateKeys.run_status] = None
                 self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
                 return
-            channel = f"gooey-outputs/{self.doc_name}/{uid}/{run_id}"
-            Thread(
-                target=self._run_thread,
-                args=[run_id, uid, st.session_state, channel],
-            ).start()
-            gooey_reset_query_parm(
-                **self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
+
+            from celeryapp.tasks import gui_runner
+
+            gui_runner.delay(
+                page_cls=self.__class__,
+                user_id=self.request.user.id,
+                run_id=run_id,
+                uid=uid,
+                state=st.session_state,
+                channel=f"gooey-outputs/{self.doc_name}/{uid}/{run_id}",
+            )
+
+            raise QueryParamsRedirectException(
+                self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
             )
 
         self._render_before_output()
 
         run_status = st.session_state.get(StateKeys.run_status)
         if run_status:
-            st.caption("Your changes are saved in the above URL. ")
+            st.caption("Your changes are saved in the above URL. Save it for later!")
             html_spinner(run_status)
         else:
             err_msg = st.session_state.get(StateKeys.error_msg)
@@ -634,81 +649,13 @@ class BasePage:
                 st.error(err_msg)
             # render run time
             elif run_time:
-                st.success(f"Success! Run Time: `{run_time:.2f}` seconds. ")
+                st.success(f"Success! Run Time: {run_time:.2f} seconds.")
 
         # render outputs
         self.render_output()
 
         if not run_status:
             self._render_after_output()
-
-    def _run_thread(self, run_id, uid, state, channel):
-        st.set_session_state(state)
-        run_time = 0
-        yield_val = None
-        error_msg = None
-
-        def save(done=False):
-            if done:
-                # clear run status
-                run_status = None
-            else:
-                # set run status to the yield value of generator
-                run_status = yield_val or "Running..."
-            if isinstance(run_status, tuple):
-                run_status, extra_output = run_status
-            else:
-                extra_output = {}
-            output = (
-                # set run status and run time
-                {
-                    StateKeys.run_time: run_time,
-                    StateKeys.error_msg: error_msg,
-                    StateKeys.run_status: run_status,
-                }
-                |
-                # extract outputs from local state
-                {
-                    k: v
-                    for k, v in st.session_state.items()
-                    if k in self.ResponseModel.__fields__
-                }
-                | extra_output
-            )
-            # send outputs to ui
-            realtime_push(channel, output)
-            # save to db
-            self.run_doc_ref(run_id, uid).set(
-                self.state_to_doc(st.session_state | output)
-            )
-
-        try:
-            gen = self.run(st.session_state)
-            while True:
-                # record time
-                start_time = time()
-                try:
-                    # advance the generator (to further progress of run())
-                    yield_val = next(gen)
-                    # increment total time taken after every iteration
-                    run_time += time() - start_time
-                    continue
-                # run completed
-                except StopIteration:
-                    run_time += time() - start_time
-                    self.deduct_credits(st.session_state)
-                    break
-                # render errors nicely
-                except Exception as e:
-                    run_time += time() - start_time
-                    traceback.print_exc()
-                    sentry_sdk.capture_exception(e)
-                    error_msg = err_msg_for_exc(e)
-                    break
-                finally:
-                    save()
-        finally:
-            save(done=True)
 
     def _setup_rng_seed(self):
         seed = st.session_state.get("seed")
@@ -745,33 +692,30 @@ class BasePage:
         if not self.is_current_user_admin():
             return
 
-        new_example_id = None
-        doc_ref = None
         example_id, *_ = extract_query_params(gooey_get_query_params())
 
         with st.expander("🛠️ Admin Options"):
-            col1, col2, col3 = st.columns(3)
+            if st.button("⭐️ Save Workflow"):
+                doc_ref = db.get_doc_ref(self.doc_name)
+                doc_ref.set(self.state_to_doc(st.session_state))
 
-            with col1:
-                if st.button("⭐️ Save Workflow & Settings"):
-                    doc_ref = db.get_doc_ref(self.doc_name)
-                    doc_ref.set(self.state_to_doc(st.session_state))
+            if st.button("🔖 Create new Example"):
+                new_example_id = get_random_doc_id()
+                doc_ref = self.example_doc_ref(new_example_id)
+                doc_ref.set(self.state_to_doc(st.session_state))
+                raise QueryParamsRedirectException(dict(example_id=new_example_id))
 
-            with col2:
-                if st.button("🔖 Add as Example"):
-                    new_example_id = get_random_doc_id()
-                    doc_ref = self.example_doc_ref(new_example_id)
-                    doc_ref.set(self.state_to_doc(st.session_state))
-                    gooey_reset_query_parm(example_id=new_example_id)
+            if example_id and st.button("💾 Save this Example"):
+                doc_ref = self.example_doc_ref(example_id)
+                doc_ref.set(self.state_to_doc(st.session_state))
+                raise QueryParamsRedirectException(dict(example_id=example_id))
 
-            with col3:
-                if example_id and st.button("💾 Save Example & Settings"):
-                    doc_ref = self.example_doc_ref(example_id)
-                    doc_ref.set(self.state_to_doc(st.session_state))
-                    gooey_reset_query_parm(example_id=example_id)
-
-            # if not doc_ref:
-            #     return
+            if example_id:
+                hidden = st.session_state.get(StateKeys.hidden)
+                if st.button("👁️ Make Public" if hidden else "🙈️ Hide"):
+                    self.set_hidden(
+                        example_id=example_id, doc=st.session_state, hidden=not hidden
+                    )
 
             ## TODO: how to model this?
             # st.success("Saved", icon="✅")
@@ -784,6 +728,10 @@ class BasePage:
         }
         ret |= {
             StateKeys.updated_at: datetime.datetime.utcnow(),
+            StateKeys.created_at: ret.get(
+                StateKeys.created_at, datetime.datetime.utcnow()
+            ),
+            StateKeys.hidden: ret.get(StateKeys.hidden, False),
         }
 
         title = state.get(StateKeys.page_title)
@@ -804,6 +752,7 @@ class BasePage:
         ] + [
             StateKeys.error_msg,
             StateKeys.run_status,
+            StateKeys.run_time,
         ]
 
     def _examples_tab(self):
@@ -830,7 +779,7 @@ class BasePage:
             example_id = snapshot.id
             doc = snapshot.to_dict()
 
-            if doc.get("__hidden"):
+            if doc.get(StateKeys.hidden):
                 raise SkipIteration()
 
             url = str(
@@ -850,6 +799,11 @@ class BasePage:
 
     def _history_tab(self):
         assert self.request, "request must be set to render history tab"
+        if not self.request.user:
+            redirect_url = furl(
+                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
+            )
+            raise RedirectException(str(redirect_url))
         uid = self.request.user.uid
 
         run_history = (
@@ -900,7 +854,7 @@ class BasePage:
             )
         copy_to_clipboard_button("🔗 Copy URL", value=url)
         if allow_delete:
-            self._example_delete_button(**query_params)
+            self._example_delete_button(**query_params, doc=doc)
 
         updated_at = doc.get("updated_at")
         if updated_at and isinstance(updated_at, datetime.datetime):
@@ -919,19 +873,25 @@ class BasePage:
 
         self.render_example(doc)
 
-    def _example_delete_button(self, example_id):
+    def _example_delete_button(self, example_id, doc):
         pressed_delete = st.button(
-            "🗑️ Delete",
+            "🙈️ Hide",
             key=f"delete_example_{example_id}",
             style={"color": "red"},
         )
         if not pressed_delete:
             return
+        self.set_hidden(example_id=example_id, doc=doc, hidden=True)
 
-        example = self.example_doc_ref(example_id)
+    def set_hidden(self, *, example_id, doc, hidden: bool):
+        doc_ref = self.example_doc_ref(example_id)
 
-        with st.spinner("deleting..."):
-            example.update({"__hidden": True})
+        with st.spinner("Hiding..."):
+            field_updates = {StateKeys.hidden: hidden}
+            doc_ref.update(field_updates)
+            doc.update(field_updates)
+
+        st.experimental_rerun()
 
     def render_example(self, state: dict):
         pass
@@ -1135,3 +1095,15 @@ def _build_page_tuple(page_cls: typing.Type[BasePage]):
         page_cls().preview_image(state), page_cls().fallback_preivew_image()
     )
     return page_cls, state, preview_image
+
+
+class RedirectException(Exception):
+    def __init__(self, url, status_code=302):
+        self.url = url
+        self.status_code = status_code
+
+
+class QueryParamsRedirectException(RedirectException):
+    def __init__(self, query_params: dict, status_code=303):
+        url = "?" + urllib.parse.urlencode(query_params)
+        super().__init__(url, status_code)

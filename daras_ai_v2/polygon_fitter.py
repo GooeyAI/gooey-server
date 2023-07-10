@@ -1,10 +1,6 @@
 import math
 
-import cv2
 import numpy as np
-
-CONTOUR_HIREARCY = cv2.RETR_EXTERNAL
-CONTOUR_MODE = cv2.CHAIN_APPROX_SIMPLE
 
 
 def roll_pts_to_have_same_origin(arr):
@@ -13,6 +9,8 @@ def roll_pts_to_have_same_origin(arr):
 
 
 def appx_best_fit_ngon(mask_cv2, n: int = 4):
+    import cv2
+
     contour = _find_largest_contour(mask_cv2)
 
     # # alternate method
@@ -84,6 +82,8 @@ def appx_best_fit_ngon(mask_cv2, n: int = 4):
 
 
 def best_fit_rotated_rect(mask_cv2):
+    import cv2
+
     contour = _find_largest_contour(mask_cv2)
 
     box2d = cv2.minAreaRect(contour)
@@ -112,6 +112,11 @@ def best_fit_rotated_rect(mask_cv2):
 
 
 def _find_largest_contour(mask_cv2):
+    import cv2
+
+    CONTOUR_HIREARCY = cv2.RETR_EXTERNAL
+    CONTOUR_MODE = cv2.CHAIN_APPROX_SIMPLE
+
     mask_cv2 = cv2.cvtColor(mask_cv2, cv2.COLOR_RGB2GRAY)
     _, thresh = cv2.threshold(mask_cv2, 1, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(thresh, CONTOUR_HIREARCY, CONTOUR_MODE)

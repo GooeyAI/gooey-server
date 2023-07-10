@@ -6,13 +6,12 @@ import stripe
 from django.db import models, IntegrityError, transaction
 from django.utils import timezone
 from firebase_admin import auth
-from google.cloud import firestore
-from google.cloud.firestore_v1.transaction import Transaction
 from phonenumber_field.modelfields import PhoneNumberField
 
 from bots.custom_fields import CustomURLField
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
 from daras_ai_v2 import settings, db
+from gooeysite.bg_db_conn import db_middleware
 
 
 class AppUserQuerySet(models.QuerySet):
@@ -54,7 +53,7 @@ class AppUser(models.Model):
 
     stripe_customer_id = models.CharField(max_length=255, default="", blank=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
     upgraded_from_anonymous_at = models.DateTimeField(null=True, blank=True)
 
     objects = AppUserQuerySet.as_manager()
@@ -68,7 +67,11 @@ class AppUser(models.Model):
         return self.display_name.split(" ")[0]
 
     def add_balance(self, amount: int, invoice_id: str, **invoice_items):
+        from google.cloud import firestore
+        from google.cloud.firestore_v1.transaction import Transaction
+
         @firestore.transactional
+        @db_middleware
         def _update_user_balance_in_txn(txn: Transaction):
             user_doc_ref = db.get_user_doc_ref(self.uid)
 
@@ -94,9 +97,9 @@ class AppUser(models.Model):
                 },
             )
 
-        _update_user_balance_in_txn(db.client.transaction())
+        _update_user_balance_in_txn(db.get_client().transaction())
 
-    def copy_from_firebase_user(self, user: auth.UserRecord):
+    def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
         # copy data from firebase user
         self.uid = user.uid
         self.is_disabled = user.disabled
@@ -111,7 +114,7 @@ class AppUser(models.Model):
         if user.photo_url:
             response = requests.get(user.photo_url)
             if response.ok:
-                ext = mimetypes.guess_extension(response.headers["Content-Type"]) or ""
+                ext = guess_ext_from_response(response)
                 self.photo_url = upload_file_from_bytes(
                     f"user_photo_{user.uid}{ext}", response.content
                 )
@@ -137,6 +140,8 @@ class AppUser(models.Model):
                 else settings.LOGIN_USER_FREE_CREDITS
             ),
         )
+
+        return self
 
     def get_or_create_stripe_customer(self) -> stripe.Customer:
         customer = self.search_stripe_customer()
