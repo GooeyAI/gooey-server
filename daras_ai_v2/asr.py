@@ -149,17 +149,23 @@ def run_google_translate(
     )
 
 
+def rchop(s, suffix):
+    if suffix and s.endswith(suffix):
+        return s[: -len(suffix)]
+    return s
+
+
 def _translate_text(text: str, language_code: str, google_translate_target: str):
     res = authed_session.post(
         f"https://translation.googleapis.com/v3/projects/{PROJECT}/locations/global:translateText",
         json.dumps(
             {
-                "source_language_code": language_code.strip("-Latn"),
+                "source_language_code": rchop(language_code, "-Latn"),
                 "target_language_code": google_translate_target,
                 "contents": text,
                 "mime_type": "text/plain",
                 "transliteration_config": {
-                    "enable_transliteration": language_code.strip("-Latn")
+                    "enable_transliteration": rchop(language_code, "-Latn")
                     in TRANSLITERATION_SUPPORTED
                 },
             }
