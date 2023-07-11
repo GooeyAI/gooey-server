@@ -52,6 +52,8 @@ from recipes.DocSearch import (
 )
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
+from routers.url_shortener import get_or_create_short_url
+from bots.models import Workflow
 
 BOT_SCRIPT_RE = re.compile(
     # start of line
@@ -533,6 +535,10 @@ Use this for prompting GPT to use the document search results.
             references = yield from get_top_k_references(
                 DocSearchPage.RequestModel.parse_obj(state)
             )
+            for reference in references:
+                reference.url = get_or_create_short_url(
+                    reference.url, self._get_current_api_url(), Workflow.VIDEOBOTS
+                )
             state["references"] = references
         # if doc search is successful, add the search results to the user prompt
         if references:
