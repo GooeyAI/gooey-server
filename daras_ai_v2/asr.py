@@ -149,8 +149,6 @@ def _translate_text(text: str, source_language: str, target_language: str):
     if source_language == target_language:
         return text
 
-    print([is_romanized, source_language, target_language, enable_transliteration])
-
     if enable_transliteration:
         authed_session, project = get_google_auth_session()
         res = authed_session.post(
