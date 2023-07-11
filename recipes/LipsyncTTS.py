@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import gooey_ui as st
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
+from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/lipsync_meta_img.gif"
 
@@ -138,3 +139,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     def render_output(self):
         self.render_example(st.session_state)
+
+    def render_usage_guide(self):
+        youtube_video("RRmwQR-IytI")
