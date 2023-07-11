@@ -43,9 +43,16 @@ def main():
         run_id = None
         example_id = None
     num_results = st.number_input("Max number of results", value=100)
-    if workflow or shorturl or longurl or run or run_id or example_id:
+    sort_by = st.selectbox(
+        "Sort by",
+        options=["Clicks", "Created"],
+        format_func=lambda s: s if s else "---",
+    )
+    if workflow or shorturl or longurl or run or run_id or example_id or sort_by:
         with st.spinner("Loading stats..."):
             query = ShortenedURLs.objects.all()
+            if sort_by == "Clicks":
+                query = query.order_by("-clicks")
             if workflow:
                 query = query.filter(run__workflow=workflow)
             if shorturl:
