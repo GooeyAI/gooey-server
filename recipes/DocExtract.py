@@ -1,23 +1,28 @@
 import typing
 
 from django.db.models import IntegerChoices
+from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.asr import (
     google_translate_language_selector,
     AsrModels,
     run_asr,
     download_youtube_to_wav,
     run_google_translate,
+    audio_to_wav,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.functional import map_parallel, flatmap_parallel
+from daras_ai_v2.gdrive_downloader import is_gdrive_url, gdrive_download
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.settings import service_account_key_path
+from daras_ai_v2.vector_search import doc_url_to_metadata
 
 
 class Columns(IntegerChoices):
@@ -45,7 +50,7 @@ class DocExtractPage(BasePage):
         sheet_url: str | None
 
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-        language: str | None
+        # language: str | None
         google_translate_target: str | None
 
         task_instructions: str | None
@@ -124,22 +129,27 @@ class DocExtractPage(BasePage):
 
 
 def extract_info(url: str) -> list[dict | None]:
-    import yt_dlp
+    if is_yt_url(url):
+        import yt_dlp
 
-    with yt_dlp.YoutubeDL(dict(ignoreerrors=True)) as ydl:
-        data = ydl.extract_info(url, download=False)
-    entries = data.get("entries", [data])
-    return entries
+        # https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/options.py
+        params = dict(ignoreerrors=True, check_formats=False)
+        with yt_dlp.YoutubeDL(params) as ydl:
+            data = ydl.extract_info(url, download=False)
+        entries = data.get("entries", [data])
+        return entries
+    else:
+        return [{"webpage_url": url}]  # assume it's a direct link
 
 
 def process_entry(worksheet, entry: dict | None, request: DocExtractPage.RequestModel):
     import gspread.utils
 
-    video_url = entry.get("webpage_url")
-    if not (entry and video_url):
+    webpage_url = entry.get("webpage_url")
+    if not (entry and webpage_url):
         return
 
-    cell = worksheet.find(video_url)
+    cell = worksheet.find(webpage_url)
     if cell:
         row = cell.row
     else:
@@ -149,18 +159,18 @@ def process_entry(worksheet, entry: dict | None, request: DocExtractPage.Request
 
     worksheet.update_cells(
         [
-            gspread.Cell(row, Columns.video_url.value, video_url),
-            gspread.Cell(row, Columns.title.value, entry["title"]),
-            gspread.Cell(row, Columns.description.value, entry["description"]),
+            gspread.Cell(row, Columns.video_url.value, webpage_url),
+            gspread.Cell(row, Columns.title.value, entry.get("title", "")),
+            gspread.Cell(row, Columns.description.value, entry.get("description", "")),
         ],
     )
 
     try:
-        for status in process_video(
+        for status in process_source(
             request=request,
             worksheet=worksheet,
             row=row,
-            video_url=video_url,
+            webpage_url=webpage_url,
         ):
             worksheet.update_cell(row, Columns.status.value, status)
     except:
@@ -170,38 +180,51 @@ def process_entry(worksheet, entry: dict | None, request: DocExtractPage.Request
         worksheet.update_cell(row, Columns.status.value, "Done")
 
 
-def process_video(
+def process_source(
     request: DocExtractPage.RequestModel,
     row: int,
-    video_url: str,
+    webpage_url: str,
     worksheet,
 ) -> typing.Iterator[str | None]:
     audio_url = worksheet.cell(row, Columns.audio_url.value).value
     if not audio_url:
         yield "Downloading"
-        audio_url, _ = download_youtube_to_wav(video_url)
+        if is_yt_url(webpage_url):
+            audio_url, _ = download_youtube_to_wav(webpage_url)
+        else:
+            f = furl(webpage_url)
+            if is_gdrive_url(f):
+                doc_meta = doc_url_to_metadata(webpage_url)
+                f_name = doc_meta.name
+                worksheet.update_cell(row, Columns.title.value, f_name)
+                f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
+                webpage_url = upload_file_from_bytes(
+                    f_name, f_bytes, content_type=doc_meta.mime_type
+                )
+            audio_url, _ = audio_to_wav(webpage_url)
         worksheet.update_cell(row, Columns.audio_url.value, audio_url)
 
-    transcript = worksheet.cell(row, Columns.transcript.value).value
-    if not transcript:
+    text = worksheet.cell(row, Columns.transcript.value).value
+    if not text:
         yield "Transcribing"
-        transcript = run_asr(audio_url, request.selected_asr_model)
-        worksheet.update_cell(row, Columns.transcript.value, transcript)
+        text = run_asr(audio_url, request.selected_asr_model)
+        worksheet.update_cell(row, Columns.transcript.value, text)
 
-    translation = worksheet.cell(row, Columns.translation.value).value
-    if not translation:
-        yield "Translating"
-        translation = run_google_translate(
-            texts=[transcript],
-            target_language=request.google_translate_target,
-            source_language=request.language,
-        )[0]
-        worksheet.update_cell(row, Columns.translation.value, translation)
+    if request.google_translate_target:
+        text = worksheet.cell(row, Columns.translation.value).value
+        if not text:
+            yield "Translating"
+            text = run_google_translate(
+                texts=[text],
+                target_language=request.google_translate_target,
+                # source_language=request.language,
+            )[0]
+            worksheet.update_cell(row, Columns.translation.value, text)
 
     summary = worksheet.cell(row, Columns.summary.value).value
-    if not summary:
+    if not summary and request.task_instructions:
         yield "Summarizing"
-        prompt = request.task_instructions.strip() + "\n\n" + translation
+        prompt = request.task_instructions.strip() + "\n\n" + text
         summary = "\n---\n".join(
             run_language_model(
                 model=request.selected_model,
