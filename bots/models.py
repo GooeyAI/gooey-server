@@ -525,7 +525,7 @@ class ShortenedURLs(models.Model):
 
     @property
     def shortened_url(self):
-        return furl(settings.APP_BASE_URL, path=f"/s/{self.shortened_guid}").url
+        return furl(settings.APP_BASE_URL, path=f"/2/{self.shortened_guid}").url
 
     class Meta:
         ordering = ("-created_at",)

@@ -13,7 +13,7 @@ from django.db.models import Q
 app = APIRouter()
 
 
-@app.get("/s/{shortened_guid}")
+@app.get("/2/{shortened_guid}")
 @transaction.atomic
 def redirect_via_short_url(shortened_guid):
     shortened = (
