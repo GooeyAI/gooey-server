@@ -23,6 +23,7 @@ from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.settings import service_account_key_path
 from daras_ai_v2.vector_search import doc_url_to_metadata
+from recipes.DocSearch import render_documents
 
 
 class Columns(IntegerChoices):
@@ -83,6 +84,11 @@ class DocExtractPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return "Transcribe YouTube videos in any language with Whisper, Google Chirp & more, run your own GPT4 prompt on each transcript and save it all to a Google Sheet. Perfect for making a YouTube-based dataset to create your own chatbot or enterprise copilot (ie. just add the finished Google sheet url to the doc section in https://gooey.ai/copilot)."
+
+    def render_example(self, state: dict):
+        render_documents(state)
+        st.write("**Google Sheets URL**")
+        st.write(st.session_state.get("sheet_url"))
 
     def render_settings(self):
         st.text_area(
