@@ -14,12 +14,10 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.GoogleGPT import SearchReference
 from daras_ai_v2.translate import (
-    TranslateAPIs,
+    Translate,
+    TranslateUI,
     LANGUAGE_CODE_TYPE,
     TRANSLATE_API_TYPE,
-    run_translate,
-    translate_api_selector,
-    translate_language_selector,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -174,7 +172,7 @@ class VideoBotsPage(BasePage):
         "max_references": 3,
         "max_context_words": 200,
         "scroll_jump": 5,
-        "translate_api": TranslateAPIs.Auto.name,
+        "translate_api": Translate.APIs.Auto.name,
     }
 
     class RequestModel(BaseModel):
@@ -306,8 +304,8 @@ Enable document search, to use custom documents as information sources.
             key="bot_script",
             height=300,
         )
-        translate_api_selector()
-        translate_language_selector(
+        TranslateUI.translate_api_selector()
+        TranslateUI.translate_language_selector(
             label="""
             ###### 🔠 User Language
             If provided, the bot will translate input prompt to english, and the responses to this language.
@@ -490,10 +488,10 @@ Use this for prompting GPT to use the document search results.
         # translate input text
         if request.user_language and request.user_language != "en":
             yield f"Translating input to english..."
-            user_input = run_translate(
+            user_input = Translate.run(
                 texts=[user_input],
-                translate_target="en",
-                translate_from=request.user_language,
+                target_language="en",
+                source_language=request.user_language,
             )[0]
 
         # parse the bot script
@@ -634,10 +632,10 @@ Use this for prompting GPT to use the document search results.
         # translate response text
         if request.user_language and request.user_language != "en":
             yield f"Translating response to {request.user_language}..."
-            output_text = run_translate(
+            output_text = Translate.run(
                 texts=output_text,
-                ranslate_target=request.user_language,
-                translate_from="en",
+                target_language=request.user_language,
+                source_language="en",
             )
 
         if references:

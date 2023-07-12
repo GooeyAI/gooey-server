@@ -493,8 +493,10 @@ TRANSLITERATION_SUPPORTED = {
 class Translator(ABC):
     """Each model/API has its own translator class which keeps things in one place and provides a template for adding more."""
 
-    # displayname of the translator
+    # enum name
     name: str = "Translator"
+    # enum value and display name
+    value: str = "translator"
     # transliteration should be done by a different endpoint - Translate.transliterate() - for all languages not in this set
     _can_transliterate: list[str] = {}
 
@@ -522,7 +524,6 @@ class Translator(ABC):
         language_code = language_code.replace("-Latn", "")
         return is_romanized, language_code
 
-    @st.cache_data
     @classmethod
     @abstractmethod
     def supported_languages(cls) -> dict[str, str]:
@@ -606,9 +607,7 @@ class Translator(ABC):
         pass
 
     @classmethod
-    def translate_language_selector(
-        cls, label: str, key: str, key_apiselect="translate_api", allow_none=True
-    ):
+    def language_selector(cls, label: str, key: str, allow_none=True):
         """
         Streamlit widget for selecting a language.
         Args:
@@ -620,13 +619,30 @@ class Translator(ABC):
             languages,
             label=label,
             key=key,
-            key_apiselect=key_apiselect,
             allow_none=allow_none,
         )
 
 
+# declared separately for caching since python support for caching classmethods is limited
+@st.cache_data()
+def _Google_supported_languages() -> dict[str, str]:
+    from google.cloud import translate
+
+    parent = f"projects/dara-c1b52/locations/global"
+    client = translate.TranslationServiceClient()
+    supported_languages = client.get_supported_languages(
+        parent, display_language_code="en"
+    )
+    return {
+        lang.language_code: lang.display_name
+        for lang in supported_languages.languages
+        if lang.support_target
+    }
+
+
 class GoogleTranslate(Translator):
-    name = "Google Translate"
+    name = "GoogleTranslate"
+    value = "Google Translate"
     _can_transliterate = {
         "ar",
         "bn",
@@ -662,21 +678,9 @@ class GoogleTranslate(Translator):
         detections = translate_client.detect_language(texts)
         return [detection["language"] for detection in detections]
 
-    @st.cache_data
     @classmethod
     def supported_languages(cls) -> dict[str, str]:
-        from google.cloud import translate
-
-        parent = f"projects/dara-c1b52/locations/global"
-        client = translate.TranslationServiceClient()
-        supported_languages = client.get_supported_languages(
-            parent, display_language_code="en"
-        )
-        return {
-            lang.language_code: lang.display_name
-            for lang in supported_languages.languages
-            if lang.support_target
-        }
+        return _Google_supported_languages()
 
     @classmethod
     def _translate_text(
@@ -734,22 +738,28 @@ class GoogleTranslate(Translator):
         return result["translatedText"]
 
 
+# declared separately for caching since python support for caching classmethods is limited
+@st.cache_data()
+def _MinT_supported_languages() -> dict[str, str]:
+    res = requests.get("https://translate.wmcloud.org/api/languages")
+    res.raise_for_status()
+    languages = res.json()
+
+    return {code: ISO_639_LANGUAGES.get(code, code) for code in languages.keys()}
+
+
 class MinT(Translator):
     name = "MinT"
+    value = "MinT"
 
     @classmethod
     def detect_languages(cls, texts: list[str]) -> list[str]:
         # won't depend on MinT for language detection
         return GoogleTranslate.detect_languages(texts)
 
-    @st.cache_data
     @classmethod
     def supported_languages(cls) -> dict[str, str]:
-        res = requests.get("https://translate.wmcloud.org/api/languages")
-        res.raise_for_status()
-        languages = res.json()
-
-        return {code: ISO_639_LANGUAGES.get(code, code) for code in languages.keys()}
+        return _MinT_supported_languages()
 
     @classmethod
     def _translate_text(
@@ -779,14 +789,14 @@ class MinT(Translator):
 
 
 class Auto(Translator):
-    name = "Auto - use recommended API based on language"
+    name = "Auto"
+    value = "Auto - use recommended API based on language"
     _can_transliterate = GoogleTranslate._can_transliterate
 
     @classmethod
     def detect_languages(cls, texts: list[str]) -> list[str]:
         return GoogleTranslate.detect_languages(texts)
 
-    @st.cache_data
     @classmethod
     def supported_languages(cls) -> dict[str, str]:
         """
@@ -837,7 +847,8 @@ _all_apis: list[Translator] = [GoogleTranslate, MinT, Auto]
 def _all_languages() -> dict[str, str]:
     dict = {}
     for api in _all_apis:
-        dict.update(api.supported_languages())
+        if api is not Auto:
+            dict.update(api.supported_languages())
     return dict
 
 
@@ -864,7 +875,7 @@ TRANSLITERATION_SUPPORTED_TYPE = typing.TypeVar(
 
 class Translate:
     apis: dict[TRANSLATE_API_TYPE, Translator] = {api.name: api for api in _all_apis}
-    APIs = Enum("APIs", {api.name: api for api in apis})
+    APIs = Enum("APIs", {api.name: api.value for api in _all_apis})
 
     @classmethod
     def supported_languages(cls) -> dict[LANGUAGE_CODE_TYPE, str]:
@@ -880,7 +891,7 @@ class Translate:
     def run(
         cls,
         texts: list[str],
-        translate_target: str,
+        target_language: str,
         api: TRANSLATE_API_TYPE = None,
         source_language: str | None = None,
         enable_transliteration: bool = True,
@@ -888,11 +899,9 @@ class Translate:
     ) -> list[str]:
         translator = cls.apis.get(api, Auto)
         result = translator.translate(
-            texts, translate_target, source_language, enable_transliteration
+            texts, target_language, source_language, enable_transliteration
         )
-        return (
-            cls.romanize(result, translate_target) if romanize_translation else result
-        )
+        return cls.romanize(result, target_language) if romanize_translation else result
 
     @classmethod
     def romanize(texts: list[str], language: ROMANIZATION_SUPPORTED_TYPE) -> list[str]:
@@ -942,12 +951,12 @@ class TranslateUI:
         label="###### Translate API",
         key="translate_api",
         allow_none=True,
-    ):
+    ) -> TRANSLATE_API_TYPE:
         options = Translate.apis.keys()
         if allow_none:
             options.insert(0, None)
             label += " (_optional_)"
-        st.selectbox(
+        return st.selectbox(
             label=label,
             key=key,
             format_func=lambda k: Translate.apis.get(k).name
@@ -965,16 +974,16 @@ class TranslateUI:
         require_source=False,
         key_source="source_language",
     ):
-        TranslateUI.translate_api_selector(
+        translator = TranslateUI.translate_api_selector(
             key=key_apiselect, allow_none=not require_api
         )
-        TranslateUI.translate_language_selector(
+        translator = Translate.apis.get(translator)
+        translator.language_selector(
             label="###### Input Language",
             key=key_source,
-            api_key=key_apiselect,
             allow_none=not require_source,
         )
-        TranslateUI.translate_language_selector(
+        translator.language_selector(
             key=key_target, api_key=key_apiselect, allow_none=not require_target
         )
 
@@ -1026,7 +1035,7 @@ class TranslateUI:
         if allow_none:
             options.insert(0, None)
             label += " (_optional_)"
-        st.selectbox(
+        return st.selectbox(
             label=label,
             key=key,
             format_func=lambda k: languages[k] if k else "———",

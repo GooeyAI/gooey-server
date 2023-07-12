@@ -12,12 +12,10 @@ from daras_ai_v2.asr import (
     forced_asr_languages,
 )
 from daras_ai_v2.translate import (
-    TranslateAPIs,
+    Translate,
+    TranslateUI,
     TRANSLATE_API_TYPE,
     LANGUAGE_CODE_TYPE,
-    translate_api_selector,
-    translate_language_selector,
-    run_translate,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -34,7 +32,7 @@ class AsrPage(BasePage):
     slug_versions = ["asr", "speech"]
 
     sane_defaults = dict(
-        output_format=AsrOutputFormat.text.name, translate_api=TranslateAPIs.Auto.name
+        output_format=AsrOutputFormat.text.name, translate_api=Translate.APIs.Auto.name
     )
 
     class RequestModel(BaseModel):
@@ -85,13 +83,13 @@ class AsrPage(BasePage):
         )
         st.write("---")
         enum_selector(AsrModels, label="###### ASR Model", key="selected_model")
-        translate_language_selector(
-            label="###### Spoken Language", key="language", use_source=True
+        TranslateUI.translate_language_selector(
+            label="###### Spoken Language", key="language"
         )
 
     def render_settings(self):
-        translate_api_selector()
-        translate_language_selector()
+        TranslateUI.translate_api_selector()
+        TranslateUI.translate_language_selector(key="google_translate_target")
         st.write("---")
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
@@ -139,10 +137,11 @@ class AsrPage(BasePage):
             # Save the raw ASR text for details view
             state["raw_output_text"] = asr_output
             # Run Translation
-            state["output_text"] = run_translate(
+            state["output_text"] = Translate.run(
                 asr_output,
-                translate_target=request.google_translate_target,
-                translate_from=forced_asr_languages.get(
+                api=request.translate_api,
+                target_language=request.google_translate_target,
+                source_language=forced_asr_languages.get(
                     selected_model, request.language
                 ),
             )

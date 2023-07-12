@@ -20,7 +20,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, run_asr
-from daras_ai_v2.translate import run_translate
+from daras_ai_v2.translate import Translate, LANGUAGE_CODE_TYPE
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )
@@ -52,7 +52,7 @@ class DocSearchRequest(BaseModel):
     scroll_jump: int | None
 
     selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-    google_translate_target: str | None
+    google_translate_target: LANGUAGE_CODE_TYPE | None
 
 
 def get_top_k_references(
@@ -362,7 +362,7 @@ def doc_url_to_text_pages(
             raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
     # optionally, translate text
     if google_translate_target:
-        pages = run_translate(pages, google_translate_target)
+        pages = Translate.run(pages, google_translate_target)
     return pages
 
 

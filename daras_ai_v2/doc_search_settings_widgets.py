@@ -2,7 +2,7 @@ import gooey_ui as st
 
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels
-from daras_ai_v2.translate import google_translate_language_selector
+from daras_ai_v2.translate import GoogleTranslate
 from daras_ai_v2.enum_selector_widget import enum_selector
 
 
@@ -93,4 +93,4 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         allow_none=True,
         use_selectbox=True,
     )
-    google_translate_language_selector()
+    GoogleTranslate.language_selector(key="google_translate_target")

@@ -9,12 +9,10 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 from daras_ai_v2.translate import (
-    TranslateAPIs,
+    Translate,
+    TranslateUI,
     TRANSLATE_API_TYPE,
     LANGUAGE_CODE_TYPE,
-    translate_settings,
-    translate_advanced_settings,
-    run_translate,
 )
 from daras_ai_v2.vector_search import download_text_doc
 
@@ -24,7 +22,7 @@ class TranslationPage(BasePage):
     slug_versions = ["languages", "transliteration", "translate"]
 
     sane_defaults = dict(
-        translate_api=TranslateAPIs.Auto.name,
+        translate_api=Translate.APIs.Auto.name,
         translate_target="en",
         enable_transliteration=True,
         romanize_translation=False,
@@ -53,20 +51,22 @@ class TranslationPage(BasePage):
         # Parse Request
         request: TranslationPage.RequestModel = self.RequestModel.parse_obj(state)
         yield "Translating Text Inputs..."
-        state["output_texts"] = run_translate(
+        state["output_texts"] = Translate.run(
             request.texts,
             request.translate_target,
             request.translate_api,
             request.translate_source,
+            request.enable_transliteration,
             request.romanize_translation,
         )
         yield "Translating Documents..."
         state["output_docs"] = [
-            run_translate(
+            Translate.run(
                 download_text_doc(doc),
                 request.translate_target,
                 request.translate_api,
                 request.translate_source,
+                request.enable_transliteration,
                 request.romanize_translation,
             )
             for doc in request.documents
@@ -141,10 +141,10 @@ class TranslationPage(BasePage):
             st.session_state["documents"] = []
 
         st.write("---")
-        translate_settings(require_api=True, require_target=True)
+        TranslateUI.translate_settings(require_api=True, require_target=True)
 
     def render_settings(self):
-        translate_advanced_settings()
+        TranslateUI.translate_advanced_settings()
 
     def validate_form_v2(self):
         non_empty_text_inputs = [text for text in st.session_state.get("texts") if text]
@@ -193,7 +193,7 @@ class TranslationPage(BasePage):
         """
 
     def get_raw_price(self, state: dict):
-        if state.get("translation_api") == TranslateAPIs.MinT:
+        if state.get("translation_api") == Translate.APIs.MinT.name:
             return 1
         texts = state.get("texts", [])
         characters = sum([len(text) for text in texts])
