@@ -18,7 +18,7 @@ from daras_ai_v2.vector_search import download_text_doc
 
 
 class TranslationPage(BasePage):
-    title = "Translation"
+    title = "Better Title from Sean"
     slug_versions = ["languages", "transliteration", "translate"]
 
     sane_defaults = dict(
@@ -43,9 +43,7 @@ class TranslationPage(BasePage):
         output_docs: list[list[str]]
 
     def preview_description(self, state: dict):
-        return (
-            "Translate between any of 200+ languages using different APIs and models."
-        )
+        return "Translate among any of 200+ languages using different APIs and models."
 
     def run(self, state: dict) -> Iterator[str | None]:
         # Parse Request
@@ -91,14 +89,14 @@ class TranslationPage(BasePage):
 
     def related_workflows(self) -> list:
         from recipes.asr import AsrPage
-        from recipes.Text2Audio import Text2AudioPage
+        from recipes.VideoBots import VideoBotsPage
         from recipes.TextToSpeech import TextToSpeechPage
         from recipes.LipsyncTTS import LipsyncTTSPage
 
         return [
             AsrPage,
+            VideoBotsPage,
             TextToSpeechPage,
-            Text2AudioPage,
             LipsyncTTSPage,
         ]
 
@@ -189,12 +187,10 @@ class TranslationPage(BasePage):
 
     def additional_notes(self) -> str | None:
         return """
-            *Cost ≈ 1 credit for 100 words (or 500 unicode characters for non English languages) ≈ 0.01 credits per word (0.002 credits per unicode character)*
+            *Cost ≈ 3 credit for 100 words (or 500 unicode characters for non English languages) ≈ 0.03 credits per word (0.006 credits per unicode character)*
         """
 
     def get_raw_price(self, state: dict):
-        if state.get("translation_api") == Translate.APIs.MinT.name:
-            return 1
         texts = state.get("texts", [])
         characters = sum([len(text) for text in texts])
-        return 0.002 * characters
+        return 0.006 * characters

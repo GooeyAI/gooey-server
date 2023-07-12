@@ -712,7 +712,7 @@ class GoogleTranslate(Translator):
         if enable_transliteration:
             authed_session, project = cls.get_google_auth_session()
             res = authed_session.post(
-                f"https://translation.googleapis.com/v3/projects/{project}/locations/global:translateText",
+                f"{GOOGLE_V3_ENDPOINT}{project}/locations/global:translateText",
                 json.dumps(
                     {
                         "source_language_code": source_language,
