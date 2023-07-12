@@ -863,13 +863,6 @@ class Auto(Translator):
 _all_apis: list[Translator] = [GoogleTranslate, MinT, Auto]
 
 
-# and this Enum
-class APIs(Enum):
-    GoogleTranslate = GoogleTranslate.value
-    MinT = MinT.value
-    Auto = Auto.value
-
-
 @st.cache_data()
 def _all_languages() -> dict[str, str]:
     dict = {}
@@ -902,7 +895,7 @@ TRANSLITERATION_SUPPORTED_TYPE = typing.TypeVar(
 
 class Translate:
     apis: dict[TRANSLATE_API_TYPE, Translator] = {api.name: api for api in _all_apis}
-    APIs = APIs
+    APIs = APIs = Enum("APIs", {api.name: api.value for api in _all_apis})
 
     @classmethod
     def supported_languages(cls) -> dict[LANGUAGE_CODE_TYPE, str]:
