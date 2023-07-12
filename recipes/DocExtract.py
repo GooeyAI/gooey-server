@@ -206,27 +206,29 @@ def process_source(
             audio_url, _ = audio_to_wav(webpage_url)
         worksheet.update_cell(row, Columns.audio_url.value, audio_url)
 
-    text = worksheet.cell(row, Columns.transcript.value).value
-    if not text:
+    transcript = worksheet.cell(row, Columns.transcript.value).value
+    if not transcript:
         yield "Transcribing"
-        text = run_asr(audio_url, request.selected_asr_model)
-        worksheet.update_cell(row, Columns.transcript.value, text)
+        transcript = run_asr(audio_url, request.selected_asr_model)
+        worksheet.update_cell(row, Columns.transcript.value, transcript)
 
     if request.google_translate_target:
-        text = worksheet.cell(row, Columns.translation.value).value
-        if not text:
+        translation = worksheet.cell(row, Columns.translation.value).value
+        if not translation:
             yield "Translating"
-            text = run_google_translate(
-                texts=[text],
+            translation = run_google_translate(
+                texts=[transcript],
                 target_language=request.google_translate_target,
                 # source_language=request.language,
             )[0]
-            worksheet.update_cell(row, Columns.translation.value, text)
+            worksheet.update_cell(row, Columns.translation.value, transcript)
+    else:
+        translation = transcript
 
     summary = worksheet.cell(row, Columns.summary.value).value
     if not summary and request.task_instructions:
         yield "Summarizing"
-        prompt = request.task_instructions.strip() + "\n\n" + text
+        prompt = request.task_instructions.strip() + "\n\n" + translation
         summary = "\n---\n".join(
             run_language_model(
                 model=request.selected_model,
