@@ -218,7 +218,9 @@ class GoogleGPTPage(BasePage):
         )
         # extract links & their corresponding titles
         link_titles = {
-            item["link"]: f'{item.get("title", "")} | {item.get("snippet", "")}'
+            furl(item["link"])
+            .remove(fragment=True)
+            .url: f'{item.get("title", "")} | {item.get("snippet", "")}'
             for item in scaleserp_results.get(request.scaleserp_search_field, [])
             if item and item.get("link")
         }
@@ -234,17 +236,9 @@ class GoogleGPTPage(BasePage):
         )
         # add pretty titles to references
         for ref in references:
-            key = ref["url"].split("#")[0]
+            key = furl(ref["url"]).remove(fragment=True).url
             ref["title"] = link_titles.get(key, "")
-        # make sure references are unique
-        uniques = {}
-        for ref in references:
-            key = ref["url"].split("#")[0]
-            try:
-                uniques[key]["snippet"] += "\n\n---\n\n" + ref["snippet"]
-            except KeyError:
-                uniques[key] = ref
-        state["references"] = list(uniques.values())
+        state["references"] = references
 
         # empty search result, abort!
         if not references:

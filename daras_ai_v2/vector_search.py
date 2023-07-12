@@ -66,9 +66,8 @@ def get_top_k_references(
     Returns:
         the top k documents
     """
-    yield f"Getting query embeddings..."
+    yield "Getting embeddings..."
     query_embeds = openai_embedding_create([request.search_query])[0]
-    yield "Getting document embeddings..."
     input_docs = request.documents or []
     embeds: list[tuple[SearchReference, np.ndarray]] = flatmap_parallel(
         lambda f_url: doc_url_to_embeds(
@@ -80,7 +79,8 @@ def get_top_k_references(
         ),
         input_docs,
     )
-    yield f"Searching documents..."
+
+    yield "Searching documents..."
     # get all matches above cutoff based on cosine similarity
     cutoff = 0.7
     candidates = [
@@ -89,10 +89,22 @@ def get_top_k_references(
         if (score := query_embeds.dot(doc_embeds)) >= cutoff
     ]
     # get top_k best matches
-    matches = heapq.nlargest(
+    references = heapq.nlargest(
         request.max_references, candidates, key=lambda match: match["score"]
     )
-    return matches
+
+    # merge duplicate references
+    uniques = {}
+    for ref in references:
+        key = ref["url"]
+        try:
+            existing = uniques[key]
+        except KeyError:
+            uniques[key] = ref
+        else:
+            existing["snippet"] += "\n\n...\n\n" + ref["snippet"]
+            existing["score"] = (existing["score"] + ref["score"]) / 2
+    return list(uniques.values())
 
 
 def references_as_prompt(references: list[SearchReference], sep="\n\n") -> str:
@@ -236,7 +248,7 @@ def get_embeds_for_doc(
             {
                 "title": doc_meta.name,
                 "url": f_url,
-                **row,
+                **row,  # preserve extra csv rows
                 "score": -1,
                 "snippet": doc.text,
             }
@@ -250,7 +262,9 @@ def get_embeds_for_doc(
             {
                 "title": doc_meta.name
                 + (f" - Page {doc.end + 1}" if len(pages) > 1 else ""),
-                "url": f_url + (f"#page={doc.end + 1}" if len(pages) > 1 else ""),
+                "url": furl(f_url)
+                .set(fragment_args={"page": doc.end + 1} if len(pages) > 1 else {})
+                .url,
                 "snippet": doc.text,
                 "score": -1,
             }

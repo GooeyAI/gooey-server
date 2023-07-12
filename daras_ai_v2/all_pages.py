@@ -35,32 +35,41 @@ from recipes.embeddings_page import EmbeddingsPage
 
 # note: the ordering here matters!
 all_home_pages = [
-    DocSearchPage,
-    DocSummaryPage,
-    GoogleGPTPage,
+    # top ones
     VideoBotsPage,
-    LipsyncTTSPage,
-    TextToSpeechPage,
-    AsrPage,
-    LipsyncPage,
     DeforumSDPage,
-    CompareText2ImgPage,
-    Text2AudioPage,
-    Img2ImgPage,
-    FaceInpaintingPage,
-    GoogleImageGenPage,
-    CompareUpscalerPage,
-    SEOSummaryPage,
-    EmailFaceInpaintingPage,
-    SocialLookupEmailPage,
-    ObjectInpaintingPage,
-    ImageSegmentationPage,
-    CompareLLMPage,
-    SmartGPTPage,
-    RelatedQnAPage,
-    RelatedQnADocPage,
     QRCodeGeneratorPage,
-    EmbeddingsPage,
+    # SEO tools
+    GoogleGPTPage,
+    SEOSummaryPage,
+    RelatedQnAPage,
+    # Image Tools
+    ObjectInpaintingPage,
+    CompareText2ImgPage,
+    Img2ImgPage,
+    # More Image
+    FaceInpaintingPage,
+    EmailFaceInpaintingPage,
+    GoogleImageGenPage,
+    # LipSync fun
+    TextToSpeechPage,
+    LipsyncPage,
+    LipsyncTTSPage,
+    # Text
+    CompareLLMPage,
+    DocSearchPage,
+    SmartGPTPage,
+    # Speech & Music
+    AsrPage,
+    # VideoPlayList,
+    Text2AudioPage,
+    # Other
+    DocSummaryPage,
+    RelatedQnADocPage,
+    SocialLookupEmailPage,
+    # More
+    ImageSegmentationPage,
+    CompareUpscalerPage,
     YoutubeBotPage,
 ]
 
@@ -68,6 +77,7 @@ all_home_pages = [
 all_api_pages = all_home_pages.copy() + [
     ChyronPlantPage,
     LetterWriterPage,
+    EmbeddingsPage,
 ]
 
 # pytest suite

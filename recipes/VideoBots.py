@@ -484,7 +484,8 @@ Use this for prompting GPT to use the document search results.
             yield f"Translating input to english..."
             user_input = run_google_translate(
                 texts=[user_input],
-                google_translate_target="en",
+                source_language=request.user_language,
+                target_language="en",
             )[0]
 
         # parse the bot script
@@ -627,7 +628,8 @@ Use this for prompting GPT to use the document search results.
             yield f"Translating response to {request.user_language}..."
             output_text = run_google_translate(
                 texts=output_text,
-                google_translate_target=request.user_language,
+                source_language="en",
+                target_language=request.user_language,
             )
 
         if references:

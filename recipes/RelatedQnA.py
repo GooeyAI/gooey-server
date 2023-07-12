@@ -82,7 +82,7 @@ class RelatedQnAPage(BasePage):
         site_filter = state.get("site_filter")
         if site_filter:
             st.write(f"**Site** \\\n{site_filter}")
-        render_qna_outputs(state, 200)
+        render_qna_outputs(state, 200, show_count=1)
 
     def render_settings(self):
         st.text_area(
