@@ -10,7 +10,7 @@ fi
 
 if [ "$RUN_JUPYTER" ]; then
   pip install jupyterlab
-  jupyter lab --ip 0.0.0.0 --port 8000 --allow-root
+  jupyter lab --allow-root --ip 0.0.0.0 --port 8000
 elif [ "$RUN_DJANGO" ]; then
   ./manage.py migrate
   ./manage.py collectstatic
