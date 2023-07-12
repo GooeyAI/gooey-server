@@ -221,7 +221,7 @@ def process_source(
                 target_language=request.google_translate_target,
                 # source_language=request.language,
             )[0]
-            worksheet.update_cell(row, Columns.translation.value, transcript)
+            worksheet.update_cell(row, Columns.translation.value, translation)
     else:
         translation = transcript
 
