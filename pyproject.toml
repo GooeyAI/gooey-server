@@ -66,7 +66,6 @@ opencv-contrib-python = "^4.7.0.72"
 numpy = "^1.25.0"
 pyzbar = "^0.1.9"
 gspread = "^5.10.0"
-pytube = "^15.0.0"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"
