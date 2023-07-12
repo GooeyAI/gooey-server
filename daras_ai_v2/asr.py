@@ -149,36 +149,27 @@ def _translate_text(text: str, source_language: str, target_language: str):
     if source_language == target_language:
         return text
 
-    if enable_transliteration:
-        authed_session, project = get_google_auth_session()
-        res = authed_session.post(
-            f"https://translation.googleapis.com/v3/projects/{project}/locations/global:translateText",
-            json.dumps(
-                {
-                    "source_language_code": source_language,
-                    "target_language_code": target_language,
-                    "contents": text,
-                    "mime_type": "text/plain",
-                    "transliteration_config": {"enable_transliteration": True},
-                }
-            ),
-            headers={
-                "Content-Type": "application/json",
-            },
-        )
-        res.raise_for_status()
-        data = res.json()
-        result = data["translations"][0]
-    else:
-        from google.cloud import translate_v2
-
-        translate_client = translate_v2.Client()
-        result = translate_client.translate(
-            text,
-            source_language=source_language,
-            target_language=target_language,
-            format_="text",
-        )
+    authed_session, project = get_google_auth_session()
+    res = authed_session.post(
+        f"https://translation.googleapis.com/v3/projects/{project}/locations/global:translateText",
+        json.dumps(
+            {
+                "source_language_code": source_language,
+                "target_language_code": target_language,
+                "contents": text,
+                "mime_type": "text/plain",
+                "transliteration_config": {
+                    "enable_transliteration": enable_transliteration
+                },
+            }
+        ),
+        headers={
+            "Content-Type": "application/json",
+        },
+    )
+    res.raise_for_status()
+    data = res.json()
+    result = data["translations"][0]
 
     return result["translatedText"]
 
