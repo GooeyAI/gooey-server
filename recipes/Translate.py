@@ -23,7 +23,7 @@ class TranslationPage(BasePage):
 
     sane_defaults = dict(
         translate_api=Translate.APIs.Auto.name,
-        translate_target="en",
+        target_language="en",
         enable_transliteration=True,
         romanize_translation=False,
     )
@@ -32,8 +32,8 @@ class TranslationPage(BasePage):
         texts: list[str] | None
         documents: list[str] | None
         translate_api: TRANSLATE_API_TYPE | None
-        translate_target: LANGUAGE_CODE_TYPE | None
-        translate_source: LANGUAGE_CODE_TYPE | None
+        target_language: LANGUAGE_CODE_TYPE | None
+        source_language: LANGUAGE_CODE_TYPE | None
 
         enable_transliteration: bool | None
         romanize_translation: bool | None
@@ -53,9 +53,9 @@ class TranslationPage(BasePage):
         yield "Translating Text Inputs..."
         state["output_texts"] = Translate.run(
             request.texts,
-            request.translate_target,
+            request.target_language,
             request.translate_api,
-            request.translate_source,
+            request.source_language,
             request.enable_transliteration,
             request.romanize_translation,
         )
@@ -63,9 +63,9 @@ class TranslationPage(BasePage):
         state["output_docs"] = [
             Translate.run(
                 download_text_doc(doc),
-                request.translate_target,
+                request.target_language,
                 request.translate_api,
-                request.translate_source,
+                request.source_language,
                 request.enable_transliteration,
                 request.romanize_translation,
             )

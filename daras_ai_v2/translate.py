@@ -986,7 +986,7 @@ class TranslateUI:
         return st.selectbox(
             label=label,
             key=key,
-            format_func=lambda k: Translate.apis.get(k).name
+            format_func=lambda k: Translate.apis.get(k).value
             if k and k in Translate.apis
             else "———",
             options=options,
