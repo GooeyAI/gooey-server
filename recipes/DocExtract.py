@@ -145,8 +145,10 @@ def extract_info(url: str) -> list[dict | None]:
 def process_entry(worksheet, entry: dict | None, request: DocExtractPage.RequestModel):
     import gspread.utils
 
+    if not entry:
+        return
     webpage_url = entry.get("webpage_url")
-    if not (entry and webpage_url):
+    if not webpage_url:
         return
 
     cell = worksheet.find(webpage_url)
