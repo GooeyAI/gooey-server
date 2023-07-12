@@ -495,8 +495,8 @@ class Translator(ABC):
 
     # displayname of the translator
     name: str = "Translator"
-    # transliteration will be done by a different endpoint before using this translator for all languages not in this set
-    can_transliterate: list[str] = {}
+    # transliteration should be done by a different endpoint - Translate.transliterate() - for all languages not in this set
+    _can_transliterate: list[str] = {}
 
     @classmethod
     @abstractmethod
@@ -551,17 +551,35 @@ class Translator(ABC):
         Returns:
             list[str]: Translated text.
         """
-        # if the language supports transliteration, we should check if the script is Latin
-        if (
-            source_language
-            and source_language not in TRANSLATE_WITH_TRANSLITERATION_SUPPORTED
-        ):
-            language_codes = [source_language] * len(texts)
-        else:
+
+        # detect languages and romanization information if not provided
+        if not source_language:
             language_codes = cls.detect_languages(texts)
+        elif not enable_transliteration:
+            language_codes = [source_language] * len(texts)
+        else:  # transliteration is enabled and we are provided a source language
+            is_specified_as_romanized, _ = cls.parse_detected_language(source_language)
+            if is_specified_as_romanized:
+                language_codes = [source_language] * len(texts)
+            else:  # check whether it is romanized
+                language_codes = cls.detect_languages(texts)
+
+        if enable_transliteration:
+            # transliterate languages using Translate.transliterate() if they can't be transliterated by the translation API
+            for i, (text, language_code) in enumerate(zip(texts, language_codes)):
+                is_romanized, language_code = cls.parse_detected_language(language_code)
+                if (
+                    is_romanized
+                    and language_code in TRANSLITERATION_SUPPORTED
+                    and language_code not in cls._can_transliterate
+                ):
+                    texts[i] = Translate.transliterate([text], [language_code])[0]
+                    language_codes[i] = language_code
 
         return map_parallel(
-            lambda text, source: cls._translate_text(text, source, target_language),
+            lambda text, source: cls._translate_text(
+                text, source, target_language, enable_transliteration
+            ),
             texts,
             language_codes,
         )
@@ -569,7 +587,11 @@ class Translator(ABC):
     @classmethod
     @abstractmethod
     def _translate_text(
-        cls, text: str, source_language: str, target_language: str
+        cls,
+        text: str,
+        source_language: str,
+        target_language: str,
+        enable_transliteration: bool = True,
     ) -> str:
         """
         Translate text using the specified API.
@@ -577,6 +599,7 @@ class Translator(ABC):
             text (str): Text to be translated.
             target_language (str): Language code to translate to.
             source_language (str): Language code to translate from.
+            enable_transliteration (bool): True iff the translator should transliterate the text before translating it when necessary.
         Returns:
             str: Translated text.
         """
@@ -604,7 +627,7 @@ class Translator(ABC):
 
 class GoogleTranslate(Translator):
     name = "Google Translate"
-    can_transliterate = {
+    _can_transliterate = {
         "ar",
         "bn",
         "gu",
@@ -656,15 +679,26 @@ class GoogleTranslate(Translator):
         }
 
     @classmethod
-    def _translate_text(cls, text: str, source_language: str, target_language: str):
-        is_romanized = source_language.endswith("-Latn")
-        source_language = source_language.replace("-Latn", "")
+    def _translate_text(
+        cls,
+        text: str,
+        source_language: str,
+        target_language: str,
+        enable_transliteration: bool = True,
+    ):
+        is_romanized, source_language = cls.parse_detected_language(source_language)
         enable_transliteration = (
-            is_romanized and source_language in cls.can_transliterate
+            is_romanized
+            and enable_transliteration
+            and source_language in cls._can_transliterate
         )
-        # prevent incorrect API calls
+        # prevent incorrect API calls, and transliterate text if the source language is romanized even if it matches the target language
         if source_language == target_language:
-            return text  # TODO: transliterate
+            return (
+                Translate.transliterate([text], [source_language])[0]
+                if enable_transliteration
+                else text
+            )
 
         if enable_transliteration:
             authed_session, project = cls.get_google_auth_session()
@@ -705,7 +739,7 @@ class MinT(Translator):
 
     @classmethod
     def detect_languages(cls, texts: list[str]) -> list[str]:
-        # don't depend on MinT for language detection
+        # won't depend on MinT for language detection
         return GoogleTranslate.detect_languages(texts)
 
     @st.cache_data
@@ -718,18 +752,19 @@ class MinT(Translator):
         return {code: ISO_639_LANGUAGES.get(code, code) for code in languages.keys()}
 
     @classmethod
-    def _translate_text(cls, text: str, source_language: str, target_language: str):
-        is_romanized = source_language.endswith("-Latn")
-        source_language = source_language.replace("-Latn", "")
-        enable_transliteration = (
-            is_romanized and source_language in TRANSLATE_WITH_TRANSLITERATION_SUPPORTED
-        )
+    def _translate_text(
+        cls,
+        text: str,
+        source_language: str,
+        target_language: str,
+        enable_transliteration: bool = True,
+    ):
+        _, source_language = cls.parse_detected_language(source_language)
+        # enable_transliteration is ignored because translate() already transliterated text when necessary since _can_transliterate is empty
+
         # prevent incorrect API calls
         if source_language == target_language:
-            return text  # TODO: Transliterate
-
-        if enable_transliteration:
-            pass  # TODO: implement transliteration
+            return text
 
         res = requests.post(
             f"https://translate.wmcloud.org/api/translate/{source_language}/{target_language}",
@@ -745,7 +780,7 @@ class MinT(Translator):
 
 class Auto(Translator):
     name = "Auto - use recommended API based on language"
-    can_transliterate = GoogleTranslate.can_transliterate
+    _can_transliterate = GoogleTranslate._can_transliterate
 
     @classmethod
     def detect_languages(cls, texts: list[str]) -> list[str]:
@@ -761,24 +796,29 @@ class Auto(Translator):
 
     @classmethod
     def _translate_text(cls, text: str, source_language: str, target_language: str):
-        is_romanized = source_language.endswith("-Latn")
-        source_language = source_language.replace("-Latn", "")
-        enable_transliteration = (  # TODO: fix logic
-            is_romanized and source_language in cls.can_transliterate
+        is_romanized, source_language = cls.parse_detected_language(source_language)
+        enable_transliteration = (
+            is_romanized
+            and enable_transliteration
+            and source_language in TRANSLITERATION_SUPPORTED
         )
         # prevent incorrect API calls, and transliterate text if the source language is romanized even if it matches the target language
         if source_language == target_language:
-            return Translate.transliterate(text) if enable_transliteration else text
+            return (
+                Translate.transliterate([text], [source_language])[0]
+                if enable_transliteration
+                else text
+            )
 
         if (
-            source_language in TRANSLATE_WITH_TRANSLITERATION_SUPPORTED
+            source_language in GoogleTranslate._can_transliterate
             and enable_transliteration
         ):
             return GoogleTranslate._translate_text(
                 text, source_language + "-Latn", target_language
             )
         if enable_transliteration:
-            text = transliterate(text)
+            text = Translate.transliterate(text)[0]
         if source_language in MinT.supported_languages():
             return MinT._translate_text([text], source_language, target_language)
         elif source_language in GoogleTranslate.supported_languages():
@@ -790,7 +830,7 @@ class Auto(Translator):
 
 
 # add new apis to this list:
-_all_apis = [GoogleTranslate, MinT, Auto]
+_all_apis: list[Translator] = [GoogleTranslate, MinT, Auto]
 
 
 @st.cache_data()
@@ -810,11 +850,15 @@ TRANSLATE_API_TYPE = typing.TypeVar(
 )
 LANGUAGE_CODE_TYPE = typing.TypeVar(
     "LANGUAGE_CODE_TYPE",
-    bound=typing.Literal[tuple(code for code, language in _all_languages().items())],
+    bound=typing.Literal[tuple(code for code, _ in _all_languages().items())],
 )
 ROMANIZATION_SUPPORTED_TYPE = typing.TypeVar(
     "ROMANIZATION_SUPPORTED_TYPE",
     bound=typing.Literal[tuple(code for code in ROMANIZATION_SUPPORTED)],
+)
+TRANSLITERATION_SUPPORTED_TYPE = typing.TypeVar(
+    "TRANSLITERATION_SUPPORTED_TYPE",
+    bound=typing.Literal[tuple(code for code in TRANSLITERATION_SUPPORTED)],
 )
 
 
@@ -842,8 +886,8 @@ class Translate:
         enable_transliteration: bool = True,
         romanize_translation: bool = False,
     ) -> list[str]:
-        api = cls.apis.get(api, Auto)
-        result = api.translate(
+        translator = cls.apis.get(api, Auto)
+        result = translator.translate(
             texts, translate_target, source_language, enable_transliteration
         )
         return (
@@ -878,13 +922,12 @@ class Translate:
 
     @classmethod
     def transliterate(
+        cls,
         texts: list[str],
-        language_codes: list[LANGUAGE_CODE_TYPE] | LANGUAGE_CODE_TYPE | None = None,
+        language_codes: list[TRANSLITERATION_SUPPORTED_TYPE] | None = None,
     ) -> list[str]:
         if not language_codes:
-            language_codes = Translate.detect_languages(texts)
-        if not isinstance(language_codes, list):
-            language_codes = [language_codes] * len(texts)
+            language_codes = cls.detect_languages(texts)
         language_codes = [code.replace("-Latn", "") for code in language_codes]
         return map_parallel(
             lambda text, code: transliterate_text(text, code),
@@ -918,9 +961,9 @@ class TranslateUI:
         require_api=False,
         key_apiselect="translate_api",
         require_target=False,
-        key_target="translate_target",
+        key_target="target_language",
         require_source=False,
-        key_source="translate_source",
+        key_source="source_language",
     ):
         TranslateUI.translate_api_selector(
             key=key_apiselect, allow_none=not require_api
@@ -930,7 +973,6 @@ class TranslateUI:
             key=key_source,
             api_key=key_apiselect,
             allow_none=not require_source,
-            use_source=True,
         )
         TranslateUI.translate_language_selector(
             key=key_target, api_key=key_apiselect, allow_none=not require_target
@@ -965,7 +1007,7 @@ class TranslateUI:
     def translate_language_selector(
         languages: dict[str, str] = None,
         label="###### Translate Target Language",
-        key="translate_target",
+        key="target_language",
         key_apiselect="translate_api",
         allow_none=True,
     ):
@@ -992,10 +1034,15 @@ class TranslateUI:
         )
 
 
-# ==== Below follows general transliteration code using the deprecated Google API since the new API does not support transliteration without translation ===
+# ================================ Transliteration ================================
+# Below follows general transliteration code using the deprecated Google API
+# since the new API does not support transliteration without translation
+# and the new API does not support all languages and scripts that the old API did.
+# Per Google's deprecation policy, this API will continue working, it just won't get updated
+# with bugfixes and the latest models. See: https://developers.google.com/transliterate/terms
 # Mutilated from https://github.com/NarVidhai/Google-Transliterate-API
 
-# Transliteration API endpoints (deprecated version)
+# Transliteration API endpoints
 G_API_DEFAULT = "https://inputtools.google.com/request?text=%s&itc=%s-t-i0&num=%d"
 G_API_CHINESE = "https://inputtools.google.com/request?text=%s&itc=%s-t-i0-%s&num=%d"
 
