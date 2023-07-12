@@ -88,7 +88,7 @@ class DocExtractPage(BasePage):
     def render_example(self, state: dict):
         render_documents(state)
         st.write("**Google Sheets URL**")
-        st.write(st.session_state.get("sheet_url"))
+        st.write(state.get("sheet_url"))
 
     def render_settings(self):
         st.text_area(
