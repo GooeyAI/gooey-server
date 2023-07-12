@@ -224,6 +224,7 @@ def process_source(
             worksheet.update_cell(row, Columns.translation.value, translation)
     else:
         translation = transcript
+        worksheet.update_cell(row, Columns.translation.value, "")
 
     summary = worksheet.cell(row, Columns.summary.value).value
     if not summary and request.task_instructions:
