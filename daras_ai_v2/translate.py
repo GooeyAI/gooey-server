@@ -607,7 +607,12 @@ class Translator(ABC):
         pass
 
     @classmethod
-    def language_selector(cls, label: str, key: str, allow_none=True):
+    def language_selector(
+        cls,
+        label: str = "###### Translate Target",
+        key: str = "target_language",
+        allow_none=True,
+    ):
         """
         Streamlit widget for selecting a language.
         Args:
@@ -778,7 +783,11 @@ class MinT(Translator):
 
         res = requests.post(
             f"https://translate.wmcloud.org/api/translate/{source_language}/{target_language}",
-            {"text": text},
+            json.dumps({"text": text}),
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
         )
         res.raise_for_status()
 
@@ -805,7 +814,13 @@ class Auto(Translator):
         return _all_languages()
 
     @classmethod
-    def _translate_text(cls, text: str, source_language: str, target_language: str):
+    def _translate_text(
+        cls,
+        text: str,
+        source_language: str,
+        target_language: str,
+        enable_transliteration: bool = True,
+    ):
         is_romanized, source_language = cls.parse_detected_language(source_language)
         enable_transliteration = (
             is_romanized
@@ -830,7 +845,12 @@ class Auto(Translator):
         if enable_transliteration:
             text = Translate.transliterate(text)[0]
         if source_language in MinT.supported_languages():
-            return MinT._translate_text([text], source_language, target_language)
+            try:
+                return MinT._translate_text(text, source_language, target_language)
+            except:
+                return GoogleTranslate._translate_text(
+                    text, source_language, target_language
+                )  # fallback to GoogleTranslate
         elif source_language in GoogleTranslate.supported_languages():
             return GoogleTranslate._translate_text(
                 text, source_language, target_language
@@ -841,6 +861,13 @@ class Auto(Translator):
 
 # add new apis to this list:
 _all_apis: list[Translator] = [GoogleTranslate, MinT, Auto]
+
+
+# and this Enum
+class APIs(Enum):
+    GoogleTranslate = GoogleTranslate.value
+    MinT = MinT.value
+    Auto = Auto.value
 
 
 @st.cache_data()
@@ -875,7 +902,7 @@ TRANSLITERATION_SUPPORTED_TYPE = typing.TypeVar(
 
 class Translate:
     apis: dict[TRANSLATE_API_TYPE, Translator] = {api.name: api for api in _all_apis}
-    APIs = Enum("APIs", {api.name: api.value for api in _all_apis})
+    APIs = APIs
 
     @classmethod
     def supported_languages(cls) -> dict[LANGUAGE_CODE_TYPE, str]:
@@ -983,9 +1010,7 @@ class TranslateUI:
             key=key_source,
             allow_none=not require_source,
         )
-        translator.language_selector(
-            key=key_target, api_key=key_apiselect, allow_none=not require_target
-        )
+        translator.language_selector(key=key_target, allow_none=not require_target)
 
     @staticmethod
     def translate_advanced_settings():
