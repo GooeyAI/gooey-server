@@ -10,12 +10,14 @@ from furl import furl
 
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
 )
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
+TRANSLITERATION_SUPPORTED = ["ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"]
 
 
 class AsrModels(Enum):
@@ -120,16 +122,75 @@ def run_google_translate(
     Returns:
         list[str]: Translated text.
     """
-    from google.cloud import translate_v2
+    from google.cloud import translate_v2 as translate
 
-    translate_client = translate_v2.Client()
-    result = translate_client.translate(
+    # if the language supports transliteration, we should check if the script is Latin
+    if source_language and source_language not in TRANSLITERATION_SUPPORTED:
+        language_codes = [source_language] * len(texts)
+    else:
+        translate_client = translate.Client()
+        detections = translate_client.detect_language(texts)
+        language_codes = [detection["language"] for detection in detections]
+
+    return map_parallel(
+        lambda text, source: _translate_text(text, source, target_language),
         texts,
-        source_language=source_language,
-        target_language=target_language,
-        format_="text",
+        language_codes,
     )
-    return [r["translatedText"] for r in result]
+
+
+def _translate_text(text: str, source_language: str, target_language: str):
+    is_romanized = source_language.endswith("-Latn")
+    source_language = source_language.replace("-Latn", "")
+    enable_transliteration = (
+        is_romanized and source_language in TRANSLITERATION_SUPPORTED
+    )
+    # prevent incorrect API calls
+    if source_language == target_language:
+        return text
+
+    authed_session, project = get_google_auth_session()
+    res = authed_session.post(
+        f"https://translation.googleapis.com/v3/projects/{project}/locations/global:translateText",
+        json.dumps(
+            {
+                "source_language_code": source_language,
+                "target_language_code": target_language,
+                "contents": text,
+                "mime_type": "text/plain",
+                "transliteration_config": {
+                    "enable_transliteration": enable_transliteration
+                },
+            }
+        ),
+        headers={
+            "Content-Type": "application/json",
+        },
+    )
+    res.raise_for_status()
+    data = res.json()
+    result = data["translations"][0]
+
+    return result["translatedText"]
+
+
+_session = None
+
+
+def get_google_auth_session():
+    global _session
+
+    if _session is None:
+        import google.auth
+        from google.auth.transport.requests import AuthorizedSession
+
+        creds, project = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        # takes care of refreshing the token and adding it to request headers
+        _session = AuthorizedSession(credentials=creds), project
+
+    return _session
 
 
 def run_asr(

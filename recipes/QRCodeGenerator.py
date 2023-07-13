@@ -41,7 +41,7 @@ class QRCodeGeneratorPage(BasePage):
     slug_versions = ["art-qr-code", "qr", "qr-code"]
 
     sane_defaults = dict(
-        num_outputs=1,
+        num_outputs=2,
         obj_scale=0.65,
         obj_pos_x=0.5,
         obj_pos_y=0.5,
@@ -137,6 +137,11 @@ class QRCodeGeneratorPage(BasePage):
             )
             st.session_state["qr_code_input_image"] = None
 
+        st.checkbox("🔗 Shorten URL", key="use_url_shortener")
+        st.caption(
+            'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
+        )
+
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
 
@@ -205,9 +210,6 @@ Here is the final output:
             """
         )
 
-        st.checkbox("🔗 URL Shortener", key="use_url_shortener")
-        st.caption("Enabling this will automatically shorten URLs")
-
         img_model_settings(
             Img2ImgModels,
             show_scheduler=True,
@@ -274,6 +276,9 @@ Here is the final output:
     def render_output(self):
         state = st.session_state
         self._render_outputs(state)
+        st.caption(f'URL: {state.get("qr_code_data")}')
+        if state.get("shortened_url", False):
+            st.caption(f'Shortened: {state.get("shortened_url")}')
 
     def _render_outputs(self, state: dict):
         for img in state.get("output_images", []):
@@ -338,6 +343,9 @@ Here is the final output:
                 ```
                 """
             )
+            st.caption(f'URL: {state.get("qr_code_data")}')
+            if state.get("shortened_url", False):
+                st.caption(f'Shortened: {state.get("shortened_url")}')
         with col2:
             self._render_outputs(state)
 
@@ -352,7 +360,7 @@ Here is the final output:
                 total += 3
             case Text2ImgModels.dall_e.name:
                 total += 10
-        return total
+        return total * state.get("num_outputs", 1)
 
 
 def is_url(url: str) -> bool:

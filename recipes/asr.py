@@ -140,7 +140,7 @@ class AsrPage(BasePage):
 
     def additional_notes(self) -> str | None:
         return """
-*Cost ≈ 1 credit for 25 words ≈ 0.04 credits per word*
+*Cost ≈ 1 credit for 12.5 words ≈ 0.08 credits per word*
               """
 
     def get_raw_price(self, state: dict):
