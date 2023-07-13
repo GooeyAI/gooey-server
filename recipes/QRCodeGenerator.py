@@ -101,7 +101,8 @@ class QRCodeGeneratorPage(BasePage):
         st.text_area(
             """
             ### 👩‍💻 Prompt
-            Describe the subject/scene of the qr code. Some prompts blend better with qr codes than others.
+            Describe the subject/scene of the QR Code.
+            Choose clear prompts and distinguishable visuals to ensure optimal readability.
             """,
             key="text_prompt",
             placeholder="Bright sunshine coming through the cracks of a wet, cave wall of big rocks",
@@ -127,7 +128,7 @@ class QRCodeGeneratorPage(BasePage):
             st.text_area(
                 """
                 ### 🔗 URL
-                Enter a URL or text. Generally, shorter is better.
+                Enter your URL below. Shorter links give more visually appealing results. 
                 """,
                 key="qr_code_data",
                 placeholder="https://www.gooey.ai",
@@ -151,7 +152,8 @@ class QRCodeGeneratorPage(BasePage):
     def render_description(self):
         st.markdown(
             """
-            Enter your URL (or text) and an image prompt and we'll generate an arty QR code with your artistic style and content in about 30 seconds. This is a rad way to advertise your website in IRL or print on a poster.
+            Create interactive and engaging QR codes with stunning visuals that are amazing for marketing, branding, and more. Combining AI Art and QR Code has never been easier! 
+            Enter your URL and image prompt, and in just 30 seconds, we'll generate an artistic QR codes tailored to your style. 
             It is made possible by the open source [Control Net](https://github.com/lllyasviel/ControlNet).
             """
         )
@@ -212,8 +214,13 @@ Here is the final output:
             show_scheduler=True,
             require_controlnet=True,
             extra_explanations={
-                ControlNetModels.sd_controlnet_tile: "Tiling: Preserves small details mainly in the qr code which makes it more readable",
-                ControlNetModels.sd_controlnet_brightness: "Brightness: Makes the qr code darker and background lighter (contrast helps qr readers)",
+                ControlNetModels.sd_controlnet_tile: "Tiling: Preserves more details of the QR Code, makes it more readable",
+                ControlNetModels.sd_controlnet_brightness: "Brightness: Dictates how light the background of the QR Code will be. Contrast is desirable for readability",
+            },
+            controlnet_settings_options={
+                "controlnet_explanation": "[Control Net models](https://huggingface.co/lllyasviel?search=controlnet) provide a layer of refinement to the image generation process that blends with the QR code. Choose your preferred models: ",
+                "low_explanation": "the prompted visual will be intact and the QR code will be more artistic but less readable",
+                "high_explanation": "the control settings that blend the QR code will be applied tightly, possibly overriding the image prompt, but the QR code will be more readable",
             },
         )
         st.write("---")
@@ -338,7 +345,10 @@ Here is the final output:
             self._render_outputs(state)
 
     def preview_description(self, state: dict) -> str:
-        return "Enter your URL (or text) and an image prompt and we'll generate an arty QR code with your artistic style and content in about 30 seconds. This is a rad way to advertise your website in IRL or print on a poster."
+        return """
+            Create interactive and engaging QR codes with stunning visuals that are amazing for marketing, branding, and more. Combining AI Art and QR Codes has never been easier! 
+            Enter your URL and image prompt, and in just 30 seconds, we'll generate an artistic QR code tailored to your style. 
+        """
 
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model", Text2ImgModels.dream_shaper.name)
