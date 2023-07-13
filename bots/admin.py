@@ -74,7 +74,11 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
 
 @admin.action(description="Export to CSV")
-def export_to_csv(modeladmin, request, queryset):
+def export_to_csv(
+    modeladmin,
+    request,
+    queryset,
+):
     filename = _get_filename()
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
@@ -83,7 +87,11 @@ def export_to_csv(modeladmin, request, queryset):
 
 
 @admin.action(description="Export to Excel")
-def export_to_excel(modeladmin, request, queryset):
+def export_to_excel(
+    modeladmin,
+    request,
+    queryset,
+):
     filename = _get_filename()
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -94,7 +102,7 @@ def export_to_excel(modeladmin, request, queryset):
 
 
 def _get_filename():
-    filename = f"Gooey.AI Conversations {dateformat.format(datetime.datetime.now(), settings.DATETIME_FORMAT)}"
+    filename = f"Gooey.AI Table {dateformat.format(datetime.datetime.now(), settings.DATETIME_FORMAT)}"
     return filename
 
 

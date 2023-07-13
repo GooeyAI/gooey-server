@@ -457,6 +457,8 @@ class Message(models.Model):
 
     _analysis_done = False
 
+    objects = MessageQuerySet.as_manager()
+
     class Meta:
         ordering = ("-created_at",)
         get_latest_by = "created_at"
