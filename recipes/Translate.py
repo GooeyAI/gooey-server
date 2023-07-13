@@ -18,7 +18,7 @@ from daras_ai_v2.vector_search import download_text_doc
 
 
 class TranslationPage(BasePage):
-    title = "Better Title from Sean"
+    title = "Compare AI Translation Tools"
     slug_versions = ["languages", "transliteration", "translate"]
 
     sane_defaults = dict(
@@ -43,7 +43,7 @@ class TranslationPage(BasePage):
         output_docs: list[list[str]]
 
     def preview_description(self, state: dict):
-        return "Translate among any of 200+ languages using different APIs and models."
+        return "Translate your text to over 200+ languages using the best AI private and public translation and transliteration tools available from Google, Meta, [WikiMedia](https://diff.wikimedia.org/2023/06/13/mint-supporting-underserved-languages-with-open-machine-translation/) & more. Includes support from [Google Translate](https://cloud.google.com/translate), NLLB-200 (No Language Left Behind project), [OPUS](https://opus.nlpl.eu/), [IndicTrans2](https://ai4bharat.iitm.ac.in/indic-trans2) and [Softcatala](https://github.com/Softcatala/nmt-softcatala)."
 
     def run(self, state: dict) -> Iterator[str | None]:
         # Parse Request
@@ -73,17 +73,7 @@ class TranslationPage(BasePage):
     def render_description(self):
         st.markdown(
             """
-            This workflow let's you compare the latest and finest translation models and APIs.
-            """
-        )
-        st.markdown(
-            """
-            Just upload one or more text files and/or paste in some text.
-            """
-        )
-        st.markdown(
-            """
-            Try out important features like Transliteration and Romanization.
+            Translate your text to over 200+ languages using the best AI private and public translation and transliteration tools available from Google, Meta, [WikiMedia](https://diff.wikimedia.org/2023/06/13/mint-supporting-underserved-languages-with-open-machine-translation/) & more. Includes support from [Google Translate](https://cloud.google.com/translate), NLLB-200 (No Language Left Behind project), [OPUS](https://opus.nlpl.eu/), [IndicTrans2](https://ai4bharat.iitm.ac.in/indic-trans2) and [Softcatala](https://github.com/Softcatala/nmt-softcatala).
             """
         )
 
@@ -101,8 +91,18 @@ class TranslationPage(BasePage):
         ]
 
     def render_form_v2(self):
-        num_inputs = st.number_input("""##### Text Inputs""", 0, 100, 1, 1)
+        num_inputs = st.number_input(
+            """
+            ##### Text Inputs
+            Select how many texts you want to translate:
+            """,
+            0,
+            100,
+            1,
+            1,
+        )
         texts = st.session_state.get("texts", [])
+        st.caption("Enter text (in any language) that you'd like to translate:")
         st.session_state["texts"] = [
             st.text_area(
                 f"""
@@ -159,14 +159,14 @@ class TranslationPage(BasePage):
         self._render_output(state)
 
     def _render_output(self, state):
-        text_outputs("**Translations**", key="output_texts")
+        text_outputs("**Translation**", key="output_texts")
         if state.get("documents", False):
             text_outputs("*Documents*", key="output_docs")
 
     def render_steps(self):
         st.markdown(
             """
-            1. Apply Transliteration necessary.
+            1. Apply Transliteration as necessary.
             """
         )
         st.markdown(
@@ -176,7 +176,7 @@ class TranslationPage(BasePage):
         )
         st.markdown(
             """
-            3. Translate with the selected API (for Auto, we look up the optimal API in a table).
+            3. Translate with the selected API (for Auto, we look up the optimal API based on the detected language and script).
             """
         )
         st.markdown(

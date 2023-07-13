@@ -493,9 +493,9 @@ TRANSLITERATION_SUPPORTED = {
 class Translator(ABC):
     """Each model/API has its own translator class which keeps things in one place and provides a template for adding more."""
 
-    # enum name
+    # enum name - should be alphanumeric (no spaces or special characters)
     name: str = "Translator"
-    # enum value and display name
+    # enum value and display name - can be anything
     value: str = "translator"
     # transliteration should be done by a different endpoint - Translate.transliterate() - for all languages not in this set
     _can_transliterate: list[str] = {}
@@ -530,6 +530,15 @@ class Translator(ABC):
         """
         Get list of supported languages.
         :return: Dictionary of language codes and display names.
+        """
+        pass
+
+    @classmethod
+    @abstractmethod
+    def description(cls) -> str:
+        """
+        Get description of the translator.
+        :return: Description of the translator.
         """
         pass
 
@@ -609,7 +618,7 @@ class Translator(ABC):
     @classmethod
     def language_selector(
         cls,
-        label: str = "###### Translate Target",
+        label: str = "###### Translate To",
         key: str = "target_language",
         allow_none=True,
     ):
@@ -686,6 +695,10 @@ class GoogleTranslate(Translator):
     @classmethod
     def supported_languages(cls) -> dict[str, str]:
         return _Google_supported_languages()
+
+    @classmethod
+    def description(cls) -> str:
+        return "We call the latest Google Translate API which leverages Google's neural machine translation models (https://en.wikipedia.org/wiki/Google_Neural_Machine_Translation)"
 
     @classmethod
     def _translate_text(
@@ -767,6 +780,10 @@ class MinT(Translator):
         return _MinT_supported_languages()
 
     @classmethod
+    def description(cls) -> str:
+        return "MinT by WikiMedia (https://diff.wikimedia.org/2023/06/13/mint-supporting-underserved-languages-with-open-machine-translation/) uses the best translation tools from Meta, AI4Bharat and more."
+
+    @classmethod
     def _translate_text(
         cls,
         text: str,
@@ -812,6 +829,10 @@ class Auto(Translator):
         Returns all available languages as a dict mapping language code to display name.
         """
         return _all_languages()
+
+    @classmethod
+    def description(cls) -> str:
+        return "Automatically detects the language(s) and uses the best API for the language."
 
     @classmethod
     def _translate_text(
@@ -971,12 +992,12 @@ class TranslateUI:
         label="###### Translate API",
         key="translate_api",
         allow_none=True,
-    ) -> TRANSLATE_API_TYPE:
-        options = Translate.apis.keys()
+    ) -> Translator:
+        options = list(Translate.apis.keys())
         if allow_none:
             options.insert(0, None)
             label += " (_optional_)"
-        return st.selectbox(
+        selected_api = st.selectbox(
             label=label,
             key=key,
             format_func=lambda k: Translate.apis.get(k).value
@@ -984,6 +1005,10 @@ class TranslateUI:
             else "———",
             options=options,
         )
+        translator = Translate.apis.get(selected_api)
+        if translator:
+            st.caption(translator.description())
+        return translator
 
     @staticmethod
     def translate_settings(
@@ -994,10 +1019,12 @@ class TranslateUI:
         require_source=False,
         key_source="source_language",
     ):
-        translator = TranslateUI.translate_api_selector(
-            key=key_apiselect, allow_none=not require_api
+        translator = (
+            TranslateUI.translate_api_selector(
+                key=key_apiselect, allow_none=not require_api
+            )
+            or Auto
         )
-        translator = Translate.apis.get(translator)
         translator.language_selector(
             label="###### Input Language",
             key=key_source,
@@ -1014,7 +1041,7 @@ class TranslateUI:
             key="enable_transliteration",
         )
         st.caption(
-            "Detects romanized input text and transliterates it to non-Latin characters where neccessary (and supported) before passing it to the translation models."
+            "Detects romanized input text and transliterates it to non-Latin characters where neccessary (and supported) before passing it to the translation models, e.g. this will turn Namaste into नमस्ते which makes it easier for the translation models to understand."
         )
         st.checkbox(
             """
@@ -1024,7 +1051,7 @@ class TranslateUI:
         )
         st.caption(
             """
-            After translation, romanize non-Latin characters when supported.
+            After translation, romanize non-Latin characters when supported, e.g. this will turn नमस्ते into Namaste.
 
             See [Romanization/Transliteration](https://guides.library.harvard.edu/mideast/romanization#:~:text=Romanization%%20refers%20to%20the%20process,converting%%20one%%20script%%20into%%20another.)
             """
@@ -1033,7 +1060,7 @@ class TranslateUI:
     @staticmethod
     def translate_language_selector(
         languages: dict[str, str] = None,
-        label="###### Translate Target Language",
+        label="###### Translate To",
         key="target_language",
         key_apiselect="translate_api",
         allow_none=True,
@@ -1047,7 +1074,7 @@ class TranslateUI:
         """
         if not languages:
             languages = Translate.apis.get(
-                st.session_state.get(key_apiselect)
+                st.session_state.get(key_apiselect), Auto
             ).supported_languages()
         options = list(languages.keys())
         if allow_none:
