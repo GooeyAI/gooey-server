@@ -14,18 +14,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagickwand-dev \
     libgl1-mesa-glx \
 	&& rm -rf /var/lib/apt/lists/*
-RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.05.0.tar.xz' | tar -xJ \
-    && cd poppler-23.05.0 \
+RUN wget -qO- 'https://poppler.freedesktop.org/poppler-23.07.0.tar.xz' | tar -xJ -C poppler \
+    && cd poppler \
     && cmake . \
     && ldconfig \
     && make install \
     && cd $WORKDIR \
-    && rm -rf poppler-23.05.0
+    && rm -rf poppler
+
+# install latest pandoc - https://github.com/jgm/pandoc/releases
+RUN wget -qO pandoc.deb 'https://github.com/jgm/pandoc/releases/download/3.1.5/pandoc-3.1.5-1-amd64.deb' \
+    && dpkg -i pandoc.deb \
+    && rm pandoc.deb
 
 # app dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-opencv \
-    pandoc \
     postgresql-client \
 	ffmpeg \
     libzbar0 \
