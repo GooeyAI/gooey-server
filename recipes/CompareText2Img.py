@@ -73,13 +73,13 @@ class CompareText2ImgPage(BasePage):
         from recipes.FaceInpainting import FaceInpaintingPage
         from recipes.ObjectInpainting import ObjectInpaintingPage
         from recipes.GoogleImageGen import GoogleImageGenPage
-        from recipes.TextToSpeech import TextToSpeechPage
+        from recipes.QRCodeGenerator import QRCodeGeneratorPage
 
         return [
             FaceInpaintingPage,
             ObjectInpaintingPage,
             GoogleImageGenPage,
-            TextToSpeechPage,
+            QRCodeGeneratorPage,
         ]
 
     def render_form_v2(self):

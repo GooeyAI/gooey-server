@@ -188,13 +188,13 @@ class DeforumSDPage(BasePage):
         from recipes.VideoBots import VideoBotsPage
         from recipes.LipsyncTTS import LipsyncTTSPage
         from recipes.CompareText2Img import CompareText2ImgPage
-        from recipes.FaceInpainting import FaceInpaintingPage
+        from recipes.QRCodeGenerator import QRCodeGeneratorPage
 
         return [
+            QRCodeGeneratorPage,
             VideoBotsPage,
             LipsyncTTSPage,
             CompareText2ImgPage,
-            FaceInpaintingPage,
         ]
 
     def render_form_v2(self):

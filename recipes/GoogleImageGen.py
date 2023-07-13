@@ -71,13 +71,13 @@ class GoogleImageGenPage(BasePage):
 
     def related_workflows(self):
         from recipes.ObjectInpainting import ObjectInpaintingPage
-        from recipes.ImageSegmentation import ImageSegmentationPage
+        from recipes.QRCodeGenerator import QRCodeGeneratorPage
         from recipes.SEOSummary import SEOSummaryPage
         from recipes.CompareText2Img import CompareText2ImgPage
 
         return [
             ObjectInpaintingPage,
-            ImageSegmentationPage,
+            QRCodeGeneratorPage,
             SEOSummaryPage,
             CompareText2ImgPage,
         ]
