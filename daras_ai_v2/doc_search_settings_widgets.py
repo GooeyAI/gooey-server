@@ -15,7 +15,7 @@ def document_uploader(
     key="documents",
     accept=(".pdf", ".txt", ".docx", ".md", ".html", ".wav", ".ogg", ".mp3", ".aac"),
 ):
-    st.write(label)
+    st.write(label, className="gui-input")
     documents = st.session_state.get(key) or []
     has_custom_urls = not all(map(is_user_uploaded_url, documents))
     if st.checkbox("Enter Custom URLs", value=has_custom_urls):

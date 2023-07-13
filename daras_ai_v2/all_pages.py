@@ -28,6 +28,7 @@ from recipes.SocialLookupEmail import SocialLookupEmailPage
 from recipes.Text2Audio import Text2AudioPage
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
+from recipes.DocExtract import DocExtractPage
 from recipes.asr import AsrPage
 from recipes.QRCodeGenerator import QRCodeGeneratorPage
 from recipes.embeddings_page import EmbeddingsPage
@@ -35,39 +36,50 @@ from recipes.Translate import TranslationPage
 
 # note: the ordering here matters!
 all_home_pages = [
-    DocSearchPage,
-    DocSummaryPage,
-    GoogleGPTPage,
+    # top ones
     VideoBotsPage,
-    LipsyncTTSPage,
-    TextToSpeechPage,
-    AsrPage,
-    LipsyncPage,
     DeforumSDPage,
-    CompareText2ImgPage,
-    Text2AudioPage,
-    Img2ImgPage,
-    FaceInpaintingPage,
-    GoogleImageGenPage,
-    CompareUpscalerPage,
-    SEOSummaryPage,
-    EmailFaceInpaintingPage,
-    SocialLookupEmailPage,
-    ObjectInpaintingPage,
-    ImageSegmentationPage,
-    CompareLLMPage,
-    SmartGPTPage,
-    RelatedQnAPage,
-    RelatedQnADocPage,
     QRCodeGeneratorPage,
-    EmbeddingsPage,
+    # SEO tools
+    GoogleGPTPage,
+    SEOSummaryPage,
+    RelatedQnAPage,
+    # Image Tools
+    ObjectInpaintingPage,
+    CompareText2ImgPage,
+    Img2ImgPage,
+    # More Image
+    FaceInpaintingPage,
+    EmailFaceInpaintingPage,
+    GoogleImageGenPage,
+    # LipSync fun
+    TextToSpeechPage,
+    LipsyncPage,
+    LipsyncTTSPage,
+    # Text
+    CompareLLMPage,
+    DocSearchPage,
+    SmartGPTPage,
+    # Speech & Music
+    AsrPage,
+    # VideoPlayList,
+    Text2AudioPage,
+    # Other
+    DocSummaryPage,
+    RelatedQnADocPage,
     TranslationPage,
+    SocialLookupEmailPage,
+    # More
+    ImageSegmentationPage,
+    CompareUpscalerPage,
+    DocExtractPage,
 ]
 
 # exposed as API
 all_api_pages = all_home_pages.copy() + [
     ChyronPlantPage,
     LetterWriterPage,
+    EmbeddingsPage,
 ]
 
 # pytest suite
@@ -102,7 +114,8 @@ class Workflow(models.IntegerChoices):
     LETTERWRITER = (23, LetterWriterPage.__name__)
     SMARTGPT = (24, SmartGPTPage.__name__)
     QRCODE = (25, QRCodeGeneratorPage.__name__)
-    TRANSLATE = (26, TranslationPage.__name__)
+    YOUTUBEBOT = (26, DocExtractPage.__name__)
+    TRANSLATE = (27, TranslationPage.__name__)
 
     @property
     def page_cls(self) -> typing.Type[BasePage]:

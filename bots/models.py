@@ -9,7 +9,6 @@ from django.utils.text import Truncator
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
-
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
 
@@ -160,7 +159,8 @@ class BotIntegrationQuerySet(models.QuerySet):
 
 class BotIntegration(models.Model):
     name = models.CharField(
-        max_length=1024, help_text="The name of the bot (for display purposes)"
+        max_length=1024,
+        help_text="The name of the bot (for display purposes)",
     )
     saved_run = models.ForeignKey(
         "bots.SavedRun",
@@ -180,7 +180,8 @@ class BotIntegration(models.Model):
         help_text="The response language (same as user language in video bots)",
     )
     show_feedback_buttons = models.BooleanField(
-        default=False, help_text="Show 👍/👎 buttons with every response"
+        default=False,
+        help_text="Show 👍/👎 buttons with every response",
     )
     platform = models.IntegerField(
         choices=Platform.choices,
@@ -230,6 +231,11 @@ class BotIntegration(models.Model):
         null=True,
         unique=True,
         help_text="Bot's WhatsApp phone number id (required if platform is WhatsApp)",
+    )
+
+    enable_analysis = models.BooleanField(
+        default=False,
+        help_text="Enable analysis for this bot",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -414,6 +420,19 @@ class Message(models.Model):
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    question_answered = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's ability to answer given question",
+    )
+    question_subject = models.TextField(
+        blank=True,
+        default="",
+        help_text="Subject of given question",
+    )
+
+    _analysis_done = False
 
     class Meta:
         ordering = ("-created_at",)
