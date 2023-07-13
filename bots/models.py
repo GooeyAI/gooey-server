@@ -384,6 +384,29 @@ class Conversation(models.Model):
     d3.boolean = True
 
 
+class MessageQuerySet(models.QuerySet):
+    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.all()
+        rows = []
+        for message in qs[:1000]:
+            message: Message
+            row = {
+                "USER": message.conversation.get_display_name(),
+                "BOT INTEGRATION": str(message.conversation.bot_integration),
+                "CREATED AT": message.created_at.astimezone(tz).replace(tzinfo=None),
+                "MESSAGE": message.content,
+                "LOCAL_LANG": message.display_content,
+                "ROLE": message.get_role_display(),
+                "FEEDBACK": message.feedbacks.first(),
+            }
+            # TODO: add answer analysis
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
+
 class Message(models.Model):
     conversation = models.ForeignKey(
         "Conversation", on_delete=models.CASCADE, related_name="messages"

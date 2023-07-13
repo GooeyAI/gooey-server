@@ -222,6 +222,7 @@ class MessageAdmin(admin.ModelAdmin):
         "prev_msg_saved_run",
     ]
     ordering = ["created_at"]
+    actions = [export_to_csv, export_to_excel]
 
     inlines = [FeedbackInline]
 
