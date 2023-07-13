@@ -388,20 +388,24 @@ class MessageQuerySet(models.QuerySet):
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
         import pandas as pd
 
-        qs = self.all()
+        qs = self.all().prefetch_related("feedbacks")
         rows = []
-        for message in qs[:1000]:
+        for message in qs[:10000]:
             message: Message
             row = {
                 "USER": message.conversation.get_display_name(),
-                "BOT INTEGRATION": str(message.conversation.bot_integration),
+                "BOT": str(message.conversation.bot_integration),
                 "CREATED AT": message.created_at.astimezone(tz).replace(tzinfo=None),
-                "MESSAGE": message.content,
-                "LOCAL_LANG": message.display_content,
+                "MESSAGE (ENGLISH)": message.content,
+                "MESSAGE (ORIGINAL)": message.display_content,
                 "ROLE": message.get_role_display(),
-                "FEEDBACK": message.feedbacks.first(),
+                "QUESTION_ANSWERED": message.question_answered,
+                "QUESTION_SUBJECT": message.question_subject,
             }
-            # TODO: add answer analysis
+            row |= {
+                f"FEEDBACK {i + 1}": feedback.get_display_text()
+                for i, feedback in enumerate(message.feedbacks.all())
+            }
             rows.append(row)
         df = pd.DataFrame.from_records(rows)
         return df
@@ -530,12 +534,16 @@ class Feedback(models.Model):
         get_latest_by = "created_at"
 
     def __str__(self):
+        ret = self.get_display_text()
+        if self.message.content:
+            ret += f" to “{Truncator(self.message.content).words(30)}”"
+        return ret
+
+    def get_display_text(self):
         ret = self.get_rating_display()
         text = self.text_english or self.text
         if text:
             ret += f" - “{Truncator(text).words(30)}”"
-        if self.message.content:
-            ret += f" to “{Truncator(self.message.content).words(30)}”"
         return ret
 
 
