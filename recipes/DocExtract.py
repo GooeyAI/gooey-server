@@ -7,12 +7,14 @@ from pydantic import BaseModel
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.asr import (
-    google_translate_language_selector,
     AsrModels,
     run_asr,
     download_youtube_to_wav,
-    run_google_translate,
     audio_to_wav,
+)
+from daras_ai_v2.translate import (
+    Translate,
+    TranslateUI,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
@@ -98,7 +100,7 @@ class DocExtractPage(BasePage):
         language_model_settings()
         enum_selector(AsrModels, label="##### ASR Model", key="selected_asr_model")
         st.write("---")
-        google_translate_language_selector()
+        TranslateUI.translate_language_selector(key="google_translate_target")
         st.write("---")
         # enum_selector(
         #     AsrOutputFormat, label="###### Output Format", key="output_format"
@@ -222,7 +224,7 @@ def process_source(
         translation = worksheet.cell(row, Columns.translation.value).value
         if not translation:
             yield "Translating"
-            translation = run_google_translate(
+            translation = Translate.run(
                 texts=[transcript],
                 target_language=request.google_translate_target,
                 # source_language=request.language,

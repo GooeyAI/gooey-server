@@ -9,7 +9,6 @@ import typing_extensions
 from furl import furl
 
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
@@ -63,6 +62,7 @@ class AsrOutputFormat(Enum):
     json = "JSON"
     srt = "SRT"
     vtt = "VTT"
+
 
 def run_asr(
     audio_url: str,
