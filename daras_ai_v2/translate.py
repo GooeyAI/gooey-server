@@ -561,6 +561,13 @@ class Translator(ABC):
         Returns:
             list[str]: Translated text.
         """
+        # prevent incorrect API calls, and transliterate text if the source language is romanized even if it matches the target language
+        if source_language == target_language:
+            return (
+                Translate.transliterate(texts, [source_language] * len(texts))
+                if enable_transliteration
+                else texts
+            )
 
         # detect languages and romanization information if not provided
         if not source_language:
@@ -1026,7 +1033,10 @@ class TranslateUI:
             or Auto
         )
         translator.language_selector(
-            label="###### Input Language",
+            label="""
+            ###### Input Language
+            Automatically detect language if not specified. If this is the same as the target language, transliteration will be applied if enabled, otherwise no translation will take place.
+            """,
             key=key_source,
             allow_none=not require_source,
         )
