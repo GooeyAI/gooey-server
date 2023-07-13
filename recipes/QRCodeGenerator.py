@@ -86,13 +86,13 @@ class QRCodeGeneratorPage(BasePage):
 
     def related_workflows(self) -> list:
         from recipes.CompareText2Img import CompareText2ImgPage
-        from recipes.Img2Img import Img2ImgPage
+        from recipes.CompareUpscaler import CompareUpscalerPage
         from recipes.FaceInpainting import FaceInpaintingPage
         from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
 
         return [
             CompareText2ImgPage,
-            Img2ImgPage,
+            CompareUpscalerPage,
             FaceInpaintingPage,
             EmailFaceInpaintingPage,
         ]
