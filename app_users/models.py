@@ -82,22 +82,27 @@ class AppUser(models.Model):
                 # avoid updating twice for same invoice
                 return
 
-            with transaction.atomic():
-                self.balance += amount
-                self.save()
+            obj = self.add_balance_direct(amount)
 
             # create invoice entry
             txn.create(
                 invoice_ref,
                 {
                     "amount": amount,
-                    "end_balance": self.balance,
+                    "end_balance": obj.balance,
                     "timestamp": datetime.datetime.utcnow(),
                     **invoice_items,
                 },
             )
 
         _update_user_balance_in_txn(db.get_client().transaction())
+
+    @transaction.atomic
+    def add_balance_direct(self, amount):
+        obj = self.__class__.objects.select_for_update().get(pk=self.pk)
+        obj.balance += amount
+        obj.save()
+        return obj
 
     def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
         # copy data from firebase user
