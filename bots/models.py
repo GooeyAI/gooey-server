@@ -505,6 +505,38 @@ class FeedbackComment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+def _get_shortened_url(guid: str):
+    return furl(settings.APP_BASE_URL, path=f"/2/{guid}").url
+
+
+class ShortenedURLsQuerySet(models.QuerySet):
+    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.all()
+        df_run = pd.DataFrame(
+            list(
+                SavedRun.objects.filter(
+                    pk__in=qs.values_list("run", flat=True).distinct()
+                ).values()
+            )
+        )
+        df = pd.DataFrame(list(qs.values())).merge(
+            df_run, how="left", left_on="run_id", right_on="id"
+        )
+        df.drop(columns=["run_id_x", "id_y"], inplace=True)
+        df.rename(columns={"id_x": "id", "run_id_y": "run_id"}, inplace=True)
+        df["workflow"] = df["workflow"].apply(lambda w: Workflow(w).name)
+        df["shortened_url"] = df["shortened_guid"].apply(_get_shortened_url)
+        df["created_at"] = df["created_at"].apply(
+            lambda d: d.astimezone(tz).replace(tzinfo=None)
+        )
+        df["updated_at"] = df["updated_at"].apply(
+            lambda d: d.astimezone(tz).replace(tzinfo=None)
+        )
+        return df
+
+
 class ShortenedURLs(models.Model):
     url = models.URLField()
     shortened_guid = models.CharField(max_length=10, unique=True)
@@ -523,9 +555,11 @@ class ShortenedURLs(models.Model):
     max_clicks = models.IntegerField(default=-1)
     disabled = models.BooleanField(default=False)
 
+    objects = ShortenedURLsQuerySet.as_manager()
+
     @property
     def shortened_url(self):
-        return furl(settings.APP_BASE_URL, path=f"/2/{self.shortened_guid}").url
+        return _get_shortened_url(self.shortened_guid)
 
     class Meta:
         ordering = ("-created_at",)

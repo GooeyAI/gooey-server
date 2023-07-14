@@ -411,3 +411,59 @@ class FeedbackAdmin(admin.ModelAdmin):
         return change_obj_url(feedback.message, label=feedback.message.display_content)
 
     messsage_display_content.short_description = "Bot Response (Original)"
+
+
+@admin.register(models.ShortenedURLs)
+class ShortenedURLs(admin.ModelAdmin):
+    autocomplete_fields = ["run"]
+    list_filter = [
+        "clicks",
+        "created_at",
+    ]
+    search_fields = [
+        "shortened_guid",
+        "url",
+    ] + [f"run__{field}" for field in SavedRunAdmin.search_fields]
+    list_display = [
+        "url",
+        "shortened_url",
+        "get_run_id",
+        "get_example_id",
+        "get_workflow",
+        "get_uid",
+        "clicks",
+        "get_max_clicks",
+        "disabled",
+        "created_at",
+        "updated_at",
+    ]
+    readonly_fields = [
+        "shortened_guid",
+        "clicks",
+        "created_at",
+        "updated_at",
+        "run",
+    ]
+    ordering = ["created_at"]
+    actions = [export_to_csv, export_to_excel]
+
+    @admin.display(ordering="max_clicks", description="Max Clicks")
+    def get_max_clicks(self, obj):
+        max_clicks = obj.max_clicks
+        return max_clicks if max_clicks != -1 else "∞"
+
+    @admin.display(ordering="run__run_id", description="Run ID")
+    def get_run_id(self, obj):
+        return obj.run.run_id
+
+    @admin.display(ordering="run__example_id", description="Example ID")
+    def get_example_id(self, obj):
+        return obj.run.example_id
+
+    @admin.display(ordering="run__workflow", description="Workflow")
+    def get_workflow(self, obj):
+        return models.Workflow(obj.run.workflow).name
+
+    @admin.display(ordering="run__uid", description="UID")
+    def get_uid(self, obj):
+        return obj.run.uid
