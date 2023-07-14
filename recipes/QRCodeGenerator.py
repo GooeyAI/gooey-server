@@ -338,7 +338,7 @@ Here is the final output:
             self._render_outputs(state)
 
     def preview_description(self, state: dict) -> str:
-        return "Enter your URL (or text) and an image prompt and we'll generate an arty QR code with your artistic style and content in about 30 seconds. This is a rad way to advertise your website in IRL or print on a poster."
+        return "Create interactive and engaging QR codes with stunning visuals that are amazing for marketing, branding, and more. Combining AI Art and QR Code has never been easier!\nEnter your URL and image prompt, and in just 30 seconds, we'll generate an artistic QR code tailored to your style. "
 
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model", Text2ImgModels.dream_shaper.name)
