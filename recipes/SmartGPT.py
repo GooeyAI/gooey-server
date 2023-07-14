@@ -193,6 +193,21 @@ class SmartGPTPage(BasePage):
                 height=200,
             )
 
+    def preview_description(self, state: dict) -> str:
+        my_string = "SmartGPT is a cutting-edge AI technology that can be used to generate natural language responses to any given input. We have combined the power of CoT, Reflexion & DERA into one pipeline so that you can use ChatGPT to its full potential! Input your prompt + a reflection/research prompt + a resolver prompt to use SmartGPT for enhanced text generation, natural language and incredible question-answer results."
+        my_word_links = {
+            "CoT": "https://arxiv.org/abs/2305.02897",
+            "Reflexion": "https://arxiv.org/abs/2303.11366",
+            "DERA": "https://arxiv.org/abs/2303.17071",
+        }
+
+        def make_links(string, word_links):
+            for word, link in word_links.items():
+                string = string.replace(word, f'<a href="{link}">{word}</a>')
+            return string
+
+        result = make_links(my_string, my_word_links)
+        return result
 
 def answers_as_prompt(texts: list[str], sep="\n\n") -> str:
     return sep.join(

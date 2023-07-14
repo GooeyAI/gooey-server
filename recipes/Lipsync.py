@@ -116,3 +116,6 @@ class LipsyncPage(BasePage):
 
     def render_usage_guide(self):
         youtube_video("EJdtC0USujM")
+
+    def preview_description(self, state: dict) -> str:
+        return "Create high-quality, realistic Lipsync animations from any audio file. Input a sample face gif/video + audio and we will automatically generate a lipsync animation that matches your audio."

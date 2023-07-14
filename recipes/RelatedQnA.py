@@ -22,7 +22,7 @@ class RelatedGoogleGPTResponse(GoogleGPTPage.ResponseModel):
 
 
 class RelatedQnAPage(BasePage):
-    title = "Related QnA"
+    title = "Generate \"People Also Ask\" SEO Content "
     slug_versions = ["related-qna-maker"]
 
     price = 75
@@ -129,7 +129,7 @@ class RelatedQnAPage(BasePage):
         ]
 
     def preview_description(self, state: dict) -> str:
-        return "Like Bing + ChatGPT or perplexity.ai, this workflow queries Google and then summarizes the results (with citations!) using an editable GPT3 script.  Filter  results to your own website so users can ask anything and get answers based only on your site's pages."
+        return "Input your Google Search query and discover related Q&As that your audience is asking, so you can create content that is more relevant and engaging. This workflow finds the related queries (aka \"People also ask\") for your Google search, browses through the URL you provide for all related results from your query and finally, generates cited answers from those results. A great way to quickly improve your website's SEO rank if you already rank well for a given query."
 
     def render_steps(self):
         col1, col2 = st.columns(2)
