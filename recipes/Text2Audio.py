@@ -146,18 +146,7 @@ class Text2AudioPage(BasePage):
             _render_output(state)
 
     def preview_description(self, state: dict) -> str:
-        my_string = "Generate AI Music with text instruction prompts. AudiLDM is capable of generating realistic audio samples by process any text input. Learn more here."
-        my_word_links = {
-            "here": "https://huggingface.co/cvssp/audioldm-m-full",
-        }
-
-        def make_links(string, word_links):
-            for word, link in word_links.items():
-                string = string.replace(word, f'<a href="{link}">{word}</a>')
-            return string
-
-        result = make_links(my_string, my_word_links)
-        return result
+        return "Generate AI Music with text instruction prompts. AudiLDM is capable of generating realistic audio samples by process any text input. Learn more [here](https://huggingface.co/cvssp/audioldm-m-full)."
 
 def _render_output(state):
     selected_models = state.get("selected_models", [])

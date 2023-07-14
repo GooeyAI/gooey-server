@@ -351,7 +351,7 @@ Choose fps for the video.
             """
             #### Resources:
 
-            [Animation slides](https://docs.google.com/presentation/d/1XkW2nHmHS0SAKpYmivO-0D15iqmp1YWMLldIEUC2du0/edit?usp=sharing)
+            [Learn Animation](https://www.help.gooey.ai/learn-animation)
 
             [Gooey Guide to Prompting](https://docs.google.com/presentation/d/1RaoMP0l7FnBZovDAR42zVmrUND9W5DW6eWet-pi6kiE/edit?usp=sharing)
 
