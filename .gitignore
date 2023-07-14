@@ -1,6 +1,8 @@
 dump.rdb
 pages/Pad.py
 
+scripts/import_users.ipynb
+
 .idea
 *.json
 

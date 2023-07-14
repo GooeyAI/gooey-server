@@ -269,6 +269,17 @@ class MessageAdmin(admin.ModelAdmin):
                 },
             ),
         )
+        fieldsets.append(
+            (
+                "Analysis",
+                {
+                    "fields": [
+                        "question_answered",
+                        "question_subject",
+                    ]
+                },
+            )
+        )
         return fieldsets
 
     def wa_delivered(self, msg: models.Message):
