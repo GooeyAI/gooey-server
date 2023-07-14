@@ -425,7 +425,7 @@ class FeedbackAdmin(admin.ModelAdmin):
 
 
 @admin.register(models.ShortenedURLs)
-class ShortenedURLs(admin.ModelAdmin):
+class ShortenedURLsAdmin(admin.ModelAdmin):
     autocomplete_fields = ["run"]
     list_filter = [
         "clicks",

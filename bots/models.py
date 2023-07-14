@@ -583,6 +583,8 @@ class ShortenedURLs(models.Model):
     class Meta:
         ordering = ("-created_at",)
         get_latest_by = "created_at"
+        verbose_name = "Shortened URL"
+        verbose_name_plural = "Shortened URLs"
 
     def __str__(self):
         return "Shortened URL: " + self.shortened_url + " for URL: " + self.url
