@@ -30,6 +30,9 @@ if DEBUG:
 else:
     SECRET_KEY = config("SECRET_KEY")
 
+# https://hashids.org/
+HASHIDS_SALT = config("HASHIDS_SALT", default="")
+
 ALLOWED_HOSTS = ["*"]
 INTERNAL_IPS = ["127.0.0.1"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -48,6 +51,7 @@ INSTALLED_APPS = [
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
     "app_users",
+    "url_shortener",
 ]
 
 MIDDLEWARE = [

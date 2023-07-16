@@ -50,6 +50,7 @@ class Workflow(models.IntegerChoices):
     CHYRONPLANT = (22, "ChyronPlant")
     LETTERWRITER = (23, "LetterWriter")
     SMARTGPT = (24, "SmartGPT")
+    QRCODE = (25, "QRCodeGenerator")
 
     def get_app_url(self, example_id: str, run_id: str, uid: str):
         """return the url to the gooey app"""
