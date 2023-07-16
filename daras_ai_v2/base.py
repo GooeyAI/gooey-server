@@ -628,7 +628,9 @@ class BasePage:
                 uid=uid,
                 state=st.session_state,
                 channel=f"gooey-outputs/{self.doc_name}/{uid}/{run_id}",
-                query_params=gooey_get_query_params(),
+                query_params=self.clean_query_params(
+                    example_id=example_id, run_id=run_id, uid=uid
+                ),
             )
 
             raise QueryParamsRedirectException(
