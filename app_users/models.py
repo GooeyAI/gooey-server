@@ -99,9 +99,9 @@ class AppUser(models.Model):
 
     @transaction.atomic
     def add_balance_direct(self, amount):
-        obj = self.__class__.objects.select_for_update().get(pk=self.pk)
+        obj: AppUser = self.__class__.objects.select_for_update().get(pk=self.pk)
         obj.balance += amount
-        obj.save()
+        obj.save(update_fields=["balance"])
         return obj
 
     def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
