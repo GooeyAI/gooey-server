@@ -1,5 +1,4 @@
 import datetime
-import json
 import os
 import os.path
 import re
@@ -9,6 +8,7 @@ from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai.image_input import (
     truncate_text_words,
 )
@@ -52,8 +52,7 @@ from recipes.DocSearch import (
 )
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
-from routers.url_shortener import get_or_create_short_url
-from bots.models import Workflow
+from url_shortener.models import ShortenedURL
 
 BOT_SCRIPT_RE = re.compile(
     # start of line
@@ -536,9 +535,11 @@ Use this for prompting GPT to use the document search results.
                 DocSearchPage.RequestModel.parse_obj(state)
             )
             for reference in references:
-                reference.url = get_or_create_short_url(
-                    reference.url, self._get_current_api_url(), Workflow.VIDEOBOTS
-                )
+                reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
+                    url=reference["url"],
+                    user=self.request.user,
+                    workflow=Workflow.VIDEOBOTS,
+                )[0].shortened_url()
             state["references"] = references
         # if doc search is successful, add the search results to the user prompt
         if references:

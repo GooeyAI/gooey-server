@@ -22,7 +22,7 @@ def gui_runner(
     uid: str,
     state: dict,
     channel: str,
-    example_id: str = None,
+    query_params: dict = None,
 ):
     self = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
 
@@ -31,7 +31,7 @@ def gui_runner(
     yield_val = None
     error_msg = None
     url = self.app_url(run_id=run_id, uid=uid)
-    set_query_params(dict(run_id=run_id, uid=uid, example_id=example_id))
+    set_query_params(query_params or {})
 
     def save(done=False):
         if done:

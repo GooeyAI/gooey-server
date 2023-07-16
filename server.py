@@ -22,7 +22,8 @@ from auth_backend import (
     SessionAuthBackend,
 )
 from daras_ai_v2 import settings
-from routers import billing, facebook, talkjs, api, root, url_shortener
+from routers import billing, facebook, talkjs, api, root
+import url_shortener.routers as url_shortener
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 

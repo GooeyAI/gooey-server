@@ -8,9 +8,10 @@ from django.core.validators import URLValidator
 from furl import furl
 from pydantic import BaseModel
 from pyzbar import pyzbar
-from urllib.parse import urlparse
 
 import gooey_ui as st
+from app_users.models import AppUser
+from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
     bytes_to_cv2_img,
@@ -30,8 +31,7 @@ from daras_ai_v2.stable_diffusion import (
     Img2ImgModels,
     Schedulers,
 )
-from routers.url_shortener import get_or_create_short_url, get_visits
-from bots.models import Workflow
+from url_shortener.models import ShortenedURL
 
 ATTEMPTS = 1
 
@@ -276,27 +276,46 @@ Here is the final output:
     def render_output(self):
         state = st.session_state
         self._render_outputs(state)
-        st.caption(f'URL: {state.get("qr_code_data")}')
-        if state.get("shortened_url", False):
-            st.caption(f'Shortened: {state.get("shortened_url")}')
+
+    def render_example(self, state: dict):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(
+                f"""
+                ```text
+                {state.get("text_prompt", "")}
+                ```
+                """
+            )
+        with col2:
+            self._render_outputs(state)
 
     def _render_outputs(self, state: dict):
         for img in state.get("output_images", []):
             st.image(img)
-            caption = f'{state.get("qr_code_data")}'
-            visits = get_visits(
-                str(urlparse(state.get("shortened_url")).path).replace("/", "")
-            )
-            if visits is not None:
-                caption += f". \n\nViews: {visits}"
-            st.caption(caption)
+            qr_code_data = state.get("qr_code_data")
+            if not qr_code_data:
+                continue
+            shortened_url = state.get("shortened_url")
+            if not shortened_url:
+                st.caption(qr_code_data)
+                continue
+            hashid = furl(shortened_url.strip("/")).path.segments[-1]
+            try:
+                clicks = ShortenedURL.objects.get_by_hashid(hashid).clicks
+            except ShortenedURL.DoesNotExist:
+                clicks = None
+            if clicks is not None:
+                st.caption(f"{shortened_url} → {qr_code_data} (Views: {clicks})")
+            else:
+                st.caption(f"{shortened_url} → {qr_code_data}")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
 
         yield "Generating QR Code..."
         image, qr_code_data, did_shorten = generate_and_upload_qr_code(
-            request, self._get_current_api_url()
+            request, self.request.user
         )
         if did_shorten:
             state["shortened_url"] = qr_code_data
@@ -333,22 +352,6 @@ Here is the final output:
         #     'Doh! That didn\'t work. Sometimes the AI produces bad QR codes. Please press "Regenerate" to try again.'
         # )
 
-    def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(
-                f"""
-                ```text
-                {state.get("text_prompt", "")}
-                ```
-                """
-            )
-            st.caption(f'URL: {state.get("qr_code_data")}')
-            if state.get("shortened_url", False):
-                st.caption(f'Shortened: {state.get("shortened_url")}')
-        with col2:
-            self._render_outputs(state)
-
     def preview_description(self, state: dict) -> str:
         return "Enter your URL (or text) and an image prompt and we'll generate an arty QR code with your artistic style and content in about 30 seconds. This is a rad way to advertise your website in IRL or print on a poster."
 
@@ -373,7 +376,8 @@ def is_url(url: str) -> bool:
 
 
 def generate_and_upload_qr_code(
-    request: QRCodeGeneratorPage.RequestModel, run_url: str = None
+    request: QRCodeGeneratorPage.RequestModel,
+    user: AppUser,
 ) -> tuple[str, str, bool]:
     qr_code_data = request.qr_code_data
     if not qr_code_data:
@@ -383,9 +387,13 @@ def generate_and_upload_qr_code(
         qr_code_data = download_qr_code_data(qr_code_input_image)
     qr_code_data = qr_code_data.strip()
 
-    should_shorten = request.use_url_shortener and is_url(qr_code_data)
-    if should_shorten:
-        qr_code_data, should_shorten = shorten_url(qr_code_data, run_url)
+    shortened = request.use_url_shortener and is_url(qr_code_data)
+    if shortened:
+        qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
+            url=qr_code_data,
+            user=user,
+            workflow=Workflow.QRCODE,
+        )[0].shortened_url()
 
     img_cv2 = generate_qr_code(qr_code_data)
 
@@ -400,29 +408,13 @@ def generate_and_upload_qr_code(
     )
 
     img_url = upload_file_from_bytes("cleaned_qr.png", cv2_img_to_bytes(img_cv2))
-    return img_url, qr_code_data, should_shorten
+    return img_url, qr_code_data, shortened
 
 
 def generate_qr_code(qr_code_data: str) -> np.ndarray:
     qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, border=0)
     qr.add_data(qr_code_data)
     return np.array(qr.make_image().convert("RGB"))
-
-
-def shorten_url(qr_code_data: str, run_url: str = None) -> tuple[str, bool]:
-    try:
-        text = get_or_create_short_url(
-            qr_code_data,
-            run_url,
-            Workflow.QRCODE,
-        )
-        # Validate that the response is a URL
-        if is_url(text):
-            return text, True
-    except Exception as e:
-        print(f"ignoring shortened url error: {e}")
-        pass  # We can keep going without the shortened url and just use the original url
-    return qr_code_data, False
 
 
 def download_qr_code_data(url: str) -> str:
