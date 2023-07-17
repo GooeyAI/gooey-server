@@ -77,6 +77,8 @@ model_max_tokens = {
     LargeLanguageModels.text_ada_001: 2049,
 }
 
+threadlocal = threading.local()
+
 
 def calc_gpt_tokens(
     text: str | list[str] | dict | list[dict],
@@ -84,12 +86,11 @@ def calc_gpt_tokens(
     sep: str = "",
     is_chat_model: bool = True,
 ) -> int:
-    local = threading.local()
     try:
-        enc = local.gpt2enc
+        enc = threadlocal.gpt2enc
     except AttributeError:
         enc = tiktoken.get_encoding("gpt2")
-        local.gpt2enc = enc
+        threadlocal.gpt2enc = enc
     if isinstance(text, (str, dict)):
         messages = [text]
     else:

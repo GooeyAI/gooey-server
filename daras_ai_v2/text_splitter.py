@@ -37,14 +37,15 @@ default_separators = (
     re.compile(whitespace),
 )
 
+threadlocal = threading.local()
+
 
 def default_length_function(text: str) -> int:
-    local = threading.local()
     try:
-        enc = local.gpt2enc
+        enc = threadlocal.gpt2enc
     except AttributeError:
         enc = tiktoken.get_encoding("gpt2")
-        local.gpt2enc = enc
+        threadlocal.gpt2enc = enc
     return len(enc.encode(text))
 
 

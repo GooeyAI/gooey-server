@@ -1,3 +1,4 @@
+import threading
 import typing
 
 from django.db.models import IntegerChoices
@@ -19,7 +20,10 @@ from daras_ai_v2.translate import (
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.functional import map_parallel, flatmap_parallel
+from daras_ai_v2.functional import (
+    apply_parallel,
+    flatapply_parallel,
+)
 from daras_ai_v2.gdrive_downloader import is_gdrive_url, gdrive_download
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
@@ -115,25 +119,125 @@ class DocExtractPage(BasePage):
         return [VideoBotsPage, AsrPage, CompareLLMPage, DocSearchPage]
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
+        import gspread.utils
+
         request: DocExtractPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        worksheet = get_worksheet(request.sheet_url)
+        entries = yield from flatapply_parallel(
+            extract_info, request.documents, message="Extracting metadata..."
+        )
 
-        # ensure column names are correct
-        if worksheet.row_values(1)[: len(Columns)] != Columns.labels:
-            worksheet.update("A1", [Columns.labels])
+        yield "Preparing sheet..."
+        spreadsheet_id = gspread.utils.extract_id_from_url(request.sheet_url)
+        ensure_header(spreadsheet_id)
+        row_numbers = init_sheet(spreadsheet_id, entries)
 
-        yield "Extracting metadata..."
-        entries = flatmap_parallel(extract_info, request.documents)
-
-        yield "Updating sheet..."
-        map_parallel(
-            lambda entry: process_entry(
-                entry=entry, worksheet=worksheet, request=request
+        yield from apply_parallel(
+            lambda entry, row: process_entry(
+                spreadsheet_id=spreadsheet_id,
+                entry=entry,
+                row=row,
+                request=request,
             ),
             entries,
+            row_numbers,
             max_workers=4,
+            message="Updating sheet...",
         )
+
+
+def ensure_header(spreadsheet_id):
+    get_spreadsheet_service().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"A1:{col_i2a(len(Columns))}1",
+        body={"values": [Columns.labels]},
+        valueInputOption="RAW",
+    ).execute()
+
+
+def init_sheet(spreadsheet_id: str, entries: list[dict | None]) -> list[int | None]:
+    import gspread.utils
+
+    start_row = 2
+    spreadsheets = get_spreadsheet_service()
+
+    # find existing rows
+    values = [
+        row[0].strip() if row else ""
+        for row in spreadsheets.values()
+        .get(
+            spreadsheetId=spreadsheet_id,
+            range=f"{col_i2a(Columns.video_url.value)}{start_row}:{col_i2a(Columns.video_url.value)}",
+        )
+        .execute()
+        .get("values", [[]])
+    ]
+
+    row_numbers = [None] * len(entries)
+    to_append = []
+    for i, entry in enumerate(entries):
+        try:
+            idx = values.index(entry["webpage_url"])
+        except ValueError:
+            row = [""] * len(Columns)
+            row[Columns.video_url.value - 1] = entry["webpage_url"]
+            to_append.append(row)
+        else:
+            row_numbers[i] = idx + start_row
+
+    # append all missing rows
+    response = (
+        spreadsheets.values()
+        .append(
+            spreadsheetId=spreadsheet_id,
+            range=f"A{start_row}:A",
+            body={"values": to_append},
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+        )
+        .execute()
+    )
+    updated_range = response["updates"]["updatedRange"].split("!")[1]
+    start_idx = gspread.utils.a1_range_to_grid_range(updated_range)["startRowIndex"]
+    for i, row in enumerate(row_numbers):
+        if row is None:
+            start_idx += 1
+            row_numbers[i] = start_idx
+
+    # update all rows with metadata
+    spreadsheets.values().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={
+            "valueInputOption": "RAW",
+            "data": [
+                {
+                    "range": f"{col_i2a(col)}{row}:{col_i2a(col)}{row}",
+                    "values": [[value]],
+                }
+                for row, entry in zip(row_numbers, entries)
+                for col, value in [
+                    (Columns.video_url.value, entry["webpage_url"]),
+                    (Columns.title.value, entry.get("title", "")),
+                    (Columns.description.value, entry.get("description", "")),
+                    (Columns.status.value, "Pending"),
+                ]
+            ],
+        },
+    ).execute()
+
+    return row_numbers
+
+
+def col_i2a(col: int) -> str:
+    div = col
+    label = ""
+    while div:
+        (div, mod) = divmod(div, 26)
+        if mod == 0:
+            mod = 26
+            div -= 1
+        label = chr(mod + 64) + label
+    return label
 
 
 def extract_info(url: str) -> list[dict | None]:
@@ -150,53 +254,54 @@ def extract_info(url: str) -> list[dict | None]:
         return [{"webpage_url": url}]  # assume it's a direct link
 
 
-def process_entry(worksheet, entry: dict | None, request: DocExtractPage.RequestModel):
-    import gspread.utils
-
+def process_entry(
+    spreadsheet_id: str,
+    row: int,
+    entry: dict | None,
+    request: DocExtractPage.RequestModel,
+):
     if not entry:
         return
     webpage_url = entry.get("webpage_url")
     if not webpage_url:
         return
 
-    cell = worksheet.find(webpage_url)
-    if cell:
-        row = cell.row
-    else:
-        table_range = worksheet.append_row([])["updates"]["updatedRange"]
-        cell = table_range.split("!")[-1]
-        row = gspread.utils.a1_to_rowcol(cell)[0]
-
-    worksheet.update_cells(
-        [
-            gspread.Cell(row, Columns.video_url.value, webpage_url),
-            gspread.Cell(row, Columns.title.value, entry.get("title", "")),
-            gspread.Cell(row, Columns.description.value, entry.get("description", "")),
-        ],
-    )
-
     try:
         for status in process_source(
             request=request,
-            worksheet=worksheet,
+            spreadsheet_id=spreadsheet_id,
             row=row,
             webpage_url=webpage_url,
         ):
-            worksheet.update_cell(row, Columns.status.value, status)
+            update_cell(spreadsheet_id, row, Columns.status.value, status)
     except:
-        worksheet.update_cell(row, Columns.status.value, "Error")
+        update_cell(spreadsheet_id, row, Columns.status.value, "Error")
         raise
     else:
-        worksheet.update_cell(row, Columns.status.value, "Done")
+        update_cell(spreadsheet_id, row, Columns.status.value, "Done")
 
 
 def process_source(
+    *,
     request: DocExtractPage.RequestModel,
+    spreadsheet_id: str,
     row: int,
     webpage_url: str,
-    worksheet,
 ) -> typing.Iterator[str | None]:
-    audio_url = worksheet.cell(row, Columns.audio_url.value).value
+    # get the values in existing row
+    existing_values = (
+        get_spreadsheet_service()
+        .values()
+        .get(spreadsheetId=spreadsheet_id, range=f"{row}:{row}")
+        .execute()
+        .get("values", [[]])[0]
+    )
+    # pad with None to avoid index errors
+    existing_values = (
+        [None] + existing_values + [None] * max(len(Columns) - len(existing_values), 0)
+    )
+
+    audio_url = existing_values[Columns.audio_url.value]
     if not audio_url:
         yield "Downloading"
         if is_yt_url(webpage_url):
@@ -206,22 +311,22 @@ def process_source(
             if is_gdrive_url(f):
                 doc_meta = doc_url_to_metadata(webpage_url)
                 f_name = doc_meta.name
-                worksheet.update_cell(row, Columns.title.value, f_name)
+                update_cell(spreadsheet_id, row, Columns.title.value, f_name)
                 f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
                 webpage_url = upload_file_from_bytes(
                     f_name, f_bytes, content_type=doc_meta.mime_type
                 )
             audio_url, _ = audio_to_wav(webpage_url)
-        worksheet.update_cell(row, Columns.audio_url.value, audio_url)
+        update_cell(spreadsheet_id, row, Columns.audio_url.value, audio_url)
 
-    transcript = worksheet.cell(row, Columns.transcript.value).value
+    transcript = existing_values[Columns.transcript.value]
     if not transcript:
         yield "Transcribing"
         transcript = run_asr(audio_url, request.selected_asr_model)
-        worksheet.update_cell(row, Columns.transcript.value, transcript)
+        update_cell(spreadsheet_id, row, Columns.transcript.value, transcript)
 
     if request.google_translate_target:
-        translation = worksheet.cell(row, Columns.translation.value).value
+        translation = existing_values[Columns.translation.value]
         if not translation:
             yield "Translating"
             translation = Translate.run(
@@ -229,12 +334,12 @@ def process_source(
                 target_language=request.google_translate_target,
                 # source_language=request.language,
             )[0]
-            worksheet.update_cell(row, Columns.translation.value, translation)
+            update_cell(spreadsheet_id, row, Columns.translation.value, translation)
     else:
         translation = transcript
-        worksheet.update_cell(row, Columns.translation.value, "")
+        update_cell(spreadsheet_id, row, Columns.translation.value, "")
 
-    summary = worksheet.cell(row, Columns.summary.value).value
+    summary = existing_values[Columns.summary.value]
     if not summary and request.task_instructions:
         yield "Summarizing"
         prompt = request.task_instructions.strip() + "\n\n" + translation
@@ -249,25 +354,39 @@ def process_source(
                 avoid_repetition=request.avoid_repetition,
             )
         )
-        worksheet.update_cell(row, Columns.summary.value, summary)
+        update_cell(spreadsheet_id, row, Columns.summary.value, summary)
+
+
+def update_cell(spreadsheet_id: str, row: int, col: int, value: str):
+    get_spreadsheet_service().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"{col_i2a(col)}{row}:{col_i2a(col)}{row}",
+        body={"values": [[value]]},
+        valueInputOption="RAW",
+    ).execute()
 
 
 def is_yt_url(url: str) -> bool:
     return "youtube.com" in url or "youtu.be" in url
 
 
-def get_worksheet(sheet_url, worksheet_index=0):
-    from oauth2client.service_account import ServiceAccountCredentials
-    import gspread
+threadlocal = threading.local()
 
-    # Authenticate with the Google Sheets API using a service account
-    scope = [
-        #     "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(
-        service_account_key_path, scope
-    )
-    client = gspread.authorize(creds)
-    sheet = client.open_by_url(sheet_url)
-    return sheet.get_worksheet(worksheet_index)
+
+def get_spreadsheet_service():
+    from oauth2client.service_account import ServiceAccountCredentials
+    from googleapiclient.discovery import build
+
+    try:
+        return threadlocal.spreadsheets
+    except AttributeError:
+        # Authenticate with the Google Sheets API using a service account
+        scope = [
+            "https://www.googleapis.com/auth/drive",
+        ]
+        creds = ServiceAccountCredentials.from_json_keyfile_name(
+            service_account_key_path, scope
+        )
+        service = build("sheets", "v4", credentials=creds)
+        threadlocal.spreadsheets = service.spreadsheets()
+        return threadlocal.spreadsheets

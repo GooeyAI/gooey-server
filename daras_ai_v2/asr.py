@@ -155,7 +155,7 @@ def run_asr(
         )
     match output_format:
         case AsrOutputFormat.text:
-            return data["text"]
+            return data["text"].strip()
         case AsrOutputFormat.json:
             return data
         case AsrOutputFormat.srt:
