@@ -46,7 +46,7 @@ class CompareLLMPage(BasePage):
         return DEFAULT_COMPARE_LM_META_IMG
 
     def preview_description(self, state: dict) -> str:
-        return "Which language model works best your prompt? Compare OpenAI GPT3 engines (davinci vs curie) with more LLMs being added soon. Pay with Stripe or PayPal"
+        return "Which language model works best your prompt? Compare your text generations across multiple large language models (LLMs) like OpenAI's evolving and latest ChatGPT engines and others like Curie, Ada, Babbage."
 
     def render_form_v2(self):
         st.text_area(

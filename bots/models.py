@@ -50,6 +50,7 @@ class Workflow(models.IntegerChoices):
     CHYRONPLANT = (22, "ChyronPlant")
     LETTERWRITER = (23, "LetterWriter")
     SMARTGPT = (24, "SmartGPT")
+    QRCODE = (25, "QRCodeGenerator")
 
     def get_app_url(self, example_id: str, run_id: str, uid: str):
         """return the url to the gooey app"""
@@ -384,6 +385,33 @@ class Conversation(models.Model):
     d3.boolean = True
 
 
+class MessageQuerySet(models.QuerySet):
+    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.all().prefetch_related("feedbacks")
+        rows = []
+        for message in qs[:10000]:
+            message: Message
+            row = {
+                "USER": message.conversation.get_display_name(),
+                "BOT": str(message.conversation.bot_integration),
+                "CREATED AT": message.created_at.astimezone(tz).replace(tzinfo=None),
+                "MESSAGE (ENGLISH)": message.content,
+                "MESSAGE (ORIGINAL)": message.display_content,
+                "ROLE": message.get_role_display(),
+                "QUESTION_ANSWERED": message.question_answered,
+                "QUESTION_SUBJECT": message.question_subject,
+            }
+            row |= {
+                f"FEEDBACK {i + 1}": feedback.get_display_text()
+                for i, feedback in enumerate(message.feedbacks.all())
+            }
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
+
 class Message(models.Model):
     conversation = models.ForeignKey(
         "Conversation", on_delete=models.CASCADE, related_name="messages"
@@ -433,6 +461,8 @@ class Message(models.Model):
     )
 
     _analysis_done = False
+
+    objects = MessageQuerySet.as_manager()
 
     class Meta:
         ordering = ("-created_at",)
@@ -505,12 +535,16 @@ class Feedback(models.Model):
         get_latest_by = "created_at"
 
     def __str__(self):
+        ret = self.get_display_text()
+        if self.message.content:
+            ret += f" to “{Truncator(self.message.content).words(30)}”"
+        return ret
+
+    def get_display_text(self):
         ret = self.get_rating_display()
         text = self.text_english or self.text
         if text:
             ret += f" - “{Truncator(text).words(30)}”"
-        if self.message.content:
-            ret += f" to “{Truncator(self.message.content).words(30)}”"
         return ret
 
 
