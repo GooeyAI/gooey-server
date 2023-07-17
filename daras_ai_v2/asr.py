@@ -171,7 +171,7 @@ def _translate_text(text: str, source_language: str, target_language: str):
     data = res.json()
     result = data["translations"][0]
 
-    return result["translatedText"]
+    return result["translatedText"].strip()
 
 
 _session = None
@@ -284,7 +284,7 @@ def run_asr(
         )
     match output_format:
         case AsrOutputFormat.text:
-            return data["text"]
+            return data["text"].strip()
         case AsrOutputFormat.json:
             return data
         case AsrOutputFormat.srt:
