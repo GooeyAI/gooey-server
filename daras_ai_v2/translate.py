@@ -1429,7 +1429,7 @@ def _update_or_create_glossary(f_url: str) -> tuple[str, "pd.DataFrame"]:
     f_url = f_url or DEFAULT_GLOSSARY_URL
     doc_meta = doc_url_to_metadata(f_url)
     df = _update_glossary(f_url, doc_meta)
-    return f"projects/{PROJECT_ID}/locations/{LOCATION}/glossaries/{GLOSSARY_NAME}", df
+    return _get_glossary(), df
 
 
 @redis_cache_decorator
