@@ -20,7 +20,6 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, run_asr
-from daras_ai_v2.translate import Translate, LANGUAGE_CODE_TYPE
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )
@@ -52,7 +51,7 @@ class DocSearchRequest(BaseModel):
     scroll_jump: int | None
 
     selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-    google_translate_target: LANGUAGE_CODE_TYPE | None
+    google_translate_target: str | None
 
 
 def get_top_k_references(
@@ -305,6 +304,8 @@ def doc_url_to_text_pages(
     Returns:
         list of text pages
     """
+    from daras_ai_v2.translate import Translate
+
     f = furl(f_url)
     f_name = doc_meta.name
     if is_gdrive_url(f):
@@ -483,3 +484,42 @@ def download_text_doc(f_url: str) -> list[str]:
             raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
 
     return pages
+
+
+def download_table_doc(f_url: str, doc_meta: DocMetadata) -> "pd.DataFrame":
+    f = furl(f_url)
+    f_name = doc_meta.name
+    if is_gdrive_url(f):
+        # download from google drive
+        f_bytes, ext = gdrive_download(f, doc_meta.mime_type)
+    else:
+        # download from url
+        try:
+            r = requests.get(
+                f_url,
+                headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
+                timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+            )
+            r.raise_for_status()
+        except requests.RequestException as e:
+            print(f"ignore error while downloading {f_url}: {e}")
+            return []
+        f_bytes = r.content
+        # if it's a known encoding, standardize to utf-8
+        if r.encoding:
+            try:
+                codec = codecs.lookup(r.encoding)
+            except LookupError:
+                pass
+            else:
+                f_bytes = codec.decode(f_bytes)[0].encode()
+        ext = guess_ext_from_response(r)
+    match ext:
+        case ".csv" | ".xlsx" | ".tsv" | ".ods" | ".gsheet":
+            import pandas as pd
+
+            df = pd.read_csv(io.BytesIO(f_bytes), dtype=str).dropna()
+        case _:
+            raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
+
+    return df

@@ -13,6 +13,7 @@ from daras_ai_v2.translate import (
     TranslateUI,
     TRANSLATE_API_TYPE,
     LANGUAGE_CODE_TYPE,
+    DEFAULT_GLOSSARY_URL,
 )
 from daras_ai_v2.vector_search import download_text_doc
 
@@ -26,6 +27,7 @@ class TranslationPage(BasePage):
         target_language="en",
         enable_transliteration=True,
         romanize_translation=False,
+        glossary_url=DEFAULT_GLOSSARY_URL,
     )
 
     class RequestModel(BaseModel):
@@ -37,6 +39,7 @@ class TranslationPage(BasePage):
 
         enable_transliteration: bool | None
         romanize_translation: bool | None
+        glossary_url: str | None
 
     class ResponseModel(BaseModel):
         output_texts: list[str]
@@ -56,6 +59,7 @@ class TranslationPage(BasePage):
             request.source_language,
             request.enable_transliteration,
             request.romanize_translation,
+            glossary_url=request.glossary_url,
         )
         yield "Translating Documents..."
         state["output_docs"] = [
@@ -66,6 +70,7 @@ class TranslationPage(BasePage):
                 request.source_language,
                 request.enable_transliteration,
                 request.romanize_translation,
+                glossary_url=request.glossary_url,
             )
             for doc in request.documents
         ]

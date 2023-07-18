@@ -2,11 +2,13 @@ import typing
 import requests
 import json
 from enum import Enum
+from abc import ABC, abstractmethod
 
 import gooey_ui as st
 from daras_ai_v2.functional import map_parallel
-from abc import ABC, abstractmethod
+from daras_ai_v2.redis_cache import redis_cache_decorator
 
+DEFAULT_GLOSSARY_URL = "https://docs.google.com/spreadsheets/d/1IRHKcOC86oZXwMB0hR7eej7YVg5kUHpriZymwYQcQX4/edit?usp=sharing"  # only viewing access
 GOOGLE_V3_ENDPOINT = "https://translate.googleapis.com/v3/projects/"
 ISO_639_LANGUAGES = {
     "aar": "Afar",
@@ -549,6 +551,7 @@ class Translator(ABC):
         target_language: str,
         source_language: str | None = None,
         enable_transliteration: bool = True,
+        glossary_url: str | None = None,
     ) -> list[str]:
         """
         Translate text using the specified API.
@@ -595,7 +598,7 @@ class Translator(ABC):
 
         return map_parallel(
             lambda text, source: cls._translate_text(
-                text, source, target_language, enable_transliteration
+                text, source, target_language, enable_transliteration, glossary_url
             ),
             texts,
             language_codes,
@@ -609,6 +612,7 @@ class Translator(ABC):
         source_language: str,
         target_language: str,
         enable_transliteration: bool = True,
+        glossary_url: str | None = None,
     ) -> str:
         """
         Translate text using the specified API.
@@ -652,7 +656,7 @@ def _Google_supported_languages() -> dict[str, str]:
     parent = f"projects/dara-c1b52/locations/global"
     client = translate.TranslationServiceClient()
     supported_languages = client.get_supported_languages(
-        parent, display_language_code="en"
+        parent=parent, display_language_code="en"
     )
     return {
         lang.language_code: lang.display_name
@@ -714,6 +718,7 @@ class GoogleTranslate(Translator):
         source_language: str,
         target_language: str,
         enable_transliteration: bool = True,
+        glossary_url: str | None = None,
     ):
         is_romanized, source_language = cls.parse_detected_language(source_language)
         enable_transliteration = (
@@ -729,36 +734,42 @@ class GoogleTranslate(Translator):
                 else text
             )
 
-        if enable_transliteration:
-            authed_session, project = cls.get_google_auth_session()
-            res = authed_session.post(
-                f"{GOOGLE_V3_ENDPOINT}{project}/locations/global:translateText",
-                json.dumps(
-                    {
-                        "source_language_code": source_language,
-                        "target_language_code": target_language,
-                        "contents": text,
-                        "mime_type": "text/plain",
-                        "transliteration_config": {"enable_transliteration": True},
-                    }
-                ),
-                headers={
-                    "Content-Type": "application/json",
-                },
-            )
-            res.raise_for_status()
-            data = res.json()
-            result = data["translations"][0]
-        else:
-            from google.cloud import translate_v2
+        config = {
+            "source_language_code": source_language,
+            "target_language_code": target_language,
+            "contents": text,
+            "mime_type": "text/plain",
+            "transliteration_config": {
+                "enable_transliteration": enable_transliteration
+            },
+        }
+        if glossary_url:
+            glossary_config = {
+                "glossaryConfig": {
+                    "glossary": _update_or_create_glossary(glossary_url),
+                    "ignoreCase": True,
+                }
+            }
+            config.update(glossary_config)
 
-            translate_client = translate_v2.Client()
-            result = translate_client.translate(
-                text,
-                source_language=source_language,
-                target_language=target_language,
-                format_="text",
-            )
+        authed_session, project = cls.get_google_auth_session()
+        res = authed_session.post(
+            f"{GOOGLE_V3_ENDPOINT}{project}/locations/us-central1:translateText",
+            json.dumps(config),
+            headers={
+                "Content-Type": "application/json",
+            },
+        )
+        res.raise_for_status()
+        data = res.json()
+        if (
+            glossary_url
+            and data["glossaryTranslations"]
+            and "translatedText" in data["glossaryTranslations"][0]
+        ):
+            result = data["glossaryTranslations"][0]
+        else:
+            result = data["translations"][0]
 
         return result["translatedText"]
 
@@ -797,9 +808,11 @@ class MinT(Translator):
         source_language: str,
         target_language: str,
         enable_transliteration: bool = True,
+        glossary_url: str | None = None,
     ):
         _, source_language = cls.parse_detected_language(source_language)
         # enable_transliteration is ignored because translate() already transliterated text when necessary since _can_transliterate is empty
+        # TODO: support glossary_url
 
         # prevent incorrect API calls
         if source_language == target_language:
@@ -848,6 +861,7 @@ class Auto(Translator):
         source_language: str,
         target_language: str,
         enable_transliteration: bool = True,
+        glossary_url: str | None = None,
     ):
         is_romanized, source_language = cls.parse_detected_language(source_language)
         enable_transliteration = (
@@ -868,7 +882,10 @@ class Auto(Translator):
             and enable_transliteration
         ):
             return GoogleTranslate._translate_text(
-                text, source_language + "-Latn", target_language
+                text,
+                source_language + "-Latn",
+                target_language,
+                glossary_url=glossary_url,
             )
         if enable_transliteration:
             text = Translate.transliterate(text)[0]
@@ -877,11 +894,17 @@ class Auto(Translator):
                 return MinT._translate_text(text, source_language, target_language)
             except:
                 return GoogleTranslate._translate_text(
-                    text, source_language, target_language
+                    text, source_language, target_language, glossary_url=glossary_url
                 )  # fallback to GoogleTranslate
         elif source_language in GoogleTranslate.supported_languages():
             return GoogleTranslate._translate_text(
-                text, source_language, target_language
+                text, source_language, target_language, glossary_url=glossary_url
+            )
+        elif source_language == "und":
+            # und = undetermined, meaning the language detection failed
+            # so we'll run google translate without a source language
+            return GoogleTranslate._translate_text(
+                text, target_language=target_language, glossary_url=glossary_url
             )
         else:
             raise ValueError(f"Translation from {source_language} is not supported.")
@@ -944,10 +967,15 @@ class Translate:
         source_language: str | None = None,
         enable_transliteration: bool = True,
         romanize_translation: bool = False,
+        glossary_url: str | None = DEFAULT_GLOSSARY_URL,
     ) -> list[str]:
         translator = cls.apis.get(api, Auto)
         result = translator.translate(
-            texts, target_language, source_language, enable_transliteration
+            texts,
+            target_language,
+            source_language,
+            enable_transliteration,
+            glossary_url,
         )
         return cls.romanize(result, target_language) if romanize_translation else result
 
@@ -1066,6 +1094,7 @@ class TranslateUI:
             See [Romanization/Transliteration](https://guides.library.harvard.edu/mideast/romanization#:~:text=Romanization%%20refers%20to%20the%20process,converting%%20one%%20script%%20into%%20another.)
             """
         )
+        TranslateUI.translate_glossary_input()
 
     @staticmethod
     def translate_language_selector(
@@ -1096,6 +1125,30 @@ class TranslateUI:
             format_func=lambda k: languages[k] if k else "———",
             options=options,
         )
+
+    @staticmethod
+    def translate_glossary_input(
+        label="##### Glossary\nUpload a google sheet, csv, or xlsx file.",
+        key="glossary_url",
+    ):
+        """
+        Streamlit widget for inputting a glossary.
+        Args:
+            label: the label to display
+            key: the key to save the selected glossary to in the session state
+        """
+        from daras_ai_v2.doc_search_settings_widgets import document_uploader
+
+        glossary_url = document_uploader(
+            label=label,
+            key=key,
+            accept=["csv", "xlsx", "xls", "gsheet", "ods", "tsv"],
+            accept_multiple_files=False,
+        )
+        st.caption(
+            f"If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing)."
+        )
+        return glossary_url
 
 
 # ================================ Transliteration ================================
@@ -1271,3 +1324,163 @@ def transliterate_text(
         return result
     except:
         return text
+
+
+# ================================ Glossary ================================
+# Below follows code for uploading a glossary to Google Cloud Translate.
+# Using a glossary is a good approach if you don’t have enough data to train your own model
+# when working with minority languages which Google still has a lot of room for improvement
+# or when you are working with a domain specific topic.
+PROJECT_ID = "dara-c1b52"  # GCP project id
+GLOSSARY_NAME = "glossary"  # name you want to give this glossary resource
+LOCATION = "us-central1"  # data center location
+BUCKET_NAME = "gooey-server-glossary"  # name of bucket
+BLOB_NAME = "glossary.csv"  # name of blob
+GLOSSARY_URI = (
+    "gs://" + BUCKET_NAME + "/" + BLOB_NAME
+)  # the uri of the glossary uploaded to Cloud Storage
+
+
+def _update_or_create_glossary(f_url: str) -> None:
+    from daras_ai_v2.vector_search import doc_url_to_metadata
+
+    print("Updating/Creating glossary...")
+    f_url = f_url or DEFAULT_GLOSSARY_URL
+    doc_meta = doc_url_to_metadata(f_url)
+    _update_glossary(f_url, doc_meta)
+    return _get_glossary()
+
+
+@redis_cache_decorator
+def _update_glossary(f_url: str, doc_meta) -> None:
+    from daras_ai_v2.vector_search import download_table_doc
+
+    df = download_table_doc(f_url, doc_meta)
+
+    _upload_glossary_to_bucket(df)
+    # delete existing glossary
+    try:
+        _delete_glossary()
+    except:
+        pass
+    # create new glossary
+    languages = [
+        lan_code
+        for lan_code in df.columns.tolist()
+        if lan_code not in ["pos", "description"]
+    ]  # these are not languages
+    _create_glossary(languages)
+
+
+def _get_glossary():
+    """Get a particular glossary based on the glossary ID."""
+    from google.cloud import translate_v3beta1
+
+    client = translate_v3beta1.TranslationServiceClient()
+
+    name = client.glossary_path(PROJECT_ID, LOCATION, GLOSSARY_NAME)
+
+    response = client.get_glossary(name=name)
+    print("Glossary name: {}".format(response.name))
+    print("Entry count: {}".format(response.entry_count))
+    print("Input URI: {}".format(response.input_config.gcs_source.input_uri))
+    return name
+
+
+def _upload_glossary_to_bucket(df):
+    """Uploads a pandas DataFrame to the bucket."""
+    # import gcloud storage
+    from google.cloud import storage
+
+    csv = df.to_csv(index=False)
+    print(csv)
+
+    # initialize the storage client and give it the bucket and the blob name
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(BUCKET_NAME)
+    blob = bucket.blob(BLOB_NAME)
+
+    # upload the file to the bucket
+    blob.upload_from_string(csv)
+
+
+def _delete_glossary(timeout=180):
+    """Delete a specific glossary based on the glossary ID."""
+    from google.cloud import translate_v3beta1
+
+    client = translate_v3beta1.TranslationServiceClient()
+
+    name = client.glossary_path(PROJECT_ID, LOCATION, GLOSSARY_NAME)
+
+    operation = client.delete_glossary(name=name)
+    result = operation.result(timeout)
+    print("Deleted: {}".format(result.name))
+
+
+def _create_glossary(languages):
+    """Creates a GCP glossary resource
+    Assumes you've already uploaded a glossary to Cloud Storage bucket
+    Args:
+        languages: list of languages in the glossary
+        project_id: GCP project id
+        glossary_name: name you want to give this glossary resource
+        glossary_uri: the uri of the glossary you uploaded to Cloud Storage
+    """
+    from google.cloud import translate_v3beta1
+    from google.api_core.exceptions import AlreadyExists
+
+    # Instantiates a client
+    client = translate_v3beta1.TranslationServiceClient()
+
+    # Set glossary resource name
+    name = client.glossary_path(PROJECT_ID, LOCATION, GLOSSARY_NAME)
+
+    # Set language codes
+    language_codes_set = translate_v3beta1.Glossary.LanguageCodesSet(
+        language_codes=languages
+    )
+
+    gcs_source = translate_v3beta1.GcsSource(input_uri=GLOSSARY_URI)
+
+    input_config = translate_v3beta1.GlossaryInputConfig(gcs_source=gcs_source)
+
+    # Set glossary resource information
+    glossary = translate_v3beta1.Glossary(
+        name=name, language_codes_set=language_codes_set, input_config=input_config
+    )
+
+    parent = f"projects/{PROJECT_ID}/locations/{LOCATION}"
+
+    # Create glossary resource
+    # Handle exception for case in which a glossary
+    #  with glossary_name already exists
+    try:
+        operation = client.create_glossary(parent=parent, glossary=glossary)
+        operation.result(timeout=90)
+        print("Created glossary " + GLOSSARY_NAME + ".")
+    except AlreadyExists:
+        print(
+            "The glossary "
+            + GLOSSARY_NAME
+            + " already exists. No new glossary was created."
+        )
+
+
+# print(
+#     Translate.run(
+#         [
+#             "is paath ka angrejee se hindee mein anuvaad mintee ke maadhyam se indikatraansa2 ka upayog karake kiya gaya hai \n Farmer.CHAT"
+#         ],
+#         "en",
+#         source_language="hi",
+#         api=GoogleTranslate.name,
+#         enable_transliteration=True,
+#         glossary_url=DEFAULT_GLOSSARY_URL,
+#     )
+# )
+
+# authed_session, project = GoogleTranslate.get_google_auth_session()
+# res = authed_session.get(
+#     f"https://translation.googleapis.com/v3/projects/{PROJECT_ID}/locations/us-central1/glossaries/{GLOSSARY_NAME}"
+# )
+# print(res.text)

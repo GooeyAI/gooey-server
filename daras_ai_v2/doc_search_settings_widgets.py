@@ -2,7 +2,6 @@ import gooey_ui as st
 
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels
-from daras_ai_v2.translate import GoogleTranslate
 from daras_ai_v2.enum_selector_widget import enum_selector
 
 
@@ -14,36 +13,58 @@ def document_uploader(
     label: str,
     key="documents",
     accept=(".pdf", ".txt", ".docx", ".md", ".html", ".wav", ".ogg", ".mp3", ".aac"),
+    accept_multiple_files=True,
 ):
     st.write(label, className="gui-input")
-    documents = st.session_state.get(key) or []
-    has_custom_urls = not all(map(is_user_uploaded_url, documents))
+    documents = st.session_state.get(key) or ([] if accept_multiple_files else "")
+    has_custom_urls = not all(
+        map(is_user_uploaded_url, documents if accept_multiple_files else [documents])
+    )
     if st.checkbox("Enter Custom URLs", value=has_custom_urls):
-        text_value = st.text_area(
-            label,
-            label_visibility="collapsed",
-            value="\n".join(documents),
-            height=150,
-            style={
-                "whiteSpace": "pre",
-                "overflowWrap": "normal",
-                "overflowX": "scroll",
-                "fontFamily": "monospace",
-                "fontSize": "0.9rem",
-            },
-        )
-        st.session_state[key] = text_value.splitlines()
+        if accept_multiple_files:
+            text_value = st.text_area(
+                label,
+                label_visibility="collapsed",
+                value="\n".join(documents),
+                height=150,
+                style={
+                    "whiteSpace": "pre",
+                    "overflowWrap": "normal",
+                    "overflowX": "scroll",
+                    "fontFamily": "monospace",
+                    "fontSize": "0.9rem",
+                },
+            )
+            st.session_state[key] = text_value.splitlines()
+        else:
+            text_value = st.text_input(
+                label,
+                label_visibility="collapsed",
+                value=documents,
+                style={
+                    "whiteSpace": "pre",
+                    "overflowWrap": "normal",
+                    "overflowX": "scroll",
+                    "fontFamily": "monospace",
+                    "fontSize": "0.9rem",
+                },
+            )
+            st.session_state[key] = (
+                text_value.splitlines()[0] if len(text_value.splitlines()) > 0 else None
+            )
     else:
         st.file_uploader(
             label,
             label_visibility="collapsed",
             key=key,
             accept=accept,
-            accept_multiple_files=True,
+            accept_multiple_files=accept_multiple_files,
         )
 
 
 def doc_search_settings(asr_allowed: bool = True):
+    from daras_ai_v2.translate import GoogleTranslate
+
     st.write("##### 🔎 Search Settings")
 
     st.number_input(
