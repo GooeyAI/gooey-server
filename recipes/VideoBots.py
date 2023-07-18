@@ -18,6 +18,7 @@ from daras_ai_v2.translate import (
     TranslateUI,
     LANGUAGE_CODE_TYPE,
     TRANSLATE_API_TYPE,
+    DEFAULT_GLOSSARY_URL,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -174,6 +175,7 @@ class VideoBotsPage(BasePage):
         "max_context_words": 200,
         "scroll_jump": 5,
         "translate_api": Translate.APIs.GoogleTranslate.name,
+        "glossary_url": DEFAULT_GLOSSARY_URL,
     }
 
     class RequestModel(BaseModel):
@@ -219,6 +221,7 @@ class VideoBotsPage(BasePage):
 
         user_language: LANGUAGE_CODE_TYPE | None
         translate_api: TRANSLATE_API_TYPE | None
+        glossary_url: str | None
 
     class ResponseModel(BaseModel):
         final_prompt: str
@@ -314,6 +317,7 @@ Enable document search, to use custom documents as information sources.
             key="user_language",
             use_source=True,
         )
+        TranslateUI.translate_glossary_input()
         st.write("---")
 
         if not "__enable_audio" in st.session_state:
@@ -493,6 +497,8 @@ Use this for prompting GPT to use the document search results.
                 texts=[user_input],
                 target_language="en",
                 source_language=request.user_language,
+                translate_api=request.translate_api,
+                glossary_url=request.glossary_url,
             )[0]
 
         # parse the bot script
@@ -643,6 +649,8 @@ Use this for prompting GPT to use the document search results.
                 texts=output_text,
                 target_language=request.user_language,
                 source_language="en",
+                translate_api=request.translate_api,
+                glossary_url=request.glossary_url,
             )
 
         if references:

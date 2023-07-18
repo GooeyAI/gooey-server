@@ -16,6 +16,7 @@ from daras_ai_v2.translate import (
     TranslateUI,
     TRANSLATE_API_TYPE,
     LANGUAGE_CODE_TYPE,
+    DEFAULT_GLOSSARY_URL,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -34,6 +35,7 @@ class AsrPage(BasePage):
     sane_defaults = dict(
         output_format=AsrOutputFormat.text.name,
         translate_api=Translate.APIs.GoogleTranslate.name,
+        glossary_url=DEFAULT_GLOSSARY_URL,
     )
 
     class RequestModel(BaseModel):
@@ -43,6 +45,7 @@ class AsrPage(BasePage):
         google_translate_target: LANGUAGE_CODE_TYPE | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
         translate_api: TRANSLATE_API_TYPE | None
+        glossary_url: str | None
 
     class ResponseModel(BaseModel):
         raw_output_text: list[str] | None
@@ -91,6 +94,7 @@ class AsrPage(BasePage):
     def render_settings(self):
         TranslateUI.translate_api_selector()
         TranslateUI.translate_language_selector(key="google_translate_target")
+        TranslateUI.translate_glossary_input()
         st.write("---")
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
@@ -145,6 +149,7 @@ class AsrPage(BasePage):
                 source_language=forced_asr_languages.get(
                     selected_model, request.language
                 ),
+                glossary_url=request.glossary_url,
             )
         else:
             # Save the raw ASR text for details view
