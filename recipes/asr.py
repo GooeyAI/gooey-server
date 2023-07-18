@@ -32,7 +32,8 @@ class AsrPage(BasePage):
     slug_versions = ["asr", "speech"]
 
     sane_defaults = dict(
-        output_format=AsrOutputFormat.text.name, translate_api=Translate.APIs.Auto.name
+        output_format=AsrOutputFormat.text.name,
+        translate_api=Translate.APIs.GoogleTranslate.name,
     )
 
     class RequestModel(BaseModel):

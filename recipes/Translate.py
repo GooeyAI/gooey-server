@@ -23,10 +23,9 @@ class TranslationPage(BasePage):
     slug_versions = ["languages", "transliteration", "translate"]
 
     sane_defaults = dict(
-        translate_api=Translate.APIs.Auto.name,
+        translate_api=Translate.APIs.GoogleTranslate.name,
         target_language="en",
         enable_transliteration=True,
-        romanize_translation=False,
         glossary_url=DEFAULT_GLOSSARY_URL,
     )
 
@@ -38,7 +37,6 @@ class TranslationPage(BasePage):
         source_language: LANGUAGE_CODE_TYPE | None
 
         enable_transliteration: bool | None
-        romanize_translation: bool | None
         glossary_url: str | None
 
     class ResponseModel(BaseModel):
@@ -58,7 +56,6 @@ class TranslationPage(BasePage):
             request.translate_api,
             request.source_language,
             request.enable_transliteration,
-            request.romanize_translation,
             glossary_url=request.glossary_url,
         )
         yield "Translating Documents..."
@@ -69,7 +66,6 @@ class TranslationPage(BasePage):
                 request.translate_api,
                 request.source_language,
                 request.enable_transliteration,
-                request.romanize_translation,
                 glossary_url=request.glossary_url,
             )
             for doc in request.documents
@@ -144,10 +140,19 @@ class TranslationPage(BasePage):
             st.session_state["documents"] = []
 
         st.write("---")
-        TranslateUI.translate_settings(require_api=True, require_target=True)
+        translate_settings(require_api=True, require_target=True)
 
     def render_settings(self):
-        TranslateUI.translate_advanced_settings()
+        st.checkbox(
+            """
+            Enable Transliteration
+            """,
+            key="enable_transliteration",
+        )
+        st.caption(
+            "Detects romanized input text and transliterates it to non-Latin characters where neccessary (and supported) before passing it to the translation models, e.g. this will turn Namaste into नमस्ते which makes it easier for the translation models to understand.\nSee [Romanization/Transliteration](https://guides.library.harvard.edu/mideast/romanization#:~:text=Romanization%%20refers%20to%20the%20process,converting%%20one%%20script%%20into%%20another.)"
+        )
+        TranslateUI.translate_glossary_input()
 
     def validate_form_v2(self):
         non_empty_text_inputs = [text for text in st.session_state.get("texts") if text]
@@ -199,3 +204,25 @@ class TranslationPage(BasePage):
         texts = state.get("texts", [])
         characters = sum([len(text) for text in texts])
         return 0.006 * characters
+
+
+def translate_settings(
+    require_api=False,
+    key_apiselect="translate_api",
+    require_target=False,
+    key_target="target_language",
+    require_source=False,
+    key_source="source_language",
+):
+    translator = TranslateUI.translate_api_selector(
+        key=key_apiselect, allow_none=not require_api
+    )
+    translator.language_selector(
+        label="""
+        ###### Input Language
+        Automatically detect language if not specified. If this is the same as the target language, transliteration will be applied if enabled, otherwise no translation will take place.
+        """,
+        key=key_source,
+        allow_none=not require_source,
+    )
+    translator.language_selector(key=key_target, allow_none=not require_target)
