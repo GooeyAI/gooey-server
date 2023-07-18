@@ -367,6 +367,7 @@ def _update_or_create_glossary(f_url: str) -> tuple[str, "pd.DataFrame"]:
 
 @redis_cache_decorator
 def _update_glossary(f_url: str, doc_meta) -> "pd.DataFrame":
+    """Goes through the full process of uploading the glossary from the url"""
     from daras_ai_v2.vector_search import download_table_doc
 
     df = download_table_doc(f_url, doc_meta)
@@ -389,7 +390,7 @@ def _update_glossary(f_url: str, doc_meta) -> "pd.DataFrame":
 
 
 def _get_glossary():
-    """Get information about a particular glossary."""
+    """Get information about the glossary."""
     from google.cloud import translate_v3beta1
 
     client = translate_v3beta1.TranslationServiceClient()
@@ -420,7 +421,7 @@ def _upload_glossary_to_bucket(df):
 
 
 def _delete_glossary(timeout=180):
-    """Delete a specific glossary based on the glossary ID."""
+    """Delete the glossary resource so a new one can be created."""
     from google.cloud import translate_v3beta1
 
     client = translate_v3beta1.TranslationServiceClient()
@@ -433,14 +434,7 @@ def _delete_glossary(timeout=180):
 
 
 def _create_glossary(languages):
-    """Creates a GCP glossary resource
-    Assumes you've already uploaded a glossary to Cloud Storage bucket
-    Args:
-        languages: list of languages in the glossary
-        project_id: GCP project id
-        glossary_name: name you want to give this glossary resource
-        glossary_uri: the uri of the glossary you uploaded to Cloud Storage
-    """
+    """Creates a GCP glossary resource."""
     from google.cloud import translate_v3beta1
     from google.api_core.exceptions import AlreadyExists
 
