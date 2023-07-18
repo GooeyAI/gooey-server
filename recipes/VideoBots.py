@@ -173,7 +173,7 @@ class VideoBotsPage(BasePage):
         "max_references": 3,
         "max_context_words": 200,
         "scroll_jump": 5,
-        "translate_api": Translate.APIs.Auto.name,
+        "translate_api": Translate.APIs.GoogleTranslate.name,
     }
 
     class RequestModel(BaseModel):
