@@ -3,6 +3,7 @@ import requests
 import json
 from enum import Enum
 from abc import ABC, abstractmethod
+import re
 
 import gooey_ui as st
 from daras_ai_v2.functional import map_parallel
@@ -1389,11 +1390,9 @@ def _mask_glossary(
         glossies = dict(zip(glossary[source_language], glossary[target_language]))
         replaced_glossies = []
         for source_glossary in glossies.keys():
-            occurences = text.count(source_glossary)
-            text = text.replace(
-                source_glossary,
-                "(" + EN_NUMERALS + ")",
-            )
+            pattern = re.compile(re.escape(source_glossary), re.IGNORECASE)
+            occurences = len(pattern.findall(text))
+            text = pattern.sub("(" + EN_NUMERALS + ")", text)
             replaced_glossies += [source_glossary] * occurences
         return text, map(lambda x: glossies[x], replaced_glossies)
     return text, []
@@ -1430,7 +1429,7 @@ def _update_or_create_glossary(f_url: str) -> tuple[str, "pd.DataFrame"]:
     f_url = f_url or DEFAULT_GLOSSARY_URL
     doc_meta = doc_url_to_metadata(f_url)
     df = _update_glossary(f_url, doc_meta)
-    return _get_glossary(), df
+    return f"projects/{PROJECT_ID}/locations/{LOCATION}/glossaries/{GLOSSARY_NAME}", df
 
 
 @redis_cache_decorator
@@ -1457,7 +1456,7 @@ def _update_glossary(f_url: str, doc_meta) -> "pd.DataFrame":
 
 
 def _get_glossary():
-    """Get a particular glossary based on the glossary ID."""
+    """Get information about a particular glossary."""
     from google.cloud import translate_v3beta1
 
     client = translate_v3beta1.TranslationServiceClient()
