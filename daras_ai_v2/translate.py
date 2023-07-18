@@ -8,6 +8,16 @@ from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.redis_cache import redis_cache_decorator
 
 DEFAULT_GLOSSARY_URL = "https://docs.google.com/spreadsheets/d/1IRHKcOC86oZXwMB0hR7eej7YVg5kUHpriZymwYQcQX4/edit?usp=sharing"  # only viewing access
+PROJECT_ID = "dara-c1b52"  # GCP project id
+GLOSSARY_NAME = "glossary"  # name you want to give this glossary resource
+LOCATION = "us-central1"  # data center location
+BUCKET_NAME = "gooey-server-glossary"  # name of bucket
+BLOB_NAME = "glossary.csv"  # name of blob
+GLOSSARY_URI = (
+    "gs://" + BUCKET_NAME + "/" + BLOB_NAME
+)  # the uri of the glossary uploaded to Cloud Storage
+
+
 GOOGLE_V3_ENDPOINT = "https://translate.googleapis.com/v3/projects/"
 
 
@@ -58,7 +68,13 @@ class Translator(ABC):
             if is_specified_as_romanized:
                 language_codes = [source_language] * len(texts)
             else:  # check whether it is romanized
-                language_codes = cls.detect_languages(texts)
+                language_codes = list(
+                    map(
+                        lambda d: d if d != "und" else source_language,
+                        cls.detect_languages(texts),
+                    )
+                )
+                # we add an extra check for und since it is not a valid language code but is returned by the API when it is unable to detect the language
 
         return map_parallel(
             lambda text, source: cls._translate_text(
@@ -101,7 +117,7 @@ class Translator(ABC):
 def _Google_supported_languages() -> dict[str, str]:
     from google.cloud import translate
 
-    parent = f"projects/dara-c1b52/locations/global"
+    parent = f"projects/dara-c1b52/locations/{LOCATION}"
     client = translate.TranslationServiceClient()
     supported_languages = client.get_supported_languages(
         parent=parent, display_language_code="en"
@@ -127,7 +143,7 @@ class GoogleTranslate(Translator):
         # "ru",
         # "ta",
         # "te",
-    }  # only enable transliteration for hindu since the glossary is more important in other languages
+    }  # only enable transliteration for hindi since the glossary is more important in other languages
     _session = None
 
     @classmethod
@@ -199,7 +215,7 @@ class GoogleTranslate(Translator):
 
         authed_session, project = cls.get_google_auth_session()
         res = authed_session.post(
-            f"{GOOGLE_V3_ENDPOINT}{project}/locations/global:translateText",
+            f"{GOOGLE_V3_ENDPOINT}{project}/locations/{LOCATION}:translateText",
             json.dumps(config),
             headers={
                 "Content-Type": "application/json",
@@ -207,7 +223,7 @@ class GoogleTranslate(Translator):
         )
         res.raise_for_status()
         data = res.json()
-        result = data["translations"][0]
+        result = data["glossaryTranslations"][0] if uri else data["translations"][0]
 
         return result["translatedText"]
 
@@ -331,20 +347,6 @@ class TranslateUI:
 
 
 # ================================ Glossary ================================
-# Below follows code for uploading a glossary to Google Cloud Translate.
-# Using a glossary is a good approach if you don’t have enough data to train your own model
-# when working with minority languages which Google still has a lot of room for improvement
-# or when you are working with a domain specific topic.
-PROJECT_ID = "dara-c1b52"  # GCP project id
-GLOSSARY_NAME = "glossary"  # name you want to give this glossary resource
-LOCATION = "us-central1"  # data center location
-BUCKET_NAME = "gooey-server-glossary"  # name of bucket
-BLOB_NAME = "glossary.csv"  # name of blob
-GLOSSARY_URI = (
-    "gs://" + BUCKET_NAME + "/" + BLOB_NAME
-)  # the uri of the glossary uploaded to Cloud Storage
-
-
 def _update_or_create_glossary(f_url: str) -> tuple[str, "pd.DataFrame"]:
     """
     Update or create a glossary resource
