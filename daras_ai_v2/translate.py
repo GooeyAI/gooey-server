@@ -501,6 +501,8 @@ class Translator(ABC):
     value: str = "translator"
     # transliteration should be done by a different endpoint - Translate.transliterate() - for all languages not in this set
     _can_transliterate: list[str] = {}
+    # whether the translator supports glossaries, if false, the glossary will be masked out by the translate function manually
+    _supports_glossary: bool = False
 
     @classmethod
     @abstractmethod
@@ -593,15 +595,39 @@ class Translator(ABC):
                     and language_code in TRANSLITERATION_SUPPORTED
                     and language_code not in cls._can_transliterate
                 ):
+                    if glossary_url:
+                        _, df = _update_or_create_glossary(glossary_url)
+                        text, replaced_glossies = _mask_glossary(
+                            text, language_code, target_language, df
+                        )
                     texts[i] = Translate.transliterate([text], [language_code])[0]
+                    if glossary_url:
+                        texts[i] = _unmask_glossary(
+                            texts[i], replaced_glossies, language_code
+                        )
                     language_codes[i] = language_code
 
+        replaced_glossies = [[]] * len(texts)
+        if not cls._supports_glossary:
+            _, df = _update_or_create_glossary(glossary_url)
+            for text, language_code in zip(texts, language_codes):
+                text, replaced_gloss = _mask_glossary(
+                    text, language_code, target_language, df
+                )
+                replaced_glossies[i] = list(replaced_gloss)
+                texts[i] = text
+
         return map_parallel(
-            lambda text, source: cls._translate_text(
-                text, source, target_language, enable_transliteration, glossary_url
+            lambda text, source, glossies: _unmask_glossary(
+                cls._translate_text(
+                    text, source, target_language, enable_transliteration, glossary_url
+                ),
+                glossies,
+                target_language,
             ),
             texts,
             language_codes,
+            replaced_glossies,
         )
 
     @classmethod
@@ -679,6 +705,7 @@ class GoogleTranslate(Translator):
         "ta",
         "te",
     }
+    _supports_glossary = True
     _session = None
 
     @classmethod
@@ -734,6 +761,23 @@ class GoogleTranslate(Translator):
                 else text
             )
 
+        if glossary_url:
+            uri, df = _update_or_create_glossary(glossary_url)
+            if enable_transliteration:
+                # glossary translation doesn't support transliteration, so we patch it in
+                enable_transliteration = False
+                text, replaced_glossaries = _mask_glossary(
+                    text, target_language, source_language, df
+                )
+                text = Translate.transliterate([text], [source_language])[0]
+                text = _unmask_glossary(text, replaced_glossaries, source_language)
+            glossary_config = {
+                "glossaryConfig": {
+                    "glossary": uri,
+                    "ignoreCase": True,
+                }
+            }
+
         config = {
             "source_language_code": source_language,
             "target_language_code": target_language,
@@ -743,13 +787,7 @@ class GoogleTranslate(Translator):
                 "enable_transliteration": enable_transliteration
             },
         }
-        if glossary_url:
-            glossary_config = {
-                "glossaryConfig": {
-                    "glossary": _update_or_create_glossary(glossary_url),
-                    "ignoreCase": True,
-                }
-            }
+        if glossary_config:
             config.update(glossary_config)
 
         authed_session, project = cls.get_google_auth_session()
@@ -812,7 +850,7 @@ class MinT(Translator):
     ):
         _, source_language = cls.parse_detected_language(source_language)
         # enable_transliteration is ignored because translate() already transliterated text when necessary since _can_transliterate is empty
-        # TODO: support glossary_url
+        # glossary_url is ignored because _supports_glossary is False so the glossary will be masked out by the translate function manually
 
         # prevent incorrect API calls
         if source_language == target_language:
@@ -1341,18 +1379,62 @@ GLOSSARY_URI = (
 )  # the uri of the glossary uploaded to Cloud Storage
 
 
-def _update_or_create_glossary(f_url: str) -> None:
+def _mask_glossary(
+    text: str,
+    source_language: LANGUAGE_CODE_TYPE,
+    target_language: LANGUAGE_CODE_TYPE,
+    glossary: "pd.DataFrame",
+) -> tuple[str, list[str]]:
+    if source_language in glossary.columns and target_language in glossary.columns:
+        glossies = dict(zip(glossary[source_language], glossary[target_language]))
+        replaced_glossies = []
+        for source_glossary in glossies.keys():
+            occurences = text.count(source_glossary)
+            text = text.replace(
+                source_glossary,
+                "(" + EN_NUMERALS + ")",
+            )
+            replaced_glossies += [source_glossary] * occurences
+        return text, map(lambda x: glossies[x], replaced_glossies)
+    return text, []
+
+
+def _unmask_glossary(
+    text: str, replaced_glossies: list[str], target_language: LANGUAGE_CODE_TYPE
+) -> str:
+    for target_glossary in replaced_glossies:
+        try:
+            to_replace = NATIVE_NUMERALS[LANG2SCRIPT[target_language]]
+        except:
+            to_replace = EN_NUMERALS
+        text = text.replace(
+            "(" + to_replace + ")",
+            target_glossary,
+            1,
+        )
+    return text
+
+
+def _update_or_create_glossary(f_url: str) -> tuple[str, "pd.DataFrame"]:
+    """
+    Update or create a glossary resource
+    Args:
+        f_url: url of the glossary file
+    Returns:
+        name: path to the glossary resource
+        df: pandas DataFrame of the glossary
+    """
     from daras_ai_v2.vector_search import doc_url_to_metadata
 
     print("Updating/Creating glossary...")
     f_url = f_url or DEFAULT_GLOSSARY_URL
     doc_meta = doc_url_to_metadata(f_url)
-    _update_glossary(f_url, doc_meta)
-    return _get_glossary()
+    df = _update_glossary(f_url, doc_meta)
+    return _get_glossary(), df
 
 
 @redis_cache_decorator
-def _update_glossary(f_url: str, doc_meta) -> None:
+def _update_glossary(f_url: str, doc_meta) -> "pd.DataFrame":
     from daras_ai_v2.vector_search import download_table_doc
 
     df = download_table_doc(f_url, doc_meta)
@@ -1370,6 +1452,8 @@ def _update_glossary(f_url: str, doc_meta) -> None:
         if lan_code not in ["pos", "description"]
     ]  # these are not languages
     _create_glossary(languages)
+
+    return df
 
 
 def _get_glossary():
@@ -1393,7 +1477,6 @@ def _upload_glossary_to_bucket(df):
     from google.cloud import storage
 
     csv = df.to_csv(index=False)
-    print(csv)
 
     # initialize the storage client and give it the bucket and the blob name
     storage_client = storage.Client()
@@ -1464,23 +1547,3 @@ def _create_glossary(languages):
             + GLOSSARY_NAME
             + " already exists. No new glossary was created."
         )
-
-
-# print(
-#     Translate.run(
-#         [
-#             "is paath ka angrejee se hindee mein anuvaad mintee ke maadhyam se indikatraansa2 ka upayog karake kiya gaya hai \n Farmer.CHAT"
-#         ],
-#         "en",
-#         source_language="hi",
-#         api=GoogleTranslate.name,
-#         enable_transliteration=True,
-#         glossary_url=DEFAULT_GLOSSARY_URL,
-#     )
-# )
-
-# authed_session, project = GoogleTranslate.get_google_auth_session()
-# res = authed_session.get(
-#     f"https://translation.googleapis.com/v3/projects/{PROJECT_ID}/locations/us-central1/glossaries/{GLOSSARY_NAME}"
-# )
-# print(res.text)
