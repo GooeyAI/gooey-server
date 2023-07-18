@@ -315,7 +315,6 @@ Enable document search, to use custom documents as information sources.
             If provided, the bot will translate input prompt to english, and the responses to this language.
             """,
             key="user_language",
-            use_source=True,
         )
         TranslateUI.translate_glossary_input()
         st.write("---")
