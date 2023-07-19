@@ -18,6 +18,7 @@ from daras_ai_v2.gpu_server import (
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 TRANSLITERATION_SUPPORTED = ["ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"]
+PROJECT = "dara-c1b52"
 
 
 class AsrModels(Enum):
@@ -28,6 +29,7 @@ class AsrModels(Enum):
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
     usm = "USM (Google)"
+    wolof = "Wolof (Google)"
 
 
 forced_asr_languages = {
@@ -96,7 +98,7 @@ def google_translate_languages() -> dict[str, str]:
     """
     from google.cloud import translate
 
-    parent = f"projects/dara-c1b52/locations/global"
+    parent = f"projects/{PROJECT}/locations/global"
     client = translate.TranslationServiceClient()
     supported_languages = client.get_supported_languages(
         parent, display_language_code="en"
@@ -209,7 +211,9 @@ def run_asr(
     Returns:
         str: Transcribed text.
     """
-    from google.cloud import speech_v1p1beta1
+    from google.cloud import speech_v1p1beta1, speech_v2
+    from google.api_core.client_options import ClientOptions
+    from google.protobuf.json_format import MessageToDict
 
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
@@ -240,6 +244,37 @@ def run_asr(
         return "\n\n".join(
             result.alternatives[0].transcript for result in response.results
         )
+    elif selected_model == AsrModels.wolof:
+        # note: only us-central1 and a few other regions support chirp recognizers (so global can't be used)
+        # also the wolof model has been uploaded to us-central1
+        location = "us-central1"
+        # also note: wolof will throw an error if used with a language code that is not wo-SN
+
+        # Initialize request argument(s)
+        config = speech_v2.RecognitionConfig()
+        config.language_codes = [language]
+        audio = speech_v2.BatchRecognizeFileMetadata()
+        audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
+        # Specify that results should be inlined in the response (only possible for 1 audio file)
+        output_config = speech_v2.RecognitionOutputConfig()
+        output_config.inline_response_config = speech_v2.InlineOutputConfig()
+        request = speech_v2.BatchRecognizeRequest(
+            recognizer=f"projects/{PROJECT}/locations/{location}/recognizers/wolof",
+            config=config,
+            files=[audio],
+            recognition_output_config=output_config,
+        )
+        # Create a client
+        options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
+        client = speech_v2.SpeechClient(client_options=options)
+        # Make the request
+        operation = client.batch_recognize(request=request)
+        # Wait for operation to complete
+        response = operation.result()
+        # Handle the response
+        return MessageToDict(response._pb)["results"][audio.uri]["transcript"][
+            "results"
+        ][0]["alternatives"][0]["transcript"]
     elif "nemo" in selected_model.name:
         r = requests.post(
             str(GpuEndpoints.nemo_asr),
