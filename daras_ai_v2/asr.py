@@ -29,8 +29,22 @@ class AsrModels(Enum):
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
     usm = "USM (Google)"
-    wolof = "Wolof (Google)"
+    chirp = "Chirp (Google)"
 
+
+chirp_models_by_langcode = {
+    "wo-SN": "wolof",
+    "wo": "wolof",
+    "en-IN": "chirp-en",
+    "en": "chirp-en",
+    "hi-IN": "chirp-hi",
+    "hi": "chirp-hi",
+    "sw": "chirp-sw",
+    "te-IN": "chirp-te",
+    "te": "chirp-te",
+    "am-ET": "chrip-am",  # [sic]
+    "am": "chrip-am",
+}
 
 forced_asr_languages = {
     AsrModels.whisper_hindi_large_v2: "hi",
@@ -244,7 +258,7 @@ def run_asr(
         return "\n\n".join(
             result.alternatives[0].transcript for result in response.results
         )
-    elif selected_model == AsrModels.wolof:
+    elif selected_model == AsrModels.chirp:
         # note: only us-central1 and a few other regions support chirp recognizers (so global can't be used)
         # also the wolof model has been uploaded to us-central1
         location = "us-central1"
@@ -252,14 +266,16 @@ def run_asr(
 
         # Initialize request argument(s)
         config = speech_v2.RecognitionConfig()
-        config.language_codes = [language]
+        config.language_codes = [
+            language if language in chirp_models_by_langcode else "wo-SN"
+        ]  # only allow supported languages
         audio = speech_v2.BatchRecognizeFileMetadata()
         audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
         # Specify that results should be inlined in the response (only possible for 1 audio file)
         output_config = speech_v2.RecognitionOutputConfig()
         output_config.inline_response_config = speech_v2.InlineOutputConfig()
         request = speech_v2.BatchRecognizeRequest(
-            recognizer=f"projects/{PROJECT}/locations/{location}/recognizers/wolof",
+            recognizer=f"projects/{PROJECT}/locations/{location}/recognizers/{chirp_models_by_langcode.get(language, 'wolof')}",
             config=config,
             files=[audio],
             recognition_output_config=output_config,
