@@ -59,6 +59,11 @@ async def startup():
     limiter.total_tokens = config("MAX_THREADS", default=limiter.total_tokens, cast=int)
 
 
+@app.get("/")
+async def health():
+    return "OK"
+
+
 @app.add_middleware
 def request_time_middleware(app):
     async def middleware(scope, receive, send):
