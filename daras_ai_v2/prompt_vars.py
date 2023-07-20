@@ -17,7 +17,7 @@ def prompt_vars_widget(key: str = "variables"):
         return
     st.write("##### ⌥ Variables")
     state_vars = st.session_state.setdefault(key, {})
-    for name in template_vars:
+    for name in sorted(template_vars):
         if name in st.session_state:
             continue
         var_key = f"__{key}_{name}"
