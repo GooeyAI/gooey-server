@@ -1,6 +1,7 @@
 import random
 import typing
 
+
 import gooey_ui as st
 from pydantic import BaseModel
 
@@ -9,6 +10,7 @@ from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.prompt_vars import prompt_vars_widget, render_prompt_vars
 
 DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/compare%20llm%20under%201%20mg%20gif.gif"
 
@@ -37,6 +39,8 @@ class CompareLLMPage(BasePage):
         max_tokens: int | None
         sampling_temperature: float | None
 
+        variables: dict[str, typing.Any] | None
+
     class ResponseModel(BaseModel):
         output_text: dict[
             typing.Literal[tuple(e.name for e in LargeLanguageModels)], list[str]
@@ -52,12 +56,14 @@ class CompareLLMPage(BasePage):
         st.text_area(
             """
             #### 👩‍💻 Prompt
-            *Supports [ChatML](https://github.com/openai/openai-python/blob/main/chatml.md)*
+            *Supports [ChatML](https://github.com/openai/openai-python/blob/main/chatml.md) & [Jinja](https://jinja.palletsprojects.com/)* 
             """,
             key="input_prompt",
             help="What a fine day..",
             height=300,
         )
+        prompt_vars_widget()
+
         enum_multiselect(
             LargeLanguageModels,
             label="#### 🤗 Compare Langugage Models",
@@ -77,6 +83,9 @@ class CompareLLMPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareLLMPage.RequestModel = self.RequestModel.parse_obj(state)
 
+        prompt = render_prompt_vars(
+            request.input_prompt, variables=request.variables, state=state
+        )
         state["output_text"] = output_text = {}
 
         for selected_model in request.selected_models:
@@ -87,7 +96,7 @@ class CompareLLMPage(BasePage):
                 quality=request.quality,
                 num_outputs=request.num_outputs,
                 temperature=request.sampling_temperature,
-                prompt=request.input_prompt,
+                prompt=prompt,
                 max_tokens=request.max_tokens,
                 avoid_repetition=request.avoid_repetition,
             )
