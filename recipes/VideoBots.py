@@ -171,7 +171,7 @@ class VideoBotsPage(BasePage):
         "max_references": 3,
         "max_context_words": 200,
         "scroll_jump": 5,
-        "use_url_shortener": True,
+        "use_url_shortener": False,
     }
 
     class RequestModel(BaseModel):
