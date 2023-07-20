@@ -17,7 +17,9 @@ def img_model_settings(
     show_scheduler=False,
     require_controlnet=False,
     extra_explanations: dict[ControlNetModels, str] = None,
-    controlnet_settings_options: dict = None,
+    controlnet_explanation: str = "### 🎛️ Control Net\n[Control Net models](https://huggingface.co/lllyasviel?search=controlnet) provide a layer of refinement to the image generation process that blends the prompt with the control image. Choose your preferred models:",
+    low_explanation: str = "At {low} the prompted visual will remain intact, regardless of the control nets",
+    high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
     st.write("#### Image Generation Settings")
     if render_model_selector:
@@ -25,7 +27,9 @@ def img_model_settings(
             models_enum,
             require_controlnet=require_controlnet,
             extra_explanations=extra_explanations,
-            controlnet_settings_options=controlnet_settings_options,
+            controlnet_explanation=controlnet_explanation,
+            low_explanation=low_explanation,
+            high_explanation=high_explanation,
         )
     else:
         selected_model = st.session_state.get("selected_model")
@@ -64,7 +68,9 @@ def model_selector(
     models_enum,
     require_controlnet=False,
     extra_explanations: dict[ControlNetModels, str] = None,
-    controlnet_settings_options: dict = None,
+    controlnet_explanation: str = "### 🎛️ Control Net\n[Control Net models](https://huggingface.co/lllyasviel?search=controlnet) provide a layer of refinement to the image generation process that blends the prompt with the control image. Choose your preferred models:",
+    low_explanation: str = "At {low} the prompted visual will remain intact, regardless of the control nets",
+    high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
     controlnet_unsupported_models = [
         Img2ImgModels.instruct_pix2pix.name,
@@ -96,16 +102,9 @@ def model_selector(
             if "selected_controlnet_model" in st.session_state:
                 st.session_state["selected_controlnet_model"] = None
         else:
-            if (
-                controlnet_settings_options
-                and "controlnet_explanation" in controlnet_settings_options
-            ):
-                label = controlnet_settings_options["controlnet_explanation"]
-            else:
-                label = "[Control Net models](https://huggingface.co/lllyasviel?search=controlnet) provide a layer of refinement to the image generation process that blends the prompt with the control image. Choose your preferred models:"
             enum_multiselect(
                 ControlNetModels,
-                label=f"""### 🎛️ Control Net\n{label}""",
+                label=controlnet_explanation,
                 key="selected_controlnet_model",
                 checkboxes=False,
                 allow_none=not require_controlnet,
@@ -113,7 +112,8 @@ def model_selector(
         with col2:
             controlnet_settings(
                 extra_explanations=extra_explanations,
-                options=controlnet_settings_options,
+                low_explanation=low_explanation,
+                high_explanation=high_explanation,
             )
     return selected_model
 
@@ -122,7 +122,9 @@ CONTROLNET_CONDITIONING_SCALE_RANGE: tuple[float, float] = (0.0, 2.0)
 
 
 def controlnet_settings(
-    extra_explanations: dict[ControlNetModels, str] = None, options=None
+    extra_explanations: dict[ControlNetModels, str] = None,
+    low_explanation: str = "At {low} the prompted visual will remain intact, regardless of the control nets",
+    high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
     models = st.session_state.get("selected_controlnet_model", [])
     if not models:
@@ -140,21 +142,11 @@ def controlnet_settings(
         """,
         className="gui-input",
     )
-    low_explanation = (
-        options["low_explanation"] if options and "low_explanation" in options else ""
-    ) or "the prompted visual will remain intact, regardless of the control nets"
-    high_explanation = (
-        (
-            options["high_explanation"]
-            if options and "high_explanation" in options
-            else ""
-        )
-        or "the control nets will be applied tightly to the prompted visual, possibly overriding the prompt"
-    )
     st.caption(
         f"""
-        `At {int(CONTROLNET_CONDITIONING_SCALE_RANGE[0])}` {low_explanation}.  
-        `At {int(CONTROLNET_CONDITIONING_SCALE_RANGE[1])}` {high_explanation}. 
+        `{low_explanation.format(low=int(CONTROLNET_CONDITIONING_SCALE_RANGE[0]))}`.
+        
+        `{high_explanation.format(high=int(CONTROLNET_CONDITIONING_SCALE_RANGE[1]))}`. 
         """
     )
     for i, model in enumerate(sorted(models)):

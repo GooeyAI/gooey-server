@@ -220,11 +220,9 @@ Here is the final output:
                 ControlNetModels.sd_controlnet_tile: "Tiling: Preserves more details of the QR Code, makes it more readable",
                 ControlNetModels.sd_controlnet_brightness: "Brightness: Dictates how light the background of the QR Code will be. Contrast is desirable for readability",
             },
-            controlnet_settings_options={
-                "controlnet_explanation": "[Control Net models](https://huggingface.co/lllyasviel?search=controlnet) provide a layer of refinement to the image generation process that blends with the QR code. Choose your preferred models: ",
-                "low_explanation": "the prompted visual will be intact and the QR code will be more artistic but less readable",
-                "high_explanation": "the control settings that blend the QR code will be applied tightly, possibly overriding the image prompt, but the QR code will be more readable",
-            },
+            controlnet_explanation="### 🎛️ Control Net\n[Control Net models](https://huggingface.co/lllyasviel?search=controlnet) provide a layer of refinement to the image generation process that blends with the QR code. Choose your preferred models: ",
+            low_explanation="At {low} the prompted visual will be intact and the QR code will be more artistic but less readable",
+            high_explanation="At {high} the control settings that blend the QR code will be applied tightly, possibly overriding the image prompt, but the QR code will be more readable",
         )
         st.write("---")
 
