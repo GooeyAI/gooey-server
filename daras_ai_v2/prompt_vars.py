@@ -28,5 +28,5 @@ def prompt_vars_widget(key: str = "variables"):
 def render_prompt_vars(prompt: str, *, variables: dict | None, state: dict | None):
     env = jinja2.sandbox.SandboxedEnvironment()
     context = (state or {}) | (variables or {})
-    context = {k: v.strip() if v else "" for k, v in context.items()}
+    context = {k: str(v).strip() if v else "" for k, v in context.items()}
     return env.from_string(prompt).render(**context)
