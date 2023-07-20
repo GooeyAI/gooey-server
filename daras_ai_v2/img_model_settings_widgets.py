@@ -17,6 +17,9 @@ def img_model_settings(
     show_scheduler=False,
     require_controlnet=False,
     extra_explanations: dict[ControlNetModels, str] = None,
+    controlnet_explanation: str = "### 🎛️ Control Net\n[Control Net models](https://huggingface.co/lllyasviel?search=controlnet) provide a layer of refinement to the image generation process that blends the prompt with the control image. Choose your preferred models:",
+    low_explanation: str = "At {low} the prompted visual will remain intact, regardless of the control nets",
+    high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
     st.write("#### Image Generation Settings")
     if render_model_selector:
@@ -24,6 +27,9 @@ def img_model_settings(
             models_enum,
             require_controlnet=require_controlnet,
             extra_explanations=extra_explanations,
+            controlnet_explanation=controlnet_explanation,
+            low_explanation=low_explanation,
+            high_explanation=high_explanation,
         )
     else:
         selected_model = st.session_state.get("selected_model")
@@ -62,6 +68,9 @@ def model_selector(
     models_enum,
     require_controlnet=False,
     extra_explanations: dict[ControlNetModels, str] = None,
+    controlnet_explanation: str = "### 🎛️ Control Net\n[Control Net models](https://huggingface.co/lllyasviel?search=controlnet) provide a layer of refinement to the image generation process that blends the prompt with the control image. Choose your preferred models:",
+    low_explanation: str = "At {low} the prompted visual will remain intact, regardless of the control nets",
+    high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
 ):
     controlnet_unsupported_models = [
         Img2ImgModels.instruct_pix2pix.name,
@@ -74,12 +83,17 @@ def model_selector(
         selected_model = enum_selector(
             Img2ImgModels,
             label="""
-            ### 🤖 Generative Model
-            The model responsible for generating the content
+            ### 🤖 Choose your preferred AI Model
             """,
             key="selected_model",
             use_selectbox=True,
             exclude=controlnet_unsupported_models if require_controlnet else [],
+        )
+        st.caption(
+            """
+            Search for our available models [here](https://huggingface.co/models?pipeline_tag=text-to-image) to learn more about them.
+            Please use our default settings for optimal results if you're a beginner.   
+            """
         )
         if (
             models_enum is Img2ImgModels
@@ -90,23 +104,28 @@ def model_selector(
         else:
             enum_multiselect(
                 ControlNetModels,
-                label="""
-                ### 🎛️ Control Net
-                The [control net models](https://huggingface.co/lllyasviel?search=controlnet) responsible for blending the prompt
-                """,
+                label=controlnet_explanation,
                 key="selected_controlnet_model",
                 checkboxes=False,
                 allow_none=not require_controlnet,
             )
         with col2:
-            controlnet_settings(extra_explanations=extra_explanations)
+            controlnet_settings(
+                extra_explanations=extra_explanations,
+                low_explanation=low_explanation,
+                high_explanation=high_explanation,
+            )
     return selected_model
 
 
 CONTROLNET_CONDITIONING_SCALE_RANGE: tuple[float, float] = (0.0, 2.0)
 
 
-def controlnet_settings(extra_explanations: dict[ControlNetModels, str] = None):
+def controlnet_settings(
+    extra_explanations: dict[ControlNetModels, str] = None,
+    low_explanation: str = "At {low} the prompted visual will remain intact, regardless of the control nets",
+    high_explanation: str = "At {high} the control nets will be applied tightly to the prompted visual, possibly overriding the prompt",
+):
     models = st.session_state.get("selected_controlnet_model", [])
     if not models:
         return
@@ -125,8 +144,9 @@ def controlnet_settings(extra_explanations: dict[ControlNetModels, str] = None):
     )
     st.caption(
         f"""
-        `{int(CONTROLNET_CONDITIONING_SCALE_RANGE[0])}` will keep the original image intact.  
-        `{int(CONTROLNET_CONDITIONING_SCALE_RANGE[1])}` will apply the specific control tightly. 
+        `{low_explanation.format(low=int(CONTROLNET_CONDITIONING_SCALE_RANGE[0]))}`.
+        
+        `{high_explanation.format(high=int(CONTROLNET_CONDITIONING_SCALE_RANGE[1]))}`. 
         """
     )
     for i, model in enumerate(sorted(models)):
@@ -313,7 +333,12 @@ def scheduler_setting(selected_model: str = None):
         return
     enum_selector(
         Schedulers,
-        label="##### Scheduler",
+        label="""
+        ##### Scheduler
+        Schedulers or Samplers are algorithms that allow us to set an iterative process on your run. They are used across models to find the preferred balance between the generation speed and output quality. 
+
+        We recommend using our default settings. Learn more, [here](https://huggingface.co/docs/diffusers/api/schedulers/overview).
+        """,
         allow_none=True,
         use_selectbox=True,
         key="scheduler",

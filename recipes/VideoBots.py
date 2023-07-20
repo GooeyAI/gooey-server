@@ -171,6 +171,7 @@ class VideoBotsPage(BasePage):
         "max_references": 3,
         "max_context_words": 200,
         "scroll_jump": 5,
+        "use_url_shortener": False,
     }
 
     class RequestModel(BaseModel):
@@ -215,6 +216,8 @@ class VideoBotsPage(BasePage):
         scroll_jump: int | None
 
         user_language: str | None
+
+        use_url_shortener: bool | None
 
     class ResponseModel(BaseModel):
         final_prompt: str
@@ -293,6 +296,10 @@ Enable document search, to use custom documents as information sources.
         youtube_video("-j2su1r8pEg")
 
     def render_settings(self):
+        st.checkbox("🔗 Shorten URL", key="use_url_shortener")
+        st.caption(
+            "This will shorten the urls of the references which allows tracking of clicks and views."
+        )
         st.text_area(
             """
             ##### 📝 Script
@@ -534,12 +541,13 @@ Use this for prompting GPT to use the document search results.
             references = yield from get_top_k_references(
                 DocSearchPage.RequestModel.parse_obj(state)
             )
-            for reference in references:
-                reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
-                    url=reference["url"],
-                    user=self.request.user,
-                    workflow=Workflow.VIDEOBOTS,
-                )[0].shortened_url()
+            if request.use_url_shortener:
+                for reference in references:
+                    reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
+                        url=reference["url"],
+                        user=self.request.user,
+                        workflow=Workflow.VIDEOBOTS,
+                    )[0].shortened_url()
             state["references"] = references
         # if doc search is successful, add the search results to the user prompt
         if references:

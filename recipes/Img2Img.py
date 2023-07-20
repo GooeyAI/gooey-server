@@ -65,13 +65,13 @@ class Img2ImgPage(BasePage):
         output_images: list[str]
 
     def related_workflows(self) -> list:
-        from recipes.ImageSegmentation import ImageSegmentationPage
+        from recipes.QRCodeGenerator import QRCodeGeneratorPage
         from recipes.ObjectInpainting import ObjectInpaintingPage
         from recipes.FaceInpainting import FaceInpaintingPage
         from recipes.CompareText2Img import CompareText2ImgPage
 
         return [
-            ImageSegmentationPage,
+            QRCodeGeneratorPage,
             ObjectInpaintingPage,
             FaceInpaintingPage,
             CompareText2ImgPage,
