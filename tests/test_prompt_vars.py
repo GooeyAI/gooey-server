@@ -20,6 +20,7 @@ from daras_ai_v2.prompt_vars import render_prompt_vars
         ("{{ a }}", {"a": ""}, {"a": "c"}, "c"),
         ("{{ a }}", {"a": ""}, {"a": ""}, ""),
         ("{{ a }}", {"a": None}, {"a": None}, ""),
+        ("{{ a }}", {"a": 5}, {}, "5"),
     ],
 )
 def test_prompt_vars(prompt, state, variables, expected):
