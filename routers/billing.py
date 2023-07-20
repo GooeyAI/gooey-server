@@ -104,6 +104,115 @@ available_subscriptions = {
     # },
 }
 
+available_subscriptions_test = {
+    "addon": {
+        "display": {
+            "name": "Add-on",
+            "title": "Add-on => Top up for $10-$100",
+            "description": "Buy a one-time top up of 1000-10,000 Credits. Good for ~200-2,000 runs, depending on which workflows you call.\nSimply click on the drop down quantity menu at the top of the page and enter your desired amount of credits all the way up to 10,000",
+        },
+        "stripe": {
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": "Gooey.AI Add-on Credits",
+                },
+                "unit_amount": 1,  # in cents
+            },
+            "quantity": 1000,  # number of credits
+            "adjustable_quantity": {
+                "enabled": True,
+                "maximum": 10_000,
+                "minimum": 1_000,
+            },
+        },
+    },
+    "addon test": {
+        "display": {
+            "name": "Add-on test",
+            "title": "Add-on => Top up for $30",
+            "description": "Buy a one-time top up of 3000 Credits for $30. Good for ~200 runs, depending on which workflows you call.",
+        },
+        "stripe": {
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": "Gooey.AI Add-on Credits",
+                },
+                "unit_amount": 1,  # in cents
+            },
+            "quantity": 3000,  # number of credits
+            "adjustable_quantity": {
+                "enabled": True,
+                "maximum": 10_000,
+                "minimum": 1_000,
+            },
+        },
+    },
+    "basic": {
+        "display": {
+            "name": "Basic Plan",
+            "title": "MONTHLY @ $10",
+            "description": "Buy a monthly plan for $10 and get new 1500 credits (~300 runs) every month.",
+        },
+        "stripe": {
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": "Gooey.AI Basic Plan",
+                },
+                "unit_amount_decimal": 0.6666,  # in cents
+                "recurring": {
+                    "interval": "month",
+                },
+            },
+            "quantity": 1500,  # number of credits
+        },
+    },
+    "premium": {
+        "display": {
+            "name": "Premium Plan",
+            "title": "$50/month + Bots",
+            "description": '10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable <a href="/video-bots/">videobots</a>.',
+        },
+        "stripe": {
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": "Gooey.AI Premium Plan",
+                },
+                "unit_amount_decimal": 0.5,  # in cents
+                "recurring": {
+                    "interval": "month",
+                },
+            },
+            "quantity": 10000,  # number of credits
+        },
+    },
+    #
+    # just for testing
+    #
+    # "daily": {
+    #     "display": {
+    #         "name": "Daily Plan",
+    #         "title": "DAILY @ $1",
+    #         "description": "100 credits everyday.",
+    #     },
+    #     "stripe": {
+    #         "price_data": {
+    #             "currency": "usd",
+    #             "product_data": {
+    #                 "name": "Gooey.AI Daily Plan",
+    #             },
+    #             "unit_amount": 1,  # in cents
+    #             "recurring": {
+    #                 "interval": "day",
+    #             },
+    #         },
+    #         "quantity": 100,  # number of credits
+    #     },
+    # },
+}
 
 @router.get("/account/", include_in_schema=False)
 def account(request: Request):
@@ -125,6 +234,25 @@ def account(request: Request):
 
     return templates.TemplateResponse("account.html", context)
 
+@router.get("/account_test/", include_in_schema=False)
+def account_test(request: Request):
+    if not request.user or request.user.is_anonymous:
+        next_url = request.query_params.get("next", "/account_test/")
+        redirect_url = furl("/login", query_params={"next": next_url})
+        return RedirectResponse(str(redirect_url))
+
+    is_admin = request.user.email in settings.ADMIN_EMAILS
+
+    context = {
+        "request": request,
+        "settings": settings,
+        "available_subscriptions": available_subscriptions_test,
+        "user_credits": request.user.balance,
+        "subscription": get_user_subscription(request.user),
+        "is_admin": is_admin,
+    }
+
+    return templates.TemplateResponse("account_test.html", context)
 
 async def request_form(request: Request):
     return await request.form()
@@ -192,6 +320,7 @@ payment_success_url = str(
 )
 account_url = str(furl(settings.APP_BASE_URL) / router.url_path_for(account.__name__))
 
+account_test_url = str(furl(settings.APP_BASE_URL) / router.url_path_for(account_test.__name__))
 
 async def request_body(request: Request):
     return await request.body()

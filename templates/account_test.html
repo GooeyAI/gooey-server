@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<script src="https://js.stripe.com/v3/" async defer></script>
+<div class="container">
+    <div class="user-info">
+        {% if request.user.photo_url %}
+        <img id="profile-picture" src="{{ request.user.photo_url }}" alt="" width="128" height="128">
+        {% endif %}
+        <div class="user-info-text-box">
+            {% if request.user.display_name %}
+            <h2>{{ request.user.display_name }}</h2>
+            {% endif %}
+            <span style="font-weight: normal">{{ request.user.email or request.user.phone_number }}</span>
+            <div style="font-weight: normal; font-size: x-small">
+                <a href="/privacy">Privacy</a>&nbsp & &nbsp;<a href="/terms">Terms</a>
+            </div>
+            <br />
+            <br />
+            <a href="/logout">Signout</a>
+        </div>
+    </div>
+    {% if is_admin %}
+    <hr>
+    <div class="admin-div">
+        <h2>Admin Links</h2>
+        <ul>
+            <li><a href="https://gooey-dash-prod.us-1.gooey.ai/" target="_blank">Usage Dashboard</a></li>
+            <li><a href="https://datastudio.google.com/reporting/5c9bb981-ef13-4e46-a5af-eef92f3c42d7"
+                    target="_blank">Traffic Dashboard</a></li>
+            <li><a href="https://sentry.io/organizations/dara-network/issues/?project=4504338635423744"
+                    target="_blank">Sentry</a></li>
+            <li>
+                <a href="https://analytics.google.com/analytics/web/#/p342900654/reports/reportinghub?params=_u..nav%3Dmaui "
+                    target="_blank">Analytics Summary</a>
+            </li>
+            <li>
+                <a href="https://analytics.google.com/analytics/web/#/p342900654/reports/explorer?params=_u..nav%3Dmaui%26_u.date00%3D20221115%26_u.date01%3D20230108%26_u.comparisonOption%3Ddisabled%26_r.explorerCard..seldim%3D%5B%22unifiedPagePathScreen%22%5D%26_r.explorerCard..rowsPerPage%3D25%26_r.explorerCard..startRow%3D0%26_r.explorerCard..selmet%3D%5B%22screenPageViews%22,%22activeUsers%22%5D%26_r.explorerCard..sortKey%3DscreenPageViews&r=4354450696&ruid=all-pages-and-screens,life-cycle,engagement&collectionId=4354433299"
+                    target="_blank">Most Popular Pages</a>
+            </li>
+        </ul>
+    </div>
+    {% endif %}
+
+    <hr>
+    <div class="credits-container">
+        <h2>Remaining Credits: {{ user_credits }} </h2>
+        <p>
+            Each new account receives {{ settings.LOGIN_USER_FREE_CREDITS }} Gooey.AI credits.
+            <br>
+            Every time you submit a workflow or make an API call,
+            we deduct credits from your account.
+            <br>
+            Most workflows cost around {{ settings.CREDITS_TO_DEDUCT_PER_RUN }} credits. You can buy more credits
+            below or <a href="{{ settings.GRANT_URL }}" target="_blank">apply for a grant</a>.
+        </p>
+    </div>
+    {% if not subscription %}
+    <hr>
+    <div class="buy-credits-container">
+        <h2>Buy Credits</h2>
+        <div class="plans-container">
+            {% for lookup_key, subscription in available_subscriptions.items() %}
+            <ul class="product">
+                <li>
+                    <h4>{{ subscription["display"]["title"] }}</h4>
+                    <h5>{{ subscription["display"]["description"] |safe }}</h5>
+                    <form action="/__/stripe/create-checkout-session" method="POST">
+                        <!-- Add a hidden field with the lookup_key of your Price -->
+                        <input type="hidden" name="lookup_key" value="{{ lookup_key }}" />
+                        <button class="btn-outline-dark" type="submit">Buy</button>
+                    </form>
+                    <form action="/__/stripe/create-checkout-session" method="POST">
+                        <input type="hidden" name="lookup_key + 40" value="{{ lookup_key + 40}}" />
+                        <button class="btn-outline-dark" type="submit">Buy</button>
+                    </form>
+                </li>
+            </ul>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% else %}
+    <h4 id="subscription-text">You are subscribed
+        to {{ subscription["display"]["name"] }}, {{ subscription["display"]["title"] }}</h4>
+    <div style="height: 25px;"></div>
+    <h4 id="add-on-text">Pay an additional $10 to get 1000 extra credits on any monthly plan.</h4>
+    <div style="height: 15px;"></div>
+    <form action="/__/stripe/create-checkout-session" method="POST">
+        <!-- Add a hidden field with the lookup_key of your Price -->
+        <input type="hidden" name="lookup_key" value="addon" />
+        <button class="btn-outline-dark" type="submit">Add Credits</button>
+    </form>
+    <hr>
+    <div class="billing-button-container">
+        <h2>Billing</h2>
+        <div class="billing-button-container-row">
+            <form action="/__/stripe/cancel-subscription" method="POST">
+                <button class="btn-outline-cancel" id="cancel-button" type="submit">Cancel Subscription</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+    <form action="/__/stripe/create-portal-session" method="POST">
+        <button class="btn-outline-dark" id="portal-button" type="submit">Manage your billing
+            information
+        </button>
+    </form>
+</div>
+{% endblock content %}
