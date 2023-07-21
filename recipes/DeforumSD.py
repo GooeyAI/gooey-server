@@ -1,15 +1,15 @@
-import datetime
 import typing
 import uuid
 
-import requests
 from pydantic import BaseModel
 
 import gooey_ui as st
-from daras_ai.image_input import storage_blob_for
+from app_users.models import AppUser
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task_outfile
+from daras_ai_v2.functional import flatten
+from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
+from recipes.CompareLLM import CompareLLMPage
 
 
 class _AnimationPrompt(typing.TypedDict):
@@ -414,8 +414,25 @@ Choose fps for the video.
         return display
 
     def run(self, state: dict):
+        from routers.api import call_api
+
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
+
+        response = call_api(
+            page_cls=CompareLLMPage,
+            user=AppUser.objects.get_or_create_from_email("support+mods@gooey.ai")[0],
+            request_body=dict(variables=dict(input=self.preview_input(state))),
+            query_params=dict(example_id="3rcxqx0r"),
+        )
+        try:
+            text = flatten(response["output"]["output_text"].values())[0]
+            if "FLAGGED" in text.splitlines()[-1]:
+                raise ValueError(
+                    "Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system."
+                )
+        except IndexError:
+            pass
 
         state["output_video"] = call_celery_task_outfile(
             "deforum",

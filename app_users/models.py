@@ -1,5 +1,4 @@
 import datetime
-import mimetypes
 
 import requests
 import stripe
@@ -38,6 +37,44 @@ class AppUserQuerySet(models.QuerySet):
                 except self.model.DoesNotExist:
                     pass
                 raise
+
+    def get_or_create_from_email(
+        self, email: str, defaults=None, **kwargs
+    ) -> tuple["AppUser", bool]:
+        kwargs.setdefault("email", email)
+        # The get() needs to be targeted at the write database in order
+        # to avoid potential transaction consistency problems.
+        self._for_write = True
+        try:
+            return super().get(**kwargs), False
+        except self.model.DoesNotExist:
+            firebase_user = get_or_create_firebase_user_by_email(email)[0]
+            # Try to create an object using passed params.
+            try:
+                user = self.model(**kwargs)
+                user.copy_from_firebase_user(firebase_user)
+                user.save()
+                return user, True
+            except IntegrityError:
+                try:
+                    return self.get(**kwargs), False
+                except self.model.DoesNotExist:
+                    pass
+                raise
+
+
+def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, bool]:
+    try:
+        return auth.get_user_by_email(email), False
+    except auth.UserNotFoundError:
+        try:
+            return auth.create_user(email=email), True
+        except auth.EmailAlreadyExistsError:
+            try:
+                return auth.get_user_by_email(email), False
+            except auth.UserNotFoundError:
+                pass
+            raise
 
 
 class AppUser(models.Model):
