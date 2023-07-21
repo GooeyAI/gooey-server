@@ -412,7 +412,7 @@ def run_asr(
         try:
             return "\n\n".join(
                 [
-                    result["alternatives"][0]["transcript"]
+                    result.get("alternatives", [{"transcript": ""}])[0]["transcript"]
                     for result in MessageToDict(response._pb)["results"][audio.uri][
                         "transcript"
                     ]["results"]
