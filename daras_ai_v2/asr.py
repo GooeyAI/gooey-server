@@ -363,7 +363,7 @@ def run_asr(
                 # look for pre-existing recognizer
                 authed_session, project = get_google_auth_session()
                 res = authed_session.get(
-                    f"https://us-central1-speech.googleapis.com/v2/projects/{project}/locations/{location}/recognizers/{recognizer_id}"
+                    f"https://{location}-speech.googleapis.com/v2/projects/{project}/locations/{location}/recognizers/{recognizer_id}"
                 )
                 recognizer = res.json()["name"]
             except:
