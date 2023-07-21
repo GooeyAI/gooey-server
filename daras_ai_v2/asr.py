@@ -19,6 +19,110 @@ from daras_ai_v2.gpu_server import (
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 TRANSLITERATION_SUPPORTED = ["ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"]
 PROJECT = "dara-c1b52"
+# below list was found experimentally since the supported languages list by google is actually wrong:
+CHIRP_SUPPORTED = [
+    "af-ZA",
+    "sq-AL",
+    "am-ET",
+    "ar-EG",
+    "hy-AM",
+    "as-IN",
+    "ast-ES",
+    "az-AZ",
+    "eu-ES",
+    "be-BY",
+    "bs-BA",
+    "bg-BG",
+    "my-MM",
+    "ca-ES",
+    "ceb-PH",
+    "ckb-IQ",
+    "zh-Hans-CN",
+    "yue-Hant-HK",
+    "hr-HR",
+    "cs-CZ",
+    "da-DK",
+    "nl-NL",
+    "en-AU",
+    "en-IN",
+    "en-GB",
+    "en-US",
+    "et-EE",
+    "fil-PH",
+    "fi-FI",
+    "fr-CA",
+    "fr-FR",
+    "gl-ES",
+    "ka-GE",
+    "de-DE",
+    "el-GR",
+    "gu-IN",
+    "ha-NG",
+    "iw-IL",
+    "hi-IN",
+    "hu-HU",
+    "is-IS",
+    "id-ID",
+    "it-IT",
+    "ja-JP",
+    "jv-ID",
+    "kea-CV",
+    "kam-KE",
+    "kn-IN",
+    "kk-KZ",
+    "km-KH",
+    "ko-KR",
+    "ky-KG",
+    "lo-LA",
+    "lv-LV",
+    "ln-CD",
+    "lt-LT",
+    "luo-KE",
+    "lb-LU",
+    "mk-MK",
+    "ms-MY",
+    "ml-IN",
+    "mt-MT",
+    "mi-NZ",
+    "mr-IN",
+    "mn-MN",
+    "ne-NP",
+    "ny-MW",
+    "oc-FR",
+    "ps-AF",
+    "fa-IR",
+    "pl-PL",
+    "pt-BR",
+    "pa-Guru-IN",
+    "ro-RO",
+    "ru-RU",
+    "nso-ZA",
+    "sr-RS",
+    "sn-ZW",
+    "sd-IN",
+    "si-LK",
+    "sk-SK",
+    "sl-SI",
+    "so-SO",
+    "es-ES",
+    "es-US",
+    "su-ID",
+    "sw",
+    "sv-SE",
+    "tg-TJ",
+    "ta-IN",
+    "te-IN",
+    "th-TH",
+    "tr-TR",
+    "uk-UA",
+    "ur-PK",
+    "uz-UZ",
+    "vi-VN",
+    "cy-GB",
+    "wo-SN",
+    "yo-NG",
+    "zu-ZA",
+]
 
 
 class AsrModels(Enum):
@@ -29,22 +133,7 @@ class AsrModels(Enum):
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
     usm = "USM (Google)"
-    chirp = "Chirp (Google)"
 
-
-chirp_models_by_langcode = {
-    "wo-SN": "wolof",
-    "wo": "wolof",
-    "en-IN": "chirp-en",
-    "en": "chirp-en",
-    "hi-IN": "chirp-hi",
-    "hi": "chirp-hi",
-    "sw": "chirp-sw",
-    "te-IN": "chirp-te",
-    "te": "chirp-te",
-    "am-ET": "chrip-am",  # [sic]
-    "am": "chrip-am",
-}
 
 forced_asr_languages = {
     AsrModels.whisper_hindi_large_v2: "hi",
@@ -225,9 +314,19 @@ def run_asr(
     Returns:
         str: Transcribed text.
     """
-    from google.cloud import speech_v1p1beta1, speech_v2
+    from google.cloud.speech_v2 import (
+        SpeechClient,
+        RecognitionConfig,
+        BatchRecognizeFileMetadata,
+        RecognitionOutputConfig,
+        InlineOutputConfig,
+        BatchRecognizeRequest,
+        AutoDetectDecodingConfig,
+    )
+    from google.cloud.speech_v2.types import cloud_speech
     from google.api_core.client_options import ClientOptions
     from google.protobuf.json_format import MessageToDict
+    from langcodes import Language
 
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
@@ -237,56 +336,78 @@ def run_asr(
     else:
         audio_url, size = audio_to_wav(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
-    # call usm model
     if selected_model == AsrModels.usm:
-        # Initialize request argument(s)
-        config = speech_v1p1beta1.RecognitionConfig()
-        config.language_code = language
-        config.audio_channel_count = 1
-        audio = speech_v1p1beta1.RecognitionAudio()
-        audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
-        request = speech_v1p1beta1.LongRunningRecognizeRequest(
-            config=config, audio=audio
-        )
-        # Create a client
-        client = speech_v1p1beta1.SpeechClient()
-        # Make the request
-        operation = client.long_running_recognize(request=request)
-        # Wait for operation to complete
-        response = operation.result()
-        # Handle the response
-        return "\n\n".join(
-            result.alternatives[0].transcript for result in response.results
-        )
-    elif selected_model == AsrModels.chirp:
         # note: only us-central1 and a few other regions support chirp recognizers (so global can't be used)
-        # also the wolof model has been uploaded to us-central1
         location = "us-central1"
-        # also note: wolof will throw an error if used with a language code that is not wo-SN
+
+        # Create a client
+        options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
+        client = SpeechClient(client_options=options)
+
+        # preprocess language into BCP-47 code to avoid generating multiple recognizers for the same languages
+        language = language.strip()
+        if language:
+            language = Language.get(language)
+            if not language.is_valid():
+                raise ValueError(f"Invalid language: {str(language)}")
+            language_code = str(language)
+            if language_code not in CHIRP_SUPPORTED:
+                language_code = None
+        else:
+            language_code = None
+
+        if language_code:
+            recognizer_id = f"chirp-{language_code.lower()}"
+
+            try:
+                # look for pre-existing recognizer
+                authed_session, project = get_google_auth_session()
+                res = authed_session.get(
+                    f"https://us-central1-speech.googleapis.com/v2/projects/{project}/locations/{location}/recognizers/{recognizer_id}"
+                )
+                recognizer = res.json()["name"]
+            except:
+                # create new recognizer if it doesn't exist
+                recognizer_request = cloud_speech.CreateRecognizerRequest(
+                    parent=f"projects/{PROJECT}/locations/{location}",
+                    recognizer_id=recognizer_id,
+                    recognizer=cloud_speech.Recognizer(
+                        language_codes=[language_code],
+                        model="chirp",
+                    ),
+                )
+
+                create_operation = client.create_recognizer(request=recognizer_request)
+                recognizer = create_operation.result().name
+        else:
+            # no language provided => use default implicit recognizer
+            recognizer = f"projects/{PROJECT}/locations/{location}/recognizers/_"
 
         # Initialize request argument(s)
-        config = speech_v2.RecognitionConfig()
-        config.language_codes = [
-            language if language in chirp_models_by_langcode else "wo-SN"
-        ]  # only allow supported languages
-        audio = speech_v2.BatchRecognizeFileMetadata()
+        config = RecognitionConfig()
+        if language_code:
+            config.language_codes = [language_code]
+        else:
+            config.language_codes = CHIRP_SUPPORTED  # pick from supported langauges
+            config.model = "chirp"  # use chirp model
+        config.auto_decoding_config = AutoDetectDecodingConfig()
+        audio = BatchRecognizeFileMetadata()
         audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
         # Specify that results should be inlined in the response (only possible for 1 audio file)
-        output_config = speech_v2.RecognitionOutputConfig()
-        output_config.inline_response_config = speech_v2.InlineOutputConfig()
-        request = speech_v2.BatchRecognizeRequest(
-            recognizer=f"projects/{PROJECT}/locations/{location}/recognizers/{chirp_models_by_langcode.get(language, 'wolof')}",
+        output_config = RecognitionOutputConfig()
+        output_config.inline_response_config = InlineOutputConfig()
+        request = BatchRecognizeRequest(
+            recognizer=recognizer,
             config=config,
             files=[audio],
             recognition_output_config=output_config,
         )
-        # Create a client
-        options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
-        client = speech_v2.SpeechClient(client_options=options)
+
         # Make the request
         operation = client.batch_recognize(request=request)
         # Wait for operation to complete
         response = operation.result()
+
         # Handle the response
         return MessageToDict(response._pb)["results"][audio.uri]["transcript"][
             "results"
