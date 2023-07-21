@@ -1,5 +1,6 @@
 import typing
 import uuid
+from multiprocessing.pool import ThreadPool
 
 from pydantic import BaseModel
 
@@ -419,12 +420,20 @@ Choose fps for the video.
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        response = call_api(
-            page_cls=CompareLLMPage,
-            user=AppUser.objects.get_or_create_from_email("support+mods@gooey.ai")[0],
-            request_body=dict(variables=dict(input=self.preview_input(state))),
-            query_params=dict(example_id="3rcxqx0r"),
-        )
+        with ThreadPool(1) as pool:
+            response = pool.apply(
+                call_api,
+                kwds=dict(
+                    page_cls=CompareLLMPage,
+                    user=AppUser.objects.get_or_create_from_email(
+                        "support+mods@gooey.ai",
+                    )[0],
+                    request_body=dict(
+                        variables=dict(input=self.preview_input(state)),
+                    ),
+                    query_params=dict(example_id="3rcxqx0r"),
+                ),
+            )
         try:
             text = flatten(response["output"]["output_text"].values())[0]
             if "FLAGGED" in text.splitlines()[-1]:
