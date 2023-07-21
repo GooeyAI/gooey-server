@@ -367,7 +367,7 @@ def run_asr(
                 )
                 recognizer = res.json()["name"]
             except:
-                # create new recognizer if it doesn't exist
+                # create new recognizer if it doesn't exist (i.e. a NOT_FOUND error is raised above)
                 recognizer_request = cloud_speech.CreateRecognizerRequest(
                     parent=f"projects/{PROJECT}/locations/{location}",
                     recognizer_id=recognizer_id,
@@ -408,10 +408,17 @@ def run_asr(
         # Wait for operation to complete
         response = operation.result()
 
-        # Handle the response
-        return MessageToDict(response._pb)["results"][audio.uri]["transcript"][
-            "results"
-        ][0]["alternatives"][0]["transcript"]
+        try:
+            return "\n\n".join(
+                [
+                    result["alternatives"][0]["transcript"]
+                    for result in MessageToDict(response._pb)["results"][audio.uri][
+                        "transcript"
+                    ]["results"]
+                ]
+            )
+        except KeyError:
+            return ""  # no transcription found
     elif "nemo" in selected_model.name:
         r = requests.post(
             str(GpuEndpoints.nemo_asr),
