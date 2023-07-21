@@ -17,8 +17,8 @@ from daras_ai_v2.gpu_server import (
 )
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
-TRANSLITERATION_SUPPORTED = ["ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"]
 PROJECT = "dara-c1b52"
+TRANSLITERATION_SUPPORTED = ["ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"]
 # below list was found experimentally since the supported languages list by google is actually wrong:
 CHIRP_SUPPORTED = [
     "af-ZA",
@@ -356,20 +356,21 @@ def run_asr(
         else:
             language_code = None
 
+        authed_session, project = get_google_auth_session()
         if language_code:
             recognizer_id = f"chirp-{language_code.lower()}"
 
             try:
                 # look for pre-existing recognizer
-                authed_session, project = get_google_auth_session()
                 res = authed_session.get(
                     f"https://{location}-speech.googleapis.com/v2/projects/{project}/locations/{location}/recognizers/{recognizer_id}"
                 )
                 recognizer = res.json()["name"]
             except:
                 # create new recognizer if it doesn't exist (i.e. a NOT_FOUND error is raised above)
+                # this is necessary since we can't create a single recognizer for all languages (only 3 languages are supported per recognizer)
                 recognizer_request = cloud_speech.CreateRecognizerRequest(
-                    parent=f"projects/{PROJECT}/locations/{location}",
+                    parent=f"projects/{project}/locations/{location}",
                     recognizer_id=recognizer_id,
                     recognizer=cloud_speech.Recognizer(
                         language_codes=[language_code],
@@ -381,7 +382,7 @@ def run_asr(
                 recognizer = create_operation.result().name
         else:
             # no language provided => use default implicit recognizer
-            recognizer = f"projects/{PROJECT}/locations/{location}/recognizers/_"
+            recognizer = f"projects/{project}/locations/{location}/recognizers/_"
 
         # Initialize request argument(s)
         config = RecognitionConfig()
