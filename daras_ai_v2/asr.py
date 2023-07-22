@@ -252,7 +252,9 @@ def google_translate_language_selector(
         label: the label to display
         key: the key to save the selected language to in the session state
     """
-    languages = google_translate_languages()
+    languages = dict(
+        MinT_translate_languages(), **google_translate_languages()
+    )  # merge dicts, favor google translate when there are conflicts
     options = list(languages.keys())
     options.insert(0, None)
     st.selectbox(
@@ -281,6 +283,18 @@ def google_translate_languages() -> dict[str, str]:
         for lang in supported_languages.languages
         if lang.support_target
     }
+
+
+@st.cache_data()
+def MinT_translate_languages() -> dict[str, str]:
+    """
+    Get list of supported languages for MinT.
+    :return: Dictionary of language codes and display names.
+    """
+    res = requests.get("https://translate.wmcloud.org/api/languages")
+    res.raise_for_status()
+    languages = res.json()
+    return {code: Language.get(code).display_name() for code in languages.keys()}
 
 
 def asr_language_selector(
@@ -334,14 +348,21 @@ def run_google_translate(
 
 
 def _translate_text(text: str, source_language: str, target_language: str):
-    is_romanized = source_language.endswith("-Latn")
-    source_language = source_language.replace("-Latn", "")
+    source_language = Language.get(source_language)
+    is_romanized = source_language.script == "Latn"
+    source_language = source_language.language
     enable_transliteration = (
         is_romanized and source_language in TRANSLITERATION_SUPPORTED
     )
     # prevent incorrect API calls
     if source_language == target_language:
         return text
+
+    if (
+        source_language not in google_translate_languages()
+        and source_language in MinT_translate_languages()
+    ):
+        return _MinT_translate_one_text(text, source_language, target_language)
 
     authed_session, project = get_google_auth_session()
     res = authed_session.post(
@@ -366,6 +387,23 @@ def _translate_text(text: str, source_language: str, target_language: str):
     result = data["translations"][0]
 
     return result["translatedText"].strip()
+
+
+def _MinT_translate_one_text(
+    text: str, source_language: str, target_language: str
+) -> str:
+    source_language = Language.get(source_language).language
+    target_language = Language.get(target_language).language
+    res = requests.post(
+        f"https://translate.wmcloud.org/api/translate/{source_language}/{target_language}",
+        json.dumps({"text": text}),
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+    )
+    res.raise_for_status()
+
+    # e.g. {"model":"IndicTrans2_indec_en","sourcelanguage":"hi","targetlanguage":"en","translation":"hello","translationtime":0.8}
+    tanslation = res.json()
+    return tanslation.get("translation", text)
 
 
 _session = None
