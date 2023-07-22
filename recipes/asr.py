@@ -12,6 +12,7 @@ from daras_ai_v2.asr import (
     AsrOutputFormat,
     AsrOutputJson,
     forced_asr_languages,
+    asr_language_selector,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -75,8 +76,10 @@ class AsrPage(BasePage):
             accept=(".wav", ".ogg", ".mp3", ".aac", ".opus", ".oga", ".mp4", ".webm"),
         )
         st.write("---")
-        enum_selector(AsrModels, label="###### ASR Model", key="selected_model")
-        st.text_input("###### Spoken Language _(optional)_", key="language")
+        selected_model = enum_selector(
+            AsrModels, label="###### ASR Model", key="selected_model"
+        )
+        asr_language_selector(AsrModels[selected_model])
 
     def render_settings(self):
         google_translate_language_selector()

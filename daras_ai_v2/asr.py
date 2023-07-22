@@ -15,12 +15,13 @@ from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
 )
+from langcodes import Language
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 PROJECT = "dara-c1b52"
-TRANSLITERATION_SUPPORTED = ["ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"]
+TRANSLITERATION_SUPPORTED = {"ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"}
 # below list was found experimentally since the supported languages list by google is actually wrong:
-CHIRP_SUPPORTED = [
+CHIRP_SUPPORTED = {
     "af-ZA",
     "sq-AL",
     "am-ET",
@@ -122,7 +123,66 @@ CHIRP_SUPPORTED = [
     "wo-SN",
     "yo-NG",
     "zu-ZA",
-]
+}
+WHISPER_SUPPORTED = {
+    "af",
+    "ar",
+    "hy",
+    "az",
+    "be",
+    "bs",
+    "bg",
+    "ca",
+    "zh",
+    "hr",
+    "cs",
+    "da",
+    "nl",
+    "en",
+    "et",
+    "fi",
+    "fr",
+    "gl",
+    "de",
+    "el",
+    "he",
+    "hi",
+    "hu",
+    "is",
+    "id",
+    "it",
+    "ja",
+    "kn",
+    "kk",
+    "ko",
+    "lv",
+    "lt",
+    "mk",
+    "ms",
+    "mr",
+    "mi",
+    "ne",
+    "no",
+    "fa",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "sr",
+    "sk",
+    "sl",
+    "es",
+    "sw",
+    "sv",
+    "tl",
+    "ta",
+    "th",
+    "tr",
+    "uk",
+    "ur",
+    "vi",
+    "cy",
+}
 
 
 class AsrModels(Enum):
@@ -150,6 +210,16 @@ asr_model_ids = {
     AsrModels.vakyansh_bhojpuri: "Harveenchadha/vakyansh-wav2vec2-bhojpuri-bhom-60",
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
+}
+
+asr_supported_languages = {
+    AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
+    AsrModels.whisper_hindi_large_v2: WHISPER_SUPPORTED,
+    AsrModels.whisper_telugu_large_v2: WHISPER_SUPPORTED | {"te"},
+    AsrModels.vakyansh_bhojpuri: ["bho"],
+    AsrModels.nemo_english: ["en"],
+    AsrModels.nemo_hindi: ["hi"],
+    AsrModels.usm: CHIRP_SUPPORTED,
 }
 
 
@@ -211,6 +281,25 @@ def google_translate_languages() -> dict[str, str]:
         for lang in supported_languages.languages
         if lang.support_target
     }
+
+
+def asr_language_selector(
+    selected_model: AsrModels,
+    label="###### Spoken Language _(optional)_",
+    key="language",
+):
+    languages = {
+        langcode: Language.get(langcode).display_name()
+        for langcode in asr_supported_languages[selected_model]
+    }
+    options = list(languages.keys())
+    options.insert(0, None)
+    return st.selectbox(
+        label=label,
+        key=key,
+        format_func=lambda k: languages[k] if k else "Auto Detect",
+        options=options,
+    )
 
 
 def run_google_translate(
@@ -326,7 +415,6 @@ def run_asr(
     from google.cloud.speech_v2.types import cloud_speech
     from google.api_core.client_options import ClientOptions
     from google.protobuf.json_format import MessageToDict
-    from langcodes import Language
 
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
