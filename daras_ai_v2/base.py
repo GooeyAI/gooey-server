@@ -827,7 +827,7 @@ class BasePage:
             .get()
         )
         if not run_history:
-            st.info("No history yet")
+            st.write("No history yet")
             return
 
         def _render(snapshot):
