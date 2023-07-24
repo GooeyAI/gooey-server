@@ -53,16 +53,16 @@ class CompareLLMPage(BasePage):
         return "Which language model works best your prompt? Compare your text generations across multiple large language models (LLMs) like OpenAI's evolving and latest ChatGPT engines and others like Curie, Ada, Babbage."
 
     def render_form_v2(self):
-        st.text_area(
+        input_prompt = st.text_area(
             """
             #### 👩‍💻 Prompt
-            *Supports [ChatML](https://github.com/openai/openai-python/blob/main/chatml.md) & [Jinja](https://jinja.palletsprojects.com/)* 
+            *Supports [ChatML](https://github.com/openai/openai-python/blob/main/chatml.md) & [Jinja](https://jinja.palletsprojects.com/templates/)* 
             """,
             key="input_prompt",
             help="What a fine day..",
             height=300,
         )
-        prompt_vars_widget()
+        prompt_vars_widget(input_prompt)
 
         enum_multiselect(
             LargeLanguageModels,
@@ -108,7 +108,9 @@ class CompareLLMPage(BasePage):
         col1, col2 = st.columns(2)
         with col1:
             st.write("**Prompt**")
-            st.write("```properties\n" + state.get("input_prompt", "") + "\n```")
+            st.write("```jinja2\n" + state.get("input_prompt", "") + "\n```")
+            for key, value in state.get("variables", {}).items():
+                st.text_area(f"`{key}`", value=value, disabled=True, height=50)
         with col2:
             self._render_outputs(state, 300)
 

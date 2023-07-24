@@ -5,10 +5,10 @@ import jinja2.sandbox
 import gooey_ui as st
 
 
-def prompt_vars_widget(key: str = "variables"):
+def prompt_vars_widget(input_prompt: str, key: str = "variables"):
     env = jinja2.sandbox.SandboxedEnvironment()
     try:
-        parsed = env.parse(st.session_state.get("input_prompt"))
+        parsed = env.parse(input_prompt)
     except jinja2.exceptions.TemplateSyntaxError as e:
         st.error(e.message)
         return
@@ -16,13 +16,15 @@ def prompt_vars_widget(key: str = "variables"):
     if not template_vars:
         return
     st.write("##### ⌥ Variables")
-    state_vars = st.session_state.setdefault(key, {})
+    old_state = st.session_state.get(key, {})
+    new_state = {}
     for name in sorted(template_vars):
         if name in st.session_state:
             continue
         var_key = f"__{key}_{name}"
-        st.session_state.setdefault(var_key, state_vars.get(name, ""))
-        state_vars[name] = st.text_area("`" + name + "`", key=var_key, height=50)
+        st.session_state.setdefault(var_key, old_state.get(name, ""))
+        new_state[name] = st.text_area("`" + name + "`", key=var_key, height=50)
+    st.session_state[key] = new_state
 
 
 def render_prompt_vars(prompt: str, *, variables: dict | None, state: dict | None):
