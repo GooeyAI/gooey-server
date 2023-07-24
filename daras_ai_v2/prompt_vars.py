@@ -23,7 +23,7 @@ def prompt_vars_widget(input_prompt: str, key: str = "variables"):
             continue
         var_key = f"__{key}_{name}"
         st.session_state.setdefault(var_key, old_state.get(name, ""))
-        new_state[name] = st.text_area("`" + name + "`", key=var_key, height=50)
+        new_state[name] = st.text_area("`" + name + "`", key=var_key, height=300)
     st.session_state[key] = new_state
 
 

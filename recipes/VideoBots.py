@@ -358,7 +358,7 @@ Enable document search, to use custom documents as information sources.
 Use this for prompting GPT to use the document search results.
 """,
                 key="task_instructions",
-                height=100,
+                height=300,
             )
             st.write("---")
 
