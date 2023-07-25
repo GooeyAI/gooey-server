@@ -1,6 +1,7 @@
 import typing
 
 import numpy as np
+from PIL import Image, ImageOps, ImageEnhance
 import qrcode
 import requests
 from django.core.exceptions import ValidationError
@@ -432,14 +433,40 @@ def download_qr_code_data(url: str) -> str:
     return extract_qr_code_data(img)
 
 
-def extract_qr_code_data(img: np.ndarray) -> str:
-    decoded = pyzbar.decode(img)
-    if not (decoded and decoded[0]):
+def extract_qr_code_data(image: np.ndarray) -> str:
+    # cycle through different sizes and sharpnesses, etc. for a more robust qr code extraction
+    image = Image.fromarray(image)
+    found_qr_code = False
+    found_qr_code_data = False
+    x, y = image.size
+    for scalar in [0.1, 0.2, 0.5, 1]:
+        image_scaled = image.resize((int(round(x * scalar)), int(round(y * scalar))))
+        for sharpness in [0.1, 0.5, 1, 2]:
+            image_scaled_sharp = ImageEnhance.Sharpness(image_scaled).enhance(sharpness)
+            image_autocontrast = ImageOps.autocontrast(image_scaled_sharp)
+            image_inverted = ImageOps.invert(image_autocontrast)
+            image_grayscale = ImageOps.grayscale(image_autocontrast)
+            image_grayscale_inverted = ImageOps.grayscale(image_inverted)
+            for img in [
+                image_autocontrast,
+                image_inverted,
+                image_grayscale,
+                image_grayscale_inverted,
+            ]:
+                decoded = pyzbar.decode(img)
+                if decoded and decoded[0]:
+                    found_qr_code = True
+                    info = decoded[0].data.decode()
+                    if info:
+                        found_qr_code_data = True
+                        print(f"QR code data: {info}")
+                        return info
+
+    if not found_qr_code:
         raise InvalidQRCode("No QR code found in image")
-    info = decoded[0].data.decode()
-    if not info:
+
+    if not found_qr_code_data:
         raise InvalidQRCode("No data found in QR code")
-    return info
 
 
 class InvalidQRCode(AssertionError):
