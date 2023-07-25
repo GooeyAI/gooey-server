@@ -365,7 +365,7 @@ Here is the final output:
 
     def get_raw_price(self, state: dict) -> int:
         selected_model = state.get("selected_model", Text2ImgModels.dream_shaper.name)
-        total = 5
+        total = 30
         match selected_model:
             case Text2ImgModels.deepfloyd_if.name:
                 total += 3
