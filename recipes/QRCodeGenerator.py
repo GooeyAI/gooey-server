@@ -26,7 +26,6 @@ from daras_ai_v2.img_model_settings_widgets import (
 )
 from daras_ai_v2.repositioning import reposition_object, repositioning_preview_widget
 from daras_ai_v2.stable_diffusion import (
-    Text2ImgModels,
     controlnet,
     ControlNetModels,
     Img2ImgModels,
@@ -61,7 +60,7 @@ class QRCodeGeneratorPage(BasePage):
         text_prompt: str
         negative_prompt: str | None
 
-        selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
+        selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
         selected_controlnet_model: list[
             typing.Literal[tuple(e.name for e in ControlNetModels)], ...
         ] | None
@@ -329,7 +328,7 @@ Here is the final output:
 
         state["raw_images"] = raw_images = []
 
-        yield f"Running {Text2ImgModels[request.selected_model].value}..."
+        yield f"Running {Img2ImgModels[request.selected_model].value}..."
         state["output_images"] = controlnet(
             selected_model=request.selected_model,
             selected_controlnet_model=request.selected_controlnet_model,
@@ -365,12 +364,10 @@ Here is the final output:
         """
 
     def get_raw_price(self, state: dict) -> int:
-        selected_model = state.get("selected_model", Text2ImgModels.dream_shaper.name)
+        selected_model = state.get("selected_model", Img2ImgModels.dream_shaper.name)
         total = 30
         match selected_model:
-            case Text2ImgModels.deepfloyd_if.name:
-                total += 3
-            case Text2ImgModels.dall_e.name:
+            case Img2ImgModels.dall_e.name:
                 total += 10
         return total * state.get("num_outputs", 1)
 

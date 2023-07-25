@@ -419,7 +419,7 @@ def controlnet(
     return call_sd_multi(
         "diffusion.controlnet",
         pipeline={
-            "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
+            "model_id": img2img_model_ids[Img2ImgModels[selected_model]],
             "seed": seed,
             "scheduler": Schedulers[scheduler].label
             if scheduler
@@ -445,13 +445,13 @@ def controlnet(
 
 def add_prompt_prefix(prompt: str, selected_model: str) -> str:
     match selected_model:
-        case Text2ImgModels.openjourney.name:
+        case Text2ImgModels.openjourney.name | Img2ImgModels.openjourney.name:
             prompt = "mdjrny-v4 style " + prompt
-        case Text2ImgModels.analog_diffusion.name:
+        case Text2ImgModels.analog_diffusion.name | Img2ImgModels.analog_diffusion.name:
             prompt = "analog style " + prompt
-        case Text2ImgModels.protogen_5_3.name:
+        case Text2ImgModels.protogen_5_3.name | Img2ImgModels.protogen_5_3.name:
             prompt = "modelshoot style " + prompt
-        case Text2ImgModels.dreamlike_2.name:
+        case Text2ImgModels.dreamlike_2.name | Img2ImgModels.dreamlike_2.name:
             prompt = "photo, " + prompt
     return prompt
 
