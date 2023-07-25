@@ -106,6 +106,7 @@ class ControlNetModels(Enum):
     sd_controlnet_seg = "Image Segmentation"
     sd_controlnet_tile = "Tiling"
     sd_controlnet_brightness = "Brightness"
+    sd_controlnet_qrmonster = "QR Monster"
 
 
 controlnet_model_explanations = {
@@ -119,6 +120,7 @@ controlnet_model_explanations = {
     ControlNetModels.sd_controlnet_seg: "Image segmentation",
     ControlNetModels.sd_controlnet_tile: "Tiling: to preserve small details",
     ControlNetModels.sd_controlnet_brightness: "Brightness: to increase contrast naturally",
+    ControlNetModels.sd_controlnet_qrmonster: "QR Monster: make beautiful QR codes that still scan with a controlnet specifically trained for this purpose",
 }
 
 controlnet_model_ids = {
@@ -132,6 +134,7 @@ controlnet_model_ids = {
     ControlNetModels.sd_controlnet_seg: "lllyasviel/sd-controlnet-seg",
     ControlNetModels.sd_controlnet_tile: "lllyasviel/control_v11f1e_sd15_tile",
     ControlNetModels.sd_controlnet_brightness: "ioclab/control_v1p_sd15_brightness",
+    ControlNetModels.sd_controlnet_qrmonster: "monster-labs/control_v1p_sd15_qrcode_monster",
 }
 
 
