@@ -134,7 +134,7 @@ controlnet_model_ids = {
     ControlNetModels.sd_controlnet_seg: "lllyasviel/sd-controlnet-seg",
     ControlNetModels.sd_controlnet_tile: "lllyasviel/control_v11f1e_sd15_tile",
     ControlNetModels.sd_controlnet_brightness: "ioclab/control_v1p_sd15_brightness",
-    ControlNetModels.sd_controlnet_qrmonster: "monster-labs/control_v1p_sd15_qrcode_monster",
+    ControlNetModels.sd_controlnet_qrmonster: "monster-labs/control_v1p_sd15_qrcode_monster/tree/main/v2",
 }
 
 
