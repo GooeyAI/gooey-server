@@ -45,6 +45,7 @@ class QRCodeGeneratorPage(BasePage):
         obj_scale=0.65,
         obj_pos_x=0.5,
         obj_pos_y=0.5,
+        color=255,
     )
 
     def __init__(self, *args, **kwargs):
@@ -80,6 +81,7 @@ class QRCodeGeneratorPage(BasePage):
         obj_scale: float | None
         obj_pos_x: float | None
         obj_pos_y: float | None
+        color: int | None
 
     class ResponseModel(BaseModel):
         output_images: list[str]
@@ -265,6 +267,9 @@ Here is the final output:
         img_cv2 = mask_cv2 = np.array(
             qrcode.QRCode(border=0).make_image().convert("RGB")
         )
+        color = st.slider(
+            "`Grayscale background`", min_value=0, max_value=255, key="color"
+        )
         repositioning_preview_widget(
             img_cv2=img_cv2,
             mask_cv2=mask_cv2,
@@ -275,7 +280,7 @@ Here is the final output:
                 st.session_state["output_width"],
                 st.session_state["output_height"],
             ),
-            color=255,
+            color=color,
         )
 
     def render_output(self):
@@ -410,7 +415,7 @@ def generate_and_upload_qr_code(
         out_obj_scale=request.obj_scale,
         out_pos_x=request.obj_pos_x,
         out_pos_y=request.obj_pos_y,
-        color=255,
+        color=request.color,
     )
 
     img_url = upload_file_from_bytes("cleaned_qr.png", cv2_img_to_bytes(img_cv2))
