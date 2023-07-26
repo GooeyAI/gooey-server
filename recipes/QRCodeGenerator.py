@@ -46,6 +46,7 @@ class QRCodeGeneratorPage(BasePage):
         obj_pos_x=0.5,
         obj_pos_y=0.5,
         color=255,
+        settings="Custom",
     )
 
     def __init__(self, *args, **kwargs):
@@ -212,6 +213,89 @@ Here is the final output:
             """
             Customize the QR Code output for your text prompt with these Settings. 
             """
+        )
+
+        settings_type = st.radio(
+            "",
+            key="settings",
+            options=["Reliable", "Creative", "Beautiful", "Custom"],
+        )
+        if settings_type == "Reliable":
+            st.caption(
+                "If you just want something tried and tested, this is our original defaults."
+            )
+            st.session_state.update(
+                {
+                    "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words",
+                    "controlnet_conditioning_scale": [0.45, 0.35],
+                    "guidance_scale": 9,
+                    "num_outputs": 2,
+                    "obj_pos_x": 0.5,
+                    "obj_pos_y": 0.5,
+                    "obj_scale": 0.65,
+                    "output_height": 512,
+                    "output_width": 512,
+                    "quality": 70,
+                    "scheduler": Schedulers.euler_ancestral.name,
+                    "selected_controlnet_model": [
+                        ControlNetModels.sd_controlnet_tile.name,
+                        ControlNetModels.sd_controlnet_brightness.name,
+                    ],
+                    "selected_model": Img2ImgModels.dream_shaper.name,
+                }
+            )
+        elif settings_type == "Creative":
+            st.caption(
+                "Stunning QR Codes with a creative flair that may not always be readable and could end up weird."
+            )
+            st.session_state.update(
+                {
+                    "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads",
+                    "controlnet_conditioning_scale": [1.4],
+                    "guidance_scale": 4,
+                    "num_outputs": 4,
+                    "obj_pos_x": 0.5,
+                    "obj_pos_y": 0.5,
+                    "obj_scale": 0.65,
+                    "output_height": 768,
+                    "output_width": 768,
+                    "quality": 40,
+                    "scheduler": Schedulers.euler_ancestral.name,
+                    "selected_controlnet_model": [
+                        ControlNetModels.sd_controlnet_qrmonster.name,
+                    ],
+                    "selected_model": Img2ImgModels.dream_shaper.name,
+                }
+            )
+        elif settings_type == "Beautiful":
+            st.caption(
+                "The best mix of reliability and creativity. Produces some of the best results for most purposes."
+            )
+            st.session_state.update(
+                {
+                    "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads.",
+                    "controlnet_conditioning_scale": [1.4, 0.25],
+                    "guidance_scale": 9,
+                    "num_outputs": 1,
+                    "obj_pos_x": 0.5,
+                    "obj_pos_y": 0.5,
+                    "obj_scale": 0.65,
+                    "output_height": 768,
+                    "output_width": 768,
+                    "quality": 70,
+                    "scheduler": Schedulers.euler_ancestral.name,
+                    "selected_controlnet_model": [
+                        ControlNetModels.sd_controlnet_qrmonster.name,
+                        ControlNetModels.sd_controlnet_brightness.name,
+                    ],
+                    "selected_model": Img2ImgModels.dream_shaper.name,
+                }
+            )
+
+        if settings_type != "Custom":
+            return
+        st.caption(
+            "For the tech savvy and the curious. Here you can play around with settings to create something truly unique."
         )
 
         img_model_settings(
