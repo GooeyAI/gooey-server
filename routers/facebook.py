@@ -434,11 +434,11 @@ def _handle_audio_msg(billing_account_user, bot):
     from routers.api import call_api
 
     # run asr
-    asr_lang = None
+    language = None
     match bot.language.lower():
         case "am":
             selected_model = AsrModels.usm.name
-            asr_lang = "am-et"
+            language = "am-et"
         case "hi":
             selected_model = AsrModels.nemo_hindi.name
         case "te":
@@ -454,7 +454,7 @@ def _handle_audio_msg(billing_account_user, bot):
             "documents": [bot.get_input_audio()],
             "selected_model": selected_model,
             "google_translate_target": None,
-            "asr_lang": asr_lang,
+            "asr_lang": language,
         },
         query_params={},
     )
