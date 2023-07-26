@@ -454,7 +454,7 @@ def _handle_audio_msg(billing_account_user, bot):
             "documents": [bot.get_input_audio()],
             "selected_model": selected_model,
             "google_translate_target": None,
-            "asr_lang": language,
+            "language": language,
         },
         query_params={},
     )
