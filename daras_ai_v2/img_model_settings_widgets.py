@@ -152,7 +152,7 @@ def controlnet_settings(
     for i, model in enumerate(sorted(models)):
         key = f"controlnet_conditioning_scale_{model}"
         try:
-            st.session_state.setdefault(key, state_values[i])
+            st.session_state[key] = state_values[i]
         except IndexError:
             pass
         new_values.append(

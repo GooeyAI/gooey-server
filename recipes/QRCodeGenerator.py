@@ -218,7 +218,7 @@ Here is the final output:
         settings_type = st.radio(
             "",
             key="settings",
-            options=["Reliable", "Creative", "Beautiful", "Custom"],
+            options=["Reliable", "Creative", "Beautiful", "3D", "Custom"],
         )
         if settings_type == "Reliable":
             st.caption(
@@ -287,6 +287,31 @@ Here is the final output:
                     "selected_controlnet_model": [
                         ControlNetModels.sd_controlnet_brightness.name,
                         ControlNetModels.sd_controlnet_qrmonster.name,
+                    ],
+                    "selected_model": Img2ImgModels.dream_shaper.name,
+                }
+            )
+        elif settings_type == "3D":
+            st.caption(
+                "Uses depth information to make the QR Code appear more 3D. This is experimental and may not always work."
+            )
+            st.session_state.update(
+                {
+                    "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads, many",
+                    "controlnet_conditioning_scale": [0.35, 0.3, 0.3],
+                    "guidance_scale": 8,
+                    "num_outputs": 1,
+                    "obj_pos_x": 0.5,
+                    "obj_pos_y": 0.5,
+                    "obj_scale": 0.8,
+                    "output_height": 512,
+                    "output_width": 512,
+                    "quality": 100,
+                    "scheduler": Schedulers.euler_ancestral.name,
+                    "selected_controlnet_model": [
+                        ControlNetModels.sd_controlnet_brightness.name,
+                        ControlNetModels.sd_controlnet_depth.name,
+                        ControlNetModels.sd_controlnet_tile.name,
                     ],
                     "selected_model": Img2ImgModels.dream_shaper.name,
                 }
