@@ -238,8 +238,8 @@ Here is the final output:
                     "quality": 70,
                     "scheduler": Schedulers.euler_ancestral.name,
                     "selected_controlnet_model": [
-                        ControlNetModels.sd_controlnet_tile.name,
                         ControlNetModels.sd_controlnet_brightness.name,
+                        ControlNetModels.sd_controlnet_tile.name,
                     ],
                     "selected_model": Img2ImgModels.dream_shaper.name,
                 }
