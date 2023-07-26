@@ -232,7 +232,7 @@ def text_area(
         style.setdefault("height", f"{height}px"),
     else:
         style.setdefault("maxHeight", f"{height}px"),
-        props.setdefault("rows", max(value.count("\n") + 1, 2))
+        props.setdefault("rows", max((value or "").count("\n") + 1, 2))
     state.RenderTreeNode(
         name="textarea",
         props=dict(
