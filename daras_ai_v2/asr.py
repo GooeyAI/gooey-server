@@ -127,21 +127,29 @@ def asr_language_selector(
     label="##### Spoken Language",
     key="language",
 ):
+    # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
     if forced_lang:
         st.session_state[key] = forced_lang
         return forced_lang
 
-    languages = {
-        langcode: f"{langcodes.Language.get(langcode).display_name()} | {langcode}"
-        for langcode in asr_supported_languages.get(selected_model, [])
-    }
-    options = list(languages.keys())
-    options.insert(0, None)
+    options = [None, *asr_supported_languages.get(selected_model, [])]
+
+    # handle non-canonical language codes
+    old_val = st.session_state.get(key)
+    if old_val and old_val not in options:
+        lobj = langcodes.Language.get(old_val)
+        for opt in options:
+            if opt and langcodes.Language.get(opt).language == lobj.language:
+                st.session_state[key] = opt
+                break
+
     return st.selectbox(
         label=label,
         key=key,
-        format_func=lambda k: languages[k] if k else "Auto Detect",
+        format_func=lambda l: (
+            f"{langcodes.Language.get(l).display_name()} | {l}" if l else "Auto Detect"
+        ),
         options=options,
     )
 
