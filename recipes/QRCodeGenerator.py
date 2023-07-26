@@ -274,7 +274,7 @@ Here is the final output:
             st.session_state.update(
                 {
                     "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads, many",
-                    "controlnet_conditioning_scale": [1.4, 0.25],
+                    "controlnet_conditioning_scale": [0.25, 1.4],
                     "guidance_scale": 9,
                     "num_outputs": 1,
                     "obj_pos_x": 0.5,
@@ -285,8 +285,8 @@ Here is the final output:
                     "quality": 70,
                     "scheduler": Schedulers.euler_ancestral.name,
                     "selected_controlnet_model": [
-                        ControlNetModels.sd_controlnet_qrmonster.name,
                         ControlNetModels.sd_controlnet_brightness.name,
+                        ControlNetModels.sd_controlnet_qrmonster.name,
                     ],
                     "selected_model": Img2ImgModels.dream_shaper.name,
                 }
