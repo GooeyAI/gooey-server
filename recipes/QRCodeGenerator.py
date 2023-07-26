@@ -273,7 +273,7 @@ Here is the final output:
             )
             st.session_state.update(
                 {
-                    "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads.",
+                    "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads, many",
                     "controlnet_conditioning_scale": [1.4, 0.25],
                     "guidance_scale": 9,
                     "num_outputs": 1,
