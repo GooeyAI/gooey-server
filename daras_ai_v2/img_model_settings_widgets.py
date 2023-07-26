@@ -160,6 +160,7 @@ def controlnet_settings(
                 selected_controlnet_model=model, explanations=explanations, key=key
             ),
         )
+    st.session_state["selected_controlnet_model"] = sorted(models)
     st.session_state["controlnet_conditioning_scale"] = new_values
 
 
