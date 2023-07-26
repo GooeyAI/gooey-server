@@ -7,7 +7,7 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 def render():
     pages = [page_cls() for page_cls in all_home_pages]
 
-    all_examples = map_parallel(lambda page: page.get_recipe_doc().to_dict(), pages)
+    all_examples = map_parallel(lambda page: page.recipe_doc_sr().to_dict(), pages)
 
     def _render(args):
         page, example_doc = args

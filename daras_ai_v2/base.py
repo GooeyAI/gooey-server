@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 import requests
 import sentry_sdk
+from django.utils import timezone
 from firebase_admin import auth
 from furl import furl
 from google.cloud import firestore
@@ -24,6 +25,7 @@ from starlette.requests import Request
 
 import gooey_ui as st
 from app_users.models import AppUser
+from bots.models import SavedRun, Workflow
 from daras_ai_v2 import db
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -330,28 +332,26 @@ class BasePage:
             st.experimental_rerun()
 
         if submitted:
-            if reason_for_report == "":
+            if not reason_for_report:
                 st.error("Reason for report cannot be empty")
                 return
 
-            with st.spinner("Reporting..."):
-                example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+            example_id, run_id, uid = extract_query_params(gooey_get_query_params())
 
-                send_reported_run_email(
-                    user=self.request.user,
-                    run_uid=uid,
-                    url=self._get_current_app_url(),
-                    recipe_name=self.title,
-                    report_type=report_type,
-                    reason_for_report=reason_for_report,
-                    error_msg=st.session_state.get(StateKeys.error_msg),
-                )
+            send_reported_run_email(
+                user=self.request.user,
+                run_uid=uid,
+                url=self._get_current_app_url(),
+                recipe_name=self.title,
+                report_type=report_type,
+                reason_for_report=reason_for_report,
+                error_msg=st.session_state.get(StateKeys.error_msg),
+            )
 
-                if report_type == inappropriate_radio_text:
-                    self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
+            if report_type == inappropriate_radio_text:
+                self.update_flag_for_run(run_id=run_id, uid=uid, is_flagged=True)
 
-            st.success("Reported.")
-            sleep(2)
+            # st.success("Reported.")
             st.session_state["show_report_workflow"] = False
             st.experimental_rerun()
 
@@ -379,39 +379,63 @@ class BasePage:
             # Return and Don't render the run any further
             st.stop()
 
-    def get_doc_from_query_params(self, query_params) -> dict | None:
+    def get_doc_from_query_params(self, query_params) -> SavedRun:
         example_id, run_id, uid = extract_query_params(query_params)
-        return self.get_firestore_state(example_id, run_id, uid)
+        return self.get_current_doc_sr(example_id, run_id, uid)
 
-    def get_firestore_state(self, example_id, run_id, uid):
+    def get_current_doc_sr(self, example_id, run_id, uid) -> SavedRun:
         if run_id and uid:
-            snapshot = self.run_doc_ref(run_id, uid).get()
+            sr = self.run_doc_sr(run_id, uid)
         elif example_id:
-            snapshot = self.example_doc_ref(example_id).get()
+            sr = self.example_doc_sr(example_id)
         else:
-            snapshot = self.get_recipe_doc()
-        return snapshot.to_dict()
+            sr = self.recipe_doc_sr()
+        return sr
 
-    def get_recipe_doc(self) -> firestore.DocumentSnapshot:
-        return db.get_or_create_doc(self.recipe_doc_ref())
-
-    def recipe_doc_ref(self) -> firestore.DocumentReference:
-        return db.get_doc_ref(self.doc_name)
-
-    def run_doc_ref(self, run_id: str, uid: str) -> firestore.DocumentReference:
-        return db.get_doc_ref(
-            collection_id=USER_RUNS_COLLECTION,
-            document_id=uid,
-            sub_collection_id=self.doc_name,
-            sub_document_id=run_id,
+    def recipe_doc_sr(self) -> SavedRun:
+        sr, created = SavedRun.objects.get_or_create(
+            workflow=Workflow.from_label(self.doc_name),
+            run_id__isnull=True,
+            uid__isnull=True,
+            example_id__isnull=True,
         )
+        if created or not sr.state:
+            sr.set(db.get_doc_ref(self.doc_name).get().to_dict())
+        return sr
 
-    def example_doc_ref(self, example_id: str) -> firestore.DocumentReference:
-        return db.get_doc_ref(
-            sub_collection_id=EXAMPLES_COLLECTION,
-            document_id=self.doc_name,
-            sub_document_id=example_id,
+    def run_doc_sr(self, run_id: str, uid: str) -> SavedRun:
+        sr, created = SavedRun.objects.get_or_create(
+            workflow=Workflow.from_label(self.doc_name), uid=uid, run_id=run_id
         )
+        if created or not sr.state:
+            sr.set(
+                db.get_doc_ref(
+                    collection_id=USER_RUNS_COLLECTION,
+                    document_id=uid,
+                    sub_collection_id=self.doc_name,
+                    sub_document_id=run_id,
+                )
+                .get()
+                .to_dict()
+            )
+        return sr
+
+    def example_doc_sr(self, example_id: str) -> SavedRun:
+        sr, created = SavedRun.objects.get_or_create(
+            workflow=Workflow.from_label(self.doc_name),
+            example_id=example_id,
+        )
+        if created or not sr.state:
+            sr.set(
+                db.get_doc_ref(
+                    sub_collection_id=EXAMPLES_COLLECTION,
+                    document_id=self.doc_name,
+                    sub_document_id=example_id,
+                )
+                .get()
+                .to_dict()
+            )
+        return sr
 
     def render_description(self):
         pass
@@ -574,10 +598,10 @@ class BasePage:
         return self.api_url(example_id, run_id, uid)
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
-        ref = self.run_doc_ref(uid=uid, run_id=run_id)
-        updates = {"is_flagged": is_flagged}
-        ref.update(updates)
-        st.session_state.update(updates)
+        ref = self.run_doc_sr(uid=uid, run_id=run_id)
+        ref.is_flagged = is_flagged
+        ref.save(update_fields=["is_flagged"])
+        st.session_state["is_flagged"] = is_flagged
 
     def create_new_run(self):
         st.session_state[StateKeys.run_status] = "Starting..."
@@ -599,7 +623,7 @@ class BasePage:
         run_id = get_random_doc_id()
         example_id, *_ = extract_query_params(gooey_get_query_params())
 
-        self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
+        self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
 
         return example_id, run_id, uid
 
@@ -616,7 +640,7 @@ class BasePage:
 
             if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
                 st.session_state[StateKeys.run_status] = None
-                self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state))
+                self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
                 return
 
             from celeryapp.tasks import gui_runner
@@ -652,7 +676,7 @@ class BasePage:
                 st.error(err_msg)
             # render run time
             elif run_time:
-                st.success(f"Success! Run Time: {run_time:.2f} seconds.")
+                st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
 
         # render outputs
         self.render_output()
@@ -699,18 +723,24 @@ class BasePage:
 
         with st.expander("🛠️ Admin Options"):
             if st.button("⭐️ Save Workflow"):
-                doc_ref = db.get_doc_ref(self.doc_name)
-                doc_ref.set(self.state_to_doc(st.session_state))
+                sr = self.recipe_doc_sr()
+                sr.set(self.state_to_doc(st.session_state))
 
             if st.button("🔖 Create new Example"):
                 new_example_id = get_random_doc_id()
-                doc_ref = self.example_doc_ref(new_example_id)
-                doc_ref.set(self.state_to_doc(st.session_state))
+                sr = SavedRun.objects.create(
+                    workflow=Workflow.from_label(self.doc_name),
+                    example_id=new_example_id,
+                )
+                sr.set(self.state_to_doc(st.session_state))
                 raise QueryParamsRedirectException(dict(example_id=new_example_id))
 
             if example_id and st.button("💾 Save this Example"):
-                doc_ref = self.example_doc_ref(example_id)
-                doc_ref.set(self.state_to_doc(st.session_state))
+                sr = SavedRun.objects.get(
+                    workflow=Workflow.from_label(self.doc_name),
+                    example_id=example_id,
+                )
+                sr.set(self.state_to_doc(st.session_state))
                 raise QueryParamsRedirectException(dict(example_id=example_id))
 
             if example_id:
@@ -759,46 +789,28 @@ class BasePage:
         ]
 
     def _examples_tab(self):
-        # if StateKeys.examples_cache not in st.session_state:
-        with st.spinner("Loading Examples..."):
-            example_docs = db.get_collection_ref(
-                document_id=self.doc_name,
-                sub_collection_id=EXAMPLES_COLLECTION,
-            ).get()
-
-            def sort_key(s):
-                updated_at = s.to_dict().get(
-                    StateKeys.updated_at, datetime.datetime.fromtimestamp(0)
-                )
-                if isinstance(updated_at, str):
-                    updated_at = datetime.datetime.fromisoformat(updated_at)
-                return updated_at.timestamp()
-
-            example_docs.sort(key=sort_key, reverse=True)
-
         allow_delete = self.is_current_user_admin()
 
-        def _render(snapshot):
-            example_id = snapshot.id
-            doc = snapshot.to_dict()
-
-            if doc.get(StateKeys.hidden):
-                raise SkipIteration()
-
+        def _render(sr: SavedRun):
             url = str(
                 furl(
-                    self.app_url(),
-                    query_params={EXAMPLE_ID_QUERY_PARAM: example_id},
+                    self.app_url(), query_params={EXAMPLE_ID_QUERY_PARAM: sr.example_id}
                 )
             )
             self._render_doc_example(
                 allow_delete=allow_delete,
-                doc=doc,
+                doc=sr.to_dict(),
                 url=url,
-                query_params=dict(example_id=example_id),
+                query_params=dict(example_id=sr.example_id),
             )
 
-        grid_layout(3, example_docs, _render)
+        example_runs = SavedRun.objects.filter(
+            workflow=Workflow.from_label(self.doc_name),
+            hidden=False,
+            example_id__isnull=False,
+        ).exclude()[:50]
+
+        grid_layout(3, example_runs, _render)
 
     def _history_tab(self):
         assert self.request, "request must be set to render history tab"
@@ -813,32 +825,24 @@ class BasePage:
         if before:
             before = datetime.datetime.fromisoformat(before)
         else:
-            before = datetime.datetime.utcnow()
-
-        run_history = (
-            db.get_collection_ref(
-                collection_id=USER_RUNS_COLLECTION,
-                document_id=uid,
-                sub_collection_id=self.doc_name,
-            )
-            .order_by(StateKeys.updated_at, direction="DESCENDING")
-            .where(StateKeys.updated_at, "<", before)
-            .limit(25)
-            .get()
+            before = timezone.now()
+        run_history = list(
+            SavedRun.objects.filter(
+                workflow=Workflow.from_label(self.doc_name),
+                uid=uid,
+                updated_at__lt=before,
+            )[:25]
         )
         if not run_history:
             st.write("No history yet")
             return
 
-        def _render(snapshot):
-            run_id = snapshot.id
-            doc = snapshot.to_dict()
-
+        def _render(sr: SavedRun):
             url = str(
                 furl(
                     self.app_url(),
                     query_params={
-                        RUN_ID_QUERY_PARAM: run_id,
+                        RUN_ID_QUERY_PARAM: sr.run_id,
                         USER_ID_QUERY_PARAM: uid,
                     },
                 )
@@ -846,9 +850,9 @@ class BasePage:
 
             self._render_doc_example(
                 allow_delete=False,
-                doc=doc,
+                doc=sr.to_dict(),
                 url=url,
-                query_params=dict(run_id=run_id, uid=uid),
+                query_params=dict(run_id=sr.run_id, uid=uid),
             )
 
         grid_layout(3, run_history, _render)
@@ -905,12 +909,12 @@ class BasePage:
         self.set_hidden(example_id=example_id, doc=doc, hidden=True)
 
     def set_hidden(self, *, example_id, doc, hidden: bool):
-        doc_ref = self.example_doc_ref(example_id)
+        sr = self.example_doc_sr(example_id)
 
         with st.spinner("Hiding..."):
-            field_updates = {StateKeys.hidden: hidden}
-            doc_ref.update(field_updates)
-            doc.update(field_updates)
+            doc[StateKeys.hidden] = hidden
+            sr.hidden = hidden
+            sr.save(update_fields=["hidden"])
 
         st.experimental_rerun()
 
@@ -1111,7 +1115,7 @@ def err_msg_for_exc(e):
 
 @lru_cache
 def _build_page_tuple(page_cls: typing.Type[BasePage]):
-    state = page_cls().get_recipe_doc().to_dict()
+    state = page_cls().recipe_doc_sr().to_dict()
     preview_image = meta_preview_url(
         page_cls().preview_image(state), page_cls().fallback_preivew_image()
     )

@@ -64,7 +64,7 @@ def gui_runner(
         # send outputs to ui
         realtime_push(channel, output)
         # save to db
-        self.run_doc_ref(run_id, uid).set(self.state_to_doc(st.session_state | output))
+        self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state | output))
 
         print(f"{url} {status}")
 

@@ -816,12 +816,9 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
             if is_connected:
                 bi.saved_run = None
             else:
-                bi.saved_run = SavedRun.objects.get_or_create(
-                    workflow=Workflow.VIDEOBOTS,
-                    example_id=example_id or "",
-                    uid=uid or "",
-                    run_id=run_id or "",
-                )[0]
+                bi.saved_run = self.get_current_doc_sr(
+                    example_id=example_id, run_id=run_id, uid=uid
+                )
             bi.save()
             st.experimental_rerun()
 

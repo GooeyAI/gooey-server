@@ -86,32 +86,40 @@ def text(body: str, *, unsafe_allow_html=False, **props):
     ).mount()
 
 
-def error(body: str, icon: str = "⚠️", *, unsafe_allow_html=False):
+def error(body: str, icon: str = "🛑", *, unsafe_allow_html=False):
     if not isinstance(body, str):
         body = repr(body)
-    markdown(
-        # language="html",
-        f"""
-<div style="background-color: rgba(255, 108, 108, 0.2); padding: 16px; border-radius: 0.25rem; display: flex; gap: 0.5rem;">
-<span style="font-size: 1.25rem">{icon}</span>
-<div>{dedent(body)}</div>
-</div>
-            """,
-        unsafe_allow_html=True,
-    )
+    with div(
+        style=dict(
+            backgroundColor="rgba(255, 108, 108, 0.2)",
+            padding="1rem",
+            paddingBottom="0",
+            marginBottom="0.5rem",
+            borderRadius="0.25rem",
+            display="flex",
+            gap="0.5rem",
+        )
+    ):
+        markdown(icon)
+        markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
 
 
 def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
-    markdown(
-        # language="html",
-        f"""
-<div style="background-color: rgba(108, 255, 108, 0.2); padding: 16px; border-radius: 0.25rem; display: flex; gap: 0.5rem;">
-<span style="font-size: 1.25rem">{icon}</span>
-<div>{dedent(body)}</div>
-</div>
-        """,
-        unsafe_allow_html=True,
-    )
+    if not isinstance(body, str):
+        body = repr(body)
+    with div(
+        style=dict(
+            backgroundColor="rgba(108, 255, 108, 0.2)",
+            padding="1rem",
+            paddingBottom="0",
+            marginBottom="0.5rem",
+            borderRadius="0.25rem",
+            display="flex",
+            gap="0.5rem",
+        )
+    ):
+        markdown(icon)
+        markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
 
 
 def caption(body: str, **props):
