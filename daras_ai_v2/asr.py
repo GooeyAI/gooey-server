@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 from enum import Enum
 
+import langcodes
 import requests
 import typing_extensions
 from furl import furl
@@ -15,174 +16,16 @@ from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
 )
-from langcodes import Language
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
-PROJECT = "dara-c1b52"
+
+
 TRANSLITERATION_SUPPORTED = {"ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"}
+
 # below list was found experimentally since the supported languages list by google is actually wrong:
-CHIRP_SUPPORTED = {
-    "af-ZA",
-    "sq-AL",
-    "am-ET",
-    "ar-EG",
-    "hy-AM",
-    "as-IN",
-    "ast-ES",
-    "az-AZ",
-    "eu-ES",
-    "be-BY",
-    "bs-BA",
-    "bg-BG",
-    "my-MM",
-    "ca-ES",
-    "ceb-PH",
-    "ckb-IQ",
-    "zh-Hans-CN",
-    "yue-Hant-HK",
-    "hr-HR",
-    "cs-CZ",
-    "da-DK",
-    "nl-NL",
-    "en-AU",
-    "en-IN",
-    "en-GB",
-    "en-US",
-    "et-EE",
-    "fil-PH",
-    "fi-FI",
-    "fr-CA",
-    "fr-FR",
-    "gl-ES",
-    "ka-GE",
-    "de-DE",
-    "el-GR",
-    "gu-IN",
-    "ha-NG",
-    "iw-IL",
-    "hi-IN",
-    "hu-HU",
-    "is-IS",
-    "id-ID",
-    "it-IT",
-    "ja-JP",
-    "jv-ID",
-    "kea-CV",
-    "kam-KE",
-    "kn-IN",
-    "kk-KZ",
-    "km-KH",
-    "ko-KR",
-    "ky-KG",
-    "lo-LA",
-    "lv-LV",
-    "ln-CD",
-    "lt-LT",
-    "luo-KE",
-    "lb-LU",
-    "mk-MK",
-    "ms-MY",
-    "ml-IN",
-    "mt-MT",
-    "mi-NZ",
-    "mr-IN",
-    "mn-MN",
-    "ne-NP",
-    "ny-MW",
-    "oc-FR",
-    "ps-AF",
-    "fa-IR",
-    "pl-PL",
-    "pt-BR",
-    "pa-Guru-IN",
-    "ro-RO",
-    "ru-RU",
-    "nso-ZA",
-    "sr-RS",
-    "sn-ZW",
-    "sd-IN",
-    "si-LK",
-    "sk-SK",
-    "sl-SI",
-    "so-SO",
-    "es-ES",
-    "es-US",
-    "su-ID",
-    "sw",
-    "sv-SE",
-    "tg-TJ",
-    "ta-IN",
-    "te-IN",
-    "th-TH",
-    "tr-TR",
-    "uk-UA",
-    "ur-PK",
-    "uz-UZ",
-    "vi-VN",
-    "cy-GB",
-    "wo-SN",
-    "yo-NG",
-    "zu-ZA",
-}
-WHISPER_SUPPORTED = {
-    "af",
-    "ar",
-    "hy",
-    "az",
-    "be",
-    "bs",
-    "bg",
-    "ca",
-    "zh",
-    "hr",
-    "cs",
-    "da",
-    "nl",
-    "en",
-    "et",
-    "fi",
-    "fr",
-    "gl",
-    "de",
-    "el",
-    "he",
-    "hi",
-    "hu",
-    "is",
-    "id",
-    "it",
-    "ja",
-    "kn",
-    "kk",
-    "ko",
-    "lv",
-    "lt",
-    "mk",
-    "ms",
-    "mr",
-    "mi",
-    "ne",
-    "no",
-    "fa",
-    "pl",
-    "pt",
-    "ro",
-    "ru",
-    "sr",
-    "sk",
-    "sl",
-    "es",
-    "sw",
-    "sv",
-    "tl",
-    "ta",
-    "th",
-    "tr",
-    "uk",
-    "ur",
-    "vi",
-    "cy",
-}
+CHIRP_SUPPORTED = {"af-ZA", "sq-AL", "am-ET", "ar-EG", "hy-AM", "as-IN", "ast-ES", "az-AZ", "eu-ES", "be-BY", "bs-BA", "bg-BG", "my-MM", "ca-ES", "ceb-PH", "ckb-IQ", "zh-Hans-CN", "yue-Hant-HK", "hr-HR", "cs-CZ", "da-DK", "nl-NL", "en-AU", "en-IN", "en-GB", "en-US", "et-EE", "fil-PH", "fi-FI", "fr-CA", "fr-FR", "gl-ES", "ka-GE", "de-DE", "el-GR", "gu-IN", "ha-NG", "iw-IL", "hi-IN", "hu-HU", "is-IS", "id-ID", "it-IT", "ja-JP", "jv-ID", "kea-CV", "kam-KE", "kn-IN", "kk-KZ", "km-KH", "ko-KR", "ky-KG", "lo-LA", "lv-LV", "ln-CD", "lt-LT", "luo-KE", "lb-LU", "mk-MK", "ms-MY", "ml-IN", "mt-MT", "mi-NZ", "mr-IN", "mn-MN", "ne-NP", "ny-MW", "oc-FR", "ps-AF", "fa-IR", "pl-PL", "pt-BR", "pa-Guru-IN", "ro-RO", "ru-RU", "nso-ZA", "sr-RS", "sn-ZW", "sd-IN", "si-LK", "sk-SK", "sl-SI", "so-SO", "es-ES", "es-US", "su-ID", "sw", "sv-SE", "tg-TJ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-PK", "uz-UZ", "vi-VN", "cy-GB", "wo-SN", "yo-NG", "zu-ZA"}  # fmt: skip
+
+WHISPER_SUPPORTED = {"af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de", "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no", "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"}  # fmt: skip
 
 
 class AsrModels(Enum):
@@ -192,16 +35,8 @@ class AsrModels(Enum):
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
-    usm = "USM (Google)"
+    usm = "Chirp / USM (Google)"
 
-
-forced_asr_languages = {
-    AsrModels.whisper_hindi_large_v2: "hi",
-    AsrModels.whisper_telugu_large_v2: "te",
-    AsrModels.vakyansh_bhojpuri: "bho",
-    AsrModels.nemo_english: "en",
-    AsrModels.nemo_hindi: "hi",
-}
 
 asr_model_ids = {
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
@@ -212,13 +47,16 @@ asr_model_ids = {
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
 }
 
+forced_asr_languages = {
+    AsrModels.whisper_hindi_large_v2: "hi",
+    AsrModels.whisper_telugu_large_v2: "te",
+    AsrModels.vakyansh_bhojpuri: "bho",
+    AsrModels.nemo_english: "en",
+    AsrModels.nemo_hindi: "hi",
+}
+
 asr_supported_languages = {
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
-    AsrModels.whisper_hindi_large_v2: WHISPER_SUPPORTED,
-    AsrModels.whisper_telugu_large_v2: WHISPER_SUPPORTED | {"te"},
-    AsrModels.vakyansh_bhojpuri: ["bho"],
-    AsrModels.nemo_english: ["en"],
-    AsrModels.nemo_hindi: ["hi"],
     AsrModels.usm: CHIRP_SUPPORTED,
 }
 
@@ -271,7 +109,8 @@ def google_translate_languages() -> dict[str, str]:
     """
     from google.cloud import translate
 
-    parent = f"projects/{PROJECT}/locations/global"
+    _, project = get_google_auth_session()
+    parent = f"projects/{project}/locations/global"
     client = translate.TranslationServiceClient()
     supported_languages = client.get_supported_languages(
         parent, display_language_code="en"
@@ -285,12 +124,17 @@ def google_translate_languages() -> dict[str, str]:
 
 def asr_language_selector(
     selected_model: AsrModels,
-    label="###### Spoken Language _(optional)_",
+    label="##### Spoken Language",
     key="language",
 ):
+    forced_lang = forced_asr_languages.get(selected_model)
+    if forced_lang:
+        st.session_state[key] = forced_lang
+        return forced_lang
+
     languages = {
-        langcode: Language.get(langcode).display_name()
-        for langcode in asr_supported_languages[selected_model]
+        langcode: f"{langcodes.Language.get(langcode).display_name()} | {langcode}"
+        for langcode in asr_supported_languages.get(selected_model, [])
     }
     options = list(languages.keys())
     options.insert(0, None)
@@ -340,7 +184,7 @@ def _translate_text(text: str, source_language: str, target_language: str):
         is_romanized and source_language in TRANSLITERATION_SUPPORTED
     )
     # prevent incorrect API calls
-    if source_language == target_language:
+    if source_language == target_language or not text:
         return text
 
     authed_session, project = get_google_auth_session()
@@ -403,18 +247,9 @@ def run_asr(
     Returns:
         str: Transcribed text.
     """
-    from google.cloud.speech_v2 import (
-        SpeechClient,
-        RecognitionConfig,
-        BatchRecognizeFileMetadata,
-        RecognitionOutputConfig,
-        InlineOutputConfig,
-        BatchRecognizeRequest,
-        AutoDetectDecodingConfig,
-    )
-    from google.cloud.speech_v2.types import cloud_speech
+    import google.cloud.speech_v2 as cloud_speech
     from google.api_core.client_options import ClientOptions
-    from google.protobuf.json_format import MessageToDict
+    from google.cloud.texttospeech_v1 import AudioEncoding
 
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
@@ -430,62 +265,37 @@ def run_asr(
 
         # Create a client
         options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
-        client = SpeechClient(client_options=options)
+        client = cloud_speech.SpeechClient(client_options=options)
 
         # preprocess language into BCP-47 code to avoid generating multiple recognizers for the same languages
-        language = language.strip()
         if language:
-            language = Language.get(language)
-            if not language.is_valid():
-                raise ValueError(f"Invalid language: {str(language)}")
-            language_code = str(language)
-            if language_code not in CHIRP_SUPPORTED:
-                language_code = None
+            lobj = langcodes.Language.get(language.strip())
+            assert lobj.is_valid(), f"Invalid language: {language!r}"
+            language = lobj.to_tag()
+            assert language in CHIRP_SUPPORTED, f"Unsupported language: {language!r}"
         else:
-            language_code = None
+            language = None
 
-        authed_session, project = get_google_auth_session()
-        if language_code:
-            recognizer_id = f"chirp-{language_code.lower()}"
-
-            try:
-                # look for pre-existing recognizer
-                res = authed_session.get(
-                    f"https://{location}-speech.googleapis.com/v2/projects/{project}/locations/{location}/recognizers/{recognizer_id}"
-                )
-                recognizer = res.json()["name"]
-            except:
-                # create new recognizer if it doesn't exist (i.e. a NOT_FOUND error is raised above)
-                # this is necessary since we can't create a single recognizer for all languages (only 3 languages are supported per recognizer)
-                recognizer_request = cloud_speech.CreateRecognizerRequest(
-                    parent=f"projects/{project}/locations/{location}",
-                    recognizer_id=recognizer_id,
-                    recognizer=cloud_speech.Recognizer(
-                        language_codes=[language_code],
-                        model="chirp",
-                    ),
-                )
-
-                create_operation = client.create_recognizer(request=recognizer_request)
-                recognizer = create_operation.result().name
-        else:
-            # no language provided => use default implicit recognizer
-            recognizer = f"projects/{project}/locations/{location}/recognizers/_"
+        recognizer = _get_or_create_recognizer(client, language, location)
 
         # Initialize request argument(s)
-        config = RecognitionConfig()
-        if language_code:
-            config.language_codes = [language_code]
+        config = cloud_speech.RecognitionConfig()
+        if language:
+            config.language_codes = [language]
         else:
             config.language_codes = CHIRP_SUPPORTED  # pick from supported langauges
             config.model = "chirp"  # use chirp model
-        config.auto_decoding_config = AutoDetectDecodingConfig()
-        audio = BatchRecognizeFileMetadata()
+        config.explicit_decoding_config = cloud_speech.ExplicitDecodingConfig(
+            encoding=AudioEncoding.LINEAR16,
+            sample_rate_hertz=16000,
+            audio_channel_count=1,
+        )
+        audio = cloud_speech.BatchRecognizeFileMetadata()
         audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
         # Specify that results should be inlined in the response (only possible for 1 audio file)
-        output_config = RecognitionOutputConfig()
-        output_config.inline_response_config = InlineOutputConfig()
-        request = BatchRecognizeRequest(
+        output_config = cloud_speech.RecognitionOutputConfig()
+        output_config.inline_response_config = cloud_speech.InlineOutputConfig()
+        request = cloud_speech.BatchRecognizeRequest(
             recognizer=recognizer,
             config=config,
             files=[audio],
@@ -495,19 +305,14 @@ def run_asr(
         # Make the request
         operation = client.batch_recognize(request=request)
         # Wait for operation to complete
-        response = operation.result()
-
-        try:
-            return "\n\n".join(
-                [
-                    result.get("alternatives", [{"transcript": ""}])[0]["transcript"]
-                    for result in MessageToDict(response._pb)["results"][audio.uri][
-                        "transcript"
-                    ]["results"]
-                ]
-            )
-        except KeyError:
-            return ""  # no transcription found
+        response = operation.result()  # BatchRecognizeFileResult
+        # Handle the response
+        return "\n\n".join(
+            result.alternatives[0].transcript
+            for batch in response.results.values()  # BatchRecognizeResults
+            for result in batch.transcript.results  # SpeechRecognitionResult
+            if result.alternatives
+        )
     elif "nemo" in selected_model.name:
         r = requests.post(
             str(GpuEndpoints.nemo_asr),
@@ -533,10 +338,13 @@ def run_asr(
             kwargs["stride_length_s"] = (6, 0)
             kwargs["batch_size"] = 32
         elif "whisper" in selected_model.name:
-            if language:
-                kwargs["language"] = language.split("-")[0]
-            else:
-                kwargs["language"] = forced_asr_languages.get(selected_model)
+            forced_lang = forced_asr_languages.get(selected_model)
+            if forced_lang:
+                kwargs["language"] = forced_lang
+            elif language:
+                lobj = langcodes.Language.get(language.strip())
+                assert lobj.is_valid(), f"Invalid language: {language!r}"
+                kwargs["language"] = lobj.language
         data = call_celery_task(
             "whisper",
             pipeline=dict(
@@ -563,6 +371,39 @@ def run_asr(
             return generate_vtt(data["chunks"])
         case _:
             raise ValueError(f"Invalid output format: {output_format}")
+
+
+def _get_or_create_recognizer(
+    client: "google.cloud.speech_v2.SpeechClient", language: str | None, location: str
+) -> str:
+    import google.api_core.exceptions
+    import google.cloud.speech_v2 as cloud_speech
+
+    _, project = get_google_auth_session()
+    if language:
+        recognizer_id = f"chirp-api--{language.lower()}"
+        try:
+            # check if recognizer already exists
+            recognizer = client.get_recognizer(
+                name=f"projects/{project}/locations/{location}/recognizers/{recognizer_id}"
+            ).name
+        except google.api_core.exceptions.NotFound:
+            # create recognizer if it doesn't exist
+            recognizer = (
+                client.create_recognizer(
+                    parent=f"projects/{project}/locations/{location}",
+                    recognizer_id=recognizer_id,
+                    recognizer=cloud_speech.Recognizer(
+                        language_codes=[language], model="chirp"
+                    ),
+                )
+                .result()
+                .name
+            )
+    else:
+        # no language provided => use default implicit recognizer
+        recognizer = f"projects/{project}/locations/{location}/recognizers/_"
+    return recognizer
 
 
 # 16kHz, 16-bit, mono
