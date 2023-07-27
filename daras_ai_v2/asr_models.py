@@ -20,9 +20,32 @@ from daras_ai_v2.gpu_server import (
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
 # below list was found experimentally since the supported languages list by google is actually wrong:
-CHIRP_SUPPORTED = {"af-ZA", "sq-AL", "am-ET", "ar-EG", "hy-AM", "as-IN", "ast-ES", "az-AZ", "eu-ES", "be-BY", "bs-BA", "bg-BG", "my-MM", "ca-ES", "ceb-PH", "ckb-IQ", "zh-Hans-CN", "yue-Hant-HK", "hr-HR", "cs-CZ", "da-DK", "nl-NL", "en-AU", "en-IN", "en-GB", "en-US", "et-EE", "fil-PH", "fi-FI", "fr-CA", "fr-FR", "gl-ES", "ka-GE", "de-DE", "el-GR", "gu-IN", "ha-NG", "iw-IL", "hi-IN", "hu-HU", "is-IS", "id-ID", "it-IT", "ja-JP", "jv-ID", "kea-CV", "kam-KE", "kn-IN", "kk-KZ", "km-KH", "ko-KR", "ky-KG", "lo-LA", "lv-LV", "ln-CD", "lt-LT", "luo-KE", "lb-LU", "mk-MK", "ms-MY", "ml-IN", "mt-MT", "mi-NZ", "mr-IN", "mn-MN", "ne-NP", "ny-MW", "oc-FR", "ps-AF", "fa-IR", "pl-PL", "pt-BR", "pa-Guru-IN", "ro-RO", "ru-RU", "nso-ZA", "sr-RS", "sn-ZW", "sd-IN", "si-LK", "sk-SK", "sl-SI", "so-SO", "es-ES", "es-US", "su-ID", "sw", "sv-SE", "tg-TJ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-PK", "uz-UZ", "vi-VN", "cy-GB", "wo-SN", "yo-NG", "zu-ZA"}  # fmt: skip
+CHIRP_SUPPORTED = {"af-ZA", "sq-AL", "am-ET", "ar-EG", "hy-AM", "as-IN", "ast-ES", "az-AZ", "eu-ES", "be-BY", "bs-BA",
+                   "bg-BG", "my-MM", "ca-ES", "ceb-PH", "ckb-IQ", "zh-Hans-CN", "yue-Hant-HK", "hr-HR", "cs-CZ",
+                   "da-DK", "nl-NL", "en-AU", "en-IN", "en-GB", "en-US", "et-EE", "fil-PH", "fi-FI", "fr-CA", "fr-FR",
+                   "gl-ES", "ka-GE", "de-DE", "el-GR", "gu-IN", "ha-NG", "iw-IL", "hi-IN", "hu-HU", "is-IS", "id-ID",
+                   "it-IT", "ja-JP", "jv-ID", "kea-CV", "kam-KE", "kn-IN", "kk-KZ", "km-KH", "ko-KR", "ky-KG", "lo-LA",
+                   "lv-LV", "ln-CD", "lt-LT", "luo-KE", "lb-LU", "mk-MK", "ms-MY", "ml-IN", "mt-MT", "mi-NZ", "mr-IN",
+                   "mn-MN", "ne-NP", "ny-MW", "oc-FR", "ps-AF", "fa-IR", "pl-PL", "pt-BR", "pa-Guru-IN", "ro-RO",
+                   "ru-RU", "nso-ZA", "sr-RS", "sn-ZW", "sd-IN", "si-LK", "sk-SK", "sl-SI", "so-SO", "es-ES", "es-US",
+                   "su-ID", "sw", "sv-SE", "tg-TJ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-PK", "uz-UZ",
+                   "vi-VN", "cy-GB", "wo-SN", "yo-NG", "zu-ZA"}  # fmt: skip
 
-WHISPER_SUPPORTED = {"af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de", "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no", "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"}  # fmt: skip
+WHISPER_SUPPORTED = {"af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi",
+                     "fr", "gl", "de", "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt",
+                     "mk", "ms", "mr", "mi", "ne", "no", "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw",
+                     "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"}  # fmt: skip
+
+# 16kHz, 16-bit, mono
+WAV_SR = 16_000
+WAV_CODEC = "pcm_s16le"
+WAV_CHANNELS = 1
+FFMPEG_WAV_ARGS = [
+    "-vn",
+    "-acodec", WAV_CODEC,
+    "-ac", str(WAV_CHANNELS),
+    "-ar", str(WAV_SR),
+]  # fmt: skip
 
 
 class AsrModels(Enum):
@@ -163,8 +186,8 @@ def run_asr(
             config.model = "chirp"  # use chirp model
         config.explicit_decoding_config = cloud_speech.ExplicitDecodingConfig(
             encoding=AudioEncoding.LINEAR16,
-            sample_rate_hertz=16000,
-            audio_channel_count=1,
+            sample_rate_hertz=WAV_SR,
+            audio_channel_count=WAV_CHANNELS,
         )
         audio = cloud_speech.BatchRecognizeFileMetadata()
         audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
@@ -282,10 +305,6 @@ def _get_or_create_recognizer(
     return recognizer
 
 
-# 16kHz, 16-bit, mono
-FFMPEG_WAV_ARGS = ["-vn", "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000"]
-
-
 def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
     """
     Convert a youtube video to wav audio file.
@@ -354,9 +373,9 @@ def check_wav_audio_format(filename: str) -> bool:
     data = json.loads(subprocess.check_output(args))
     return (
         len(data["streams"]) == 1
-        and data["streams"][0]["codec_name"] == "pcm_s16le"
-        and data["streams"][0]["channels"] == 1
-        and data["streams"][0]["sample_rate"] == "16000"
+        and data["streams"][0]["codec_name"] == WAV_CODEC
+        and int(data["streams"][0]["channels"]) == WAV_CHANNELS
+        and int(data["streams"][0]["sample_rate"]) == WAV_SR
     )
 
 
