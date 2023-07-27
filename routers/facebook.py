@@ -1,6 +1,23 @@
 import traceback
 
 import glom
+from daras_ai_v2.bots import (
+    BotInterface,
+    PAGE_NOT_CONNECTED_ERROR,
+    RESET_KEYWORD,
+    RESET_MSG,
+    DEFAULT_RESPONSE,
+    INVALID_INPUT_FORMAT,
+    AUDIO_ASR_CONFIRMATION,
+    ERROR_MSG,
+    FEEDBACK_THUMBS_UP_MSG,
+    FEEDBACK_THUMBS_DOWN_MSG,
+    FEEDBACK_CONFIRMED_MSG,
+    TAPPED_SKIP_MSG,
+    # Mock testing
+    # _echo,
+    # _mock_api_output,
+)
 import requests
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
@@ -23,47 +40,12 @@ from bots.models import (
 from daras_ai_v2 import settings, db
 from daras_ai_v2.all_pages import Workflow
 from daras_ai_v2.asr import AsrModels, run_google_translate
-from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot, BotInterface
+from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
 from gooeysite.bg_db_conn import db_middleware
 
 router = APIRouter()
-
-PAGE_NOT_CONNECTED_ERROR = (
-    "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
-    "Please go to the Integrations Tab and connect this page."
-)
-
-RESET_KEYWORD = "reset"
-RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
-
-DEFAULT_RESPONSE = (
-    "🤔🤖 Well that was Unexpected! I seem to be lost. Could you please try again?."
-)
-
-INVALID_INPUT_FORMAT = (
-    "⚠️ Sorry! I don't understand {} messsages. Please try with text or audio."
-)
-
-AUDIO_ASR_CONFIRMATION = """
-🎧 I heard: “{}”
-Working on your answer…
-""".strip()
-
-ERROR_MSG = """
-`{0!r}`
-
-⚠️ Sorry, I ran into an error while processing your request. Please try again, or type "Reset" to start over.
-""".strip()
-
-FEEDBACK_THUMBS_UP_MSG = "🎉 What did you like about my response?"
-FEEDBACK_THUMBS_DOWN_MSG = "🤔 What was the issue with the response? How could it be improved? Please send me an voice note or text me."
-FEEDBACK_CONFIRMED_MSG = (
-    "🙏 Thanks! Your feedback helps us make {bot_name} better. How else can I help you?"
-)
-
-TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
 
 
 @router.get("/__/fb/connect/")
@@ -566,29 +548,3 @@ def _process_msg(
         ),
     ]
     return response_text, response_audio, response_video, msgs_to_save
-
-
-def _echo(bot, input_text):
-    response_text = f"You said ```{input_text}```\nhttps://www.youtube.com/"
-    if bot.get_input_audio():
-        response_audio = [bot.get_input_audio()]
-    else:
-        response_audio = None
-    if bot.get_input_video():
-        response_video = [bot.get_input_video()]
-    else:
-        response_video = None
-    msgs_to_save = []
-    return msgs_to_save, response_audio, response_text, response_video
-
-
-def _mock_api_output(input_text):
-    return {
-        "url": "https://gooey.ai?example_id=mock-api-example",
-        "output": {
-            "input_text": input_text,
-            "raw_input_text": input_text,
-            "raw_output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
-            "output_text": [f"echo: ```{input_text}```\nhttps://www.youtube.com/"],
-        },
-    }

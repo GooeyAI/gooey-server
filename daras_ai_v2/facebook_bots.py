@@ -1,73 +1,17 @@
-import mimetypes
-import typing
-
 import requests
 
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
-from daras_ai_v2.all_pages import Workflow
 from daras_ai_v2.asr import run_google_translate
-from daras_ai_v2.base import BasePage
 from daras_ai_v2.text_splitter import text_splitter
+from daras_ai_v2.bots import BotInterface
 
 WA_MSG_MAX_SIZE = 1024
 
 WHATSAPP_AUTH_HEADER = {
     "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
 }
-
-
-class BotInterface:
-    input_message: dict
-    platform: Platform
-    billing_account_uid: str
-    page_cls: typing.Type[BasePage] | None
-    query_params: dict
-    bot_id: str
-    user_id: str
-    input_type: str
-    language: str
-    show_feedback_buttons: bool = False
-    convo: Conversation
-
-    def send_msg(
-        self,
-        *,
-        text: str = None,
-        audio: str = None,
-        video: str = None,
-        buttons: list = None,
-        should_translate: bool = False,
-    ) -> str | None:
-        raise NotImplementedError
-
-    def mark_read(self):
-        raise NotImplementedError
-
-    def get_input_text(self) -> str | None:
-        raise NotImplementedError
-
-    def get_input_audio(self) -> str | None:
-        raise NotImplementedError
-
-    def get_input_video(self) -> str | None:
-        raise NotImplementedError
-
-    def nice_filename(self, mime_type: str) -> str:
-        ext = mimetypes.guess_extension(mime_type) or ""
-        return f"{self.platform}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
-
-    def _unpack_bot_integration(self, bi: BotIntegration):
-        self.page_cls = Workflow(bi.saved_run.workflow).page_cls
-        self.query_params = self.page_cls.clean_query_params(
-            example_id=bi.saved_run.example_id,
-            run_id=bi.saved_run.run_id,
-            uid=bi.saved_run.uid,
-        )
-        self.billing_account_uid = bi.billing_account_uid
-        self.language = bi.user_language
-        self.show_feedback_buttons = bi.show_feedback_buttons
 
 
 class WhatsappBot(BotInterface):

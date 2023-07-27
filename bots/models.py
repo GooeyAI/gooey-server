@@ -17,6 +17,7 @@ class Platform(models.IntegerChoices):
     FACEBOOK = 1
     INSTAGRAM = (2, "Instagram & FB")
     WHATSAPP = 3
+    SLACK = 4
 
     def get_favicon(self):
         if self == Platform.WHATSAPP:
