@@ -264,6 +264,22 @@ def _MinT_translate_one_text(
 _session = None
 
 
+def _MinT_translate_one_text(
+    text: str, source_language: str, target_language: str
+) -> str:
+    source_language = langcodes.Language.get(source_language).language
+    target_language = langcodes.Language.get(target_language).language
+    res = requests.post(
+        f"https://translate.wmcloud.org/api/translate/{source_language}/{target_language}",
+        json={"text": text},
+    )
+    res.raise_for_status()
+
+    # e.g. {"model":"IndicTrans2_indec_en","sourcelanguage":"hi","targetlanguage":"en","translation":"hello","translationtime":0.8}
+    tanslation = res.json()
+    return tanslation.get("translation", text)
+
+
 def get_google_auth_session():
     global _session
 
