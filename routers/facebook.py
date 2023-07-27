@@ -22,7 +22,8 @@ from bots.models import (
 )
 from daras_ai_v2 import settings, db
 from daras_ai_v2.all_pages import Workflow
-from daras_ai_v2.asr import AsrModels, run_google_translate
+from daras_ai_v2.asr_models import AsrModels
+from daras_ai_v2.translation import run_google_translate
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot, BotInterface
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT

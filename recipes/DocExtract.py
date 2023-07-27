@@ -7,12 +7,10 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.asr import (
-    google_translate_language_selector,
+from daras_ai_v2.asr_models import (
     AsrModels,
     run_asr,
     download_youtube_to_wav,
-    run_google_translate,
     audio_to_wav,
 )
 from daras_ai_v2.base import BasePage
@@ -26,6 +24,10 @@ from daras_ai_v2.gdrive_downloader import is_gdrive_url, gdrive_download
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.settings import service_account_key_path
+from daras_ai_v2.translation import (
+    google_translate_language_selector,
+    run_google_translate,
+)
 from daras_ai_v2.vector_search import doc_url_to_metadata
 from recipes.DocSearch import render_documents
 

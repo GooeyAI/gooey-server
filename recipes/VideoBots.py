@@ -13,10 +13,6 @@ from daras_ai.image_input import (
     truncate_text_words,
 )
 from daras_ai_v2.GoogleGPT import SearchReference
-from daras_ai_v2.asr import (
-    run_google_translate,
-    google_translate_language_selector,
-)
 from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
@@ -44,6 +40,10 @@ from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
+)
+from daras_ai_v2.translation import (
+    google_translate_language_selector,
+    run_google_translate,
 )
 from recipes.DocSearch import (
     get_top_k_references,

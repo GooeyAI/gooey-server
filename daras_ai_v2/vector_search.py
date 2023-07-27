@@ -19,7 +19,7 @@ from daras_ai.image_input import (
     guess_ext_from_response,
 )
 from daras_ai_v2 import settings
-from daras_ai_v2.asr import AsrModels, run_asr, run_google_translate
+from daras_ai_v2.asr_models import AsrModels
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )

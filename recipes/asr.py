@@ -4,11 +4,9 @@ from jinja2.lexer import whitespace_re
 from pydantic import BaseModel
 
 import gooey_ui as st
-from daras_ai_v2.asr import (
+from daras_ai_v2.asr_models import (
     AsrModels,
-    google_translate_language_selector,
     run_asr,
-    run_google_translate,
     AsrOutputFormat,
     AsrOutputJson,
     forced_asr_languages,
@@ -21,6 +19,10 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.text_output_widget import text_outputs
+from daras_ai_v2.translation import (
+    google_translate_language_selector,
+    run_google_translate,
+)
 from recipes.DocSearch import render_documents
 
 

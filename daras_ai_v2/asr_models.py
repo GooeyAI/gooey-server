@@ -11,16 +11,13 @@ from furl import furl
 
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.google_auth import get_google_auth_session
 from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
 )
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
-
-
-TRANSLITERATION_SUPPORTED = {"ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"}
 
 # below list was found experimentally since the supported languages list by google is actually wrong:
 CHIRP_SUPPORTED = {"af-ZA", "sq-AL", "am-ET", "ar-EG", "hy-AM", "as-IN", "ast-ES", "az-AZ", "eu-ES", "be-BY", "bs-BA", "bg-BG", "my-MM", "ca-ES", "ceb-PH", "ckb-IQ", "zh-Hans-CN", "yue-Hant-HK", "hr-HR", "cs-CZ", "da-DK", "nl-NL", "en-AU", "en-IN", "en-GB", "en-US", "et-EE", "fil-PH", "fi-FI", "fr-CA", "fr-FR", "gl-ES", "ka-GE", "de-DE", "el-GR", "gu-IN", "ha-NG", "iw-IL", "hi-IN", "hu-HU", "is-IS", "id-ID", "it-IT", "ja-JP", "jv-ID", "kea-CV", "kam-KE", "kn-IN", "kk-KZ", "km-KH", "ko-KR", "ky-KG", "lo-LA", "lv-LV", "ln-CD", "lt-LT", "luo-KE", "lb-LU", "mk-MK", "ms-MY", "ml-IN", "mt-MT", "mi-NZ", "mr-IN", "mn-MN", "ne-NP", "ny-MW", "oc-FR", "ps-AF", "fa-IR", "pl-PL", "pt-BR", "pa-Guru-IN", "ro-RO", "ru-RU", "nso-ZA", "sr-RS", "sn-ZW", "sd-IN", "si-LK", "sk-SK", "sl-SI", "so-SO", "es-ES", "es-US", "su-ID", "sw", "sv-SE", "tg-TJ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-PK", "uz-UZ", "vi-VN", "cy-GB", "wo-SN", "yo-NG", "zu-ZA"}  # fmt: skip
@@ -78,66 +75,6 @@ class AsrOutputFormat(Enum):
     vtt = "VTT"
 
 
-def google_translate_language_selector(
-    label="""
-    ###### Google Translate (*optional*)
-    """,
-    key="google_translate_target",
-):
-    """
-    Streamlit widget for selecting a language for Google Translate.
-    Args:
-        label: the label to display
-        key: the key to save the selected language to in the session state
-    """
-    languages = dict(
-        MinT_translate_languages(), **google_translate_languages()
-    )  # merge dicts, favor google translate when there are conflicts
-    options = list(languages.keys())
-    options.insert(0, None)
-    st.selectbox(
-        label=label,
-        key=key,
-        format_func=lambda k: languages[k] if k else "———",
-        options=options,
-    )
-
-
-@st.cache_data()
-def google_translate_languages() -> dict[str, str]:
-    """
-    Get list of supported languages for Google Translate.
-    :return: Dictionary of language codes and display names.
-    """
-    from google.cloud import translate
-
-    _, project = get_google_auth_session()
-    parent = f"projects/{project}/locations/global"
-    client = translate.TranslationServiceClient()
-    supported_languages = client.get_supported_languages(
-        parent, display_language_code="en"
-    )
-    return {
-        lang.language_code: lang.display_name
-        for lang in supported_languages.languages
-        if lang.support_target
-    }
-
-
-@st.cache_data()
-def MinT_translate_languages() -> dict[str, str]:
-    """
-    Get list of supported languages for MinT.
-    :return: Dictionary of language codes and display names.
-    """
-    res = requests.get("https://translate.wmcloud.org/api/languages")
-    res.raise_for_status()
-    languages = res.json()
-    return {
-        code: langcodes.Language.get(code).display_name() for code in languages.keys()
-    }
-
-
 def asr_language_selector(
     selected_model: AsrModels,
     label="##### Spoken Language",
@@ -168,115 +105,6 @@ def asr_language_selector(
         ),
         options=options,
     )
-
-
-def run_google_translate(
-    texts: list[str],
-    target_language: str,
-    source_language: str = None,
-) -> list[str]:
-    """
-    Translate text using the Google Translate API.
-    Args:
-        texts (list[str]): Text to be translated.
-        target_language (str): Language code to translate to.
-        source_language (str): Language code to translate from.
-    Returns:
-        list[str]: Translated text.
-    """
-    from google.cloud import translate_v2 as translate
-
-    # if the language supports transliteration, we should check if the script is Latin
-    if source_language and source_language not in TRANSLITERATION_SUPPORTED:
-        language_codes = [source_language] * len(texts)
-    else:
-        translate_client = translate.Client()
-        detections = translate_client.detect_language(texts)
-        language_codes = [detection["language"] for detection in detections]
-
-    return map_parallel(
-        lambda text, source: _translate_text(text, source, target_language),
-        texts,
-        language_codes,
-    )
-
-
-def _translate_text(text: str, source_language: str, target_language: str):
-    source_language = langcodes.Language.get(source_language)
-    is_romanized = source_language.script == "Latn"
-    source_language = source_language.language
-    enable_transliteration = (
-        is_romanized and source_language in TRANSLITERATION_SUPPORTED
-    )
-    # prevent incorrect API calls
-    if source_language == target_language or not text:
-        return text
-
-    if (
-        source_language not in google_translate_languages()
-        and source_language in MinT_translate_languages()
-    ):
-        return _MinT_translate_one_text(text, source_language, target_language)
-
-    authed_session, project = get_google_auth_session()
-    res = authed_session.post(
-        f"https://translation.googleapis.com/v3/projects/{project}/locations/global:translateText",
-        json.dumps(
-            {
-                "source_language_code": source_language,
-                "target_language_code": target_language,
-                "contents": text,
-                "mime_type": "text/plain",
-                "transliteration_config": {
-                    "enable_transliteration": enable_transliteration
-                },
-            }
-        ),
-        headers={
-            "Content-Type": "application/json",
-        },
-    )
-    res.raise_for_status()
-    data = res.json()
-    result = data["translations"][0]
-
-    return result["translatedText"].strip()
-
-
-def _MinT_translate_one_text(
-    text: str, source_language: str, target_language: str
-) -> str:
-    source_language = langcodes.Language.get(source_language).language
-    target_language = langcodes.Language.get(target_language).language
-    res = requests.post(
-        f"https://translate.wmcloud.org/api/translate/{source_language}/{target_language}",
-        json.dumps({"text": text}),
-        headers={"Accept": "application/json", "Content-Type": "application/json"},
-    )
-    res.raise_for_status()
-
-    # e.g. {"model":"IndicTrans2_indec_en","sourcelanguage":"hi","targetlanguage":"en","translation":"hello","translationtime":0.8}
-    tanslation = res.json()
-    return tanslation.get("translation", text)
-
-
-_session = None
-
-
-def get_google_auth_session():
-    global _session
-
-    if _session is None:
-        import google.auth
-        from google.auth.transport.requests import AuthorizedSession
-
-        creds, project = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-        # takes care of refreshing the token and adding it to request headers
-        _session = AuthorizedSession(credentials=creds), project
-
-    return _session
 
 
 def run_asr(

@@ -7,9 +7,9 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import Workflow
-from daras_ai_v2.asr import run_google_translate
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.text_splitter import text_splitter
+from daras_ai_v2.translation import run_google_translate
 
 WA_MSG_MAX_SIZE = 1024
 

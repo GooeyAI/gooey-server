@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from daras_ai_v2.GoogleGPT import render_output_with_refs, GoogleGPTPage
-from daras_ai_v2.asr import AsrModels
+from daras_ai_v2.asr_models import AsrModels
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,

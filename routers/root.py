@@ -29,7 +29,7 @@ from auth_backend import (
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
-from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
+from daras_ai_v2.asr_models import FFMPEG_WAV_ARGS, check_wav_audio_format
 from daras_ai_v2.base import (
     BasePage,
     RedirectException,
