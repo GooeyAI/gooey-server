@@ -16,7 +16,6 @@ from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
 )
-from langcodes import Language
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 TRANSLITERATION_SUPPORTED = {"ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"}
@@ -59,11 +58,6 @@ asr_supported_languages = {
 
 asr_supported_languages = {
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
-    AsrModels.whisper_hindi_large_v2: WHISPER_SUPPORTED,
-    AsrModels.whisper_telugu_large_v2: WHISPER_SUPPORTED | {"te"},
-    AsrModels.vakyansh_bhojpuri: ["bho"],
-    AsrModels.nemo_english: ["en"],
-    AsrModels.nemo_hindi: ["hi"],
     AsrModels.usm: CHIRP_SUPPORTED,
 }
 
@@ -140,7 +134,9 @@ def MinT_translate_languages() -> dict[str, str]:
     res = requests.get("https://translate.wmcloud.org/api/languages")
     res.raise_for_status()
     languages = res.json()
-    return {code: Language.get(code).display_name() for code in languages.keys()}
+    return {
+        code: langcodes.Language.get(code).display_name() for code in languages.keys()
+    }
 
 
 def asr_language_selector(
@@ -207,7 +203,7 @@ def run_google_translate(
 
 
 def _translate_text(text: str, source_language: str, target_language: str):
-    source_language = Language.get(source_language)
+    source_language = langcodes.Language.get(source_language)
     is_romanized = source_language.script == "Latn"
     source_language = source_language.language
     enable_transliteration = (
@@ -251,8 +247,8 @@ def _translate_text(text: str, source_language: str, target_language: str):
 def _MinT_translate_one_text(
     text: str, source_language: str, target_language: str
 ) -> str:
-    source_language = Language.get(source_language).language
-    target_language = Language.get(target_language).language
+    source_language = langcodes.Language.get(source_language).language
+    target_language = langcodes.Language.get(target_language).language
     res = requests.post(
         f"https://translate.wmcloud.org/api/translate/{source_language}/{target_language}",
         json.dumps({"text": text}),
