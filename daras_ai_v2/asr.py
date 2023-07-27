@@ -195,6 +195,9 @@ def _translate_text(text: str, source_language: str, target_language: str):
     if source_language == target_language or not text:
         return text
 
+    if source_language == "wo-SN":
+        return _MinT_translate_one_text(text, source_language, target_language)
+
     authed_session, project = get_google_auth_session()
     res = authed_session.post(
         f"https://translation.googleapis.com/v3/projects/{project}/locations/global:translateText",
@@ -221,6 +224,22 @@ def _translate_text(text: str, source_language: str, target_language: str):
 
 
 _session = None
+
+
+def _MinT_translate_one_text(
+    text: str, source_language: str, target_language: str
+) -> str:
+    source_language = langcodes.Language.get(source_language).language
+    target_language = langcodes.Language.get(target_language).language
+    res = requests.post(
+        f"https://translate.wmcloud.org/api/translate/{source_language}/{target_language}",
+        json={"text": text},
+    )
+    res.raise_for_status()
+
+    # e.g. {"model":"IndicTrans2_indec_en","sourcelanguage":"hi","targetlanguage":"en","translation":"hello","translationtime":0.8}
+    tanslation = res.json()
+    return tanslation.get("translation", text)
 
 
 def get_google_auth_session():
