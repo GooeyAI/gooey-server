@@ -75,11 +75,16 @@ class AsrPage(BasePage):
             "##### Audio Files",
             accept=(".wav", ".ogg", ".mp3", ".aac", ".opus", ".oga", ".mp4", ".webm"),
         )
-        st.write("---")
-        selected_model = enum_selector(
-            AsrModels, label="###### ASR Model", key="selected_model"
-        )
-        asr_language_selector(AsrModels[selected_model])
+        col1, col2 = st.columns(2, responsive=False)
+        with col1:
+            selected_model = enum_selector(
+                AsrModels,
+                label="##### ASR Model",
+                key="selected_model",
+                use_selectbox=True,
+            )
+        with col2:
+            asr_language_selector(AsrModels[selected_model])
 
     def render_settings(self):
         google_translate_language_selector()

@@ -219,14 +219,20 @@ def text_area(
     **props,
 ) -> str:
     style = props.setdefault("style", {})
-    style.setdefault("height", f"{height}px"),
     if key:
         assert not value, "only one of value or key can be provided"
     else:
-        key = md5_values("textarea", label, height, help, placeholder, label_visibility)
+        key = md5_values(
+            "textarea", label, height, help, value, placeholder, label_visibility
+        )
     value = state.session_state.setdefault(key, value)
     if label_visibility != "visible":
         label = None
+    if disabled:
+        style.setdefault("height", f"{height}px"),
+    else:
+        style.setdefault("maxHeight", f"{height}px"),
+        props.setdefault("rows", max((value or "").count("\n") + 1, 2))
     state.RenderTreeNode(
         name="textarea",
         props=dict(

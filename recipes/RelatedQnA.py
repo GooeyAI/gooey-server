@@ -88,7 +88,7 @@ class RelatedQnAPage(BasePage):
         st.text_area(
             "### Task Instructions",
             key="task_instructions",
-            height=100,
+            height=300,
         )
 
         language_model_settings()

@@ -809,6 +809,12 @@ class BasePage:
             raise RedirectException(str(redirect_url))
         uid = self.request.user.uid
 
+        before = gooey_get_query_params().get("updated_at__lt", None)
+        if before:
+            before = datetime.datetime.fromisoformat(before)
+        else:
+            before = datetime.datetime.utcnow()
+
         run_history = (
             db.get_collection_ref(
                 collection_id=USER_RUNS_COLLECTION,
@@ -816,10 +822,13 @@ class BasePage:
                 sub_collection_id=self.doc_name,
             )
             .order_by(StateKeys.updated_at, direction="DESCENDING")
-            # .offset(len(run_history))
-            .limit(50)
+            .where(StateKeys.updated_at, "<", before)
+            .limit(25)
             .get()
         )
+        if not run_history:
+            st.write("No history yet")
+            return
 
         def _render(snapshot):
             run_id = snapshot.id
@@ -844,8 +853,17 @@ class BasePage:
 
         grid_layout(3, run_history, _render)
 
-        # if st.button("Load More"):
-        #     st.experimental_rerun()
+        next_url = (
+            furl(self._get_current_app_url()) / MenuTabs.paths[MenuTabs.history] / "/"
+        )
+        next_url.query.params.set(
+            "updated_at__lt", run_history[-1].to_dict()["updated_at"]
+        )
+        with st.link(to=str(next_url)):
+            st.html(
+                # language=HTML
+                f"""<button type="button" class="btn btn-theme">Load More</button>"""
+            )
 
     def _render_doc_example(
         self, *, allow_delete: bool, doc: dict, url: str, query_params: dict

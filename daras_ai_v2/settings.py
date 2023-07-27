@@ -20,6 +20,8 @@ from furl import furl
 from sentry_sdk.integrations.threading import ThreadingIntegration
 from starlette.templating import Jinja2Templates
 
+from django.contrib.humanize.templatetags import humanize
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -84,6 +86,8 @@ TEMPLATES = [
 ]
 
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["humanize"] = humanize
+
 
 # needed to override django admin templates
 FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
