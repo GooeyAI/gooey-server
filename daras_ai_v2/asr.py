@@ -195,7 +195,7 @@ def _translate_text(text: str, source_language: str, target_language: str):
     if source_language == target_language or not text:
         return text
 
-    if source_language == "wo-SN":
+    if source_language == "wo-SN" or target_language == "wo-SN":
         return _MinT_translate_one_text(text, source_language, target_language)
 
     authed_session, project = get_google_auth_session()
