@@ -439,7 +439,7 @@ def _handle_audio_msg(billing_account_user, bot):
         case "am":
             selected_model = AsrModels.usm.name
             language = "am-ET"
-        case "wo-SN":
+        case "wo-sn":
             selected_model = AsrModels.usm.name
             language = "wo-SN"
         case "hi":
