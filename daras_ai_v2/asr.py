@@ -130,6 +130,7 @@ def google_translate_languages() -> dict[str, str]:
         if lang.support_target
     }
 
+
 @st.cache_data()
 def MinT_translate_languages() -> dict[str, str]:
     """
@@ -140,6 +141,7 @@ def MinT_translate_languages() -> dict[str, str]:
     res.raise_for_status()
     languages = res.json()
     return {code: Language.get(code).display_name() for code in languages.keys()}
+
 
 def asr_language_selector(
     selected_model: AsrModels,
@@ -169,7 +171,6 @@ def asr_language_selector(
         format_func=lambda l: (
             f"{langcodes.Language.get(l).display_name()} | {l}" if l else "Auto Detect"
         ),
->>>>>>> master
         options=options,
     )
 
