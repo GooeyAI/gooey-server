@@ -255,18 +255,19 @@ class BasePage:
                 self.run_as_api_tab()
 
     def render_related_workflows(self):
-        workflows = self.related_workflows()
-        if not workflows:
+        page_clses = self.related_workflows()
+        if not page_clses:
             return
 
         with st.link(to="/explore/"):
             st.html("<h2>Related Workflows</h2>")
 
-        related_recipe_docs = map_parallel(_build_page_tuple, workflows)
-
-        def _render(page_tuple):
-            page_cls, state, preview_image = page_tuple
+        def _render(page_cls):
             page = page_cls()
+            state = page_cls().recipe_doc_sr().to_dict()
+            preview_image = meta_preview_url(
+                page_cls().preview_image(state), page_cls().fallback_preivew_image()
+            )
 
             with st.link(to=page.app_url()):
                 st.markdown(
@@ -278,7 +279,7 @@ class BasePage:
                 st.markdown(f"###### {page.title}")
             st.caption(page.preview_description(state))
 
-        grid_layout(4, related_recipe_docs, _render)
+        grid_layout(4, page_clses, _render)
 
     def related_workflows(self) -> list:
         return []
@@ -759,13 +760,6 @@ class BasePage:
             for field_name in self.fields_to_save()
             if field_name in state
         }
-        ret |= {
-            StateKeys.updated_at: datetime.datetime.utcnow(),
-            StateKeys.created_at: ret.get(
-                StateKeys.created_at, datetime.datetime.utcnow()
-            ),
-            StateKeys.hidden: ret.get(StateKeys.hidden, False),
-        }
 
         title = state.get(StateKeys.page_title)
         notes = state.get(StateKeys.page_notes)
@@ -914,7 +908,7 @@ class BasePage:
         with st.spinner("Hiding..."):
             doc[StateKeys.hidden] = hidden
             sr.hidden = hidden
-            sr.save(update_fields=["hidden"])
+            sr.save(update_fields=["hidden", "updated_at"])
 
         st.experimental_rerun()
 
@@ -1111,15 +1105,6 @@ def err_msg_for_exc(e):
         return f"(HTTP {response.status_code}) {err_body}"
     else:
         return f"{type(e).__name__}: {e}"
-
-
-@lru_cache
-def _build_page_tuple(page_cls: typing.Type[BasePage]):
-    state = page_cls().recipe_doc_sr().to_dict()
-    preview_image = meta_preview_url(
-        page_cls().preview_image(state), page_cls().fallback_preivew_image()
-    )
-    return page_cls, state, preview_image
 
 
 class RedirectException(Exception):

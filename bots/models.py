@@ -107,7 +107,7 @@ class SavedRun(models.Model):
     hidden = models.BooleanField(default=False)
     is_flagged = models.BooleanField(default=False)
 
-    updated_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -169,10 +169,12 @@ class SavedRun(models.Model):
         from daras_ai_v2.base import StateKeys
 
         state = state.copy()
-        self.updated_at = _parse_dt(state.pop(StateKeys.updated_at, None)) or EPOCH
-        self.created_at = (
-            _parse_dt(state.pop(StateKeys.created_at, None)) or self.updated_at
-        )
+        # ignore updated_at from firebase, we use auto_now=True
+        state.pop(StateKeys.updated_at, None)
+        # self.updated_at = _parse_dt() or EPOCH
+        created_at = _parse_dt(state.pop(StateKeys.created_at, None))
+        if created_at:
+            self.created_at = created_at
         self.error_msg = state.pop(StateKeys.error_msg, None) or ""
         self.run_time = datetime.timedelta(
             seconds=state.pop(StateKeys.run_time, None) or 0
@@ -180,7 +182,7 @@ class SavedRun(models.Model):
         self.run_status = state.pop(StateKeys.run_status, None) or ""
         self.page_title = state.pop(StateKeys.page_title, None) or ""
         self.page_notes = state.pop(StateKeys.page_notes, None) or ""
-        self.hidden = state.pop(StateKeys.hidden, False)
+        # self.hidden = state.pop(StateKeys.hidden, False)
         self.is_flagged = state.pop("is_flagged", False)
         self.state = state
 
