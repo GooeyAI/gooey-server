@@ -545,6 +545,7 @@ def slider(
     help: str = None,
     *,
     disabled: bool = False,
+    default_value_attr: str = "defaultValue",
 ) -> float:
     value = _input_widget(
         input_type="range",
@@ -556,6 +557,7 @@ def slider(
         min=min_value,
         max=max_value,
         step=_step_value(min_value, max_value, step),
+        default_value_attr=default_value_attr,
     )
     return value or 0
 

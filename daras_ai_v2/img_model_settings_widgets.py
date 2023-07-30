@@ -135,6 +135,9 @@ def controlnet_settings(
     explanations = controlnet_model_explanations | extra_explanations
 
     state_values = st.session_state.get("controlnet_conditioning_scale", [])
+    if len(models) != len(state_values):
+        state_values = state_values + [1] * len(models)
+        state_values = state_values[: len(models)]
     new_values = []
     st.write(
         """
@@ -149,12 +152,11 @@ def controlnet_settings(
         `{high_explanation.format(high=int(CONTROLNET_CONDITIONING_SCALE_RANGE[1]))}`. 
         """
     )
-    for i, model in enumerate(sorted(models)):
+    for model, value in sorted(zip(models, state_values), key=lambda x: x[0]):
         key = f"controlnet_conditioning_scale_{model}"
-        try:
-            st.session_state[key] = state_values[i]
-        except IndexError:
-            pass
+        if st.session_state.get("controlnet_overwrite"):
+            st.session_state[key] = value
+        st.session_state.setdefault(key, value)
         new_values.append(
             controlnet_weight_setting(
                 selected_controlnet_model=model, explanations=explanations, key=key
@@ -179,6 +181,9 @@ def controlnet_weight_setting(
         min_value=CONTROLNET_CONDITIONING_SCALE_RANGE[0],
         max_value=CONTROLNET_CONDITIONING_SCALE_RANGE[1],
         step=0.05,
+        default_value_attr="value"
+        if st.session_state.get("controlnet_overwrite")
+        else "defaultValue",
     )
 
 

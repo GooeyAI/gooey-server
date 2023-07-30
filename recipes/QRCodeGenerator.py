@@ -35,6 +35,93 @@ from url_shortener.models import ShortenedURL
 
 ATTEMPTS = 1
 
+PRESETS = {
+    "Reliable": {
+        "description": "If you just want something tried and tested, this is our original defaults.",
+        "state_update": {
+            "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words",
+            "controlnet_conditioning_scale": [0.45, 0.35],
+            "guidance_scale": 9,
+            "num_outputs": 2,
+            "obj_pos_x": 0.5,
+            "obj_pos_y": 0.5,
+            "obj_scale": 0.65,
+            "output_height": 512,
+            "output_width": 512,
+            "quality": 70,
+            "scheduler": Schedulers.euler_ancestral.name,
+            "selected_controlnet_model": [
+                ControlNetModels.sd_controlnet_brightness.name,
+                ControlNetModels.sd_controlnet_tile.name,
+            ],
+            "selected_model": Img2ImgModels.dream_shaper.name,
+        },
+    },
+    "Creative": {
+        "description": "Stunning QR Codes with a creative flair that may not always be readable and could end up weird.",
+        "state_update": {
+            "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads",
+            "controlnet_conditioning_scale": [1.4],
+            "guidance_scale": 4,
+            "num_outputs": 4,
+            "obj_pos_x": 0.5,
+            "obj_pos_y": 0.5,
+            "obj_scale": 0.65,
+            "output_height": 768,
+            "output_width": 768,
+            "quality": 40,
+            "scheduler": Schedulers.euler_ancestral.name,
+            "selected_controlnet_model": [
+                ControlNetModels.sd_controlnet_qrmonster.name,
+            ],
+            "selected_model": Img2ImgModels.dream_shaper.name,
+        },
+    },
+    "Beautiful": {
+        "description": "The best mix of reliability and creativity. Produces some of the best results for most purposes.",
+        "state_update": {
+            "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads, many",
+            "controlnet_conditioning_scale": [0.25, 1.4],
+            "guidance_scale": 9,
+            "num_outputs": 1,
+            "obj_pos_x": 0.5,
+            "obj_pos_y": 0.5,
+            "obj_scale": 0.65,
+            "output_height": 768,
+            "output_width": 768,
+            "quality": 70,
+            "scheduler": Schedulers.euler_ancestral.name,
+            "selected_controlnet_model": [
+                ControlNetModels.sd_controlnet_brightness.name,
+                ControlNetModels.sd_controlnet_qrmonster.name,
+            ],
+            "selected_model": Img2ImgModels.dream_shaper.name,
+        },
+    },
+    "3D": {
+        "description": "Uses depth information to make the QR Code appear more 3D. This is experimental and may not always work.",
+        "state_update": {
+            "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads, many",
+            "controlnet_conditioning_scale": [0.35, 0.3, 0.3],
+            "guidance_scale": 8,
+            "num_outputs": 1,
+            "obj_pos_x": 0.5,
+            "obj_pos_y": 0.5,
+            "obj_scale": 0.8,
+            "output_height": 512,
+            "output_width": 512,
+            "quality": 100,
+            "scheduler": Schedulers.euler_ancestral.name,
+            "selected_controlnet_model": [
+                ControlNetModels.sd_controlnet_brightness.name,
+                ControlNetModels.sd_controlnet_depth.name,
+                ControlNetModels.sd_controlnet_tile.name,
+            ],
+            "selected_model": Img2ImgModels.dream_shaper.name,
+        },
+    },
+}
+
 
 class QRCodeGeneratorPage(BasePage):
     title = "AI Art QR Code"
@@ -46,7 +133,6 @@ class QRCodeGeneratorPage(BasePage):
         obj_pos_x=0.5,
         obj_pos_y=0.5,
         color=255,
-        settings="Custom",
     )
 
     def __init__(self, *args, **kwargs):
@@ -215,113 +301,23 @@ Here is the final output:
             """
         )
 
-        settings_type = st.radio(
-            "",
-            key="settings",
-            options=["Reliable", "Creative", "Beautiful", "3D", "Custom"],
-        )
-        if settings_type == "Reliable":
+        preset_match = None
+        st.session_state["controlnet_overwrite"] = False
+        for preset, preset_value in PRESETS.items():
+            key = "preset_" + preset
+            if st.button(preset, key=key, disabled=st.session_state.get(key, False)):
+                preset_match = preset_value
+                st.session_state.update(preset_value["state_update"])
+                st.session_state["controlnet_overwrite"] = True
+        if not preset_match:
+            st.button("Custom", key="preset_Custom", disabled=True)
             st.caption(
-                "If you just want something tried and tested, this is our original defaults."
+                "For the tech savvy and the curious. Here you can play around with settings to create something truly unique."
             )
-            st.session_state.update(
-                {
-                    "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words",
-                    "controlnet_conditioning_scale": [0.45, 0.35],
-                    "guidance_scale": 9,
-                    "num_outputs": 2,
-                    "obj_pos_x": 0.5,
-                    "obj_pos_y": 0.5,
-                    "obj_scale": 0.65,
-                    "output_height": 512,
-                    "output_width": 512,
-                    "quality": 70,
-                    "scheduler": Schedulers.euler_ancestral.name,
-                    "selected_controlnet_model": [
-                        ControlNetModels.sd_controlnet_brightness.name,
-                        ControlNetModels.sd_controlnet_tile.name,
-                    ],
-                    "selected_model": Img2ImgModels.dream_shaper.name,
-                }
-            )
-        elif settings_type == "Creative":
+        else:
             st.caption(
-                "Stunning QR Codes with a creative flair that may not always be readable and could end up weird."
+                preset_match["description"],
             )
-            st.session_state.update(
-                {
-                    "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads",
-                    "controlnet_conditioning_scale": [1.4],
-                    "guidance_scale": 4,
-                    "num_outputs": 4,
-                    "obj_pos_x": 0.5,
-                    "obj_pos_y": 0.5,
-                    "obj_scale": 0.65,
-                    "output_height": 768,
-                    "output_width": 768,
-                    "quality": 40,
-                    "scheduler": Schedulers.euler_ancestral.name,
-                    "selected_controlnet_model": [
-                        ControlNetModels.sd_controlnet_qrmonster.name,
-                    ],
-                    "selected_model": Img2ImgModels.dream_shaper.name,
-                }
-            )
-        elif settings_type == "Beautiful":
-            st.caption(
-                "The best mix of reliability and creativity. Produces some of the best results for most purposes."
-            )
-            st.session_state.update(
-                {
-                    "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads, many",
-                    "controlnet_conditioning_scale": [0.25, 1.4],
-                    "guidance_scale": 9,
-                    "num_outputs": 1,
-                    "obj_pos_x": 0.5,
-                    "obj_pos_y": 0.5,
-                    "obj_scale": 0.65,
-                    "output_height": 768,
-                    "output_width": 768,
-                    "quality": 70,
-                    "scheduler": Schedulers.euler_ancestral.name,
-                    "selected_controlnet_model": [
-                        ControlNetModels.sd_controlnet_brightness.name,
-                        ControlNetModels.sd_controlnet_qrmonster.name,
-                    ],
-                    "selected_model": Img2ImgModels.dream_shaper.name,
-                }
-            )
-        elif settings_type == "3D":
-            st.caption(
-                "Uses depth information to make the QR Code appear more 3D. This is experimental and may not always work."
-            )
-            st.session_state.update(
-                {
-                    "negative_prompt": "ugly, disfigured, low quality, blurry, nsfw, text, words, multiple heads, many",
-                    "controlnet_conditioning_scale": [0.35, 0.3, 0.3],
-                    "guidance_scale": 8,
-                    "num_outputs": 1,
-                    "obj_pos_x": 0.5,
-                    "obj_pos_y": 0.5,
-                    "obj_scale": 0.8,
-                    "output_height": 512,
-                    "output_width": 512,
-                    "quality": 100,
-                    "scheduler": Schedulers.euler_ancestral.name,
-                    "selected_controlnet_model": [
-                        ControlNetModels.sd_controlnet_brightness.name,
-                        ControlNetModels.sd_controlnet_depth.name,
-                        ControlNetModels.sd_controlnet_tile.name,
-                    ],
-                    "selected_model": Img2ImgModels.dream_shaper.name,
-                }
-            )
-
-        if settings_type != "Custom":
-            return
-        st.caption(
-            "For the tech savvy and the curious. Here you can play around with settings to create something truly unique."
-        )
 
         img_model_settings(
             Img2ImgModels,
