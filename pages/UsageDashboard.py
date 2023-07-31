@@ -1,14 +1,16 @@
-import plotly.graph_objects as go
-from django.db.models import Q, QuerySet, Count, Func
+import numpy as np
 
-from bots.models import SavedRun, Workflow
 from gooeysite import wsgi
 
 assert wsgi
 
+import plotly.graph_objects as go
+from django.db.models import Q, QuerySet, Count, Func
+
+from bots.models import SavedRun, Workflow
+
 from app_users.models import AppUser
 import datetime
-from multiprocessing.pool import ThreadPool
 import pandas as pd
 import plotly.express as px
 import pytz
@@ -33,19 +35,22 @@ team_user_Q = (
 
 
 def main():
-    st.write(
-        """
-### User Selection
-# """
-    )
-
     col1, col2, col3 = st.columns(3)
     with col1:
-        last_n_days = st.number_input("Last n Days", min_value=1, value=14)
+        timezone = st.selectbox(
+            "Timezone",
+            pytz.common_timezones,
+            index=pytz.common_timezones.index("Asia/Kolkata"),
+        )
+        timezone = pytz.timezone(timezone)
+        now = datetime.datetime.now(timezone)
     with col2:
-        datepart = st.selectbox("Frequency", options=["day", "week", "hour", "month"])
+        start_time = st.date_input(
+            "Start Date", value=now - datetime.timedelta(days=30)
+        )
     with col3:
-        timezone = st.text_input("Timezone", value="Asia/Kolkata")
+        end_time = st.date_input("End Date", value=now)
+    time_selector = dict(created_at__gte=start_time, created_at__lte=end_time)
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -55,17 +60,13 @@ def main():
     with col3:
         exclude_disabled = st.checkbox("Exclude Banned", value=True)
 
-    now = datetime.datetime.now(pytz.timezone(timezone))
-    today = datetime.datetime.date(now)
-    time_offset = today - pd.offsets.Day(last_n_days - 1)
-
     app_users = get_filtered_app_users(
         exclude_anon=exclude_anon,
         exclude_disabled=exclude_disabled,
         exclude_team=exclude_team,
     )
 
-    signups = app_users.filter(created_at__gte=time_offset).order_by("-created_at")
+    signups = app_users.filter(**time_selector).order_by("-created_at")
     st.write(f"### {signups.count()} Sign-ups")
     user_signups_df = pd.DataFrame.from_records(
         [
@@ -73,7 +74,7 @@ def main():
                 "uid": user.uid,
                 "display_name": user.display_name,
                 "email": str(user.email or user.phone_number),
-                "created_at": user.created_at.astimezone(pytz.timezone(timezone)),
+                "created_at": user.created_at.astimezone(timezone),
                 "balance": user.balance,
             }
             for user in signups
@@ -85,7 +86,7 @@ def main():
         st.dataframe(user_signups_df.head(100))
 
     saved_runs_qs = SavedRun.objects.filter(
-        created_at__gt=time_offset,
+        **time_selector,
         run_id__isnull=False,
         uid__isnull=False,
         uid__in=app_users.values("uid"),
@@ -143,7 +144,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
             pd.DataFrame.from_records(
                 [
                     {
-                        "created_at": sr.created_at.astimezone(pytz.timezone(timezone)),
+                        "created_at": sr.created_at.astimezone(timezone),
                         "workflow": sr.get_workflow_display(),
                         "run_id": sr.run_id,
                         "uid": sr.uid,
@@ -186,6 +187,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
             use_container_width=True,
         )
 
+    datepart = st.selectbox("Frequency", options=["day", "week", "hour", "month"])
     datepart_func = Func(
         "created_at",
         function="date_trunc",
@@ -214,12 +216,8 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
         use_container_width=True,
     )
 
-    st.write(
-        """
-### Runs Over Time
-Pro Tip: double click on any recipe to drill-down
-        """
-    )
+    st.write("### Runs Over Time")
+
     runs_over_time = list(
         saved_runs_qs.annotate(datepart=datepart_func)
         .values("datepart")
@@ -233,17 +231,38 @@ Pro Tip: double click on any recipe to drill-down
         .values("datepart", *[workflow.label for workflow in sorted_workflows])
         .order_by("datepart")
     )
+
+    sorted_workflows = st.multiselect(
+        "Workflows",
+        options=sorted_workflows,
+        default=sorted_workflows,
+        format_func=lambda w: w.label,
+    )
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        steps = st.number_input("Forecasting steps", min_value=0, value=3)
+    if steps:
+        with col2:
+            degree = st.number_input("Degree of polynomial", min_value=1, value=2)
+        with col3:
+            exclude_last = st.checkbox("Exclude last data point", value=True)
+            off = -1 if exclude_last else None
+
+    time_ = [row["datepart"] for row in runs_over_time]
     st.plotly_chart(
         go.Figure(
             data=[
                 go.Bar(
                     name=workflow.label,
-                    x=[row["datepart"] for row in runs_over_time],
-                    y=[row[workflow.label] for row in runs_over_time],
+                    x=time_ + get_extended_x(time_, steps),
+                    y=yval + get_fitted_y(yval[:off], steps, degree),
                     offsetgroup=0,
                     text=workflow.label,
+                    marker=dict(opacity=[1] * len(time_) + [0.5] * steps),
                 )
                 for workflow in sorted_workflows
+                if (yval := [row[workflow.label] for row in runs_over_time])
             ],
             layout=go.Layout(
                 barmode="stack",
@@ -253,6 +272,20 @@ Pro Tip: double click on any recipe to drill-down
         ),
         use_container_width=True,
     )
+
+
+def get_extended_x(x: list[datetime.datetime], steps):
+    return [
+        x[-1] + datetime.timedelta(seconds=(x[-1] - x[-2]).total_seconds() * (i + 1))
+        for i in range(steps)
+    ]
+
+
+def get_fitted_y(y: list[float], steps, degree):
+    coeffs = np.polyfit(range(len(y)), y, degree)
+    return [np.polyval(coeffs, i) for i in range(len(y), len(y) + steps)]
+    # params = scipy.optimize.curve_fit(f, range(len(y)), y)[0]
+    # return [f(i, *params) for i in range(len(y), len(y) + steps)]
 
 
 def merge_user_data(df: pd.DataFrame, uids: list[str]) -> pd.DataFrame:
@@ -272,15 +305,6 @@ def merge_user_data(df: pd.DataFrame, uids: list[str]) -> pd.DataFrame:
     df = users_df.merge(df, on="uid")
     df = df.set_index("uid")
     return df
-
-
-class DateTrunc(Func):
-    function = "POSITION"
-    template = "%(function)s('%(substring)s' in %(expressions)s)"
-
-    def __init__(self, expression, substring):
-        # substring=substring is an SQL injection vulnerability!
-        super().__init__(expression, substring=substring)
 
 
 def get_filtered_app_users(
@@ -312,5 +336,4 @@ def get_filtered_app_users(
 
 
 if __name__ == "__main__":
-    with ThreadPool(1000) as pool:
-        main()
+    main()
