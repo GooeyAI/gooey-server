@@ -955,8 +955,8 @@ class BasePage:
 
         st.write("#### 📤 Example Request")
 
-        include_all = st.checkbox("Show all fields")
-        as_form_data = st.checkbox("Upload Files via Form Data")
+        include_all = st.checkbox("##### Show all fields")
+        as_form_data = st.checkbox("##### Upload Files via Form Data")
 
         request_body = get_example_request_body(
             self.RequestModel, st.session_state, include_all=include_all
@@ -976,7 +976,8 @@ class BasePage:
             return
 
         st.write("---")
-        st.write("### 🔐 API keys")
+        with st.tag("a", id="api-keys"):
+            st.write("### 🔐 API keys")
 
         manage_api_keys(self.request.user)
 
