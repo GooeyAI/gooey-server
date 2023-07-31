@@ -739,34 +739,42 @@ Use this for prompting GPT to use the document search results.
     def messenger_bot_integration(self):
         from bots.models import BotIntegration, Platform
         from routers.facebook import ig_connect_url, fb_connect_url
+        from routers.slack import slack_connect_url
         from daras_ai_v2.all_pages import Workflow
         from bots.models import SavedRun
 
         st.markdown(
             # language=html
             f"""
-<h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>       
+            <h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>       
 
-Your can connect your FB Messenger account here directly.<br>
-If you ping us at support@gooey.ai, we'll add your other accounts too!
+            Your can connect your FB Messenger account and Slack Workspace here directly.<br>
+            If you ping us at support@gooey.ai, we'll add your other accounts too!
 
-<!--
-<div style='height: 50px'>
-    <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
-      <img height="20" src="https://www.instagram.com/favicon.ico">️
-      &nbsp; 
-      Add Your Instagram Page
-    </a>
-</div>
--->
-<div style='height: 50px'>
-    <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
-      <img height="20" src="https://www.facebook.com/favicon.ico">️             
-      &nbsp; 
-      Add Your Facebook Page
-    </a>
-</div>
-""",
+            <!--
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
+                <img height="20" src="https://www.instagram.com/favicon.ico">️
+                &nbsp; 
+                Add Your Instagram Page
+                </a>
+            </div>
+            -->
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
+                <img height="20" src="https://www.facebook.com/favicon.ico">️             
+                &nbsp; 
+                Add Your Facebook Page
+                </a>
+            </div>
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{slack_connect_url}">
+                <img height="20" src="https://www.slack.com/favicon.ico">️             
+                &nbsp; 
+                Add Your Slack Workspace
+                </a>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
         st.write("---")

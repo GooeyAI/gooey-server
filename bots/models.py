@@ -234,6 +234,25 @@ class BotIntegration(models.Model):
         unique=True,
         help_text="Bot's WhatsApp phone number id (required if platform is WhatsApp)",
     )
+    slack_channel_id = models.CharField(
+        max_length=256,
+        blank=True,
+        default=None,
+        null=True,
+        unique=True,
+        help_text="Bot's Slack channel id (required if platform is Slack)",
+    )
+    slack_channel_hook_url = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's Slack channel hook url (required if platform is Slack)",
+    )
+    slack_access_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's Slack access token (required if platform is Slack)",
+        editable=False,
+    )
 
     enable_analysis = models.BooleanField(
         default=False,
@@ -336,6 +355,12 @@ class Conversation(models.Model):
         default="",
         db_index=True,
         help_text="User's WhatsApp phone number (required if platform is WhatsApp)",
+    )
+    slack_user_id = models.TextField(
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="User's Slack channel id (required if platform is Slack)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1,86 +1,126 @@
-# import traceback
-
-# import glom
-# from daras_ai_v2.bots import (
-#     BotInterface,
-#     PAGE_NOT_CONNECTED_ERROR,
-#     RESET_KEYWORD,
-#     RESET_MSG,
-#     DEFAULT_RESPONSE,
-#     INVALID_INPUT_FORMAT,
-#     AUDIO_ASR_CONFIRMATION,
-#     ERROR_MSG,
-#     FEEDBACK_THUMBS_UP_MSG,
-#     FEEDBACK_THUMBS_DOWN_MSG,
-#     FEEDBACK_CONFIRMED_MSG,
-#     TAPPED_SKIP_MSG,
-#     # Mock testing
-#     # _echo,
-#     # _mock_api_output,
-# )
 import requests
+from furl import furl
+from string import Template
+from fastapi import APIRouter, HTTPException, Depends, Request, Response
+from starlette.background import BackgroundTasks
+from starlette.responses import RedirectResponse, HTMLResponse
 
-# from fastapi import APIRouter, HTTPException, Depends
-# from fastapi.responses import RedirectResponse
-# from furl import furl
-# from sentry_sdk import capture_exception
-# from starlette.background import BackgroundTasks
-# from starlette.requests import Request
-# from starlette.responses import HTMLResponse, Response
+from langcodes import Language
 
-# from app_users.models import AppUser
-# from bots.models import (
-#     BotIntegration,
-#     Platform,
-#     Message,
-#     Conversation,
-#     Feedback,
-#     SavedRun,
-#     ConvoState,
-# )
-# from daras_ai_v2 import settings, db
-# from daras_ai_v2.all_pages import Workflow
-# from daras_ai_v2.asr import AsrModels, run_google_translate
-# from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
-# from daras_ai_v2.functional import map_parallel
-# from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
-# from gooeysite.bg_db_conn import db_middleware
+from bots.models import BotIntegration, Platform
+from daras_ai_v2 import settings
+from daras_ai_v2.bots import _on_msg, request_json
 
-# router = APIRouter()
+from daras_ai_v2.slack_bot import SlackBot
+from daras_ai_v2.asr import run_google_translate
 
+router = APIRouter()
 
-def run_google_translate(text: str, language: str) -> str:
-    return text
-
+slack_connect_url = "https://slack.com/oauth/v2/authorize?client_id=5628699523239.5666992444400&scope=app_mentions:read,incoming-webhook,channels:read,chat:write&user_scope="
 
 SLACK_CONFIRMATION_MSG = """
 Hi there! 👋
 
-{name} is now connected to your Slack workspace! 
+$name is now connected to your Slack workspace in this channel! 
 
-I was created to {slack_description} You can DM me to start a conversation with me ({name}). 
+@mention me and I'll respond to you in this channel. Add 👍 or 👎 to my responses to help me learn.
 
-I'm also available in this channel if you have any questions regarding how I work or need to update one of my settings.
-
-I have been configured for {user_language} and will respond to you in that language.
+I have been configured for $user_language and will respond to you in that language.
 
 Type `/help` to see what I can do for you.
 """.strip()
 
 
-def send_confirmation_msg(bot: "BotIntegration"):
+@router.get("/__/slack/redirect/")
+def slack_connect_redirect(request: Request):
+    print(request)
+    if not request.user or request.user.is_anonymous:
+        redirect_url = furl("/login", query_params={"next": request.url})
+        return RedirectResponse(str(redirect_url))
+
+    retry_button = f'<a href="{slack_connect_url}">Retry</a>'
+
+    code = request.query_params.get("code")
+    if not code:
+        return HTMLResponse(
+            f"<p>Oh No! Something went wrong here.</p><p>Error: {dict(request.query_params)}</p>"
+            + retry_button,
+            status_code=400,
+        )
+    res = requests.post(
+        f"https://slack.com/api/oauth.v2.access?code={code}&client_id={settings.SLACK_CLIENT_ID}&client_secret={settings.SLACK_CLIENT_SECRET}",  # TODO: use Basic auth header instead
+    )
+    print(res.text)
+    res = res.json()
+    slack_access_token = res["access_token"]
+    slack_workspace = res["team"]["name"]
+    slack_channel = res["incoming_webhook"]["channel"]
+    slack_channel_id = res["incoming_webhook"]["channel_id"]
+    slack_channel_hook_url = res["incoming_webhook"]["url"]
+
+    try:
+        bi = BotIntegration.objects.get(
+            slack_access_token=slack_access_token, slack_channel_id=slack_channel_id
+        )
+    except BotIntegration.DoesNotExist:
+        bi = BotIntegration(
+            slack_access_token=slack_access_token,
+            slack_channel_id=slack_channel_id,
+            slack_channel_hook_url=slack_channel_hook_url,
+            billing_account_uid=request.user.uid,
+            name=slack_workspace + " - " + slack_channel,
+            platform=Platform.SLACK,
+        )
+        bi.save()
+
+    send_confirmation_msg(bi)
+
+    return HTMLResponse(
+        f"Sucessfully Connected to {slack_workspace} workspace on {slack_channel}! You may now close this page."
+    )
+
+
+def send_confirmation_msg(bot: BotIntegration):
+    substitutions = vars(bot).copy()  # convert to dict for string substitution
+    substitutions["user_language"] = Language.get(
+        bot.user_language, "en"
+    ).display_name()
+    text = run_google_translate(
+        [Template(SLACK_CONFIRMATION_MSG).safe_substitute(**substitutions)],
+        target_language=bot.user_language,
+        source_language="en",
+    )[0]
     requests.post(
-        "https://hooks.slack.com/services/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",
-        data=f'{"text": "{run_google_translate(SLACK_CONFIRMATION_MSG.format(**vars(bot)), bot.user_language)}"}',
+        bot.slack_channel_hook_url,
+        data=('{"text": "' + text + '"}').encode("utf-8"),
         headers={"Content-type": "application/json"},
     )
 
 
-class Test:
-    def __init__(self):
-        self.name = "test_name"
-        self.slack_description = "test_description"
-        self.user_language = "en"
-
-
-send_confirmation_msg(Test())
+@router.post("/__/slack/event/")
+def slack_event(
+    background_tasks: BackgroundTasks,
+    data: dict = Depends(request_json),
+):
+    if data["token"] != settings.SLACK_VERIFICATION_TOKEN:
+        raise HTTPException(403, "Only accepts requests from Slack")
+    if data["type"] == "url_verification":
+        return data["challenge"]
+    print("slack_eventhook: " + str(data))
+    if data["type"] == "event_callback":
+        workspace_id = data["team_id"]
+        application_id = data["api_app_id"]
+        event = data["event"]
+    if event["type"] == "app_mention":
+        bot = SlackBot(
+            {
+                "workspace_id": workspace_id,
+                "application_id": application_id,
+                "channel": event["channel"],
+                "thread_ts": event["event_ts"],
+                "text": event["text"],
+                "user": event["user"],
+            }
+        )
+        background_tasks.add_task(_on_msg, bot)
+    return Response("OK")
