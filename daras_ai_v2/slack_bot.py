@@ -61,7 +61,6 @@ class SlackBot(BotInterface):
             content_type=mime_type,
         )
         return audio_url
-        return None
 
     def get_input_video(self) -> str | None:
         return None

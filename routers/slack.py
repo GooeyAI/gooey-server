@@ -1,6 +1,5 @@
 import requests
 from furl import furl
-from urllib.parse import parse_qs
 from string import Template
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from starlette.background import BackgroundTasks
@@ -10,25 +9,23 @@ from langcodes import Language
 
 from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings
-from daras_ai_v2.bots import _on_msg, request_json, request_body
+from daras_ai_v2.bots import _on_msg, request_json
 
 from daras_ai_v2.slack_bot import SlackBot
 from daras_ai_v2.asr import run_google_translate
 
 router = APIRouter()
 
-slack_connect_url = f"https://slack.com/oauth/v2/authorize?client_id={settings.SLACK_CLIENT_ID}&scope=app_mentions:read,incoming-webhook,channels:read,chat:write&user_scope="
+slack_connect_url = f"https://slack.com/oauth/v2/authorize?client_id={settings.SLACK_CLIENT_ID}&scope=channels:history,channels:read,chat:write,chat:write.customize,incoming-webhook&user_scope="
 
 SLACK_CONFIRMATION_MSG = """
 Hi there! 👋
 
 $name is now connected to your Slack workspace in this channel! 
 
-@mention me and I'll respond to you in this channel. Add 👍 or 👎 to my responses to help me learn.
+I'll respond to any non-bot messages in this channel. Add 👍 or 👎 to my responses to help me learn.
 
 I have been configured for $user_language and will respond to you in that language.
-
-Type `/help` to see what I can do for you.
 """.strip()
 
 
@@ -112,17 +109,24 @@ def slack_event(
         workspace_id = data["team_id"]
         application_id = data["api_app_id"]
         event = data["event"]
-    if event["type"] == "app_mention":
-        bot = SlackBot(
-            {
-                "workspace_id": workspace_id,
-                "application_id": application_id,
-                "channel": event["channel"],
-                "thread_ts": event["event_ts"],
-                "text": event["text"],
-                "user": event["user"],
-                "files": event.get("files", []),
-            }
-        )
+    if event["type"] == "message":
+        if event.get("subtype") == "bot_message":
+            return Response("OK")  # ignore messages from other bots and this bot
+        try:
+            bot = SlackBot(
+                {
+                    "workspace_id": workspace_id,
+                    "application_id": application_id,
+                    "channel": event["channel"],
+                    "thread_ts": event["event_ts"],
+                    "text": event["text"],
+                    "user": event["user"],
+                    "files": event.get("files", []),
+                }
+            )
+        except BotIntegration.DoesNotExist:
+            print("bot integration does not exist")
+            return Response("OK")  # contacted from an invalid channel, ignore message
+        print("bot integration exists")
         background_tasks.add_task(_on_msg, bot)
     return Response("OK")
