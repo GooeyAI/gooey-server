@@ -17,7 +17,7 @@ from daras_ai_v2.asr import run_google_translate
 
 router = APIRouter()
 
-slack_connect_url = "https://slack.com/oauth/v2/authorize?client_id=5628699523239.5666992444400&scope=app_mentions:read,incoming-webhook,channels:read,chat:write&user_scope="
+slack_connect_url = f"https://slack.com/oauth/v2/authorize?client_id={settings.SLACK_CLIENT_ID}&scope=app_mentions:read,incoming-webhook,channels:read,chat:write&user_scope="
 
 SLACK_CONFIRMATION_MSG = """
 Hi there! 👋
