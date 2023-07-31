@@ -28,6 +28,10 @@ async def request_json(request: Request):
     return await request.json()
 
 
+async def request_body(request: Request):
+    return (await request.body()).decode("utf-8")
+
+
 class BotInterface:
     input_message: dict
     platform: Platform

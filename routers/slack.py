@@ -1,5 +1,6 @@
 import requests
 from furl import furl
+from urllib.parse import parse_qs
 from string import Template
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from starlette.background import BackgroundTasks
@@ -9,7 +10,7 @@ from langcodes import Language
 
 from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings
-from daras_ai_v2.bots import _on_msg, request_json
+from daras_ai_v2.bots import _on_msg, request_json, request_body
 
 from daras_ai_v2.slack_bot import SlackBot
 from daras_ai_v2.asr import run_google_translate
@@ -29,6 +30,8 @@ I have been configured for $user_language and will respond to you in that langua
 
 Type `/help` to see what I can do for you.
 """.strip()
+
+SLACK_HELP_MSG = "@mention me and I'll respond to you in this channel. Add 👍 or 👎 to my responses to help me learn. I'll respond to text, audio and video messages!"
 
 
 @router.get("/__/slack/redirect/")
@@ -124,3 +127,23 @@ def slack_event(
         )
         background_tasks.add_task(_on_msg, bot)
     return Response("OK")
+
+
+@router.post("/__/slack/help/")
+def slack_help(data: dict = Depends(request_body)):
+    params = parse_qs(data)
+    try:
+        bi = BotIntegration.objects.get(slack_channel_id=params["channel_id"])
+        language = bi.user_language
+    except BotIntegration.DoesNotExist:
+        language = "en"
+    try:
+        return run_google_translate(
+            [Template(SLACK_HELP_MSG).safe_substitute(**params)],
+            target_language=params.get("text", [language])[0],
+            source_language="en",
+        )[0]
+    except requests.exceptions.HTTPError:
+        return Response(
+            "Unsupported language code! Try running `/help en` to ensure the language is supported."
+        )
