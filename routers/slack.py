@@ -87,6 +87,7 @@ def slack_interaction(
                 "user": data["user"]["id"],
                 "files": [],
                 "actions": data["actions"],
+                "msg_id": data["container"]["message_ts"],
             }
         )
         background_tasks.add_task(_on_msg, bot)
@@ -121,6 +122,7 @@ def slack_event(
                     "user": event["user"],
                     "files": event.get("files", []),
                     "actions": [],
+                    "msg_id": event["ts"],
                 }
             )
         except BotIntegration.DoesNotExist:

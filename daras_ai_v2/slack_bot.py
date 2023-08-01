@@ -37,6 +37,7 @@ class SlackBot(BotInterface):
                 "user": str,
                 "files": list[dict],
                 "actions": list[dict],
+                "msg_id": str,
             }
         ],
     ):
@@ -91,7 +92,7 @@ class SlackBot(BotInterface):
     def get_interactive_msg_info(self) -> tuple[str, str]:
         return (
             self.input_message["actions"][0]["value"],
-            self.input_message["thread_ts"],
+            self.input_message["msg_id"],
         )
 
     def send_msg(
@@ -106,8 +107,9 @@ class SlackBot(BotInterface):
         if should_translate and self.language and self.language != "en":
             text = run_google_translate([text], self.language)[0]
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
+        msg_id = self.input_message["thread_ts"]
         for doc in splits:
-            reply(
+            msg_id = reply(
                 text=doc.text,
                 audio=audio,
                 video=video,
@@ -117,7 +119,7 @@ class SlackBot(BotInterface):
                 token=self.slack_access_token,
                 buttons=buttons,
             )
-        return self.input_message["thread_ts"]
+        return msg_id
 
     def mark_read(self):
         pass
@@ -133,7 +135,7 @@ def reply(
     token: str = None,
     buttons: list = [],
 ):
-    requests.post(
+    res = requests.post(
         "https://slack.com/api/chat.postMessage",
         data=json.dumps(
             {
@@ -156,6 +158,7 @@ def reply(
             "Content-type": "application/json",
         },
     )
+    return res.json().get("ts", thread_ts)
 
 
 def create_button_block(
