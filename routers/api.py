@@ -159,7 +159,7 @@ def call_api(
     page = page_cls(request=SimpleNamespace(user=user))
 
     # get saved state from db
-    state = page.get_doc_from_query_params(query_params)
+    state = page.get_doc_from_query_params(query_params).to_dict()
     if state is None:
         raise HTTPException(status_code=404)
 
@@ -191,7 +191,7 @@ def call_api(
     # create the run
     run_id = get_random_doc_id()
     run_url = str(furl(page.app_url(), query_params=dict(run_id=run_id, uid=user.uid)))
-    run_doc_ref = page.run_doc_ref(run_id, user.uid)
+    run_doc_ref = page.run_doc_sr(run_id, user.uid)
 
     # save the run
     run_doc_ref.set(page.state_to_doc(state))

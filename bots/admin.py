@@ -35,8 +35,27 @@ class BotIntegrationAdminForm(forms.ModelForm):
 
 @admin.register(models.SavedRun)
 class SavedRunAdmin(admin.ModelAdmin):
+    list_display = [
+        "__str__",
+        "example_id",
+        "run_id",
+        "uid",
+        "created_at",
+        "run_time",
+        "updated_at",
+    ]
+
+    list_filter = ["workflow"]
+
     search_fields = ["workflow", "example_id", "run_id", "uid"]
-    readonly_fields = ["view_bots", "open_in_firebase", "open_in_gooey"]
+    readonly_fields = [
+        "view_bots",
+        "open_in_firebase",
+        "open_in_gooey",
+        "created_at",
+        "updated_at",
+        "run_time",
+    ]
 
     def view_bots(self, saved_run: models.SavedRun):
         return list_related_html_url(saved_run.botintegrations)
@@ -44,12 +63,14 @@ class SavedRunAdmin(admin.ModelAdmin):
     view_bots.short_description = "View Bots"
 
     def open_in_firebase(self, saved_run: models.SavedRun):
-        return open_in_new_tab(saved_run.get_firebase_url())
+        return open_in_new_tab(
+            saved_run.get_firebase_url(), label=saved_run.get_firebase_url()
+        )
 
     open_in_firebase.short_description = "Open in Firebase"
 
     def open_in_gooey(self, saved_run: models.SavedRun):
-        return open_in_new_tab(saved_run.get_app_url())
+        return open_in_new_tab(saved_run.get_app_url(), label=saved_run.get_app_url())
 
     open_in_gooey.short_description = "Open in Gooey"
 

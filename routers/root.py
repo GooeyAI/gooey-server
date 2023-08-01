@@ -226,9 +226,9 @@ def st_page(
 
     state = json_data.setdefault("state", {})
     if not state:
-        firestore_state = page.get_firestore_state(example_id, run_id, uid)
-        if firestore_state is not None:
-            state.update(firestore_state)
+        db_state = page.get_current_doc_sr(example_id, run_id, uid).to_dict()
+        if db_state is not None:
+            state.update(db_state)
             for k, v in page.sane_defaults.items():
                 state.setdefault(k, v)
     if state is None:

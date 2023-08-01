@@ -4,6 +4,8 @@ from bots.admin import SavedRunAdmin, export_to_csv, export_to_excel
 from bots.admin_links import list_related_html_url
 from url_shortener import models
 
+from app_users.admin import AppUserAdmin
+
 
 @admin.register(models.ShortenedURL)
 class ShortenedURLAdmin(admin.ModelAdmin):
@@ -12,9 +14,11 @@ class ShortenedURLAdmin(admin.ModelAdmin):
         "clicks",
         "created_at",
     ]
-    search_fields = ["url", "user"] + [
-        f"saved_run__{field}" for field in SavedRunAdmin.search_fields
-    ]
+    search_fields = (
+        ["url"]
+        + [f"saved_runs__{field}" for field in SavedRunAdmin.search_fields]
+        + [f"user__{field}" for field in AppUserAdmin.search_fields]
+    )
     list_display = [
         "url",
         "user",
