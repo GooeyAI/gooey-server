@@ -154,6 +154,7 @@ def _on_msg(bot: BotInterface):
         bot.billing_account_uid
     )[0]
     # get the user's input
+    print("input type:", bot.input_type)
     match bot.input_type:
         # handle button press
         case "interactive":
@@ -328,7 +329,7 @@ def _handle_interactive_msg(bot: BotInterface):
     )
 
 
-def _handle_audio_msg(billing_account_user, bot):
+def _handle_audio_msg(billing_account_user, bot: BotInterface):
     from recipes.asr import AsrPage
     from routers.api import call_api
 
@@ -345,7 +346,8 @@ def _handle_audio_msg(billing_account_user, bot):
         case "bho":
             selected_model = AsrModels.vakyansh_bhojpuri.name
         case _:
-            selected_model = AsrModels.whisper_large_v2.name
+            selected_model = AsrModels.usm.name
+    print("running asr")
     result = call_api(
         page_cls=AsrPage,
         user=billing_account_user,
@@ -357,6 +359,7 @@ def _handle_audio_msg(billing_account_user, bot):
         },
         query_params={},
     )
+    print(result)
     return result
 
 

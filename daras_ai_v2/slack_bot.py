@@ -1,11 +1,24 @@
 import requests
+
 import json
 
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate
 from daras_ai_v2.bots import BotInterface
+
+from langcodes import Language
+from string import Template
+
+SLACK_CONFIRMATION_MSG = """
+Hi there! 👋
+
+$name is now connected to your Slack workspace in this channel!
+
+I'll respond to any non-bot text and audio messages in this channel. Add 👍 or 👎 to my responses to help me learn.
+
+I have been configured for $user_language and will respond to you in that language.
+""".strip()
 
 
 class SlackBot(BotInterface):
@@ -19,6 +32,7 @@ class SlackBot(BotInterface):
                 "thread_ts": str,
                 "text": str,
                 "user": str,
+                "files": list[dict],
             }
         ],
     ):
@@ -34,8 +48,9 @@ class SlackBot(BotInterface):
                 "audio" if "audio" in message["files"][0]["mimetype"] else "text"
             )
 
-        bi = BotIntegration.objects.get(slack_channel_id=self.bot_id)
+        bi: BotIntegration = BotIntegration.objects.get(slack_channel_id=self.bot_id)
         self.name = bi.name
+        self.slack_access_token = bi.slack_access_token
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
             slack_user_id=self.user_id,
@@ -49,21 +64,23 @@ class SlackBot(BotInterface):
         url = self.input_message.get("files", [{}])[0].get("url_private_download", "")
         if not url:
             return None
-        r = requests.get(url)
-        r.raise_for_status()
-        mime_type = self.input_message.get("files", [{}])[0].get(
-            "mimetype", "audio/mp4"
+        r = requests.get(
+            url, headers={"Authorization": f"Bearer {self.slack_access_token}"}
         )
+        r.raise_for_status()
+        print(r.text)
+        mime_type = "audio/mp4"
         # upload file to firebase
         audio_url = upload_file_from_bytes(
             filename=self.nice_filename(mime_type),
             data=r.content,
             content_type=mime_type,
         )
+        print("found audio url: " + audio_url)
         return audio_url
 
     def get_input_video(self) -> str | None:
-        return None
+        raise NotImplementedError()  # not used yet
 
     def send_msg(
         self,
@@ -84,6 +101,7 @@ class SlackBot(BotInterface):
             channel=self.bot_id,
             thread_ts=self.input_message["thread_ts"],
             username=self.name,
+            token=self.slack_access_token,
         )
 
     def mark_read(self):
@@ -97,6 +115,7 @@ def reply(
     channel: str = None,
     thread_ts: str = None,
     username: str = "Video Bot",
+    token: str = None,
 ):
     requests.post(
         "https://slack.com/api/chat.postMessage",
@@ -110,7 +129,26 @@ def reply(
             }
         ),
         headers={
-            "Authorization": f"Bearer {settings.SLACK_TOKEN}",
+            "Authorization": f"Bearer {token}",
             "Content-type": "application/json",
         },
     )
+
+
+def send_confirmation_msg(bot: BotIntegration):
+    substitutions = vars(bot).copy()  # convert to dict for string substitution
+    substitutions["user_language"] = Language.get(
+        bot.user_language, "en"
+    ).display_name()
+    text = run_google_translate(
+        [Template(SLACK_CONFIRMATION_MSG).safe_substitute(**substitutions)],
+        target_language=bot.user_language,
+        source_language="en",
+    )[0]
+    print("confirmation msg: " + text)
+    res = requests.post(
+        str(bot.slack_channel_hook_url),
+        data=('{"text": "' + text + '"}').encode("utf-8"),
+        headers={"Content-type": "application/json"},
+    )
+    res.raise_for_status()

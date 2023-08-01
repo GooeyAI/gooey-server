@@ -1,32 +1,19 @@
 import requests
 from furl import furl
-from string import Template
+
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from starlette.background import BackgroundTasks
 from starlette.responses import RedirectResponse, HTMLResponse
-
-from langcodes import Language
 
 from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json
 
 from daras_ai_v2.slack_bot import SlackBot
-from daras_ai_v2.asr import run_google_translate
 
 router = APIRouter()
 
-slack_connect_url = f"https://slack.com/oauth/v2/authorize?client_id={settings.SLACK_CLIENT_ID}&scope=channels:history,channels:read,chat:write,chat:write.customize,incoming-webhook&user_scope="
-
-SLACK_CONFIRMATION_MSG = """
-Hi there! 👋
-
-$name is now connected to your Slack workspace in this channel! 
-
-I'll respond to any non-bot messages in this channel. Add 👍 or 👎 to my responses to help me learn.
-
-I have been configured for $user_language and will respond to you in that language.
-""".strip()
+slack_connect_url = f"https://slack.com/oauth/v2/authorize?client_id={settings.SLACK_CLIENT_ID}&scope=channels:history,channels:read,chat:write,chat:write.customize,files:read,incoming-webhook&user_scope="
 
 
 @router.get("/__/slack/redirect/")
@@ -71,27 +58,8 @@ def slack_connect_redirect(request: Request):
         )
         bi.save()
 
-    send_confirmation_msg(bi)
-
     return HTMLResponse(
         f"Sucessfully Connected to {slack_workspace} workspace on {slack_channel}! You may now close this page."
-    )
-
-
-def send_confirmation_msg(bot: BotIntegration):
-    substitutions = vars(bot).copy()  # convert to dict for string substitution
-    substitutions["user_language"] = Language.get(
-        bot.user_language, "en"
-    ).display_name()
-    text = run_google_translate(
-        [Template(SLACK_CONFIRMATION_MSG).safe_substitute(**substitutions)],
-        target_language=bot.user_language,
-        source_language="en",
-    )[0]
-    requests.post(
-        bot.slack_channel_hook_url,
-        data=('{"text": "' + text + '"}').encode("utf-8"),
-        headers={"Content-type": "application/json"},
     )
 
 
@@ -110,8 +78,9 @@ def slack_event(
         application_id = data["api_app_id"]
         event = data["event"]
     if event["type"] == "message":
-        if event.get("subtype") == "bot_message":
-            return Response("OK")  # ignore messages from other bots and this bot
+        if event.get("subtype", "text") not in ["text", "slack_audio", "file_share"]:
+            print("ignoring message subtype: " + event.get("subtype"))
+            return Response("OK")  # ignore messages from bots, and service messages
         try:
             bot = SlackBot(
                 {
@@ -119,14 +88,13 @@ def slack_event(
                     "application_id": application_id,
                     "channel": event["channel"],
                     "thread_ts": event["event_ts"],
-                    "text": event["text"],
+                    "text": event.get("text", ""),
                     "user": event["user"],
                     "files": event.get("files", []),
                 }
             )
         except BotIntegration.DoesNotExist:
-            print("bot integration does not exist")
+            print("contacted from an invalid channel, ignore message")
             return Response("OK")  # contacted from an invalid channel, ignore message
-        print("bot integration exists")
         background_tasks.add_task(_on_msg, bot)
     return Response("OK")

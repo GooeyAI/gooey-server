@@ -781,7 +781,7 @@ Use this for prompting GPT to use the document search results.
 
         st.button("🔄 Refresh")
 
-        integrations = BotIntegration.objects.filter(
+        integrations: list[BotIntegration] = BotIntegration.objects.filter(
             billing_account_uid=self.request.user.uid
         ).order_by("platform")
         if not integrations:
@@ -830,6 +830,10 @@ Use this for prompting GPT to use the document search results.
                     uid=uid or "",
                     run_id=run_id or "",
                 )[0]
+                if bi.platform == Platform.SLACK:
+                    from daras_ai_v2.slack_bot import send_confirmation_msg
+
+                    send_confirmation_msg(bi)
             bi.save()
             st.experimental_rerun()
 
