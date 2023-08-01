@@ -107,9 +107,8 @@ class SlackBot(BotInterface):
         if should_translate and self.language and self.language != "en":
             text = run_google_translate([text], self.language)[0]
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
-        msg_id = self.input_message["thread_ts"]
-        for doc in splits:
-            msg_id = reply(
+        for doc in splits[:-1]:
+            reply(
                 text=doc.text,
                 audio=audio,
                 video=video,
@@ -117,8 +116,18 @@ class SlackBot(BotInterface):
                 thread_ts=self.input_message["thread_ts"],
                 username=self.name,
                 token=self.slack_access_token,
-                buttons=buttons,
+                buttons=[],
             )
+        msg_id = reply(
+            text=splits[-1].text,
+            audio=audio,
+            video=video,
+            channel=self.bot_id,
+            thread_ts=self.input_message["thread_ts"],
+            username=self.name,
+            token=self.slack_access_token,
+            buttons=buttons,
+        )
         return msg_id
 
     def mark_read(self):
