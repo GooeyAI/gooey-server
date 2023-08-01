@@ -4,6 +4,7 @@ import json
 
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai_v2.text_splitter import text_splitter
 from daras_ai_v2.asr import run_google_translate
 from daras_ai_v2.bots import BotInterface
 
@@ -19,6 +20,8 @@ I'll respond to any non-bot text and audio messages in this channel. Add 👍 or
 
 I have been configured for $user_language and will respond to you in that language.
 """.strip()
+
+SLACK_MAX_SIZE = 4000
 
 
 class SlackBot(BotInterface):
@@ -93,16 +96,18 @@ class SlackBot(BotInterface):
     ) -> str | None:
         if should_translate and self.language and self.language != "en":
             text = run_google_translate([text], self.language)[0]
+        splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
         # TODO: handle buttons
-        return reply(
-            text=text,
-            audio=audio,
-            video=video,
-            channel=self.bot_id,
-            thread_ts=self.input_message["thread_ts"],
-            username=self.name,
-            token=self.slack_access_token,
-        )
+        for doc in splits:
+            return reply(
+                text=doc.text,
+                audio=audio,
+                video=video,
+                channel=self.bot_id,
+                thread_ts=self.input_message["thread_ts"],
+                username=self.name,
+                token=self.slack_access_token,
+            )
 
     def mark_read(self):
         pass
