@@ -824,12 +824,9 @@ Use this for prompting GPT to use the document search results.
             if is_connected:
                 bi.saved_run = None
             else:
-                bi.saved_run = SavedRun.objects.get_or_create(
-                    workflow=Workflow.VIDEOBOTS,
-                    example_id=example_id or "",
-                    uid=uid or "",
-                    run_id=run_id or "",
-                )[0]
+                bi.saved_run = self.get_current_doc_sr(
+                    example_id=example_id, run_id=run_id, uid=uid
+                )
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg
 
