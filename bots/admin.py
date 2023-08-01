@@ -18,10 +18,11 @@ class BotIntegrationAdminForm(forms.ModelForm):
         widgets = {
             "platform": forms.Select(
                 attrs={
-                    "--hideshow-fields": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username,wa_phone_number,wa_phone_number_id",
+                    "--hideshow-fields": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username,wa_phone_number,wa_phone_number_id,slack_channel_id,slack_channel_hook_url,slack_access_token",
                     "--show-on-1": "fb_page_id,fb_page_name,fb_page_access_token",
                     "--show-on-2": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username",
                     "--show-on-3": "wa_phone_number,wa_phone_number_id",
+                    "--show-on-4": "slack_channel_id,slack_channel_hook_url,slack_access_token",
                 },
             ),
         }
@@ -62,6 +63,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "ig_username",
         "fb_page_id",
         "wa_phone_number",
+        "slack_channel_id",
     ]
     form = BotIntegrationAdminForm
     readonly_fields = ["view_conversations", "created_at", "updated_at"]

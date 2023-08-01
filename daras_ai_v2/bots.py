@@ -346,7 +346,7 @@ def _handle_audio_msg(billing_account_user, bot: BotInterface):
         case "bho":
             selected_model = AsrModels.vakyansh_bhojpuri.name
         case _:
-            selected_model = AsrModels.usm.name
+            selected_model = AsrModels.whisper_large_v2.name
     print("running asr")
     result = call_api(
         page_cls=AsrPage,
