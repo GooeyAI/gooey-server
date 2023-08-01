@@ -1,5 +1,6 @@
 import requests
 from furl import furl
+import json
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from starlette.background import BackgroundTasks
@@ -7,7 +8,7 @@ from starlette.responses import RedirectResponse, HTMLResponse
 
 from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings
-from daras_ai_v2.bots import _on_msg, request_json
+from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
 
 from daras_ai_v2.slack_bot import SlackBot
 
@@ -55,12 +56,40 @@ def slack_connect_redirect(request: Request):
             billing_account_uid=request.user.uid,
             name=slack_workspace + " - " + slack_channel,
             platform=Platform.SLACK,
+            show_feedback_buttons=True,
         )
         bi.save()
 
     return HTMLResponse(
         f"Sucessfully Connected to {slack_workspace} workspace on {slack_channel}! You may now close this page."
     )
+
+
+@router.post("/__/slack/interaction/")
+def slack_interaction(
+    background_tasks: BackgroundTasks,
+    data: dict = Depends(request_urlencoded_body),
+):
+    print("slack_interaction: " + str(data))
+    data = json.loads(data["payload"][0])
+    if data["token"] != settings.SLACK_VERIFICATION_TOKEN:
+        raise HTTPException(403, "Only accepts requests from Slack")
+    if data["type"] == "block_actions":
+        workspace_id = data["team"]["id"]
+        application_id = data["api_app_id"]
+        bot = SlackBot(
+            {
+                "workspace_id": workspace_id,
+                "application_id": application_id,
+                "channel": data["channel"]["id"],
+                "thread_ts": data["container"]["thread_ts"],
+                "text": "",
+                "user": data["user"]["id"],
+                "files": [],
+                "actions": data["actions"],
+            }
+        )
+        background_tasks.add_task(_on_msg, bot)
 
 
 @router.post("/__/slack/event/")
@@ -91,6 +120,7 @@ def slack_event(
                     "text": event.get("text", ""),
                     "user": event["user"],
                     "files": event.get("files", []),
+                    "actions": [],
                 }
             )
         except BotIntegration.DoesNotExist:

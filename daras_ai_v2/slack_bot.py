@@ -36,6 +36,7 @@ class SlackBot(BotInterface):
                 "text": str,
                 "user": str,
                 "files": list[dict],
+                "actions": list[dict],
             }
         ],
     ):
@@ -50,6 +51,8 @@ class SlackBot(BotInterface):
             self.input_type = (
                 "audio" if "audio" in message["files"][0]["mimetype"] else "text"
             )
+        if message["actions"]:
+            self.input_type = "interactive"
 
         bi: BotIntegration = BotIntegration.objects.get(slack_channel_id=self.bot_id)
         self.name = bi.name
@@ -85,6 +88,12 @@ class SlackBot(BotInterface):
     def get_input_video(self) -> str | None:
         raise NotImplementedError()  # not used yet
 
+    def get_interactive_msg_info(self) -> tuple[str, str]:
+        return (
+            self.input_message["actions"][0]["value"],
+            self.input_message["thread_ts"],
+        )
+
     def send_msg(
         self,
         *,
@@ -97,9 +106,8 @@ class SlackBot(BotInterface):
         if should_translate and self.language and self.language != "en":
             text = run_google_translate([text], self.language)[0]
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
-        # TODO: handle buttons
         for doc in splits:
-            return reply(
+            reply(
                 text=doc.text,
                 audio=audio,
                 video=video,
@@ -107,7 +115,9 @@ class SlackBot(BotInterface):
                 thread_ts=self.input_message["thread_ts"],
                 username=self.name,
                 token=self.slack_access_token,
+                buttons=buttons,
             )
+        return self.input_message["thread_ts"]
 
     def mark_read(self):
         pass
@@ -121,6 +131,7 @@ def reply(
     thread_ts: str = None,
     username: str = "Video Bot",
     token: str = None,
+    buttons: list = [],
 ):
     requests.post(
         "https://slack.com/api/chat.postMessage",
@@ -131,6 +142,13 @@ def reply(
                 "text": text,
                 "username": username,
                 "icon_emoji": ":robot_face:",
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {"type": "plain_text", "text": text},
+                    },
+                ]
+                + create_button_block(buttons),
             }
         ),
         headers={
@@ -138,6 +156,28 @@ def reply(
             "Content-type": "application/json",
         },
     )
+
+
+def create_button_block(
+    buttons: list[dict[{"type": "reply", "reply": dict[{"id": str, "title": str}]}]]
+) -> list[dict]:
+    if not buttons:
+        return []
+    elements = []
+    for button in buttons:
+        element = {}
+        element["type"] = "button"
+        element["text"] = {"type": "plain_text", "text": button["reply"]["title"]}
+        element["value"] = button["reply"]["id"]
+        element["action_id"] = "button_" + button["reply"]["id"]
+        elements.append(element)
+
+    return [
+        {
+            "type": "actions",
+            "elements": elements,
+        }
+    ]
 
 
 def send_confirmation_msg(bot: BotIntegration):

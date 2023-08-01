@@ -5,6 +5,7 @@ import traceback
 from sentry_sdk import capture_exception
 from fastapi import HTTPException, Request
 from furl import furl
+from urllib.parse import parse_qs
 
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.all_pages import Workflow
@@ -26,6 +27,10 @@ from bots.models import (
 
 async def request_json(request: Request):
     return await request.json()
+
+
+async def request_urlencoded_body(request: Request):
+    return parse_qs((await request.body()).decode("utf-8"))
 
 
 class BotInterface:
@@ -78,6 +83,11 @@ class BotInterface:
         self.billing_account_uid = bi.billing_account_uid
         self.language = bi.user_language
         self.show_feedback_buttons = bi.show_feedback_buttons
+
+    def get_interactive_msg_info(self) -> tuple[str, str]:
+        button_id = self.input_message["interactive"]["button_reply"]["id"]
+        context_msg_id = self.input_message["context"]["id"]
+        return button_id, context_msg_id
 
 
 PAGE_NOT_CONNECTED_ERROR = (
@@ -261,6 +271,7 @@ def _process_and_send_msg(
     # this really shouldn't happen, but just in case it does, we should have a nice message
     response_text = response_text or DEFAULT_RESPONSE
     # send the response to the user
+    print(bot.show_feedback_buttons)
     msg_id = bot.send_msg(
         text=response_text,
         audio=response_audio,
@@ -270,7 +281,7 @@ def _process_and_send_msg(
     if not msgs_to_save:
         return
     # save the whatsapp message id for the sent message
-    if bot.platform == Platform.WHATSAPP and msg_id:
+    if bot.platform in [Platform.WHATSAPP, Platform.SLACK] and msg_id:
         msgs_to_save[-1].wa_msg_id = msg_id
     # save the messages
     for msg in msgs_to_save:
@@ -279,8 +290,7 @@ def _process_and_send_msg(
 
 def _handle_interactive_msg(bot: BotInterface):
     try:
-        button_id = bot.input_message["interactive"]["button_reply"]["id"]
-        context_msg_id = bot.input_message["context"]["id"]
+        button_id, context_msg_id = bot.get_interactive_msg_info()
     except (KeyError,) as e:
         bot.send_msg(text=ERROR_MSG.format(e))
         return
@@ -345,9 +355,10 @@ def _handle_audio_msg(billing_account_user, bot: BotInterface):
             selected_model = AsrModels.whisper_telugu_large_v2.name
         case "bho":
             selected_model = AsrModels.vakyansh_bhojpuri.name
+        case "en":
+            selected_model = AsrModels.usm.name
         case _:
             selected_model = AsrModels.whisper_large_v2.name
-    print("running asr")
     result = call_api(
         page_cls=AsrPage,
         user=billing_account_user,
@@ -359,7 +370,6 @@ def _handle_audio_msg(billing_account_user, bot: BotInterface):
         },
         query_params={},
     )
-    print(result)
     return result
 
 
