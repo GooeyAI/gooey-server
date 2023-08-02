@@ -49,7 +49,7 @@ class BotInterface:
     def send_msg(
         self,
         *,
-        text: str = None,
+        text: str | None = None,
         audio: str = None,
         video: str = None,
         buttons: list = None,

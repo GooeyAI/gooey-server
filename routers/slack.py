@@ -10,7 +10,7 @@ from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
 
-from daras_ai_v2.slack_bot import SlackBot
+from daras_ai_v2.slack_bot import SlackBot, SlackMessage
 
 router = APIRouter()
 
@@ -78,17 +78,17 @@ def slack_interaction(
         workspace_id = data["team"]["id"]
         application_id = data["api_app_id"]
         bot = SlackBot(
-            {
-                "workspace_id": workspace_id,
-                "application_id": application_id,
-                "channel": data["channel"]["id"],
-                "thread_ts": data["container"]["thread_ts"],
-                "text": "",
-                "user": data["user"]["id"],
-                "files": [],
-                "actions": data["actions"],
-                "msg_id": data["container"]["message_ts"],
-            }
+            SlackMessage(
+                workspace_id=workspace_id,
+                application_id=application_id,
+                channel=data["channel"]["id"],
+                thread_ts=data["container"]["thread_ts"],
+                text="",
+                user=data["user"]["id"],
+                files=[],
+                actions=data["actions"],
+                msg_id=data["container"]["message_ts"],
+            )
         )
         background_tasks.add_task(_on_msg, bot)
 
@@ -107,26 +107,32 @@ def slack_event(
         workspace_id = data["team_id"]
         application_id = data["api_app_id"]
         event = data["event"]
-    if event["type"] == "message":
-        if event.get("subtype", "text") not in ["text", "slack_audio", "file_share"]:
-            print("ignoring message subtype: " + event.get("subtype"))
-            return Response("OK")  # ignore messages from bots, and service messages
-        try:
-            bot = SlackBot(
-                {
-                    "workspace_id": workspace_id,
-                    "application_id": application_id,
-                    "channel": event["channel"],
-                    "thread_ts": event["event_ts"],
-                    "text": event.get("text", ""),
-                    "user": event["user"],
-                    "files": event.get("files", []),
-                    "actions": [],
-                    "msg_id": event["ts"],
-                }
-            )
-        except BotIntegration.DoesNotExist:
-            print("contacted from an invalid channel, ignore message")
-            return Response("OK")  # contacted from an invalid channel, ignore message
-        background_tasks.add_task(_on_msg, bot)
+        if event["type"] == "message":
+            if event.get("subtype", "text") not in [
+                "text",
+                "slack_audio",
+                "file_share",
+            ]:
+                print("ignoring message subtype: " + event.get("subtype"))
+                return Response("OK")  # ignore messages from bots, and service messages
+            try:
+                bot = SlackBot(
+                    SlackMessage(
+                        workspace_id=workspace_id,
+                        application_id=application_id,
+                        channel=event["channel"],
+                        thread_ts=event["event_ts"],
+                        text=event.get("text", ""),
+                        user=event["user"],
+                        files=event.get("files", []),
+                        actions=[],
+                        msg_id=event["ts"],
+                    )
+                )
+            except BotIntegration.DoesNotExist:
+                print("contacted from an invalid channel, ignore message")
+                return Response(
+                    "OK"
+                )  # contacted from an invalid channel, ignore message
+            background_tasks.add_task(_on_msg, bot)
     return Response("OK")

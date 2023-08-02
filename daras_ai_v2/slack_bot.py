@@ -1,6 +1,6 @@
 import requests
 
-import json
+from typing import TypedDict
 
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
@@ -24,24 +24,24 @@ I have been configured for $user_language and will respond to you in that langua
 SLACK_MAX_SIZE = 4000
 
 
+class SlackMessage(TypedDict):
+    workspace_id: str
+    application_id: str
+    channel: str
+    thread_ts: str
+    text: str
+    user: str
+    files: list[dict]
+    actions: list[dict]
+    msg_id: str
+
+
 class SlackBot(BotInterface):
     def __init__(
         self,
-        message: dict[
-            {
-                "workspace_id": str,
-                "application_id": str,
-                "channel": str,
-                "thread_ts": str,
-                "text": str,
-                "user": str,
-                "files": list[dict],
-                "actions": list[dict],
-                "msg_id": str,
-            }
-        ],
+        message: SlackMessage,
     ):
-        self.input_message = message
+        self.input_message = message  # type: ignore
         self.platform = Platform.SLACK
 
         self.bot_id = message["channel"]
@@ -98,12 +98,14 @@ class SlackBot(BotInterface):
     def send_msg(
         self,
         *,
-        text: str = None,
-        audio: str = None,
-        video: str = None,
-        buttons: list = None,
+        text: str | None = None,
+        audio: str | None = None,
+        video: str | None = None,
+        buttons: list | None = None,
         should_translate: bool = False,
     ) -> str | None:
+        if not text:  # TODO: handle audio/video
+            return None
         if should_translate and self.language and self.language != "en":
             text = run_google_translate([text], self.language)[0]
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
@@ -126,7 +128,7 @@ class SlackBot(BotInterface):
             thread_ts=self.input_message["thread_ts"],
             username=self.name,
             token=self.slack_access_token,
-            buttons=buttons,
+            buttons=buttons or [],
         )
         return msg_id
 
@@ -135,13 +137,13 @@ class SlackBot(BotInterface):
 
 
 def reply(
-    text: str = None,
-    audio: str = None,
-    video: str = None,
-    channel: str = None,
-    thread_ts: str = None,
+    text: str,
+    channel: str,
+    thread_ts: str,
+    audio: str | None = None,
+    video: str | None = None,
     username: str = "Video Bot",
-    token: str = None,
+    token: str | None = None,
     buttons: list = [],
 ):
     res = requests.post(
@@ -168,7 +170,7 @@ def reply(
 
 
 def create_button_block(
-    buttons: list[dict[{"type": "reply", "reply": dict[{"id": str, "title": str}]}]]
+    buttons: list[dict[{"type": str, "reply": dict[{"id": str, "title": str}]}]]
 ) -> list[dict]:
     if not buttons:
         return []
@@ -192,7 +194,7 @@ def create_button_block(
 def send_confirmation_msg(bot: BotIntegration):
     substitutions = vars(bot).copy()  # convert to dict for string substitution
     substitutions["user_language"] = Language.get(
-        bot.user_language, "en"
+        bot.user_language,
     ).display_name()
     text = run_google_translate(
         [Template(SLACK_CONFIRMATION_MSG).safe_substitute(**substitutions)],
