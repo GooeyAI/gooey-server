@@ -1,5 +1,6 @@
 import typing
 from pathlib import Path
+import urllib.request
 
 from pydantic import BaseModel
 
@@ -10,6 +11,7 @@ from daras_ai_v2.lipsync_api import wav2lip
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 
+CREDITS_PER_BYTE = 1
 
 class LipsyncPage(BasePage):
     title = "Lip Syncing"
@@ -119,3 +121,20 @@ class LipsyncPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return "Create high-quality, realistic Lipsync animations from any audio file. Input a sample face gif/video + audio and we will automatically generate a lipsync animation that matches your audio."
+
+    def additional_notes(self) -> str | None:
+        return f"""
+        *Cost ≈ {CREDITS_PER_BYTE} credits per byte*
+        """
+
+    def get_raw_price(self, state: dict) -> float:
+        # Retrieve the input_audio from the state dictionary
+        input_audio_file_path = st.session_state.get("input_audio")
+
+        audio_file = urllib.request.urlopen(input_audio_file_path)
+        audio_size = audio_file.length
+
+        if audio_size is None:
+            return 0.0
+
+        return audio_size * CREDITS_PER_BYTE
