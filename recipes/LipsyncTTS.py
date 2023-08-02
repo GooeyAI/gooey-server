@@ -1,6 +1,7 @@
 import typing
 
 from pydantic import BaseModel
+import urllib.request
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -10,6 +11,7 @@ from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/lipsync_meta_img.gif"
 
+CREDITS_PER_BYTE = 1
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lipsync Video with Any Text"
@@ -144,3 +146,28 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     def render_usage_guide(self):
         youtube_video("RRmwQR-IytI")
+
+    def additional_notes(self) -> str | None:
+        return f"""
+        *Cost ≈ {CREDITS_PER_BYTE} credits per byte*
+        """
+
+    def get_raw_price(self, state: dict) -> float:
+        # Retrieve the input_audio from the state dictionary
+        input_face_file_path = st.session_state.get("input_face")
+
+        face_file = urllib.request.urlopen(input_face_file_path)
+        face_size = face_file.length
+
+        input_audio_file_path = st.session_state.get("input_audio")
+
+        audio_file = urllib.request.urlopen(input_audio_file_path)
+        audio_size = audio_file.length
+
+        if face_size is None:
+            return 0.0
+        
+        if audio_size is None:
+            return 0.0
+
+        return (face_size + audio_size) * CREDITS_PER_BYTE
