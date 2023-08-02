@@ -1,24 +1,20 @@
 import typing
 from pathlib import Path
 import urllib.request
-import requests
 
 from pydantic import BaseModel
 
 import gooey_ui as st
-from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.lipsync_api import wav2lip
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 
-CREDITS_PER_BYTE = (0.000002)
-
+CREDITS_PER_BYTE = 1
 
 class LipsyncPage(BasePage):
     title = "Lip Syncing"
-    workflow = Workflow.LIPSYNC
     slug_versions = ["Lipsync"]
 
     class RequestModel(BaseModel):
@@ -128,24 +124,17 @@ class LipsyncPage(BasePage):
 
     def additional_notes(self) -> str | None:
         return f"""
-        *Cost ≈ {CREDITS_PER_BYTE * 1000000} credits per megabyte*
+        *Cost ≈ {CREDITS_PER_BYTE} credits per byte*
         """
 
     def get_raw_price(self, state: dict) -> float:
-        # Retrieve the input_audio and input_face from the state dictionary
-        input_audio_file_path = state.get("input_audio")
-        input_face_file_path = state.get("input_face")
+        # Retrieve the input_audio from the state dictionary
+        input_audio_file_path = st.session_state.get("input_audio")
 
-        audio_size_headers = requests.head(input_audio_file_path)
-        audio_size = float(audio_size_headers.headers["Content-length"])
-
-        face_size_headers = requests.head(input_face_file_path)
-        face_size = float(face_size_headers.headers["Content-length"])
+        audio_file = urllib.request.urlopen(input_audio_file_path)
+        audio_size = audio_file.length
 
         if audio_size is None:
             return 0.0
 
-        if face_size is None:
-            return 0.0
-
-        return (audio_size + face_size) * CREDITS_PER_BYTE
+        return audio_size * CREDITS_PER_BYTE
