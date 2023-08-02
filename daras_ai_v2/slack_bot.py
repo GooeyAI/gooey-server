@@ -146,25 +146,22 @@ def reply(
 ):
     res = requests.post(
         "https://slack.com/api/chat.postMessage",
-        data=json.dumps(
-            {
-                "channel": channel,
-                "thread_ts": thread_ts,
-                "text": text,
-                "username": username,
-                "icon_emoji": ":robot_face:",
-                "blocks": [
-                    {
-                        "type": "section",
-                        "text": {"type": "plain_text", "text": text},
-                    },
-                ]
-                + create_button_block(buttons),
-            }
-        ),
+        json={
+            "channel": channel,
+            "thread_ts": thread_ts,
+            "text": text,
+            "username": username,
+            "icon_emoji": ":robot_face:",
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {"type": "plain_text", "text": text},
+                },
+            ]
+            + create_button_block(buttons),
+        },
         headers={
             "Authorization": f"Bearer {token}",
-            "Content-type": "application/json",
         },
     )
     return res.json().get("ts", thread_ts)
