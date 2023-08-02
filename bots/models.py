@@ -351,14 +351,10 @@ class BotIntegration(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["billing_account_uid", "platform"]),
-            models.Index(
-                fields=[
-                    "fb_page_id",
-                    "ig_account_id",
-                    "wa_phone_number_id",
-                    "slack_channel_id",
-                ]
-            ),
+            models.Index(fields=["fb_page_id"]),
+            models.Index(fields=["ig_account_id"]),
+            models.Index(fields=["wa_phone_number_id"]),
+            models.Index(fields=["slack_channel_id"]),
         ]
 
     def __str__(self):
