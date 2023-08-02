@@ -85,9 +85,7 @@ class BotInterface:
         self.show_feedback_buttons = bi.show_feedback_buttons
 
     def get_interactive_msg_info(self) -> tuple[str, str]:
-        button_id = self.input_message["interactive"]["button_reply"]["id"]
-        context_msg_id = self.input_message["context"]["id"]
-        return button_id, context_msg_id
+        raise NotImplementedError("This bot does not support interactive messages.")
 
 
 PAGE_NOT_CONNECTED_ERROR = (
@@ -291,7 +289,7 @@ def _process_and_send_msg(
 def _handle_interactive_msg(bot: BotInterface):
     try:
         button_id, context_msg_id = bot.get_interactive_msg_info()
-    except (KeyError,) as e:
+    except NotImplementedError as e:
         bot.send_msg(text=ERROR_MSG.format(e))
         return
     match button_id:

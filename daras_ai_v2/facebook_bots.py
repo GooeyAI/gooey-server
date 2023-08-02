@@ -61,6 +61,11 @@ class WhatsappBot(BotInterface):
             content_type=mime_type,
         )
 
+    def get_interactive_msg_info(self) -> tuple[str, str]:
+        button_id = self.input_message["interactive"]["button_reply"]["id"]
+        context_msg_id = self.input_message["context"]["id"]
+        return button_id, context_msg_id
+
     def send_msg(
         self,
         *,
