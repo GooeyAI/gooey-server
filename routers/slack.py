@@ -44,21 +44,17 @@ def slack_connect_redirect(request: Request):
     slack_channel_id = res["incoming_webhook"]["channel_id"]
     slack_channel_hook_url = res["incoming_webhook"]["url"]
 
-    try:
-        bi = BotIntegration.objects.get(
-            slack_access_token=slack_access_token, slack_channel_id=slack_channel_id
-        )
-    except BotIntegration.DoesNotExist:
-        bi = BotIntegration(
-            slack_access_token=slack_access_token,
-            slack_channel_id=slack_channel_id,
+    BotIntegration.objects.get_or_create(
+        slack_access_token=slack_access_token,
+        slack_channel_id=slack_channel_id,
+        defaults=dict(
             slack_channel_hook_url=slack_channel_hook_url,
             billing_account_uid=request.user.uid,
             name=slack_workspace + " - " + slack_channel,
             platform=Platform.SLACK,
             show_feedback_buttons=True,
-        )
-        bi.save()
+        ),
+    )
 
     return HTMLResponse(
         f"Sucessfully Connected to {slack_workspace} workspace on {slack_channel}! You may now close this page."
