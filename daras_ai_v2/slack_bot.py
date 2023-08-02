@@ -202,7 +202,6 @@ def send_confirmation_msg(bot: BotIntegration):
     print("confirmation msg: " + text)
     res = requests.post(
         str(bot.slack_channel_hook_url),
-        data=('{"text": "' + text + '"}').encode("utf-8"),
-        headers={"Content-type": "application/json"},
+        json={"text": text},
     )
     res.raise_for_status()
