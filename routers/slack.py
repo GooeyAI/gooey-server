@@ -45,9 +45,9 @@ def slack_connect_redirect(request: Request):
     slack_channel_hook_url = res["incoming_webhook"]["url"]
 
     BotIntegration.objects.get_or_create(
-        slack_access_token=slack_access_token,
         slack_channel_id=slack_channel_id,
         defaults=dict(
+            slack_access_token=slack_access_token,
             slack_channel_hook_url=slack_channel_hook_url,
             billing_account_uid=request.user.uid,
             name=slack_workspace + " - " + slack_channel,
@@ -126,9 +126,9 @@ def slack_event(
                     )
                 )
             except BotIntegration.DoesNotExist:
-                print("contacted from an invalid channel, ignore message")
+                print("contacted from an on-monitored channel, ignore message")
                 return Response(
                     "OK"
-                )  # contacted from an invalid channel, ignore message
+                )  # contacted from a channel that this integration has not been explicitly connected to (we recieve events from all channels in WorkSpace), ignore message
             background_tasks.add_task(_on_msg, bot)
     return Response("OK")
