@@ -53,6 +53,7 @@ from recipes.DocSearch import (
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
+from django.db.models import QuerySet
 
 BOT_SCRIPT_RE = re.compile(
     # start of line
@@ -781,7 +782,7 @@ Use this for prompting GPT to use the document search results.
 
         st.button("🔄 Refresh")
 
-        integrations: list[BotIntegration] = BotIntegration.objects.filter(
+        integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
             billing_account_uid=self.request.user.uid
         ).order_by("platform")
         if not integrations:
