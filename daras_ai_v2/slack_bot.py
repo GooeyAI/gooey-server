@@ -16,7 +16,9 @@ Hi there! 👋
 
 $name is now connected to your Slack workspace in this channel!
 
-I'll respond to any non-bot text and audio messages in this channel. Add 👍 or 👎 to my responses to help me learn.
+Invite my bot account to this channel by typing "@Gooey.AI Copilot" and selecting "Invite to Channel".
+
+I'll then respond to any text and audio messages in this channel while keeping track of a separate conversation history with each user. Add 👍 or 👎 to my responses to help me learn.
 
 I have been configured for $user_language and will respond to you in that language.
 """.strip()
