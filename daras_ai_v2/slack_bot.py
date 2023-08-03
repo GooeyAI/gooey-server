@@ -77,8 +77,8 @@ class SlackBot(BotInterface):
             url, headers={"Authorization": f"Bearer {self.slack_access_token}"}
         )
         r.raise_for_status()
-        print(r.text)
-        mime_type = "audio/mp4"
+        content_type = r.headers.get("Content-Type", "application/octet-stream")
+        mime_type = content_type.split(";")[0]
         # upload file to firebase
         audio_url = upload_file_from_bytes(
             filename=self.nice_filename(mime_type),
