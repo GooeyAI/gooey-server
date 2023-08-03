@@ -146,8 +146,10 @@ def reply(
     video: str | None = None,
     username: str = "Video Bot",
     token: str | None = None,
-    buttons: list = [],
+    buttons: list = None,
 ):
+    if buttons is None:
+        buttons = []
     res = requests.post(
         "https://slack.com/api/chat.postMessage",
         json={
