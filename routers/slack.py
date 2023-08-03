@@ -3,6 +3,7 @@ from furl import furl
 import json
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
+from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
 from starlette.responses import RedirectResponse, HTMLResponse
 
@@ -125,8 +126,9 @@ def slack_event(
                         msg_id=event["ts"],
                     )
                 )
-            except BotIntegration.DoesNotExist:
-                print("contacted from an on-monitored channel, ignore message")
+            except BotIntegration.DoesNotExist as e:
+                capture_exception(e)
+                print("contacted from an on-monitored channel, ignoring:", e)
                 return Response(
                     "OK"
                 )  # contacted from a channel that this integration has not been explicitly connected to (we recieve events from all channels in WorkSpace), ignore message
