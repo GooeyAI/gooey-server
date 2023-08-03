@@ -23,6 +23,7 @@ class Platform(models.IntegerChoices):
     FACEBOOK = 1
     INSTAGRAM = (2, "Instagram & FB")
     WHATSAPP = 3
+    SLACK = 4
 
     def get_favicon(self):
         if self == Platform.WHATSAPP:
@@ -117,10 +118,11 @@ class SavedRun(models.Model):
             ["workflow", "run_id", "uid"],
         ]
         indexes = [
-            models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
             models.Index(fields=["workflow"]),
-            models.Index(fields=["run_id", "uid"]),
-            models.Index(fields=["example_id"]),
+            models.Index(fields=["workflow", "run_id", "uid"]),
+            models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
+            models.Index(fields=["workflow", "example_id", "hidden"]),
+            models.Index(fields=["workflow", "uid", "updated_at"]),
         ]
 
     def __str__(self):
@@ -317,6 +319,25 @@ class BotIntegration(models.Model):
         unique=True,
         help_text="Bot's WhatsApp phone number id (required if platform is WhatsApp)",
     )
+    slack_channel_id = models.CharField(
+        max_length=256,
+        blank=True,
+        default=None,
+        null=True,
+        unique=True,
+        help_text="Bot's Slack channel id (required if platform is Slack)",
+    )
+    slack_channel_hook_url = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's Slack channel hook url (required if platform is Slack)",
+    )
+    slack_access_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's Slack access token (required if platform is Slack)",
+        editable=False,
+    )
 
     enable_analysis = models.BooleanField(
         default=False,
@@ -331,7 +352,7 @@ class BotIntegration(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["billing_account_uid", "platform"]),
-            models.Index(fields=["fb_page_id", "ig_account_id", "wa_phone_number_id"]),
+            models.Index(fields=["fb_page_id", "ig_account_id"]),
         ]
 
     def __str__(self):
@@ -420,6 +441,12 @@ class Conversation(models.Model):
         db_index=True,
         help_text="User's WhatsApp phone number (required if platform is WhatsApp)",
     )
+    slack_user_id = models.TextField(
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="User's Slack ID (required if platform is Slack)",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -427,14 +454,9 @@ class Conversation(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(
-                fields=[
-                    "bot_integration",
-                    "fb_page_id",
-                    "ig_account_id",
-                    "wa_phone_number",
-                ]
-            ),
+            models.Index(fields=["bot_integration", "fb_page_id", "ig_account_id"]),
+            models.Index(fields=["bot_integration", "wa_phone_number"]),
+            models.Index(fields=["bot_integration", "slack_user_id"]),
         ]
 
     def __str__(self):

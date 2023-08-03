@@ -299,6 +299,8 @@ def run_asr(
             lobj = langcodes.Language.get(language.strip())
             assert lobj.is_valid(), f"Invalid language: {language!r}"
             language = lobj.to_tag()
+            if language == "en":
+                language = "en-US"
             assert language in CHIRP_SUPPORTED, f"Unsupported language: {language!r}"
         else:
             language = None
