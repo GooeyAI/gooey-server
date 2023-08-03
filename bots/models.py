@@ -118,10 +118,11 @@ class SavedRun(models.Model):
             ["workflow", "run_id", "uid"],
         ]
         indexes = [
-            models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
             models.Index(fields=["workflow"]),
-            models.Index(fields=["run_id", "uid"]),
-            models.Index(fields=["example_id"]),
+            models.Index(fields=["workflow", "run_id", "uid"]),
+            models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
+            models.Index(fields=["workflow", "example_id", "hidden"]),
+            models.Index(fields=["workflow", "uid", "updated_at"]),
         ]
 
     def __str__(self):
@@ -351,10 +352,7 @@ class BotIntegration(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["billing_account_uid", "platform"]),
-            models.Index(fields=["fb_page_id"]),
-            models.Index(fields=["ig_account_id"]),
-            models.Index(fields=["wa_phone_number_id"]),
-            models.Index(fields=["slack_channel_id"]),
+            models.Index(fields=["fb_page_id", "ig_account_id"]),
         ]
 
     def __str__(self):
@@ -447,7 +445,7 @@ class Conversation(models.Model):
         blank=True,
         default="",
         db_index=True,
-        help_text="User's Slack channel id (required if platform is Slack)",
+        help_text="User's Slack ID (required if platform is Slack)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -456,14 +454,9 @@ class Conversation(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(
-                fields=[
-                    "bot_integration",
-                    "fb_page_id",
-                    "ig_account_id",
-                    "wa_phone_number",
-                ]
-            ),
+            models.Index(fields=["bot_integration", "fb_page_id", "ig_account_id"]),
+            models.Index(fields=["bot_integration", "wa_phone_number"]),
+            models.Index(fields=["bot_integration", "slack_user_id"]),
         ]
 
     def __str__(self):
