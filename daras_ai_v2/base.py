@@ -6,7 +6,6 @@ import urllib
 import urllib.parse
 import uuid
 from copy import deepcopy
-from functools import lru_cache
 from random import Random
 from time import sleep
 from types import SimpleNamespace
@@ -14,9 +13,9 @@ from types import SimpleNamespace
 import requests
 import sentry_sdk
 from django.utils import timezone
+from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
-from google.cloud import firestore
 from pydantic import BaseModel
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
@@ -40,8 +39,7 @@ from daras_ai_v2.db import (
     EXAMPLES_COLLECTION,
     ANONYMOUS_USER_COOKIE,
 )
-from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.grid_layout_widget import grid_layout, SkipIteration
+from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -409,16 +407,15 @@ class BasePage:
             workflow=Workflow.from_label(self.doc_name), uid=uid, run_id=run_id
         )
         if created or not sr.state:
-            sr.set(
-                db.get_doc_ref(
-                    collection_id=USER_RUNS_COLLECTION,
-                    document_id=uid,
-                    sub_collection_id=self.doc_name,
-                    sub_document_id=run_id,
-                )
-                .get()
-                .to_dict()
-            )
+            doc = db.get_doc_ref(
+                collection_id=USER_RUNS_COLLECTION,
+                document_id=uid,
+                sub_collection_id=self.doc_name,
+                sub_document_id=run_id,
+            ).get()
+            if not doc.exists:
+                raise HTTPException(status_code=404)
+            sr.set(doc.to_dict())
         return sr
 
     def example_doc_sr(self, example_id: str) -> SavedRun:
@@ -427,15 +424,14 @@ class BasePage:
             example_id=example_id,
         )
         if created or not sr.state:
-            sr.set(
-                db.get_doc_ref(
-                    sub_collection_id=EXAMPLES_COLLECTION,
-                    document_id=self.doc_name,
-                    sub_document_id=example_id,
-                )
-                .get()
-                .to_dict()
-            )
+            doc = db.get_doc_ref(
+                sub_collection_id=EXAMPLES_COLLECTION,
+                document_id=self.doc_name,
+                sub_document_id=example_id,
+            ).get()
+            if not doc.exists:
+                raise HTTPException(status_code=404)
+            sr.set(doc.to_dict())
         return sr
 
     def render_description(self):
