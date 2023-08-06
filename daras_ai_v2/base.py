@@ -413,8 +413,8 @@ class BasePage:
                 sub_collection_id=self.doc_name,
                 sub_document_id=run_id,
             ).get()
-            if not doc.exists:
-                raise HTTPException(status_code=404)
+            #if not doc.exists:
+            #    raise HTTPException(status_code=404)
             sr.set(doc.to_dict())
         return sr
 
