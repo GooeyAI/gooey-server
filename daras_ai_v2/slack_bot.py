@@ -16,9 +16,7 @@ Hi there! 👋
 
 $name is now connected to your Slack workspace in this channel!
 
-Invite my bot account to this channel by typing "@Gooey.AI Copilot" and selecting "Invite to Channel".
-
-I'll then respond to any text and audio messages in this channel while keeping track of a separate conversation history with each user. Add 👍 or 👎 to my responses to help me learn.
+I'll respond to any text and audio messages in this channel while keeping track of a separate conversation history with each user. Add 👍 or 👎 to my responses to help me learn.
 
 I have been configured for $user_language and will respond to you in that language.
 """.strip()
@@ -241,3 +239,15 @@ def send_confirmation_msg(bot: BotIntegration):
         json={"text": text},
     )
     res.raise_for_status()
+
+
+def invite_bot_account_to_channel(channel: str, bot_user_id: str, token: str):
+    res = requests.post(
+        "https://slack.com/api/conversations.invite",
+        json={"channel": channel, "users": bot_user_id},
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+    res.raise_for_status()
+    print("invited " + bot_user_id + " to " + channel)
