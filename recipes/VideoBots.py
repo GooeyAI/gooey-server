@@ -824,6 +824,29 @@ Use this for prompting GPT to use the document search results.
                     "🔌💔️ Disconnect" if is_connected else "🖇️ Connect",
                     key=f"btn_connect_{bi.id}",
                 )
+                if bi.platform == Platform.SLACK:
+                    # archive the bot by clearing all fields since deleting will delete conversations as well
+                    if st.button("🗑️ Archive"):
+                        for field in bi._meta.get_fields():
+                            if field.name in [
+                                "id",
+                                "saved_run",
+                                "platform",
+                                "user_language",
+                                "show_feedback_buttons",
+                                "enable_analysis",
+                                "created_at",
+                                "updated_at",
+                            ]:
+                                continue
+                            try:
+                                setattr(
+                                    bi, field.name, getattr(bi, field.name) + "archived"
+                                )
+                            except:
+                                pass
+                        bi.save()
+                        st.experimental_rerun()
             if not pressed:
                 continue
             if is_connected:
