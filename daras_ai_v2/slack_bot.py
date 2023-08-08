@@ -106,7 +106,7 @@ class SlackBot(BotInterface):
         buttons: list | None = None,
         should_translate: bool = False,
     ) -> str | None:
-        if not text:  # TODO: handle audio/video
+        if not text:
             return None
         if should_translate and self.language and self.language != "en":
             text = run_google_translate([text], self.language)[0]
