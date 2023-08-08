@@ -142,11 +142,11 @@ def reply(
     text: str,
     channel: str,
     thread_ts: str,
+    token: str,
     audio: str | None = None,
     video: str | None = None,
     username: str = "Video Bot",
-    token: str | None = None,
-    buttons: list = None,
+    buttons: list | None = None,
 ):
     if buttons is None:
         buttons = []
@@ -164,6 +164,8 @@ def reply(
                     "text": {"type": "plain_text", "text": text},
                 },
             ]
+            + create_file_block("Audio", token, audio)
+            + create_file_block("Video", token, video)
             + create_button_block(buttons),
         },
         headers={
@@ -171,6 +173,34 @@ def reply(
         },
     )
     return res.json().get("ts", thread_ts)
+
+
+def create_file_block(
+    title: str,
+    token: str,
+    url: str | None = None,
+) -> list[dict]:
+    if not url:
+        return []
+    res = requests.get(
+        "https://slack.com/api/files.remote.add",
+        params={
+            "external_id": url,
+            "external_url": url,
+            "title": title,
+        },
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+    res.raise_for_status()
+    return [
+        {
+            "type": "file",
+            "external_id": url,
+            "source": "remote",
+        },
+    ]
 
 
 def create_button_block(
