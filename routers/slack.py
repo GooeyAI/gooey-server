@@ -15,7 +15,7 @@ from daras_ai_v2.slack_bot import SlackBot, SlackMessage
 
 router = APIRouter()
 
-slack_connect_url = f"https://slack.com/oauth/v2/authorize?client_id={settings.SLACK_CLIENT_ID}&scope=channels:history,channels:read,chat:write,chat:write.customize,files:read,incoming-webhook&user_scope="
+slack_connect_url = f"https://slack.com/oauth/v2/authorize?client_id={settings.SLACK_CLIENT_ID}&scope=channels:history,channels:read,chat:write,chat:write.customize,chat:write.public,files:read,files:write,incoming-webhook,groups:history,groups:read,groups:write&user_scope="
 
 
 @router.get("/__/slack/redirect/")
