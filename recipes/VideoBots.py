@@ -17,7 +17,7 @@ from daras_ai_v2.asr import (
     run_google_translate,
     google_translate_language_selector,
 )
-from daras_ai_v2.base import BasePage, MenuTabs
+from daras_ai_v2.base import BasePage, MenuTabs, StateKeys
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
@@ -829,6 +829,7 @@ Use this for prompting GPT to use the document search results.
             if is_connected:
                 bi.saved_run = None
             else:
+                bi.name = st.session_state.get(StateKeys.page_title, bi.name)
                 bi.saved_run = self.get_current_doc_sr(
                     example_id=example_id, run_id=run_id, uid=uid
                 )
