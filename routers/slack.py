@@ -11,11 +11,11 @@ from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
 
-from daras_ai_v2.slack_bot import SlackBot, SlackMessage
+from daras_ai_v2.slack_bot import SlackBot, SlackMessage, invite_bot_account_to_channel
 
 router = APIRouter()
 
-slack_connect_url = f"https://slack.com/oauth/v2/authorize?client_id={settings.SLACK_CLIENT_ID}&scope=channels:history,channels:read,chat:write,chat:write.customize,chat:write.public,files:read,files:write,groups:history,groups:read,groups:write,incoming-webhook,remote_files:read,remote_files:share,remote_files:write&user_scope="
+slack_connect_url = f"https://slack.com/oauth/v2/authorize?client_id={settings.SLACK_CLIENT_ID}&scope=channels:history,channels:read,chat:write,chat:write.customize,files:read,files:write,groups:history,groups:read,groups:write,incoming-webhook,remote_files:read,remote_files:share,remote_files:write&user_scope=channels:write,channels:write.invites,groups:write,groups:write.invites"
 
 
 @router.get("/__/slack/redirect/")
@@ -44,6 +44,12 @@ def slack_connect_redirect(request: Request):
     slack_channel = res["incoming_webhook"]["channel"]
     slack_channel_id = res["incoming_webhook"]["channel_id"]
     slack_channel_hook_url = res["incoming_webhook"]["url"]
+    slack_bot_user_id = res["bot_user_id"]
+    slack_user_access_token = res["authed_user"]["access_token"]
+
+    invite_bot_account_to_channel(
+        slack_channel_id, slack_bot_user_id, slack_user_access_token
+    )
 
     BotIntegration.objects.get_or_create(
         slack_channel_id=slack_channel_id,
