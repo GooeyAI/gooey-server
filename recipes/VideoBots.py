@@ -770,9 +770,13 @@ Use this for prompting GPT to use the document search results.
             </div>
             <div style='height: 50px'>
                 <a target="_blank" class="streamlit-like-btn" href="{slack_connect_url}">
-                <img height="20" src="https://www.slack.com/favicon.ico">️             
+                <img height="20" src="https://www.slack.com/favicon.ico">             
                 &nbsp; 
                 Add Your Slack Workspace
+                </a>
+                <a target="_blank" href="https://docs.google.com/document/d/1EuBaC4TGHTFSOgKYM1eOlisjvPAwLji9dExKwbt2ocA/edit?usp=sharing" class="streamlit-like-btn" aria-label="docs">
+                <img height="20" width="0" src="https://www.slack.com/favicon.ico">   <!-- for vertical alignment -->          
+                ℹ️
                 </a>
             </div>
             """,
