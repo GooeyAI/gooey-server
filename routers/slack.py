@@ -12,6 +12,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
 
 from daras_ai_v2.slack_bot import SlackBot, SlackMessage, invite_bot_account_to_channel
+from django.db import transaction
 
 router = APIRouter()
 
@@ -51,17 +52,24 @@ def slack_connect_redirect(request: Request):
         slack_channel_id, slack_bot_user_id, slack_user_access_token
     )
 
-    BotIntegration.objects.get_or_create(
-        slack_channel_id=slack_channel_id,
-        defaults=dict(
-            slack_access_token=slack_access_token,
-            slack_channel_hook_url=slack_channel_hook_url,
-            billing_account_uid=request.user.uid,
-            name=slack_workspace + " - " + slack_channel,
-            platform=Platform.SLACK,
-            show_feedback_buttons=True,
-        ),
+    config = dict(
+        slack_access_token=slack_access_token,
+        slack_channel_hook_url=slack_channel_hook_url,
+        billing_account_uid=request.user.uid,
     )
+
+    with transaction.atomic():
+        bi, created = BotIntegration.objects.get_or_create(
+            slack_channel_id=slack_channel_id,
+            defaults=dict(
+                **config,
+                name=slack_workspace + " - " + slack_channel,
+                platform=Platform.SLACK,
+                show_feedback_buttons=True,
+            ),
+        )
+        if not created:
+            BotIntegration.objects.filter(pk=bi.pk).update(**config)
 
     return HTMLResponse(
         f"Sucessfully Connected to {slack_workspace} workspace on {slack_channel}! You may now close this page."
