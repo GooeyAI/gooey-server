@@ -110,7 +110,8 @@ model_max_tokens = {
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
     LargeLanguageModels.palm2_text: 8192,
     LargeLanguageModels.palm2_chat: 4096,
-    # https://huggingface.co/docs/transformers/main/model_doc/llama2#transformers.LlamaConfig.max_position_embeddings
+    # https://huggingface.co/docs/transformers/main/model_doc/llama2#transformers.LlamaConfig.max_position_embeddings and https://huggingface.co/TheBloke/Llama-2-13B-chat-GPTQ/discussions/7
+    # should be 4096 but we use 2048 to be safe since it seems replicate has not updated yet based on their last version release date???
     LargeLanguageModels.llama2_70b_chat: 2048,
 }
 
