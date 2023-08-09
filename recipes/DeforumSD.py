@@ -436,7 +436,7 @@ Choose fps for the video.
             )
         try:
             text = flatten(response["output"]["output_text"].values())[0]
-            if "FLAGGED" in text.splitlines()[-1]:
+            if "FLAGGED" in text.splitlines()[-1].upper():
                 raise ValueError(
                     "Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system."
                 )

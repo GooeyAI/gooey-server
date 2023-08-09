@@ -20,8 +20,7 @@ available_subscriptions = {
     "addon": {
         "display": {
             "name": "Add-on",
-            "title": "Add-on => Top up for $10",
-            "description": "Buy a one-time top up of 1000 Credits for $10. Good for ~200 runs, depending on which workflows you call.",
+            "title": "Top up Credits",
         },
         "stripe": {
             "price_data": {
@@ -31,10 +30,10 @@ available_subscriptions = {
                 },
                 "unit_amount": 1,  # in cents
             },
-            "quantity": 1000,  # number of credits
+            # "quantity": 1000,  # number of credits (set by html)
             "adjustable_quantity": {
                 "enabled": True,
-                "maximum": 10_000,
+                "maximum": 50_000,
                 "minimum": 1_000,
             },
         },
@@ -42,7 +41,7 @@ available_subscriptions = {
     "basic": {
         "display": {
             "name": "Basic Plan",
-            "title": "MONTHLY @ $10",
+            "title": "$10/Month",
             "description": "Buy a monthly plan for $10 and get new 1500 credits (~300 runs) every month.",
         },
         "stripe": {
@@ -136,7 +135,11 @@ def create_checkout_session(
 ):
     lookup_key = body_form["lookup_key"]
     subscription = available_subscriptions[lookup_key]
-    line_item = subscription["stripe"]
+    line_item = subscription["stripe"].copy()
+
+    quantity = body_form.get("quantity")
+    if quantity:
+        line_item["quantity"] = int(quantity)
 
     if get_user_subscription(request.user) == subscription:
         # already subscribed

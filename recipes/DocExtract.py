@@ -98,6 +98,7 @@ class DocExtractPage(BasePage):
         st.text_area(
             "### 👩‍🏫 Task Instructions",
             key="task_instructions",
+            height=300,
         )
         language_model_settings()
         enum_selector(AsrModels, label="##### ASR Model", key="selected_asr_model")

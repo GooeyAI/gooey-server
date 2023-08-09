@@ -15,12 +15,12 @@ class ShortenedURLQuerySet(models.QuerySet):
         self, *, user: AppUser, url: str, workflow: Workflow
     ) -> tuple["ShortenedURL", bool]:
         surl, created = self.filter_first_or_create(url=url, user=user)
-        example_id, run_id, uid = extract_query_params(
-            gooey_get_query_params(), default=""
-        )
+        _, run_id, uid = extract_query_params(gooey_get_query_params())
         surl.saved_runs.add(
             SavedRun.objects.get_or_create(
-                workflow=workflow, example_id=example_id, run_id=run_id, uid=uid
+                workflow=workflow,
+                run_id=run_id,
+                uid=uid,
             )[0],
         )
         return surl, created

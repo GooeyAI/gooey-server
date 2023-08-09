@@ -172,7 +172,7 @@ SearchSEO > Page Parsing > GPT3
         st.text_area(
             "### Task Instructions",
             key="task_instructions",
-            height=100,
+            height=300,
         )
 
         # st.checkbox("Blog Generator Mode", key="enable_blog_mode")

@@ -20,6 +20,8 @@ from furl import furl
 from sentry_sdk.integrations.threading import ThreadingIntegration
 from starlette.templating import Jinja2Templates
 
+from django.contrib.humanize.templatetags import humanize
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -84,6 +86,8 @@ TEMPLATES = [
 ]
 
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["humanize"] = humanize
+
 
 # needed to override django admin templates
 FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
@@ -251,6 +255,9 @@ FB_APP_ID = config("FB_APP_ID", "")
 FB_APP_SECRET = config("FB_APP_SECRET", "")
 FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
 WHATSAPP_ACCESS_TOKEN = config("WHATSAPP_ACCESS_TOKEN", None)
+SLACK_VERIFICATION_TOKEN = config("SLACK_VERIFICATION_TOKEN", "")
+SLACK_CLIENT_ID = config("SLACK_CLIENT_ID", "")
+SLACK_CLIENT_SECRET = config("SLACK_CLIENT_SECRET", "")
 
 TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
 TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")

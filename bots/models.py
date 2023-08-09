@@ -5,18 +5,25 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.text import Truncator
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
+from bots.custom_fields import PostgresJSONEncoder
+
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
+
+
+EPOCH = datetime.datetime.utcfromtimestamp(0)
 
 
 class Platform(models.IntegerChoices):
     FACEBOOK = 1
     INSTAGRAM = (2, "Instagram & FB")
     WHATSAPP = 3
+    SLACK = 4
 
     def get_favicon(self):
         if self == Platform.WHATSAPP:
@@ -38,19 +45,23 @@ class Workflow(models.IntegerChoices):
     COMPARETEXT2IMG = (10, "CompareText2Img")
     TEXT2AUDIO = (11, "text2audio")
     IMG2IMG = (12, "Img2Img")
-    FACEINPAINTING = (13, "FaceInpainting")
+    FACEINPAINTING = (13, "FaceInpainting#2")
     GOOGLEIMAGEGEN = (14, "GoogleImageGen")
     COMPAREUPSCALER = (15, "compare-ai-upscalers")
     SEOSUMMARY = (16, "SEOSummary")
-    EMAILFACEINPAINTING = (17, "EmailFaceInpainting")
+    EMAILFACEINPAINTING = (17, "EmailFaceInpainting#2")
     SOCIALLOOKUPEMAIL = (18, "SocialLookupEmail")
     OBJECTINPAINTING = (19, "ObjectInpainting")
-    IMAGESEGMENTATION = (20, "ImageSegmentation")
+    IMAGESEGMENTATION = (20, "ImageSegmentation#2")
     COMPARELLM = (21, "CompareLLM")
     CHYRONPLANT = (22, "ChyronPlant")
     LETTERWRITER = (23, "LetterWriter")
     SMARTGPT = (24, "SmartGPT")
-    QRCODE = (25, "QRCodeGenerator")
+    QRCODE = (25, "art-qr-code")
+    YOUTUBEBOT = (26, "doc-extract")
+    RELATEDQNAMAKER = (27, "related-qna-maker")
+    RELATEDQNAMAKERDOC = (28, "related-qna-maker-doc")
+    EMBEDDINGS = (29, "embeddings")
 
     def get_app_url(self, example_id: str, run_id: str, uid: str):
         """return the url to the gooey app"""
@@ -76,29 +87,42 @@ class Workflow(models.IntegerChoices):
             + path
         )
 
+    @classmethod
+    def from_label(cls, label: str):
+        return {w.label: w for w in Workflow}[label]
+
 
 class SavedRun(models.Model):
     workflow = models.IntegerField(choices=Workflow.choices, default=Workflow.VIDEOBOTS)
-    example_id = models.TextField(
-        default="",
-        blank=True,
-    )
-    run_id = models.TextField(
-        default="",
-        blank=True,
-    )
-    uid = models.TextField(
-        default="",
-        blank=True,
-    )
+    example_id = models.TextField(default=None, null=True, blank=True)
+    run_id = models.TextField(default=None, null=True, blank=True)
+    uid = models.TextField(default=None, null=True, blank=True)
+
+    state = models.JSONField(default=dict, blank=True, encoder=PostgresJSONEncoder)
+
+    error_msg = models.TextField(default="", blank=True)
+    run_time = models.DurationField(default=datetime.timedelta, blank=True)
+    run_status = models.TextField(default="", blank=True)
+    page_title = models.TextField(default="", blank=True)
+    page_notes = models.TextField(default="", blank=True)
+    hidden = models.BooleanField(default=False)
+    is_flagged = models.BooleanField(default=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ["workflow", "example_id", "run_id", "uid"]
+        ordering = ["-updated_at"]
+        unique_together = [
+            ["workflow", "example_id"],
+            ["workflow", "run_id", "uid"],
+        ]
         indexes = [
-            models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
             models.Index(fields=["workflow"]),
-            models.Index(fields=["run_id", "uid"]),
-            models.Index(fields=["example_id"]),
+            models.Index(fields=["workflow", "run_id", "uid"]),
+            models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
+            models.Index(fields=["workflow", "example_id", "hidden"]),
+            models.Index(fields=["workflow", "uid", "updated_at"]),
         ]
 
     def __str__(self):
@@ -111,6 +135,68 @@ class SavedRun(models.Model):
     def get_firebase_url(self):
         workflow = Workflow(self.workflow)
         return workflow.get_firebase_url(self.example_id, self.run_id, self.uid)
+
+    def to_dict(self) -> dict:
+        from daras_ai_v2.base import StateKeys
+
+        ret = self.state.copy()
+        if self.updated_at:
+            ret[StateKeys.updated_at] = self.updated_at
+        if self.created_at:
+            ret[StateKeys.created_at] = self.created_at
+        if self.error_msg:
+            ret[StateKeys.error_msg] = self.error_msg
+        if self.run_time:
+            ret[StateKeys.run_time] = self.run_time.total_seconds()
+        if self.run_status:
+            ret[StateKeys.run_status] = self.run_status
+        if self.page_title:
+            ret[StateKeys.page_title] = self.page_title
+        if self.page_notes:
+            ret[StateKeys.page_notes] = self.page_notes
+        if self.hidden:
+            ret[StateKeys.hidden] = self.hidden
+        if self.is_flagged:
+            ret["is_flagged"] = self.is_flagged
+        return ret
+
+    def set(self, state: dict):
+        if not state:
+            return
+
+        self.copy_from_firebase_state(state)
+        self.save()
+
+    def copy_from_firebase_state(self, state: dict) -> "SavedRun":
+        from daras_ai_v2.base import StateKeys
+
+        state = state.copy()
+        # ignore updated_at from firebase, we use auto_now=True
+        state.pop(StateKeys.updated_at, None)
+        # self.updated_at = _parse_dt() or EPOCH
+        created_at = _parse_dt(state.pop(StateKeys.created_at, None))
+        if created_at:
+            self.created_at = created_at
+        self.error_msg = state.pop(StateKeys.error_msg, None) or ""
+        self.run_time = datetime.timedelta(
+            seconds=state.pop(StateKeys.run_time, None) or 0
+        )
+        self.run_status = state.pop(StateKeys.run_status, None) or ""
+        self.page_title = state.pop(StateKeys.page_title, None) or ""
+        self.page_notes = state.pop(StateKeys.page_notes, None) or ""
+        # self.hidden = state.pop(StateKeys.hidden, False)
+        self.is_flagged = state.pop("is_flagged", False)
+        self.state = state
+
+        return self
+
+
+def _parse_dt(dt) -> datetime.datetime | None:
+    if isinstance(dt, str):
+        return datetime.datetime.fromisoformat(dt)
+    elif isinstance(dt, datetime.datetime):
+        return datetime.datetime.fromtimestamp(dt.timestamp(), dt.tzinfo)
+    return None
 
 
 class BotIntegrationQuerySet(models.QuerySet):
@@ -233,6 +319,25 @@ class BotIntegration(models.Model):
         unique=True,
         help_text="Bot's WhatsApp phone number id (required if platform is WhatsApp)",
     )
+    slack_channel_id = models.CharField(
+        max_length=256,
+        blank=True,
+        default=None,
+        null=True,
+        unique=True,
+        help_text="Bot's Slack channel id (required if platform is Slack)",
+    )
+    slack_channel_hook_url = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's Slack channel hook url (required if platform is Slack)",
+    )
+    slack_access_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's Slack access token (required if platform is Slack)",
+        editable=False,
+    )
 
     enable_analysis = models.BooleanField(
         default=False,
@@ -247,7 +352,7 @@ class BotIntegration(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["billing_account_uid", "platform"]),
-            models.Index(fields=["fb_page_id", "ig_account_id", "wa_phone_number_id"]),
+            models.Index(fields=["fb_page_id", "ig_account_id"]),
         ]
 
     def __str__(self):
@@ -336,6 +441,12 @@ class Conversation(models.Model):
         db_index=True,
         help_text="User's WhatsApp phone number (required if platform is WhatsApp)",
     )
+    slack_user_id = models.TextField(
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="User's Slack ID (required if platform is Slack)",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -343,14 +454,9 @@ class Conversation(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(
-                fields=[
-                    "bot_integration",
-                    "fb_page_id",
-                    "ig_account_id",
-                    "wa_phone_number",
-                ]
-            ),
+            models.Index(fields=["bot_integration", "fb_page_id", "ig_account_id"]),
+            models.Index(fields=["bot_integration", "wa_phone_number"]),
+            models.Index(fields=["bot_integration", "slack_user_id"]),
         ]
 
     def __str__(self):
@@ -364,8 +470,6 @@ class Conversation(models.Model):
         )
 
     get_display_name.short_description = "User"
-
-    datetime.timedelta(days=3),
 
     def last_active_delta(self) -> datetime.timedelta:
         return abs(self.messages.latest().created_at - self.created_at)

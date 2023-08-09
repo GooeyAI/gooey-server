@@ -75,3 +75,26 @@ export MAGICK_HOME=/opt/homebrew
 Use black - https://pypi.org/project/black
 
 **Recommended**: Black IDE integration Guide: [Pycharm](https://black.readthedocs.io/en/stable/integrations/editors.html#pycharm-intellij-idea)
+
+## Dangerous postgres commands
+
+### backup & restore postgres db
+
+```bash
+fname=$(date +"%Y-%m-%d_%I-%M-%S_%p").dump
+pg_dump -Fc -f "$fname"
+```
+
+```bash
+./manage.py reset_db -c
+createdb -T template0 $PGDATABASE
+pg_restore --no-privileges --no-owner -d $PGDATABASE $fname
+```
+
+### copy one postgres db to another
+
+```  
+./manage.py reset_db -c
+createdb -T template0 $PGDATABASE
+pg_dump $SOURCE_DATABASE | psql -q $PGDATABASE
+```

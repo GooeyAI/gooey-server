@@ -53,6 +53,7 @@ from recipes.DocSearch import (
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
+from django.db.models import QuerySet
 
 BOT_SCRIPT_RE = re.compile(
     # start of line
@@ -358,7 +359,7 @@ Enable document search, to use custom documents as information sources.
 Use this for prompting GPT to use the document search results.
 """,
                 key="task_instructions",
-                height=100,
+                height=300,
             )
             st.write("---")
 
@@ -739,41 +740,49 @@ Use this for prompting GPT to use the document search results.
     def messenger_bot_integration(self):
         from bots.models import BotIntegration, Platform
         from routers.facebook import ig_connect_url, fb_connect_url
+        from routers.slack import slack_connect_url
         from daras_ai_v2.all_pages import Workflow
         from bots.models import SavedRun
 
         st.markdown(
             # language=html
             f"""
-<h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>       
+            <h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>       
 
-Your can connect your FB Messenger account here directly.<br>
-If you ping us at support@gooey.ai, we'll add your other accounts too!
+            Your can connect your FB Messenger account and Slack Workspace here directly.<br>
+            If you ping us at support@gooey.ai, we'll add your other accounts too!
 
-<!--
-<div style='height: 50px'>
-    <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
-      <img height="20" src="https://www.instagram.com/favicon.ico">️
-      &nbsp; 
-      Add Your Instagram Page
-    </a>
-</div>
--->
-<div style='height: 50px'>
-    <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
-      <img height="20" src="https://www.facebook.com/favicon.ico">️             
-      &nbsp; 
-      Add Your Facebook Page
-    </a>
-</div>
-""",
+            <!--
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
+                <img height="20" src="https://www.instagram.com/favicon.ico">️
+                &nbsp; 
+                Add Your Instagram Page
+                </a>
+            </div>
+            -->
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
+                <img height="20" src="https://www.facebook.com/favicon.ico">️             
+                &nbsp; 
+                Add Your Facebook Page
+                </a>
+            </div>
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{slack_connect_url}">
+                <img height="20" src="https://www.slack.com/favicon.ico">️             
+                &nbsp; 
+                Add Your Slack Workspace
+                </a>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
         st.write("---")
 
         st.button("🔄 Refresh")
 
-        integrations = BotIntegration.objects.filter(
+        integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
             billing_account_uid=self.request.user.uid
         ).order_by("platform")
         if not integrations:
@@ -816,12 +825,13 @@ If you ping us at support@gooey.ai, we'll add your other accounts too!
             if is_connected:
                 bi.saved_run = None
             else:
-                bi.saved_run = SavedRun.objects.get_or_create(
-                    workflow=Workflow.VIDEOBOTS,
-                    example_id=example_id or "",
-                    uid=uid or "",
-                    run_id=run_id or "",
-                )[0]
+                bi.saved_run = self.get_current_doc_sr(
+                    example_id=example_id, run_id=run_id, uid=uid
+                )
+                if bi.platform == Platform.SLACK:
+                    from daras_ai_v2.slack_bot import send_confirmation_msg
+
+                    send_confirmation_msg(bi)
             bi.save()
             st.experimental_rerun()
 

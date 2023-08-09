@@ -2,12 +2,6 @@
 
 set -ex
 
-if [ "$DUMP_DATABASE" ] && [ "$PGDATABASE" ]; then
-  dropdb $PGDATABASE || true
-  createdb -T template0 $PGDATABASE
-  pg_dump $DUMP_DATABASE | psql -q $PGDATABASE
-fi
-
 if [ "$RUN_JUPYTER" ]; then
   pip install jupyterlab
   jupyter lab --allow-root --ip 0.0.0.0 --port 8000

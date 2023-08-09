@@ -33,50 +33,49 @@ def api_example_generator(api_url: furl, request_body: dict, as_form_data: bool)
     api_url = str(api_url)
 
     with curl:
-        st.write(
-            """
-```bash
-export GOOEY_API_KEY=sk-xxxx
-```
-            """
-        )
-
         if as_form_data:
-            st.write(
-                r"""
-```bash
+            curl_code = r"""
 curl %(api_url)s \
   -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY" \
   %(files)s \
   -F json=%(json)s
-```
-                """
-                % dict(
-                    api_url=shlex.quote(api_url),
-                    auth_keyword=auth_keyword,
-                    files=" \\\n  ".join(
-                        f"-F {key}=@{shlex.quote(filename)}"
-                        for key, filename in filenames
-                    ),
-                    json=shlex.quote(json.dumps(request_body, indent=2)),
-                )
+                """ % dict(
+                api_url=shlex.quote(api_url),
+                auth_keyword=auth_keyword,
+                files=" \\\n  ".join(
+                    f"-F {key}=@{shlex.quote(filename)}" for key, filename in filenames
+                ),
+                json=shlex.quote(json.dumps(request_body, indent=2)),
             )
         else:
-            st.write(
-                r"""
-```bash
+            curl_code = r"""
 curl %(api_url)s \
   -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY" \
   -H 'Content-Type: application/json' \
   -d %(json)s
+            """ % dict(
+                api_url=shlex.quote(api_url),
+                auth_keyword=auth_keyword,
+                json=shlex.quote(json.dumps(request_body, indent=2)),
+            )
+        st.write(
+            """
+1. Generate an api key [below👇](#api-keys)
+
+2. Install [curl](https://everything.curl.dev/get) & add the `GOOEY_API_KEY` to your environment variables.  
+Never store the api key [in your code](https://12factor.net/config).          
+```bash
+export GOOEY_API_KEY=sk-xxxx
+```
+
+3. Run the following `curl` command in your terminal.  
+If you encounter any issues, write to us at support@gooey.ai and make sure to include the full curl command and the error message.
+```bash
+%s
 ```
             """
-                % dict(
-                    api_url=shlex.quote(api_url),
-                    auth_keyword=auth_keyword,
-                    json=shlex.quote(json.dumps(request_body, indent=2)),
-                )
-            )
+            % curl_code.strip()
+        )
 
     with python:
         if as_form_data:
@@ -134,11 +133,17 @@ print(response.status_code, result)
         py_code = black.format_str(py_code, mode=black.FileMode())
         st.write(
             rf"""
+1. Generate an api key [below👇](#api-keys)
+
+2. Install [requests](https://requests.readthedocs.io/en/latest/) & add the `GOOEY_API_KEY` to your environment variables.  
+Never store the api key [in your code](https://12factor.net/config).          
 ```bash
 $ python3 -m pip install requests
 $ export GOOEY_API_KEY=sk-xxxx
-```    
-
+```
+    
+3. Use this sample code to call the API.    
+If you encounter any issues, write to us at support@gooey.ai and make sure to include the full code snippet and the error message.
 ```python
 %s
 ```
@@ -213,11 +218,17 @@ gooeyAPI();
 
         st.write(
             r"""
+1. Generate an api key [below👇](#api-keys)
+
+2. Install [node-fetch](https://www.npmjs.com/package/node-fetch) & add the `GOOEY_API_KEY` to your environment variables.  
+Never store the api key [in your code](https://12factor.net/config) and don't use direcly in the browser.          
 ```bash
 $ npm install node-fetch
 $ export GOOEY_API_KEY=sk-xxxx
 ```
 
+3. Use this sample code to call the API.    
+If you encounter any issues, write to us at support@gooey.ai and make sure to include the full code snippet and the error message.
 ```js
 %s
 ```

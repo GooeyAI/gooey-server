@@ -86,32 +86,40 @@ def text(body: str, *, unsafe_allow_html=False, **props):
     ).mount()
 
 
-def error(body: str, icon: str = "⚠️", *, unsafe_allow_html=False):
+def error(body: str, icon: str = "🛑", *, unsafe_allow_html=False):
     if not isinstance(body, str):
         body = repr(body)
-    markdown(
-        # language="html",
-        f"""
-<div style="background-color: rgba(255, 108, 108, 0.2); padding: 16px; border-radius: 0.25rem; display: flex; gap: 0.5rem;">
-<span style="font-size: 1.25rem">{icon}</span>
-<div>{dedent(body)}</div>
-</div>
-            """,
-        unsafe_allow_html=True,
-    )
+    with div(
+        style=dict(
+            backgroundColor="rgba(255, 108, 108, 0.2)",
+            padding="1rem",
+            paddingBottom="0",
+            marginBottom="0.5rem",
+            borderRadius="0.25rem",
+            display="flex",
+            gap="0.5rem",
+        )
+    ):
+        markdown(icon)
+        markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
 
 
 def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
-    markdown(
-        # language="html",
-        f"""
-<div style="background-color: rgba(108, 255, 108, 0.2); padding: 16px; border-radius: 0.25rem; display: flex; gap: 0.5rem;">
-<span style="font-size: 1.25rem">{icon}</span>
-<div>{dedent(body)}</div>
-</div>
-        """,
-        unsafe_allow_html=True,
-    )
+    if not isinstance(body, str):
+        body = repr(body)
+    with div(
+        style=dict(
+            backgroundColor="rgba(108, 255, 108, 0.2)",
+            padding="1rem",
+            paddingBottom="0",
+            marginBottom="0.5rem",
+            borderRadius="0.25rem",
+            display="flex",
+            gap="0.5rem",
+        )
+    ):
+        markdown(icon)
+        markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
 
 
 def caption(body: str, **props):
@@ -219,14 +227,20 @@ def text_area(
     **props,
 ) -> str:
     style = props.setdefault("style", {})
-    style.setdefault("height", f"{height}px"),
     if key:
         assert not value, "only one of value or key can be provided"
     else:
-        key = md5_values("textarea", label, height, help, placeholder, label_visibility)
+        key = md5_values(
+            "textarea", label, height, help, value, placeholder, label_visibility
+        )
     value = state.session_state.setdefault(key, value)
     if label_visibility != "visible":
         label = None
+    if disabled:
+        style.setdefault("height", f"{height}px"),
+    else:
+        style.setdefault("maxHeight", f"{height}px"),
+        props.setdefault("rows", max((value or "").count("\n") + 1, 2))
     state.RenderTreeNode(
         name="textarea",
         props=dict(

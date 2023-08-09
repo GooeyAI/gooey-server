@@ -16,7 +16,6 @@
                     <a href="/privacy">Privacy</a>&nbsp & &nbsp;<a href="/terms">Terms</a>
                 </div>
                 <br/>
-                <br/>
                 <a href="/logout">Signout</a>
             </div>
         </div>
@@ -41,8 +40,9 @@
         {% endif %}
 
         <hr>
+
         <div class="credits-container">
-            <h2>Remaining Credits: {{ user_credits }} </h2>
+            <h2>Remaining Credits: {{ humanize.intcomma(user_credits) }}</h2>
             <p>
                 Each new account receives {{ settings.LOGIN_USER_FREE_CREDITS }} Gooey.AI credits.
                 <br>
@@ -53,52 +53,53 @@
                 below or <a href="{{ settings.GRANT_URL }}" target="_blank">apply for a grant</a>.
             </p>
         </div>
+
         {% if not subscription %}
             <hr>
             <div class="buy-credits-container">
                 <h2>Buy Credits</h2>
+                <div class="pb-2">
+                    1000 credits is good for ~200 runs, depending on which <a
+                        href="https://gooey.ai/explore/">workflows</a>
+                    you call.
+                </div>
                 <div class="plans-container">
                     {% for lookup_key, subscription in available_subscriptions.items() %}
                         <ul class="product">
                             <li>
                                 <h4>{{ subscription["display"]["title"] }}</h4>
                                 <h5>{{ subscription["display"]["description"] |safe }}</h5>
-                                <form action="/__/stripe/create-checkout-session" method="POST">
-                                    <!-- Add a hidden field with the lookup_key of your Price -->
-                                    <input type="hidden" name="lookup_key" value="{{ lookup_key }}"/>
-                                    <button class="btn-outline-dark" type="submit">Buy</button>
-                                </form>
+                                {% if lookup_key == "addon" %}
+                                    {% include 'add_on_credits.html' %}
+                                {% else %}
+                                    <form action="/__/stripe/create-checkout-session" method="POST">
+                                        <!-- Add a hidden field with the lookup_key of your Price -->
+                                        <input type="hidden" name="lookup_key" value="{{ lookup_key }}"/>
+                                        <button class="streamlit-like-btn" type="submit">Buy</button>
+                                    </form>
+                                {% endif %}
                             </li>
                         </ul>
                     {% endfor %}
                 </div>
             </div>
-
         {% else %}
-            <h4 id="subscription-text">You are subscribed
-                to {{ subscription["display"]["name"] }}, {{ subscription["display"]["title"] }}</h4>
-            <div style="height: 25px;"></div>
-            <h4 id="add-on-text">Pay an additional $10 to get 1000 extra credits on any monthly plan.</h4>
-            <div style="height: 15px;"></div>
-            <form action="/__/stripe/create-checkout-session" method="POST">
-                <!-- Add a hidden field with the lookup_key of your Price -->
-                <input type="hidden" name="lookup_key" value="addon"/>
-                <button class="btn-outline-dark" type="submit">Add Credits</button>
+            <hr/>
+            <h4 id="subscription-text">
+                You are subscribed to {{ subscription["display"]["name"] }}, {{ subscription["display"]["title"] }}
+            </h4>
+            <form class="d-inline" action="/__/stripe/cancel-subscription" method="POST">
+                <button class="bg-danger streamlit-like-btn" id="cancel-button" type="submit">Cancel Subscription
+                </button>
             </form>
-            <hr>
-            <div class="billing-button-container">
-                <h2>Billing</h2>
-                <div class="billing-button-container-row">
-                    <form action="/__/stripe/cancel-subscription" method="POST">
-                        <button class="btn-outline-cancel" id="cancel-button" type="submit">Cancel Subscription</button>
-                    </form>
-                </div>
-            </div>
+            <form class="d-inline" action="/__/stripe/create-portal-session" method="POST">
+                <button class="streamlit-like-btn" id="portal-button" type="submit">Manage your billing
+                    information
+                </button>
+            </form>
+
+            <div class="p-1"></div>
+            {% include 'add_on_credits.html' %}
         {% endif %}
-        <form action="/__/stripe/create-portal-session" method="POST">
-            <button class="btn-outline-dark" id="portal-button" type="submit">Manage your billing
-                information
-            </button>
-        </form>
     </div>
 {% endblock content %}

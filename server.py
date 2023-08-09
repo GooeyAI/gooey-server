@@ -22,7 +22,7 @@ from auth_backend import (
     SessionAuthBackend,
 )
 from daras_ai_v2 import settings
-from routers import billing, facebook, talkjs, api, root
+from routers import billing, facebook, talkjs, api, root, slack
 import url_shortener.routers as url_shortener
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -33,6 +33,7 @@ app.include_router(api.app)
 app.include_router(billing.router, include_in_schema=False)
 app.include_router(talkjs.router, include_in_schema=False)
 app.include_router(facebook.router, include_in_schema=False)
+app.include_router(slack.router, include_in_schema=False)
 app.include_router(root.app, include_in_schema=False)
 app.include_router(url_shortener.app, include_in_schema=False)
 
