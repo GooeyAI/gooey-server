@@ -174,10 +174,6 @@ def call_api(
     request_dict = {k: v for k, v in request_body.items() if v is not None}
     state.update(request_dict)
 
-    # set streamlit session state
-    st.set_session_state(state)
-    st.set_query_params(query_params)
-
     # check the balance
     if user.balance <= 0:
         account_url = furl(settings.APP_BASE_URL) / "account"
@@ -190,11 +186,15 @@ def call_api(
 
     # create the run
     run_id = get_random_doc_id()
-    run_url = str(furl(page.app_url(), query_params=dict(run_id=run_id, uid=user.uid)))
+    query_params = dict(run_id=run_id, uid=user.uid)
+    run_url = str(furl(page.app_url(), query_params=query_params))
     run_doc_ref = page.run_doc_sr(run_id, user.uid, create=True)
-
-    # save the run
     run_doc_ref.set(page.state_to_doc(state))
+
+    # set streamlit session state
+    st.set_session_state(state)
+    st.set_query_params(query_params)
+
     # run the script
     try:
         gen = page.run(state)
