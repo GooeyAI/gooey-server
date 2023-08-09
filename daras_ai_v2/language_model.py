@@ -110,6 +110,8 @@ model_max_tokens = {
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
     LargeLanguageModels.palm2_text: 8192,
     LargeLanguageModels.palm2_chat: 4096,
+    # https://huggingface.co/docs/transformers/main/model_doc/llama2#transformers.LlamaConfig.max_position_embeddings
+    LargeLanguageModels.llama2_70b_chat: 2048,
 }
 
 threadlocal = threading.local()
