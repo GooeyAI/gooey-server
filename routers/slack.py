@@ -52,6 +52,10 @@ def slack_connect_redirect(request: Request):
         slack_channel_id, slack_bot_user_id, slack_user_access_token
     )
 
+    invite_bot_account_to_channel(
+        slack_channel_id, slack_bot_user_id, slack_user_access_token
+    )
+
     config = dict(
         slack_access_token=slack_access_token,
         slack_channel_hook_url=slack_channel_hook_url,
