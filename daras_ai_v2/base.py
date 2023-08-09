@@ -392,47 +392,27 @@ class BasePage:
         return sr
 
     def recipe_doc_sr(self) -> SavedRun:
-        sr, created = SavedRun.objects.get_or_create(
+        return SavedRun.objects.get_or_create(
             workflow=Workflow.from_label(self.doc_name),
             run_id__isnull=True,
             uid__isnull=True,
             example_id__isnull=True,
-        )
-        if created or not sr.state:
-            sr.set(db.get_doc_ref(self.doc_name).get().to_dict())
-        return sr
+        )[0]
 
-    def run_doc_sr(self, run_id: str, uid: str) -> SavedRun:
-        sr, created = SavedRun.objects.get_or_create(
+    def run_doc_sr(self, run_id: str, uid: str, create: bool = False) -> SavedRun:
+        config = dict(
             workflow=Workflow.from_label(self.doc_name), uid=uid, run_id=run_id
         )
-        if created or not sr.state:
-            doc = db.get_doc_ref(
-                collection_id=USER_RUNS_COLLECTION,
-                document_id=uid,
-                sub_collection_id=self.doc_name,
-                sub_document_id=run_id,
-            ).get()
-            # if not doc.exists:
-            #    raise HTTPException(status_code=404)
-            sr.set(doc.to_dict())
-        return sr
+        if create:
+            return SavedRun.objects.get_or_create(**config)[0]
+        else:
+            return SavedRun.objects.get(**config)
 
     def example_doc_sr(self, example_id: str) -> SavedRun:
-        sr, created = SavedRun.objects.get_or_create(
+        return SavedRun.objects.get(
             workflow=Workflow.from_label(self.doc_name),
             example_id=example_id,
         )
-        if created or not sr.state:
-            doc = db.get_doc_ref(
-                sub_collection_id=EXAMPLES_COLLECTION,
-                document_id=self.doc_name,
-                sub_document_id=example_id,
-            ).get()
-            if not doc.exists:
-                raise HTTPException(status_code=404)
-            sr.set(doc.to_dict())
-        return sr
 
     def render_description(self):
         pass
@@ -620,7 +600,9 @@ class BasePage:
         run_id = get_random_doc_id()
         example_id, *_ = extract_query_params(gooey_get_query_params())
 
-        self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
+        self.run_doc_sr(run_id, uid, create=True).set(
+            self.state_to_doc(st.session_state)
+        )
 
         return example_id, run_id, uid
 
