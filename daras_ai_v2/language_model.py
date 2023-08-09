@@ -12,6 +12,9 @@ import tiktoken
 import typing_extensions
 from jinja2.lexer import whitespace_re
 
+import requests
+from django.conf import settings
+
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
@@ -30,6 +33,7 @@ CHATML_ROLE_USER = "user"
 class LLMApis(Enum):
     vertex_ai = "Vertex AI"
     openai = "OpenAI"
+    replicate = "Replicate"
 
 
 class LargeLanguageModels(Enum):
@@ -47,12 +51,15 @@ class LargeLanguageModels(Enum):
     palm2_text = "PaLM 2 (text-bison)"
     palm2_chat = "PaLM 2 (chat-bison)"
 
+    llama2_70b_chat = "LLAMA 2.0 (70B, chat)"
+
     def is_chat_model(self) -> bool:
         return self in [
             LargeLanguageModels.gpt_4,
             LargeLanguageModels.gpt_3_5_turbo,
             LargeLanguageModels.gpt_3_5_turbo_16k,
             LargeLanguageModels.palm2_chat,
+            LargeLanguageModels.llama2_70b_chat,
         ]
 
 
@@ -68,6 +75,7 @@ engine_names = {
     LargeLanguageModels.text_ada_001: "text-ada-001",
     LargeLanguageModels.palm2_text: "text-bison",
     LargeLanguageModels.palm2_chat: "chat-bison",
+    LargeLanguageModels.llama2_70b_chat: "2c1608e18606fad2812020dc541930f2d0495ce32eee50074220b87300bc16e1",
 }
 
 llm_api = {
@@ -82,6 +90,7 @@ llm_api = {
     LargeLanguageModels.text_ada_001: LLMApis.openai,
     LargeLanguageModels.palm2_text: LLMApis.vertex_ai,
     LargeLanguageModels.palm2_chat: LLMApis.vertex_ai,
+    LargeLanguageModels.llama2_70b_chat: LLMApis.replicate,
 }
 
 
@@ -300,8 +309,113 @@ def _run_chat_model(
             num_outputs=num_outputs,
             temperature=temperature,
         )
+    elif api == LLMApis.replicate:
+        return _run_replicate_chat(
+            version=engine,
+            messages=messages,
+            max_new_tokens=max_tokens,
+            num_outputs=num_outputs,
+            temperature=temperature,
+            repetition_penalty=1.15 if avoid_repetition else 1,
+        )
     else:
         raise ValueError(f"Unknown api: {api}")
+
+
+def _run_replicate_chat(
+    version: str,
+    messages: list[ConversationEntry],
+    max_new_tokens: int = 500,
+    system_prompt: str | None = None,
+    min_new_tokens: int = -1,
+    temperature: float = 0.95,
+    top_p: float = 0.95,
+    top_k: int = 250,
+    repetition_penalty: float = 1.15,
+    repetition_penalty_sustain: int = 256,
+    token_repetition_penalty_decay: int = 128,
+    debug: bool = False,
+    num_outputs: int = 1,
+) -> list[ConversationEntry]:
+    """
+    Args:
+        version: The model version to use for the request. See available models: https://replicate.com/replicate/llama-2-70b-chat/versions
+        messages: List of messages to generate model response. Will be converted to a single prompt.
+        max_new_tokens: The maximum number of tokens to generate.
+        system_prompt: The system prompt to use for the request.
+        min_new_tokens: The minimum number of tokens to generate. To disable, set to -1.
+        temperature: The randomness of the prediction. This value must be between 0 and 1, inclusive. 0 means deterministic.
+        top_p: Cumulative probability of top vocabulary tokens to select from. This value must be between 0 and 1, inclusive.
+        top_k: The number of highest probability vocabulary tokens to select from.
+        repetition_penalty: Penalty for repeated words in generated text; 1 is no penalty, values greater than 1 discourage repetition, less than 1 encourage it.
+        repetition_penalty_sustain: Number of most recent tokens to apply repetition penalty to, -1 to apply to whole context.
+        token_repetition_penalty_decay: Gradually decrease penalty over this many tokens.
+        debug: Whether to provide debugging output in logs
+        num_outputs: The number of responses to generate.
+    """
+    # load system messages as system_prompt,
+    for message in messages:
+        if message.get("role") == CHATML_ROLE_SYSTEM:
+            if not system_prompt:
+                system_prompt = ""
+            system_prompt += "\n" + message.get("content", "")
+    messages = [
+        message for message in messages if message.get("role") != CHATML_ROLE_SYSTEM
+    ]
+    prompt = "\n\n".join([format_chatml_message(message) for message in messages])
+    polling_ids = []
+    for _ in range(num_outputs):
+        res = requests.post(
+            "https://api.replicate.com/v1/predictions",
+            json={
+                "version": version,
+                "input": {
+                    "system_prompt": system_prompt,
+                    "prompt": prompt,
+                    "max_new_tokens": max_new_tokens,
+                    "min_new_tokens": min_new_tokens,
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                    "repetition_penalty": repetition_penalty,
+                    "repetition_penalty_sustain": repetition_penalty_sustain,
+                    "token_repetition_penalty_decay": token_repetition_penalty_decay,
+                    "debug": debug,
+                },
+            },
+            headers={
+                "Authorization": f"Token {settings.REPLICATE_API_KEY}",
+            },
+        )
+        res.raise_for_status()
+        res = res.json()
+        polling_ids.append(res["id"])
+
+    POLLING_INTERVAL = 0.5
+    MAX_POLLING_TIME = 60
+    outputs = []
+    for _ in range(int(MAX_POLLING_TIME / POLLING_INTERVAL)):
+        for id in polling_ids:
+            res = requests.get(
+                f"https://api.replicate.com/v1/predictions/{id}",
+                headers={
+                    "Authorization": f"Token {settings.REPLICATE_API_KEY}",
+                },
+            )
+            res.raise_for_status()
+            res = res.json()
+            if res["status"] == "succeeded":
+                outputs += [
+                    {
+                        "role": CHATML_ROLE_ASSISSTANT,
+                        "content": "".join(res.get("output", "")),
+                    }
+                ]
+                polling_ids.remove(id)
+        if not polling_ids:
+            break  # all done
+        sleep(POLLING_INTERVAL)
+    return outputs
 
 
 def _run_palm_chat(
