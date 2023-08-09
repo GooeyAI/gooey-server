@@ -50,7 +50,7 @@ def enum_selector(
     label: str = "",
     allow_none: bool = False,
     use_selectbox: bool = False,
-    exclude: list[E] = None,
+    exclude: list[E] | None = None,
     **kwargs,
 ) -> str:
     label = label or enum_cls.__name__

@@ -15,9 +15,7 @@ from jinja2.lexer import whitespace_re
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
-
-_gpt2_tokenizer = None
-
+from daras_ai_v2.asr import get_google_auth_session
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
 
@@ -27,6 +25,11 @@ CHATML_END_TOKEN = "<|im_end|>"
 CHATML_ROLE_SYSTEM = "system"
 CHATML_ROLE_ASSISSTANT = "assistant"
 CHATML_ROLE_USER = "user"
+
+
+class LLMApis(Enum):
+    vertex_ai = "Vertex AI"
+    openai = "OpenAI"
 
 
 class LargeLanguageModels(Enum):
@@ -41,11 +44,15 @@ class LargeLanguageModels(Enum):
     text_ada_001 = "Ada"
     code_davinci_002 = "Codex (Deprecated)"
 
+    palm2_text = "PaLM 2 (text-bison)"
+    palm2_chat = "PaLM 2 (chat-bison)"
+
     def is_chat_model(self) -> bool:
         return self in [
             LargeLanguageModels.gpt_4,
             LargeLanguageModels.gpt_3_5_turbo,
             LargeLanguageModels.gpt_3_5_turbo_16k,
+            LargeLanguageModels.palm2_chat,
         ]
 
 
@@ -59,6 +66,22 @@ engine_names = {
     LargeLanguageModels.text_curie_001: "text-curie-001",
     LargeLanguageModels.text_babbage_001: "text-babbage-001",
     LargeLanguageModels.text_ada_001: "text-ada-001",
+    LargeLanguageModels.palm2_text: "text-bison",
+    LargeLanguageModels.palm2_chat: "chat-bison",
+}
+
+llm_api = {
+    LargeLanguageModels.gpt_4: LLMApis.openai,
+    LargeLanguageModels.gpt_3_5_turbo: LLMApis.openai,
+    LargeLanguageModels.gpt_3_5_turbo_16k: LLMApis.openai,
+    LargeLanguageModels.text_davinci_003: LLMApis.openai,
+    LargeLanguageModels.text_davinci_002: LLMApis.openai,
+    LargeLanguageModels.code_davinci_002: LLMApis.openai,
+    LargeLanguageModels.text_curie_001: LLMApis.openai,
+    LargeLanguageModels.text_babbage_001: LLMApis.openai,
+    LargeLanguageModels.text_ada_001: LLMApis.openai,
+    LargeLanguageModels.palm2_text: LLMApis.vertex_ai,
+    LargeLanguageModels.palm2_chat: LLMApis.vertex_ai,
 }
 
 
@@ -75,6 +98,9 @@ model_max_tokens = {
     LargeLanguageModels.text_curie_001: 2049,
     LargeLanguageModels.text_babbage_001: 2049,
     LargeLanguageModels.text_ada_001: 2049,
+    # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
+    LargeLanguageModels.palm2_text: 8192,
+    LargeLanguageModels.palm2_chat: 4096,
 }
 
 threadlocal = threading.local()
@@ -111,11 +137,8 @@ def calc_gpt_tokens(
     return len(enc.encode(combined))
 
 
-F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
-
-
 def get_openai_error_cls():
-    import openai
+    import openai.error
 
     return (
         openai.error.Timeout,
@@ -126,11 +149,26 @@ def get_openai_error_cls():
     )
 
 
+def get_vertex_ai_error_cls():
+    import google.api_core.exceptions
+
+    return (
+        google.api_core.exceptions.DeadlineExceeded,
+        google.api_core.exceptions.ServiceUnavailable,
+        google.api_core.exceptions.TooManyRequests,
+        google.api_core.exceptions.InternalServerError,
+        google.api_core.exceptions.GatewayTimeout,
+        google.api_core.exceptions.ResourceExhausted,
+    )
+
+
 def do_retry(
     max_retries: int = 5,
     retry_delay: float = 5,
-    get_error_cls=get_openai_error_cls,
-) -> typing.Callable[[F], F]:
+    get_error_cls=lambda: get_openai_error_cls() + get_vertex_ai_error_cls(),
+) -> typing.Callable[
+    [typing.Callable[..., typing.Any]], typing.Callable[..., typing.Any]
+]:
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
@@ -153,7 +191,7 @@ def do_retry(
     return decorator
 
 
-def openai_embedding_create(texts: list[str]) -> list[np.ndarray]:
+def openai_embedding_create(texts: list[str]) -> list[np.ndarray | None]:
     # replace newlines, which can negatively affect performance.
     texts = [whitespace_re.sub(" ", text) for text in texts]
     # get the redis cache
@@ -202,7 +240,7 @@ def _openai_embedding_create(
     import openai
 
     res = openai.Embedding.create(model=model, input=input)
-    ret = np.array([data["embedding"] for data in res["data"]])
+    ret = np.array([data["embedding"] for data in res["data"]])  # type: ignore
 
     # see - https://community.openai.com/t/text-embedding-ada-002-embeddings-sometime-return-nan/279664/5
     if np.isnan(ret).any():
@@ -225,47 +263,95 @@ class ConversationEntry(typing_extensions.TypedDict):
 
 def _run_chat_model(
     *,
-    messages: list[dict],
+    api: LLMApis = LLMApis.openai,
+    messages: list[ConversationEntry],
     max_tokens: int,
     num_outputs: int,
     temperature: float,
     engine: str = "gpt-3.5-turbo",
-    stop: list[str] = None,
+    stop: list[str] | None = None,
     avoid_repetition: bool = False,
 ) -> list[dict]:
     import openai
 
-    r = openai.ChatCompletion.create(
-        model=engine,
-        messages=messages,
-        max_tokens=max_tokens,
-        stop=stop,
-        n=num_outputs,
-        temperature=temperature,
-        frequency_penalty=0.1 if avoid_repetition else 0,
-        presence_penalty=0.25 if avoid_repetition else 0,
-    )
-    return [
-        {
-            "role": choice["message"]["role"],
-            "content": choice["message"]["content"].strip(),
-        }
-        for choice in r["choices"]
-    ]
+    if api == LLMApis.openai:
+        r = openai.ChatCompletion.create(
+            model=engine,
+            messages=messages,
+            max_tokens=max_tokens,
+            stop=stop,
+            n=num_outputs,
+            temperature=temperature,
+            frequency_penalty=0.1 if avoid_repetition else 0,
+            presence_penalty=0.25 if avoid_repetition else 0,
+        )
+        return [
+            {
+                "role": choice["message"]["role"],
+                "content": choice["message"]["content"].strip(),
+            }
+            for choice in r["choices"]  # type: ignore
+        ]
+    elif api == LLMApis.vertex_ai:
+        pass
+    else:
+        raise ValueError(f"Unknown api: {api}")
+
+
+def _run_palm(
+    model_id: str,
+    prompt: str,
+    maxOutputTokens: int = 0,
+    topK: int = 40,
+    topP: float = 0.95,
+    num_outputs: int = 1,
+    temperature: float = 0.0,
+) -> list[str]:
+    """
+    Args:
+        model_id: The model id to use for the request. See available models: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
+        prompt: Text input to generate model response. Prompts can include preamble, questions, suggestions, instructions, or examples.
+        maxOutputTokens: The maximum number of tokens to generate. This value must be between 1 and 1024, inclusive. 0 means no limit.
+        topK: The number of highest probability vocabulary tokens to select from. This value must be between 1 and 40, inclusive.
+        topP: Cumulative probability of top vocabulary tokens to select from. This value must be between 0 and 1, inclusive.
+        num_outputs: The number of responses to generate.
+        temperature: The randomness of the prediction. This value must be between 0 and 1, inclusive. 0 means deterministic. 0.2 recommended by Google.
+    """
+    session, project = get_google_auth_session()
+    outputs = []
+    for _ in range(num_outputs):
+        res = session.post(
+            f"https://us-central1-aiplatform.googleapis.com/v1/projects/{project}/locations/us-central1/publishers/google/models/{model_id}:predict",
+            json={
+                "instances": [
+                    {
+                        "prompt": prompt,
+                    }
+                ],
+                "parameters": {
+                    "maxOutputTokens": maxOutputTokens,
+                    "topK": topK,
+                    "topP": topP,
+                    "temperature": temperature,
+                },
+            },
+        )
+        res.raise_for_status()
+        outputs += [prediction["content"] for prediction in res.json()["predictions"]]
+    return outputs
 
 
 @do_retry()
 def run_language_model(
     *,
-    api_provider: str = "openai",
-    model: str,
-    prompt: str = None,
-    messages: list[dict] = None,
+    model: tuple[[e.name for e in LargeLanguageModels]],  # type: ignore
+    prompt: str | None = None,
+    messages: list[ConversationEntry] | None = None,  # type: ignore
     max_tokens: int = 512,
     quality: float = 1.0,
     num_outputs: int = 1,
     temperature: float = 0.7,
-    stop: list[str] = None,
+    stop: list[str] | None = None,
     avoid_repetition: bool = False,
 ) -> list[str]:
     import openai
@@ -274,16 +360,18 @@ def run_language_model(
         messages
     ), "Pleave provide exactly one of { prompt, messages }"
 
-    model = LargeLanguageModels[model]
+    model: LargeLanguageModels = LargeLanguageModels[str(model)]
+    api = llm_api[model]
     if model.is_chat_model():
         if messages:
             is_chatml = False
         else:
             # if input is chatml, parse out the json messages
-            is_chatml, messages = parse_chatml(prompt)
-        messages = _run_chat_model(
+            is_chatml, messages = parse_chatml(prompt)  # type: ignore
+        messages: list[ConversationEntry] = _run_chat_model(
+            api=api,
             engine=engine_names[model],
-            messages=messages,
+            messages=messages or [],  # type: ignore
             max_tokens=max_tokens,
             num_outputs=num_outputs,
             temperature=temperature,
@@ -295,18 +383,29 @@ def run_language_model(
             format_chatml_message(entry) if is_chatml else entry["content"]
             for entry in messages
         ]
-    r = openai.Completion.create(
-        engine=engine_names[model],
-        prompt=prompt,
-        max_tokens=max_tokens,
-        stop=stop,
-        best_of=int(num_outputs * quality),
-        n=num_outputs,
-        temperature=temperature,
-        frequency_penalty=0.1 if avoid_repetition else 0,
-        presence_penalty=0.25 if avoid_repetition else 0,
-    )
-    return [choice["text"].strip() for choice in r["choices"]]
+    if api == LLMApis.openai:
+        r = openai.Completion.create(
+            engine=engine_names[model],
+            prompt=prompt,
+            max_tokens=max_tokens,
+            stop=stop,
+            best_of=int(num_outputs * quality),
+            n=num_outputs,
+            temperature=temperature,
+            frequency_penalty=0.1 if avoid_repetition else 0,
+            presence_penalty=0.25 if avoid_repetition else 0,
+        )
+        return [choice["text"].strip() for choice in r["choices"]]  # type: ignore
+    elif api == LLMApis.vertex_ai:
+        return _run_palm(
+            model_id=engine_names[model],
+            prompt=prompt,  # type: ignore
+            maxOutputTokens=max_tokens,
+            num_outputs=num_outputs,
+            temperature=temperature,
+        )
+    else:
+        raise ValueError(f"Unknown api: {api}")
 
 
 def format_chatml_message(entry: ConversationEntry) -> str:
@@ -323,7 +422,7 @@ chatml_re = re.compile(
 )
 
 
-def parse_chatml(prompt: str) -> (bool, list[dict]):
+def parse_chatml(prompt: str) -> tuple[bool, list[dict]]:
     splits = chatml_re.split(prompt)
     is_chatml = len(splits) > 1
     if is_chatml:

@@ -146,7 +146,11 @@ class CompareLLMPage(BasePage):
                     total += 2
                 case LargeLanguageModels.text_ada_001.name:
                     total += 1
-        return total
+                case LargeLanguageModels.palm2_text.name:
+                    total += 300
+                case LargeLanguageModels.palm2_chat.name:
+                    total += 150
+        return total * state.get("num_outputs", 1)
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage
