@@ -271,7 +271,7 @@ def _run_chat_model(
     engine: str = "gpt-3.5-turbo",
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
-) -> list[dict]:
+) -> list[ConversationEntry]:
     import openai
 
     if api == LLMApis.openai:
@@ -293,9 +293,83 @@ def _run_chat_model(
             for choice in r["choices"]  # type: ignore
         ]
     elif api == LLMApis.vertex_ai:
-        pass
+        return _run_palm_chat(
+            model_id=engine,
+            messages=messages,
+            maxOutputTokens=max_tokens,
+            num_outputs=num_outputs,
+            temperature=temperature,
+        )
     else:
         raise ValueError(f"Unknown api: {api}")
+
+
+def _run_palm_chat(
+    model_id: str,
+    messages: list[ConversationEntry],
+    context: str | None = None,
+    examples: list[dict] = [],
+    maxOutputTokens: int = 0,
+    topK: int = 40,
+    topP: float = 0.95,
+    num_outputs: int = 1,
+    temperature: float = 0.0,
+) -> list[ConversationEntry]:
+    """
+    Args:
+        model_id: The model id to use for the request. See available models: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
+        messages: List of messages to generate model response.
+        context: Optional context to use for the request.
+        examples: Optional examples to use for the request. Each dict has an "input" and "output" dict with a single key "content".
+        maxOutputTokens: The maximum number of tokens to generate. This value must be between 1 and 1024, inclusive. 0 means no limit.
+        topK: The number of highest probability vocabulary tokens to select from. This value must be between 1 and 40, inclusive.
+        topP: Cumulative probability of top vocabulary tokens to select from. This value must be between 0 and 1, inclusive.
+        num_outputs: The number of responses to generate.
+        temperature: The randomness of the prediction. This value must be between 0 and 1, inclusive. 0 means deterministic. 0.2 recommended by Google.
+    """
+    session, project = get_google_auth_session()
+    outputs = []
+
+    # load system messages as context, TODO: label examples correctly too
+    for message in messages:
+        if message.get("role") == CHATML_ROLE_SYSTEM:
+            if not context:
+                context = ""
+            context += "\n" + message.get("content", "")
+    messages = [
+        message for message in messages if message.get("role") != CHATML_ROLE_SYSTEM
+    ]
+
+    config: dict[str, typing.Any] = {
+        "messages": [
+            {"author": message["role"], "content": message["content"]}
+            for message in messages
+        ],
+    }
+    if context:
+        config["context"] = context
+    if examples:
+        config["examples"] = examples
+
+    for _ in range(num_outputs):
+        res = session.post(
+            f"https://us-central1-aiplatform.googleapis.com/v1/projects/{project}/locations/us-central1/publishers/google/models/{model_id}:predict",
+            json={
+                "instances": [config],
+                "parameters": {
+                    "maxOutputTokens": maxOutputTokens,
+                    "topK": topK,
+                    "topP": topP,
+                    "temperature": temperature,
+                },
+            },
+        )
+        res.raise_for_status()
+        outputs += [
+            {"role": candidate["author"], "content": candidate["content"]}
+            for candidate in res.json()["predictions"][0]["candidates"]
+        ]
+    return outputs
 
 
 def _run_palm(
