@@ -1024,7 +1024,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def get_price_roundoff(self, state: dict) -> int:
         # don't allow fractional pricing for now, min 1 credit
-        return -1  # max(1, math.ceil(self.get_raw_price(state)))
+        return max(1, math.ceil(self.get_raw_price(state)))
 
     def get_raw_price(self, state: dict) -> float:
         return self.price
