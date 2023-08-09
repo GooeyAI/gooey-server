@@ -149,9 +149,11 @@ class CompareLLMPage(BasePage):
                 case LargeLanguageModels.text_ada_001.name:
                     total += 1
                 case LargeLanguageModels.palm2_text.name:
-                    total += 300
+                    total += 15
                 case LargeLanguageModels.palm2_chat.name:
-                    total += 150
+                    total += 10
+                case LargeLanguageModels.llama2_70b_chat.name:
+                    total += 5
         return total * state.get("num_outputs", 1)
 
     def related_workflows(self) -> list:
