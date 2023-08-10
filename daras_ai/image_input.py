@@ -134,6 +134,10 @@ def truncate_text_words(text: str, maxlen: int, sep: str = " …") -> str:
 
 
 def guess_ext_from_response(response: requests.Response) -> str:
-    content_type = response.headers.get("Content-Type", "application/octet-stream")
-    mimetype = content_type.split(";")[0]
+    mimetype = get_mimetype_from_response(response)
     return mimetypes.guess_extension(mimetype) or ""
+
+
+def get_mimetype_from_response(response: requests.Response) -> str:
+    content_type = response.headers.get("Content-Type", "application/octet-stream")
+    return content_type.split(";")[0]
