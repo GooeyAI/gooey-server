@@ -17,6 +17,7 @@ from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
     guess_ext_from_response,
+    get_mimetype_from_response,
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, run_asr, run_google_translate
@@ -194,16 +195,20 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
         name = meta["name"]
         etag = meta.get("md5Checksum") or meta.get("modifiedTime")
         mime_type = meta["mimeType"]
-    elif is_user_uploaded_url(str(f)):
-        # extract filename from url
-        name = f.path.segments[-1]
-        etag = None
-        mime_type = None
     else:
-        # extract filename from url
-        name = f"{f.host}{f.path}"
-        etag = None
-        mime_type = None
+        r = requests.head(f_url)
+        r.raise_for_status()
+        mime_type = get_mimetype_from_response(r)
+        etag = r.headers.get("etag", r.headers.get("last-modified"))
+        name = (
+            r.headers.get("content-disposition", "").split("filename=")[-1].strip('"')
+        )
+    # extract filename from url as a fallback
+    if not name:
+        if is_user_uploaded_url(str(f)):
+            name = f.path.segments[-1]
+        else:
+            name = f"{f.host}{f.path}"
     return DocMetadata(name, etag, mime_type)
 
 

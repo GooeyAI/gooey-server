@@ -1,12 +1,17 @@
+import io
+import random
 import threading
 import typing
 
+import requests
 from django.db.models import IntegerChoices
 from furl import furl
 from pydantic import BaseModel
+from pypdf import PdfWriter, PdfReader
 
 import gooey_ui as st
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
+from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
     google_translate_language_selector,
     AsrModels,
@@ -15,9 +20,11 @@ from daras_ai_v2.asr import (
     run_google_translate,
     audio_to_wav,
 )
+from daras_ai_v2.azure_doc_extract import azure_pdf_extract
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import (
     apply_parallel,
     flatapply_parallel,
@@ -26,15 +33,15 @@ from daras_ai_v2.gdrive_downloader import is_gdrive_url, gdrive_download
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.settings import service_account_key_path
-from daras_ai_v2.vector_search import doc_url_to_metadata
+from daras_ai_v2.vector_search import doc_url_to_metadata, DocMetadata
 from recipes.DocSearch import render_documents
 
 
 class Columns(IntegerChoices):
-    video_url = 1, "Source"
+    webpage_url = 1, "Source"
     title = 2, "Title"
     description = 3, "Description"
-    audio_url = 4, "Audio"
+    content_url = 4, "Content"
     transcript = 5, "Transcript"
     translation = 6, "Translation"
     summary = 7, "Summarized"
@@ -75,7 +82,7 @@ class DocExtractPage(BasePage):
     def render_form_v2(self):
         document_uploader(
             "##### 🤖 Youtube URLS",
-            accept=(".wav", ".ogg", ".mp3", ".aac", ".opus", ".oga", ".mp4", ".webm"),
+            accept=("audio/*", "application/pdf"),
         )
         st.text_input(
             "##### 📊 Google Sheets URL",
@@ -101,6 +108,7 @@ class DocExtractPage(BasePage):
             height=300,
         )
         language_model_settings()
+        "##### Document AI Model"
         enum_selector(AsrModels, label="##### ASR Model", key="selected_asr_model")
         st.write("---")
         google_translate_language_selector()
@@ -166,7 +174,7 @@ def init_sheet(spreadsheet_id: str, entries: list[dict | None]) -> list[int | No
         for row in spreadsheets.values()
         .get(
             spreadsheetId=spreadsheet_id,
-            range=f"{col_i2a(Columns.video_url.value)}{start_row}:{col_i2a(Columns.video_url.value)}",
+            range=f"{col_i2a(Columns.webpage_url.value)}{start_row}:{col_i2a(Columns.webpage_url.value)}",
         )
         .execute()
         .get("values", [[]])
@@ -179,7 +187,7 @@ def init_sheet(spreadsheet_id: str, entries: list[dict | None]) -> list[int | No
             idx = values.index(entry["webpage_url"])
         except ValueError:
             row = [""] * len(Columns)
-            row[Columns.video_url.value - 1] = entry["webpage_url"]
+            row[Columns.webpage_url.value - 1] = entry["webpage_url"]
             to_append.append(row)
         else:
             row_numbers[i] = idx + start_row
@@ -215,7 +223,7 @@ def init_sheet(spreadsheet_id: str, entries: list[dict | None]) -> list[int | No
                 }
                 for row, entry in zip(row_numbers, entries)
                 for col, value in [
-                    (Columns.video_url.value, entry["webpage_url"]),
+                    (Columns.webpage_url.value, entry["webpage_url"]),
                     (Columns.title.value, entry.get("title", "")),
                     (Columns.description.value, entry.get("description", "")),
                     (Columns.status.value, "Pending"),
@@ -250,7 +258,33 @@ def extract_info(url: str) -> list[dict | None]:
         entries = data.get("entries", [data])
         return entries
     else:
-        return [{"webpage_url": url}]  # assume it's a direct link
+        # assume it's a direct link
+        doc_meta = doc_url_to_metadata(url)
+
+        if "application/pdf" in doc_meta.mime_type:
+            f = furl(url)
+            if is_gdrive_url(f):
+                f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
+            else:
+                r = requests.get(
+                    url,
+                    headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
+                    timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+                )
+                r.raise_for_status()
+                f_bytes = r.content
+            inputpdf = PdfReader(io.BytesIO(f_bytes))
+            return [
+                {
+                    "webpage_url": f.copy().set(fragment_args={"page": i + 1}).url,
+                    "pdf_page": page,
+                    "title": (doc_meta.name + f" - Page {i + 1}"),
+                    "doc_meta": doc_meta,
+                }
+                for i, page in enumerate(inputpdf.pages)
+            ]
+
+        return [{"webpage_url": url, "title": doc_meta.name, "doc_meta": doc_meta}]
 
 
 def process_entry(
@@ -259,10 +293,7 @@ def process_entry(
     entry: dict | None,
     request: DocExtractPage.RequestModel,
 ):
-    if not entry:
-        return
-    webpage_url = entry.get("webpage_url")
-    if not webpage_url:
+    if not (entry and entry.get("webpage_url")):
         return
 
     try:
@@ -270,7 +301,7 @@ def process_entry(
             request=request,
             spreadsheet_id=spreadsheet_id,
             row=row,
-            webpage_url=webpage_url,
+            entry=entry,
         ):
             update_cell(spreadsheet_id, row, Columns.status.value, status)
     except:
@@ -285,8 +316,11 @@ def process_source(
     request: DocExtractPage.RequestModel,
     spreadsheet_id: str,
     row: int,
-    webpage_url: str,
+    entry: dict,
 ) -> typing.Iterator[str | None]:
+    webpage_url = entry["webpage_url"]
+    doc_meta = entry.get("doc_meta")
+
     # get the values in existing row
     existing_values = (
         get_spreadsheet_service()
@@ -300,28 +334,39 @@ def process_source(
         [None] + existing_values + [None] * max(len(Columns) - len(existing_values), 0)
     )
 
-    audio_url = existing_values[Columns.audio_url.value]
-    if not audio_url:
+    content_url = existing_values[Columns.content_url.value]
+    if not content_url:
         yield "Downloading"
         if is_yt_url(webpage_url):
-            audio_url, _ = download_youtube_to_wav(webpage_url)
+            content_url, _ = download_youtube_to_wav(webpage_url)
         else:
-            f = furl(webpage_url)
-            if is_gdrive_url(f):
-                doc_meta = doc_url_to_metadata(webpage_url)
-                f_name = doc_meta.name
-                update_cell(spreadsheet_id, row, Columns.title.value, f_name)
-                f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
-                webpage_url = upload_file_from_bytes(
-                    f_name, f_bytes, content_type=doc_meta.mime_type
-                )
-            audio_url, _ = audio_to_wav(webpage_url)
-        update_cell(spreadsheet_id, row, Columns.audio_url.value, audio_url)
+            if "audio/" in doc_meta.mime_type:
+                f = furl(webpage_url)
+                if is_gdrive_url(f):
+                    f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
+                    webpage_url = upload_file_from_bytes(
+                        doc_meta.name, f_bytes, content_type=doc_meta.mime_type
+                    )
+                content_url, _ = audio_to_wav(webpage_url)
+            elif "application/pdf" in doc_meta.mime_type:
+                page = entry["pdf_page"]
+                outputpdf = PdfWriter()
+                outputpdf.add_page(page)
+                with io.BytesIO() as outf:
+                    outputpdf.write(outf)
+                    content_url = upload_file_from_bytes(
+                        entry["title"], outf.getvalue(), content_type="application/pdf"
+                    )
+        update_cell(spreadsheet_id, row, Columns.content_url.value, content_url)
 
     transcript = existing_values[Columns.transcript.value]
     if not transcript:
-        yield "Transcribing"
-        transcript = run_asr(audio_url, request.selected_asr_model)
+        if "audio/" in doc_meta.mime_type:
+            yield "Transcribing"
+            transcript = run_asr(content_url, request.selected_asr_model)
+        elif "application/pdf" in doc_meta.mime_type:
+            yield "Extracting PDF"
+            transcript = str(azure_pdf_extract(content_url)[0])
         update_cell(spreadsheet_id, row, Columns.transcript.value, transcript)
 
     if request.google_translate_target:
