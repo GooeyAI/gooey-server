@@ -141,14 +141,6 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
-    @property
-    def async_endpoint(self) -> str:
-        return f"/v3/async/{self.slug_versions[0]}/"
-
-    @property
-    def status_endpoint(self) -> str:
-        return f"/v3/async/{self.slug_versions[0]}/status/"
-
     def render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
