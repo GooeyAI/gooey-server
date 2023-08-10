@@ -4,20 +4,17 @@ import os
 import os.path
 import os.path
 import typing
-from traceback import print_exc
 from types import SimpleNamespace
 
 from fastapi import APIRouter
-from fastapi import Body
 from fastapi import Depends
 from fastapi import Form
 from fastapi import HTTPException
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic import ValidationError
 from pydantic import create_model
 from pydantic.generics import GenericModel
-from sentry_sdk import capture_exception
 from starlette.datastructures import FormData
 from starlette.datastructures import UploadFile
 from starlette.requests import Request
@@ -29,31 +26,64 @@ from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
 from daras_ai_v2.base import (
     BasePage,
+    StateKeys,
 )
-from daras_ai_v2.base import (
-    err_msg_for_exc,
-)
-from daras_ai_v2.crypto import get_random_doc_id
 from gooey_token_authentication1.token_authentication import api_auth_header
 
 app = APIRouter()
 
 
-class FailedReponseModel(BaseModel):
-    id: str | None
-    url: str | None
-    created_at: str | None
-    error: str | None
-
-
 O = typing.TypeVar("O")
 
+## v2
 
-class ApiResponseModel(GenericModel, typing.Generic[O]):
-    id: str
-    url: str
-    created_at: str
-    output: O
+
+class ApiResponseModelV2(GenericModel, typing.Generic[O]):
+    id: str = Field(description="Unique ID for this run")
+    url: str = Field(description="Web URL for this run")
+    created_at: str = Field(description="Time when the run was created as ISO format")
+
+    output: O = Field(description="Output of the run")
+
+
+class FailedReponseModelV2(BaseModel):
+    id: str | None = Field(description="Unique ID for this run")
+    url: str | None = Field(description="Web URL for this run")
+    created_at: str | None = Field(
+        description="Time when the run was created as ISO format"
+    )
+
+    error: str | None = Field(description="Error message if the run failed")
+
+
+## v3
+
+
+class BaseResponseModelV3(GenericModel):
+    run_id: str = Field(description="Unique ID for this run")
+    web_url: str = Field(description="Web URL for this run")
+    created_at: str = Field(description="Time when the run was created as ISO format")
+
+
+class AsyncApiResponseModelV3(BaseResponseModelV3):
+    status_url: str = Field(description="URL to check the status of the run")
+
+
+class AsyncStatusResponseModelV3(BaseResponseModelV3, typing.Generic[O]):
+    run_time_sec: int = Field(description="Total run time in seconds")
+    status: typing.Literal["starting", "running", "completed", "failed"] = Field(
+        description="Status of the run"
+    )
+    status_msg: str = Field(
+        description="Status message of the run as a human readable string"
+    )
+    output: O | None = Field(description="Output of the run")
+
+
+class FailedReponseModelV3(BaseResponseModelV3):
+    run_time_sec: int = Field(description="Total run time in seconds")
+    status: typing.Literal["failed"] = Field(description="Status of the run => failed")
+    error: str | None = Field(description="Error message if the run failed")
 
 
 async def request_form_files(request: Request) -> FormData:
@@ -61,25 +91,23 @@ async def request_form_files(request: Request) -> FormData:
 
 
 def script_to_api(page_cls: typing.Type[BasePage]):
-    body_spec = Body(examples=page_cls.RequestModel.Config.schema_extra.get("examples"))
-
     response_model = create_model(
         page_cls.__name__ + "Response",
-        __base__=ApiResponseModel[page_cls.ResponseModel],
+        __base__=ApiResponseModelV2[page_cls.ResponseModel],
     )
 
-    endpoint = page_cls().endpoint
+    endpoint = page_cls().endpoint.rstrip("/")
 
     @app.post(
         os.path.join(endpoint, "form/"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModel}, 402: {}},
+        responses={500: {"model": FailedReponseModelV2}, 402: {}},
         include_in_schema=False,
     )
     @app.post(
         os.path.join(endpoint, "form"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModel}, 402: {}},
+        responses={500: {"model": FailedReponseModelV2}, 402: {}},
         include_in_schema=False,
     )
     def run_api_form(
@@ -123,21 +151,20 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         os.path.join(endpoint, ""),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModel}, 402: {}},
+        responses={500: {"model": FailedReponseModelV2}, 402: {}},
         operation_id=page_cls.slug_versions[0],
         name=page_cls.title,
     )
     @app.post(
         endpoint,
         response_model=response_model,
-        responses={500: {"model": FailedReponseModel}, 402: {}},
-        operation_id=page_cls.slug_versions[0],
+        responses={500: {"model": FailedReponseModelV2}, 402: {}},
         include_in_schema=False,
     )
     def run_api_json(
         request: Request,
+        page_request: page_cls.RequestModel,
         user: AppUser = Depends(api_auth_header),
-        page_request: page_cls.RequestModel = body_spec,
     ):
         return call_api(
             page_cls=page_cls,
@@ -146,6 +173,87 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             query_params=request.query_params,
         )
 
+    async_endpoint = page_cls().async_endpoint.rstrip("/")
+
+    @app.post(
+        os.path.join(async_endpoint, ""),
+        response_model=AsyncApiResponseModelV3,
+        responses={500: {"model": FailedReponseModelV2}, 402: {}},
+        operation_id="async__" + page_cls.slug_versions[0],
+        name=page_cls.title + " (async)",
+        status_code=202,
+    )
+    @app.post(
+        async_endpoint,
+        response_model=AsyncApiResponseModelV3,
+        responses={500: {"model": FailedReponseModelV2}, 402: {}},
+        include_in_schema=False,
+        status_code=202,
+    )
+    def run_api_json_async(
+        request: Request,
+        page_request: page_cls.RequestModel,
+        user: AppUser = Depends(api_auth_header),
+    ):
+        return call_api(
+            page_cls=page_cls,
+            user=user,
+            request_body=page_request.dict(),
+            query_params=request.query_params,
+            run_async=True,
+        )
+
+    status_endpoint = page_cls().status_endpoint.rstrip("/")
+    response_model = create_model(
+        page_cls.__name__ + "StatusResponse",
+        __base__=AsyncStatusResponseModelV3[page_cls.ResponseModel],
+    )
+
+    @app.get(
+        os.path.join(status_endpoint, ""),
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModelV3}, 402: {}},
+        operation_id="status__" + page_cls.slug_versions[0],
+        name=page_cls.title + " (status)",
+    )
+    @app.get(
+        status_endpoint,
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModelV3}, 402: {}},
+        include_in_schema=False,
+    )
+    def run_api_json_async(run_id: str, user: AppUser = Depends(api_auth_header)):
+        self = page_cls()
+        sr = self.run_doc_sr(run_id, user.uid)
+        state = sr.to_dict()
+        err_msg = state.get(StateKeys.error_msg)
+        run_time = state.get(StateKeys.run_time, 0)
+        web_url = str(furl(self.app_url(run_id=run_id, uid=user.uid)))
+        ret = {
+            "run_id": run_id,
+            "web_url": web_url,
+            "created_at": sr.created_at.isoformat(),
+            "run_time_sec": run_time,
+        }
+        if err_msg:
+            ret |= {"status": "failed", "error": err_msg}
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    **ret,
+                },
+            )
+        else:
+            status_msg = state.get(StateKeys.run_status) or ""
+            ret |= {"status_msg": status_msg}
+            if status_msg.lower().startswith("starting"):
+                ret |= {"status": "starting"}
+            elif status_msg:
+                ret |= {"status": "running"}
+            else:
+                ret |= {"status": "completed", "output": state}
+            return ret
+
 
 def call_api(
     *,
@@ -153,29 +261,32 @@ def call_api(
     user: AppUser,
     request_body: dict,
     query_params,
+    run_async: bool = False,
 ) -> dict:
     created_at = datetime.datetime.utcnow().isoformat()
+
     # init a new page for every request
-    page = page_cls(request=SimpleNamespace(user=user))
+    self = page_cls(request=SimpleNamespace(user=user))
 
     # get saved state from db
-    state = page.get_doc_from_query_params(query_params).to_dict()
+    state = self.get_doc_from_query_params(query_params).to_dict()
     if state is None:
         raise HTTPException(status_code=404)
 
     # set sane defaults
-    for k, v in page.sane_defaults.items():
+    for k, v in self.sane_defaults.items():
         state.setdefault(k, v)
-
-    # only use the request values, discard outputs
-    state = page.RequestModel.parse_obj(state).dict()
 
     # remove None values & insert request data
     request_dict = {k: v for k, v in request_body.items() if v is not None}
     state.update(request_dict)
 
+    # set streamlit session state
+    st.set_session_state(state)
+    st.set_query_params(query_params)
+
     # check the balance
-    if user.balance <= 0:
+    if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
         account_url = furl(settings.APP_BASE_URL) / "account"
         raise HTTPException(
             status_code=402,
@@ -184,51 +295,45 @@ def call_api(
             },
         )
 
-    # create the run
-    run_id = get_random_doc_id()
-    query_params = dict(run_id=run_id, uid=user.uid)
-    run_url = str(furl(page.app_url(), query_params=query_params))
-    run_doc_ref = page.run_doc_sr(run_id, user.uid, create=True)
-    run_doc_ref.set(page.state_to_doc(state))
-
-    # set streamlit session state
-    st.set_session_state(state)
-    st.set_query_params(query_params)
-
-    # run the script
-    try:
-        gen = page.run(state)
-        try:
-            while True:
-                next(gen)
-        except StopIteration:
-            pass
-    except Exception as e:
-        print_exc()
-        capture_exception(e)
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "id": run_id,
-                "url": run_url,
-                "created_at": created_at,
-                "error": err_msg_for_exc(e),
-            },
+    example_id, run_id, uid = self.create_new_run()
+    result = self.call_runner_task(example_id, run_id, uid)
+    web_url = str(furl(self.app_url(run_id=run_id, uid=uid)))
+    if run_async:
+        status_url = str(
+            furl(settings.API_BASE_URL, query_params=dict(run_id=run_id))
+            / self.status_endpoint
         )
-    finally:
-        # save the run
-        run_doc_ref.set(page.state_to_doc(state))
-
-    # deduct credits
-    page.deduct_credits(st.session_state)
-
-    # return updated state
-    return {
-        "id": run_id,
-        "url": run_url,
-        "created_at": created_at,
-        "output": state,
-    }
+        # return the url to check status
+        return {
+            "run_id": run_id,
+            "web_url": web_url,
+            "created_at": created_at,
+            "status_url": status_url,
+        }
+    else:
+        # wait for the result
+        result.get()
+        state = self.run_doc_sr(run_id, uid).to_dict()
+        # check for errors
+        err_msg = state.get(StateKeys.error_msg)
+        if err_msg:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "id": run_id,
+                    "url": web_url,
+                    "created_at": created_at,
+                    "error": err_msg,
+                },
+            )
+        else:
+            # return updated state
+            return {
+                "id": run_id,
+                "url": web_url,
+                "created_at": created_at,
+                "output": state,
+            }
 
 
 def setup_pages():

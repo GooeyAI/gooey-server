@@ -25,7 +25,6 @@ from starlette.requests import Request
 import gooey_ui as st
 from app_users.models import AppUser
 from bots.models import SavedRun, Workflow
-from daras_ai_v2 import db
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -35,12 +34,9 @@ from daras_ai_v2.crypto import (
     get_random_doc_id,
 )
 from daras_ai_v2.db import (
-    USER_RUNS_COLLECTION,
-    EXAMPLES_COLLECTION,
     ANONYMOUS_USER_COOKIE,
 )
 from daras_ai_v2.grid_layout_widget import grid_layout
-from daras_ai_v2.html_error_widget import html_error
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
@@ -144,6 +140,14 @@ class BasePage:
     @property
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
+
+    @property
+    def async_endpoint(self) -> str:
+        return f"/v3/async/{self.slug_versions[0]}/"
+
+    @property
+    def status_endpoint(self) -> str:
+        return f"/v3/async/{self.slug_versions[0]}/status/"
 
     def render(self):
         with sentry_sdk.configure_scope() as scope:
@@ -383,13 +387,16 @@ class BasePage:
         return self.get_current_doc_sr(example_id, run_id, uid)
 
     def get_current_doc_sr(self, example_id, run_id, uid) -> SavedRun:
-        if run_id and uid:
-            sr = self.run_doc_sr(run_id, uid)
-        elif example_id:
-            sr = self.example_doc_sr(example_id)
-        else:
-            sr = self.recipe_doc_sr()
-        return sr
+        try:
+            if run_id and uid:
+                sr = self.run_doc_sr(run_id, uid)
+            elif example_id:
+                sr = self.example_doc_sr(example_id)
+            else:
+                sr = self.recipe_doc_sr()
+            return sr
+        except SavedRun.DoesNotExist:
+            raise HTTPException(status_code=404)
 
     def recipe_doc_sr(self) -> SavedRun:
         return SavedRun.objects.get_or_create(
@@ -619,23 +626,12 @@ class BasePage:
 
             if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
                 st.session_state[StateKeys.run_status] = None
+                st.session_state[
+                    StateKeys.error_msg
+                ] = self.generate_credit_error_message(example_id, run_id, uid)
                 self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
-                return
-
-            from celeryapp.tasks import gui_runner
-
-            gui_runner.delay(
-                page_cls=self.__class__,
-                user_id=self.request.user.id,
-                run_id=run_id,
-                uid=uid,
-                state=st.session_state,
-                channel=f"gooey-outputs/{self.doc_name}/{uid}/{run_id}",
-                query_params=self.clean_query_params(
-                    example_id=example_id, run_id=run_id, uid=uid
-                ),
-            )
-
+            else:
+                self.call_runner_task(example_id, run_id, uid)
             raise QueryParamsRedirectException(
                 self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
             )
@@ -662,6 +658,50 @@ class BasePage:
 
         if not run_status:
             self._render_after_output()
+
+    def call_runner_task(self, example_id, run_id, uid):
+        from celeryapp.tasks import gui_runner
+
+        return gui_runner.delay(
+            page_cls=self.__class__,
+            user_id=self.request.user.id,
+            run_id=run_id,
+            uid=uid,
+            state=st.session_state,
+            channel=f"gooey-outputs/{self.doc_name}/{uid}/{run_id}",
+            query_params=self.clean_query_params(
+                example_id=example_id, run_id=run_id, uid=uid
+            ),
+        )
+
+    def generate_credit_error_message(self, example_id, run_id, uid) -> str:
+        account_url = furl(settings.APP_BASE_URL) / "account/"
+        if self.request.user.is_anonymous:
+            account_url.query.params["next"] = self.app_url(example_id, run_id, uid)
+            # language=HTML
+            error_msg = f"""
+<p>
+Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
+</p>
+
+You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs). 
+You can <a href="/pricing/" target="_blank">purchase more</a> if you run out of credits.
+            """
+        else:
+            # language=HTML
+            error_msg = f"""
+<p>
+Doh! You’re out of Gooey.AI credits.
+</p>
+
+<p>
+Please <a href="{settings.GRANT_URL}" target="_blank">apply for a grant</a> or 
+<a href="{account_url}" target="_blank">buy more</a> to run more workflows.
+</p>
+
+We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discord</a> if you’ve got any questions.
+            """
+        return error_msg
 
     def _setup_rng_seed(self):
         seed = st.session_state.get("seed")
@@ -962,40 +1002,7 @@ class BasePage:
     def check_credits(self) -> bool:
         assert self.request, "request must be set to check credits"
         assert self.request.user, "request.user must be set to check credits"
-
-        if self.request.user.balance < self.get_price_roundoff(st.session_state):
-            account_url = furl(settings.APP_BASE_URL) / "account/"
-
-            if self.request.user.is_anonymous:
-                account_url.query.params["next"] = self._get_current_app_url()
-                # language=HTML
-                error = f"""
-<p>
-Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
-</p>
-    
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs). 
-You can <a href="/pricing/" target="_blank">purchase more</a> if you run out of credits.
-                """
-            else:
-                # language=HTML
-                error = f"""
-<p>
-Doh! You’re out of Gooey.AI credits.
-</p>
-            
-<p>
-Please <a href="{settings.GRANT_URL}" target="_blank">apply for a grant</a> or 
-<a href="{account_url}" target="_blank">buy more</a> to run more workflows.
-</p>
-            
-We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discord</a> if you’ve got any questions.
-                """
-
-            html_error(error)
-            return False
-
-        return True
+        return self.request.user.balance >= self.get_price_roundoff(st.session_state)
 
     def deduct_credits(self, state: dict):
         assert self.request, "request must be set to deduct credits"

@@ -35,28 +35,6 @@ class LetterWriterPage(BasePage):
         input_prompt: str | None
         strip_html_2_text: bool | None
 
-        class Config:
-            schema_extra = {
-                "examples": {
-                    "Basic": {
-                        "value": {
-                            "action_id": "14904",
-                        }
-                    },
-                    "Custom example letters": {
-                        "value": {
-                            "action_id": "14904",
-                            "example_letters": [
-                                {
-                                    "prompt": "Extreme weather events, both extreme cold and extreme heat will probably increase in frequency due to climate change.",
-                                    "completion": "Dear Senate Rules Committee Members, Please pull HB 1620 out of the Rules Committee and send it for a floor vote",
-                                }
-                            ],
-                        }
-                    },
-                }
-            }
-
     class ResponseModel(BaseModel):
         output_letters: list[str]
 
