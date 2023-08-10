@@ -86,7 +86,7 @@ def text(body: str, *, unsafe_allow_html=False, **props):
     ).mount()
 
 
-def error(body: str, icon: str = "🛑", *, unsafe_allow_html=False):
+def error(body: str, icon: str = "🔥", *, unsafe_allow_html=False):
     if not isinstance(body, str):
         body = repr(body)
     with div(
@@ -101,7 +101,8 @@ def error(body: str, icon: str = "🛑", *, unsafe_allow_html=False):
         )
     ):
         markdown(icon)
-        markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
+        with div():
+            markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
 
 
 def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
