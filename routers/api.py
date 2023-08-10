@@ -91,62 +91,11 @@ async def request_form_files(request: Request) -> FormData:
 
 
 def script_to_api(page_cls: typing.Type[BasePage]):
+    endpoint = page_cls().endpoint.rstrip("/")
     response_model = create_model(
         page_cls.__name__ + "Response",
         __base__=ApiResponseModelV2[page_cls.ResponseModel],
     )
-
-    endpoint = page_cls().endpoint.rstrip("/")
-
-    @app.post(
-        os.path.join(endpoint, "form/"),
-        response_model=response_model,
-        responses={500: {"model": FailedReponseModelV2}, 402: {}},
-        include_in_schema=False,
-    )
-    @app.post(
-        os.path.join(endpoint, "form"),
-        response_model=response_model,
-        responses={500: {"model": FailedReponseModelV2}, 402: {}},
-        include_in_schema=False,
-    )
-    def run_api_form(
-        request: Request,
-        user: AppUser = Depends(api_auth_header),
-        form_data=Depends(request_form_files),
-        page_request_json: str = Form(alias="json"),
-    ):
-        page_request_data = json.loads(page_request_json)
-        # fill in the file urls from the form data
-        form_data: FormData
-        for key in form_data.keys():
-            uf_list = form_data.getlist(key)
-            if not (uf_list and isinstance(uf_list[0], UploadFile)):
-                continue
-            urls = [
-                upload_file_from_bytes(uf.filename, uf.file.read(), uf.content_type)
-                for uf in uf_list
-            ]
-            try:
-                is_str = (
-                    page_cls.RequestModel.schema()["properties"][key]["type"]
-                    == "string"
-                )
-            except KeyError:
-                raise HTTPException(
-                    status_code=400, detail=f'Inavlid file field "{key}"'
-                )
-            if is_str:
-                page_request_data[key] = urls[0]
-            else:
-                page_request_data.setdefault(key, []).extend(urls)
-        # validate the request
-        try:
-            page_request = page_cls.RequestModel.parse_obj(page_request_data)
-        except ValidationError as e:
-            raise HTTPException(status_code=422, detail=e.errors())
-        # call regular json api
-        return run_api_json(request, page_request=page_request, user=user)
 
     @app.post(
         os.path.join(endpoint, ""),
@@ -173,20 +122,44 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             query_params=request.query_params,
         )
 
-    async_endpoint = page_cls().async_endpoint.rstrip("/")
+    @app.post(
+        os.path.join(endpoint, "form/"),
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModelV2}, 402: {}},
+        include_in_schema=False,
+    )
+    @app.post(
+        os.path.join(endpoint, "form"),
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModelV2}, 402: {}},
+        include_in_schema=False,
+    )
+    def run_api_form(
+        request: Request,
+        user: AppUser = Depends(api_auth_header),
+        form_data=Depends(request_form_files),
+        page_request_json: str = Form(alias="json"),
+    ):
+        # parse form data
+        page_request = _parse_form_data(page_cls, form_data, page_request_json)
+        # call regular json api
+        return run_api_json(request, page_request=page_request, user=user)
+
+    endpoint = endpoint.replace("v2", "v3")
+    response_model = AsyncApiResponseModelV3
 
     @app.post(
-        os.path.join(async_endpoint, ""),
-        response_model=AsyncApiResponseModelV3,
-        responses={500: {"model": FailedReponseModelV2}, 402: {}},
+        os.path.join(endpoint, "async/"),
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModelV3}, 402: {}},
         operation_id="async__" + page_cls.slug_versions[0],
         name=page_cls.title + " (async)",
         status_code=202,
     )
     @app.post(
-        async_endpoint,
-        response_model=AsyncApiResponseModelV3,
-        responses={500: {"model": FailedReponseModelV2}, 402: {}},
+        os.path.join(endpoint, "async"),
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModelV3}, 402: {}},
         include_in_schema=False,
         status_code=202,
     )
@@ -203,21 +176,43 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             run_async=True,
         )
 
-    status_endpoint = page_cls().status_endpoint.rstrip("/")
+    @app.post(
+        os.path.join(endpoint, "async/form/"),
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModelV3}, 402: {}},
+        include_in_schema=False,
+    )
+    @app.post(
+        os.path.join(endpoint, "async/form"),
+        response_model=response_model,
+        responses={500: {"model": FailedReponseModelV3}, 402: {}},
+        include_in_schema=False,
+    )
+    def run_api_form(
+        request: Request,
+        user: AppUser = Depends(api_auth_header),
+        form_data=Depends(request_form_files),
+        page_request_json: str = Form(alias="json"),
+    ):
+        # parse form data
+        page_request = _parse_form_data(page_cls, form_data, page_request_json)
+        # call regular json api
+        return run_api_json_async(request, page_request=page_request, user=user)
+
     response_model = create_model(
         page_cls.__name__ + "StatusResponse",
         __base__=AsyncStatusResponseModelV3[page_cls.ResponseModel],
     )
 
     @app.get(
-        os.path.join(status_endpoint, ""),
+        os.path.join(endpoint, "status/"),
         response_model=response_model,
         responses={500: {"model": FailedReponseModelV3}, 402: {}},
         operation_id="status__" + page_cls.slug_versions[0],
         name=page_cls.title + " (status)",
     )
     @app.get(
-        status_endpoint,
+        os.path.join(endpoint, "status"),
         response_model=response_model,
         responses={500: {"model": FailedReponseModelV3}, 402: {}},
         include_in_schema=False,
@@ -253,6 +248,39 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             else:
                 ret |= {"status": "completed", "output": state}
             return ret
+
+
+def _parse_form_data(
+    page_cls: typing.Type[BasePage],
+    form_data: FormData,
+    page_request_json: str,
+):
+    page_request_data = json.loads(page_request_json)
+    # fill in the file urls from the form data
+    for key in form_data.keys():
+        uf_list = form_data.getlist(key)
+        if not (uf_list and isinstance(uf_list[0], UploadFile)):
+            continue
+        urls = [
+            upload_file_from_bytes(uf.filename, uf.file.read(), uf.content_type)
+            for uf in uf_list
+        ]
+        try:
+            is_str = (
+                page_cls.RequestModel.schema()["properties"][key]["type"] == "string"
+            )
+        except KeyError:
+            raise HTTPException(status_code=400, detail=f'Inavlid file field "{key}"')
+        if is_str:
+            page_request_data[key] = urls[0]
+        else:
+            page_request_data.setdefault(key, []).extend(urls)
+    # validate the request
+    try:
+        page_request = page_cls.RequestModel.parse_obj(page_request_data)
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors())
+    return page_request
 
 
 def call_api(
