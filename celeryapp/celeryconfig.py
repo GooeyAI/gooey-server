@@ -11,11 +11,13 @@ app = Celery()
 
 app.conf.update(
     broker_url=settings.LOCAL_CELERY_BROKER_URL,
+    result_backend=settings.LOCAL_CELERY_RESULT_BACKEND,
     imports=["celeryapp.tasks"],
     task_track_started=True,
     task_acks_late=True,
     task_serializer="pickle",
     accept_content=["pickle"],
+    result_serializer="pickle",
 )
 
 # Load task modules from all registered Django apps.

@@ -219,7 +219,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     )
     def run_api_json_async(run_id: str, user: AppUser = Depends(api_auth_header)):
         self = page_cls()
-        sr = self.run_doc_sr(run_id, user.uid)
+        sr = self.get_current_doc_sr(example_id=None, run_id=run_id, uid=user.uid)
         state = sr.to_dict()
         err_msg = state.get(StateKeys.error_msg)
         run_time = state.get(StateKeys.run_time, 0)
@@ -329,7 +329,8 @@ def call_api(
     if run_async:
         status_url = str(
             furl(settings.API_BASE_URL, query_params=dict(run_id=run_id))
-            / self.status_endpoint
+            / self.endpoint.replace("v2", "v3")
+            / "status"
         )
         # return the url to check status
         return {
@@ -340,7 +341,7 @@ def call_api(
         }
     else:
         # wait for the result
-        result.get()
+        result.get(disable_sync_subtasks=False)
         state = self.run_doc_sr(run_id, uid).to_dict()
         # check for errors
         err_msg = state.get(StateKeys.error_msg)
