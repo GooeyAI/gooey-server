@@ -4,6 +4,7 @@ from django.db import models, transaction, IntegrityError
 from furl import furl
 
 from app_users.models import AppUser
+from bots.custom_fields import CustomURLField
 from bots.models import Workflow, SavedRun
 from daras_ai_v2 import settings
 from daras_ai_v2.query_params import gooey_get_query_params
@@ -86,7 +87,7 @@ _hashids = hashids.Hashids(salt=settings.HASHIDS_SALT)
 
 
 class ShortenedURL(models.Model):
-    url = models.URLField()
+    url = CustomURLField()
 
     user = models.ForeignKey(
         "app_users.AppUser",
