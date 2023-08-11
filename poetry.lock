@@ -4093,6 +4093,24 @@ files = [
 diagrams = ["jinja2", "railroad-diagrams"]
 
 [[package]]
+name = "pypdf"
+version = "3.15.0"
+description = "A pure-python PDF library capable of splitting, merging, cropping, and transforming PDF files"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "pypdf-3.15.0-py3-none-any.whl", hash = "sha256:2e29ddb62561ec91157c784783714703ddd3ce08f070ecbc57404fb86cd9fc97"},
+    {file = "pypdf-3.15.0.tar.gz", hash = "sha256:8a6264e1c47c63dc2484e29bdfa76b121435896a84e94b7c5ae82c6ae96354bb"},
+]
+
+[package.extras]
+crypto = ["PyCryptodome", "cryptography"]
+dev = ["black", "flit", "pip-tools", "pre-commit (<2.18.0)", "pytest-cov", "pytest-socket", "wheel"]
+docs = ["myst_parser", "sphinx", "sphinx_rtd_theme"]
+full = ["Pillow (>=8.0.0)", "PyCryptodome", "cryptography"]
+image = ["Pillow (>=8.0.0)"]
+
+[[package]]
 name = "pypng"
 version = "0.20220715.0"
 description = "Pure Python library for saving and loading PNG images"
@@ -5174,6 +5192,20 @@ files = [
 requests = {version = ">=2.20", markers = "python_version >= \"3.0\""}
 
 [[package]]
+name = "tabulate"
+version = "0.9.0"
+description = "Pretty-print tabular data"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "tabulate-0.9.0-py3-none-any.whl", hash = "sha256:024ca478df22e9340661486f85298cff5f6dcdba14f3813e8830015b9ed1948f"},
+    {file = "tabulate-0.9.0.tar.gz", hash = "sha256:0095b12bf5966de529c0feb1fa08671671b3368eec77d7ef7ab114be2c068b3c"},
+]
+
+[package.extras]
+widechars = ["wcwidth"]
+
+[[package]]
 name = "tenacity"
 version = "8.2.2"
 description = "Retry code until it succeeds"
@@ -5948,4 +5980,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "d670575b3dcc9623cac7e67e1ea54b63b095db19ef7108a28f10fa461b70a96f"
+content-hash = "927f15a90ce3407f7114d4b2e94c1e2a73dd277ea8da2c69c7ea2993430c6b6b"

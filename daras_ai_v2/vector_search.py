@@ -196,7 +196,11 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
         etag = meta.get("md5Checksum") or meta.get("modifiedTime")
         mime_type = meta["mimeType"]
     else:
-        r = requests.head(f_url)
+        r = requests.head(
+            f_url,
+            headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
+            timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+        )
         r.raise_for_status()
         mime_type = get_mimetype_from_response(r)
         etag = r.headers.get("etag", r.headers.get("last-modified"))

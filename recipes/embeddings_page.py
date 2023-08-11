@@ -73,11 +73,11 @@ class EmbeddingsPage(BasePage):
         for i, text in enumerate(texts):
             texts[i] = st.text_area(f"`texts[{i}]`", value=text, disabled=True)
 
-    def fields_to_save(self) -> [str]:
-        to_save = super().fields_to_save()
-        # dont save the embeddings they are too big + firebase doesn't support 2d array
-        to_save.remove("embeddings")
-        return to_save
+    # def fields_to_save(self) -> [str]:
+    #     to_save = super().fields_to_save()
+    #     # dont save the embeddings they are too big + firebase doesn't support 2d array
+    #     to_save.remove("embeddings")
+    #     return to_save
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: EmbeddingsPage.RequestModel = self.RequestModel.parse_obj(state)
