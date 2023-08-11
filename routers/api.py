@@ -217,7 +217,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         responses={500: {"model": FailedReponseModelV3}, 402: {}},
         include_in_schema=False,
     )
-    def run_api_json_async(run_id: str, user: AppUser = Depends(api_auth_header)):
+    def get_run_status(run_id: str, user: AppUser = Depends(api_auth_header)):
         self = page_cls()
         sr = self.get_current_doc_sr(example_id=None, run_id=run_id, uid=user.uid)
         state = sr.to_dict()

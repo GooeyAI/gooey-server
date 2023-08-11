@@ -1,10 +1,11 @@
-import os.path
-
 import pytest
+import requests
+from furl import furl
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from auth_backend import force_authentication
+from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
 from daras_ai_v2.tabs_widget import MenuTabs
 from routers import facebook
@@ -13,7 +14,8 @@ from server import app
 client = TestClient(app)
 
 excluded_endpoints = [
-    facebook.fb_webhook_verify,  # gives 403
+    facebook.fb_webhook_verify.__name__,  # gives 403
+    "get_run_status",  # needs query params
 ]
 
 route_paths = [
@@ -23,7 +25,7 @@ route_paths = [
         isinstance(route, Route)
         and "GET" in route.methods
         and not route.param_convertors
-        and route.endpoint not in excluded_endpoints
+        and route.endpoint.__name__ not in excluded_endpoints
     )
 ]
 
@@ -43,6 +45,10 @@ tabs = list(MenuTabs.paths.values())
 @pytest.mark.parametrize("slug", page_slugs)
 def test_page_slugs(slug, tab):
     with force_authentication():
-        r = client.post(os.path.join(slug, tab), json={}, allow_redirects=True)
+        r = requests.post(
+            str(furl(settings.API_BASE_URL) / slug / tab),
+            json={},
+        )
+        # r = client.post(os.path.join(slug, tab), json={}, allow_redirects=True)
     print(r.content)
     assert r.status_code == 200
