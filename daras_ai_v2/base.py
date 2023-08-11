@@ -966,16 +966,22 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         st.write("#### 📤 Example Request")
 
         include_all = st.checkbox("##### Show all fields")
+        as_async = st.checkbox("##### Run Async")
         as_form_data = st.checkbox("##### Upload Files via Form Data")
 
         request_body = get_example_request_body(
             self.RequestModel, st.session_state, include_all=include_all
         )
         response_body = self.get_example_response_body(
-            st.session_state, include_all=include_all
+            st.session_state, as_async=as_async, include_all=include_all
         )
 
-        api_example_generator(self._get_current_api_url(), request_body, as_form_data)
+        api_example_generator(
+            api_url=self._get_current_api_url(),
+            request_body=request_body,
+            as_form_data=as_form_data,
+            as_async=as_async,
+        )
         st.write("")
 
         st.write("#### 🎁 Example Response")
@@ -1013,19 +1019,35 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_example_response_body(
         self,
         state: dict,
+        as_async: bool = False,
         include_all: bool = False,
     ) -> dict:
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        return dict(
-            id=run_id or example_id or get_random_doc_id(),
-            url=self._get_current_app_url(),
-            created_at=datetime.datetime.utcnow().isoformat(),
-            output=get_example_request_body(
-                self.ResponseModel,
-                state,
-                include_all=include_all,
-            ),
+        run_id = run_id or get_random_doc_id()
+        created_at = st.session_state.get(
+            StateKeys.created_at, datetime.datetime.utcnow()
         )
+        web_url = self.app_url(run_id=get_random_doc_id(), uid=uid)
+        if as_async:
+            return dict(
+                run_id=run_id,
+                web_url=web_url,
+                created_at=created_at,
+                run_time_sec=st.session_state.get(StateKeys.run_time, 0),
+                status="completed",
+                output=get_example_request_body(
+                    self.ResponseModel, state, include_all=include_all
+                ),
+            )
+        else:
+            return dict(
+                id=run_id,
+                url=web_url,
+                created_at=created_at,
+                output=get_example_request_body(
+                    self.ResponseModel, state, include_all=include_all
+                ),
+            )
 
     def additional_notes(self) -> str | None:
         pass

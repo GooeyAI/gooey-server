@@ -10,6 +10,7 @@ from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Form
 from fastapi import HTTPException
+from fastapi import Response
 from furl import furl
 from pydantic import BaseModel, Field
 from pydantic import ValidationError
@@ -74,16 +75,14 @@ class AsyncStatusResponseModelV3(BaseResponseModelV3, typing.Generic[O]):
     status: typing.Literal["starting", "running", "completed", "failed"] = Field(
         description="Status of the run"
     )
-    status_msg: str = Field(
-        description="Status message of the run as a human readable string"
-    )
+    detail: str = Field(description="Status of the run as a human readable string")
     output: O | None = Field(description="Output of the run")
 
 
 class FailedReponseModelV3(BaseResponseModelV3):
     run_time_sec: int = Field(description="Total run time in seconds")
     status: typing.Literal["failed"] = Field(description="Status of the run => failed")
-    error: str | None = Field(description="Error message if the run failed")
+    detail: str = Field(description="Error message of the failed run")
 
 
 async def request_form_files(request: Request) -> FormData:
@@ -165,16 +164,19 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     )
     def run_api_json_async(
         request: Request,
+        response: Response,
         page_request: page_cls.RequestModel,
         user: AppUser = Depends(api_auth_header),
     ):
-        return call_api(
+        ret = call_api(
             page_cls=page_cls,
             user=user,
             request_body=page_request.dict(),
             query_params=request.query_params,
             run_async=True,
         )
+        response.headers["Location"] = ret["status_url"]
+        return ret
 
     @app.post(
         os.path.join(endpoint, "async/form/"),
@@ -190,6 +192,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     )
     def run_api_form(
         request: Request,
+        response: Response,
         user: AppUser = Depends(api_auth_header),
         form_data=Depends(request_form_files),
         page_request_json: str = Form(alias="json"),
@@ -197,7 +200,9 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         # parse form data
         page_request = _parse_form_data(page_cls, form_data, page_request_json)
         # call regular json api
-        return run_api_json_async(request, page_request=page_request, user=user)
+        return run_api_json_async(
+            request, response=response, page_request=page_request, user=user
+        )
 
     response_model = create_model(
         page_cls.__name__ + "StatusResponse",
@@ -217,7 +222,11 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         responses={500: {"model": FailedReponseModelV3}, 402: {}},
         include_in_schema=False,
     )
-    def get_run_status(run_id: str, user: AppUser = Depends(api_auth_header)):
+    def get_run_status(
+        response: Response,
+        run_id: str,
+        user: AppUser = Depends(api_auth_header),
+    ):
         self = page_cls()
         sr = self.get_current_doc_sr(example_id=None, run_id=run_id, uid=user.uid)
         state = sr.to_dict()
@@ -231,19 +240,15 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             "run_time_sec": run_time,
         }
         if err_msg:
-            ret |= {"status": "failed", "error": err_msg}
-            raise HTTPException(
-                status_code=500,
-                detail={
-                    **ret,
-                },
-            )
+            ret |= {"status": "failed", "detail": err_msg}
+            response.status_code = 500
+            return ret
         else:
-            status_msg = state.get(StateKeys.run_status) or ""
-            ret |= {"status_msg": status_msg}
-            if status_msg.lower().startswith("starting"):
+            run_status = state.get(StateKeys.run_status) or ""
+            ret |= {"detail": run_status}
+            if run_status.lower().startswith("starting"):
                 ret |= {"status": "starting"}
-            elif status_msg:
+            elif run_status:
                 ret |= {"status": "running"}
             else:
                 ret |= {"status": "completed", "output": state}
@@ -330,7 +335,7 @@ def call_api(
         status_url = str(
             furl(settings.API_BASE_URL, query_params=dict(run_id=run_id))
             / self.endpoint.replace("v2", "v3")
-            / "status"
+            / "status/"
         )
         # return the url to check status
         return {

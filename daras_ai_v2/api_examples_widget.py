@@ -21,16 +21,22 @@ def get_filenames(request_body):
             yield key, furl(item).path.segments[-1]
 
 
-def api_example_generator(api_url: furl, request_body: dict, as_form_data: bool):
+def api_example_generator(
+    *, api_url: furl, request_body: dict, as_form_data: bool, as_async: bool
+):
     js, python, curl = st.tabs(["`node.js`", "`python`", "`curl`"])
 
     filenames = []
+    if as_async:
+        api_url /= "async/"
     if as_form_data:
         filenames = list(get_filenames(request_body))
         for key, _ in filenames:
             request_body.pop(key, None)
         api_url /= "form/"
     api_url = str(api_url)
+    if as_async:
+        api_url = api_url.replace("v2", "v3")
 
     with curl:
         if as_form_data:
@@ -58,6 +64,31 @@ curl %(api_url)s \
                 auth_keyword=auth_keyword,
                 json=shlex.quote(json.dumps(request_body, indent=2)),
             )
+        if as_async:
+            curl_code = r"""
+status_url=$(
+%(curl_code)s | jq -r '.status_url'
+)
+
+while true; do
+    result=$(curl $status_url -H "Authorization: %(auth_keyword)s $GOOEY_API_KEY")
+    status=$(echo $result | jq -r '.status')
+    if [ "$status" = "completed" ]; then
+        echo $result
+        break
+    elif [ "$status" = "failed" ]; then
+        echo $result
+        break
+    fi
+    sleep 3
+done
+            """ % dict(
+                curl_code=indent(curl_code.strip(), " " * 2),
+                api_url=shlex.quote(api_url),
+                auth_keyword=auth_keyword,
+                json=shlex.quote(json.dumps(request_body, indent=2)),
+            )
+
         st.write(
             """
 1. Generate an api key [below👇](#api-keys)
@@ -95,9 +126,7 @@ response = requests.post(
     files=files,
     data={"json": json.dumps(payload)},
 )
-
-result = response.json()
-print(response.status_code, result)
+assert response.ok, response.content
             """ % dict(
                 files=",".join(
                     f'({key!r}, open({name!r}, "rb"))' for key, name in filenames
@@ -113,6 +142,7 @@ import requests
 
 payload = %(json)s
 
+# Submit the task asynchronously
 response = requests.post(
     "%(api_url)s",
     headers={
@@ -120,14 +150,39 @@ response = requests.post(
     },
     json=payload,
 )
-
-result = response.json()
-print(response.status_code, result)
+assert response.ok, response.content
             """ % dict(
                 api_url=api_url,
                 auth_keyword=auth_keyword,
                 json=repr(request_body),
             )
+        if as_async:
+            py_code += r"""
+from time import sleep            
+            
+# Wait for the task to complete
+status_url = response.headers["Location"]
+while True:
+    response = requests.get(status_url, headers={"Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"]})
+    assert response.ok, response.content
+    result = response.json()
+    if result["status"] == "completed":
+        print(response.status_code, result)
+        break
+    elif result["status"] == "failed":
+        print(response.status_code, result)
+        break
+    else:
+        sleep(3)
+            """ % dict(
+                api_url=api_url,
+                auth_keyword=auth_keyword,
+            )
+        else:
+            py_code += r"""
+result = response.json()
+print(response.status_code, result)
+"""
         import black
 
         py_code = black.format_str(py_code, mode=black.FileMode())
@@ -204,17 +259,42 @@ async function gooeyAPI() {
     },
     body: JSON.stringify(payload),
   });
-
-  const result = await response.json();
-  console.log(response.status, result);
-}
-
-gooeyAPI();
             """ % dict(
                 api_url=api_url,
                 auth_keyword=auth_keyword,
                 json=json.dumps(request_body, indent=2),
             )
+
+        if as_async:
+            js_code += """
+  const status_url = response.headers.get("Location");
+  while (true) {
+    const response = await fetch(status_url, {
+        method: "GET",
+        headers: {
+        "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+        },
+    });
+    const result = await response.json();
+    if (result.status === "completed") {
+        console.log(response.status, result);
+        break;
+    } else if (result.status === "failed") {
+        console.log(response.status, result);
+        break;
+    } else {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  }""" % dict(
+                api_url=api_url,
+                auth_keyword=auth_keyword,
+            )
+        else:
+            js_code += """
+  const result = await response.json();
+  console.log(response.status, result);"""
+
+        js_code += "\n}\n\ngooeyAPI();"
 
         st.write(
             r"""
