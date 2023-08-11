@@ -47,7 +47,7 @@ class ApiResponseModelV2(GenericModel, typing.Generic[O]):
     output: O = Field(description="Output of the run")
 
 
-class FailedReponseModelV2(BaseModel):
+class FailedResponseDetail(BaseModel):
     id: str | None = Field(description="Unique ID for this run")
     url: str | None = Field(description="Web URL for this run")
     created_at: str | None = Field(
@@ -55,6 +55,10 @@ class FailedReponseModelV2(BaseModel):
     )
 
     error: str | None = Field(description="Error message if the run failed")
+
+
+class FailedReponseModelV2(BaseModel):
+    detail: FailedResponseDetail
 
 
 ## v3
@@ -67,7 +71,9 @@ class BaseResponseModelV3(GenericModel):
 
 
 class AsyncApiResponseModelV3(BaseResponseModelV3):
-    status_url: str = Field(description="URL to check the status of the run")
+    status_url: str = Field(
+        description="URL to check the status of the run. Also included in the `Location` header of the response."
+    )
 
 
 class AsyncStatusResponseModelV3(BaseResponseModelV3, typing.Generic[O]):
@@ -75,14 +81,12 @@ class AsyncStatusResponseModelV3(BaseResponseModelV3, typing.Generic[O]):
     status: typing.Literal["starting", "running", "completed", "failed"] = Field(
         description="Status of the run"
     )
-    detail: str = Field(description="Status of the run as a human readable string")
-    output: O | None = Field(description="Output of the run")
-
-
-class FailedReponseModelV3(BaseResponseModelV3):
-    run_time_sec: int = Field(description="Total run time in seconds")
-    status: typing.Literal["failed"] = Field(description="Status of the run => failed")
-    detail: str = Field(description="Error message of the failed run")
+    detail: str = Field(
+        description="Details about the status of the run as a human readable string"
+    )
+    output: O | None = Field(
+        description='Output of the run. Only available if status is `"completed"`'
+    )
 
 
 async def request_form_files(request: Request) -> FormData:
@@ -101,7 +105,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         response_model=response_model,
         responses={500: {"model": FailedReponseModelV2}, 402: {}},
         operation_id=page_cls.slug_versions[0],
-        name=page_cls.title,
+        name=page_cls.title + " (v2 sync)",
     )
     @app.post(
         endpoint,
@@ -150,15 +154,15 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         os.path.join(endpoint, "async/"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV3}, 402: {}},
+        responses={402: {}},
         operation_id="async__" + page_cls.slug_versions[0],
-        name=page_cls.title + " (async)",
+        name=page_cls.title + " (v3 async)",
         status_code=202,
     )
     @app.post(
         os.path.join(endpoint, "async"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV3}, 402: {}},
+        responses={402: {}},
         include_in_schema=False,
         status_code=202,
     )
@@ -181,13 +185,13 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.post(
         os.path.join(endpoint, "async/form/"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV3}, 402: {}},
+        responses={402: {}},
         include_in_schema=False,
     )
     @app.post(
         os.path.join(endpoint, "async/form"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV3}, 402: {}},
+        responses={402: {}},
         include_in_schema=False,
     )
     def run_api_form(
@@ -212,18 +216,17 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     @app.get(
         os.path.join(endpoint, "status/"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV3}, 402: {}},
+        responses={402: {}},
         operation_id="status__" + page_cls.slug_versions[0],
-        name=page_cls.title + " (status)",
+        name=page_cls.title + " (v3 status)",
     )
     @app.get(
         os.path.join(endpoint, "status"),
         response_model=response_model,
-        responses={500: {"model": FailedReponseModelV3}, 402: {}},
+        responses={402: {}},
         include_in_schema=False,
     )
     def get_run_status(
-        response: Response,
         run_id: str,
         user: AppUser = Depends(api_auth_header),
     ):
@@ -241,7 +244,6 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         }
         if err_msg:
             ret |= {"status": "failed", "detail": err_msg}
-            response.status_code = 500
             return ret
         else:
             run_status = state.get(StateKeys.run_status) or ""

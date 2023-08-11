@@ -1022,12 +1022,14 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         as_async: bool = False,
         include_all: bool = False,
     ) -> dict:
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        run_id = run_id or get_random_doc_id()
+        run_id = get_random_doc_id()
         created_at = st.session_state.get(
-            StateKeys.created_at, datetime.datetime.utcnow()
+            StateKeys.created_at, datetime.datetime.utcnow().isoformat()
         )
-        web_url = self.app_url(run_id=get_random_doc_id(), uid=uid)
+        web_url = self.app_url(
+            run_id=run_id,
+            uid=self.request.user and self.request.user.uid,
+        )
         if as_async:
             return dict(
                 run_id=run_id,

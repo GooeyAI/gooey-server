@@ -221,16 +221,10 @@ async function gooeyAPI() {
   const response = await fetch("%(api_url)s", {
     method: "POST",
     headers: {
-        "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+      "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
     },
     body: formData,
   });
-
-  const result = await response.json();
-  console.log(response.status, result);
-}
-
-gooeyAPI();
             """ % dict(
                 json=json.dumps(request_body, indent=2),
                 files=indent(
@@ -254,8 +248,8 @@ async function gooeyAPI() {
   const response = await fetch("%(api_url)s", {
     method: "POST",
     headers: {
-        "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
-        "Content-Type": "application/json",
+      "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
   });
@@ -265,6 +259,12 @@ async function gooeyAPI() {
                 json=json.dumps(request_body, indent=2),
             )
 
+        js_code += """
+  if (!response.ok) {
+    throw new Error(response.status);
+  }
+        """
+
         if as_async:
             js_code += """
   const status_url = response.headers.get("Location");
@@ -272,9 +272,13 @@ async function gooeyAPI() {
     const response = await fetch(status_url, {
         method: "GET",
         headers: {
-        "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
+          "Authorization": "%(auth_keyword)s " + process.env["GOOEY_API_KEY"],
         },
     });
+    if (!response.ok) {
+        throw new Error(response.status);
+    }
+    
     const result = await response.json();
     if (result.status === "completed") {
         console.log(response.status, result);
