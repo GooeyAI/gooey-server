@@ -196,17 +196,26 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
         etag = meta.get("md5Checksum") or meta.get("modifiedTime")
         mime_type = meta["mimeType"]
     else:
-        r = requests.head(
-            f_url,
-            headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-            timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
-        )
-        r.raise_for_status()
-        mime_type = get_mimetype_from_response(r)
-        etag = r.headers.get("etag", r.headers.get("last-modified"))
-        name = (
-            r.headers.get("content-disposition", "").split("filename=")[-1].strip('"')
-        )
+        try:
+            r = requests.head(
+                f_url,
+                headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
+                timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+            )
+            r.raise_for_status()
+        except requests.RequestException as e:
+            print(f"ignore error while downloading {f_url}: {e}")
+            mime_type = None
+            etag = None
+            name = None
+        else:
+            mime_type = get_mimetype_from_response(r)
+            etag = r.headers.get("etag", r.headers.get("last-modified"))
+            name = (
+                r.headers.get("content-disposition", "")
+                .split("filename=")[-1]
+                .strip('"')
+            )
     # extract filename from url as a fallback
     if not name:
         if is_user_uploaded_url(str(f)):
