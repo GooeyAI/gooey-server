@@ -142,7 +142,6 @@ import requests
 
 payload = %(json)s
 
-# Submit the task asynchronously
 response = requests.post(
     "%(api_url)s",
     headers={
@@ -160,7 +159,6 @@ assert response.ok, response.content
             py_code += r"""
 from time import sleep            
             
-# Wait for the task to complete
 status_url = response.headers["Location"]
 while True:
     response = requests.get(status_url, headers={"Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"]})
