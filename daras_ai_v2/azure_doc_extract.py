@@ -3,6 +3,7 @@ from furl import furl
 from tabulate import tabulate
 
 from daras_ai_v2 import settings
+from daras_ai_v2.redis_cache import redis_cache_decorator
 from gooeysite import wsgi
 
 assert wsgi
@@ -44,12 +45,13 @@ def azure_pdf_extract(pdf_url: str):
                 sleep(1)
 
 
-def extract_records(result, page):
-    table_polys = extract_tables(result, page)
+@redis_cache_decorator
+def extract_records(result: dict, page_num: int) -> list[dict]:
+    table_polys = extract_tables(result, page_num)
     records = []
     for para in result["paragraphs"]:
         try:
-            if para["boundingRegions"][0]["pageNumber"] != page:
+            if para["boundingRegions"][0]["pageNumber"] != page_num:
                 continue
         except (KeyError, IndexError):
             continue
