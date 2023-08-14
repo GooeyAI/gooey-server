@@ -81,6 +81,7 @@ def gdrive_metadata(file_id: str) -> dict:
     metadata = (
         service.files()
         .get(
+            supportsAllDrives=True,
             fileId=file_id,
             fields="name,md5Checksum,modifiedTime,mimeType",
         )
