@@ -2,6 +2,7 @@ import codecs
 import heapq
 import io
 import random
+import re
 import subprocess
 import tempfile
 import typing
@@ -91,7 +92,9 @@ def get_top_k_references(
     ]
     # get top_k best matches
     references = heapq.nlargest(
-        request.max_references, candidates, key=lambda match: match["score"]
+        request.max_references,
+        candidates,
+        key=lambda match: match["score"] * float(match.get("weight", None) or "1"),
     )
 
     # merge duplicate references
@@ -260,22 +263,34 @@ def get_embeds_for_doc(
     chunk_size = int(max_context_words * 2)
     chunk_overlap = int(max_context_words * 2 / scroll_jump)
     metas: list[SearchReference]
-    # split the text into chunks
     if isinstance(pages, pd.DataFrame):
-        metas = [
-            {
-                "title": doc_meta.name,
-                "url": f_url,
-                **row,  # preserve extra csv rows
-                "score": -1,
-                "snippet": doc.text,
-            }
-            for idx, row in pages.iterrows()
-            for doc in text_splitter(
-                row["snippet"], chunk_size=chunk_size, chunk_overlap=chunk_overlap
-            )
-        ]
+        metas = []
+        # treat each row as a separate document
+        for idx, row in pages.iterrows():
+            sections = (row.get("sections") or "").strip()
+            snippet = (row.get("snippet") or "").strip()
+            if sections:
+                splits = split_sections(
+                    sections, chunk_size=chunk_size, chunk_overlap=chunk_overlap
+                )
+            elif snippet:
+                splits = text_splitter(
+                    row["snippet"], chunk_size=chunk_size, chunk_overlap=chunk_overlap
+                )
+            else:
+                continue
+            metas += [
+                {
+                    "title": doc_meta.name,
+                    "url": f_url,
+                    **row,  # preserve extra csv rows
+                    "score": -1,
+                    "snippet": doc.text,
+                }
+                for doc in splits
+            ]
     else:
+        # split the text into chunks
         metas = [
             {
                 "title": doc_meta.name
@@ -300,6 +315,31 @@ def get_embeds_for_doc(
         batch = texts[i : i + batch_size]
         embeds.extend(openai_embedding_create(batch))
     return list(zip(metas, embeds))
+
+
+sections_re = re.compile(r"\s*[\r\n\f\v](\w+)\=")
+
+
+def split_sections(sections: str, *, chunk_overlap: int, chunk_size: int):
+    split = sections_re.split(sections)
+    header = ""
+    for role, content in zip(split[1::2], split[2::2]):
+        match role:
+            case "content":
+                for doc in text_splitter(
+                    content, chunk_size=chunk_size, chunk_overlap=chunk_overlap
+                ):
+                    doc.text = header + doc.text
+                    yield doc
+            case "table":
+                for doc in text_splitter(
+                    content, chunk_size=chunk_size, chunk_overlap=chunk_overlap
+                ):
+                    doc.text = header + doc.text
+                    yield doc
+                    break  # truncate tables that are too large. TODO: extract table headers
+            case _:
+                header += f"{role}={content}\n"
 
 
 @redis_cache_decorator
@@ -370,10 +410,10 @@ def doc_url_to_text_pages(
         case ".csv" | ".xlsx" | ".tsv" | ".ods":
             import pandas as pd
 
-            df = pd.read_csv(io.BytesIO(f_bytes), dtype=str).dropna()
+            df = pd.read_csv(io.BytesIO(f_bytes), dtype=str).fillna("")
             assert (
-                "snippet" in df.columns
-            ), f'uploaded spreadsheet must contain a "snippet" column - {f_name !r}'
+                "snippet" in df.columns or "sections" in df.columns
+            ), f'uploaded spreadsheet must contain a "snippet" or "sections" column - {f_name !r}'
             pages = df
         case _:
             raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
