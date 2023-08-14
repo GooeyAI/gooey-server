@@ -3,7 +3,7 @@ import operator
 import re
 import threading
 import typing
-
+from enum import Enum
 
 import tiktoken
 from collections import deque
@@ -83,12 +83,18 @@ class Document:
         return f"{self.__class__.__qualname__}(span={self.span!r}, text={self.text!r})"
 
 
+class SeparatorFallback(Enum):
+    IGNORE = 1
+    RAISE_ERROR = 2
+
+
 def text_splitter(
     docs: typing.Iterable[str | Document],
     *,
     chunk_size: int,
     chunk_overlap: int = 0,
     separators: list[re.Pattern] = default_separators,
+    fallback: SeparatorFallback = SeparatorFallback.IGNORE,
     length_function: L = default_length_function,
 ) -> list[Document]:
     if not docs:
@@ -97,7 +103,7 @@ def text_splitter(
         docs = [docs]
     if isinstance(docs[0], str):
         docs = [Document(d, (idx, idx), length_function) for idx, d in enumerate(docs)]
-    splits = _split(docs, chunk_size, separators)
+    splits = _split(docs, chunk_size, separators, fallback)
     docs = list(_join(splits, chunk_size, chunk_overlap))
     return docs
 
@@ -106,9 +112,14 @@ def _split(
     docs: list[Document],
     chunk_size: int,
     separators: list[re.Pattern],
+    fallback: SeparatorFallback,
 ) -> typing.Iterable[Document]:
     if not separators:
-        raise ValueError("No separators left, cannot split further")
+        match fallback:
+            case SeparatorFallback.IGNORE:
+                return
+            case SeparatorFallback.RAISE_ERROR:
+                raise ValueError("No separators left, cannot split further")
     for doc in docs:
         # skip empty docs
         if not doc.text.strip():
@@ -126,7 +137,7 @@ def _split(
             if len(frag) <= chunk_size:
                 yield frag
             else:
-                yield from _split([frag], chunk_size, separators[1:])
+                yield from _split([frag], chunk_size, separators[1:], fallback)
 
 
 def re_split(pat: re.Pattern, text: str):
