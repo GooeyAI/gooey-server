@@ -13,6 +13,39 @@ from bots.admin_links import list_related_html_url, open_in_new_tab, change_obj_
 from bots.models import FeedbackComment, CHATML_ROLE_ASSISSTANT
 
 
+@admin.action(description="Export to CSV")
+def export_to_csv(
+    modeladmin,
+    request,
+    queryset,
+):
+    filename = _get_filename()
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
+    queryset.to_df().to_csv(response, index=False)
+    return response
+
+
+@admin.action(description="Export to Excel")
+def export_to_excel(
+    modeladmin,
+    request,
+    queryset,
+):
+    filename = _get_filename()
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
+    queryset.to_df().to_excel(response, index=False)
+    return response
+
+
+def _get_filename():
+    filename = f"Gooey.AI Table {dateformat.format(datetime.datetime.now(), settings.DATETIME_FORMAT)}"
+    return filename
+
+
 class BotIntegrationAdminForm(forms.ModelForm):
     class Meta:
         widgets = {
@@ -57,6 +90,8 @@ class SavedRunAdmin(admin.ModelAdmin):
         "run_time",
     ]
 
+    actions = [export_to_csv, export_to_excel]
+
     def view_bots(self, saved_run: models.SavedRun):
         return list_related_html_url(saved_run.botintegrations)
 
@@ -94,39 +129,6 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         return list_related_html_url(bi.conversations)
 
     view_conversations.short_description = "Messages"
-
-
-@admin.action(description="Export to CSV")
-def export_to_csv(
-    modeladmin,
-    request,
-    queryset,
-):
-    filename = _get_filename()
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
-    queryset.to_df().to_csv(response, index=False)
-    return response
-
-
-@admin.action(description="Export to Excel")
-def export_to_excel(
-    modeladmin,
-    request,
-    queryset,
-):
-    filename = _get_filename()
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
-    queryset.to_df().to_excel(response, index=False)
-    return response
-
-
-def _get_filename():
-    filename = f"Gooey.AI Table {dateformat.format(datetime.datetime.now(), settings.DATETIME_FORMAT)}"
-    return filename
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):
