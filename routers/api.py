@@ -300,6 +300,30 @@ def call_api(
 ) -> dict:
     created_at = datetime.datetime.utcnow().isoformat()
 
+    self, result, run_id, uid = submit_api_call(
+        page_cls=page_cls,
+        request_body=request_body,
+        user=user,
+        query_params=query_params,
+    )
+
+    return build_api_response(
+        self=self,
+        result=result,
+        run_id=run_id,
+        uid=uid,
+        run_async=run_async,
+        created_at=created_at,
+    )
+
+
+def submit_api_call(
+    *,
+    page_cls: typing.Type[BasePage],
+    request_body: dict,
+    user: AppUser,
+    query_params: dict,
+) -> tuple[BasePage, "celery.result.AsyncResult", str, str]:
     # init a new page for every request
     self = page_cls(request=SimpleNamespace(user=user))
 
@@ -329,9 +353,22 @@ def call_api(
                 "error": f"Doh! You need to purchase additional credits to run more Gooey.AI recipes: {account_url}",
             },
         )
-
+    # create a new run
     example_id, run_id, uid = self.create_new_run()
+    # submit the task
     result = self.call_runner_task(example_id, run_id, uid)
+    return self, result, run_id, uid
+
+
+def build_api_response(
+    *,
+    self: BasePage,
+    result: "celery.result.AsyncResult",
+    run_id: str,
+    uid: str,
+    run_async: bool,
+    created_at: str,
+):
     web_url = str(furl(self.app_url(run_id=run_id, uid=uid)))
     if run_async:
         status_url = str(

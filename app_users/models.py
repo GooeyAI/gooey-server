@@ -93,6 +93,8 @@ class AppUser(models.Model):
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
     upgraded_from_anonymous_at = models.DateTimeField(null=True, blank=True)
 
+    disable_safety_checker = models.BooleanField(default=False)
+
     objects = AppUserQuerySet.as_manager()
 
     def __str__(self):
