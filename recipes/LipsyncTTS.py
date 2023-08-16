@@ -151,22 +151,3 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         return f"""
         *Cost ≈ {CREDITS_PER_BYTE} credits per byte*
         """
-
-    def get_raw_price(self, state: dict) -> float:
-        # Retrieve the input_audio and input_face from the state dictionary
-        input_face_file_path = state.get("input_face")
-        input_audio_file_path = state.get("input_audio")
-
-        audio_size_headers = requests.head(input_audio_file_path)
-        audio_size = float(audio_size_headers.headers["Content-length"])
-
-        face_size_headers = requests.head(input_face_file_path)
-        face_size = float(face_size_headers.headers["Content-length"])
-
-        if face_size is None:
-            return 0.0
-
-        if audio_size is None:
-            return 0.0
-
-        return (face_size + audio_size) * CREDITS_PER_BYTE
