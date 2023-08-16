@@ -236,8 +236,10 @@ SCALESERP_API_KEY = config("SCALESERP_API_KEY", None)
 EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="sean@dara.network")
-
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
+
+SAFTY_CHECKER_EXAMPLE_ID = "3rcxqx0r"
+SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)

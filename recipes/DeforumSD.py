@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from app_users.models import AppUser
+from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import flatten
 from daras_ai_v2.gpu_server import call_celery_task_outfile
@@ -415,33 +416,11 @@ Choose fps for the video.
         return display
 
     def run(self, state: dict):
-        from routers.api import call_api
-
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        with ThreadPool(1) as pool:
-            response = pool.apply(
-                call_api,
-                kwds=dict(
-                    page_cls=CompareLLMPage,
-                    user=AppUser.objects.get_or_create_from_email(
-                        "support+mods@gooey.ai",
-                    )[0],
-                    request_body=dict(
-                        variables=dict(input=self.preview_input(state)),
-                    ),
-                    query_params=dict(example_id="3rcxqx0r"),
-                ),
-            )
-        try:
-            text = flatten(response["output"]["output_text"].values())[0]
-            if text.splitlines()[-1].upper().endswith("FLAGGED"):
-                raise ValueError(
-                    "Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system."
-                )
-        except IndexError:
-            pass
+        if not self.request.user.disable_safety_checker:
+            safety_checker(self.preview_input(state))
 
         state["output_video"] = call_celery_task_outfile(
             "deforum",
@@ -467,3 +446,42 @@ Choose fps for the video.
             content_type="video/mp4",
             filename=f"gooey.ai animation {request.animation_prompts}.mp4",
         )[0]
+
+
+def safety_checker(text_input: str):
+    from routers.api import submit_api_call
+
+    # ge the billing account for the checker
+    billing_account = AppUser.objects.get_or_create_from_email(
+        settings.SAFTY_CHECKER_BILLING_EMAIL
+    )[0]
+
+    # run in a thread to avoid messing up threadlocals
+    with ThreadPool(1) as pool:
+        page, result, run_id, uid = pool.apply(
+            submit_api_call,
+            kwds=dict(
+                page_cls=CompareLLMPage,
+                query_params=dict(example_id=settings.SAFTY_CHECKER_EXAMPLE_ID),
+                user=billing_account,
+                request_body=dict(variables=dict(input=text_input)),
+            ),
+        )
+
+    # wait for checker
+    result.get(disable_sync_subtasks=False)
+    # get result
+    sr = page.run_doc_sr(run_id, uid)
+    # if checker failed, raise error
+    if sr.error_msg:
+        raise RuntimeError(sr.error_msg)
+
+    # check for flagged
+    for text in flatten(sr.state["output_text"].values()):
+        lines = text.splitlines()
+        if not lines:
+            continue
+        if lines[-1].upper().endswith("FLAGGED"):
+            raise ValueError(
+                "Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system."
+            )
