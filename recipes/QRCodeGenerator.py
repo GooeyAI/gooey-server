@@ -32,6 +32,7 @@ from daras_ai_v2.stable_diffusion import (
     Schedulers,
 )
 from url_shortener.models import ShortenedURL
+from daras_ai_v2.loom_video_widget import youtube_video
 
 ATTEMPTS = 1
 
@@ -372,6 +373,9 @@ Here is the final output:
             case Text2ImgModels.dall_e.name:
                 total += 10
         return total * state.get("num_outputs", 1)
+    
+    def render_usage_guide(self):
+        youtube_video("Q1D6B_-UoxY")
 
 
 def is_url(url: str) -> bool:
