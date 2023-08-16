@@ -92,6 +92,24 @@ class Workflow(models.IntegerChoices):
         return {w.label: w for w in Workflow}[label]
 
 
+class SavedRunQuerySet(models.QuerySet):
+    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
+        import pandas as pd
+
+        # export only the first 10,000 records
+        qs = self.all()[:10_000]
+        # Convert the queryset to a list of dicts
+        records = [sr.to_dict() | {"web_url": sr.get_app_url()} for sr in qs]
+        # Convert the list of dicts to a dataframe
+        df = pd.DataFrame.from_records(records)
+        # Identify datetime columns and convert them to the specified timezone
+        for column, dtype in df.dtypes.items():
+            if not pd.api.types.is_datetime64_any_dtype(dtype):
+                continue
+            df[column] = df[column].dt.tz_convert(tz)
+        return df
+
+
 class SavedRun(models.Model):
     workflow = models.IntegerField(choices=Workflow.choices, default=Workflow.VIDEOBOTS)
     example_id = models.TextField(default=None, null=True, blank=True)
@@ -110,6 +128,8 @@ class SavedRun(models.Model):
 
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = SavedRunQuerySet.as_manager()
 
     class Meta:
         ordering = ["-updated_at"]
