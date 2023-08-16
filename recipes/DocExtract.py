@@ -357,16 +357,24 @@ def process_source(
                     content_url = upload_file_from_bytes(
                         entry["title"], outf.getvalue(), content_type="application/pdf"
                     )
+            else:
+                raise NotImplementedError(
+                    f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"
+                )
         update_cell(spreadsheet_id, row, Columns.content_url.value, content_url)
 
     transcript = existing_values[Columns.transcript.value]
     if not transcript:
-        if "audio/" in doc_meta.mime_type:
+        if is_yt_url(webpage_url) or "audio/" in doc_meta.mime_type:
             yield "Transcribing"
             transcript = run_asr(content_url, request.selected_asr_model)
         elif "application/pdf" in doc_meta.mime_type:
             yield "Extracting PDF"
             transcript = str(azure_pdf_extract(content_url)[0])
+        else:
+            raise NotImplementedError(
+                f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"
+            )
         update_cell(spreadsheet_id, row, Columns.transcript.value, transcript)
 
     if request.google_translate_target:
