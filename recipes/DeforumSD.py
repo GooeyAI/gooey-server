@@ -278,22 +278,22 @@ How should the camera pan vertically? This parameter uses positive values to mov
         if animation_mode == "3D":
             st.text_input(
                 """
-###### Camera Rotation
+###### Roll Clockwise/Counterclockwise
 Gradually moves the camera on a focal axis. Roll the camera clockwise or counterclockwise in a specific degree per frame. This parameter uses positive values to roll counterclockwise and negative values to roll clockwise. E.g. use `0:(-1), 20:(0)` to roll the camera 1 degree clockwise for the first 20 frames.
                 """,
                 key="rotation_3d_z",
             )
             st.text_input(
                 """
-###### Rotate Up/Down 
-Tilts the camera up or down in degrees per frame. This parameter uses positive values to tilt up and negative values to tilt down.
+###### Pan Left/Right
+Pans the canvas left or right in degrees per frame. This parameter uses positive values to pan right and negative values to pan left.
                 """,
                 key="rotation_3d_y",
             )
             st.text_input(
                 """
-###### Rotate Left/Right 
-Pans the canvas left or right in degrees per frame. This parameter uses positive values to pan right and negative values to pan left.
+###### Tilt Up/Down
+Tilts the camera up or down in degrees per frame. This parameter uses positive values to tilt up and negative values to tilt down.
                 """,
                 key="rotation_3d_x",
             )
