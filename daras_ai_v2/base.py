@@ -216,15 +216,7 @@ class BasePage:
             case MenuTabs.run:
                 input_col, output_col = st.columns([3, 2], gap="medium")
                 with input_col:
-                    self.render_author()
-                    self.render_form_v2()
-                    with st.expander("⚙️ Settings"):
-                        self.render_settings()
-                        st.write("---")
-                        st.write("##### 🖌️ Personalize")
-                        st.text_input("Title", key=StateKeys.page_title)
-                        st.text_area("Notes", key=StateKeys.page_notes)
-                    submitted = self.render_submit_button()
+                    submitted = self._render_input_col()
                 with output_col:
                     self._render_output_col(submitted)
 
@@ -580,31 +572,17 @@ class BasePage:
         ref.save(update_fields=["is_flagged"])
         st.session_state["is_flagged"] = is_flagged
 
-    def create_new_run(self):
-        st.session_state[StateKeys.run_status] = "Starting..."
-        st.session_state.pop(StateKeys.error_msg, None)
-        st.session_state.pop(StateKeys.run_time, None)
-        self._setup_rng_seed()
-        self.clear_outputs()
-
-        assert self.request, "request is not set for current session"
-        if self.request.user:
-            uid = self.request.user.uid
-        else:
-            uid = auth.create_user().uid
-            self.request.scope["user"] = AppUser.objects.create(
-                uid=uid, is_anonymous=True, balance=settings.ANON_USER_FREE_CREDITS
-            )
-            self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
-
-        run_id = get_random_doc_id()
-        example_id, *_ = extract_query_params(gooey_get_query_params())
-
-        self.run_doc_sr(run_id, uid, create=True).set(
-            self.state_to_doc(st.session_state)
-        )
-
-        return example_id, run_id, uid
+    def _render_input_col(self):
+        self.render_author()
+        self.render_form_v2()
+        with st.expander("⚙️ Settings"):
+            self.render_settings()
+            st.write("---")
+            st.write("##### 🖌️ Personalize")
+            st.text_input("Title", key=StateKeys.page_title)
+            st.text_area("Notes", key=StateKeys.page_notes)
+        submitted = self.render_submit_button()
+        return submitted
 
     def _render_output_col(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
@@ -650,6 +628,32 @@ class BasePage:
 
         if not run_status:
             self._render_after_output()
+
+    def create_new_run(self):
+        st.session_state[StateKeys.run_status] = "Starting..."
+        st.session_state.pop(StateKeys.error_msg, None)
+        st.session_state.pop(StateKeys.run_time, None)
+        self._setup_rng_seed()
+        self.clear_outputs()
+
+        assert self.request, "request is not set for current session"
+        if self.request.user:
+            uid = self.request.user.uid
+        else:
+            uid = auth.create_user().uid
+            self.request.scope["user"] = AppUser.objects.create(
+                uid=uid, is_anonymous=True, balance=settings.ANON_USER_FREE_CREDITS
+            )
+            self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
+
+        run_id = get_random_doc_id()
+        example_id, *_ = extract_query_params(gooey_get_query_params())
+
+        self.run_doc_sr(run_id, uid, create=True).set(
+            self.state_to_doc(st.session_state)
+        )
+
+        return example_id, run_id, uid
 
     def call_runner_task(self, example_id, run_id, uid):
         from celeryapp.tasks import gui_runner
