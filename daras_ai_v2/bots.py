@@ -10,7 +10,7 @@ from urllib.parse import parse_qs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.all_pages import Workflow
 from daras_ai_v2.asr import AsrModels, run_google_translate
-from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISSTANT
+from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from gooeysite.bg_db_conn import db_middleware
 
 from app_users.models import AppUser
@@ -467,7 +467,7 @@ def _process_msg(
         ),
         Message(
             conversation=convo,
-            role=CHATML_ROLE_ASSISSTANT,
+            role=CHATML_ROLE_ASSISTANT,
             content=raw_output_text,
             display_content=output_text,
             saved_run=SavedRun.objects.get_or_create(
