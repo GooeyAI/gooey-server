@@ -11,7 +11,7 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
     run_language_model,
     CHATML_ROLE_USER,
-    CHATML_ROLE_ASSISSTANT,
+    CHATML_ROLE_ASSISTANT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.pt import PromptTree
@@ -118,7 +118,7 @@ class SmartGPTPage(BasePage):
             {
                 "prompt": [
                     {"role": CHATML_ROLE_USER, "content": cot_prompt},
-                    {"role": CHATML_ROLE_ASSISSTANT, "content": cot_out},
+                    {"role": CHATML_ROLE_ASSISTANT, "content": cot_out},
                     {"role": CHATML_ROLE_USER, "content": request.reflexion_prompt},
                 ],
                 "children": prompt_tree,
@@ -142,15 +142,15 @@ class SmartGPTPage(BasePage):
                 "prompt": [
                     {"role": CHATML_ROLE_USER, "content": cot_prompt},
                     {
-                        "role": CHATML_ROLE_ASSISSTANT,
+                        "role": CHATML_ROLE_ASSISTANT,
                         "content": answers_as_prompt(cot_outputs),
                     },
                     {
-                        "role": CHATML_ROLE_ASSISSTANT,
+                        "role": CHATML_ROLE_ASSISTANT,
                         "content": request.reflexion_prompt,
                     },
                     {
-                        "role": CHATML_ROLE_ASSISSTANT,
+                        "role": CHATML_ROLE_ASSISTANT,
                         "content": answers_as_prompt(reflexion_outputs),
                     },
                     {"role": CHATML_ROLE_USER, "content": request.dera_prompt},

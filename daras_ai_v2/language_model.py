@@ -26,7 +26,7 @@ CHATML_START_TOKEN = "<|im_start|>"
 CHATML_END_TOKEN = "<|im_end|>"
 
 CHATML_ROLE_SYSTEM = "system"
-CHATML_ROLE_ASSISSTANT = "assistant"
+CHATML_ROLE_ASSISTANT = "assistant"
 CHATML_ROLE_USER = "user"
 
 

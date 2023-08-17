@@ -30,7 +30,7 @@ from daras_ai_v2.language_model import (
     CHATML_END_TOKEN,
     CHATML_START_TOKEN,
     LargeLanguageModels,
-    CHATML_ROLE_ASSISSTANT,
+    CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
     CHATML_ROLE_SYSTEM,
     model_max_tokens,
@@ -129,7 +129,7 @@ def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
         if (len(script_matches) - idx) % 2 == 0:
             role = CHATML_ROLE_USER
         else:
-            role = CHATML_ROLE_ASSISSTANT
+            role = CHATML_ROLE_ASSISTANT
         scripted_msgs.append(
             {
                 "role": role,
@@ -276,15 +276,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_form_v2(self):
         st.text_area(
             """
-            #### 👩‍💻 Prompt
-            Ask me anything!
+            ##### 📝 Script
+            Instructions to the bot + an example scripted conversation (~1000 words)
             """,
-            key="input_prompt",
-            help="What a fine day..",
-            height=50,
+            key="bot_script",
+            height=300,
         )
-
-        st.checkbox("♻️ Disable Memory", key="__clear_msgs")
 
         document_uploader(
             """
@@ -300,14 +297,6 @@ Enable document search, to use custom documents as information sources.
         st.checkbox("🔗 Shorten URL", key="use_url_shortener")
         st.caption(
             "This will shorten the urls of the references which allows tracking of clicks and views."
-        )
-        st.text_area(
-            """
-            ##### 📝 Script
-            Instructions to the bot + an example scripted conversation (~1000 words)
-            """,
-            key="bot_script",
-            height=300,
         )
         google_translate_language_selector(
             """
@@ -391,30 +380,80 @@ Use this for prompting GPT to use the document search results.
             st.write(truncate_text_words(output_text[0], maxlen=200))
 
     def render_output(self):
-        output_text = st.session_state.get("output_text", [])
-        output_video = st.session_state.get("output_video", [])
-        output_audio = st.session_state.get("output_audio", [])
-        if output_text:
-            st.write(f"#### 💌 Response")
-            for idx, text in enumerate(output_text):
-                try:
-                    st.video(output_video[idx])
-                except IndexError:
-                    try:
-                        st.audio(output_audio[idx])
-                    except IndexError:
-                        pass
-                st.write(text)
+        with st.div(className="pb-3"):
+            with st.div(
+                className="pb-1",
+                style=dict(
+                    maxHeight="80vh",
+                    overflowY="scroll",
+                    display="flex",
+                    flexDirection="column-reverse",
+                    border="1px solid #c9c9c9",
+                ),
+            ):
+                with st.div(className="px-3 py-1 pt-2"):
+                    output_text = st.session_state.get("output_text", [])
+                    output_video = st.session_state.get("output_video", [])
+                    output_audio = st.session_state.get("output_audio", [])
+                    if output_text:
+                        st.write(f"**Assistant**")
+                        for idx, text in enumerate(output_text):
+                            st.write(text)
+                            try:
+                                st.video(output_video[idx])
+                            except IndexError:
+                                try:
+                                    st.audio(output_audio[idx])
+                                except IndexError:
+                                    pass
 
-        messages = st.session_state.get("messages", [])
-        # if messages and st.checkbox("🗑️ Clear History"):
-        #     messages.clear()
-        if messages:
-            with st.expander(f"💬 Conversation", expanded=True):
-                for entry in messages:
-                    display_name = entry.get("display_name") or entry["role"]
-                    display_name = display_name.capitalize()
-                    st.caption(f'**_{display_name}_** \\\n{entry["content"]}')
+                for entry in reversed(
+                    st.session_state.get("messages", [])
+                    + [
+                        {
+                            "role": CHATML_ROLE_USER,
+                            "content": st.session_state.get("input_prompt"),
+                        }
+                    ]
+                ):
+                    with st.div(
+                        className="px-3 py-1 pt-2",
+                        style=dict(
+                            background="rgba(239, 239, 239, 0.6)"
+                            if entry["role"] == CHATML_ROLE_USER
+                            else "#fff",
+                        ),
+                    ):
+                        display_name = entry.get("display_name") or entry["role"]
+                        display_name = display_name.capitalize()
+                        st.write(f'**{display_name}** \\\n{entry["content"]}')
+
+            with st.div(
+                className="px-3 pt-3 d-flex gap-1",
+                style=dict(background="rgba(239, 239, 239, 0.6)"),
+            ):
+                with st.div(className="flex-grow-1"):
+                    new_input = st.text_area(
+                        "", placeholder="Send a message", height=50
+                    )
+
+                if st.button("✈ Send", style=dict(height="3.2rem")):
+                    st.session_state["messages"].extend(
+                        [
+                            {
+                                "role": CHATML_ROLE_USER,
+                                "content": st.session_state.get("raw_input_text"),
+                            },
+                            {
+                                "role": CHATML_ROLE_ASSISTANT,
+                                "content": st.session_state.get(
+                                    "raw_output_text", [""]
+                                )[0],
+                            },
+                        ]
+                    )
+                    st.session_state["input_prompt"] = new_input
+                    self.on_submit()
 
         references = st.session_state.get("references", [])
         if not references:
@@ -483,11 +522,6 @@ Use this for prompting GPT to use the document search results.
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
-        # clear message history if requested
-        clear_msgs = bool(state.get("__clear_msgs"))
-        if clear_msgs:
-            saved_msgs.clear()
-
         # translate input text
         if request.user_language and request.user_language != "en":
             yield f"Translating input to english..."
@@ -514,7 +548,7 @@ Use this for prompting GPT to use the document search results.
         try:
             bot_display_name = scripted_msgs[-1]["display_name"]
         except IndexError:
-            bot_display_name = CHATML_ROLE_ASSISSTANT
+            bot_display_name = CHATML_ROLE_ASSISTANT
         try:
             user_display_name = scripted_msgs[-2]["display_name"]
         except IndexError:
@@ -578,7 +612,7 @@ Use this for prompting GPT to use the document search results.
             # assistant prompt to triger a model response
             prompt_messages.append(
                 {
-                    "role": CHATML_ROLE_ASSISSTANT,
+                    "role": CHATML_ROLE_ASSISTANT,
                     "display_name": bot_display_name,
                     "content": "",
                 }
@@ -621,23 +655,7 @@ Use this for prompting GPT to use the document search results.
                 stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
             )
         # save model response
-        saved_msgs.extend(
-            [
-                {
-                    "role": CHATML_ROLE_USER,
-                    "display_name": user_display_name,
-                    "content": user_input,
-                },
-                {
-                    "role": CHATML_ROLE_ASSISSTANT,
-                    "display_name": bot_display_name,
-                    "content": output_text[0],
-                },
-            ]
-        )
         state["raw_output_text"] = output_text.copy()
-        # save message history
-        yield "Saving messages...", {"messages": saved_msgs}
 
         # translate response text
         if request.user_language and request.user_language != "en":
