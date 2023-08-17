@@ -1,6 +1,7 @@
 import codecs
 import heapq
 import io
+import mimetypes
 import random
 import re
 import subprocess
@@ -225,6 +226,9 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
             name = f.path.segments[-1]
         else:
             name = f"{f.host}{f.path}"
+    # guess mimetype from name as a fallback
+    if not mime_type:
+        mime_type = mimetypes.guess_type(name)[0]
     return DocMetadata(name, etag, mime_type)
 
 
