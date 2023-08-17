@@ -256,7 +256,7 @@ def extract_info(url: str) -> list[dict | None]:
         with yt_dlp.YoutubeDL(params) as ydl:
             data = ydl.extract_info(url, download=False)
         entries = data.get("entries", [data])
-        return entries
+        return [e for e in entries if e]
     else:
         # assume it's a direct link
         doc_meta = doc_url_to_metadata(url)
