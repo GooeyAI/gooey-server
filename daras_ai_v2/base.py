@@ -1,4 +1,5 @@
 import datetime
+import html
 import inspect
 import math
 import typing
@@ -615,7 +616,6 @@ class BasePage:
 
         if submitted:
             example_id, run_id, uid = self.create_new_run()
-
             if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
                 st.session_state[StateKeys.run_status] = None
                 st.session_state[
@@ -1095,7 +1095,7 @@ def err_msg_for_exc(e):
         try:
             err_body = response.json()
         except requests.JSONDecodeError:
-            err_body = response.text
+            err_str = response.text
         else:
             format_exc = err_body.get("format_exc")
             if format_exc:
@@ -1104,7 +1104,8 @@ def err_msg_for_exc(e):
             err_str = err_body.get("str")
             if err_type and err_str:
                 return f"(GPU) {err_type}: {err_str}"
-        return f"(HTTP {response.status_code}) {err_body}"
+            err_str = str(err_body)
+        return f"(HTTP {response.status_code}) {html.escape(err_str[:1000])}"
     else:
         return f"{type(e).__name__}: {e}"
 
