@@ -82,7 +82,7 @@ class DocExtractPage(BasePage):
     def render_form_v2(self):
         document_uploader(
             "##### 🤖 Youtube URLS",
-            accept=("audio/*", "application/pdf"),
+            accept=("audio/*", "application/pdf", "video/*"),
         )
         st.text_input(
             "##### 📊 Google Sheets URL",
@@ -260,6 +260,7 @@ def extract_info(url: str) -> list[dict | None]:
     else:
         # assume it's a direct link
         doc_meta = doc_url_to_metadata(url)
+        assert doc_meta.mime_type, f"Could not determine mime type for {url}"
 
         if "application/pdf" in doc_meta.mime_type:
             f = furl(url)
@@ -339,33 +340,36 @@ def process_source(
         yield "Downloading"
         if is_yt_url(webpage_url):
             content_url, _ = download_youtube_to_wav(webpage_url)
-        else:
-            if "audio/" in doc_meta.mime_type:
-                f = furl(webpage_url)
-                if is_gdrive_url(f):
-                    f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
-                    webpage_url = upload_file_from_bytes(
-                        doc_meta.name, f_bytes, content_type=doc_meta.mime_type
-                    )
-                content_url, _ = audio_to_wav(webpage_url)
-            elif "application/pdf" in doc_meta.mime_type:
-                page = entry["pdf_page"]
-                outputpdf = PdfWriter()
-                outputpdf.add_page(page)
-                with io.BytesIO() as outf:
-                    outputpdf.write(outf)
-                    content_url = upload_file_from_bytes(
-                        entry["title"], outf.getvalue(), content_type="application/pdf"
-                    )
-            else:
-                raise NotImplementedError(
-                    f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"
+        elif "video/" in doc_meta.mime_type or "audio/" in doc_meta.mime_type:
+            f = furl(webpage_url)
+            if is_gdrive_url(f):
+                f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
+                webpage_url = upload_file_from_bytes(
+                    doc_meta.name, f_bytes, content_type=doc_meta.mime_type
                 )
+            content_url, _ = audio_to_wav(webpage_url)
+        elif "application/pdf" in doc_meta.mime_type:
+            page = entry["pdf_page"]
+            outputpdf = PdfWriter()
+            outputpdf.add_page(page)
+            with io.BytesIO() as outf:
+                outputpdf.write(outf)
+                content_url = upload_file_from_bytes(
+                    entry["title"], outf.getvalue(), content_type="application/pdf"
+                )
+        else:
+            raise NotImplementedError(
+                f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"
+            )
         update_cell(spreadsheet_id, row, Columns.content_url.value, content_url)
 
     transcript = existing_values[Columns.transcript.value]
     if not transcript:
-        if is_yt_url(webpage_url) or "audio/" in doc_meta.mime_type:
+        if (
+            is_yt_url(webpage_url)
+            or "video/" in doc_meta.mime_type
+            or "audio/" in doc_meta.mime_type
+        ):
             yield "Transcribing"
             transcript = run_asr(content_url, request.selected_asr_model)
         elif "application/pdf" in doc_meta.mime_type:

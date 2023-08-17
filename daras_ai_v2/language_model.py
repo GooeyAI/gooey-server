@@ -141,9 +141,7 @@ def do_retry(
                 except get_error_cls() as e:
                     if n < max_retries:
                         n += 1
-                        print(
-                            f"({n}/5) captured error, retry in {retry_delay}s:", repr(e)
-                        )
+                        print(f"({n}/5) captured error, retry in {retry_delay}s: {e!r}")
                         sleep(retry_delay)
                     else:
                         raise
