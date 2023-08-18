@@ -687,8 +687,7 @@ Doh! You’re out of Gooey.AI credits.
 </p>
 
 <p>
-Please <a href="{settings.GRANT_URL}" target="_blank">apply for a grant</a> or 
-<a href="{account_url}" target="_blank">buy more</a> to run more workflows.
+Please <a href="{account_url}" target="_blank">buy more</a> to run more workflows.
 </p>
 
 We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discord</a> if you’ve got any questions.
