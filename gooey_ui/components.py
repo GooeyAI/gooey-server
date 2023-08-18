@@ -240,8 +240,8 @@ def text_area(
     if disabled:
         style.setdefault("height", f"{height}px"),
     else:
-        style.setdefault("maxHeight", f"{height}px"),
-        props.setdefault("rows", max((value or "").count("\n") + 1, 2))
+        style.setdefault("maxHeight", "90vh"),
+        props.setdefault("rows", nrows_for_text(value, height))
     state.RenderTreeNode(
         name="textarea",
         props=dict(
@@ -255,6 +255,21 @@ def text_area(
         ),
     ).mount()
     return value or ""
+
+
+def nrows_for_text(
+    text: str,
+    max_height_px: int,
+    min_rows: int = 2,
+    row_height_px: int = 30,
+    row_width_px: int = 80,
+) -> int:
+    max_rows = max_height_px // row_height_px
+    nrows = int(
+        sum(len(line) / row_width_px for line in (text or "").strip().splitlines())
+    )
+    nrows = min(max(nrows, min_rows), max_rows)
+    return nrows
 
 
 def multiselect(
