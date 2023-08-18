@@ -11,6 +11,7 @@ from daras_ai_v2.google_search import call_scaleserp_rq
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
+from daras_ai_v2.search_ref import CitationStyles
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import DocSearchPage, render_doc_search_step
 
@@ -27,6 +28,10 @@ class RelatedQnADocPage(BasePage):
 
     price = 100
 
+    sane_defaults = {
+        "citation_style": CitationStyles.number.name,
+    }
+
     class RequestModel(BaseModel):
         search_query: str
         documents: list[str] | None
@@ -42,8 +47,9 @@ class RelatedQnADocPage(BasePage):
         max_references: int | None
         max_context_words: int | None
         scroll_jump: int | None
-
         sampling_temperature: float | None
+
+        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
 
         scaleserp_search_field: str | None
         scaleserp_locations: list[str] | None
