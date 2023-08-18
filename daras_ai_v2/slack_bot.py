@@ -159,7 +159,7 @@ def reply(
             "blocks": [
                 {
                     "type": "section",
-                    "text": {"type": "plain_text", "text": text},
+                    "text": {"type": "mrkdwn", "text": text},
                 },
             ]
             + create_file_block("Audio", token, audio)

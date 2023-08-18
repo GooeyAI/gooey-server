@@ -21,6 +21,7 @@ from daras_ai_v2.search_ref import (
     SearchReference,
     render_output_with_refs,
     apply_response_template,
+    CitationStyles,
 )
 from daras_ai_v2.vector_search import (
     DocSearchRequest,
@@ -46,6 +47,7 @@ class DocSearchPage(BasePage):
         "scroll_jump": 5,
         "avoid_repetition": True,
         "selected_model": LargeLanguageModels.text_davinci_003.name,
+        "citation_style": CitationStyles.number.name,
     }
 
     class RequestModel(DocSearchRequest):
@@ -59,6 +61,8 @@ class DocSearchPage(BasePage):
         quality: float | None
         max_tokens: int | None
         sampling_temperature: float | None
+
+        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
 
     class ResponseModel(BaseModel):
         output_text: list[str]
@@ -174,7 +178,12 @@ class DocSearchPage(BasePage):
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
         )
-        apply_response_template(output_text, references)
+
+        citation_style = (
+            request.citation_style and CitationStyles[request.citation_style]
+        ) or None
+        apply_response_template(output_text, references, citation_style)
+
         state["output_text"] = output_text
 
 

@@ -478,7 +478,7 @@ def safety_checker(text_input: str):
 
     # check for flagged
     for text in flatten(sr.state["output_text"].values()):
-        lines = text.splitlines()
+        lines = text.strip().splitlines()
         if not lines:
             continue
         if lines[-1].upper().endswith("FLAGGED"):

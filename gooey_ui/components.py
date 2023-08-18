@@ -1,4 +1,5 @@
 import base64
+import math
 import textwrap
 import typing
 
@@ -265,7 +266,7 @@ def nrows_for_text(
     row_width_px: int = 80,
 ) -> int:
     max_rows = max_height_px // row_height_px
-    nrows = int(
+    nrows = math.ceil(
         sum(len(line) / row_width_px for line in (text or "").strip().splitlines())
     )
     nrows = min(max(nrows, min_rows), max_rows)

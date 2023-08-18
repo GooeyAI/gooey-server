@@ -4,6 +4,7 @@ import os.path
 import re
 import typing
 
+from django.db.models import QuerySet
 from furl import furl
 from pydantic import BaseModel
 
@@ -39,7 +40,7 @@ from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.query_params_util import extract_query_params
-from daras_ai_v2.search_ref import apply_response_template
+from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
@@ -53,7 +54,6 @@ from recipes.DocSearch import (
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
-from django.db.models import QuerySet
 
 BOT_SCRIPT_RE = re.compile(
     # start of line
@@ -166,6 +166,7 @@ class VideoBotsPage(BasePage):
         "face_padding_left": 0,
         "face_padding_right": 0,
         # doc search
+        "citation_style": CitationStyles.number.name,
         "documents": [],
         "task_instructions": "Make sure to use only the following search results to guide your response. "
         'If the Search Results do not contain enough information, say "I don\'t know".',
@@ -216,9 +217,10 @@ class VideoBotsPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
-        user_language: str | None
-
+        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
+
+        user_language: str | None
 
     class ResponseModel(BaseModel):
         final_prompt: str
@@ -655,7 +657,10 @@ Use this for prompting GPT to use the document search results.
                 stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
             )
         # save model response
-        state["raw_output_text"] = output_text.copy()
+        state["raw_output_text"] = [
+            "".join(snippet for snippet, refs in parse_refs(text, references))
+            for text in output_text
+        ]
 
         # translate response text
         if request.user_language and request.user_language != "en":
@@ -667,7 +672,10 @@ Use this for prompting GPT to use the document search results.
             )
 
         if references:
-            apply_response_template(output_text, references)
+            citation_style = (
+                request.citation_style and CitationStyles[request.citation_style]
+            ) or None
+            apply_response_template(output_text, references, citation_style)
 
         state["output_text"] = output_text
 
@@ -760,7 +768,6 @@ Use this for prompting GPT to use the document search results.
         from routers.facebook import ig_connect_url, fb_connect_url
         from routers.slack import slack_connect_url
         from daras_ai_v2.all_pages import Workflow
-        from bots.models import SavedRun
 
         st.markdown(
             # language=html
