@@ -393,7 +393,7 @@ Use this for prompting GPT to use the document search results.
                     border="1px solid #c9c9c9",
                 ),
             ):
-                with st.div(className="px-3 py-1 pt-2"):
+                with msg_container_widget(CHATML_ROLE_ASSISTANT):
                     output_text = st.session_state.get("output_text", [])
                     output_video = st.session_state.get("output_video", [])
                     output_audio = st.session_state.get("output_audio", [])
@@ -409,23 +409,13 @@ Use this for prompting GPT to use the document search results.
                                 except IndexError:
                                     pass
 
-                for entry in reversed(
-                    st.session_state.get("messages", [])
-                    + [
-                        {
-                            "role": CHATML_ROLE_USER,
-                            "content": st.session_state.get("input_prompt"),
-                        }
-                    ]
-                ):
-                    with st.div(
-                        className="px-3 py-1 pt-2",
-                        style=dict(
-                            background="rgba(239, 239, 239, 0.6)"
-                            if entry["role"] == CHATML_ROLE_USER
-                            else "#fff",
-                        ),
-                    ):
+                input_prompt = st.session_state.get("input_prompt")
+                if input_prompt:
+                    with msg_container_widget(CHATML_ROLE_USER):
+                        st.write(f"**User** \\\n{input_prompt}")
+
+                for entry in reversed(st.session_state.get("messages", [])):
+                    with msg_container_widget(entry["role"]):
                         display_name = entry.get("display_name") or entry["role"]
                         display_name = display_name.capitalize()
                         st.write(f'**{display_name}** \\\n{entry["content"]}')
@@ -440,22 +430,32 @@ Use this for prompting GPT to use the document search results.
                     )
 
                 if st.button("✈ Send", style=dict(height="3.2rem")):
-                    st.session_state["messages"].extend(
-                        [
+                    messsages = st.session_state.get("messages", [])
+                    raw_input_text = st.session_state.get("raw_input_text") or ""
+                    raw_output_text = (st.session_state.get("raw_output_text") or [""])[
+                        0
+                    ]
+                    if raw_input_text and raw_output_text:
+                        messsages += [
                             {
                                 "role": CHATML_ROLE_USER,
-                                "content": st.session_state.get("raw_input_text"),
+                                "content": raw_input_text,
                             },
                             {
                                 "role": CHATML_ROLE_ASSISTANT,
-                                "content": st.session_state.get(
-                                    "raw_output_text", [""]
-                                )[0],
+                                "content": raw_output_text,
                             },
                         ]
-                    )
+                    st.session_state["messages"] = messsages
                     st.session_state["input_prompt"] = new_input
                     self.on_submit()
+
+        if st.button("🗑️ Clear"):
+            st.session_state["messages"] = []
+            st.session_state["input_prompt"] = ""
+            st.session_state["raw_input_text"] = ""
+            self.clear_outputs()
+            st.experimental_rerun()
 
         references = st.session_state.get("references", [])
         if not references:
@@ -883,3 +883,14 @@ def convo_window_clipper(
         ):
             return i + step
     return 0
+
+
+def msg_container_widget(role: str):
+    return st.div(
+        className="px-3 py-1 pt-2",
+        style=dict(
+            background="rgba(239, 239, 239, 0.6)"
+            if role == CHATML_ROLE_USER
+            else "#fff",
+        ),
+    )
