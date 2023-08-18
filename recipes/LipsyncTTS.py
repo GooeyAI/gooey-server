@@ -1,8 +1,6 @@
 import typing
 
 from pydantic import BaseModel
-import urllib.request
-import requests
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -12,15 +10,11 @@ from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/lipsync_meta_img.gif"
 
-CREDITS_PER_BYTE = 1
-
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lipsync Video with Any Text"
     workflow = Workflow.LIPSYNC_TTS
     slug_versions = ["LipsyncTTS", "lipsync-maker"]
-
-    price = 10
 
     class RequestModel(BaseModel):
         input_face: str
@@ -148,8 +142,3 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     def render_usage_guide(self):
         youtube_video("RRmwQR-IytI")
-
-    def additional_notes(self) -> str | None:
-        return f"""
-        *Cost ≈ {CREDITS_PER_BYTE} credits per byte*
-        """
