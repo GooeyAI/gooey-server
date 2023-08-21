@@ -39,6 +39,7 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
 from daras_ai_v2.text_output_widget import text_output
@@ -817,24 +818,24 @@ Use this for prompting GPT to use the document search results.
         if not integrations:
             return
 
-        example_id, run_id, uid = extract_query_params(
-            self._get_current_api_url().query.params
-        )
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
 
         for bi in integrations:
             is_connected = (
-                bi.saved_run
-                and Workflow(bi.saved_run.workflow) == Workflow.VIDEOBOTS
-                and (
-                    not (
-                        bi.saved_run.example_id
-                        or bi.saved_run.run_id
-                        or bi.saved_run.uid
-                    )
-                    or (run_id == bi.saved_run.run_id and uid == bi.saved_run.uid)
-                    or (example_id == bi.saved_run.example_id)
-                )
+                bi.saved_run and Workflow(bi.saved_run.workflow) == Workflow.VIDEOBOTS
             )
+            if bi.saved_run.run_id and bi.saved_run.uid:
+                is_connected = (
+                    is_connected
+                    and bi.saved_run.run_id == run_id
+                    and bi.saved_run.uid == uid
+                )
+            elif bi.saved_run.example_id:
+                is_connected = is_connected and bi.saved_run.example_id == example_id
+            else:
+                is_connected = not (
+                    bi.saved_run.run_id or bi.saved_run.uid or bi.saved_run.example_id
+                )
             col1, col2, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()
