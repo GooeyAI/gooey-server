@@ -16,12 +16,17 @@ class SearchReference(typing.TypedDict):
 
 
 class CitationStyles(Enum):
-    number = "Numerical ( [1] [2] [3] ..)"
+    number = "Numbers ( [1] [2] [3] ..)"
     title = "Source Title ( [Source 1] [Source 2] [Source 3] ..)"
     url = "Source URL ( [https://source1.com] [https://source2.com] [https://source3.com] ..)"
+
     markdown = "Markdown ( [Source 1](https://source1.com) [Source 2](https://source2.com) [Source 3](https://source3.com) ..)"
     html = "HTML ( <a href='https://source1.com'>Source 1</a> <a href='https://source2.com'>Source 2</a> <a href='https://source3.com'>Source 3</a> ..)"
     slack_mrkdwn = "Slack mrkdwn ( <https://source1.com|Source 1> <https://source2.com|Source 2> <https://source3.com|Source 3> ..)"
+
+    number_markdown = "Inline Numbers + Markdown listed at the end"
+    number_html = "Inline Numbers + HTML listed at the end"
+    number_slack_mrkdwn = "Inline Numbers + Slack mrkdwn listed at the end"
 
 
 def remove_quotes(snippet: str) -> str:
@@ -54,26 +59,22 @@ def apply_response_template(
     for i, text in enumerate(output_text):
         formatted = ""
         all_refs = {}
+
         for snippet, ref_map in parse_refs(text, references):
             match citation_style:
-                case CitationStyles.number:
+                case CitationStyles.number | CitationStyles.number_html | CitationStyles.number_markdown | CitationStyles.number_slack_mrkdwn:
                     cites = " ".join(f"[{ref_num}]" for ref_num in ref_map.keys())
                 case CitationStyles.title:
                     cites = " ".join(f"[{ref['title']}]" for ref in ref_map.values())
                 case CitationStyles.url:
                     cites = " ".join(f"[{ref['url']}]" for ref in ref_map.values())
                 case CitationStyles.markdown:
-                    cites = " ".join(
-                        f"[{ref['title']}]({ref['url']})" for ref in ref_map.values()
-                    )
+                    cites = " ".join(ref_to_markdown(ref) for ref in ref_map.values())
                 case CitationStyles.html:
-                    cites = " ".join(
-                        f"<a href='{ref['url']}'>{ref['title']}</a>"
-                        for ref in ref_map.values()
-                    )
+                    cites = " ".join(ref_to_html(ref) for ref in ref_map.values())
                 case CitationStyles.slack_mrkdwn:
                     cites = " ".join(
-                        f"<{ref['url']}|{ref['title']}>" for ref in ref_map.values()
+                        ref_to_slack_mrkdwn(ref) for ref in ref_map.values()
                     )
                 case None:
                     cites = ""
@@ -81,6 +82,27 @@ def apply_response_template(
                     raise ValueError(f"Unknown citation style: {citation_style}")
             formatted += snippet + " " + cites + " "
             all_refs.update(ref_map)
+
+        match citation_style:
+            case CitationStyles.number_markdown:
+                formatted += "\n\n"
+                formatted += "\n".join(
+                    f"[{ref_num}] {ref_to_markdown(ref)}"
+                    for ref_num, ref in all_refs.items()
+                )
+            case CitationStyles.number_html:
+                formatted += "<br><br>"
+                formatted += "<br>".join(
+                    f"[{ref_num}] {ref_to_html(ref)}"
+                    for ref_num, ref in all_refs.items()
+                )
+            case CitationStyles.number_slack_mrkdwn:
+                formatted += "\n\n"
+                formatted += "\n".join(
+                    f"[{ref_num}] {ref_to_slack_mrkdwn(ref)}"
+                    for ref_num, ref in all_refs.items()
+                )
+
         for ref_num, ref in all_refs.items():
             try:
                 template = ref["response_template"]
@@ -96,6 +118,18 @@ def apply_response_template(
 
 
 search_ref_pat = re.compile(r"\[" r"[\d\s\.\,\[\]\$\{\}]+" r"\]")
+
+
+def ref_to_markdown(ref: SearchReference) -> str:
+    return f"[{ref['title']}]({ref['url']})"
+
+
+def ref_to_html(ref: SearchReference) -> str:
+    return f'<a target="_blank" href="{ref["url"]}">{ref["title"]}</a>'
+
+
+def ref_to_slack_mrkdwn(ref: SearchReference) -> str:
+    return f"<{ref['url']}|{ref['title']}>"
 
 
 def parse_refs(
