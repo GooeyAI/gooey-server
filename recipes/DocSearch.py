@@ -186,6 +186,16 @@ class DocSearchPage(BasePage):
 
         state["output_text"] = output_text
 
+    def get_raw_price(self, state: dict) -> float:
+        name = state.get("selected_model")
+        match name:
+            case LargeLanguageModels.gpt_4.name:
+                return 60
+            case LargeLanguageModels.gpt_3_5_turbo_16k.name:
+                return 20
+            case _:
+                return 10
+
 
 def render_documents(state, label="**Documents**", *, key="documents"):
     documents = state.get(key, [])
