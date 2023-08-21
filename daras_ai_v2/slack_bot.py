@@ -3,9 +3,9 @@ import requests
 from typing import TypedDict
 
 from bots.models import BotIntegration, Platform, Conversation
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_response
 from daras_ai_v2.text_splitter import text_splitter
-from daras_ai_v2.asr import run_google_translate
+from daras_ai_v2.asr import run_google_translate, audio_url_to_wav, audio_bytes_to_wav
 from daras_ai_v2.bots import BotInterface
 
 from langcodes import Language
@@ -49,9 +49,13 @@ class SlackBot(BotInterface):
 
         self.input_type = "text"
         if message["files"]:
-            self.input_type = (
-                "audio" if "audio" in message["files"][0]["mimetype"] else "text"
-            )
+            match message["files"][0]["mimetype"]:
+                case "audio":
+                    self.input_type = "audio"
+                case "video":
+                    self.input_type = "video"
+                case _:
+                    self.input_type = "text"
         if message["actions"]:
             self.input_type = "interactive"
 
@@ -71,23 +75,27 @@ class SlackBot(BotInterface):
         url = self.input_message.get("files", [{}])[0].get("url_private_download", "")
         if not url:
             return None
+        # download file from slack
         r = requests.get(
             url, headers={"Authorization": f"Bearer {self.slack_access_token}"}
         )
         r.raise_for_status()
-        content_type = r.headers.get("Content-Type", "application/octet-stream")
-        mime_type = content_type.split(";")[0]
+        # ensure file is audio/video
+        mime_type = get_mimetype_from_response(r)
+        assert (
+            "audio/" in mime_type or "video/" in mime_type
+        ), f"Invalid mime type {mime_type} for {url}"
+        # convert to wav
+        data, _ = audio_bytes_to_wav(r.content)
+        mime_type = "audio/wav"
         # upload file to firebase
         audio_url = upload_file_from_bytes(
             filename=self.nice_filename(mime_type),
-            data=r.content,
+            data=data,
             content_type=mime_type,
         )
-        print("found audio url: " + audio_url)
+        # print("found audio url: " + audio_url)
         return audio_url
-
-    def get_input_video(self) -> str | None:
-        raise NotImplementedError()  # not used yet
 
     def get_interactive_msg_info(self) -> tuple[str, str]:
         return (

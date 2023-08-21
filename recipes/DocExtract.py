@@ -18,7 +18,7 @@ from daras_ai_v2.asr import (
     run_asr,
     download_youtube_to_wav,
     run_google_translate,
-    audio_to_wav,
+    audio_url_to_wav,
 )
 from daras_ai_v2.azure_doc_extract import azure_pdf_extract
 from daras_ai_v2.base import BasePage
@@ -347,7 +347,7 @@ def process_source(
                 webpage_url = upload_file_from_bytes(
                     doc_meta.name, f_bytes, content_type=doc_meta.mime_type
                 )
-            content_url, _ = audio_to_wav(webpage_url)
+            content_url, _ = audio_url_to_wav(webpage_url)
         elif "application/pdf" in doc_meta.mime_type:
             page = entry["pdf_page"]
             outputpdf = PdfWriter()
