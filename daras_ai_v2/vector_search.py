@@ -298,7 +298,7 @@ def get_embeds_for_doc(
         metas = [
             {
                 "title": doc_meta.name
-                + (f" - Page {doc.end + 1}" if len(pages) > 1 else ""),
+                + (f", page {doc.end + 1}" if len(pages) > 1 else ""),
                 "url": furl(f_url)
                 .set(fragment_args={"page": doc.end + 1} if len(pages) > 1 else {})
                 .url,

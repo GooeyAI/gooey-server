@@ -279,7 +279,7 @@ def extract_info(url: str) -> list[dict | None]:
                 {
                     "webpage_url": f.copy().set(fragment_args={"page": i + 1}).url,
                     "pdf_page": page,
-                    "title": (doc_meta.name + f" - Page {i + 1}"),
+                    "title": (doc_meta.name + f", page {i + 1}"),
                     "doc_meta": doc_meta,
                 }
                 for i, page in enumerate(inputpdf.pages)
