@@ -821,21 +821,29 @@ Use this for prompting GPT to use the document search results.
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
 
         for bi in integrations:
-            is_connected = (
-                bi.saved_run and Workflow(bi.saved_run.workflow) == Workflow.VIDEOBOTS
-            )
-            if bi.saved_run.run_id and bi.saved_run.uid:
+            if bi.saved_run:
+                # same run_id and uid
+                if bi.saved_run.run_id and bi.saved_run.uid:
+                    is_connected = (
+                        bi.saved_run.run_id == run_id and bi.saved_run.uid == uid
+                    )
+                # same example_id
+                elif bi.saved_run.example_id:
+                    is_connected = bi.saved_run.example_id == example_id
+                # root recipe
+                else:
+                    is_connected = not (
+                        bi.saved_run.run_id
+                        or bi.saved_run.uid
+                        or bi.saved_run.example_id
+                    )
+                # same workflow
                 is_connected = (
                     is_connected
-                    and bi.saved_run.run_id == run_id
-                    and bi.saved_run.uid == uid
+                    and Workflow(bi.saved_run.workflow) == Workflow.VIDEOBOTS
                 )
-            elif bi.saved_run.example_id:
-                is_connected = is_connected and bi.saved_run.example_id == example_id
             else:
-                is_connected = not (
-                    bi.saved_run.run_id or bi.saved_run.uid or bi.saved_run.example_id
-                )
+                is_connected = False
             col1, col2, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()

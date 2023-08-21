@@ -376,7 +376,13 @@ class BotIntegration(models.Model):
         ]
 
     def __str__(self):
-        orig_name = self.wa_phone_number or self.ig_username or self.fb_page_name
+        orig_name = (
+            self.wa_phone_number
+            or self.ig_username
+            or self.fb_page_name
+            or self.wa_phone_number_id
+            or self.fb_page_id
+        )
         if self.name and orig_name and self.name != orig_name:
             return f"{self.name} ({orig_name})"
         else:
