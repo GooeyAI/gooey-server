@@ -133,6 +133,10 @@ def truncate_text_words(text: str, maxlen: int, sep: str = " …") -> str:
     return trunc + sep
 
 
+# Add some missing mimetypes
+mimetypes.add_type("audio/wav", ".wav")
+
+
 def guess_ext_from_response(response: requests.Response) -> str:
     mimetype = get_mimetype_from_response(response)
     return mimetypes.guess_extension(mimetype) or ""
