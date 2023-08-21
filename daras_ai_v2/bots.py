@@ -66,9 +66,6 @@ class BotInterface:
     def get_input_audio(self) -> str | None:
         raise NotImplementedError
 
-    def get_input_video(self) -> str | None:
-        raise NotImplementedError
-
     def nice_filename(self, mime_type: str) -> str:
         ext = mimetypes.guess_extension(mime_type) or ""
         return f"{self.platform}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
@@ -168,7 +165,7 @@ def _on_msg(bot: BotInterface):
         case "interactive":
             _handle_interactive_msg(bot)
             return
-        case "audio":
+        case "audio" | "video":
             try:
                 result = _handle_audio_msg(billing_account_user, bot)
                 speech_run = result.get("url")

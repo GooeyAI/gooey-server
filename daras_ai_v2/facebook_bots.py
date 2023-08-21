@@ -1,9 +1,9 @@
 import requests
 
 from bots.models import BotIntegration, Platform, Conversation
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_response
 from daras_ai_v2 import settings
-from daras_ai_v2.asr import run_google_translate
+from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
 from daras_ai_v2.text_splitter import text_splitter
 from daras_ai_v2.bots import BotInterface
 
@@ -41,23 +41,21 @@ class WhatsappBot(BotInterface):
         try:
             media_id = self.input_message["audio"]["id"]
         except KeyError:
-            return None
-        return self._download_wa_media(media_id)
-
-    def get_input_video(self) -> str | None:
-        try:
-            media_id = self.input_message["video"]["id"]
-        except KeyError:
-            return None
+            try:
+                media_id = self.input_message["video"]["id"]
+            except KeyError:
+                return None
         return self._download_wa_media(media_id)
 
     def _download_wa_media(self, media_id: str) -> str:
         # download file from whatsapp
-        content, mime_type = retrieve_wa_media_by_id(media_id)
+        data, mime_type = retrieve_wa_media_by_id(media_id)
+        data, _ = audio_bytes_to_wav(data)
+        mime_type = "audio/wav"
         # upload file to firebase
         return upload_file_from_bytes(
             filename=self.nice_filename(mime_type),
-            data=content,
+            data=data,
             content_type=mime_type,
         )
 
@@ -369,17 +367,21 @@ class FacebookBot(BotInterface):
         # downlad file from facebook
         r = requests.get(url)
         r.raise_for_status()
-        mime_type = r.headers["content-type"]
+        # ensure file is audio/video
+        mime_type = get_mimetype_from_response(r)
+        assert (
+            "audio/" in mime_type or "video/" in mime_type
+        ), f"Invalid mime type {mime_type} for {url}"
+        # convert to wav
+        data, _ = audio_bytes_to_wav(r.content)
+        mime_type = "audio/wav"
         # upload file to firebase
         audio_url = upload_file_from_bytes(
             filename=self.nice_filename(mime_type),
-            data=r.content,
+            data=data,
             content_type=mime_type,
         )
         return audio_url
-
-    def get_input_video(self) -> str | None:
-        raise NotImplementedError
 
 
 def send_fb_msg(

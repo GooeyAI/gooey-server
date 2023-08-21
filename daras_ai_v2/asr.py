@@ -284,7 +284,7 @@ def run_asr(
     if is_youtube_url:
         audio_url, size = download_youtube_to_wav(audio_url)
     else:
-        audio_url, size = audio_to_wav(audio_url)
+        audio_url, size = audio_url_to_wav(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
     if selected_model == AsrModels.usm:
         # note: only us-central1 and a few other regions support chirp recognizers (so global can't be used)
@@ -471,26 +471,33 @@ def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
     return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
 
 
-def audio_to_wav(audio_url: str) -> tuple[str, int]:
+def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
+    r = requests.get(audio_url)
+    r.raise_for_status()
+
+    wavdata, size = audio_bytes_to_wav(r.content)
+    if not wavdata:
+        return audio_url, size
+
+    filename = furl(audio_url.strip("/")).path.segments[-1] + ".wav"
+    return upload_file_from_bytes(filename, wavdata, "audio/wav"), len(wavdata)
+
+
+def audio_bytes_to_wav(audio_bytes: bytes) -> tuple[bytes | None, int]:
     with tempfile.NamedTemporaryFile() as infile:
-        r = requests.get(audio_url)
-        r.raise_for_status()
-        infile.write(r.content)
+        infile.write(audio_bytes)
         infile.flush()
 
         if check_wav_audio_format(infile.name):
             # already a wav file
-            return audio_url, os.path.getsize(infile.name)
+            return None, os.path.getsize(infile.name)
 
         with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
             # convert audio to single channel wav
             args = ["ffmpeg", "-y", "-i", infile.name, *FFMPEG_WAV_ARGS, outfile.name]
             print("\t$ " + " ".join(args))
             subprocess.check_call(args)
-            wavdata = outfile.read()
-
-    filename = furl(audio_url.strip("/")).path.segments[-1] + ".wav"
-    return upload_file_from_bytes(filename, wavdata, "audio/wav"), len(wavdata)
+            return outfile.read(), os.path.getsize(outfile.name)
 
 
 def check_wav_audio_format(filename: str) -> bool:
