@@ -376,7 +376,11 @@ class BotIntegration(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.name or self.wa_phone_number or self.ig_username or self.fb_page_name}"
+        orig_name = self.wa_phone_number or self.ig_username or self.fb_page_name
+        if self.name and orig_name and self.name != orig_name:
+            return f"{self.name} ({orig_name})"
+        else:
+            return self.name or orig_name
 
 
 class ConvoState(models.IntegerChoices):
