@@ -47,14 +47,16 @@ class SlackBot(BotInterface):
         self.bot_id = message["channel"]
         self.user_id = message["user"]
 
-        media_display_type = message.get("files", [{}])[0].get("media_display_type", "")
-        match media_display_type:
-            case "audio":
-                self.input_type = "audio"
-            case "video":
-                self.input_type = "video"
-            case _:
-                self.input_type = "text"
+        files = message.get("files", [])
+        if files:
+            media_display_type = files[0].get("media_display_type", "")
+            match media_display_type:
+                case "audio":
+                    self.input_type = "audio"
+                case "video":
+                    self.input_type = "video"
+                case _:
+                    self.input_type = "text"
         if message.get("actions"):
             self.input_type = "interactive"
 
@@ -71,7 +73,10 @@ class SlackBot(BotInterface):
         return self.input_message["text"]
 
     def get_input_audio(self) -> str | None:
-        url = self.input_message.get("files", [{}])[0].get("url_private_download", "")
+        files = self.input_message.get("files", [])
+        if not files:
+            return None
+        url = files[0].get("url_private_download", "")
         if not url:
             return None
         # download file from slack
