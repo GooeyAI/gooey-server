@@ -81,6 +81,7 @@ def get_top_k_references(
             google_translate_target=request.google_translate_target,
         ),
         input_docs,
+        max_workers=10,
     )
 
     yield "Searching documents..."
