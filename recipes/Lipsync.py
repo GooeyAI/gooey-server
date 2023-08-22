@@ -12,7 +12,7 @@ from daras_ai_v2.lipsync_api import wav2lip
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 
-CREDITS_PER_BYTE = 1
+CREDITS_PER_BYTE = (0.000002)
 
 
 class LipsyncPage(BasePage):
@@ -126,7 +126,7 @@ class LipsyncPage(BasePage):
 
     def additional_notes(self) -> str | None:
         return f"""
-        *Cost ≈ {CREDITS_PER_BYTE} credits per byte*
+        *Cost ≈ {CREDITS_PER_BYTE * 1000000} credits per megabyte*
         """
 
     def get_raw_price(self, state: dict) -> float:
