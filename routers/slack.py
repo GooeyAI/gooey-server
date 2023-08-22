@@ -81,8 +81,10 @@ def slack_interaction(
     background_tasks: BackgroundTasks,
     data: dict = Depends(request_urlencoded_body),
 ):
+    data = json.loads(data.get("payload", ["{}"])[0])
     print("slack_interaction: " + str(data))
-    data = json.loads(data["payload"][0])
+    if not data:
+        raise HTTPException(400, "No payload")
     if data["token"] != settings.SLACK_VERIFICATION_TOKEN:
         raise HTTPException(403, "Only accepts requests from Slack")
     if data["type"] == "block_actions":

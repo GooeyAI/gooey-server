@@ -47,16 +47,15 @@ class SlackBot(BotInterface):
         self.bot_id = message["channel"]
         self.user_id = message["user"]
 
-        self.input_type = "text"
-        if message["files"]:
-            match message["files"][0]["mimetype"]:
-                case "audio":
-                    self.input_type = "audio"
-                case "video":
-                    self.input_type = "video"
-                case _:
-                    self.input_type = "text"
-        if message["actions"]:
+        media_display_type = message.get("files", [{}])[0].get("media_display_type", "")
+        match media_display_type:
+            case "audio":
+                self.input_type = "audio"
+            case "video":
+                self.input_type = "video"
+            case _:
+                self.input_type = "text"
+        if message.get("actions"):
             self.input_type = "interactive"
 
         bi: BotIntegration = BotIntegration.objects.get(slack_channel_id=self.bot_id)
