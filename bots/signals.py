@@ -10,11 +10,11 @@ from bots.tasks import msg_analysis
 def run_after_message_save(instance: Message, **kwargs):
     if (
         # analysis is enabled
-        instance.conversation.bot_integration.enable_analysis
-        # answer is not already done
-        and not instance._analysis_done
-        and not (instance.question_answered and instance.question_subject)
+        instance.conversation.bot_integration.analysis_run
+        # analysis is not running
+        and not instance._analysis_started
         # this is the assistant's response
         and instance.role == CHATML_ROLE_ASSISSTANT
     ):
         msg_analysis.delay(msg_id=instance.id)
+        instance._analysis_started = True

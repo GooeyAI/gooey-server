@@ -9,6 +9,7 @@ from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import BotIntegration, Platform
 from bots.models import Workflow
 from daras_ai.image_input import (
     truncate_text_words,
@@ -765,10 +766,8 @@ Use this for prompting GPT to use the document search results.
         show_landbot_widget()
 
     def messenger_bot_integration(self):
-        from bots.models import BotIntegration, Platform
         from routers.facebook import ig_connect_url, fb_connect_url
         from routers.slack import slack_connect_url
-        from daras_ai_v2.all_pages import Workflow
 
         st.markdown(
             # language=html
