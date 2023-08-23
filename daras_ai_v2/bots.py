@@ -1,17 +1,11 @@
 import mimetypes
-import typing
 import traceback
-
-from sentry_sdk import capture_exception
-from fastapi import HTTPException, Request
-from furl import furl
+import typing
 from urllib.parse import parse_qs
 
-from daras_ai_v2.base import BasePage
-from daras_ai_v2.all_pages import Workflow
-from daras_ai_v2.asr import AsrModels, run_google_translate
-from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
-from gooeysite.bg_db_conn import db_middleware
+from fastapi import HTTPException, Request
+from furl import furl
+from sentry_sdk import capture_exception
 
 from app_users.models import AppUser
 from bots.models import (
@@ -22,7 +16,12 @@ from bots.models import (
     Feedback,
     SavedRun,
     ConvoState,
+    Workflow,
 )
+from daras_ai_v2.asr import AsrModels, run_google_translate
+from daras_ai_v2.base import BasePage
+from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
+from gooeysite.bg_db_conn import db_middleware
 
 
 async def request_json(request: Request):
@@ -159,7 +158,7 @@ def _on_msg(bot: BotInterface):
         bot.billing_account_uid
     )[0]
     # get the user's input
-    print("input type:", bot.input_type)
+    # print("input type:", bot.input_type)
     match bot.input_type:
         # handle button press
         case "interactive":
