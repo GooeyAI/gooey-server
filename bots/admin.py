@@ -1,5 +1,6 @@
 import datetime
 
+import django.db.models
 from django import forms
 from django.conf import settings
 from django.contrib import admin
@@ -8,9 +9,18 @@ from django.http import HttpResponse
 from django.utils import dateformat
 from django.utils.timesince import timesince
 
-from bots import models
 from bots.admin_links import list_related_html_url, open_in_new_tab, change_obj_url
-from bots.models import FeedbackComment, CHATML_ROLE_ASSISSTANT
+from bots.models import (
+    FeedbackComment,
+    CHATML_ROLE_ASSISSTANT,
+    SavedRun,
+    Message,
+    Platform,
+    Feedback,
+    Conversation,
+    BotIntegration,
+)
+from gooeysite.custom_widgets import JSONEditorWidget
 
 
 @admin.action(description="Export to CSV")
@@ -66,7 +76,7 @@ class BotIntegrationAdminForm(forms.ModelForm):
         ]
 
 
-@admin.register(models.SavedRun)
+@admin.register(SavedRun)
 class SavedRunAdmin(admin.ModelAdmin):
     list_display = [
         "__str__",
@@ -77,14 +87,12 @@ class SavedRunAdmin(admin.ModelAdmin):
         "run_time",
         "updated_at",
     ]
-
     list_filter = ["workflow"]
-
     search_fields = ["workflow", "example_id", "run_id", "uid"]
+
     readonly_fields = [
-        "view_bots",
-        "open_in_firebase",
         "open_in_gooey",
+        "view_bots",
         "created_at",
         "updated_at",
         "run_time",
@@ -92,27 +100,24 @@ class SavedRunAdmin(admin.ModelAdmin):
 
     actions = [export_to_csv, export_to_excel]
 
-    def view_bots(self, saved_run: models.SavedRun):
+    formfield_overrides = {
+        django.db.models.JSONField: {"widget": JSONEditorWidget},
+    }
+
+    def view_bots(self, saved_run: SavedRun):
         return list_related_html_url(saved_run.botintegrations)
 
     view_bots.short_description = "View Bots"
 
-    def open_in_firebase(self, saved_run: models.SavedRun):
-        return open_in_new_tab(
-            saved_run.get_firebase_url(), label=saved_run.get_firebase_url()
-        )
-
-    open_in_firebase.short_description = "Open in Firebase"
-
-    def open_in_gooey(self, saved_run: models.SavedRun):
+    def open_in_gooey(self, saved_run: SavedRun):
         return open_in_new_tab(saved_run.get_app_url(), label=saved_run.get_app_url())
 
     open_in_gooey.short_description = "Open in Gooey"
 
 
-@admin.register(models.BotIntegration)
+@admin.register(BotIntegration)
 class BotIntegrationAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["saved_run"]
+    autocomplete_fields = ["saved_run", "analysis_run"]
     search_fields = [
         "name",
         "ig_account_id",
@@ -123,17 +128,25 @@ class BotIntegrationAdmin(admin.ModelAdmin):
     ]
     form = BotIntegrationAdminForm
     readonly_fields = ["view_conversations", "created_at", "updated_at"]
-    list_display = ["__str__", "platform", "wa_phone_number"]
+    list_display = [
+        "__str__",
+        "platform",
+        "wa_phone_number",
+        "created_at",
+        "updated_at",
+        "analysis_run",
+    ]
+    list_filter = ["platform"]
 
-    def view_conversations(self, bi: models.BotIntegration):
+    def view_conversations(self, bi: BotIntegration):
         return list_related_html_url(bi.conversations)
 
     view_conversations.short_description = "Messages"
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):
-    title = models.Conversation.last_active_delta.short_description
-    parameter_name = models.Conversation.last_active_delta.__name__
+    title = Conversation.last_active_delta.short_description
+    parameter_name = Conversation.last_active_delta.__name__
 
     def lookups(self, request, model_admin):
         return [
@@ -158,7 +171,7 @@ class LastActiveDeltaFilter(admin.SimpleListFilter):
         return queryset
 
 
-@admin.register(models.Conversation)
+@admin.register(Conversation)
 class ConversationAdmin(admin.ModelAdmin):
     list_display = [
         "get_display_name",
@@ -191,7 +204,7 @@ class ConversationAdmin(admin.ModelAdmin):
         )
         return qs
 
-    def view_last_msg(self, convo: models.Conversation):
+    def view_last_msg(self, convo: Conversation):
         msg = convo.messages.latest()
         return change_obj_url(
             msg,
@@ -201,13 +214,13 @@ class ConversationAdmin(admin.ModelAdmin):
     view_last_msg.short_description = "Last Message"
     view_last_msg.admin_order_field = "__last_msg"
 
-    def view_messages(self, convo: models.Conversation):
+    def view_messages(self, convo: Conversation):
         return list_related_html_url(convo.messages, show_add=False)
 
     view_messages.short_description = "Messages"
     view_messages.admin_order_field = "__msg_count"
 
-    def view_last_active_delta(self, convo: models.Conversation):
+    def view_last_active_delta(self, convo: Conversation):
         return timesince(datetime.datetime.now() - convo.last_active_delta())
 
     view_last_active_delta.short_description = "Duration"
@@ -215,13 +228,13 @@ class ConversationAdmin(admin.ModelAdmin):
 
 
 class FeedbackInline(admin.TabularInline):
-    model = models.Feedback
+    model = Feedback
     extra = 0
     can_delete = False
     readonly_fields = ["created_at"]
 
 
-@admin.register(models.Message)
+@admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
     autocomplete_fields = ["conversation"]
     list_filter = [
@@ -250,6 +263,7 @@ class MessageAdmin(admin.ModelAdmin):
         "created_at",
         "wa_msg_id",
         "saved_run",
+        "analysis_run",
         "prev_msg_content",
         "prev_msg_display_content",
         "prev_msg_saved_run",
@@ -259,12 +273,16 @@ class MessageAdmin(admin.ModelAdmin):
 
     inlines = [FeedbackInline]
 
-    def feedbacks(self, msg: models.Message):
+    formfield_overrides = {
+        django.db.models.JSONField: {"widget": JSONEditorWidget},
+    }
+
+    def feedbacks(self, msg: Message):
         return msg.feedbacks.count() or None
 
     feedbacks.short_description = "Feedbacks"
 
-    def get_fieldsets(self, request, msg: models.Message = None):
+    def get_fieldsets(self, request, msg: Message = None):
         fieldsets = [
             (
                 None,
@@ -308,6 +326,8 @@ class MessageAdmin(admin.ModelAdmin):
                 "Analysis",
                 {
                     "fields": [
+                        "analysis_result",
+                        "analysis_run",
                         "question_answered",
                         "question_subject",
                     ]
@@ -316,30 +336,30 @@ class MessageAdmin(admin.ModelAdmin):
         )
         return fieldsets
 
-    def wa_delivered(self, msg: models.Message):
+    def wa_delivered(self, msg: Message):
         if (
             msg.role != CHATML_ROLE_ASSISSTANT
-            or msg.conversation.bot_integration.platform != models.Platform.WHATSAPP
+            or msg.conversation.bot_integration.platform != Platform.WHATSAPP
         ):
-            raise models.Message.DoesNotExist
+            raise Message.DoesNotExist
         return bool(msg.wa_msg_id)
 
     wa_delivered.short_description = "Delivered"
     wa_delivered.boolean = True
 
-    def prev_msg_content(self, message: models.Message):
+    def prev_msg_content(self, message: Message):
         prev_msg = message.get_previous_by_created_at()
         return change_obj_url(prev_msg, label=prev_msg.content)
 
     prev_msg_content.short_description = "User Message (English)"
 
-    def prev_msg_display_content(self, message: models.Message):
+    def prev_msg_display_content(self, message: Message):
         prev_msg = message.get_previous_by_created_at()
         return change_obj_url(prev_msg, label=prev_msg.display_content)
 
     prev_msg_display_content.short_description = "User Message (Original)"
 
-    def prev_msg_saved_run(self, message: models.Message):
+    def prev_msg_saved_run(self, message: Message):
         prev_msg = message.get_previous_by_created_at()
         return change_obj_url(prev_msg.saved_run)
 
@@ -355,7 +375,7 @@ class FeedbackCommentInline(admin.StackedInline):
     autocomplete_fields = ["author"]
 
 
-@admin.register(models.Feedback)
+@admin.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):
     autocomplete_fields = ["message"]
     list_filter = ["rating", "status", "message__conversation__bot_integration"]
@@ -424,22 +444,22 @@ class FeedbackAdmin(admin.ModelAdmin):
         ),
     )
 
-    def prev_msg_content(self, feedback: models.Feedback):
+    def prev_msg_content(self, feedback: Feedback):
         prev_msg = feedback.message.get_previous_by_created_at()
         return change_obj_url(prev_msg, label=prev_msg.content)
 
     prev_msg_content.short_description = "User Message (English)"
 
-    def prev_msg_display_content(self, feedback: models.Feedback):
+    def prev_msg_display_content(self, feedback: Feedback):
         prev_msg = feedback.message.get_previous_by_created_at()
         return change_obj_url(prev_msg, label=prev_msg.display_content)
 
     prev_msg_display_content.short_description = "User Message (Original)"
 
-    def run_id(self, feedback: models.Feedback):
+    def run_id(self, feedback: Feedback):
         return change_obj_url(feedback.message.conversation.bot_integration.saved_run)
 
-    def conversation_link(self, feedback: models.Feedback):
+    def conversation_link(self, feedback: Feedback):
         return change_obj_url(
             feedback.message.conversation,
             label=f"View Conversation for {feedback.message.conversation.get_display_name()}",
@@ -447,12 +467,12 @@ class FeedbackAdmin(admin.ModelAdmin):
 
     conversation_link.short_description = "Conversation"
 
-    def messsage_content(self, feedback: models.Feedback):
+    def messsage_content(self, feedback: Feedback):
         return change_obj_url(feedback.message, label=feedback.message.content)
 
     messsage_content.short_description = "Bot Response (English)"
 
-    def messsage_display_content(self, feedback: models.Feedback):
+    def messsage_display_content(self, feedback: Feedback):
         return change_obj_url(feedback.message, label=feedback.message.display_content)
 
     messsage_display_content.short_description = "Bot Response (Original)"

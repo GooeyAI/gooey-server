@@ -1,16 +1,22 @@
 import datetime
+import typing
+from multiprocessing.pool import ThreadPool
 
 import pytz
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
-from django.utils import timezone
 from django.utils.text import Truncator
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
+from app_users.models import AppUser
 from bots.custom_fields import PostgresJSONEncoder
+
+if typing.TYPE_CHECKING:
+    from daras_ai_v2.base import BasePage
+    import celery.result
 
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
@@ -33,6 +39,10 @@ class Platform(models.IntegerChoices):
 
 
 class Workflow(models.IntegerChoices):
+    """
+    A list of all workflows. The label is the doc name
+    """
+
     DOCSEARCH = (1, "doc-search")
     DOCSUMMARY = (2, "doc-summary")
     GOOGLEGPT = (3, "google-gpt")
@@ -91,6 +101,12 @@ class Workflow(models.IntegerChoices):
     def from_label(cls, label: str):
         return {w.label: w for w in Workflow}[label]
 
+    @property
+    def page_cls(self) -> typing.Type["BasePage"]:
+        from routers.root import page_map, normalize_slug
+
+        return page_map[normalize_slug(self.label)]
+
 
 class SavedRunQuerySet(models.QuerySet):
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
@@ -112,9 +128,9 @@ class SavedRunQuerySet(models.QuerySet):
 
 class SavedRun(models.Model):
     workflow = models.IntegerField(choices=Workflow.choices, default=Workflow.VIDEOBOTS)
-    example_id = models.TextField(default=None, null=True, blank=True)
-    run_id = models.TextField(default=None, null=True, blank=True)
-    uid = models.TextField(default=None, null=True, blank=True)
+    example_id = models.CharField(max_length=128, default=None, null=True, blank=True)
+    run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
+    uid = models.CharField(max_length=128, default=None, null=True, blank=True)
 
     state = models.JSONField(default=dict, blank=True, encoder=PostgresJSONEncoder)
 
@@ -209,6 +225,30 @@ class SavedRun(models.Model):
         self.state = state
 
         return self
+
+    def submit_api_call(
+        self,
+        current_user: AppUser,
+        *,
+        variables: dict = None,
+    ) -> tuple["BasePage", "celery.result.AsyncResult", str, str]:
+        from routers.api import submit_api_call
+
+        # run in a thread to avoid messing up threadlocals
+        with ThreadPool(1) as pool:
+            page, result, run_id, uid = pool.apply(
+                submit_api_call,
+                kwds=dict(
+                    page_cls=Workflow(self.workflow).page_cls,
+                    query_params=dict(
+                        example_id=self.example_id, run_id=self.id, uid=self.uid
+                    ),
+                    user=current_user,
+                    request_body=dict(variables=variables),
+                ),
+            )
+
+        return page, result, run_id, uid
 
 
 def _parse_dt(dt) -> datetime.datetime | None:
@@ -359,9 +399,18 @@ class BotIntegration(models.Model):
         editable=False,
     )
 
+    analysis_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.SET_NULL,
+        related_name="analysis_botintegrations",
+        null=True,
+        blank=True,
+        default=None,
+        help_text="If provided, the message content will be analyzed for this bot using this saved run",
+    )
     enable_analysis = models.BooleanField(
         default=False,
-        help_text="Enable analysis for this bot",
+        help_text="Enable analysis for this bot (DEPRECATED)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -370,6 +419,7 @@ class BotIntegration(models.Model):
     objects = BotIntegrationQuerySet.as_manager()
 
     class Meta:
+        ordering = ["-updated_at"]
         indexes = [
             models.Index(fields=["billing_account_uid", "platform"]),
             models.Index(fields=["fb_page_id", "ig_account_id"]),
@@ -583,18 +633,33 @@ class Message(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    analysis_result = models.JSONField(
+        blank=True,
+        default=dict,
+        help_text="The result of the analysis of this message",
+    )
+    analysis_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.SET_NULL,
+        related_name="analysis_messages",
+        null=True,
+        blank=True,
+        default=None,
+        help_text="The analysis run that generated the analysis of this message",
+    )
+
     question_answered = models.TextField(
         blank=True,
         default="",
-        help_text="Bot's ability to answer given question",
+        help_text="Bot's ability to answer given question (DEPRECATED)",
     )
     question_subject = models.TextField(
         blank=True,
         default="",
-        help_text="Subject of given question",
+        help_text="Subject of given question (DEPRECATED)",
     )
 
-    _analysis_done = False
+    _analysis_started = False
 
     objects = MessageQuerySet.as_manager()
 

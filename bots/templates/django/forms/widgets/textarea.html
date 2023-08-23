@@ -1,2 +1,32 @@
-<textarea rows="1" name="{{ widget.name }}"{% include "django/forms/widgets/attrs.html" %}>
-{% if widget.value %}{{ widget.value }}{% endif %}</textarea>
+{% load extras %}
+
+{% if "jsoneditor" in widget.attrs.class %}
+    <style>
+        .CodeMirror {
+            max-height: 40vh;
+            width: 70vw;
+            height: auto;
+        }
+
+        @media (max-width: 767px) {
+            .CodeMirror {
+                width: 100%;
+            }
+        }
+    </style>
+    <textarea name="{{ widget.name }}" {% include "django/forms/widgets/attrs.html" %}
+    >{% if widget.value %}{{ widget.value | pretty_json }}{% endif %}</textarea>
+    <script>
+        CodeMirror.fromTextArea(document.getElementById("{{ widget.attrs.id }}"), {
+            lineNumbers: true,
+            matchBrackets: true,
+            mode: "application/json",
+            gutters: ["CodeMirror-lint-markers"],
+            theme: "monokai",
+            lint: true,
+        });
+    </script>
+{% else %}
+    <textarea rows="1" name="{{ widget.name }}" {% include "django/forms/widgets/attrs.html" %}
+    >{% if widget.value %}{{ widget.value }}{% endif %}</textarea>
+{% endif %}
