@@ -93,7 +93,7 @@ class SavedRunAdmin(admin.ModelAdmin):
     actions = [export_to_csv, export_to_excel]
 
     def view_bots(self, saved_run: models.SavedRun):
-        return list_related_html_url(saved_run.botintegrations)
+        return list_related_html_url(saved_run.saved_run_bot_integrations)
 
     view_bots.short_description = "View Bots"
 
@@ -112,7 +112,7 @@ class SavedRunAdmin(admin.ModelAdmin):
 
 @admin.register(models.BotIntegration)
 class BotIntegrationAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["saved_run"]
+    autocomplete_fields = ["saved_run", "analysis_run"]
     search_fields = [
         "name",
         "ig_account_id",

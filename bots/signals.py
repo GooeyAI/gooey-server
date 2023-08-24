@@ -10,7 +10,7 @@ from bots.tasks import msg_analysis
 def run_after_message_save(instance: Message, **kwargs):
     if (
         # analysis is enabled
-        instance.conversation.bot_integration.enable_analysis
+        instance.conversation.bot_integration.analysis_run
         # answer is not already done
         and not instance._analysis_done
         and not (instance.question_answered and instance.question_subject)

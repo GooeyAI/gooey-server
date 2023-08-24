@@ -272,11 +272,20 @@ class BotIntegration(models.Model):
     saved_run = models.ForeignKey(
         "bots.SavedRun",
         on_delete=models.SET_NULL,
-        related_name="botintegrations",
+        related_name="saved_run_botintegrations",
         null=True,
         default=None,
         blank=True,
         help_text="The saved run that the bot is based on",
+    )
+    analysis_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.SET_NULL,
+        related_name="analysis_run_botintegrations",
+        null=True,
+        default=None,
+        blank=True,
+        help_text="The analysis run that the bot will run",
     )
     billing_account_uid = models.TextField(
         help_text="The gooey account uid where the credits will be deducted from",
@@ -592,6 +601,13 @@ class Message(models.Model):
         blank=True,
         default="",
         help_text="Subject of given question",
+    )
+    
+    analysis_data = models.JSONField(
+        blank=True,
+        null=True,
+        default=dict,  # You can set your desired default value here
+        help_text="JSON data that is captured from analysis",
     )
 
     _analysis_done = False
