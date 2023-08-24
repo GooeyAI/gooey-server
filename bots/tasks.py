@@ -19,26 +19,30 @@ def msg_analysis(msg_id: int):
     analysis_sr = bi.analysis_run
     assert analysis_sr, "bot integration must have an analysis run"
 
+    # make the api call
+    billing_account = AppUser.objects.get(uid=bi.billing_account_uid)
     variables = dict(
         user_msg=msg.get_previous_by_created_at().content,
         assistant_msg=msg.content,
         bot_script=msg.saved_run.state.get("bot_script", ""),
         references=references_as_prompt(msg.saved_run.state.get("references", [])),
     )
-    billing_account = AppUser.objects.get(uid=bi.billing_account_uid)
-
-    # make the api call
-    page, result, run_id, uid = analysis_sr.submit_api_call(
-        billing_account, variables=variables
+    result, sr = analysis_sr.submit_api_call(
+        current_user=billing_account,
+        request_body=dict(variables=variables),
     )
+
+    # save the run before the result is ready
+    Message.objects.filter(id=msg_id).update(analysis_run=sr)
+
+    # wait for the result
     result.get(disable_sync_subtasks=False)
-    # get result
-    sr = page.run_doc_sr(run_id, uid)
+    sr.refresh_from_db()
     # if failed, raise error
     if sr.error_msg:
         raise RuntimeError(sr.error_msg)
 
+    # save the result as json
     Message.objects.filter(id=msg_id).update(
-        analysis_run=sr,
         analysis_result=json.loads(flatten(sr.state["output_text"].values())[0]),
     )
