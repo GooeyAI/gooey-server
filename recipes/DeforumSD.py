@@ -470,6 +470,7 @@ def safety_checker(text_input: str):
 
     # wait for checker
     result.get(disable_sync_subtasks=False)
+    sr.refresh_from_db()
     # if checker failed, raise error
     if sr.error_msg:
         raise RuntimeError(sr.error_msg)
