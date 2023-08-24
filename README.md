@@ -82,6 +82,7 @@ Use black - https://pypi.org/project/black
 
 ```bash
 fname=$(date +"%Y-%m-%d_%I-%M-%S_%p").dump
+echo $PWD/$fname
 pg_dump -Fc -f "$fname"
 ```
 

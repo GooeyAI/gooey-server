@@ -30,7 +30,6 @@ def gui_runner(
     run_time = 0
     yield_val = None
     error_msg = None
-    url = self.app_url(run_id=run_id, uid=uid)
     set_query_params(query_params or {})
 
     def save(done=False):

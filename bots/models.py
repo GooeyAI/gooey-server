@@ -417,7 +417,7 @@ class BotIntegration(models.Model):
 
     def __str__(self):
         orig_name = (
-            self.wa_phone_number
+            (self.wa_phone_number and self.wa_phone_number.as_international)
             or self.ig_username
             or self.fb_page_name
             or self.wa_phone_number_id
@@ -537,6 +537,8 @@ class Conversation(models.Model):
             (self.wa_phone_number and self.wa_phone_number.as_international)
             or self.ig_username
             or self.fb_page_name
+            or self.fb_page_id
+            or self.slack_user_id
         )
 
     get_display_name.short_description = "User"
