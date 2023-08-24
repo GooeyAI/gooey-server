@@ -39,6 +39,7 @@ ATTEMPTS = 1
 
 class QRCodeGeneratorPage(BasePage):
     title = "AI Art QR Code"
+    workflow = Workflow.QR_CODE
     slug_versions = ["art-qr-code", "qr", "qr-code"]
 
     sane_defaults = dict(
@@ -373,7 +374,7 @@ Here is the final output:
             case Text2ImgModels.dall_e.name:
                 total += 10
         return total * state.get("num_outputs", 1)
-    
+
     def render_usage_guide(self):
         youtube_video("Q1D6B_-UoxY")
 
@@ -403,7 +404,7 @@ def generate_and_upload_qr_code(
         qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
             url=qr_code_data,
             user=user,
-            workflow=Workflow.QRCODE,
+            workflow=Workflow.QR_CODE,
         )[0].shortened_url()
 
     img_cv2 = generate_qr_code(qr_code_data)

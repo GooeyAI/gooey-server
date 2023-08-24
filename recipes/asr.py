@@ -4,6 +4,7 @@ from jinja2.lexer import whitespace_re
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2.asr import (
     AsrModels,
     google_translate_language_selector,
@@ -26,6 +27,7 @@ from recipes.DocSearch import render_documents
 
 class AsrPage(BasePage):
     title = "Speech Recognition & Translation"
+    workflow = Workflow.ASR
     slug_versions = ["asr", "speech"]
 
     sane_defaults = dict(output_format=AsrOutputFormat.text.name)

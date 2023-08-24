@@ -3,6 +3,7 @@ import typing
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -12,6 +13,7 @@ DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspo
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lipsync Video with Any Text"
+    workflow = Workflow.LIPSYNC_TTS
     slug_versions = ["LipsyncTTS", "lipsync-maker"]
 
     price = 10

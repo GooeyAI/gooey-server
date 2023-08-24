@@ -467,7 +467,7 @@ def _process_msg(
             content=raw_output_text,
             display_content=output_text,
             saved_run=SavedRun.objects.get_or_create(
-                workflow=Workflow.VIDEOBOTS, **furl(result.get("url", "")).query.params
+                workflow=Workflow.VIDEO_BOTS, **furl(result.get("url", "")).query.params
             )[0],
         ),
     ]

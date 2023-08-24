@@ -4,6 +4,7 @@ import requests
 import gooey_ui as st
 from pydantic import BaseModel
 
+from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
     resize_img_scale,
@@ -28,6 +29,7 @@ from daras_ai_v2.stable_diffusion import (
 
 class GoogleImageGenPage(BasePage):
     title = "Render Image Search Results with AI"
+    workflow = Workflow.GOOGLE_IMAGE_GEN
     slug_versions = ["GoogleImageGen", "render-images-with-ai"]
 
     sane_defaults = {

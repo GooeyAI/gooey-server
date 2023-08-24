@@ -6,6 +6,7 @@ import requests
 import gooey_ui as st
 from pydantic import BaseModel
 
+from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import db, settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -19,8 +20,8 @@ twitter_handle_regex = r"(@)?[A-Za-z0-9_]{1,15}"
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
     title = "AI Generated Photo from Email Profile Lookup"
+    workflow = Workflow.EMAIL_FACE_INPAINTING
     slug_versions = ["EmailFaceInpainting", "ai-image-from-email-lookup"]
-    version = 2
 
     sane_defaults = {
         "num_outputs": 1,

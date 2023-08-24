@@ -4,6 +4,7 @@ from django.db import models
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gpu_server import call_celery_task
@@ -30,6 +31,7 @@ class EmbeddingModels(models.TextChoices):
 
 class EmbeddingsPage(BasePage):
     title = "Embeddings"
+    workflow = Workflow.EMBEDDINGS
     slug_versions = ["embeddings", "embed", "text-embedings"]
     price = 1
 

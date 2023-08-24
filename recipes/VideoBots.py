@@ -144,6 +144,7 @@ def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
 
 class VideoBotsPage(BasePage):
     title = "Copilot for your Enterprise"  #  "Create Interactive Video Bots"
+    workflow = Workflow.VIDEO_BOTS
     slug_versions = ["video-bots", "bots", "copilot"]
 
     sane_defaults = {
@@ -585,7 +586,7 @@ Use this for prompting GPT to use the document search results.
                     reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
                         url=reference["url"],
                         user=self.request.user,
-                        workflow=Workflow.VIDEOBOTS,
+                        workflow=Workflow.VIDEO_BOTS,
                     )[0].shortened_url()
             state["references"] = references
         # if doc search is successful, add the search results to the user prompt
@@ -839,7 +840,7 @@ Use this for prompting GPT to use the document search results.
                 # same workflow
                 is_connected = (
                     is_connected
-                    and Workflow(bi.saved_run.workflow) == Workflow.VIDEOBOTS
+                    and Workflow(bi.saved_run.workflow) == Workflow.VIDEO_BOTS
                 )
             else:
                 is_connected = False

@@ -3,6 +3,7 @@ import typing
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2.GoogleGPT import render_output_with_refs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
@@ -24,6 +25,7 @@ class RelatedDocSearchResponse(DocSearchPage.ResponseModel):
 
 class RelatedQnADocPage(BasePage):
     title = '"People Also Ask" Answers from a Doc'
+    workflow = Workflow.RELATED_QNA_MAKER_DOC
     slug_versions = ["related-qna-maker-doc"]
 
     price = 100

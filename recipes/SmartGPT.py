@@ -4,6 +4,7 @@ import jinja2.sandbox
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2.GoogleGPT import render_output_with_refs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import map_parallel
@@ -19,6 +20,7 @@ from daras_ai_v2.pt import PromptTree
 
 class SmartGPTPage(BasePage):
     title = "SmartGPT"
+    workflow = Workflow.SMART_GPT
     slug_versions = ["SmartGPT"]
     price = 20
 

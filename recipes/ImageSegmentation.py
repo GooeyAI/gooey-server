@@ -7,6 +7,7 @@ import requests
 import gooey_ui as st
 from pydantic import BaseModel
 
+from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
     cv2_img_to_bytes,
@@ -30,8 +31,8 @@ from daras_ai_v2.repositioning import (
 
 class ImageSegmentationPage(BasePage):
     title = "AI Background Changer"
+    workflow = Workflow.IMAGE_SEGMENTATION
     slug_versions = ["ImageSegmentation", "remove-image-background-with-ai"]
-    version = 2
 
     sane_defaults = {
         "mask_threshold": 0.5,
