@@ -1,0 +1,17 @@
+{% for k, kvcounts in results.items %}
+    <table>
+        <thead>
+        <th>{{ k }}</th>
+        <th>Count</th>
+        </thead>
+        {% for v, count, url in kvcounts %}
+            <tr>
+                <td>
+                    <a target="_blank" href="{{ url }}">{{ v }}</a>
+                </td>
+                <td>{{ count }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+    <br>
+{% endfor %}

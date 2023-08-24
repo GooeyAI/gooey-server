@@ -1,13 +1,19 @@
 import datetime
+import json
 
 import django.db.models
 from django import forms
 from django.conf import settings
 from django.contrib import admin
-from django.db.models import Max, Count, F
+from django.db import DataError
+from django.db.models import Max, Count, F, Func
 from django.http import HttpResponse
+from django.template import loader
+from django.urls import reverse
 from django.utils import dateformat
+from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
+from furl import furl
 
 from bots.admin_links import list_related_html_url, open_in_new_tab, change_obj_url
 from bots.models import (
@@ -58,6 +64,8 @@ def _get_filename():
 
 class BotIntegrationAdminForm(forms.ModelForm):
     class Meta:
+        model = BotIntegration
+        fields = "__all__"
         widgets = {
             "platform": forms.Select(
                 attrs={
@@ -74,6 +82,169 @@ class BotIntegrationAdminForm(forms.ModelForm):
         js = [
             "https://cdn.jsdelivr.net/gh/scientifichackers/django-hideshow@0.0.1/hideshow.js",
         ]
+
+
+@admin.register(BotIntegration)
+class BotIntegrationAdmin(admin.ModelAdmin):
+    search_fields = [
+        "name",
+        "ig_account_id",
+        "ig_username",
+        "fb_page_id",
+        "wa_phone_number",
+        "slack_channel_id",
+    ]
+    list_display = [
+        "__str__",
+        "platform",
+        "wa_phone_number",
+        "created_at",
+        "updated_at",
+        "analysis_run",
+    ]
+    list_filter = ["platform"]
+
+    form = BotIntegrationAdminForm
+
+    autocomplete_fields = ["saved_run", "analysis_run"]
+
+    readonly_fields = [
+        "fb_page_access_token",
+        "slack_access_token",
+        "view_analysis_results",
+        "view_conversations",
+        "view_messsages",
+        "created_at",
+        "updated_at",
+    ]
+
+    fieldsets = [
+        (
+            None,
+            {
+                "fields": [
+                    "name",
+                    "saved_run",
+                    "billing_account_uid",
+                    "user_language",
+                ],
+            },
+        ),
+        (
+            "Platform",
+            {
+                "fields": [
+                    "platform",
+                    "fb_page_id",
+                    "fb_page_name",
+                    "fb_page_access_token",
+                    "ig_account_id",
+                    "ig_username",
+                    "wa_phone_number",
+                    "wa_phone_number_id",
+                    "slack_channel_id",
+                    "slack_channel_hook_url",
+                    "slack_access_token",
+                ]
+            },
+        ),
+        (
+            "Stats",
+            {
+                "fields": [
+                    "view_conversations",
+                    "view_messsages",
+                    "created_at",
+                    "updated_at",
+                ]
+            },
+        ),
+        (
+            "Settings",
+            {
+                "fields": [
+                    "show_feedback_buttons",
+                    "analysis_run",
+                    "enable_analysis",
+                    "view_analysis_results",
+                ]
+            },
+        ),
+    ]
+
+    @admin.display(description="Messages")
+    def view_messsages(self, bi: BotIntegration):
+        return list_related_html_url(
+            Message.objects.filter(conversation__bot_integration=bi),
+            query_param="conversation__bot_integration__id__exact",
+            instance_id=bi.id,
+        )
+
+    @admin.display(description="Conversations")
+    def view_conversations(self, bi: BotIntegration):
+        return list_related_html_url(bi.conversations)
+
+    @admin.display(description="Analysis Results")
+    def view_analysis_results(self, bi: BotIntegration):
+        msgs = Message.objects.filter(
+            conversation__bot_integration=bi,
+        ).exclude(
+            analysis_result={},
+        )
+        max_depth = 3
+        field = "analysis_result"
+        nested_keys = [field]
+        for i in range(max_depth):
+            next_keys = []
+            for parent in nested_keys:
+                try:
+                    next_keys.extend(
+                        f"{parent}__{child}"
+                        for child in (
+                            msgs.values(parent)
+                            .annotate(
+                                keys=Func(F(parent), function="jsonb_object_keys")
+                            )
+                            .order_by()
+                            .distinct()
+                            .values_list("keys", flat=True)
+                        )
+                    )
+                except DataError:
+                    next_keys.append(parent)
+            nested_keys = next_keys
+        results = {
+            key.split(field + "__")[-1]: [
+                (
+                    json.dumps(val).strip('"'),
+                    count,
+                    furl(
+                        reverse(
+                            f"admin:{Message._meta.app_label}_{Message.__name__.lower()}_changelist"
+                        ),
+                        query_params={
+                            f"conversation__bot_integration__id__exact": bi.id,
+                            key: val,
+                        },
+                    ),
+                )
+                for val, count in (
+                    msgs.values(key)
+                    .annotate(count=Count("id"))
+                    .order_by("-count")
+                    .values_list(key, "count")
+                )
+                if val
+            ]
+            for key in nested_keys
+        }
+        if not results:
+            raise Message.DoesNotExist
+        html = loader.render_to_string(
+            "anaylsis_result.html", context=dict(results=results)
+        )
+        html = mark_safe(html)
+        return html
 
 
 @admin.register(SavedRun)
@@ -114,35 +285,6 @@ class SavedRunAdmin(admin.ModelAdmin):
         return open_in_new_tab(saved_run.get_app_url(), label=saved_run.get_app_url())
 
     open_in_gooey.short_description = "Open in Gooey"
-
-
-@admin.register(BotIntegration)
-class BotIntegrationAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["saved_run", "analysis_run"]
-    search_fields = [
-        "name",
-        "ig_account_id",
-        "ig_username",
-        "fb_page_id",
-        "wa_phone_number",
-        "slack_channel_id",
-    ]
-    form = BotIntegrationAdminForm
-    readonly_fields = ["view_conversations", "created_at", "updated_at"]
-    list_display = [
-        "__str__",
-        "platform",
-        "wa_phone_number",
-        "created_at",
-        "updated_at",
-        "analysis_run",
-    ]
-    list_filter = ["platform"]
-
-    def view_conversations(self, bi: BotIntegration):
-        return list_related_html_url(bi.conversations)
-
-    view_conversations.short_description = "Messages"
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):
