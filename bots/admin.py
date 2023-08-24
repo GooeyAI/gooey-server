@@ -92,6 +92,7 @@ class SavedRunAdmin(admin.ModelAdmin):
 
     readonly_fields = [
         "open_in_gooey",
+        "parent",
         "view_bots",
         "created_at",
         "updated_at",

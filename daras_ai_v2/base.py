@@ -385,10 +385,14 @@ class BasePage:
             example_id__isnull=True,
         )[0]
 
-    def run_doc_sr(self, run_id: str, uid: str, create: bool = False) -> SavedRun:
+    def run_doc_sr(
+        self, run_id: str, uid: str, create: bool = False, parent: SavedRun = None
+    ) -> SavedRun:
         config = dict(workflow=self.workflow, uid=uid, run_id=run_id)
         if create:
-            return SavedRun.objects.get_or_create(**config)[0]
+            return SavedRun.objects.get_or_create(
+                **config, defaults=dict(parent=parent)
+            )[0]
         else:
             return SavedRun.objects.get(**config)
 
@@ -642,9 +646,13 @@ class BasePage:
             self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
 
         run_id = get_random_doc_id()
-        example_id, *_ = extract_query_params(gooey_get_query_params())
+        example_id, parent_run_id, parent_uid = extract_query_params(
+            gooey_get_query_params()
+        )
 
-        self.run_doc_sr(run_id, uid, create=True).set(
+        parent = self.get_current_doc_sr(example_id, parent_run_id, parent_uid)
+
+        self.run_doc_sr(run_id, uid, create=True, parent=parent).set(
             self.state_to_doc(st.session_state)
         )
 
@@ -728,11 +736,16 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if not self.is_current_user_admin():
             return
 
-        example_id, *_ = extract_query_params(gooey_get_query_params())
+        example_id, parent_run_id, parent_uid = extract_query_params(
+            gooey_get_query_params()
+        )
 
         with st.expander("🛠️ Admin Options"):
             if st.button("⭐️ Save Workflow"):
                 sr = self.recipe_doc_sr()
+                sr.parent = self.get_current_doc_sr(
+                    example_id, parent_run_id, parent_uid
+                )
                 sr.set(self.state_to_doc(st.session_state))
 
             if st.button("🔖 Create new Example"):
@@ -741,6 +754,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                     workflow=self.workflow,
                     example_id=new_example_id,
                 )
+                sr.parent = self.get_current_doc_sr(
+                    example_id, parent_run_id, parent_uid
+                )
                 sr.set(self.state_to_doc(st.session_state))
                 raise QueryParamsRedirectException(dict(example_id=new_example_id))
 
@@ -748,6 +764,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 sr = SavedRun.objects.get(
                     workflow=self.workflow,
                     example_id=example_id,
+                )
+                sr.parent = self.get_current_doc_sr(
+                    example_id, parent_run_id, parent_uid
                 )
                 sr.set(self.state_to_doc(st.session_state))
                 raise QueryParamsRedirectException(dict(example_id=example_id))
