@@ -112,6 +112,14 @@ class SavedRunQuerySet(models.QuerySet):
 
 
 class SavedRun(models.Model):
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="children",
+    )
+
     workflow = models.IntegerField(
         choices=Workflow.choices, default=Workflow.VIDEO_BOTS
     )
