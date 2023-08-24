@@ -219,10 +219,10 @@ class SavedRun(models.Model):
 
     def submit_api_call(
         self,
-        current_user: AppUser,
         *,
-        variables: dict = None,
-    ) -> tuple["BasePage", "celery.result.AsyncResult", str, str]:
+        current_user: AppUser,
+        request_body: dict,
+    ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
         # run in a thread to avoid messing up threadlocals
@@ -235,11 +235,10 @@ class SavedRun(models.Model):
                         example_id=self.example_id, run_id=self.id, uid=self.uid
                     ),
                     user=current_user,
-                    request_body=dict(variables=variables),
+                    request_body=request_body,
                 ),
             )
-
-        return page, result, run_id, uid
+        return result, page.run_doc_sr(run_id, uid)
 
 
 def _parse_dt(dt) -> datetime.datetime | None:
