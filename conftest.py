@@ -1,12 +1,12 @@
 import pytest
 
 
-@pytest.fixture(scope="session")
-def celery_config():
-    return {
-        "task_always_eager": True,
-        "result_backend": "rpc",
-    }
+@pytest.fixture
+def django_db_setup(django_db_setup, django_db_blocker):
+    with django_db_blocker.unblock():
+        from django.core.management import call_command
+
+        call_command("loaddata", "fixture.json")
 
 
 @pytest.fixture(
