@@ -244,6 +244,7 @@ class MessageAdmin(admin.ModelAdmin):
         "created_at",
     ]
     search_fields = [
+        "analysis_result",
         "role",
         "content",
         "display_content",
