@@ -459,21 +459,17 @@ def safety_checker(text_input: str):
     )[0]
 
     # run in a thread to avoid messing up threadlocals
-    with ThreadPool(1) as pool:
-        page, result, run_id, uid = pool.apply(
-            submit_api_call,
-            kwds=dict(
-                page_cls=CompareLLMPage,
-                query_params=dict(example_id=settings.SAFTY_CHECKER_EXAMPLE_ID),
-                user=billing_account,
-                request_body=dict(variables=dict(input=text_input)),
-            ),
+    result, sr = (
+        CompareLLMPage()
+        .example_doc_sr(settings.SAFTY_CHECKER_EXAMPLE_ID)
+        .submit_api_call(
+            current_user=billing_account,
+            request_body=dict(variables=dict(input=text_input)),
         )
+    )
 
     # wait for checker
     result.get(disable_sync_subtasks=False)
-    # get result
-    sr = page.run_doc_sr(run_id, uid)
     # if checker failed, raise error
     if sr.error_msg:
         raise RuntimeError(sr.error_msg)
