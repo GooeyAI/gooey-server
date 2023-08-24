@@ -1,12 +1,12 @@
 import typing
 
-from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
-from daras_ai_v2 import settings
+from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_multiselect, enum_selector
+from daras_ai_v2.descriptions import prompting101
+from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.img_model_settings_widgets import (
     negative_prompt_setting,
     guidance_scale_setting,
@@ -16,7 +16,6 @@ from daras_ai_v2.img_model_settings_widgets import (
     sd_2_upscaling_setting,
     scheduler_setting,
 )
-from daras_ai_v2.descriptions import prompting101
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
@@ -29,6 +28,7 @@ from daras_ai_v2.stable_diffusion import (
 
 class CompareText2ImgPage(BasePage):
     title = "Compare AI Image Generators"
+    workflow = Workflow.COMPARE_TEXT2IMG
     slug_versions = [
         "CompareText2Img",
         "text2img",

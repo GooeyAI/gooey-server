@@ -110,7 +110,7 @@ def main():
             .annotate(
                 all_recipes=Count("run_id"),
                 **{
-                    workflow.label: Count("run_id", filter=Q(workflow=workflow))
+                    workflow.short_slug: Count("run_id", filter=Q(workflow=workflow))
                     for workflow in sorted_workflows
                 },
                 total_errors=Count("error_msg", filter=~Q(error_msg="")),
@@ -167,7 +167,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
         counts_df.sum(numeric_only=True)
         .rename("Total Runs")
         .to_frame()
-        .reset_index(names=["slug"])
+        .reset_index(names=["label"])
         .sort_values("Total Runs", ascending=False)
         .reset_index(drop=True)
     )
@@ -182,7 +182,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
             px.pie(
                 total_runs.iloc[2:],
                 values="Total Runs",
-                names="slug",
+                names="label",
             ),
             use_container_width=True,
         )
@@ -224,11 +224,11 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
         .annotate(
             total_runs=Count("run_id"),
             **{
-                workflow.label: Count("run_id", filter=Q(workflow=workflow))
+                workflow.short_slug: Count("run_id", filter=Q(workflow=workflow))
                 for workflow in sorted_workflows
             },
         )
-        .values("datepart", *[workflow.label for workflow in sorted_workflows])
+        .values("datepart", *[workflow.short_slug for workflow in sorted_workflows])
         .order_by("datepart")
     )
 
@@ -236,7 +236,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
         "Workflows",
         options=sorted_workflows,
         default=sorted_workflows,
-        format_func=lambda w: w.label,
+        format_func=lambda w: w.short_slug,
     )
 
     col1, col2, col3 = st.columns(3)
@@ -254,15 +254,15 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
         go.Figure(
             data=[
                 go.Bar(
-                    name=workflow.label,
+                    name=workflow.short_slug,
                     x=time_ + get_extended_x(time_, steps),
                     y=yval + get_fitted_y(yval[:off], steps, degree),
                     offsetgroup=0,
-                    text=workflow.label,
+                    text=workflow.short_slug,
                     marker=dict(opacity=[1] * len(time_) + [0.5] * steps),
                 )
                 for workflow in sorted_workflows
-                if (yval := [row[workflow.label] for row in runs_over_time])
+                if (yval := [row[workflow.short_slug] for row in runs_over_time])
             ],
             layout=go.Layout(
                 barmode="stack",

@@ -84,8 +84,9 @@ class StateKeys:
 
 class BasePage:
     title: str
+    workflow: Workflow
     slug_versions: list[str]
-    version: int = 1
+
     sane_defaults: dict = {}
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
@@ -101,13 +102,6 @@ class BasePage:
         self.tab = tab
         self.request = request
         self.run_user = run_user
-
-    @property
-    def doc_name(self) -> str:
-        # for backwards compat
-        if self.version == 1:
-            return self.slug_versions[0]
-        return f"{self.slug_versions[0]}#{self.version}"
 
     @classmethod
     def app_url(cls, example_id=None, run_id=None, uid=None, tab_name=None) -> str:
@@ -152,7 +146,7 @@ class BasePage:
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
 
         if st.session_state.get(StateKeys.run_status):
-            channel = f"gooey-outputs/{self.doc_name}/{uid}/{run_id}"
+            channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
             output = realtime_pull([channel])[0]
             if output:
                 st.session_state.update(output)
@@ -385,16 +379,14 @@ class BasePage:
 
     def recipe_doc_sr(self) -> SavedRun:
         return SavedRun.objects.get_or_create(
-            workflow=Workflow.from_label(self.doc_name),
+            workflow=self.workflow,
             run_id__isnull=True,
             uid__isnull=True,
             example_id__isnull=True,
         )[0]
 
     def run_doc_sr(self, run_id: str, uid: str, create: bool = False) -> SavedRun:
-        config = dict(
-            workflow=Workflow.from_label(self.doc_name), uid=uid, run_id=run_id
-        )
+        config = dict(workflow=self.workflow, uid=uid, run_id=run_id)
         if create:
             return SavedRun.objects.get_or_create(**config)[0]
         else:
@@ -402,7 +394,7 @@ class BasePage:
 
     def example_doc_sr(self, example_id: str) -> SavedRun:
         return SavedRun.objects.get(
-            workflow=Workflow.from_label(self.doc_name),
+            workflow=self.workflow,
             example_id=example_id,
         )
 
@@ -667,7 +659,7 @@ class BasePage:
             run_id=run_id,
             uid=uid,
             state=st.session_state,
-            channel=f"gooey-outputs/{self.doc_name}/{uid}/{run_id}",
+            channel=f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}",
             query_params=self.clean_query_params(
                 example_id=example_id, run_id=run_id, uid=uid
             ),
@@ -746,7 +738,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             if st.button("🔖 Create new Example"):
                 new_example_id = get_random_doc_id()
                 sr = SavedRun.objects.create(
-                    workflow=Workflow.from_label(self.doc_name),
+                    workflow=self.workflow,
                     example_id=new_example_id,
                 )
                 sr.set(self.state_to_doc(st.session_state))
@@ -754,7 +746,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
             if example_id and st.button("💾 Save this Example"):
                 sr = SavedRun.objects.get(
-                    workflow=Workflow.from_label(self.doc_name),
+                    workflow=self.workflow,
                     example_id=example_id,
                 )
                 sr.set(self.state_to_doc(st.session_state))
@@ -815,7 +807,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             )
 
         example_runs = SavedRun.objects.filter(
-            workflow=Workflow.from_label(self.doc_name),
+            workflow=self.workflow,
             hidden=False,
             example_id__isnull=False,
         ).exclude()[:50]
@@ -838,7 +830,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             before = timezone.now()
         run_history = list(
             SavedRun.objects.filter(
-                workflow=Workflow.from_label(self.doc_name),
+                workflow=self.workflow,
                 uid=uid,
                 updated_at__lt=before,
             )[:25]

@@ -1,6 +1,5 @@
 import datetime
 import os.path
-import re
 import subprocess
 import tempfile
 import typing
@@ -12,7 +11,6 @@ from fastapi.responses import RedirectResponse
 from fastapi.routing import APIRouter
 from firebase_admin import auth, exceptions
 from furl import furl
-from starlette.background import BackgroundTasks
 from starlette.datastructures import FormData
 from starlette.requests import Request
 from starlette.responses import (
@@ -28,10 +26,9 @@ from auth_backend import (
 )
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings
-from daras_ai_v2.all_pages import all_api_pages
+from daras_ai_v2.all_pages import all_api_pages, normalize_slug, page_slug_map
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
 from daras_ai_v2.base import (
-    BasePage,
     RedirectException,
 )
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
@@ -210,7 +207,7 @@ def st_page(
     json_data: dict = Depends(request_json),
 ):
     try:
-        page_cls = page_map[normalize_slug(page_slug)]
+        page_cls = page_slug_map[normalize_slug(page_slug)]
     except KeyError:
         raise HTTPException(status_code=404)
     # ensure the latest slug is used
@@ -290,12 +287,3 @@ def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
 
     st.html(templates.get_template("footer.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))
-
-
-def normalize_slug(page_slug):
-    return re.sub(r"[-_]", "", page_slug.lower())
-
-
-page_map: dict[str, typing.Type[BasePage]] = {
-    normalize_slug(slug): page for page in all_api_pages for slug in page.slug_versions
-}

@@ -4,6 +4,7 @@ import requests
 
 from pydantic import BaseModel
 import gooey_ui as st
+from bots.models import Workflow
 
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage
@@ -16,6 +17,7 @@ DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG = "https://storage.googleapis.com/dara-c1b5
 
 class SocialLookupEmailPage(BasePage):
     title = "Profile Lookup + GPT3 for AI-Personalized Emails"
+    workflow = Workflow.SOCIAL_LOOKUP_EMAIL
     slug_versions = ["SocialLookupEmail", "email-writer-with-profile-lookup"]
 
     sane_defaults = {

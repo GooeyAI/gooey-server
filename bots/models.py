@@ -39,39 +39,39 @@ class Platform(models.IntegerChoices):
 
 
 class Workflow(models.IntegerChoices):
-    """
-    A list of all workflows. The label is the doc name
-    """
-
-    DOCSEARCH = (1, "doc-search")
-    DOCSUMMARY = (2, "doc-summary")
-    GOOGLEGPT = (3, "google-gpt")
-    VIDEOBOTS = (4, "video-bots")
-    LIPSYNCTTS = (5, "LipsyncTTS")
-    TEXTTOSPEECH = (6, "TextToSpeech")
-    ASR = (7, "asr")
+    DOC_SEARCH = (1, "Doc Search")
+    DOC_SUMMARY = (2, "Doc Summary")
+    GOOGLE_GPT = (3, "Google GPT")
+    VIDEO_BOTS = (4, "Copilot")
+    LIPSYNC_TTS = (5, "Lipysnc + TTS")
+    TEXT_TO_SPEECH = (6, "Text to Speech")
+    ASR = (7, "Speech Recognition")
     LIPSYNC = (8, "Lipsync")
-    DEFORUMSD = (9, "DeforumSD")
-    COMPARETEXT2IMG = (10, "CompareText2Img")
-    TEXT2AUDIO = (11, "text2audio")
-    IMG2IMG = (12, "Img2Img")
-    FACEINPAINTING = (13, "FaceInpainting#2")
-    GOOGLEIMAGEGEN = (14, "GoogleImageGen")
-    COMPAREUPSCALER = (15, "compare-ai-upscalers")
-    SEOSUMMARY = (16, "SEOSummary")
-    EMAILFACEINPAINTING = (17, "EmailFaceInpainting#2")
-    SOCIALLOOKUPEMAIL = (18, "SocialLookupEmail")
-    OBJECTINPAINTING = (19, "ObjectInpainting")
-    IMAGESEGMENTATION = (20, "ImageSegmentation#2")
-    COMPARELLM = (21, "CompareLLM")
-    CHYRONPLANT = (22, "ChyronPlant")
-    LETTERWRITER = (23, "LetterWriter")
-    SMARTGPT = (24, "SmartGPT")
-    QRCODE = (25, "art-qr-code")
-    YOUTUBEBOT = (26, "doc-extract")
-    RELATEDQNAMAKER = (27, "related-qna-maker")
-    RELATEDQNAMAKERDOC = (28, "related-qna-maker-doc")
-    EMBEDDINGS = (29, "embeddings")
+    DEFORUM_SD = (9, "Deforum Animation")
+    COMPARE_TEXT2IMG = (10, "Compare Text2Img")
+    TEXT_2_AUDIO = (11, "Text2Audio")
+    IMG_2_IMG = (12, "Img2Img")
+    FACE_INPAINTING = (13, "Face Inpainting")
+    GOOGLE_IMAGE_GEN = (14, "Google Image Gen")
+    COMPARE_UPSCALER = (15, "Comapre AI Upscalers")
+    SEO_SUMMARY = (16, "SEO Summary")
+    EMAIL_FACE_INPAINTING = (17, "Email Face Inpainting")
+    SOCIAL_LOOKUP_EMAIL = (18, "Social Lookup Email")
+    OBJECT_INPAINTING = (19, "Object Inpainting")
+    IMAGE_SEGMENTATION = (20, "Image Segmentation")
+    COMPARE_LLM = (21, "Compare LLM")
+    CHYRON_PLANT = (22, "Chyron Plant")
+    LETTER_WRITER = (23, "Letter Writer")
+    SMART_GPT = (24, "Smart GPT")
+    QR_CODE = (25, "AI QR Code")
+    DOC_EXTRACT = (26, "Doc Extract")
+    RELATED_QNA_MAKER = (27, "Related QnA Maker")
+    RELATED_QNA_MAKER_DOC = (28, "Related QnA Maker Doc")
+    EMBEDDINGS = (29, "Embeddings")
+
+    @property
+    def short_slug(self):
+        return min(self.page_cls.slug_versions, key=len)
 
     def get_app_url(self, example_id: str, run_id: str, uid: str):
         """return the url to the gooey app"""
@@ -81,31 +81,16 @@ class Workflow(models.IntegerChoices):
         if example_id:
             query_params |= dict(example_id=example_id)
         return str(
-            furl(settings.APP_BASE_URL, query_params=query_params) / self.label / ""
+            furl(settings.APP_BASE_URL, query_params=query_params)
+            / self.short_slug
+            / "/"
         )
-
-    def get_firebase_url(self, example_id: str, run_id: str, uid: str):
-        """return the url to the firebase dashboard for the document daras-ai-v2/workflow/example_id or daras-ai-v2/workflow or daras-ai-v2/uid/run_id"""
-        if run_id and uid:
-            path = f"user_runs/{uid}/{self.label}/{run_id}"
-        elif example_id:
-            path = f"daras-ai-v2/{self.label}/examples/{example_id}"
-        else:
-            path = f"daras-ai-v2/{self.label}"
-        return (
-            "https://console.firebase.google.com/project/dara-c1b52/firestore/data/"
-            + path
-        )
-
-    @classmethod
-    def from_label(cls, label: str):
-        return {w.label: w for w in Workflow}[label]
 
     @property
     def page_cls(self) -> typing.Type["BasePage"]:
-        from routers.root import page_map, normalize_slug
+        from daras_ai_v2.all_pages import workflow_map
 
-        return page_map[normalize_slug(self.label)]
+        return workflow_map[self]
 
 
 class SavedRunQuerySet(models.QuerySet):
@@ -127,7 +112,9 @@ class SavedRunQuerySet(models.QuerySet):
 
 
 class SavedRun(models.Model):
-    workflow = models.IntegerField(choices=Workflow.choices, default=Workflow.VIDEOBOTS)
+    workflow = models.IntegerField(
+        choices=Workflow.choices, default=Workflow.VIDEO_BOTS
+    )
     example_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
@@ -167,10 +154,6 @@ class SavedRun(models.Model):
     def get_app_url(self):
         workflow = Workflow(self.workflow)
         return workflow.get_app_url(self.example_id, self.run_id, self.uid)
-
-    def get_firebase_url(self):
-        workflow = Workflow(self.workflow)
-        return workflow.get_firebase_url(self.example_id, self.run_id, self.uid)
 
     def to_dict(self) -> dict:
         from daras_ai_v2.base import StateKeys

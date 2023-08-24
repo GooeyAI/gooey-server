@@ -5,6 +5,7 @@ from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
@@ -35,6 +36,7 @@ DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot
 
 class DocSearchPage(BasePage):
     title = "Search your Docs with GPT"
+    workflow = Workflow.DOC_SEARCH
     slug_versions = ["doc-search"]
 
     sane_defaults = {

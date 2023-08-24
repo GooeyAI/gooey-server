@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from pypdf import PdfWriter, PdfReader
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
@@ -50,6 +51,7 @@ class Columns(IntegerChoices):
 
 class DocExtractPage(BasePage):
     title = "Youtube Transcripts + GPT extraction to Google Sheets"
+    workflow = Workflow.DOC_EXTRACT
     slug_versions = [
         "doc-extract",
         "youtube-bot",

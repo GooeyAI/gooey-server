@@ -6,6 +6,7 @@ import requests
 import gooey_ui as st
 from pydantic import BaseModel
 
+from bots.models import Workflow
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -28,6 +29,7 @@ text2audio_model_ids = {
 
 class Text2AudioPage(BasePage):
     title = "Text guided audio generator"
+    workflow = Workflow.TEXT_2_AUDIO
     slug_versions = ["text2audio"]
 
     sane_defaults = dict(

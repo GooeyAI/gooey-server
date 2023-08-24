@@ -3,6 +3,7 @@ import typing
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.face_restoration import UpscalerModels, run_upscaler_model
@@ -13,6 +14,7 @@ DEFAULT_COMPARE_UPSCALER_META_IMG = "https://storage.googleapis.com/dara-c1b52.a
 
 class CompareUpscalerPage(BasePage):
     title = "Compare AI Image Upscalers"
+    workflow = Workflow.COMPARE_UPSCALER
     slug_versions = ["compare-ai-upscalers"]
 
     class RequestModel(BaseModel):
