@@ -4,6 +4,7 @@ import requests
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -20,6 +21,7 @@ from daras_ai_v2.stable_diffusion import (
 
 class Img2ImgPage(BasePage):
     title = "Edit An Image with AI prompt"
+    workflow = Workflow.IMG_2_IMG
     slug_versions = ["Img2Img", "ai-photo-editor"]
 
     sane_defaults = {

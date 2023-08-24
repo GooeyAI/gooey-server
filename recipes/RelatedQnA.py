@@ -3,6 +3,7 @@ import typing
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import doc_search_settings
@@ -23,6 +24,7 @@ class RelatedGoogleGPTResponse(GoogleGPTPage.ResponseModel):
 
 class RelatedQnAPage(BasePage):
     title = 'Generate "People Also Ask" SEO Content '
+    workflow = Workflow.RELATED_QNA_MAKER
     slug_versions = ["related-qna-maker"]
 
     price = 75

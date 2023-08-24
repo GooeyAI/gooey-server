@@ -5,6 +5,7 @@ import typing
 import gooey_ui as st
 from pydantic import BaseModel
 
+from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
@@ -17,6 +18,7 @@ DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot
 
 class CompareLLMPage(BasePage):
     title = "Large Language Models: GPT-3"
+    workflow = Workflow.COMPARE_LLM
     slug_versions = ["CompareLLM", "llm", "compare-large-language-models"]
 
     sane_defaults = {

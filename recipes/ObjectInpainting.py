@@ -4,6 +4,7 @@ import requests
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
     resize_img_scale,
@@ -27,6 +28,7 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 
 class ObjectInpaintingPage(BasePage):
     title = "Generate Product Photo Backgrounds"
+    workflow = Workflow.OBJECT_INPAINTING
     slug_versions = ["ObjectInpainting", "product-photo-background-generator"]
 
     sane_defaults = {

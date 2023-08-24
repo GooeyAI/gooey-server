@@ -5,6 +5,7 @@ from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import doc_search_settings
 from daras_ai_v2.google_search import call_scaleserp
@@ -28,6 +29,7 @@ DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot
 
 class GoogleGPTPage(BasePage):
     title = "Web Search + GPT3"
+    workflow = Workflow.GOOGLE_GPT
     slug_versions = ["google-gpt"]
 
     price = 175

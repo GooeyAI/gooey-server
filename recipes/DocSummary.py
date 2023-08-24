@@ -4,6 +4,7 @@ from enum import Enum
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2.GoogleGPT import render_output_with_refs, GoogleGPTPage
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
@@ -37,6 +38,7 @@ class CombineDocumentsChains(Enum):
 
 class DocSummaryPage(BasePage):
     title = "Summarize your Docs with GPT"
+    workflow = Workflow.DOC_SUMMARY
     slug_versions = ["doc-summary"]
 
     price = 225

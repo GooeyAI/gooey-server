@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.base import (
     BasePage,
@@ -9,6 +10,7 @@ from daras_ai_v2.base import (
 
 class ChyronPlantPage(BasePage):
     title = "Chyron Plant Bot"
+    workflow = Workflow.CHYRON_PLANT
     slug_versions = ["ChyronPlant"]
 
     class RequestModel(BaseModel):

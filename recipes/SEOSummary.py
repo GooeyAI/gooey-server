@@ -12,6 +12,7 @@ from html_sanitizer import Sanitizer
 from lxml import etree
 from pydantic import BaseModel
 
+from bots.models import Workflow
 from daras_ai_v2.base import BasePage, gooey_rng
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import map_parallel
@@ -53,6 +54,7 @@ sanitizer = Sanitizer(
 
 class SEOSummaryPage(BasePage):
     title = "Create a perfect SEO-optimized Title & Paragraph"
+    workflow = Workflow.SEO_SUMMARY
     slug_versions = ["SEOSummary", "seo-paragraph-generator"]
 
     def preview_image(self, state: dict) -> str | None:

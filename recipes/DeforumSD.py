@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from app_users.models import AppUser
+from bots.models import Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import flatten
@@ -153,6 +154,7 @@ DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.
 
 class DeforumSDPage(BasePage):
     title = "AI Animation Generator"
+    workflow = Workflow.DEFORUM_SD
     slug_versions = ["DeforumSD", "animation-generator"]
 
     sane_defaults = dict(

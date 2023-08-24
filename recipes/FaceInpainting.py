@@ -5,6 +5,7 @@ import requests
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai.extract_face import extract_and_reposition_face_cv2
 from daras_ai.image_input import (
     upload_file_from_bytes,
@@ -25,8 +26,8 @@ from daras_ai_v2.stable_diffusion import InpaintingModels
 
 class FaceInpaintingPage(BasePage):
     title = "AI Image with a Face"
+    workflow = Workflow.FACE_INPAINTING
     slug_versions = ["FaceInpainting", "face-in-ai-generated-photo"]
-    version = 2
 
     sane_defaults = {
         "num_outputs": 1,

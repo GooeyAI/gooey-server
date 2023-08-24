@@ -8,6 +8,7 @@ import gooey_ui as st
 from google.cloud import texttospeech
 from pydantic import BaseModel
 
+from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, storage_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
@@ -23,6 +24,7 @@ DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/da
 
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"
+    workflow = Workflow.TEXT_TO_SPEECH
     slug_versions = [
         "TextToSpeech",
         "tts",
