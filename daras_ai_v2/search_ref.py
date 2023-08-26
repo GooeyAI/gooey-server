@@ -40,10 +40,7 @@ def render_text_with_refs(text: str, references: list[SearchReference]):
         if not refs:
             continue
         ref_html = ", ".join(
-            [
-                f'<a target="_blank" href="{ref["url"]}">{ref_num}</a>'
-                for ref_num, ref in refs.items()
-            ]
+            html_link(str(ref_num), ref["url"]) for ref_num, ref in refs.items()
         )
         html += f"<sup>[{ref_html}]</sup>"
     # convert newlines to <br> and paragraphs
@@ -62,8 +59,23 @@ def apply_response_template(
 
         for snippet, ref_map in parse_refs(text, references):
             match citation_style:
-                case CitationStyles.number | CitationStyles.number_html | CitationStyles.number_markdown | CitationStyles.number_slack_mrkdwn:
+                case CitationStyles.number:
                     cites = " ".join(f"[{ref_num}]" for ref_num in ref_map.keys())
+                case CitationStyles.number_html:
+                    cites = " ".join(
+                        html_link(f"[{ref_num}]", ref["url"])
+                        for ref_num, ref in ref_map.items()
+                    )
+                case CitationStyles.number_markdown:
+                    cites = " ".join(
+                        markdown_link(f"[{ref_num}]", ref["url"])
+                        for ref_num, ref in ref_map.items()
+                    )
+                case CitationStyles.number_slack_mrkdwn:
+                    cites = " ".join(
+                        slack_mrkdwn_link(f"[{ref_num}]", ref["url"])
+                        for ref_num, ref in ref_map.items()
+                    )
                 case CitationStyles.title:
                     cites = " ".join(f"[{ref['title']}]" for ref in ref_map.values())
                 case CitationStyles.url:
@@ -88,19 +100,19 @@ def apply_response_template(
                 formatted += "\n\n"
                 formatted += "\n".join(
                     f"[{ref_num}] {ref_to_markdown(ref)}"
-                    for ref_num, ref in all_refs.items()
+                    for ref_num, ref in sorted(all_refs.items())
                 )
             case CitationStyles.number_html:
                 formatted += "<br><br>"
                 formatted += "<br>".join(
                     f"[{ref_num}] {ref_to_html(ref)}"
-                    for ref_num, ref in all_refs.items()
+                    for ref_num, ref in sorted(all_refs.items())
                 )
             case CitationStyles.number_slack_mrkdwn:
                 formatted += "\n\n"
                 formatted += "\n".join(
                     f"[{ref_num}] {ref_to_slack_mrkdwn(ref)}"
-                    for ref_num, ref in all_refs.items()
+                    for ref_num, ref in sorted(all_refs.items())
                 )
 
         for ref_num, ref in all_refs.items():
@@ -121,15 +133,27 @@ search_ref_pat = re.compile(r"\[" r"[\d\s\.\,\[\]\$\{\}]+" r"\]")
 
 
 def ref_to_markdown(ref: SearchReference) -> str:
-    return f"[{ref['title']}]({ref['url']})"
+    return markdown_link(ref["title"], ref["url"])
 
 
 def ref_to_html(ref: SearchReference) -> str:
-    return f'<a target="_blank" href="{ref["url"]}">{ref["title"]}</a>'
+    return html_link(ref["title"], ref["url"])
 
 
 def ref_to_slack_mrkdwn(ref: SearchReference) -> str:
-    return f"<{ref['url']}|{ref['title']}>"
+    return slack_mrkdwn_link(ref["title"], ref["url"])
+
+
+def markdown_link(title: str, url: str) -> str:
+    return f"[{title}]({url})"
+
+
+def html_link(title: str, url: str) -> str:
+    return f'<a target="_blank" href="{url}">{title}</a>'
+
+
+def slack_mrkdwn_link(title: str, url: str) -> str:
+    return f"<{url}|{title}>"
 
 
 def parse_refs(
