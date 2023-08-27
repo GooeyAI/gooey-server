@@ -66,6 +66,8 @@ def enum_selector(
     return widget(
         **kwargs,
         options=options,
-        format_func=lambda k: enum_cls[k].value if k else "———",
+        format_func=lambda k: getattr(enum_cls[k], "label", enum_cls[k].value)
+        if k
+        else "———",
         label=label,
     )
