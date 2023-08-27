@@ -1,8 +1,10 @@
+from enum import Enum
 import typing
 import uuid
 from multiprocessing.pool import ThreadPool
 
 from pydantic import BaseModel
+from daras_ai_v2.enum_selector_widget import enum_selector
 
 import gooey_ui as st
 from app_users.models import AppUser
@@ -14,6 +16,11 @@ from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from recipes.CompareLLM import CompareLLMPage
 
+
+class AnimationModels(Enum):
+    #Add complete list of animation models here
+    protogen_v2 = "Protogen_V2.2.ckpt"
+    protogen_v3 = "Protogen_V3.ckpt"
 
 class _AnimationPrompt(typing.TypedDict):
     frame: str
@@ -229,7 +236,12 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
         """
 
     def get_raw_price(self, state: dict) -> float:
-        return state.get("max_frames", 100) * CREDITS_PER_FRAME
+        max_frames = state.get("max_frames", 100)
+        if max_frames is not None:
+            return max_frames * CREDITS_PER_FRAME
+        else:
+        # Handle the case where max_frames is None
+            return 0  #add some other appropriate value here
 
     def validate_form_v2(self):
         prompt_list = st.session_state.get("animation_prompts")
@@ -246,6 +258,15 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
     def render_settings(self):
         col1, col2 = st.columns(2)
         with col1:
+            selected_model = enum_selector(
+            AnimationModels,
+            label="""
+            Choose your preferred AI Animation Model
+            """,
+            key="selected_model",
+            use_selectbox=True,
+            )
+                      
             animation_mode = st.selectbox(
                 "Animation Mode", key="animation_mode", options=["2D", "3D"]
             )
@@ -427,7 +448,7 @@ Choose fps for the video.
         state["output_video"] = call_celery_task_outfile(
             "deforum",
             pipeline=dict(
-                model_id="Protogen_V2.2.ckpt",
+                model_id= AnimationModels[state.get("selected_model")] or "Protogen_V2.2.ckpt",
                 seed=request.seed,
             ),
             inputs=dict(
