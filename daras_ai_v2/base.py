@@ -977,7 +977,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
         st.markdown(
-            f"📖 To learn more, take a look at our [complete API]({api_docs_url})"
+            f'📖 To learn more, take a look at our <a href="{api_docs_url}" target="_blank">complete API</a>'
         )
 
         st.write("#### 📤 Example Request")
