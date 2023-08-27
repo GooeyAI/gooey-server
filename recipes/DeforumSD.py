@@ -1,26 +1,25 @@
-from enum import Enum
 import typing
 import uuid
-from multiprocessing.pool import ThreadPool
 
+from django.db.models import TextChoices
 from pydantic import BaseModel
-from daras_ai_v2.enum_selector_widget import enum_selector
 
 import gooey_ui as st
 from app_users.models import AppUser
 from bots.models import Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.functional import flatten
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from recipes.CompareLLM import CompareLLMPage
 
 
-class AnimationModels(Enum):
-    #Add complete list of animation models here
-    protogen_v2 = "Protogen_V2.2.ckpt"
-    protogen_v3 = "Protogen_V3.ckpt"
+class AnimationModels(TextChoices):
+    protogen_2_2 = ("Protogen_V2.2.ckpt", "Protogen V2.2 (darkstorm2150)")
+    epicdream = ("epicdream.safetensors", "epiCDream (epinikion)")
+
 
 class _AnimationPrompt(typing.TypedDict):
     frame: str
@@ -174,12 +173,15 @@ class DeforumSDPage(BasePage):
         rotation_3d_z="0:(0)",
         fps=12,
         seed=42,
+        selected_model=AnimationModels.protogen_2_2.name,
     )
 
     class RequestModel(BaseModel):
         # input_prompt: str
         animation_prompts: AnimationPrompts
         max_frames: int | None
+
+        selected_model: typing.Literal[tuple(e.name for e in AnimationModels)] | None
 
         animation_mode: str | None
         zoom: str | None
@@ -236,12 +238,8 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
         """
 
     def get_raw_price(self, state: dict) -> float:
-        max_frames = state.get("max_frames", 100)
-        if max_frames is not None:
-            return max_frames * CREDITS_PER_FRAME
-        else:
-        # Handle the case where max_frames is None
-            return 0  #add some other appropriate value here
+        max_frames = state.get("max_frames", 100) or 0
+        return max_frames * CREDITS_PER_FRAME
 
     def validate_form_v2(self):
         prompt_list = st.session_state.get("animation_prompts")
@@ -258,15 +256,15 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
     def render_settings(self):
         col1, col2 = st.columns(2)
         with col1:
-            selected_model = enum_selector(
-            AnimationModels,
-            label="""
+            enum_selector(
+                AnimationModels,
+                label="""
             Choose your preferred AI Animation Model
             """,
-            key="selected_model",
-            use_selectbox=True,
+                key="selected_model",
+                use_selectbox=True,
             )
-                      
+
             animation_mode = st.selectbox(
                 "Animation Mode", key="animation_mode", options=["2D", "3D"]
             )
@@ -448,7 +446,7 @@ Choose fps for the video.
         state["output_video"] = call_celery_task_outfile(
             "deforum",
             pipeline=dict(
-                model_id= AnimationModels[state.get("selected_model")] or "Protogen_V2.2.ckpt",
+                model_id=AnimationModels[request.selected_model].value,
                 seed=request.seed,
             ),
             inputs=dict(
@@ -472,8 +470,6 @@ Choose fps for the video.
 
 
 def safety_checker(text_input: str):
-    from routers.api import submit_api_call
-
     # ge the billing account for the checker
     billing_account = AppUser.objects.get_or_create_from_email(
         settings.SAFTY_CHECKER_BILLING_EMAIL
