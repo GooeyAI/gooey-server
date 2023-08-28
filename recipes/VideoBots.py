@@ -591,7 +591,7 @@ Prompt to transform the conversation history into a vector search query.
             )
             query_msgs = query_msgs[clip_idx:]
 
-            query_instructions = request.query_instructions.strip()
+            query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
                 query_instructions = jinja2.Template(query_instructions).render(
                     **state
