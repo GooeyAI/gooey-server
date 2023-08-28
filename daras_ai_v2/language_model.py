@@ -93,6 +93,7 @@ llm_api = {
     LargeLanguageModels.llama2_70b_chat: LLMApis.together,
 }
 
+EMBEDDING_MODEL_MAX_TOKENS = 8191
 
 model_max_tokens = {
     # https://platform.openai.com/docs/models/gpt-4

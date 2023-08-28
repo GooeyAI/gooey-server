@@ -4,6 +4,7 @@ import os.path
 import re
 import typing
 
+import jinja2
 from django.db.models import QuerySet
 from furl import furl
 from pydantic import BaseModel
@@ -66,6 +67,8 @@ BOT_SCRIPT_RE = re.compile(
     r"\:\ ",
     flags=re.M,
 )
+
+SAFETY_BUFFER = 100
 
 
 def show_landbot_widget():
@@ -214,6 +217,7 @@ class VideoBotsPage(BasePage):
         messages: list[ConversationEntry] | None
 
         # doc search
+        query_instructions: str | None
         task_instructions: str | None
         documents: list[str] | None
         max_references: int | None
@@ -350,9 +354,17 @@ Enable document search, to use custom documents as information sources.
             st.text_area(
                 """
 ##### 👩‍🏫 Task Instructions
-Use this for prompting GPT to use the document search results.
-""",
+Prompt for interpreting the document sources.
+                """,
                 key="task_instructions",
+                height=300,
+            )
+            st.text_area(
+                """
+##### 👁‍🗨 Query Instructions
+Prompt to transform the conversation history into a vector search query.                
+                """,
+                key="query_instructions",
                 height=300,
             )
             st.write("---")
@@ -479,7 +491,7 @@ Use this for prompting GPT to use the document search results.
         search_query = st.session_state.get("search_query")
         if search_query:
             st.text_area(
-                "Document Search Query",
+                "**Document Search Query**",
                 value=search_query,
                 height=100,
                 disabled=True,
@@ -490,11 +502,13 @@ Use this for prompting GPT to use the document search results.
             st.write("**References**")
             st.json(references, expanded=False)
 
-        text_output(
-            "**Final Prompt**",
-            value=st.session_state.get("final_prompt"),
-            height=300,
-        )
+        final_prompt = st.session_state.get("final_prompt")
+        if final_prompt:
+            text_output(
+                "**Final Prompt**",
+                value=final_prompt,
+                height=300,
+            )
 
         for idx, text in enumerate(st.session_state.get("raw_output_text", [])):
             st.text_area(
@@ -573,10 +587,35 @@ Use this for prompting GPT to use the document search results.
             # formulate the search query as a history of all the messages
             query_msgs = saved_msgs + [user_prompt]
             clip_idx = convo_window_clipper(
-                query_msgs, max(request.max_tokens * 4, 4000), sep=" "
+                query_msgs, model_max_tokens[model] // 2, sep=" "
             )
-            query_msgs = reversed(query_msgs[clip_idx:])
-            state["search_query"] = "\n---\n".join(msg["content"] for msg in query_msgs)
+            query_msgs = query_msgs[clip_idx:]
+
+            query_instructions = request.query_instructions.strip()
+            if query_instructions:
+                query_instructions = jinja2.Template(query_instructions).render(
+                    **state
+                    | dict(
+                        messages="\n".join(
+                            f'{msg["role"]}: """{msg["content"]}"""'
+                            for msg in query_msgs
+                        ),
+                    ),
+                )
+                state["search_query"] = run_language_model(
+                    model=request.selected_model,
+                    prompt=query_instructions,
+                    max_tokens=model_max_tokens[model] // 2,
+                    quality=request.quality,
+                    temperature=request.sampling_temperature,
+                    avoid_repetition=request.avoid_repetition,
+                )[0]
+            else:
+                query_msgs.reverse()
+                state["search_query"] = "\n---\n".join(
+                    msg["content"] for msg in query_msgs
+                )
+
             # perform doc search
             references = yield from get_top_k_references(
                 DocSearchPage.RequestModel.parse_obj(state)
@@ -598,13 +637,12 @@ Use this for prompting GPT to use the document search results.
             )
 
         # truncate the history to fit the model's max tokens
-        safety_buffer = 100
         history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
             model_max_tokens[model]
             - calc_gpt_tokens([system_prompt, user_prompt], is_chat_model=is_chat_model)
             - request.max_tokens
-            - safety_buffer
+            - SAFETY_BUFFER
         )
         clip_idx = convo_window_clipper(
             history_window, max_history_tokens, is_chat_model=is_chat_model
