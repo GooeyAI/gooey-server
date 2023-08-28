@@ -272,15 +272,16 @@ def get_embeds_for_doc(
         metas = []
         # treat each row as a separate document
         for idx, row in pages.iterrows():
-            sections = (row.get("sections") or "").strip()
-            snippet = (row.get("snippet") or "").strip()
+            row = dict(row)
+            sections = (row.pop("sections", "") or "").strip()
+            snippet = (row.pop("snippet", "") or "").strip()
             if sections:
                 splits = split_sections(
                     sections, chunk_size=chunk_size, chunk_overlap=chunk_overlap
                 )
             elif snippet:
                 splits = text_splitter(
-                    row["snippet"], chunk_size=chunk_size, chunk_overlap=chunk_overlap
+                    snippet, chunk_size=chunk_size, chunk_overlap=chunk_overlap
                 )
             else:
                 continue
@@ -322,13 +323,17 @@ def get_embeds_for_doc(
     return list(zip(metas, embeds))
 
 
-sections_re = re.compile(r"\s*[\r\n\f\v](\w+)\=")
+sections_re = re.compile(r"(\s*[\r\n\f\v]|^)(\w+)\=", re.MULTILINE)
 
 
 def split_sections(sections: str, *, chunk_overlap: int, chunk_size: int):
     split = sections_re.split(sections)
     header = ""
-    for role, content in zip(split[1::2], split[2::2]):
+    for i in range(2, len(split), 3):
+        role = split[i].strip()
+        content = split[i + 1].strip()
+        if not content:
+            continue
         match role:
             case "content":
                 for doc in text_splitter(

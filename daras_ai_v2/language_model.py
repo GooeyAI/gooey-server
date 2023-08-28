@@ -61,6 +61,7 @@ engine_names = {
     LargeLanguageModels.text_ada_001: "text-ada-001",
 }
 
+EMBEDDING_MODEL_MAX_TOKENS = 8191
 
 model_max_tokens = {
     # https://platform.openai.com/docs/models/gpt-4
