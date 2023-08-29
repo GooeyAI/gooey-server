@@ -47,8 +47,8 @@ def document_uploader(
         )
 
 
-def doc_search_settings(asr_allowed: bool = True):
-    st.write("##### 🔎 Search Settings")
+def doc_search_settings():
+    st.write("##### 🔎 Document Search Settings")
 
     if "citation_style" in st.session_state:
         enum_selector(
@@ -93,17 +93,5 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         max_value=50,
     )
 
-    if not asr_allowed:
-        return
 
-    st.write("---")
-    st.write("##### 🎤 Document Speech Recognition")
 
-    enum_selector(
-        AsrModels,
-        label="###### ASR Model",
-        key="selected_asr_model",
-        allow_none=True,
-        use_selectbox=True,
-    )
-    google_translate_language_selector()

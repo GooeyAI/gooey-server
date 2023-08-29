@@ -8,6 +8,7 @@ import jinja2
 from django.db.models import QuerySet
 from furl import furl
 from pydantic import BaseModel
+from daras_ai_v2.enum_selector_widget import enum_selector
 
 import gooey_ui as st
 from bots.models import BotIntegration, Platform
@@ -17,6 +18,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
+    AsrModels,
     run_google_translate,
     google_translate_language_selector,
 )
@@ -42,6 +44,7 @@ from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.query_params import gooey_get_query_params
+from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -138,14 +141,14 @@ def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
             {
                 "role": role,
                 "display_name": match.group(1).strip(),
-                "content": bot_script[match.end() : next_match_start].strip(),
+                "content": bot_script[match.end(): next_match_start].strip(),
             }
         )
     return system_message, scripted_msgs
 
 
 class VideoBotsPage(BasePage):
-    title = "Copilot for your Enterprise"  #  "Create Interactive Video Bots"
+    title = "Copilot for your Enterprise"  # "Create Interactive Video Bots"
     workflow = Workflow.VIDEO_BOTS
     slug_versions = ["video-bots", "bots", "copilot"]
 
@@ -223,7 +226,8 @@ class VideoBotsPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
-        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
+        citation_style: typing.Literal[tuple(
+            e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
 
         user_language: str | None
@@ -284,7 +288,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_form_v2(self):
         st.text_area(
             """
-            ##### 📝 Script
+            ##### 📝 Prompt
             Instructions to the bot + an example scripted conversation (~1000 words)
             """,
             key="bot_script",
@@ -302,10 +306,38 @@ Enable document search, to use custom documents as information sources.
         youtube_video("-j2su1r8pEg")
 
     def render_settings(self):
+        if st.session_state.get("documents") or st.session_state.get(
+            "__documents_files"
+        ):
+            st.text_area(
+                """
+            ##### 👩‍🏫 Document Search Results Instructions
+            This prompt should contain guidelines on how the Prompt should interpret the results of the knowledge base query.
+            """,
+                key="task_instructions",
+                height=300,
+            )
+
+            st.write("---")
+            doc_search_settings()
+            st.write("---")
+
+        language_model_settings()
+        st.write("---")
         st.checkbox("🔗 Shorten URL", key="use_url_shortener")
         st.caption(
             "This will shorten the urls of the references which allows tracking of clicks and views."
         )
+        st.write("---")
+        st.text_area(
+            """
+            ##### 👁‍🗨 Conversation Summarization Instructions
+            This prompt runs before the workflow performs a vectorDB search of the knowledge base documents and should summarize the conversation history into a VectorDB query. In general, you shouldn't need to adjust it.               
+                """,
+            key="query_instructions",
+            height=300,
+        )
+        st.write("---")
         google_translate_language_selector(
             """
             ###### 🔠 User Language
@@ -319,7 +351,8 @@ Enable document search, to use custom documents as information sources.
             st.session_state["__enable_audio"] = bool(
                 st.session_state.get("tts_provider")
             )
-        enable_audio = st.checkbox("Enable Audio Ouput?", key="__enable_audio")
+        enable_audio = st.checkbox(
+            "Enable Audio Output?", key="__enable_audio")
         if not enable_audio:
             st.write("---")
             st.session_state["tts_provider"] = None
@@ -327,51 +360,36 @@ Enable document search, to use custom documents as information sources.
             text_to_speech_settings()
             st.write("---")
 
-            if not "__enable_video" in st.session_state:
-                st.session_state["__enable_video"] = bool(
-                    st.session_state.get("input_face")
-                )
-            enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
-            if not enable_video:
-                st.write("---")
-                st.session_state["input_face"] = None
-            else:
-                st.file_uploader(
-                    """
-                    #### 👩‍🦰 Input Face
-                    Upload a video/image that contains faces to use  
-                    *Recommended - mp4 / mov / png / jpg / gif* 
-                    """,
-                    key="input_face",
-                )
-                lipsync_settings()
-                st.write("---")
+        st.write("##### 🎤 Document Speech Recognition")
 
-        if st.session_state.get("documents") or st.session_state.get(
-            "__documents_files"
-        ):
-            st.text_area(
-                """
-##### 👩‍🏫 Task Instructions
-Prompt for interpreting the document sources.
-                """,
-                key="task_instructions",
-                height=300,
+        enum_selector(
+            AsrModels,
+            label="###### ASR Model",
+            key="selected_asr_model",
+            allow_none=True,
+            use_selectbox=True,
+        )
+        google_translate_language_selector()
+
+        st.write("---")
+        if not "__enable_video" in st.session_state:
+            st.session_state["__enable_video"] = bool(
+                st.session_state.get("input_face")
             )
-            st.text_area(
+        enable_video = st.checkbox(
+            "Enable Video Output?", key="__enable_video")
+        if not enable_video:
+            st.session_state["input_face"] = None
+        else:
+            st.file_uploader(
                 """
-##### 👁‍🗨 Query Instructions
-Prompt to transform the conversation history into a vector search query.                
+                #### 👩‍🦰 Input Face
+                Upload a video/image that contains faces to use  
+                *Recommended - mp4 / mov / png / jpg / gif* 
                 """,
-                key="query_instructions",
-                height=300,
+                key="input_face",
             )
-            st.write("---")
-
-            doc_search_settings()
-            st.write("---")
-
-        language_model_settings()
+            lipsync_settings()
 
     def fields_to_save(self) -> [str]:
         return super().fields_to_save() + ["landbot_url"]
@@ -430,7 +448,8 @@ Prompt to transform the conversation history into a vector search query.
 
                 for entry in reversed(st.session_state.get("messages", [])):
                     with msg_container_widget(entry["role"]):
-                        display_name = entry.get("display_name") or entry["role"]
+                        display_name = entry.get(
+                            "display_name") or entry["role"]
                         display_name = display_name.capitalize()
                         st.write(f'**{display_name}** \\\n{entry["content"]}')
 
@@ -445,7 +464,8 @@ Prompt to transform the conversation history into a vector search query.
 
                 if st.button("✈ Send", style=dict(height="3.2rem")):
                     messsages = st.session_state.get("messages", [])
-                    raw_input_text = st.session_state.get("raw_input_text") or ""
+                    raw_input_text = st.session_state.get(
+                        "raw_input_text") or ""
                     raw_output_text = (st.session_state.get("raw_output_text") or [""])[
                         0
                     ]
@@ -530,7 +550,8 @@ Prompt to transform the conversation history into a vector search query.
                 st.audio(audio_url)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
+        request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(
+            state)
 
         user_input = request.input_prompt.strip()
         if not user_input:
@@ -556,9 +577,11 @@ Prompt to transform the conversation history into a vector search query.
         if system_message:
             # add time to prompt
             utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
-            system_message = system_message.replace("{{ datetime.utcnow }}", utcnow)
+            system_message = system_message.replace(
+                "{{ datetime.utcnow }}", utcnow)
             # insert to top
-            system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": system_message}
+            system_prompt = {"role": CHATML_ROLE_SYSTEM,
+                             "content": system_message}
         else:
             system_prompt = None
 
@@ -639,7 +662,8 @@ Prompt to transform the conversation history into a vector search query.
         history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
             model_max_tokens[model]
-            - calc_gpt_tokens([system_prompt, user_prompt], is_chat_model=is_chat_model)
+            - calc_gpt_tokens([system_prompt, user_prompt],
+                              is_chat_model=is_chat_model)
             - request.max_tokens
             - SAFETY_BUFFER
         )
@@ -661,7 +685,8 @@ Prompt to transform the conversation history into a vector search query.
             )
 
         # final prompt to display
-        prompt = "\n".join(format_chatml_message(entry) for entry in prompt_messages)
+        prompt = "\n".join(format_chatml_message(entry)
+                           for entry in prompt_messages)
         state["final_prompt"] = prompt
 
         # ensure input script is not too big
@@ -670,7 +695,8 @@ Prompt to transform the conversation history into a vector search query.
         )
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
-            raise ValueError("Input Script is too long! Please reduce the script size.")
+            raise ValueError(
+                "Input Script is too long! Please reduce the script size.")
 
         yield f"Running {model.value}..."
         if is_chat_model:
@@ -855,17 +881,40 @@ Prompt to transform the conversation history into a vector search query.
         if not integrations:
             return
 
-        current_sr = self.get_sr_from_query_params_dict(gooey_get_query_params())
+        example_id, run_id, uid = extract_query_params(
+            gooey_get_query_params())
+
         for bi in integrations:
-            is_connected = bi.saved_run == current_sr
+            if bi.saved_run:
+                # same run_id and uid
+                if bi.saved_run.run_id and bi.saved_run.uid:
+                    is_connected = (
+                        bi.saved_run.run_id == run_id and bi.saved_run.uid == uid
+                    )
+                # same example_id
+                elif bi.saved_run.example_id:
+                    is_connected = bi.saved_run.example_id == example_id
+                # root recipe
+                else:
+                    is_connected = not (
+                        bi.saved_run.run_id
+                        or bi.saved_run.uid
+                        or bi.saved_run.example_id
+                    )
+                # same workflow
+                is_connected = (
+                    is_connected
+                    and Workflow(bi.saved_run.workflow) == Workflow.VIDEO_BOTS
+                )
+            else:
+                is_connected = False
             col1, col2, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()
                 st.markdown(
+                    # language=html
                     f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                    f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
-                    if bi.saved_run
-                    else f"<span>{bi}</span>",
+                    f"<span>{bi}</span>",
                     unsafe_allow_html=True,
                 )
             with col2:
@@ -879,7 +928,9 @@ Prompt to transform the conversation history into a vector search query.
                 bi.saved_run = None
             else:
                 bi.name = st.session_state.get(StateKeys.page_title, bi.name)
-                bi.saved_run = current_sr
+                bi.saved_run = self.get_current_doc_sr(
+                    example_id=example_id, run_id=run_id, uid=uid
+                )
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg
 
