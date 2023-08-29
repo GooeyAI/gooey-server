@@ -16,11 +16,10 @@ from pathlib import Path
 import sentry_sdk
 import stripe
 from decouple import config, UndefinedValueError, Csv
+from django.contrib.humanize.templatetags import humanize
 from furl import furl
 from sentry_sdk.integrations.threading import ThreadingIntegration
 from starlette.templating import Jinja2Templates
-
-from django.contrib.humanize.templatetags import humanize
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -219,8 +218,6 @@ UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
-POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
-
 APP_BASE_URL = config("APP_BASE_URL", "/")
 API_BASE_URL = config("API_BASE_URL", "/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
@@ -233,8 +230,11 @@ SCALESERP_API_KEY = config("SCALESERP_API_KEY", None)
 # timeout for fetching external urls in the wild
 EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 
+
+POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="sean@dara.network")
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
+SEND_RUN_EMAIL_AFTER_SEC = 5
 
 SAFTY_CHECKER_EXAMPLE_ID = "3rcxqx0r"
 SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"

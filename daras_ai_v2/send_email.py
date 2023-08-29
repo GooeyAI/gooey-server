@@ -6,13 +6,11 @@ from os.path import basename
 
 import requests
 from decouple import config
-from firebase_admin.auth import UserRecord
 
 from app_users.models import AppUser
-from gooey_ui import UploadedFile
-
 from daras_ai_v2 import settings
 from daras_ai_v2.settings import templates
+from gooey_ui import UploadedFile
 
 
 def send_reported_run_email(
