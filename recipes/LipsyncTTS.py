@@ -16,8 +16,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     workflow = Workflow.LIPSYNC_TTS
     slug_versions = ["LipsyncTTS", "lipsync-maker"]
 
-    price = 10
-
     class RequestModel(BaseModel):
         input_face: str
         input_audio: str | None

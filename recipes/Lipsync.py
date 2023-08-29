@@ -1,5 +1,7 @@
 import typing
 from pathlib import Path
+import urllib.request
+import requests
 
 from pydantic import BaseModel
 
@@ -10,6 +12,8 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.lipsync_api import wav2lip
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+
+CREDITS_PER_MB = 2
 
 
 class LipsyncPage(BasePage):
@@ -121,3 +125,24 @@ class LipsyncPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return "Create high-quality, realistic Lipsync animations from any audio file. Input a sample face gif/video + audio and we will automatically generate a lipsync animation that matches your audio."
+
+    def additional_notes(self) -> str | None:
+        return f"""
+        *Cost ≈ {CREDITS_PER_MB} credits per MB*
+        """
+
+    def get_raw_price(self, state: dict) -> float:
+        total_bytes = 0
+
+        input_audio = state.get("input_audio")
+        if input_audio:
+            r = requests.head(input_audio)
+            total_bytes += float(r.headers.get("Content-length")) or 1
+
+        input_face = state.get("input_face")
+        if input_face:
+            r = requests.head(input_face)
+            total_bytes += float(r.headers.get("Content-length")) or 1
+
+        total_mb = total_bytes / 1024 / 1024
+        return total_mb * CREDITS_PER_MB
