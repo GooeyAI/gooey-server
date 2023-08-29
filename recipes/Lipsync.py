@@ -13,7 +13,7 @@ from daras_ai_v2.lipsync_api import wav2lip
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 
-CREDITS_PER_BYTE = (0.000002)
+CREDITS_PER_MB = 2
 
 
 class LipsyncPage(BasePage):
@@ -128,24 +128,23 @@ class LipsyncPage(BasePage):
 
     def additional_notes(self) -> str | None:
         return f"""
-        *Cost ≈ {CREDITS_PER_BYTE * 1000000} credits per megabyte*
+        *Cost ≈ {CREDITS_PER_MB} credits per MB*
         """
 
     def get_raw_price(self, state: dict) -> float:
-        # Retrieve the input_audio and input_face from the state dictionary
-        input_audio_file_path = state.get("input_audio")
-        input_face_file_path = state.get("input_face")
+        total_bytes = 0
 
-        audio_size_headers = requests.head(input_audio_file_path)
-        audio_size = float(audio_size_headers.headers["Content-length"])
+        input_audio = state.get("input_audio")
+        if input_audio:
+            r = requests.head(input_audio)
+            r.raise_for_status()
+            total_bytes += float(r.headers["Content-length"]) or 0
 
-        face_size_headers = requests.head(input_face_file_path)
-        face_size = float(face_size_headers.headers["Content-length"])
+        input_face = state.get("input_face")
+        if input_face:
+            r = requests.head(input_face)
+            r.raise_for_status()
+            total_bytes += float(r.headers["Content-length"]) or 0
 
-        if audio_size is None:
-            return 0.0
-
-        if face_size is None:
-            return 0.0
-
-        return (audio_size + face_size) * CREDITS_PER_BYTE
+        total_mb = total_bytes / 1024 / 1024
+        return total_mb * CREDITS_PER_MB
