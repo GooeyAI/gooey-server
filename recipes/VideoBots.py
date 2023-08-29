@@ -154,7 +154,7 @@ class VideoBotsPage(BasePage):
         "google_voice_name": "en-IN-Wavenet-A",
         "google_pitch": 0.0,
         "google_speaking_rate": 1.0,
-        "uberduck_voice_name": "hecko",
+        "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
         # gpt3
         "selected_model": LargeLanguageModels.text_davinci_003.name,
