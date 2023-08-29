@@ -148,6 +148,13 @@ class SavedRun(models.Model):
             ["workflow", "example_id"],
             ["workflow", "run_id", "uid"],
         ]
+        constraints = [
+            models.CheckConstraint(
+                # ensure that the parent is not the same as the current record
+                check=~models.Q(parent=models.F("id")),
+                name="parent_not_self",
+            ),
+        ]
         indexes = [
             models.Index(fields=["workflow"]),
             models.Index(fields=["workflow", "run_id", "uid"]),

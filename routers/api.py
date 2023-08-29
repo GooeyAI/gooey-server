@@ -231,7 +231,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         user: AppUser = Depends(api_auth_header),
     ):
         self = page_cls()
-        sr = self.get_current_doc_sr(example_id=None, run_id=run_id, uid=user.uid)
+        sr = self.get_sr_from_query_params(example_id=None, run_id=run_id, uid=user.uid)
         state = sr.to_dict()
         err_msg = state.get(StateKeys.error_msg)
         run_time = state.get(StateKeys.run_time, 0)
@@ -328,7 +328,7 @@ def submit_api_call(
     self = page_cls(request=SimpleNamespace(user=user))
 
     # get saved state from db
-    state = self.get_doc_from_query_params(query_params).to_dict()
+    state = self.get_sr_from_query_params_dict(query_params).to_dict()
     if state is None:
         raise HTTPException(status_code=404)
 
