@@ -902,7 +902,7 @@ Prompt to transform the conversation history into a vector search query.
                 bi.saved_run = None
             else:
                 bi.name = st.session_state.get(StateKeys.page_title, bi.name)
-                bi.saved_run = self.get_current_doc_sr(
+                bi.saved_run = self.get_sr_from_query_params(
                     example_id=example_id, run_id=run_id, uid=uid
                 )
                 if bi.platform == Platform.SLACK:

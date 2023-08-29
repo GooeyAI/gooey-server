@@ -223,7 +223,7 @@ def st_page(
 
     state = json_data.setdefault("state", {})
     if not state:
-        db_state = page.get_current_doc_sr(example_id, run_id, uid).to_dict()
+        db_state = page.get_sr_from_query_params(example_id, run_id, uid).to_dict()
         if db_state is not None:
             state.update(db_state)
             for k, v in page.sane_defaults.items():

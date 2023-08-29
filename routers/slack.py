@@ -3,6 +3,7 @@ from furl import furl
 import json
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
+from requests.auth import HTTPBasicAuth
 from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
 from starlette.responses import RedirectResponse, HTMLResponse
@@ -16,12 +17,42 @@ from django.db import transaction
 
 router = APIRouter()
 
-slack_connect_url = f"https://slack.com/oauth/v2/authorize?client_id={settings.SLACK_CLIENT_ID}&scope=channels:history,channels:read,chat:write,chat:write.customize,files:read,files:write,groups:history,groups:read,groups:write,incoming-webhook,remote_files:read,remote_files:share,remote_files:write&user_scope=channels:write,channels:write.invites,groups:write,groups:write.invites"
+slack_connect_url = furl(
+    "https://slack.com/oauth/v2/authorize",
+    query_params=dict(
+        client_id=settings.SLACK_CLIENT_ID,
+        scope=",".join(
+            [
+                "channels:history",
+                "channels:read",
+                "chat:write",
+                "chat:write.customize",
+                "files:read",
+                "files:write",
+                "groups:history",
+                "groups:read",
+                "groups:write",
+                "incoming-webhook",
+                "remote_files:read",
+                "remote_files:share",
+                "remote_files:write",
+            ]
+        ),
+        user_scope=",".join(
+            [
+                "channels:write",
+                "channels:write.invites",
+                "groups:write",
+                "groups:write.invites",
+                # "chat:write",
+            ]
+        ),
+    ),
+)
 
 
 @router.get("/__/slack/redirect/")
 def slack_connect_redirect(request: Request):
-    print(request)
     if not request.user or request.user.is_anonymous:
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
@@ -36,8 +67,13 @@ def slack_connect_redirect(request: Request):
             status_code=400,
         )
     res = requests.post(
-        f"https://slack.com/api/oauth.v2.access?code={code}&client_id={settings.SLACK_CLIENT_ID}&client_secret={settings.SLACK_CLIENT_SECRET}",  # TODO: use Basic auth header instead
+        furl(
+            "https://slack.com/api/oauth.v2.access",
+            query_params=dict(code=code),
+        ).url,
+        auth=HTTPBasicAuth(settings.SLACK_CLIENT_ID, settings.SLACK_CLIENT_SECRET),
     )
+    res.raise_for_status()
     print(res.text)
     res = res.json()
     slack_access_token = res["access_token"]

@@ -80,22 +80,57 @@ Use black - https://pypi.org/project/black
 
 ### backup & restore postgres db
 
+**on server**
 ```bash
-fname=$(date +"%Y-%m-%d_%I-%M-%S_%p").dump
+# select a running container
+cid=$(docker ps | grep gooey-api-prod | cut -d " " -f 1 | head -1)
+# give it a nice name 
+fname=gooey_db_$(date +"%Y-%m-%d_%I-%M-%S_%p").dump
+# exec the script to create the fixture
+docker exec -it $cid pg_dump --dbname $PGDATABASE --format c -f "$fname"
+# copy the fixture outside container
+docker cp $cid:/app/$fname .
+# print the absolute path
 echo $PWD/$fname
-pg_dump -Fc -f "$fname"
 ```
 
 ```bash
+# reset the database
 ./manage.py reset_db -c
+# create the database with an empty template
 createdb -T template0 $PGDATABASE
+# restore the database
 pg_restore --no-privileges --no-owner -d $PGDATABASE $fname
+```
+
+### create & load fixtures
+
+```bash
+# select a running container
+cid=$(docker ps  | grep gooey-api-prod | cut -d " " -f 1 | head -1)
+# exec the script to create the fixture
+docker exec -it $cid poetry run ./manage.py runscript create_fixture
+# copy the fixture outside container
+docker cp $cid:/app/fixture.json .
+# print the absolute path
+echo $PWD/fixture.json
+```
+
+```bash
+# reset the database
+./manage.py reset_db -c
+# create the database
+./manage.py sqlcreate | psql postgres
+# run migrations
+./manage.py migrate
+# load the fixture
+./manage.py loaddata fixture.json
 ```
 
 ### copy one postgres db to another
 
-```  
-./manage.py reset_db -c
+```
+./manage.py reset_db
 createdb -T template0 $PGDATABASE
 pg_dump $SOURCE_DATABASE | psql -q $PGDATABASE
 ```

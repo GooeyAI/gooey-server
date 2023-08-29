@@ -361,11 +361,11 @@ class BasePage:
             # Return and Don't render the run any further
             st.stop()
 
-    def get_doc_from_query_params(self, query_params) -> SavedRun:
+    def get_sr_from_query_params_dict(self, query_params) -> SavedRun:
         example_id, run_id, uid = extract_query_params(query_params)
-        return self.get_current_doc_sr(example_id, run_id, uid)
+        return self.get_sr_from_query_params(example_id, run_id, uid)
 
-    def get_current_doc_sr(self, example_id, run_id, uid) -> SavedRun:
+    def get_sr_from_query_params(self, example_id, run_id, uid) -> SavedRun:
         try:
             if run_id and uid:
                 sr = self.run_doc_sr(run_id, uid)
@@ -396,11 +396,12 @@ class BasePage:
         else:
             return SavedRun.objects.get(**config)
 
-    def example_doc_sr(self, example_id: str) -> SavedRun:
-        return SavedRun.objects.get(
-            workflow=self.workflow,
-            example_id=example_id,
-        )
+    def example_doc_sr(self, example_id: str, create: bool = False) -> SavedRun:
+        config = dict(workflow=self.workflow, example_id=example_id)
+        if create:
+            return SavedRun.objects.get_or_create(**config)[0]
+        else:
+            return SavedRun.objects.get(**config)
 
     def render_description(self):
         pass
@@ -646,17 +647,13 @@ class BasePage:
             self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
 
         run_id = get_random_doc_id()
-        example_id, parent_run_id, parent_uid = extract_query_params(
-            gooey_get_query_params()
-        )
-
-        parent = self.get_current_doc_sr(example_id, parent_run_id, parent_uid)
+        parent = self.get_sr_from_query_params_dict(gooey_get_query_params())
 
         self.run_doc_sr(run_id, uid, create=True, parent=parent).set(
             self.state_to_doc(st.session_state)
         )
 
-        return example_id, run_id, uid
+        return parent.example_id, run_id, uid
 
     def call_runner_task(self, example_id, run_id, uid):
         from celeryapp.tasks import gui_runner
@@ -736,50 +733,41 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if not self.is_current_user_admin():
             return
 
-        example_id, parent_run_id, parent_uid = extract_query_params(
-            gooey_get_query_params()
-        )
+        current_sr = self.get_sr_from_query_params_dict(gooey_get_query_params())
 
         with st.expander("🛠️ Admin Options"):
+            sr_to_save = None
+
             if st.button("⭐️ Save Workflow"):
-                sr = self.recipe_doc_sr()
-                sr.parent = self.get_current_doc_sr(
-                    example_id, parent_run_id, parent_uid
-                )
-                sr.set(self.state_to_doc(st.session_state))
+                sr_to_save = self.recipe_doc_sr()
 
             if st.button("🔖 Create new Example"):
-                new_example_id = get_random_doc_id()
-                sr = SavedRun.objects.create(
-                    workflow=self.workflow,
-                    example_id=new_example_id,
-                )
-                sr.parent = self.get_current_doc_sr(
-                    example_id, parent_run_id, parent_uid
-                )
-                sr.set(self.state_to_doc(st.session_state))
-                raise QueryParamsRedirectException(dict(example_id=new_example_id))
+                sr_to_save = self.example_doc_sr(get_random_doc_id(), create=True)
 
-            if example_id and st.button("💾 Save this Example"):
-                sr = SavedRun.objects.get(
-                    workflow=self.workflow,
-                    example_id=example_id,
-                )
-                sr.parent = self.get_current_doc_sr(
-                    example_id, parent_run_id, parent_uid
-                )
-                sr.set(self.state_to_doc(st.session_state))
-                raise QueryParamsRedirectException(dict(example_id=example_id))
+            if current_sr.example_id:
+                if st.button("💾 Save this Example"):
+                    sr_to_save = self.example_doc_sr(current_sr.example_id)
 
-            if example_id:
                 hidden = st.session_state.get(StateKeys.hidden)
                 if st.button("👁️ Make Public" if hidden else "🙈️ Hide"):
                     self.set_hidden(
-                        example_id=example_id, doc=st.session_state, hidden=not hidden
+                        example_id=current_sr.example_id,
+                        doc=st.session_state,
+                        hidden=not hidden,
                     )
 
-            ## TODO: how to model this?
-            # st.success("Saved", icon="✅")
+            if sr_to_save:
+                if current_sr != sr_to_save:  # ensure parent != child
+                    sr_to_save.parent = current_sr
+                sr_to_save.set(self.state_to_doc(st.session_state))
+                ## TODO: pass the success message to the redirect
+                # st.success("Saved", icon="✅")
+                raise QueryParamsRedirectException(
+                    dict(example_id=sr_to_save.example_id)
+                )
+
+            if current_sr.parent:
+                st.write(f"Parent: {current_sr.parent.get_app_url()}")
 
     def state_to_doc(self, state: dict):
         ret = {
@@ -1135,5 +1123,6 @@ class RedirectException(Exception):
 
 class QueryParamsRedirectException(RedirectException):
     def __init__(self, query_params: dict, status_code=303):
+        query_params = {k: v for k, v in query_params.items() if v is not None}
         url = "?" + urllib.parse.urlencode(query_params)
         super().__init__(url, status_code)
