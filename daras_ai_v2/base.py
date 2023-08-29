@@ -647,13 +647,19 @@ class BasePage:
             self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
 
         run_id = get_random_doc_id()
-        parent = self.get_sr_from_query_params_dict(gooey_get_query_params())
+
+        parent_example_id, parent_run_id, parent_uid = extract_query_params(
+            gooey_get_query_params()
+        )
+        parent = self.get_sr_from_query_params(
+            parent_example_id, parent_run_id, parent_uid
+        )
 
         self.run_doc_sr(run_id, uid, create=True, parent=parent).set(
             self.state_to_doc(st.session_state)
         )
 
-        return parent.example_id, run_id, uid
+        return parent_example_id, run_id, uid
 
     def call_runner_task(self, example_id, run_id, uid):
         from celeryapp.tasks import gui_runner
@@ -733,7 +739,12 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if not self.is_current_user_admin():
             return
 
-        current_sr = self.get_sr_from_query_params_dict(gooey_get_query_params())
+        parent_example_id, parent_run_id, parent_uid = extract_query_params(
+            gooey_get_query_params()
+        )
+        current_sr = self.get_sr_from_query_params(
+            parent_example_id, parent_run_id, parent_uid
+        )
 
         with st.expander("🛠️ Admin Options"):
             sr_to_save = None
@@ -744,10 +755,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             if st.button("🔖 Create new Example"):
                 sr_to_save = self.example_doc_sr(get_random_doc_id(), create=True)
 
-            if current_sr.example_id:
+            if parent_example_id:
                 if st.button("💾 Save this Example"):
-                    sr_to_save = self.example_doc_sr(current_sr.example_id)
+                    sr_to_save = self.example_doc_sr(parent_example_id)
 
+            if current_sr.example_id:
                 hidden = st.session_state.get(StateKeys.hidden)
                 if st.button("👁️ Make Public" if hidden else "🙈️ Hide"):
                     self.set_hidden(
