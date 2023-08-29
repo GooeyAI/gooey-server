@@ -6,20 +6,11 @@ from google.cloud import texttospeech
 from daras_ai_v2.enum_selector_widget import enum_selector
 
 UBERDUCK_VOICES = {
-    "hecko": "Reserved Male European",
-    "ryan-gosling": "Laidback US Male",
-    "elsa": "Earnest Female US",
-    "judi-dench": "Older Female UK 70s",
-    "rc-bray": "Wise Male US 50s",
-    "dr-phil": "Southern Drawl US Male",
-    "3kliksphilip": "Upbeat Male UK",
-    "ellen": "Mellow Female US",
-    "steve-irwin": "Casual Male Australian",
-    "pam-beesly": "Soft-spoken Female US",
-    "mark-elliott": "Friendly Older Male US",
-    "woody-jh": "Cheery Southern Male US",
-    "judy-hopps": "Upbeat Female US",
-    "the-rock": "Samoan Action Star",
+
+    "Aiden Botha": "b01cf18d-0f10-46dd-adc6-562b599fdae4",
+    "Angus": "7d29a280-8a3e-4c4b-9df4-cbe77e8f4a63",
+    "Damon Edwards Deep": "df71a60f-1294-4cf1-bd5d-a7e6d7350178",
+    "General Herring":"818bc1dd-1d34-4205-81a8-5e32dfec3e2b"
 }
 
 
@@ -128,7 +119,7 @@ def text_to_speech_settings():
                     ###### Voice name (Uberduck)
                     """,
                     key="uberduck_voice_name",
-                    format_func=lambda option: f"{UBERDUCK_VOICES[option]} | {option}",
+                    format_func=lambda option: f"{option}",
                     options=UBERDUCK_VOICES.keys(),
                 )
 
