@@ -135,14 +135,12 @@ class LipsyncPage(BasePage):
         input_audio = state.get("input_audio")
         if input_audio:
             r = requests.head(input_audio)
-            r.raise_for_status()
-            total_bytes += float(r.headers["Content-length"]) or 0
+            total_bytes += float(r.headers.get("Content-length")) or 1
 
         input_face = state.get("input_face")
         if input_face:
             r = requests.head(input_face)
-            r.raise_for_status()
-            total_bytes += float(r.headers["Content-length"]) or 0
+            total_bytes += float(r.headers.get("Content-length")) or 1
 
         total_mb = total_bytes / 1024 / 1024
         return total_mb * CREDITS_PER_MB
