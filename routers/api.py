@@ -356,7 +356,7 @@ def submit_api_call(
     # create a new run
     example_id, run_id, uid = self.create_new_run()
     # submit the task
-    result = self.call_runner_task(example_id, run_id, uid)
+    result = self.call_runner_task(example_id, run_id, uid, is_api_call=True)
     return self, result, run_id, uid
 
 

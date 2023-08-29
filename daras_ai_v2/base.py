@@ -661,7 +661,7 @@ class BasePage:
 
         return parent_example_id, run_id, uid
 
-    def call_runner_task(self, example_id, run_id, uid):
+    def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
         from celeryapp.tasks import gui_runner
 
         return gui_runner.delay(
@@ -674,6 +674,7 @@ class BasePage:
             query_params=self.clean_query_params(
                 example_id=example_id, run_id=run_id, uid=uid
             ),
+            is_api_call=is_api_call,
         )
 
     def generate_credit_error_message(self, example_id, run_id, uid) -> str:
