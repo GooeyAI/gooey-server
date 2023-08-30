@@ -92,6 +92,3 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         min_value=1,
         max_value=50,
     )
-
-
-
