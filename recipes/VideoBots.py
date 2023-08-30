@@ -288,7 +288,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         st.text_area(
             """
             ##### 📝 Prompt
-            Instructions to the bot + an example scripted conversation (~1000 words)
+            High-level system Instructions to the copilot + optional example scripted conversations between the copilot and the user. 
             """,
             key="bot_script",
             height=300,
@@ -297,7 +297,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         document_uploader(
             """
 ##### 📄 Documents (*optional*)
-Enable document search, to use custom documents as information sources.
+Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
 """
         )
 
@@ -320,12 +320,11 @@ Enable document search, to use custom documents as information sources.
             st.write("---")
             doc_search_settings()
             st.write("---")
-
-        language_model_settings()
+        st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
         st.write("---")
-        st.checkbox("🔗 Shorten URL", key="use_url_shortener")
+        language_model_settings()
         st.caption(
-            "This will shorten the urls of the references which allows tracking of clicks and views."
+            "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
         )
         st.write("---")
         st.text_area(
