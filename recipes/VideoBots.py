@@ -141,7 +141,7 @@ def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
             {
                 "role": role,
                 "display_name": match.group(1).strip(),
-                "content": bot_script[match.end(): next_match_start].strip(),
+                "content": bot_script[match.end() : next_match_start].strip(),
             }
         )
     return system_message, scripted_msgs
@@ -226,8 +226,7 @@ class VideoBotsPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
-        citation_style: typing.Literal[tuple(
-            e.name for e in CitationStyles)] | None
+        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
 
         user_language: str | None
@@ -351,8 +350,7 @@ Enable document search, to use custom documents as information sources.
             st.session_state["__enable_audio"] = bool(
                 st.session_state.get("tts_provider")
             )
-        enable_audio = st.checkbox(
-            "Enable Audio Output?", key="__enable_audio")
+        enable_audio = st.checkbox("Enable Audio Output?", key="__enable_audio")
         if not enable_audio:
             st.write("---")
             st.session_state["tts_provider"] = None
@@ -376,8 +374,7 @@ Enable document search, to use custom documents as information sources.
             st.session_state["__enable_video"] = bool(
                 st.session_state.get("input_face")
             )
-        enable_video = st.checkbox(
-            "Enable Video Output?", key="__enable_video")
+        enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
         if not enable_video:
             st.session_state["input_face"] = None
         else:
@@ -448,8 +445,7 @@ Enable document search, to use custom documents as information sources.
 
                 for entry in reversed(st.session_state.get("messages", [])):
                     with msg_container_widget(entry["role"]):
-                        display_name = entry.get(
-                            "display_name") or entry["role"]
+                        display_name = entry.get("display_name") or entry["role"]
                         display_name = display_name.capitalize()
                         st.write(f'**{display_name}** \\\n{entry["content"]}')
 
@@ -464,8 +460,7 @@ Enable document search, to use custom documents as information sources.
 
                 if st.button("✈ Send", style=dict(height="3.2rem")):
                     messsages = st.session_state.get("messages", [])
-                    raw_input_text = st.session_state.get(
-                        "raw_input_text") or ""
+                    raw_input_text = st.session_state.get("raw_input_text") or ""
                     raw_output_text = (st.session_state.get("raw_output_text") or [""])[
                         0
                     ]
@@ -550,8 +545,7 @@ Enable document search, to use custom documents as information sources.
                 st.audio(audio_url)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(
-            state)
+        request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
         user_input = request.input_prompt.strip()
         if not user_input:
@@ -577,11 +571,9 @@ Enable document search, to use custom documents as information sources.
         if system_message:
             # add time to prompt
             utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
-            system_message = system_message.replace(
-                "{{ datetime.utcnow }}", utcnow)
+            system_message = system_message.replace("{{ datetime.utcnow }}", utcnow)
             # insert to top
-            system_prompt = {"role": CHATML_ROLE_SYSTEM,
-                             "content": system_message}
+            system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": system_message}
         else:
             system_prompt = None
 
@@ -662,8 +654,7 @@ Enable document search, to use custom documents as information sources.
         history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
             model_max_tokens[model]
-            - calc_gpt_tokens([system_prompt, user_prompt],
-                              is_chat_model=is_chat_model)
+            - calc_gpt_tokens([system_prompt, user_prompt], is_chat_model=is_chat_model)
             - request.max_tokens
             - SAFETY_BUFFER
         )
@@ -685,8 +676,7 @@ Enable document search, to use custom documents as information sources.
             )
 
         # final prompt to display
-        prompt = "\n".join(format_chatml_message(entry)
-                           for entry in prompt_messages)
+        prompt = "\n".join(format_chatml_message(entry) for entry in prompt_messages)
         state["final_prompt"] = prompt
 
         # ensure input script is not too big
@@ -695,8 +685,7 @@ Enable document search, to use custom documents as information sources.
         )
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
-            raise ValueError(
-                "Input Script is too long! Please reduce the script size.")
+            raise ValueError("Input Script is too long! Please reduce the script size.")
 
         yield f"Running {model.value}..."
         if is_chat_model:
@@ -881,8 +870,7 @@ Enable document search, to use custom documents as information sources.
         if not integrations:
             return
 
-        example_id, run_id, uid = extract_query_params(
-            gooey_get_query_params())
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
 
         for bi in integrations:
             if bi.saved_run:
