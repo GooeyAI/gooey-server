@@ -22,7 +22,7 @@ def language_model_settings(show_selector=True):
         st.slider(
             label="""
 ###### Answer Outputs
-How many answers should the copilot generate? Note, more answer outputs will increase the cost of each run.
+How many answers should the copilot generate? Additional answer outputs increase the cost of each run.
             """,
             key="num_outputs",
             min_value=1,
@@ -51,7 +51,7 @@ Generate multiple responses and choose the best one.
         st.number_input(
             label="""
             ###### Max Output Tokens
-            *The maximum number of tokens to generate in the completion. Increase to generate longer responses.*
+            The maximum number of tokens to generate in the completion. Increase to generate longer responses.
             """,
             key="max_tokens",
             min_value=10,

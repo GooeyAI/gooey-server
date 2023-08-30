@@ -288,7 +288,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         st.text_area(
             """
             ##### 📝 Prompt
-            High-level system Instructions to the copilot + optional example scripted conversations between the copilot and the user. 
+            High-level system instructions to the copilot + optional example conversations between the bot and the user.
             """,
             key="bot_script",
             height=300,
@@ -311,7 +311,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.text_area(
                 """
             ##### 👩‍🏫 Document Search Results Instructions
-            This prompt should contain guidelines on how the Prompt should interpret the results of the knowledge base query.
+            <font color="grey"> Guidelines to interpret the results of the knowledge base query.
             """,
                 key="task_instructions",
                 height=300,
@@ -321,16 +321,16 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             doc_search_settings()
             st.write("---")
         st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
-        st.write("---")
-        language_model_settings()
         st.caption(
             "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
         )
         st.write("---")
+        language_model_settings()
+        st.write("---")
         st.text_area(
             """
             ##### 👁‍🗨 Conversation Summarization Instructions
-            This prompt runs before the workflow performs a vectorDB search of the knowledge base documents and should summarize the conversation history into a VectorDB query. In general, you shouldn't need to adjust it.               
+            <font color="grey"> These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.
                 """,
             key="query_instructions",
             height=300,
@@ -339,7 +339,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         google_translate_language_selector(
             """
             ###### 🔠 User Language
-            If provided, the bot will translate input prompt to english, and the responses to this language.
+            If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
             """,
             key="user_language",
         )
@@ -357,11 +357,17 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             text_to_speech_settings()
             st.write("---")
 
-        st.write("##### 🎤 Document Speech Recognition")
+        st.write(
+            """
+            ##### 🎤 Speech Recognition & Translation
+            <font color="grey"> When users provide an audio input message (e.g. a WhatsApp audio note), we need to perform speech recognition and often translation to English to improve the quality of the copilot's answers.
+            """,
+            key="speech_recognition_settings",
+        )
 
         enum_selector(
             AsrModels,
-            label="###### ASR Model",
+            label="###### Speech Recognition Model",
             key="selected_asr_model",
             allow_none=True,
             use_selectbox=True,
