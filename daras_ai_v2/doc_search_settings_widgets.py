@@ -62,7 +62,7 @@ def doc_search_settings():
     st.number_input(
         label="""
 ###### Max Citations
-The maximum number of citations to include from the document search.
+The maximum number of document search citations.
 """,
         key="max_references",
         min_value=1,
@@ -71,9 +71,9 @@ The maximum number of citations to include from the document search.
 
     st.number_input(
         label="""
-###### Max document snippet words (in words)
+###### Max Snippet Words
 
-After a document search, relevant snippets of your documents are returned as results. This setting sets the maximum number of words in each snippet. A high snippet size allows the LLM to access more information from your document, at the cost of being verbose and running out of input tokens (which can cause a failure for the copilot to respond). 
+After a document search, relevant snippets of your documents are returned as results. This setting adjusts the maximum number of words in each snippet. A high snippet size allows the LLM to access more information from your document results, at the cost of being verbose and potentially exhausting input tokens (which can cause a failure of the copilot to respond). Default: 300 
 """,
         key="max_context_words",
         min_value=10,
@@ -82,8 +82,8 @@ After a document search, relevant snippets of your documents are returned as res
 
     st.number_input(
         label="""
-###### Overlapping Snippet lines
-Your knowledge base documents are split into overlapping snippets. This settings allows to adjust how much those snippets overlap (and in general you shouldn't need to adjust this from the default 5 lines). 
+###### Overlapping Snippet Lines
+Your knowledge base documents are split into overlapping snippets. This settings adjusts how much those snippets overlap. In general you shouldn't need to adjust this. Default: 5
 
 """,
         key="scroll_jump",
