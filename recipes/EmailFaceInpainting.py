@@ -263,6 +263,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 bcc=request.email_bcc,
                 subject=request.email_subject,
                 html_body=self._get_email_body(request, output_images),
+                message_stream="gooey-ai-workflows",
             )
             state["email_sent"] = True
 
