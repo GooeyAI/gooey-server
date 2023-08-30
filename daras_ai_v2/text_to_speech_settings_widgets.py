@@ -6,18 +6,17 @@ from google.cloud import texttospeech
 from daras_ai_v2.enum_selector_widget import enum_selector
 
 UBERDUCK_VOICES = {
-
     "Aiden Botha": "b01cf18d-0f10-46dd-adc6-562b599fdae4",
     "Angus": "7d29a280-8a3e-4c4b-9df4-cbe77e8f4a63",
     "Damon Edwards Deep": "df71a60f-1294-4cf1-bd5d-a7e6d7350178",
-    "General Herring":"818bc1dd-1d34-4205-81a8-5e32dfec3e2b",
-    "Zeus":"92022a27-75fb-4e15-90ca-95095a82f5ee",
-    "Rose":"e76808ae-e81d-46a1-97cd-29bc3783d25b",
-    "Davo":"23fb3c48-4115-4525-84c8-90dba2c290d6",
-    "Kiwi":"769bdb7a-2763-4e2a-a4e5-d237727e033e",
-    "Bertie":"080e856b-6fcd-4010-bd3a-3bc0712037a3",
-    "Jake Turner":"13c0b24a-abff-4c30-9729-7250844ef314",
-    "Carolyn Samuelson":"60c910d0-d924-4f74-a47c-6c9e44e2bb8b"
+    "General Herring": "818bc1dd-1d34-4205-81a8-5e32dfec3e2b",
+    "Zeus": "92022a27-75fb-4e15-90ca-95095a82f5ee",
+    "Rose": "e76808ae-e81d-46a1-97cd-29bc3783d25b",
+    "Davo": "23fb3c48-4115-4525-84c8-90dba2c290d6",
+    "Kiwi": "769bdb7a-2763-4e2a-a4e5-d237727e033e",
+    "Bertie": "080e856b-6fcd-4010-bd3a-3bc0712037a3",
+    "Jake Turner": "13c0b24a-abff-4c30-9729-7250844ef314",
+    "Carolyn Samuelson": "60c910d0-d924-4f74-a47c-6c9e44e2bb8b",
 }
 
 
