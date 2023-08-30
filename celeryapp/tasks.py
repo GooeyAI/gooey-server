@@ -113,16 +113,18 @@ def send_email_on_completion(page: BasePage, sr: SavedRun):
     )
     if not to_address:
         return
-    prompt = page.preview_input(sr.state) or ""
-    title = sr.state.get("__title") or page.title
+    prompt = (page.preview_input(sr.state) or "").strip()
+    title = (sr.state.get("__title") or page.title).strip()
+    subject = f"🌻 “{truncate_text_words(prompt, maxlen=50)}” {title} is done"
     send_email_via_postmark(
         from_address=settings.SUPPORT_EMAIL,
         to_address=to_address,
-        subject=f"🌻 “{truncate_text_words(prompt, maxlen=50)}” {title} is done",
+        subject=subject,
         html_body=templates.get_template("run_complete_email.html").render(
             run_time_sec=round(run_time_sec),
             app_url=sr.get_app_url(),
             prompt=prompt,
             title=title,
         ),
+        message_stream="gooey-ai-workflows",
     )

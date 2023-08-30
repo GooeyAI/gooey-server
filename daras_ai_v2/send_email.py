@@ -1,4 +1,5 @@
 import smtplib
+import typing
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -51,8 +52,11 @@ def send_email_via_postmark(
     subject: str = "",
     html_body: str = "",
     text_body: str = "",
+    message_stream: typing.Literal[
+        "outbound", "gooey-ai-workflows", "announcements"
+    ] = "outbound",
 ):
-    requests.post(
+    r = requests.post(
         "https://api.postmarkapp.com/email",
         headers={
             "X-Postmark-Server-Token": settings.POSTMARK_API_TOKEN,
@@ -89,9 +93,10 @@ def send_email_via_postmark(
             #     },
             # ],
             # "Metadata": {"color": "blue", "client-id": "12345"},
-            # "MessageStream": "outbound",
+            "MessageStream": message_stream,
         },
     )
+    assert r.ok, r.text
 
 
 def send_smtp_message(
