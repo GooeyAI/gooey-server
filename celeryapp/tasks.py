@@ -106,7 +106,10 @@ def gui_runner(
 
 def send_email_on_completion(page: BasePage, sr: SavedRun):
     run_time_sec = sr.run_time.total_seconds()
-    if run_time_sec <= settings.SEND_RUN_EMAIL_AFTER_SEC:
+    if (
+        run_time_sec <= settings.SEND_RUN_EMAIL_AFTER_SEC
+        or not settings.POSTMARK_API_TOKEN  # make dev easier
+    ):
         return
     to_address = (
         AppUser.objects.filter(uid=sr.uid).values_list("email", flat=True).first()
