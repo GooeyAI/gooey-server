@@ -863,7 +863,9 @@ Prompt to transform the conversation history into a vector search query.
                 favicon = Platform(bi.platform).get_favicon()
                 st.markdown(
                     f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                    f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>',
+                    f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
+                    if bi.saved_run
+                    else f"<span>{bi}</span>",
                     unsafe_allow_html=True,
                 )
             with col2:
