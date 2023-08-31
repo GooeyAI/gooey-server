@@ -355,24 +355,6 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.session_state["tts_provider"] = None
         else:
             text_to_speech_settings()
-            st.write("---")
-
-        st.write(
-            """
-            ##### 🎤 Speech Recognition & Translation
-            <font color="grey"> When users provide an audio input message (e.g. a WhatsApp audio note), we need to perform speech recognition and often translation to English to improve the quality of the copilot's answers.
-            """,
-            key="speech_recognition_settings",
-        )
-
-        enum_selector(
-            AsrModels,
-            label="###### Speech Recognition Model",
-            key="selected_asr_model",
-            allow_none=True,
-            use_selectbox=True,
-        )
-        google_translate_language_selector()
 
         st.write("---")
         if not "__enable_video" in st.session_state:
