@@ -8,6 +8,7 @@ import jinja2
 from django.db.models import QuerySet
 from furl import furl
 from pydantic import BaseModel
+from daras_ai_v2.enum_selector_widget import enum_selector
 
 import gooey_ui as st
 from bots.models import BotIntegration, Platform
@@ -17,6 +18,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
+    AsrModels,
     run_google_translate,
     google_translate_language_selector,
 )
@@ -145,7 +147,7 @@ def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
 
 
 class VideoBotsPage(BasePage):
-    title = "Copilot for your Enterprise"  #  "Create Interactive Video Bots"
+    title = "Copilot for your Enterprise"  # "Create Interactive Video Bots"
     workflow = Workflow.VIDEO_BOTS
     slug_versions = ["video-bots", "bots", "copilot"]
 
@@ -284,8 +286,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_form_v2(self):
         st.text_area(
             """
-            ##### 📝 Script
-            Instructions to the bot + an example scripted conversation (~1000 words)
+            ##### 📝 Prompt
+            High-level system instructions to the copilot + optional example conversations between the bot and the user.
             """,
             key="bot_script",
             height=300,
@@ -294,7 +296,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         document_uploader(
             """
 ##### 📄 Documents (*optional*)
-Enable document search, to use custom documents as information sources.
+Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
 """
         )
 
@@ -302,14 +304,41 @@ Enable document search, to use custom documents as information sources.
         youtube_video("-j2su1r8pEg")
 
     def render_settings(self):
-        st.checkbox("🔗 Shorten URL", key="use_url_shortener")
+        if st.session_state.get("documents") or st.session_state.get(
+            "__documents_files"
+        ):
+            st.text_area(
+                """
+            ##### 👩‍🏫 Document Search Results Instructions
+            <font color="grey"> Guidelines to interpret the results of the knowledge base query.
+            """,
+                key="task_instructions",
+                height=300,
+            )
+
+            st.write("---")
+            doc_search_settings()
+            st.write("---")
+        st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
         st.caption(
-            "This will shorten the urls of the references which allows tracking of clicks and views."
+            "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
         )
+        st.write("---")
+        language_model_settings()
+        st.write("---")
+        st.text_area(
+            """
+            ##### 👁‍🗨 Conversation Summarization Instructions
+            <font color="grey"> These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.
+                """,
+            key="query_instructions",
+            height=300,
+        )
+        st.write("---")
         google_translate_language_selector(
             """
             ###### 🔠 User Language
-            If provided, the bot will translate input prompt to english, and the responses to this language.
+            If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
             """,
             key="user_language",
         )
@@ -319,59 +348,31 @@ Enable document search, to use custom documents as information sources.
             st.session_state["__enable_audio"] = bool(
                 st.session_state.get("tts_provider")
             )
-        enable_audio = st.checkbox("Enable Audio Ouput?", key="__enable_audio")
+        enable_audio = st.checkbox("Enable Audio Output?", key="__enable_audio")
         if not enable_audio:
             st.write("---")
             st.session_state["tts_provider"] = None
         else:
             text_to_speech_settings()
-            st.write("---")
 
-            if not "__enable_video" in st.session_state:
-                st.session_state["__enable_video"] = bool(
-                    st.session_state.get("input_face")
-                )
-            enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
-            if not enable_video:
-                st.write("---")
-                st.session_state["input_face"] = None
-            else:
-                st.file_uploader(
-                    """
-                    #### 👩‍🦰 Input Face
-                    Upload a video/image that contains faces to use  
-                    *Recommended - mp4 / mov / png / jpg / gif* 
-                    """,
-                    key="input_face",
-                )
-                lipsync_settings()
-                st.write("---")
-
-        if st.session_state.get("documents") or st.session_state.get(
-            "__documents_files"
-        ):
-            st.text_area(
-                """
-##### 👩‍🏫 Task Instructions
-Prompt for interpreting the document sources.
-                """,
-                key="task_instructions",
-                height=300,
+        st.write("---")
+        if not "__enable_video" in st.session_state:
+            st.session_state["__enable_video"] = bool(
+                st.session_state.get("input_face")
             )
-            st.text_area(
+        enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
+        if not enable_video:
+            st.session_state["input_face"] = None
+        else:
+            st.file_uploader(
                 """
-##### 👁‍🗨 Query Instructions
-Prompt to transform the conversation history into a vector search query.                
+                #### 👩‍🦰 Input Face
+                Upload a video/image that contains faces to use  
+                *Recommended - mp4 / mov / png / jpg / gif* 
                 """,
-                key="query_instructions",
-                height=300,
+                key="input_face",
             )
-            st.write("---")
-
-            doc_search_settings()
-            st.write("---")
-
-        language_model_settings()
+            lipsync_settings()
 
     def fields_to_save(self) -> [str]:
         return super().fields_to_save() + ["landbot_url"]

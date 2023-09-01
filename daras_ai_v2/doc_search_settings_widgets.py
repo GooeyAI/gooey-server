@@ -48,7 +48,7 @@ def document_uploader(
 
 
 def doc_search_settings(asr_allowed: bool = True):
-    st.write("##### 🔎 Search Settings")
+    st.write("##### 🔎 Document Search Settings")
 
     if "citation_style" in st.session_state:
         enum_selector(
@@ -61,8 +61,8 @@ def doc_search_settings(asr_allowed: bool = True):
 
     st.number_input(
         label="""
-###### Max References
-The maximum number of References to include from the source document.
+###### Max Citations
+The maximum number of document search citations.
 """,
         key="max_references",
         min_value=1,
@@ -71,11 +71,9 @@ The maximum number of References to include from the source document.
 
     st.number_input(
         label="""
-###### Max context size (in words)
+###### Max Snippet Words
 
-The maximum size of each split of the document.\\
-A high context size allows GPT to access a greater chunk of information from the source document, 
-at the cost of being too verbose, and running out of input tokens. 
+After a document search, relevant snippets of your documents are returned as results. This setting adjusts the maximum number of words in each snippet. A high snippet size allows the LLM to access more information from your document results, at the cost of being verbose and potentially exhausting input tokens (which can cause a failure of the copilot to respond). Default: 300 
 """,
         key="max_context_words",
         min_value=10,
@@ -84,9 +82,9 @@ at the cost of being too verbose, and running out of input tokens.
 
     st.number_input(
         label="""
-###### Scroll Jump
-We split the documents into chunks by scrolling through it.\\
-If scroll jump is too high, there might not be enough overlap between the chunks to answer the questions accurately.
+###### Overlapping Snippet Lines
+Your knowledge base documents are split into overlapping snippets. This settings adjusts how much those snippets overlap. In general you shouldn't need to adjust this. Default: 5
+
 """,
         key="scroll_jump",
         min_value=1,

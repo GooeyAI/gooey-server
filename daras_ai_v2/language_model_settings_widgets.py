@@ -21,8 +21,8 @@ def language_model_settings(show_selector=True):
     with col1:
         st.slider(
             label="""
-###### Number of Outputs
-How many completion choices to generate for each input
+###### Answer Outputs
+How many answers should the copilot generate? Additional answer outputs increase the cost of each run.
             """,
             key="num_outputs",
             min_value=1,
@@ -37,7 +37,7 @@ How many completion choices to generate for each input
         with col2:
             st.slider(
                 label="""
-###### Quality
+###### Attempts
 Generate multiple responses and choose the best one.
             """,
                 key="quality",
@@ -50,8 +50,8 @@ Generate multiple responses and choose the best one.
     with col1:
         st.number_input(
             label="""
-            ###### Output Size
-            *The maximum number of [tokens](https://beta.openai.com/tokenizer) to generate in the completion.*
+            ###### Max Output Tokens
+            The maximum number of tokens to generate in the completion. Increase to generate longer responses.
             """,
             key="max_tokens",
             min_value=10,
@@ -60,12 +60,9 @@ Generate multiple responses and choose the best one.
     with col2:
         st.slider(
             label="""
-            ###### Model Creativity 
-            *(Sampling Temperature)*
+            ###### Creativity (aka Sampling Temperature)
     
-            Higher values allow the model to take more risks.
-            Try values larger than `1` for more creative applications, 
-            or values close to `0` for a more well-defined answer. 
+            Higher values allow the LLM to take more risks. Try values larger than 1 for more creative applications or 0 to ensure that LLM gives the same answer when given the same user input. 
             """,
             key="sampling_temperature",
             min_value=0.0,
