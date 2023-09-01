@@ -147,7 +147,7 @@ class TextToSpeechPage(BasePage):
                 voicemodel_uuid = (
                     UBERDUCK_VOICES.get(
                         state.get("uberduck_voice_name"), UBERDUCK_VOICES["Aiden Botha"]
-                    )
+                    ).strip()
                     if "uberduck_voice_name" in state
                     else UBERDUCK_VOICES["Aiden Botha"]
                 ).strip()
