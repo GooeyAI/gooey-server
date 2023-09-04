@@ -250,7 +250,7 @@ class VideoBotsPage(BasePage):
 
         # doc search
         references: list[SearchReference] | None
-        search_query: str | None
+        final_search_query: str | None
 
     def related_workflows(self):
         from recipes.LipsyncTTS import LipsyncTTSPage
@@ -316,30 +316,21 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.text_area(
                 """
             ##### 👩‍🏫 Document Search Results Instructions
-            <font color="grey"> Guidelines to interpret the results of the knowledge base query.
+            Guidelines to interpret the results of the knowledge base query.
             """,
                 key="task_instructions",
                 height=300,
             )
 
             st.write("---")
+            st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
+            st.caption(
+                "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
+            )
+            st.write("---")
             doc_search_settings()
             st.write("---")
-        st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
-        st.caption(
-            "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
-        )
-        st.write("---")
         language_model_settings()
-        st.write("---")
-        st.text_area(
-            """
-            ##### 👁‍🗨 Conversation Summarization Instructions
-            <font color="grey"> These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.
-                """,
-            key="query_instructions",
-            height=300,
-        )
         st.write("---")
         google_translate_language_selector(
             """
@@ -494,13 +485,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         if st.session_state.get("tts_provider"):
             st.video(st.session_state.get("input_face"), caption="Input Face")
 
-        search_query = st.session_state.get("search_query")
-        if search_query:
+        final_search_query = st.session_state.get("final_search_query")
+        if final_search_query:
             st.text_area(
-                "**Document Search Query**",
-                value=search_query,
-                height=100,
-                disabled=True,
+                "**Final Search Query**", value=final_search_query, disabled=True
             )
 
         references = st.session_state.get("references", [])
@@ -608,7 +596,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                         ),
                     },
                 )
-                state["search_query"] = run_language_model(
+                final_search_query = run_language_model(
                     model=request.selected_model,
                     prompt=query_instructions,
                     max_tokens=model_max_tokens[model] // 2,
@@ -616,15 +604,20 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     temperature=request.sampling_temperature,
                     avoid_repetition=request.avoid_repetition,
                 )[0]
+                state["final_search_query"] = (
+                    final_search_query.strip().strip('"').strip("'")
+                )
             else:
                 query_msgs.reverse()
-                state["search_query"] = "\n---\n".join(
+                state["final_search_query"] = "\n---\n".join(
                     msg["content"] for msg in query_msgs
                 )
 
             # perform doc search
             references = yield from get_top_k_references(
-                DocSearchPage.RequestModel.parse_obj(state)
+                DocSearchPage.RequestModel.parse_obj(
+                    {**state, "search_query": state["final_search_query"]}
+                ),
             )
             if request.use_url_shortener:
                 for reference in references:
@@ -705,7 +698,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             )
         # save model response
         state["raw_output_text"] = [
-            "".join(snippet for snippet, refs in parse_refs(text, references))
+            "".join(snippet for snippet, _ in parse_refs(text, references))
             for text in output_text
         ]
 
@@ -717,6 +710,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 source_language="en",
                 target_language=request.user_language,
             )
+
+        tts_text = [
+            "".join(snippet for snippet, _ in parse_refs(text, references))
+            for text in output_text
+        ]
 
         if references:
             citation_style = (
@@ -732,7 +730,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         if not request.tts_provider:
             return
         tts_state = dict(state)
-        for text in state["output_text"]:
+        for text in tts_text:
             tts_state["text_prompt"] = text
             yield from TextToSpeechPage().run(tts_state)
             state["output_audio"].append(tts_state["audio_url"])

@@ -130,15 +130,16 @@ class DocSearchPage(BasePage):
         return "Add your PDF, Word, HTML or Text docs, train our AI on them with OpenAI embeddings & vector search and then process results with a GPT3 script. This workflow is perfect for anything NOT in ChatGPT: 250-page compliance PDFs, training manuals, your diary, etc."
 
     def render_steps(self):
-        col1, col2 = st.columns(2)
+        final_search_query = st.session_state.get("final_search_query")
+        if final_search_query:
+            st.text_area(
+                "**Final Search Query**", value=final_search_query, disabled=True
+            )
 
-        with col1:
-            scaleserp_results = st.session_state.get("scaleserp_results")
-            if scaleserp_results:
-                st.write("**ScaleSERP Results**")
-                st.json(scaleserp_results, expanded=False)
-            else:
-                st.div()
+        scaleserp_results = st.session_state.get("scaleserp_results")
+        if scaleserp_results:
+            st.write("**ScaleSERP Results**")
+            st.json(scaleserp_results, expanded=False)
 
         render_doc_search_step(
             st.session_state.get("final_prompt"),
@@ -161,7 +162,7 @@ class DocSearchPage(BasePage):
             query_instructions = jinja2.Template(query_instructions).render(
                 **request.dict()
             )
-            response.final_search_query = run_language_model(
+            final_search_query = run_language_model(
                 model=request.selected_model,
                 prompt=query_instructions,
                 max_tokens=model_max_tokens[model] // 2,
@@ -169,6 +170,9 @@ class DocSearchPage(BasePage):
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
             )[0]
+            response.final_search_query = (
+                final_search_query.strip().strip('"').strip("'")
+            )
         else:
             response.final_search_query = request.search_query
 
