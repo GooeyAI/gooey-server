@@ -11,6 +11,7 @@ from furl import furl
 
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai_v2 import settings
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gpu_server import (
     GpuEndpoints,
@@ -36,6 +37,7 @@ class AsrModels(Enum):
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
     usm = "Chirp / USM (Google)"
+    deepgram = "Deepgram"
 
 
 asr_model_ids = {
@@ -58,12 +60,14 @@ forced_asr_languages = {
 asr_supported_languages = {
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
+    AsrModels.deepgram: WHISPER_SUPPORTED,
 }
 
 
 class AsrChunk(typing_extensions.TypedDict):
     timestamp: tuple[float, float]
     text: str
+    speaker: int | None
 
 
 class AsrOutputJson(typing_extensions.TypedDict):
@@ -286,7 +290,44 @@ def run_asr(
     else:
         audio_url, size = audio_url_to_wav(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
-    if selected_model == AsrModels.usm:
+
+    if selected_model == AsrModels.deepgram:
+        r = requests.post(
+            "https://api.deepgram.com/v1/listen",
+            headers={
+                "Authorization": f"Token {settings.DEEPGRAM_API_KEY}",
+            },
+            params={
+                "tier": "nova",
+                "model": "general",  # "phonecall"
+                "diarize": "true",
+                "language": language,
+                "detect_language": "true" if language else "false",
+            },
+            json={
+                "url": audio_url,
+            },
+        )
+        r.raise_for_status()
+        data = r.json()
+        result = data["results"]["channels"][0]["alternatives"][0]
+        chunk = None
+        chunks = []
+        for word in result["words"]:
+            if not chunk or word["speaker"] != chunk["speaker"]:
+                chunk = {
+                    "speaker": word["speaker"],
+                    "text": word["word"],
+                    "timestamp": word["start"],
+                }
+                chunks.append(chunk)
+            else:
+                chunk["text"] += " " + word["word"]
+        return "\n".join(
+            f"Speaker {chunk['speaker']}: {chunk['text']}" for chunk in chunks
+        )
+
+    elif selected_model == AsrModels.usm:
         # note: only us-central1 and a few other regions support chirp recognizers (so global can't be used)
         location = "us-central1"
 

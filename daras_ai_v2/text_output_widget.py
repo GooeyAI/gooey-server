@@ -22,7 +22,7 @@ def text_outputs(
                     label_visibility="collapsed",
                     height=height,
                     idx=idx,
-                    value=text,
+                    value=str(text),
                 )
         case _:
             st.div()
