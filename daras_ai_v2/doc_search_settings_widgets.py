@@ -97,10 +97,12 @@ If scroll jump is too high, there might not be enough overlap between the chunks
         return
 
     st.write("---")
-    st.write("""
+    st.write(
+        """
              ##### 🎤 Knowledge Base Speech Recognition
              <font color="grey">If your knowledge base documents contain audio or video files, we'll transcribe and optionally translate them to English, given we've found most vectorDBs and LLMs perform best in English (even if their final answers are translated into another language). 
-             """)
+             """
+    )
 
     enum_selector(
         AsrModels,
