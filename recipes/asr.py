@@ -155,5 +155,5 @@ class AsrPage(BasePage):
 
     def get_raw_price(self, state: dict):
         texts = state.get("output_text", [])
-        total_words = sum(len(whitespace_re.split(out)) for out in texts)
+        total_words = sum(len(whitespace_re.split(str(out))) for out in texts)
         return 0.04 * total_words
