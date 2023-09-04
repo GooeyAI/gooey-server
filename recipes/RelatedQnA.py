@@ -33,31 +33,11 @@ class RelatedQnAPage(BasePage):
         max_references=4,
         max_context_words=200,
         scroll_jump=5,
+        dense_weight=1.0,
     )
 
-    class RequestModel(BaseModel):
-        search_query: str
-        site_filter: str
-
-        task_instructions: str | None
-
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        sampling_temperature: float | None
-
-        max_search_urls: int | None
-
-        scaleserp_search_field: str | None
-        scaleserp_locations: list[str] | None
-
-        max_references: int | None
-        max_context_words: int | None
-        scroll_jump: int | None
+    class RequestModel(GoogleGPTPage.RequestModel):
+        pass
 
     class ResponseModel(BaseModel):
         output_queries: list[RelatedGoogleGPTResponse]
@@ -94,8 +74,9 @@ class RelatedQnAPage(BasePage):
         )
 
         language_model_settings()
-        doc_search_settings(asr_allowed=False)
+        st.write("---")
 
+        doc_search_settings(asr_allowed=False)
         st.write("---")
 
         st.write("#### Search Tools")

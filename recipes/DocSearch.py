@@ -1,6 +1,7 @@
 import datetime
 import typing
 
+import jinja2
 from furl import furl
 from pydantic import BaseModel
 
@@ -15,6 +16,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
+    model_max_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -50,10 +52,12 @@ class DocSearchPage(BasePage):
         "avoid_repetition": True,
         "selected_model": LargeLanguageModels.text_davinci_003.name,
         "citation_style": CitationStyles.number.name,
+        "dense_weight": 1.0,
     }
 
     class RequestModel(DocSearchRequest):
         task_instructions: str | None
+        query_instructions: str | None
 
         selected_model: typing.Literal[
             tuple(e.name for e in LargeLanguageModels)
@@ -71,6 +75,7 @@ class DocSearchPage(BasePage):
 
         references: list[SearchReference]
         final_prompt: str
+        final_search_query: str | None
 
     def render_form_v2(self):
         st.text_area("##### Search Query", key="search_query")
@@ -144,39 +149,64 @@ class DocSearchPage(BasePage):
     def render_usage_guide(self):
         youtube_video("Xe4L_dQ2KvU")
 
-    def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: DocSearchPage.RequestModel = self.RequestModel.parse_obj(state)
+    def run_v2(
+        self,
+        request: "DocSearchPage.RequestModel",
+        response: "DocSearchPage.ResponseModel",
+    ):
+        model = LargeLanguageModels[request.selected_model]
 
-        references = yield from get_top_k_references(request)
-        state["references"] = references
+        query_instructions = (request.query_instructions or "").strip()
+        if query_instructions:
+            query_instructions = jinja2.Template(query_instructions).render(
+                **request.dict()
+            )
+            response.final_search_query = run_language_model(
+                model=request.selected_model,
+                prompt=query_instructions,
+                max_tokens=model_max_tokens[model] // 2,
+                quality=request.quality,
+                temperature=request.sampling_temperature,
+                avoid_repetition=request.avoid_repetition,
+            )[0]
+        else:
+            response.final_search_query = request.search_query
+
+        response.references = yield from get_top_k_references(
+            DocSearchRequest.parse_obj(
+                {
+                    **request.dict(),
+                    "search_query": response.final_search_query,
+                },
+            ),
+        )
 
         # empty search result, abort!
-        if not references:
+        if not response.references:
             raise ValueError(
                 f"Your search - {request.search_query} - did not match any documents."
             )
 
-        prompt = ""
+        response.final_prompt = ""
         # add time to instructions
         utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
         task_instructions = request.task_instructions.replace(
             "{{ datetime.utcnow }}", utcnow
         )
         # add search results to the prompt
-        prompt += references_as_prompt(references) + "\n\n"
+        response.final_prompt += references_as_prompt(response.references) + "\n\n"
         # add task instructions
-        prompt += task_instructions.strip() + "\n\n"
+        response.final_prompt += task_instructions.strip() + "\n\n"
         # add the question
-        prompt += f"Question: {request.search_query}\nAnswer:"
-        state["final_prompt"] = prompt
+        response.final_prompt += f"Question: {request.search_query}\nAnswer:"
 
-        yield f"Generating answer using {LargeLanguageModels[request.selected_model].value}..."
-        output_text = run_language_model(
+        yield f"Generating answer using {model.value}..."
+        response.output_text = run_language_model(
             model=request.selected_model,
             quality=request.quality,
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
-            prompt=prompt,
+            prompt=response.final_prompt,
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
         )
@@ -184,9 +214,9 @@ class DocSearchPage(BasePage):
         citation_style = (
             request.citation_style and CitationStyles[request.citation_style]
         ) or None
-        apply_response_template(output_text, references, citation_style)
-
-        state["output_text"] = output_text
+        apply_response_template(
+            response.output_text, response.references, citation_style
+        )
 
     def get_raw_price(self, state: dict) -> float:
         name = state.get("selected_model")

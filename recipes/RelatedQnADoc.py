@@ -32,27 +32,10 @@ class RelatedQnADocPage(BasePage):
 
     sane_defaults = {
         "citation_style": CitationStyles.number.name,
+        "dense_weight": 1.0,
     }
 
-    class RequestModel(BaseModel):
-        search_query: str
-        documents: list[str] | None
-        task_instructions: str | None
-
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
-        avoid_repetition: bool | None
-        num_outputs: int | None
-        quality: float | None
-        max_tokens: int | None
-        max_references: int | None
-        max_context_words: int | None
-        scroll_jump: int | None
-        sampling_temperature: float | None
-
-        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
-
+    class RequestModel(DocSearchPage.RequestModel):
         scaleserp_search_field: str | None
         scaleserp_locations: list[str] | None
 

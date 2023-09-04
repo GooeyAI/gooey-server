@@ -12,7 +12,9 @@ import numpy as np
 import requests
 from furl import furl
 from googleapiclient.errors import HttpError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from rank_bm25 import BM25Okapi
+from scipy.stats import rankdata
 
 import gooey_ui as gui
 from daras_ai.image_input import (
@@ -56,6 +58,16 @@ class DocSearchRequest(BaseModel):
     selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
     google_translate_target: str | None
 
+    dense_weight: float | None = Field(
+        ge=0.0,
+        le=1.0,
+        title="Dense Embeddings Weightage",
+        description="""
+Weightage for dense vs sparse embeddings. `0` for sparse, `1` for dense, `0.5` for equal weight.
+Generally speaking, dense embeddings excel at understanding the context of the query, whereas sparse vectors excel at keyword matches.
+        """,
+    )
+
 
 def get_top_k_references(
     request: DocSearchRequest,
@@ -85,19 +97,55 @@ def get_top_k_references(
     )
 
     yield "Searching documents..."
-    # get all matches above cutoff based on cosine similarity
+    # get dense scores above cutoff based on cosine similarity
     cutoff = 0.7
-    candidates = [
-        {**ref, "score": score}
-        for ref, doc_embeds in embeds
-        if (score := query_embeds.dot(doc_embeds)) >= cutoff
-    ]
+    # candidates = [
+    #     {**ref, "score": score}
+    #     for ref, doc_embeds in embeds
+    #     if (score := query_embeds.dot(doc_embeds)) >= cutoff
+    # ]
     # get top_k best matches
-    references = heapq.nlargest(
-        request.max_references,
-        candidates,
-        key=lambda match: match["score"] * float(match.get("weight", None) or "1"),
+    # references = heapq.nlargest(
+    #     request.max_references,
+    #     candidates,
+    #     key=lambda match: match["score"] * float(match.get("weight", None) or "1"),
+    # )
+    dense_scores = np.dot([doc_embeds for _, doc_embeds in embeds], query_embeds)
+    dense_scores *= [float(ref.get("weight") or "1") for ref, _ in embeds]
+    dense_scores[dense_scores < cutoff] = 0.0
+
+    # get sparse scores
+    tokenized_corpus = [
+        (meta["title"] + " " + meta["snippet"]).lower().split(" ") for meta, _ in embeds
+    ]
+    bm25 = BM25Okapi(tokenized_corpus)
+    tokenized_query = request.search_query.lower().split(" ")
+    sparse_scores = bm25.get_scores(tokenized_query)
+
+    alpha = request.dense_weight or 1
+    beta = 1 - alpha
+
+    # RRF formula: 1 / (k + rank)
+    k = 60
+
+    # Get ranks
+    sparse_ranks = rankdata(-sparse_scores, method="ordinal")
+    dense_ranks = rankdata(-dense_scores, method="ordinal")
+
+    # Calculate RRF scores
+    rrf_scores = (beta / (k + sparse_ranks) + alpha / (k + dense_ranks)) * k
+
+    # Final ranking
+    top_k = np.argpartition(rrf_scores, -request.max_references)[
+        -request.max_references :
+    ]
+    final_ranks = sorted(
+        top_k,
+        key=lambda idx: rrf_scores[idx],
+        reverse=True,
     )
+
+    references = [embeds[i][0] | {"score": rrf_scores[i]} for i in final_ranks]
 
     # merge duplicate references
     uniques = {}

@@ -51,6 +51,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
 )
+from daras_ai_v2.vector_search import DocSearchRequest
 from recipes.DocSearch import (
     get_top_k_references,
     DocSearchPage,
@@ -182,6 +183,7 @@ class VideoBotsPage(BasePage):
         "max_context_words": 200,
         "scroll_jump": 5,
         "use_url_shortener": False,
+        "dense_weight": 1.0,
     }
 
     class RequestModel(BaseModel):
@@ -219,12 +221,15 @@ class VideoBotsPage(BasePage):
         messages: list[ConversationEntry] | None
 
         # doc search
-        query_instructions: str | None
         task_instructions: str | None
+        query_instructions: str | None
         documents: list[str] | None
         max_references: int | None
         max_context_words: int | None
         scroll_jump: int | None
+        dense_weight: float | None = DocSearchRequest.__fields__[
+            "dense_weight"
+        ].field_info
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
@@ -595,13 +600,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
                 query_instructions = jinja2.Template(query_instructions).render(
-                    **state
-                    | dict(
-                        messages="\n".join(
+                    {
+                        **state,
+                        "messages": "\n".join(
                             f'{msg["role"]}: """{msg["content"]}"""'
                             for msg in query_msgs
                         ),
-                    ),
+                    },
                 )
                 state["search_query"] = run_language_model(
                     model=request.selected_model,
