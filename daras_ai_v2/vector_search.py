@@ -1,5 +1,4 @@
 import codecs
-import heapq
 import io
 import mimetypes
 import random
@@ -44,7 +43,7 @@ from daras_ai_v2.search_ref import (
     SearchReference,
     remove_quotes,
 )
-from daras_ai_v2.text_splitter import text_splitter
+from daras_ai_v2.text_splitter import text_splitter, puncts, pad
 
 
 class DocSearchRequest(BaseModel):
@@ -116,10 +115,11 @@ def get_top_k_references(
 
     # get sparse scores
     tokenized_corpus = [
-        (meta["title"] + " " + meta["snippet"]).lower().split(" ") for meta, _ in embeds
+        bm25_tokenizer(ref["title"]) + bm25_tokenizer(ref["snippet"])
+        for ref, _ in embeds
     ]
     bm25 = BM25Okapi(tokenized_corpus)
-    tokenized_query = request.search_query.lower().split(" ")
+    tokenized_query = bm25_tokenizer(request.search_query)
     sparse_scores = bm25.get_scores(tokenized_query)
 
     alpha = request.dense_weight or 1
@@ -159,6 +159,13 @@ def get_top_k_references(
             existing["snippet"] += "\n\n...\n\n" + ref["snippet"]
             existing["score"] = (existing["score"] + ref["score"]) / 2
     return list(uniques.values())
+
+
+bm25_split_re = re.compile(r"[" + puncts + pad + "]")
+
+
+def bm25_tokenizer(text: str) -> list[str]:
+    return [t for t in bm25_split_re.split(text.lower()) if t]
 
 
 def references_as_prompt(references: list[SearchReference], sep="\n\n") -> str:
