@@ -128,8 +128,8 @@ def get_openai_error_cls():
 
 
 def do_retry(
-    max_retries: int = 5,
-    retry_delay: float = 5,
+    max_retries: int = 10,
+    retry_delay: float = 6,
     get_error_cls=get_openai_error_cls,
 ) -> typing.Callable[[F], F]:
     def decorator(fn):

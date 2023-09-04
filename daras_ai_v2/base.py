@@ -517,6 +517,16 @@ class BasePage:
         raise NotImplementedError
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
+        request = self.RequestModel.parse_obj(state)
+        response = SimpleNamespace()
+        for val in self.run_v2(request, response):
+            state.update(response.__dict__)
+            yield val
+        state.update(self.ResponseModel.parse_obj(response.__dict__))
+
+    def run_v2(
+        self, request: BaseModel, response: BaseModel
+    ) -> typing.Iterator[str | None]:
         raise NotImplementedError
 
     def _render_report_button(self):

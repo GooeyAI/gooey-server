@@ -48,7 +48,18 @@ def document_uploader(
 
 
 def doc_search_settings(asr_allowed: bool = True):
+    from daras_ai_v2.vector_search import DocSearchRequest
+
     st.write("##### 🔎 Document Search Settings")
+
+    st.text_area(
+        """
+##### 👁‍🗨 Query Instructions
+Prompt to transform the conversation history into a vector search query.                
+        """,
+        key="query_instructions",
+        height=300,
+    )
 
     if "citation_style" in st.session_state:
         enum_selector(
@@ -58,6 +69,14 @@ def doc_search_settings(asr_allowed: bool = True):
             use_selectbox=True,
             allow_none=True,
         )
+
+    dense_weight_ = DocSearchRequest.__fields__["dense_weight"]
+    st.number_input(
+        label=f"###### {dense_weight_.field_info.title}\n{dense_weight_.field_info.description}",
+        key=dense_weight_.name,
+        min_value=dense_weight_.field_info.ge,
+        max_value=dense_weight_.field_info.le,
+    )
 
     st.number_input(
         label="""

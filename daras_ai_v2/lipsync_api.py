@@ -11,6 +11,7 @@ def wav2lip(*, face: str, audio: str, pads: (int, int, int, int)) -> bytes:
             face=face,
             audio=audio,
             pads=pads,
+            batch_size=256,
             # "out_height": 480,
             # "smooth": True,
             # "fps": 25,

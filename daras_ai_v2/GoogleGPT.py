@@ -1,6 +1,7 @@
 import datetime
 import typing
 
+import jinja2
 from furl import furl
 from pydantic import BaseModel
 
@@ -9,7 +10,11 @@ from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import doc_search_settings
 from daras_ai_v2.google_search import call_scaleserp
-from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
+from daras_ai_v2.language_model import (
+    run_language_model,
+    LargeLanguageModels,
+    model_max_tokens,
+)
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
@@ -55,6 +60,7 @@ class GoogleGPTPage(BasePage):
         max_references=4,
         max_context_words=200,
         scroll_jump=5,
+        dense_weight=1.0,
     )
 
     class RequestModel(BaseModel):
@@ -62,6 +68,7 @@ class GoogleGPTPage(BasePage):
         site_filter: str
 
         task_instructions: str | None
+        query_instructions: str | None
 
         selected_model: typing.Literal[
             tuple(e.name for e in LargeLanguageModels)
@@ -81,6 +88,10 @@ class GoogleGPTPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
+        dense_weight: float | None = DocSearchRequest.__fields__[
+            "dense_weight"
+        ].field_info
+
     class ResponseModel(BaseModel):
         output_text: list[str]
 
@@ -89,6 +100,8 @@ class GoogleGPTPage(BasePage):
         # summarized_urls: list[dict]
         references: list[SearchReference]
         final_prompt: str
+
+        final_search_query: str | None
 
     def render_form_v2(self):
         st.text_area("##### Google Search Query", key="search_query")
@@ -168,15 +181,16 @@ class GoogleGPTPage(BasePage):
         youtube_video("mcscNaUIosA")
 
     def render_steps(self):
-        col1, col2 = st.columns(2)
+        final_search_query = st.session_state.get("final_search_query")
+        if final_search_query:
+            st.text_area(
+                "**Final Search Query**", value=final_search_query, disabled=True
+            )
 
-        with col1:
-            scaleserp_results = st.session_state.get("scaleserp_results")
-            if scaleserp_results:
-                st.write("**ScaleSERP Results**")
-                st.json(scaleserp_results)
-            else:
-                st.div()
+        scaleserp_results = st.session_state.get("scaleserp_results")
+        if scaleserp_results:
+            st.write("**ScaleSERP Results**")
+            st.json(scaleserp_results)
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
@@ -186,8 +200,6 @@ class GoogleGPTPage(BasePage):
                 height=400,
                 disabled=True,
             )
-        else:
-            st.div()
 
         output_text: list = st.session_state.get("output_text", [])
         for idx, text in enumerate(output_text):
@@ -199,21 +211,44 @@ class GoogleGPTPage(BasePage):
                 height=200,
             )
 
-        st.write("**References**")
-        st.json(st.session_state.get("references", []))
+        references = st.session_state.get("references", [])
+        if references:
+            st.write("**References**")
+            st.json(references)
 
-    def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: GoogleGPTPage.RequestModel = self.RequestModel.parse_obj(state)
+    def run_v2(
+        self,
+        request: "GoogleGPTPage.RequestModel",
+        response: "GoogleGPTPage.ResponseModel",
+    ):
+        model = LargeLanguageModels[request.selected_model]
 
-        search_query = request.search_query
+        query_instructions = (request.query_instructions or "").strip()
+        if query_instructions:
+            query_instructions = jinja2.Template(query_instructions).render(
+                **request.dict()
+            )
+            final_search_query = run_language_model(
+                model=request.selected_model,
+                prompt=query_instructions,
+                max_tokens=model_max_tokens[model] // 2,
+                quality=request.quality,
+                temperature=request.sampling_temperature,
+                avoid_repetition=request.avoid_repetition,
+            )[0]
+            response.final_search_query = (
+                final_search_query.strip().strip('"').strip("'")
+            )
+        else:
+            response.final_search_query = request.search_query
 
         yield "Googling..."
         if request.site_filter:
             f = furl(request.site_filter)
-            serp_search_query = f"site:{f.host}{f.path} {search_query}"
+            serp_search_query = f"site:{f.host}{f.path} {response.final_search_query}"
         else:
-            serp_search_query = search_query
-        state["scaleserp_results"] = scaleserp_results = call_scaleserp(
+            serp_search_query = response.final_search_query
+        response.scaleserp_results = call_scaleserp(
             serp_search_query,
             include_fields=request.scaleserp_search_field,
             location=",".join(request.scaleserp_locations),
@@ -223,53 +258,53 @@ class GoogleGPTPage(BasePage):
             furl(item["link"])
             .remove(fragment=True)
             .url: f'{item.get("title", "")} | {item.get("snippet", "")}'
-            for item in scaleserp_results.get(request.scaleserp_search_field, [])
+            for item in response.scaleserp_results.get(
+                request.scaleserp_search_field, []
+            )
             if item and item.get("link")
         }
+
         # run vector search on links
-        references = yield from get_top_k_references(
-            DocSearchRequest(
-                documents=list(link_titles.keys()),
-                search_query=request.search_query,
-                max_references=request.max_references,
-                max_context_words=request.max_context_words,
-                scroll_jump=request.scroll_jump,
-            )
+        response.references = yield from get_top_k_references(
+            DocSearchRequest.parse_obj(
+                {
+                    **request.dict(),
+                    "documents": list(link_titles.keys()),
+                    "search_query": response.final_search_query,
+                },
+            ),
         )
         # add pretty titles to references
-        for ref in references:
+        for ref in response.references:
             key = furl(ref["url"]).remove(fragment=True).url
             ref["title"] = link_titles.get(key, "")
-        state["references"] = references
 
         # empty search result, abort!
-        if not references:
+        if not response.references:
             raise ValueError(
                 f"Your search - {request.search_query} - did not match any documents."
             )
 
-        prompt = ""
+        response.final_prompt = ""
         # add time to instructions
         utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
         task_instructions = request.task_instructions.replace(
             "{{ datetime.utcnow }}", utcnow
         )
         # add search results to the prompt
-        prompt += references_as_prompt(references) + "\n\n"
+        response.final_prompt += references_as_prompt(response.references) + "\n\n"
         # add task instructions
-        prompt += task_instructions.strip() + "\n\n"
+        response.final_prompt += task_instructions.strip() + "\n\n"
         # add the question
-        prompt += f"Question: {request.search_query}\nAnswer:"
-        state["final_prompt"] = prompt
+        response.final_prompt += f"Question: {request.search_query}\nAnswer:"
 
-        yield f"Generating answer using {LargeLanguageModels[request.selected_model].value}..."
-        output_text = run_language_model(
+        yield f"Generating answer using {model.value}..."
+        response.output_text = run_language_model(
             model=request.selected_model,
             quality=request.quality,
             num_outputs=request.num_outputs,
             temperature=request.sampling_temperature,
-            prompt=prompt,
+            prompt=response.final_prompt,
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
         )
-        state["output_text"] = output_text
