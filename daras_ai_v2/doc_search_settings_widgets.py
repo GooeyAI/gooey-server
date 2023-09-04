@@ -52,15 +52,6 @@ def doc_search_settings(asr_allowed: bool = True):
 
     st.write("##### 🔎 Document Search Settings")
 
-    st.text_area(
-        """
-##### 👁‍🗨 Query Instructions
-Prompt to transform the conversation history into a vector search query.                
-        """,
-        key="query_instructions",
-        height=300,
-    )
-
     if "citation_style" in st.session_state:
         enum_selector(
             CitationStyles,
@@ -71,7 +62,7 @@ Prompt to transform the conversation history into a vector search query.
         )
 
     dense_weight_ = DocSearchRequest.__fields__["dense_weight"]
-    st.number_input(
+    st.slider(
         label=f"###### {dense_weight_.field_info.title}\n{dense_weight_.field_info.description}",
         key=dense_weight_.name,
         min_value=dense_weight_.field_info.ge,
@@ -112,6 +103,16 @@ Your knowledge base documents are split into overlapping snippets. This settings
 
     if not asr_allowed:
         return
+
+    st.text_area(
+        """
+###### 👁‍🗨 Summarization Instructions
+Prompt to transform the conversation history into a vector search query.  
+These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.                
+        """,
+        key="query_instructions",
+        height=300,
+    )
 
     st.write("---")
     st.write("##### 🎤 Document Speech Recognition")

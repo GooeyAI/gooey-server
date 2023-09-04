@@ -23,10 +23,12 @@ class CitationStyles(Enum):
     markdown = "Markdown ( [Source 1](https://source1.com) [Source 2](https://source2.com) [Source 3](https://source3.com) ..)"
     html = "HTML ( <a href='https://source1.com'>Source 1</a> <a href='https://source2.com'>Source 2</a> <a href='https://source3.com'>Source 3</a> ..)"
     slack_mrkdwn = "Slack mrkdwn ( <https://source1.com|Source 1> <https://source2.com|Source 2> <https://source3.com|Source 3> ..)"
+    plaintext = "Plain Text / WhatsApp ( [Source 1 https://source1.com] [Source 2 https://source2.com] [Source 3 https://source3.com] ..)"
 
-    number_markdown = "Inline Numbers + Markdown listed at the end"
-    number_html = "Inline Numbers + HTML listed at the end"
-    number_slack_mrkdwn = "Inline Numbers + Slack mrkdwn listed at the end"
+    number_markdown = " Markdown Numbers + Footnotes"
+    number_html = "HTML Numbers + Footnotes"
+    number_slack_mrkdwn = "Slack mrkdown Numbers + Footnotes"
+    number_plaintext = "Plain Text / WhatsApp Numbers + Footnotes"
 
 
 def remove_quotes(snippet: str) -> str:
@@ -59,7 +61,7 @@ def apply_response_template(
 
         for snippet, ref_map in parse_refs(text, references):
             match citation_style:
-                case CitationStyles.number:
+                case CitationStyles.number | CitationStyles.number_plaintext:
                     cites = " ".join(f"[{ref_num}]" for ref_num in ref_map.keys())
                 case CitationStyles.number_html:
                     cites = " ".join(
@@ -88,6 +90,11 @@ def apply_response_template(
                     cites = " ".join(
                         ref_to_slack_mrkdwn(ref) for ref in ref_map.values()
                     )
+                case CitationStyles.plaintext:
+                    cites = " ".join(
+                        f'[{ref["title"]} {ref["url"]}]'
+                        for ref_num, ref in ref_map.items()
+                    )
                 case None:
                     cites = ""
                 case _:
@@ -112,6 +119,12 @@ def apply_response_template(
                 formatted += "\n\n"
                 formatted += "\n".join(
                     f"[{ref_num}] {ref_to_slack_mrkdwn(ref)}"
+                    for ref_num, ref in sorted(all_refs.items())
+                )
+            case CitationStyles.number_plaintext:
+                formatted += "\n\n"
+                formatted += "\n".join(
+                    f'{ref_num}. {ref["title"]} {ref["url"]}'
                     for ref_num, ref in sorted(all_refs.items())
                 )
 
