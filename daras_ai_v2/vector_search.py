@@ -161,7 +161,7 @@ def get_top_k_references(
     return list(uniques.values())
 
 
-bm25_split_re = re.compile(r"[" + puncts + pad + "]")
+bm25_split_re = re.compile(rf"[{puncts}\s]")
 
 
 def bm25_tokenizer(text: str) -> list[str]:
