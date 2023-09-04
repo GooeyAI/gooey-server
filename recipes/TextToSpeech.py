@@ -145,12 +145,9 @@ class TextToSpeechPage(BasePage):
 
             case TextToSpeechProviders.UBERDUCK:
                 voicemodel_uuid = (
-                    UBERDUCK_VOICES.get(
-                        state.get("uberduck_voice_name"), UBERDUCK_VOICES["Aiden Botha"]
-                    ).strip()
-                    if "uberduck_voice_name" in state
-                    else UBERDUCK_VOICES["Aiden Botha"]
+                    UBERDUCK_VOICES.get(state.get("uberduck_voice_name")) or UBERDUCK_VOICES["Aiden Botha"]
                 ).strip()
+                
                 pace = (
                     state["uberduck_speaking_rate"]
                     if "uberduck_speaking_rate" in state
