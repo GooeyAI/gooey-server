@@ -8,7 +8,6 @@ import jinja2
 from django.db.models import QuerySet
 from furl import furl
 from pydantic import BaseModel
-from daras_ai_v2.enum_selector_widget import enum_selector
 
 import gooey_ui as st
 from bots.models import BotIntegration, Platform
@@ -18,7 +17,6 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
-    AsrModels,
     run_google_translate,
     google_translate_language_selector,
 )
@@ -54,7 +52,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
 from daras_ai_v2.vector_search import DocSearchRequest
 from recipes.DocSearch import (
     get_top_k_references,
-    DocSearchPage,
     references_as_prompt,
 )
 from recipes.Lipsync import LipsyncPage
@@ -615,7 +612,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
             # perform doc search
             references = yield from get_top_k_references(
-                DocSearchPage.RequestModel.parse_obj(
+                DocSearchRequest.parse_obj(
                     {**state, "search_query": state["final_search_query"]}
                 ),
             )

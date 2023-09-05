@@ -40,6 +40,9 @@ COPY ./pyproject.toml ./poetry.lock ./
 # install python dependencies
 RUN pip install --no-cache-dir -U poetry pip && poetry install --no-cache --only main --no-interaction
 
+# install nltk stopwords
+RUN python -c 'import nltk; nltk.download("stopwords")'
+
 # copy the code into the container
 COPY . .
 
