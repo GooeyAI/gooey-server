@@ -327,12 +327,12 @@ def _run_chat_model(
 def _run_together_chat(
     version: str,
     messages: list[ConversationEntry],
-    max_new_tokens: int = 1024,
-    temperature: float = 0.7,
-    top_p: float = 0.7,
-    top_k: int = 50,
-    repetition_penalty: float = 1,
-    num_outputs: int = 1,
+    max_new_tokens: int = 1024,  # Default value version 1.0
+    temperature: float = 0.7,  # Default value version 1.0
+    top_p: float = 0.7,  # Default value version 1.0
+    top_k: int = 50,  # Default value version 1.0
+    repetition_penalty: float = 1,  # Default value version 1.0
+    num_outputs: int = 1,  # Default value version 1.0
 ) -> list[ConversationEntry]:
     """
     Args:
@@ -347,11 +347,26 @@ def _run_together_chat(
         debug: Whether to provide debugging output in logs
         num_outputs: The number of responses to generate.
     """
-    messages = [
-        message for message in messages if message.get("role") != CHATML_ROLE_SYSTEM
-    ]
-    prompt = "\n\n".join([format_chatml_message(message) for message in messages])
 
+    if messages[0]["role"] != CHATML_ROLE_SYSTEM:
+        messages = [
+            {
+                "role": CHATML_ROLE_SYSTEM,
+                "content": DEFAULT_SYSTEM_MSG,
+            }
+        ] + messages
+
+    messages = [
+        f"<s>[INST] <<SYS>>\n{ message['content']}\n<</SYS>>"
+        if message.get("role") == CHATML_ROLE_SYSTEM
+        else f"{message['content']} [/INST]"
+        if (message.get("role") == CHATML_ROLE_USER) & i == 1
+        else f"[INST] {message['content']} [/INST]"
+        if message.get("role") == CHATML_ROLE_USER
+        else message["content"]
+        for i, message in enumerate(messages)
+    ]
+    prompt = "\n\n".join([message for message in messages])
     outputs = []
 
     for _ in range(num_outputs):
@@ -360,7 +375,7 @@ def _run_together_chat(
             json={
                 "model": version,
                 "max_tokens": max_new_tokens,
-                "prompt": f"[INST] {prompt} [/INST]",
+                "prompt": f"{prompt}",
                 "request_type": "language-model-inference",
                 "temperature": temperature,
                 "top_p": top_p,
@@ -391,11 +406,11 @@ def _run_palm_chat(
     messages: list[ConversationEntry],
     context: str | None = None,
     examples: list[dict] = [],
-    maxOutputTokens: int = 0,
-    topK: int = 40,
-    topP: float = 0.95,
-    num_outputs: int = 1,
-    temperature: float = 0.0,
+    maxOutputTokens: int = 0,  # Default value version 1.0
+    topK: int = 40,  # Default value version 1.0
+    topP: float = 0.95,  # Default value version 1.0
+    num_outputs: int = 1,  # Default value version 1.0
+    temperature: float = 0.0,  # Default value version 1.0
 ) -> list[ConversationEntry]:
     """
     Args:
@@ -457,11 +472,11 @@ def _run_palm_chat(
 def _run_palm(
     model_id: str,
     prompt: str,
-    maxOutputTokens: int = 0,
-    topK: int = 40,
-    topP: float = 0.95,
-    num_outputs: int = 1,
-    temperature: float = 0.0,
+    maxOutputTokens: int = 0,  # Default value version 1.0
+    topK: int = 40,  # Default value version 1.0
+    topP: float = 0.95,  # Default value version 1.0
+    num_outputs: int = 1,  # Default value version 1.0
+    temperature: float = 0.0,  # Default value version 1.0
 ) -> list[str]:
     """
     Args:
@@ -503,10 +518,10 @@ def run_language_model(
     model: tuple[[e.name for e in LargeLanguageModels]],  # type: ignore
     prompt: str | None = None,
     messages: list[ConversationEntry] | None = None,  # type: ignore
-    max_tokens: int = 512,
-    quality: float = 1.0,
-    num_outputs: int = 1,
-    temperature: float = 0.7,
+    max_tokens: int = 512,  # Default value version 1.0
+    quality: float = 1.0,  # Default value version 1.0
+    num_outputs: int = 1,  # Default value version 1.0
+    temperature: float = 0.7,  # Default value version 1.0
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
 ) -> list[str]:
