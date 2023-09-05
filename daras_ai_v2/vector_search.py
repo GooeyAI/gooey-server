@@ -11,6 +11,7 @@ import numpy as np
 import requests
 from furl import furl
 from googleapiclient.errors import HttpError
+from nltk.corpus import stopwords
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
 from scipy.stats import rankdata
@@ -109,8 +110,10 @@ def get_top_k_references(
     #     candidates,
     #     key=lambda match: match["score"] * float(match.get("weight", None) or "1"),
     # )
+    custom_weights = np.array([float(ref.get("weight") or "1") for ref, _ in embeds])
+
     dense_scores = np.dot([doc_embeds for _, doc_embeds in embeds], query_embeds)
-    dense_scores *= [float(ref.get("weight") or "1") for ref, _ in embeds]
+    dense_scores *= custom_weights
     dense_scores[dense_scores < cutoff] = 0.0
 
     # get sparse scores
@@ -120,7 +123,8 @@ def get_top_k_references(
     ]
     bm25 = BM25Okapi(tokenized_corpus)
     tokenized_query = bm25_tokenizer(request.search_query)
-    sparse_scores = bm25.get_scores(tokenized_query)
+    sparse_scores = np.array(bm25.get_scores(tokenized_query))
+    sparse_scores *= custom_weights
 
     alpha = request.dense_weight or 1
     beta = 1 - alpha
@@ -162,10 +166,14 @@ def get_top_k_references(
 
 
 bm25_split_re = re.compile(rf"[{puncts}\s]")
+en_stopwords = None
 
 
 def bm25_tokenizer(text: str) -> list[str]:
-    return [t for t in bm25_split_re.split(text.lower()) if t]
+    global en_stopwords
+    if not en_stopwords:
+        en_stopwords = stopwords.words("english")
+    return [t for t in bm25_split_re.split(text.lower()) if t and t not in en_stopwords]
 
 
 def references_as_prompt(references: list[SearchReference], sep="\n\n") -> str:
