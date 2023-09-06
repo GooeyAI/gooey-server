@@ -192,11 +192,13 @@ class DocSearchPage(BasePage):
             )
 
         response.final_prompt = ""
+        task_instructions = (request.task_instructions or "").strip()
+        if not task_instructions:
+            response.output_text = []
+            return
         # add time to instructions
         utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
-        task_instructions = request.task_instructions.replace(
-            "{{ datetime.utcnow }}", utcnow
-        )
+        task_instructions = task_instructions.replace("{{ datetime.utcnow }}", utcnow)
         # add search results to the prompt
         response.final_prompt += references_as_prompt(response.references) + "\n\n"
         # add task instructions
