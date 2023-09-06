@@ -101,9 +101,6 @@ Your knowledge base documents are split into overlapping snippets. This settings
         max_value=50,
     )
 
-    if not asr_allowed:
-        return
-
     st.text_area(
         """
 ###### 👁‍🗨 Summarization Instructions
@@ -113,6 +110,9 @@ These instructions run before the workflow performs a search of the knowledge ba
         key="query_instructions",
         height=300,
     )
+
+    if not asr_allowed:
+        return
 
     st.write("---")
     st.write("##### 🎤 Document Speech Recognition")
