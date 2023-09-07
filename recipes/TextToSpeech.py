@@ -15,6 +15,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.gpu_server import GpuEndpoints
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
+    UBERDUCK_VOICES,
     text_to_speech_settings,
     TextToSpeechProviders,
 )
@@ -37,7 +38,7 @@ class TextToSpeechPage(BasePage):
         "google_voice_name": "en-IN-Wavenet-A",
         "google_pitch": 0.0,
         "google_speaking_rate": 1.0,
-        "uberduck_voice_name": "hecko",
+        "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
     }
 
@@ -143,23 +144,22 @@ class TextToSpeechPage(BasePage):
                 state["audio_url"] = blob.public_url
 
             case TextToSpeechProviders.UBERDUCK:
-                voice_name = (
-                    state["uberduck_voice_name"]
-                    if "uberduck_voice_name" in state
-                    else "hecko"
+                voicemodel_uuid = (
+                    UBERDUCK_VOICES.get(state.get("uberduck_voice_name"))
+                    or UBERDUCK_VOICES["Aiden Botha"]
                 ).strip()
+
                 pace = (
                     state["uberduck_speaking_rate"]
                     if "uberduck_speaking_rate" in state
                     else 1.0
                 )
-
                 response = requests.post(
                     "https://api.uberduck.ai/speak",
                     auth=(settings.UBERDUCK_KEY, settings.UBERDUCK_SECRET),
                     json={
+                        "voicemodel_uuid": voicemodel_uuid,
                         "speech": text,
-                        "voice": voice_name,
                         "pace": pace,
                     },
                 )
