@@ -220,6 +220,7 @@ class VideoBotsPage(BasePage):
         # doc search
         task_instructions: str | None
         query_instructions: str | None
+        keyword_instructions: str | None
         documents: list[str] | None
         max_references: int | None
         max_context_words: int | None
@@ -248,6 +249,7 @@ class VideoBotsPage(BasePage):
         # doc search
         references: list[SearchReference] | None
         final_search_query: str | None
+        final_keyword_query: str | None
 
     def related_workflows(self):
         from recipes.LipsyncTTS import LipsyncTTSPage
@@ -325,7 +327,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
             )
             st.write("---")
-            doc_search_settings()
+            doc_search_settings(keyword_instructions_allowed=True)
             st.write("---")
         language_model_settings()
         st.write("---")
@@ -488,6 +490,12 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 "**Final Search Query**", value=final_search_query, disabled=True
             )
 
+        final_keyword_query = st.session_state.get("final_keyword_query")
+        if final_keyword_query:
+            st.text_area(
+                "**Final Keyword Query**", value=final_keyword_query, disabled=True
+            )
+
         references = st.session_state.get("references", [])
         if references:
             st.write("**References**")
@@ -582,18 +590,17 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             )
             query_msgs = query_msgs[clip_idx:]
 
+            chat_history = "\n".join(
+                f'{msg["role"]}: """{msg["content"]}"""' for msg in query_msgs
+            )
+
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
+                yield "Generating search query..."
                 query_instructions = jinja2.Template(query_instructions).render(
-                    {
-                        **state,
-                        "messages": "\n".join(
-                            f'{msg["role"]}: """{msg["content"]}"""'
-                            for msg in query_msgs
-                        ),
-                    },
+                    {**state, "messages": chat_history},
                 )
-                final_search_query = run_language_model(
+                state["final_search_query"] = run_language_model(
                     model=request.selected_model,
                     prompt=query_instructions,
                     max_tokens=model_max_tokens[model] // 2,
@@ -601,19 +608,35 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     temperature=request.sampling_temperature,
                     avoid_repetition=request.avoid_repetition,
                 )[0]
-                state["final_search_query"] = (
-                    final_search_query.strip().strip('"').strip("'")
-                )
             else:
                 query_msgs.reverse()
                 state["final_search_query"] = "\n---\n".join(
                     msg["content"] for msg in query_msgs
                 )
 
+            keyword_instructions = (request.keyword_instructions or "").strip()
+            if keyword_instructions:
+                yield "Exctracting keywords..."
+                keyword_instructions = jinja2.Template(keyword_instructions).render(
+                    {**state, "messages": chat_history},
+                )
+                state["final_keyword_query"] = run_language_model(
+                    model=request.selected_model,
+                    prompt=keyword_instructions,
+                    max_tokens=model_max_tokens[model] // 2,
+                    quality=request.quality,
+                    temperature=request.sampling_temperature,
+                    avoid_repetition=request.avoid_repetition,
+                )[0]
+
             # perform doc search
             references = yield from get_top_k_references(
                 DocSearchRequest.parse_obj(
-                    {**state, "search_query": state["final_search_query"]}
+                    {
+                        **state,
+                        "search_query": state["final_search_query"],
+                        "keyword_query": state.get("final_keyword_query"),
+                    },
                 ),
             )
             if request.use_url_shortener:

@@ -13,7 +13,7 @@ from furl import furl
 from googleapiclient.errors import HttpError
 from nltk.corpus import stopwords
 from pydantic import BaseModel, Field
-from rank_bm25 import BM25Plus
+from rank_bm25 import BM25Okapi
 from scipy.stats import rankdata
 
 import gooey_ui as gui
@@ -49,6 +49,8 @@ from daras_ai_v2.text_splitter import text_splitter, puncts
 
 class DocSearchRequest(BaseModel):
     search_query: str
+    keyword_query: str | None
+
     documents: list[str] | None
 
     max_references: int | None
@@ -82,7 +84,6 @@ def get_top_k_references(
         the top k documents
     """
     yield "Getting embeddings..."
-    query_embeds = openai_embedding_create([request.search_query])[0]
     input_docs = request.documents or []
     embeds: list[tuple[SearchReference, np.ndarray]] = flatmap_parallel(
         lambda f_url: doc_url_to_embeds(
@@ -96,23 +97,14 @@ def get_top_k_references(
         max_workers=10,
     )
 
+    dense_query_embeds = openai_embedding_create([request.search_query])[0]
+
     yield "Searching documents..."
     # get dense scores above cutoff based on cosine similarity
     cutoff = 0.7
-    # candidates = [
-    #     {**ref, "score": score}
-    #     for ref, doc_embeds in embeds
-    #     if (score := query_embeds.dot(doc_embeds)) >= cutoff
-    # ]
-    # get top_k best matches
-    # references = heapq.nlargest(
-    #     request.max_references,
-    #     candidates,
-    #     key=lambda match: match["score"] * float(match.get("weight", None) or "1"),
-    # )
     custom_weights = np.array([float(ref.get("weight") or "1") for ref, _ in embeds])
 
-    dense_scores = np.dot([doc_embeds for _, doc_embeds in embeds], query_embeds)
+    dense_scores = np.dot([doc_embeds for _, doc_embeds in embeds], dense_query_embeds)
     dense_scores *= custom_weights
     dense_scores[dense_scores < cutoff] = 0.0
 
@@ -121,20 +113,24 @@ def get_top_k_references(
         bm25_tokenizer(ref["title"]) + bm25_tokenizer(ref["snippet"])
         for ref, _ in embeds
     ]
-    bm25 = BM25Plus(tokenized_corpus, k1=1.2, b=0.75)
-    tokenized_query = bm25_tokenizer(request.search_query)
-    sparse_scores = np.array(bm25.get_scores(tokenized_query))
-    sparse_scores *= custom_weights
+    bm25 = BM25Okapi(tokenized_corpus, k1=2, b=0.3)
+    sparse_query_tokenized = bm25_tokenizer(
+        request.keyword_query or request.search_query
+    )
+    sparse_scores = np.array(bm25.get_scores(sparse_query_tokenized))
+    # sparse_scores *= custom_weights
 
-    alpha = request.dense_weight or 1
+    alpha = request.dense_weight
+    if alpha is None:
+        alpha = 1
     beta = 1 - alpha
 
     # RRF formula: 1 / (k + rank)
     k = 60
 
     # Get ranks
-    sparse_ranks = rankdata(-sparse_scores, method="ordinal")
-    dense_ranks = rankdata(-dense_scores, method="ordinal")
+    sparse_ranks = rankdata(-sparse_scores, method="max")
+    dense_ranks = rankdata(-dense_scores, method="max")
 
     # Calculate RRF scores
     rrf_scores = (beta / (k + sparse_ranks) + alpha / (k + dense_ranks)) * k
