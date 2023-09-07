@@ -13,7 +13,7 @@ from furl import furl
 from googleapiclient.errors import HttpError
 from nltk.corpus import stopwords
 from pydantic import BaseModel, Field
-from rank_bm25 import BM25Okapi
+from rank_bm25 import BM25Plus
 from scipy.stats import rankdata
 
 import gooey_ui as gui
@@ -44,7 +44,7 @@ from daras_ai_v2.search_ref import (
     SearchReference,
     remove_quotes,
 )
-from daras_ai_v2.text_splitter import text_splitter, puncts, pad
+from daras_ai_v2.text_splitter import text_splitter, puncts
 
 
 class DocSearchRequest(BaseModel):
@@ -121,7 +121,7 @@ def get_top_k_references(
         bm25_tokenizer(ref["title"]) + bm25_tokenizer(ref["snippet"])
         for ref, _ in embeds
     ]
-    bm25 = BM25Okapi(tokenized_corpus)
+    bm25 = BM25Plus(tokenized_corpus, k1=1.2, b=0.75)
     tokenized_query = bm25_tokenizer(request.search_query)
     sparse_scores = np.array(bm25.get_scores(tokenized_query))
     sparse_scores *= custom_weights
@@ -173,7 +173,7 @@ def bm25_tokenizer(text: str) -> list[str]:
     global en_stopwords
     if not en_stopwords:
         en_stopwords = stopwords.words("english")
-    return [t for t in bm25_split_re.split(text.lower()) if t and t not in en_stopwords]
+    return [t for t in bm25_split_re.split(text.lower()) if t]
 
 
 def references_as_prompt(references: list[SearchReference], sep="\n\n") -> str:
