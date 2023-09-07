@@ -347,7 +347,6 @@ def _run_together_chat(
         debug: Whether to provide debugging output in logs
         num_outputs: The number of responses to generate.
     """
-
     if messages[0]["role"] != CHATML_ROLE_SYSTEM:
         messages = [
             {
@@ -356,16 +355,8 @@ def _run_together_chat(
             }
         ] + messages
 
-    messages = [
-        f"<s>[INST] <<SYS>>\n{ message['content']}\n<</SYS>>"
-        if message.get("role") == CHATML_ROLE_SYSTEM
-        else f"{message['content']} [/INST]"
-        if (message.get("role") == CHATML_ROLE_USER) & i == 1
-        else f"[INST] {message['content']} [/INST]"
-        if message.get("role") == CHATML_ROLE_USER
-        else message["content"]
-        for i, message in enumerate(messages)
-    ]
+    messages = [format_llama_message(i, message) for i, message in enumerate(messages)]
+
     prompt = "\n\n".join([message for message in messages])
     outputs = []
 
@@ -586,7 +577,20 @@ def format_chatml_message(entry: ConversationEntry) -> str:
         msg += "\n" + content + CHATML_END_TOKEN
     return msg
 
+def format_llama_message(index, message):
+    role = message.get("role")
+    content = message["content"]
 
+    if role == CHATML_ROLE_SYSTEM:
+        return f"<s>[INST] <<SYS>>\n{content}\n<</SYS>>"
+    elif role == CHATML_ROLE_USER:
+        if index == 1:
+            return f"{content} [/INST]"
+        else:
+            return f"[INST] {content} [/INST]"
+    else:
+        return content
+        
 chatml_re = re.compile(
     re.escape(CHATML_START_TOKEN) + r"(.*)$",
     flags=re.M,
