@@ -47,7 +47,9 @@ def document_uploader(
         )
 
 
-def doc_search_settings(asr_allowed: bool = True):
+def doc_search_settings(
+    asr_allowed: bool = True, keyword_instructions_allowed: bool = False
+):
     from daras_ai_v2.vector_search import DocSearchRequest
 
     st.write("##### 🔎 Document Search Settings")
@@ -110,6 +112,14 @@ These instructions run before the workflow performs a search of the knowledge ba
         key="query_instructions",
         height=300,
     )
+    if keyword_instructions_allowed:
+        st.text_area(
+            """
+###### 🔑 Keyword Exctraction                 
+        """,
+            key="keyword_instructions",
+            height=300,
+        )
 
     if not asr_allowed:
         return
