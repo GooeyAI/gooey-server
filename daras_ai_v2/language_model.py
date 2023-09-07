@@ -577,6 +577,7 @@ def format_chatml_message(entry: ConversationEntry) -> str:
         msg += "\n" + content + CHATML_END_TOKEN
     return msg
 
+
 def format_llama_message(index, message):
     role = message.get("role")
     content = message["content"]
@@ -590,7 +591,8 @@ def format_llama_message(index, message):
             return f"[INST] {content} [/INST]"
     else:
         return content
-        
+
+
 chatml_re = re.compile(
     re.escape(CHATML_START_TOKEN) + r"(.*)$",
     flags=re.M,
