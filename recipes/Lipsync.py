@@ -6,6 +6,7 @@ import requests
 from pydantic import BaseModel
 
 import gooey_ui as st
+from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.lipsync_api import wav2lip
@@ -17,6 +18,7 @@ CREDITS_PER_MB = 2
 
 class LipsyncPage(BasePage):
     title = "Lip Syncing"
+    workflow = Workflow.LIPSYNC
     slug_versions = ["Lipsync"]
 
     class RequestModel(BaseModel):

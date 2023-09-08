@@ -42,7 +42,6 @@ from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.query_params import gooey_get_query_params
-from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -880,39 +879,17 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         if not integrations:
             return
 
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-
+        current_sr = self.get_sr_from_query_params_dict(gooey_get_query_params())
         for bi in integrations:
-            if bi.saved_run:
-                # same run_id and uid
-                if bi.saved_run.run_id and bi.saved_run.uid:
-                    is_connected = (
-                        bi.saved_run.run_id == run_id and bi.saved_run.uid == uid
-                    )
-                # same example_id
-                elif bi.saved_run.example_id:
-                    is_connected = bi.saved_run.example_id == example_id
-                # root recipe
-                else:
-                    is_connected = not (
-                        bi.saved_run.run_id
-                        or bi.saved_run.uid
-                        or bi.saved_run.example_id
-                    )
-                # same workflow
-                is_connected = (
-                    is_connected
-                    and Workflow(bi.saved_run.workflow) == Workflow.VIDEO_BOTS
-                )
-            else:
-                is_connected = False
+            is_connected = bi.saved_run == current_sr
             col1, col2, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()
                 st.markdown(
-                    # language=html
                     f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                    f"<span>{bi}</span>",
+                    f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
+                    if bi.saved_run
+                    else f"<span>{bi}</span>",
                     unsafe_allow_html=True,
                 )
             with col2:
@@ -926,9 +903,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 bi.saved_run = None
             else:
                 bi.name = st.session_state.get(StateKeys.page_title, bi.name)
-                bi.saved_run = self.get_current_doc_sr(
-                    example_id=example_id, run_id=run_id, uid=uid
-                )
+                bi.saved_run = current_sr
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg
 
