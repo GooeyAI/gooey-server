@@ -28,6 +28,7 @@ class WhatsappBot(BotInterface):
         caption = self._get_caption()
         if caption:
             self.input_type = "text"
+            self.input_message["text"] = {"body": caption}
 
         bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
         self.convo = Conversation.objects.get_or_create(
@@ -40,7 +41,7 @@ class WhatsappBot(BotInterface):
         try:
             return self.input_message["text"]["body"]
         except KeyError:
-            return self._get_caption()
+            return None
 
     def _get_caption(self):
         return self.input_message.get(self.input_type, {}).get("caption")
