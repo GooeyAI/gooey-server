@@ -42,17 +42,18 @@ class LargeLanguageModels(Enum):
     gpt_3_5_turbo = "ChatGPT (GPT-3.5-turbo)"
     gpt_3_5_turbo_16k = "ChatGPT+ (GPT-3.5-turbo-16k)"
 
+    llama2_70b_chat = "LLAMA 2.0 (70B, chat)"
+    palm2_chat = "PaLM 2 (chat-bison)"
+
+    palm2_text = "PaLM 2 (text-bison)"
+
     text_davinci_003 = "GPT-3.5 (Davinci-3)"
     text_davinci_002 = "GPT-3.5 (Davinci-2)"
     text_curie_001 = "Curie"
     text_babbage_001 = "Babbage"
     text_ada_001 = "Ada"
+
     code_davinci_002 = "Codex (Deprecated)"
-
-    palm2_text = "PaLM 2 (text-bison)"
-    palm2_chat = "PaLM 2 (chat-bison)"
-
-    llama2_70b_chat = "LLAMA 2.0 (70B, chat)"
 
     def is_chat_model(self) -> bool:
         return self in [
