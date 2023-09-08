@@ -187,9 +187,7 @@ class DocSearchPage(BasePage):
 
         # empty search result, abort!
         if not response.references:
-            raise ValueError(
-                f"Your search - {request.search_query} - did not match any documents."
-            )
+            raise EmptySearchResults(request.search_query)
 
         response.final_prompt = ""
         task_instructions = (request.task_instructions or "").strip()
@@ -269,3 +267,9 @@ def render_doc_search_step(
             value=text,
             height=200,
         )
+
+
+class EmptySearchResults(Exception):
+    def __init__(self, search_query: str):
+        self.search_query = search_query
+        super().__init__(f"Your search “{search_query}” did not match any documents.")

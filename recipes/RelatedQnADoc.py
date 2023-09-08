@@ -14,7 +14,7 @@ from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
 from daras_ai_v2.search_ref import CitationStyles
 from daras_ai_v2.vector_search import render_sources_widget
-from recipes.DocSearch import DocSearchPage, render_doc_search_step
+from recipes.DocSearch import DocSearchPage, render_doc_search_step, EmptySearchResults
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
 
@@ -145,17 +145,24 @@ class RelatedQnADocPage(BasePage):
         state["related_questions"] = related_questions
 
         yield f"Generating answers using {LargeLanguageModels[request.selected_model].value}..."
-        state["output_queries"] = map_parallel(
+        output_queries = map_parallel(
             lambda ques: run_doc_search(state.copy(), ques),
             related_questions,
             max_workers=4,
         )
+        output_queries = list(filter(None, output_queries))
+        if not output_queries:
+            raise EmptySearchResults(search_query)
+        state["output_queries"] = output_queries
 
 
 def run_doc_search(state: dict, related_question: str):
     state["search_query"] = related_question
-    for _ in DocSearchPage().run(state):
-        pass
+    try:
+        for _ in DocSearchPage().run(state):
+            pass
+    except EmptySearchResults:
+        return None
     return RelatedDocSearchResponse.parse_obj(state).dict()
 
 
