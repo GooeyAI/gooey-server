@@ -24,6 +24,11 @@ class WhatsappBot(BotInterface):
 
         self.input_type = message["type"]
 
+        # if the message has a caption, treat it as text
+        caption = self._get_caption()
+        if caption:
+            self.input_type = "text"
+
         bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
@@ -35,7 +40,10 @@ class WhatsappBot(BotInterface):
         try:
             return self.input_message["text"]["body"]
         except KeyError:
-            return None
+            return self._get_caption()
+
+    def _get_caption(self):
+        return self.input_message.get(self.input_type, {}).get("caption")
 
     def get_input_audio(self) -> str | None:
         try:
@@ -293,14 +301,6 @@ class FacebookBot(BotInterface):
             self.platform = Platform.FACEBOOK
 
         self.input_message = messaging["message"]
-
-        # if the message has a caption, move it to the text field
-        input_msg_type_obj = (
-            self.input_message.get(self.input_message.get("type")) or {}
-        )
-        caption = input_msg_type_obj.get("caption")
-        if caption:
-            self.input_message["text"] = caption
 
         if "text" in self.input_message:
             self.input_type = "text"
