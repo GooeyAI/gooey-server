@@ -294,6 +294,14 @@ class FacebookBot(BotInterface):
 
         self.input_message = messaging["message"]
 
+        # if the message has a caption, move it to the text field
+        input_msg_type_obj = (
+            self.input_message.get(self.input_message.get("type")) or {}
+        )
+        caption = input_msg_type_obj.get("caption")
+        if caption:
+            self.input_message["text"] = self.input_message["caption"]
+
         if "text" in self.input_message:
             self.input_type = "text"
         elif "attachments" in self.input_message:
