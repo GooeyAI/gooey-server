@@ -27,6 +27,7 @@ from recipes.DocSearch import (
     DocSearchRequest,
     references_as_prompt,
     get_top_k_references,
+    EmptySearchResults,
 )
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
@@ -263,6 +264,8 @@ class GoogleGPTPage(BasePage):
             )
             if item and item.get("link")
         }
+        if not link_titles:
+            raise EmptySearchResults(serp_search_query)
 
         # run vector search on links
         response.references = yield from get_top_k_references(
@@ -281,9 +284,7 @@ class GoogleGPTPage(BasePage):
 
         # empty search result, abort!
         if not response.references:
-            raise ValueError(
-                f"Your search - {request.search_query} - did not match any documents."
-            )
+            raise EmptySearchResults(request.search_query)
 
         response.final_prompt = ""
         # add time to instructions

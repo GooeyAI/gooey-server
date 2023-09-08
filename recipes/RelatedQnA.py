@@ -12,7 +12,7 @@ from daras_ai_v2.google_search import call_scaleserp_rq
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
-from recipes.DocSearch import render_doc_search_step
+from recipes.DocSearch import render_doc_search_step, EmptySearchResults
 from recipes.RelatedQnADoc import render_qna_outputs
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
@@ -153,15 +153,22 @@ class RelatedQnAPage(BasePage):
         state["related_questions"] = related_questions
 
         yield f"Generating answers using {LargeLanguageModels[request.selected_model].value}..."
-        state["output_queries"] = map_parallel(
+        output_queries = map_parallel(
             lambda ques: run_google_gpt(state.copy(), ques),
             related_questions,
             max_workers=4,
         )
+        output_queries = list(filter(None, output_queries))
+        if not output_queries:
+            raise EmptySearchResults(search_query)
+        state["output_queries"] = output_queries
 
 
-def run_google_gpt(state: dict, related_question: str):
+def run_google_gpt(state: dict, related_question: str) -> dict | None:
     state["search_query"] = related_question
-    for _ in GoogleGPTPage().run(state):
-        pass
+    try:
+        for _ in GoogleGPTPage().run(state):
+            pass
+    except EmptySearchResults:
+        return None
     return RelatedGoogleGPTResponse.parse_obj(state).dict()
