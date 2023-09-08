@@ -218,6 +218,9 @@ UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
+REPLICATE_API_KEY = config("REPLICATE_API_KEY", default="")
+TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
+
 APP_BASE_URL = config("APP_BASE_URL", "/")
 API_BASE_URL = config("API_BASE_URL", "/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
