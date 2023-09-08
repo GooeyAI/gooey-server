@@ -300,7 +300,7 @@ class FacebookBot(BotInterface):
         )
         caption = input_msg_type_obj.get("caption")
         if caption:
-            self.input_message["text"] = self.input_message["caption"]
+            self.input_message["text"] = caption
 
         if "text" in self.input_message:
             self.input_type = "text"
