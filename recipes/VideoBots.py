@@ -607,7 +607,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     quality=request.quality,
                     temperature=request.sampling_temperature,
                     avoid_repetition=request.avoid_repetition,
-                )[0]
+                )[0].strip()
             else:
                 query_msgs.reverse()
                 state["final_search_query"] = "\n---\n".join(
@@ -627,7 +627,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     quality=request.quality,
                     temperature=request.sampling_temperature,
                     avoid_repetition=request.avoid_repetition,
-                )[0]
+                )[0].strip()
 
             # perform doc search
             references = yield from get_top_k_references(
