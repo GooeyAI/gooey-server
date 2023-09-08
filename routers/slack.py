@@ -186,3 +186,67 @@ def slack_event(
                 )  # contacted from a channel that this integration has not been explicitly connected to (we recieve events from all channels in WorkSpace), ignore message
             background_tasks.add_task(_on_msg, bot)
     return Response("OK")
+
+
+@router.get("/__/slack/redirect/shortcuts/")
+def slack_connect_redirect_shortcuts(request: Request):
+    retry_button = f'<a href="{slack_connect_url}">Retry</a>'
+
+    code = request.query_params.get("code")
+    if not code:
+        return HTMLResponse(
+            f"<p>Oh No! Something went wrong here.</p><p>Error: {dict(request.query_params)}</p>"
+            + retry_button,
+            status_code=400,
+        )
+    res = requests.post(
+        furl(
+            "https://slack.com/api/oauth.v2.access",
+            query_params=dict(code=code, redirect_uri=slack_shortcuts_redirect_uri),
+        ).url,
+        auth=HTTPBasicAuth(settings.SLACK_CLIENT_ID, settings.SLACK_CLIENT_SECRET),
+    )
+    res.raise_for_status()
+    print(res.text)
+    res = res.json()
+    payload = json.dumps(
+        dict(
+            slack_channel=res["incoming_webhook"]["channel"],
+            slack_user_access_token=res["authed_user"]["access_token"],
+            slack_team_id=res["team"]["id"],
+        ),
+        indent=2,
+    )
+    return HTMLResponse(
+        # language=HTML
+        """
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-size: 1.2rem; text-align: center; font-family: sans-serif">
+            <p>
+                <textarea style="font-family: monospace; width: 100%%;" rows=5 id="foo">%(payload)s</textarea>
+            </p>
+
+            <p>
+                <button id="new-copy" style="padding: 2rem; font-size: 1.5rem;">
+                    Click here to Complete Setup
+                </button>
+            </p>
+
+            <script>
+                document.getElementById("new-copy").addEventListener("click", event => {
+                    navigator.clipboard.writeText(%(payload)r);
+                    document.body.innerText = "Setup Complete! You can close this window now."
+                });
+            </script>
+        </body>
+        """
+        % dict(payload=payload)
+    )
+
+
+slack_shortcuts_redirect_uri = (
+    furl(settings.APP_BASE_URL)
+    / router.url_path_for(slack_connect_redirect_shortcuts.__name__)
+).url
