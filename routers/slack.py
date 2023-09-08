@@ -211,7 +211,8 @@ def slack_connect_redirect_shortcuts(request: Request):
     res = res.json()
     payload = json.dumps(
         dict(
-            slack_channel=res["incoming_webhook"]["channel"],
+            slack_channel=res["incoming_webhook"]["channel"].strip("#"),
+            slack_channel_id=res["incoming_webhook"]["channel_id"],
             slack_user_access_token=res["authed_user"]["access_token"],
             slack_team_id=res["team"]["id"],
         ),
