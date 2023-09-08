@@ -517,12 +517,23 @@ class BasePage:
         raise NotImplementedError
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
+        # initialize request and response
         request = self.RequestModel.parse_obj(state)
-        response = SimpleNamespace()
-        for val in self.run_v2(request, response):
-            state.update(response.__dict__)
+        response = self.ResponseModel.construct()
+
+        # run the recipe
+        gen = self.run_v2(request, response)
+        while True:
+            try:
+                val = next(gen)
+            except StopIteration:
+                break
+            finally:
+                state.update(response.dict())
             yield val
-        state.update(self.ResponseModel.parse_obj(response.__dict__))
+
+        # validate the response if successful
+        self.ResponseModel.validate(response)
 
     def run_v2(
         self, request: BaseModel, response: BaseModel

@@ -6,9 +6,10 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
-from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.functional import map_parallel, apply_parallel
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import CitationStyles
 from daras_ai_v2.serp_search import get_related_questions_from_serp_api
 from daras_ai_v2.serp_search_locations import (
@@ -45,6 +46,7 @@ class RelatedQnADocPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
+        final_search_query: str
         output_queries: list[RelatedDocSearchResponse]
         serp_results: dict
 
@@ -102,6 +104,12 @@ class RelatedQnADocPage(BasePage):
         return 'This workflow finds the related queries (aka "People also ask") for a Google search, searches your doc, pdf or file (from a URL or via an upload) and then generates answers using vector DB results from your docs.'
 
     def render_steps(self):
+        final_search_query = st.session_state.get("final_search_query")
+        if final_search_query:
+            st.text_area(
+                "**Final Search Query**", value=final_search_query, disabled=True
+            )
+
         serp_results = st.session_state.get(
             "serp_results", st.session_state.get("scaleserp_results")
         )
@@ -113,46 +121,58 @@ class RelatedQnADocPage(BasePage):
         for i, result in enumerate(output_queries):
             st.write("---")
             st.write(f"##### {i + 1}. _{result.get('search_query')}_")
-            render_doc_search_step(
-                result.get("final_prompt", ""),
-                result.get("output_text", []),
-                result.get("references", []),
-            )
+            render_doc_search_step(result)
 
-    def run(self, state: dict) -> typing.Iterator[str | None]:
-        request: RelatedQnADocPage.RequestModel = self.RequestModel.parse_obj(state)
-        search_query = request.search_query
+    def run_v2(
+        self,
+        request: "RelatedQnADocPage.RequestModel",
+        response: "RelatedQnADocPage.ResponseModel",
+    ):
+        query_instructions = (request.query_instructions or "").strip()
+        if query_instructions:
+            yield "Generating final search query..."
+            response.final_search_query = generate_final_search_query(
+                request=request, response=response, instructions=query_instructions
+            )
+        else:
+            response.final_search_query = request.search_query
 
         yield "Googling Related Questions..."
-        serp_results, related_questions = get_related_questions_from_serp_api(
-            search_query,
+        (
+            response.serp_results,
+            related_questions,
+        ) = get_related_questions_from_serp_api(
+            response.final_search_query,
             search_location=request.serp_search_location,
         )
-        state["serp_results"] = serp_results
-        state["related_questions"] = related_questions
 
-        all_queries = [search_query] + related_questions
+        all_questions = [request.search_query] + related_questions[:9]
 
-        yield f"Generating answers using {LargeLanguageModels[request.selected_model].value}..."
-        output_queries = map_parallel(
-            lambda ques: run_doc_search(state.copy(), ques),
-            all_queries,
+        response.output_queries = []
+        yield from apply_parallel(
+            lambda ques: run_doc_search(request.copy(), ques, response.output_queries),
+            all_questions,
             max_workers=4,
+            message=f"Generating answers using {LargeLanguageModels[request.selected_model].value}...",
         )
-        output_queries = list(filter(None, output_queries))
-        if not output_queries:
-            raise EmptySearchResults(search_query)
-        state["output_queries"] = output_queries
+        if not response.output_queries:
+            raise EmptySearchResults(response.final_search_query)
 
 
-def run_doc_search(state: dict, related_question: str):
-    state["search_query"] = related_question
+def run_doc_search(
+    request: DocSearchPage.RequestModel,
+    related_question: str,
+    outputs: list[RelatedDocSearchResponse],
+):
+    response = RelatedDocSearchResponse.construct()
+    request.search_query = related_question
+    response.search_query = related_question
     try:
-        for _ in DocSearchPage().run(state):
+        for _ in DocSearchPage().run_v2(request, response):
             pass
     except EmptySearchResults:
         return None
-    return RelatedDocSearchResponse.parse_obj(state).dict()
+    outputs.append(response)
 
 
 def render_qna_outputs(state, height, show_count=None):
