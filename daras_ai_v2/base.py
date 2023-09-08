@@ -519,6 +519,9 @@ class BasePage:
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
         response = SimpleNamespace()
+        response.output_text = ["No Search Result Found"]
+        response.references = [{"url": "", "title": "", "snippet": "", "score": 1.0}]
+        response.final_prompt = ""
         for val in self.run_v2(request, response):
             state.update(response.__dict__)
             yield val

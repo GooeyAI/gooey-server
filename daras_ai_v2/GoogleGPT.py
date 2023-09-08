@@ -263,6 +263,8 @@ class GoogleGPTPage(BasePage):
             )
             if item and item.get("link")
         }
+        if not link_titles:
+            return "No search results found."
 
         # run vector search on links
         response.references = yield from get_top_k_references(
