@@ -11,7 +11,6 @@ import numpy as np
 import requests
 from furl import furl
 from googleapiclient.errors import HttpError
-from nltk.corpus import stopwords
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
 from scipy.stats import rankdata
@@ -100,40 +99,52 @@ def get_top_k_references(
     dense_query_embeds = openai_embedding_create([request.search_query])[0]
 
     yield "Searching documents..."
-    # get dense scores above cutoff based on cosine similarity
-    cutoff = 0.7
-    custom_weights = np.array([float(ref.get("weight") or "1") for ref, _ in embeds])
 
-    dense_scores = np.dot([doc_embeds for _, doc_embeds in embeds], dense_query_embeds)
-    dense_scores *= custom_weights
-    dense_scores[dense_scores < cutoff] = 0.0
+    dense_weight = request.dense_weight
+    if dense_weight is None:  # for backwards compatibility
+        dense_weight = 1
+    sparse_weight = 1 - dense_weight
 
-    # get sparse scores
-    tokenized_corpus = [
-        bm25_tokenizer(ref["title"]) + bm25_tokenizer(ref["snippet"])
-        for ref, _ in embeds
-    ]
-    bm25 = BM25Okapi(tokenized_corpus, k1=2, b=0.3)
-    sparse_query_tokenized = bm25_tokenizer(
-        request.keyword_query or request.search_query
-    )
-    sparse_scores = np.array(bm25.get_scores(sparse_query_tokenized))
-    # sparse_scores *= custom_weights
+    if dense_weight:
+        # get dense scores above cutoff based on cosine similarity
+        cutoff = 0.7
+        custom_weights = np.array(
+            [float(ref.get("weight") or "1") for ref, _ in embeds]
+        )
 
-    alpha = request.dense_weight
-    if alpha is None:
-        alpha = 1
-    beta = 1 - alpha
+        dense_scores = np.dot(
+            [doc_embeds for _, doc_embeds in embeds], dense_query_embeds
+        )
+        dense_scores *= custom_weights
+        dense_scores[dense_scores < cutoff] = 0.0
+        dense_ranks = rankdata(-dense_scores, method="max")
+    else:
+        dense_ranks = np.zeros(len(embeds))
+
+    if sparse_weight:
+        # get sparse scores
+        tokenized_corpus = [
+            bm25_tokenizer(ref["title"]) + bm25_tokenizer(ref["snippet"])
+            for ref, _ in embeds
+        ]
+        bm25 = BM25Okapi(tokenized_corpus, k1=2, b=0.3)
+        sparse_query_tokenized = bm25_tokenizer(
+            request.keyword_query or request.search_query
+        )
+        if sparse_query_tokenized:
+            sparse_scores = np.array(bm25.get_scores(sparse_query_tokenized))
+            # sparse_scores *= custom_weights
+            sparse_ranks = rankdata(-sparse_scores, method="max")
+        else:
+            sparse_ranks = np.zeros(len(embeds))
+    else:
+        sparse_ranks = np.zeros(len(embeds))
 
     # RRF formula: 1 / (k + rank)
     k = 60
-
-    # Get ranks
-    sparse_ranks = rankdata(-sparse_scores, method="max")
-    dense_ranks = rankdata(-dense_scores, method="max")
-
-    # Calculate RRF scores
-    rrf_scores = (beta / (k + sparse_ranks) + alpha / (k + dense_ranks)) * k
+    rrf_scores = (
+        sparse_weight / (k + sparse_ranks) + dense_weight / (k + dense_ranks)
+    ) * k
 
     # Final ranking
     top_k = np.argpartition(rrf_scores, -request.max_references)[
@@ -162,13 +173,9 @@ def get_top_k_references(
 
 
 bm25_split_re = re.compile(rf"[{puncts}\s]")
-en_stopwords = None
 
 
 def bm25_tokenizer(text: str) -> list[str]:
-    global en_stopwords
-    if not en_stopwords:
-        en_stopwords = stopwords.words("english")
     return [t for t in bm25_split_re.split(text.lower()) if t]
 
 
