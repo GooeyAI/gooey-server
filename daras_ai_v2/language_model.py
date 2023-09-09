@@ -8,18 +8,17 @@ from functools import wraps
 from time import sleep
 
 import numpy as np
+import requests
 import tiktoken
 import typing_extensions
+from django.conf import settings
 from jinja2.lexer import whitespace_re
 
-import requests
-from django.conf import settings
-
+from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
-from daras_ai_v2.asr import get_google_auth_session
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
 
@@ -38,22 +37,22 @@ class LLMApis(Enum):
 
 
 class LargeLanguageModels(Enum):
-    gpt_4 = "GPT-4"
-    gpt_3_5_turbo = "ChatGPT (GPT-3.5-turbo)"
-    gpt_3_5_turbo_16k = "ChatGPT+ (GPT-3.5-turbo-16k)"
+    gpt_4 = "GPT-4 (openai)"
+    gpt_3_5_turbo = "ChatGPT (openai)"
+    gpt_3_5_turbo_16k = "ChatGPT 16k (openai)"
 
-    llama2_70b_chat = "LLAMA 2.0 (70B, chat)"
-    palm2_chat = "PaLM 2 (chat-bison)"
+    llama2_70b_chat = "Llama 2 (Meta AI)"
+    palm2_chat = "PaLM 2 Text (Google)"
 
-    palm2_text = "PaLM 2 (text-bison)"
+    palm2_text = "PaLM 2 Chat (Google)"
 
-    text_davinci_003 = "GPT-3.5 (Davinci-3)"
-    text_davinci_002 = "GPT-3.5 (Davinci-2)"
-    text_curie_001 = "Curie"
-    text_babbage_001 = "Babbage"
-    text_ada_001 = "Ada"
+    text_davinci_003 = "GPT-3.5 Davinci-3 (openai)"
+    text_davinci_002 = "GPT-3.5 Davinci-2 (openai)"
+    text_curie_001 = "Curie (openai)"
+    text_babbage_001 = "Babbage (openai)"
+    text_ada_001 = "Ada (openai)"
 
-    code_davinci_002 = "Codex (Deprecated)"
+    code_davinci_002 = "Codex [Deprecated] (openai)"
 
     def is_chat_model(self) -> bool:
         return self in [
