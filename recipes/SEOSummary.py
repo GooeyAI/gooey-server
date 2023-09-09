@@ -29,6 +29,7 @@ from daras_ai_v2.serp_search import get_links_from_serp_api
 from daras_ai_v2.serp_search_locations import (
     serp_search_settings,
     SerpSearchLocation,
+    SerpSearchType,
 )
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
 
@@ -69,9 +70,8 @@ class SEOSummaryPage(BasePage):
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
         title="Ruggable",
         company_url="https://ruggable.com",
-        scaleserp_search_field="organic_results",
-        scaleserp_locations=["United States"],
-        serp_search_location=SerpSearchLocation.UNITED_STATES.value,
+        serp_serach_type=SerpSearchType.SEARCH,
+        serp_search_location=SerpSearchLocation.UNITED_STATES,
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,

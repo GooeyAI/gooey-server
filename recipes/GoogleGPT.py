@@ -25,6 +25,7 @@ from daras_ai_v2.serp_search_locations import (
     GoogleSearchMixin,
     serp_search_settings,
     SerpSearchLocation,
+    SerpSearchType,
 )
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import (
@@ -49,7 +50,8 @@ class GoogleGPTPage(BasePage):
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
         title="Ruggable",
         company_url="https://ruggable.com",
-        serp_search_location=SerpSearchLocation.UNITED_STATES.value,
+        serp_serach_type=SerpSearchType.SEARCH,
+        serp_search_location=SerpSearchLocation.UNITED_STATES,
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,

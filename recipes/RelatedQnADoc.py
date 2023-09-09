@@ -14,6 +14,7 @@ from daras_ai_v2.serp_search import get_related_questions_from_serp_api
 from daras_ai_v2.serp_search_locations import (
     serp_search_settings,
     SerpSearchLocation,
+    SerpSearchType,
 )
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import DocSearchPage, render_doc_search_step, EmptySearchResults
@@ -36,7 +37,8 @@ class RelatedQnADocPage(BasePage):
     sane_defaults = dict(
         citation_style=CitationStyles.number.name,
         dense_weight=1.0,
-        serp_search_location=SerpSearchLocation.UNITED_STATES.value,
+        serp_serach_type=SerpSearchType.SEARCH,
+        serp_search_location=SerpSearchLocation.UNITED_STATES,
     )
 
     class RequestModel(GoogleSearchMixin, DocSearchPage.RequestModel):

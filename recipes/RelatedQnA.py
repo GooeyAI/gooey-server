@@ -13,6 +13,7 @@ from daras_ai_v2.serp_search import get_related_questions_from_serp_api
 from daras_ai_v2.serp_search_locations import (
     serp_search_settings,
     SerpSearchLocation,
+    SerpSearchType,
 )
 from recipes.DocSearch import render_doc_search_step, EmptySearchResults
 from recipes.GoogleGPT import GoogleGPTPage
@@ -37,7 +38,8 @@ class RelatedQnAPage(BasePage):
         max_context_words=200,
         scroll_jump=5,
         dense_weight=1.0,
-        serp_search_location=SerpSearchLocation.UNITED_STATES.value,
+        serp_serach_type=SerpSearchType.SEARCH,
+        serp_search_location=SerpSearchLocation.UNITED_STATES,
     )
 
     class RequestModel(GoogleGPTPage.RequestModel):

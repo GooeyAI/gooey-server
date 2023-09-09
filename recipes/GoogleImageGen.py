@@ -43,8 +43,8 @@ class GoogleImageGenPage(BasePage):
         sd_2_upscaling=False,
         seed=42,
         image_guidance_scale=1.2,
-        scaleserp_locations=["United States"],
-        serp_search_location=SerpSearchLocation.UNITED_STATES.value,
+        serp_serach_type=SerpSearchType.SEARCH,
+        serp_search_location=SerpSearchLocation.UNITED_STATES,
     )
 
     class RequestModel(GoogleSearchLocationMixin, BaseModel):
