@@ -323,6 +323,7 @@ def selectbox(
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
+    default_value: T = None,
 ) -> T | None:
     if not options:
         return None
@@ -333,7 +334,7 @@ def selectbox(
         key = md5_values("select", label, options, help, label_visibility)
     value = state.session_state.get(key)
     if value not in options:
-        value = options[0]
+        value = default_value or options[0]
     state.session_state.setdefault(key, value)
     state.RenderTreeNode(
         name="select",

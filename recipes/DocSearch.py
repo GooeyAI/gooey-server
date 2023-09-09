@@ -90,7 +90,7 @@ class DocSearchPage(BasePage):
         from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
         from recipes.SEOSummary import SEOSummaryPage
         from recipes.VideoBots import VideoBotsPage
-        from daras_ai_v2.GoogleGPT import GoogleGPTPage
+        from recipes.GoogleGPT import GoogleGPTPage
 
         return [
             GoogleGPTPage,
@@ -135,11 +135,6 @@ class DocSearchPage(BasePage):
             st.text_area(
                 "**Final Search Query**", value=final_search_query, disabled=True
             )
-
-        scaleserp_results = st.session_state.get("scaleserp_results")
-        if scaleserp_results:
-            st.write("**ScaleSERP Results**")
-            st.json(scaleserp_results, expanded=False)
 
         render_doc_search_step(
             st.session_state.get("final_prompt"),

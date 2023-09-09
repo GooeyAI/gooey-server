@@ -2,7 +2,6 @@ import re
 import typing
 
 from bots.models import Workflow
-from daras_ai_v2.GoogleGPT import GoogleGPTPage
 from daras_ai_v2.base import BasePage
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
@@ -14,6 +13,7 @@ from recipes.DocSearch import DocSearchPage
 from recipes.DocSummary import DocSummaryPage
 from recipes.EmailFaceInpainting import EmailFaceInpaintingPage
 from recipes.FaceInpainting import FaceInpaintingPage
+from recipes.GoogleGPT import GoogleGPTPage
 from recipes.GoogleImageGen import GoogleImageGenPage
 from recipes.ImageSegmentation import ImageSegmentationPage
 from recipes.Img2Img import Img2ImgPage

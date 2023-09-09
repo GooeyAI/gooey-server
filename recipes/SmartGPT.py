@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from daras_ai_v2.GoogleGPT import render_output_with_refs
+from recipes.GoogleGPT import render_output_with_refs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
@@ -83,7 +83,7 @@ class SmartGPTPage(BasePage):
         from recipes.CompareLLM import CompareLLMPage
         from recipes.DocSearch import DocSearchPage
         from recipes.DocSummary import DocSummaryPage
-        from daras_ai_v2.GoogleGPT import GoogleGPTPage
+        from recipes.GoogleGPT import GoogleGPTPage
 
         return [
             CompareLLMPage,

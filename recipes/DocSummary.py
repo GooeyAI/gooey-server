@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from daras_ai_v2.GoogleGPT import render_output_with_refs, GoogleGPTPage
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -26,6 +25,7 @@ from recipes.DocSearch import (
     DocSearchPage,
     render_documents,
 )
+from recipes.GoogleGPT import render_output_with_refs, GoogleGPTPage
 
 DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
 

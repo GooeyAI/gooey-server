@@ -9,7 +9,6 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import doc_search_settings
-from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
@@ -17,10 +16,15 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
 from daras_ai_v2.search_ref import (
     SearchReference,
     render_output_with_refs,
+)
+from daras_ai_v2.serp_search import get_links_from_serp_api
+from daras_ai_v2.serp_search_locations import (
+    GoogleSearchMixin,
+    serp_search_settings,
+    SerpSearchLocation,
 )
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import (
@@ -45,8 +49,7 @@ class GoogleGPTPage(BasePage):
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
         title="Ruggable",
         company_url="https://ruggable.com",
-        scaleserp_search_field="organic_results",
-        scaleserp_locations=["United States"],
+        serp_search_location=SerpSearchLocation.UNITED_STATES.value,
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
@@ -64,7 +67,7 @@ class GoogleGPTPage(BasePage):
         dense_weight=1.0,
     )
 
-    class RequestModel(BaseModel):
+    class RequestModel(GoogleSearchMixin, BaseModel):
         search_query: str
         site_filter: str
 
@@ -82,9 +85,6 @@ class GoogleGPTPage(BasePage):
 
         max_search_urls: int | None
 
-        scaleserp_search_field: str | None
-        scaleserp_locations: list[str] | None
-
         max_references: int | None
         max_context_words: int | None
         scroll_jump: int | None
@@ -96,9 +96,8 @@ class GoogleGPTPage(BasePage):
     class ResponseModel(BaseModel):
         output_text: list[str]
 
-        scaleserp_results: dict
-        # search_urls: list[str]
-        # summarized_urls: list[dict]
+        serp_results: dict
+
         references: list[SearchReference]
         final_prompt: str
 
@@ -139,25 +138,7 @@ class GoogleGPTPage(BasePage):
 
         st.write("---")
 
-        st.write("#### Search Tools")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.text_input(
-                "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**",
-                key="scaleserp_search_field",
-            )
-        with col2:
-            st.number_input(
-                label="""
-                ###### Max Search URLs
-                The maximum number of search URLs to consider as References
-                """,
-                key="max_search_urls",
-                min_value=1,
-                max_value=10,
-            )
-        scaleserp_location_picker()
+        serp_search_settings()
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage
@@ -188,10 +169,12 @@ class GoogleGPTPage(BasePage):
                 "**Final Search Query**", value=final_search_query, disabled=True
             )
 
-        scaleserp_results = st.session_state.get("scaleserp_results")
-        if scaleserp_results:
-            st.write("**ScaleSERP Results**")
-            st.json(scaleserp_results)
+        serp_results = st.session_state.get(
+            "serp_results", st.session_state.get("scaleserp_results")
+        )
+        if serp_results:
+            st.write("**Web Search Results**")
+            st.json(serp_results)
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
@@ -249,21 +232,13 @@ class GoogleGPTPage(BasePage):
             serp_search_query = f"site:{f.host}{f.path} {response.final_search_query}"
         else:
             serp_search_query = response.final_search_query
-        response.scaleserp_results = call_scaleserp(
+        response.serp_results, links = get_links_from_serp_api(
             serp_search_query,
-            include_fields=request.scaleserp_search_field,
-            location=",".join(request.scaleserp_locations),
+            search_type=request.serp_search_type,
+            search_location=request.serp_search_location,
         )
         # extract links & their corresponding titles
-        link_titles = {
-            furl(item["link"])
-            .remove(fragment=True)
-            .url: f'{item.get("title", "")} | {item.get("snippet", "")}'
-            for item in response.scaleserp_results.get(
-                request.scaleserp_search_field, []
-            )
-            if item and item.get("link")
-        }
+        link_titles = {item.url: f"{item.title} | {item.snippet}" for item in links}
         if not link_titles:
             raise EmptySearchResults(serp_search_query)
 

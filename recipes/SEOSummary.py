@@ -1,22 +1,21 @@
 import random
 import re
 import typing
-from functools import partial
 
 import readability
 import requests
-import gooey_ui as st
 from bs4 import BeautifulSoup
 from furl import furl
 from html_sanitizer import Sanitizer
 from lxml import etree
 from pydantic import BaseModel
 
+import gooey_ui as st
 from bots.models import Workflow
-from daras_ai_v2.base import BasePage, gooey_rng
+from recipes.GoogleGPT import GoogleSearchMixin
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
@@ -25,10 +24,12 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.scaleserp_location_picker_widget import (
-    scaleserp_location_picker,
-)
 from daras_ai_v2.scrollable_html_widget import scrollable_html
+from daras_ai_v2.serp_search import get_links_from_serp_api
+from daras_ai_v2.serp_search_locations import (
+    serp_search_settings,
+    SerpSearchLocation,
+)
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
 
 KEYWORDS_SEP = re.compile(r"[\n,]")
@@ -70,6 +71,7 @@ class SEOSummaryPage(BasePage):
         company_url="https://ruggable.com",
         scaleserp_search_field="organic_results",
         scaleserp_locations=["United States"],
+        serp_search_location=SerpSearchLocation.UNITED_STATES.value,
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
         sampling_temperature=0.8,
@@ -84,7 +86,7 @@ class SEOSummaryPage(BasePage):
         # enable_blog_mode=False,
     )
 
-    class RequestModel(BaseModel):
+    class RequestModel(GoogleSearchMixin, BaseModel):
         search_query: str
         keywords: str
         title: str
@@ -92,8 +94,6 @@ class SEOSummaryPage(BasePage):
 
         task_instructions: str | None
 
-        scaleserp_search_field: str | None
-        scaleserp_locations: list[str] | None
         enable_html: bool | None
 
         selected_model: typing.Literal[
@@ -116,7 +116,7 @@ class SEOSummaryPage(BasePage):
     class ResponseModel(BaseModel):
         output_content: list[str]
 
-        scaleserp_results: dict
+        serp_results: dict
         search_urls: list[str]
         summarized_urls: list[dict]
         final_prompt: str
@@ -125,7 +125,7 @@ class SEOSummaryPage(BasePage):
         from recipes.SocialLookupEmail import SocialLookupEmailPage
         from recipes.GoogleImageGen import GoogleImageGenPage
         from recipes.DocSearch import DocSearchPage
-        from daras_ai_v2.GoogleGPT import GoogleGPTPage
+        from recipes.GoogleGPT import GoogleGPTPage
 
         return [
             GoogleGPTPage,
@@ -185,25 +185,7 @@ SearchSEO > Page Parsing > GPT3
 
         st.write("---")
 
-        st.write("#### Search Tools")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.text_input(
-                "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**",
-                key="scaleserp_search_field",
-            )
-        with col2:
-            st.number_input(
-                label="""
-                ###### Max Search URLs
-                The maximum number of search URLs to consider as References
-                """,
-                key="max_search_urls",
-                min_value=1,
-                max_value=10,
-            )
-        scaleserp_location_picker()
+        serp_search_settings()
 
     def render_output(self):
         output_content = st.session_state.get("output_content")
@@ -228,12 +210,12 @@ SearchSEO > Page Parsing > GPT3
         col1, col2 = st.columns(2)
 
         with col1:
-            scaleserp_results = st.session_state.get("scaleserp_results")
-            if scaleserp_results:
-                st.write("**ScaleSERP Results**")
-                st.json(scaleserp_results, expanded=False)
-            else:
-                st.div()
+            serp_results = st.session_state.get(
+                "serp_results", st.session_state.get("scaleserp_results")
+            )
+            if serp_results:
+                st.write("**Web Search Results**")
+                st.json(serp_results)
 
         with col2:
             search_urls = st.session_state.get("search_urls")
@@ -288,17 +270,13 @@ SearchSEO > Page Parsing > GPT3
 
         yield "Googling..."
 
-        scaleserp_results = call_scaleserp(
+        serp_results, links = get_links_from_serp_api(
             request.search_query,
-            include_fields=request.scaleserp_search_field,
-            location=",".join(request.scaleserp_locations),
+            search_type=request.serp_search_type,
+            search_location=request.serp_search_location,
         )
-        search_urls = _extract_search_urls(request, scaleserp_results)[
-            : request.max_search_urls
-        ]
-
-        state["scaleserp_results"] = scaleserp_results
-        state["search_urls"] = search_urls
+        state["serp_results"] = serp_results
+        state["search_urls"] = [it.url for it in links]
 
         yield from _gen_final_prompt(request, state)
 
@@ -332,20 +310,17 @@ def _crosslink_keywords(output_content, request):
     host = furl(request.company_url).host
 
     all_results = map_parallel(
-        partial(
-            call_scaleserp,
-            include_fields="organic_results",
-        ),
-        # fmt: off
-        [
-            f"site:{host} {keyword}"
-            for keyword in relevant_keywords
-        ],
+        lambda keyword: get_links_from_serp_api(
+            f"site:{host} {keyword}",
+            search_type=request.serp_search_type,
+            search_location=request.serp_search_location,
+        )[1],
+        relevant_keywords,
     )
 
     for keyword, results in zip(relevant_keywords, all_results):
         try:
-            href = results["organic_results"][0]["link"]
+            href = results[0].url
         except (IndexError, KeyError):
             continue
 
@@ -474,21 +449,3 @@ def _call_summarize_url(url: str) -> (str, str):
     r.raise_for_status()
     doc = readability.Document(r.text)
     return doc.title(), doc.summary()
-
-
-def _extract_search_urls(
-    request: SEOSummaryPage.RequestModel, scaleserp_results: dict
-) -> list[str]:
-    try:
-        results = scaleserp_results[request.scaleserp_search_field]
-    except KeyError:
-        raise ValueError(f"No results returned for query {request.search_query!r}")
-
-    search_urls = [
-        result["link"]
-        for result in results
-        if "link" in result and furl(result["link"]).host not in BANNED_HOSTS
-    ]
-    gooey_rng.shuffle(search_urls)
-
-    return search_urls

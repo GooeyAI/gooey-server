@@ -4,17 +4,20 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from daras_ai_v2.GoogleGPT import render_output_with_refs
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.google_search import call_scaleserp_rq
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
-from daras_ai_v2.scaleserp_location_picker_widget import scaleserp_location_picker
 from daras_ai_v2.search_ref import CitationStyles
+from daras_ai_v2.serp_search import get_related_questions_from_serp_api
+from daras_ai_v2.serp_search_locations import (
+    serp_search_settings,
+    SerpSearchLocation,
+)
 from daras_ai_v2.vector_search import render_sources_widget
 from recipes.DocSearch import DocSearchPage, render_doc_search_step, EmptySearchResults
+from recipes.GoogleGPT import render_output_with_refs, GoogleSearchMixin
 
 DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
 
@@ -30,18 +33,18 @@ class RelatedQnADocPage(BasePage):
 
     price = 100
 
-    sane_defaults = {
-        "citation_style": CitationStyles.number.name,
-        "dense_weight": 1.0,
-    }
+    sane_defaults = dict(
+        citation_style=CitationStyles.number.name,
+        dense_weight=1.0,
+        serp_search_location=SerpSearchLocation.UNITED_STATES.value,
+    )
 
-    class RequestModel(DocSearchPage.RequestModel):
-        scaleserp_search_field: str | None
-        scaleserp_locations: list[str] | None
+    class RequestModel(GoogleSearchMixin, DocSearchPage.RequestModel):
+        pass
 
     class ResponseModel(BaseModel):
         output_queries: list[RelatedDocSearchResponse]
-        scaleserp_results: dict
+        serp_results: dict
 
     def render_description(self) -> str:
         return "This workflow gets the related queries for your Google search, searches your custom domain and builds answers using the results and GPT."
@@ -78,25 +81,7 @@ class RelatedQnADocPage(BasePage):
 
         st.write("---")
 
-        st.write("#### Search Tools")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.text_input(
-                "**ScaleSERP [Search Property](https://www.scaleserp.com/docs/search-api/results/google/search)**",
-                key="scaleserp_search_field",
-            )
-        with col2:
-            st.number_input(
-                label="""
-                ###### Max Search URLs
-                The maximum number of search URLs to consider as References
-                """,
-                key="max_search_urls",
-                min_value=1,
-                max_value=10,
-            )
-        scaleserp_location_picker()
+        serp_search_settings()
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage
@@ -115,10 +100,13 @@ class RelatedQnADocPage(BasePage):
         return 'This workflow finds the related queries (aka "People also ask") for a Google search, searches your doc, pdf or file (from a URL or via an upload) and then generates answers using vector DB results from your docs.'
 
     def render_steps(self):
-        scaleserp_results = st.session_state.get("scaleserp_results")
-        if scaleserp_results:
-            st.write("**ScaleSERP Results**")
-            st.json(scaleserp_results, expanded=False)
+        serp_results = st.session_state.get(
+            "serp_results", st.session_state.get("scaleserp_results")
+        )
+        if serp_results:
+            st.write("**Web Search Results**")
+            st.json(serp_results)
+
         output_queries = st.session_state.get("output_queries", [])
         for i, result in enumerate(output_queries):
             st.write("---")
@@ -134,20 +122,19 @@ class RelatedQnADocPage(BasePage):
         search_query = request.search_query
 
         yield "Googling Related Questions..."
-        scaleserp_results, related_questions = call_scaleserp_rq(
+        serp_results, related_questions = get_related_questions_from_serp_api(
             search_query,
-            location=",".join(request.scaleserp_locations),
+            search_location=request.serp_search_location,
         )
-        # add the original search query
-        related_questions.insert(0, search_query)
-        # save the results
-        state["scaleserp_results"] = scaleserp_results
+        state["serp_results"] = serp_results
         state["related_questions"] = related_questions
+
+        all_queries = [search_query] + related_questions
 
         yield f"Generating answers using {LargeLanguageModels[request.selected_model].value}..."
         output_queries = map_parallel(
             lambda ques: run_doc_search(state.copy(), ques),
-            related_questions,
+            all_queries,
             max_workers=4,
         )
         output_queries = list(filter(None, output_queries))

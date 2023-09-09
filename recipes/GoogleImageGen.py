@@ -1,23 +1,26 @@
 import typing
 
 import requests
-import gooey_ui as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
     resize_img_scale,
 )
 from daras_ai_v2.base import BasePage, gooey_rng
-from daras_ai_v2.google_search import call_scaleserp
 from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
     model_selector,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.scaleserp_location_picker_widget import (
-    scaleserp_location_picker,
+from daras_ai_v2.serp_search import call_serp_api
+from daras_ai_v2.serp_search_locations import (
+    serp_search_location_selectbox,
+    GoogleSearchLocationMixin,
+    SerpSearchType,
+    SerpSearchLocation,
 )
 from daras_ai_v2.stable_diffusion import (
     img2img,
@@ -32,18 +35,19 @@ class GoogleImageGenPage(BasePage):
     workflow = Workflow.GOOGLE_IMAGE_GEN
     slug_versions = ["GoogleImageGen", "render-images-with-ai"]
 
-    sane_defaults = {
-        "num_outputs": 1,
-        "quality": 50,
-        "guidance_scale": 7.5,
-        "prompt_strength": 0.5,
-        "sd_2_upscaling": False,
-        "seed": 42,
-        "image_guidance_scale": 1.2,
-        "scaleserp_locations": ["United States"],
-    }
+    sane_defaults = dict(
+        num_outputs=1,
+        quality=50,
+        guidance_scale=7.5,
+        prompt_strength=0.5,
+        sd_2_upscaling=False,
+        seed=42,
+        image_guidance_scale=1.2,
+        scaleserp_locations=["United States"],
+        serp_search_location=SerpSearchLocation.UNITED_STATES.value,
+    )
 
-    class RequestModel(BaseModel):
+    class RequestModel(GoogleSearchLocationMixin, BaseModel):
         search_query: str
         text_prompt: str
 
@@ -62,8 +66,6 @@ class GoogleImageGenPage(BasePage):
         seed: int | None
 
         image_guidance_scale: float | None
-
-        scaleserp_locations: list[str] | None
 
     class ResponseModel(BaseModel):
         output_images: list[str]
@@ -102,21 +104,20 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
         yield "Googling..."
 
-        scaleserp_results = call_scaleserp(
+        serp_results = call_serp_api(
             request.search_query,
-            search_type="images",
-            include_fields="image_results",
-            images_size="medium",
-            location=",".join(request.scaleserp_locations),
+            search_type=SerpSearchType.IMAGES,
+            search_location=request.serp_search_location,
         )
         image_urls = [
-            result["image"]
-            for result in scaleserp_results.get("image_results", [])
-            if "image" in result
+            link
+            for result in serp_results.get("images", [])
+            if (link := result.get("imageUrl"))
         ][:10]
         gooey_rng.shuffle(image_urls)
 
         yield "Downloading..."
+
         state["image_urls"] = image_urls
         # If model is not selected, don't do anything else
         if not state["selected_model"]:
@@ -193,7 +194,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
     def render_settings(self):
         img_model_settings(Img2ImgModels, render_model_selector=False)
-        scaleserp_location_picker()
+        serp_search_location_selectbox()
 
     def render_output(self):
         out_imgs = st.session_state.get("output_images")

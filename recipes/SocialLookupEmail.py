@@ -55,7 +55,7 @@ class SocialLookupEmailPage(BasePage):
         from recipes.SEOSummary import SEOSummaryPage
         from recipes.VideoBots import VideoBotsPage
 
-        from daras_ai_v2.GoogleGPT import GoogleGPTPage
+        from recipes.GoogleGPT import GoogleGPTPage
 
         return [
             GoogleGPTPage,
