@@ -540,6 +540,45 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
             return
 
 
+def download_table_doc(f_url: str, doc_meta: DocMetadata) -> "pd.DataFrame":
+    f = furl(f_url)
+    f_name = doc_meta.name
+    if is_gdrive_url(f):
+        # download from google drive
+        f_bytes, ext = gdrive_download(f, doc_meta.mime_type)
+    else:
+        # download from url
+        try:
+            r = requests.get(
+                f_url,
+                headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
+                timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+            )
+            r.raise_for_status()
+        except requests.RequestException as e:
+            print(f"ignore error while downloading {f_url}: {e}")
+            return []
+        f_bytes = r.content
+        # if it's a known encoding, standardize to utf-8
+        if r.encoding:
+            try:
+                codec = codecs.lookup(r.encoding)
+            except LookupError:
+                pass
+            else:
+                f_bytes = codec.decode(f_bytes)[0].encode()
+        ext = guess_ext_from_response(r)
+    match ext:
+        case ".csv" | ".xlsx" | ".tsv" | ".ods" | ".gsheet":
+            import pandas as pd
+
+            df = pd.read_csv(io.BytesIO(f_bytes), dtype=str).dropna()
+        case _:
+            raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
+
+    return df
+
+
 def render_sources_widget(refs: list[SearchReference]):
     if not refs:
         return

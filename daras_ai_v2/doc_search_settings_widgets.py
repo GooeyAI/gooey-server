@@ -14,28 +14,48 @@ def document_uploader(
     label: str,
     key="documents",
     accept=(".pdf", ".txt", ".docx", ".md", ".html", ".wav", ".ogg", ".mp3", ".aac"),
+    accept_multiple_files=True,
 ):
     st.write(label, className="gui-input")
-    documents = st.session_state.get(key) or []
-    has_custom_urls = not all(map(is_user_uploaded_url, documents))
+    documents = st.session_state.get(key) or ([] if accept_multiple_files else "")
+    has_custom_urls = not all(
+        map(is_user_uploaded_url, documents if accept_multiple_files else [documents])
+    )
     custom_key = "__custom_" + key
     if st.checkbox("Enter Custom URLs", value=has_custom_urls):
         if not custom_key in st.session_state:
             st.session_state[custom_key] = "\n".join(documents)
-        text_value = st.text_area(
-            label,
-            key=custom_key,
-            label_visibility="collapsed",
-            height=150,
-            style={
-                "whiteSpace": "pre",
-                "overflowWrap": "normal",
-                "overflowX": "scroll",
-                "fontFamily": "monospace",
-                "fontSize": "0.9rem",
-            },
-        )
-        st.session_state[key] = text_value.strip().splitlines()
+        if accept_multiple_files:
+            text_value = st.text_area(
+                label,
+                key=custom_key,
+                label_visibility="collapsed",
+                height=150,
+                style={
+                    "whiteSpace": "pre",
+                    "overflowWrap": "normal",
+                    "overflowX": "scroll",
+                    "fontFamily": "monospace",
+                    "fontSize": "0.9rem",
+                },
+            )
+            st.session_state[key] = text_value.strip().splitlines()
+        else:
+            text_value = st.text_input(
+                label,
+                label_visibility="collapsed",
+                key=custom_key,
+                style={
+                    "whiteSpace": "pre",
+                    "overflowWrap": "normal",
+                    "overflowX": "scroll",
+                    "fontFamily": "monospace",
+                    "fontSize": "0.9rem",
+                },
+            )
+            st.session_state[key] = (
+                text_value.splitlines()[0] if len(text_value.splitlines()) > 0 else None
+            )
     else:
         st.session_state.pop(custom_key, None)
         st.file_uploader(
@@ -43,7 +63,7 @@ def document_uploader(
             label_visibility="collapsed",
             key=key,
             accept=accept,
-            accept_multiple_files=True,
+            accept_multiple_files=accept_multiple_files,
         )
 
 
