@@ -43,7 +43,7 @@ class GoogleImageGenPage(BasePage):
         sd_2_upscaling=False,
         seed=42,
         image_guidance_scale=1.2,
-        serp_serach_type=SerpSearchType.SEARCH,
+        serp_search_type=SerpSearchType.SEARCH,
         serp_search_location=SerpSearchLocation.UNITED_STATES,
     )
 

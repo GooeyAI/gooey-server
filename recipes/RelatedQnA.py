@@ -38,7 +38,7 @@ class RelatedQnAPage(BasePage):
         max_context_words=200,
         scroll_jump=5,
         dense_weight=1.0,
-        serp_serach_type=SerpSearchType.SEARCH,
+        serp_search_type=SerpSearchType.SEARCH,
         serp_search_location=SerpSearchLocation.UNITED_STATES,
     )
 

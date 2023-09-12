@@ -70,7 +70,7 @@ class SEOSummaryPage(BasePage):
         keywords="outdoor rugs,8x10 rugs,rug sizes,checkered rugs,5x7 rugs",
         title="Ruggable",
         company_url="https://ruggable.com",
-        serp_serach_type=SerpSearchType.SEARCH,
+        serp_search_type=SerpSearchType.SEARCH,
         serp_search_location=SerpSearchLocation.UNITED_STATES,
         enable_html=False,
         selected_model=LargeLanguageModels.text_davinci_003.name,
