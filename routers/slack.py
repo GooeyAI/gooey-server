@@ -36,6 +36,9 @@ slack_connect_url = furl(
                 "remote_files:read",
                 "remote_files:share",
                 "remote_files:write",
+                "im:history",
+                "im:read",
+                "im:write",
             ]
         ),
         user_scope=",".join(
@@ -83,6 +86,7 @@ def slack_connect_redirect(request: Request):
     slack_channel_hook_url = res["incoming_webhook"]["url"]
     slack_bot_user_id = res["bot_user_id"]
     slack_user_access_token = res["authed_user"]["access_token"]
+    slack_team_id = res["team"]["id"]
 
     invite_bot_account_to_channel(
         slack_channel_id, slack_bot_user_id, slack_user_access_token
@@ -92,6 +96,7 @@ def slack_connect_redirect(request: Request):
         slack_access_token=slack_access_token,
         slack_channel_hook_url=slack_channel_hook_url,
         billing_account_uid=request.user.uid,
+        slack_team_id=slack_team_id,
     )
 
     with transaction.atomic():
@@ -137,6 +142,7 @@ def slack_interaction(
                 files=[],
                 actions=data["actions"],
                 msg_id=data["container"]["message_ts"],
+                team_id=data["team"]["id"],
             )
         )
         background_tasks.add_task(_on_msg, bot)
@@ -176,11 +182,12 @@ def slack_event(
                         files=event.get("files", []),
                         actions=[],
                         msg_id=event["ts"],
+                        team_id=event["team"],
                     )
                 )
             except BotIntegration.DoesNotExist as e:
                 capture_exception(e)
-                print("contacted from an on-monitored channel, ignoring:", e)
+                print("contacted from an un-monitored channel, ignoring:", e)
                 return Response(
                     "OK"
                 )  # contacted from a channel that this integration has not been explicitly connected to (we recieve events from all channels in WorkSpace), ignore message

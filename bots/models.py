@@ -376,6 +376,12 @@ class BotIntegration(models.Model):
         unique=True,
         help_text="Bot's WhatsApp phone number id (required if platform is WhatsApp)",
     )
+    slack_team_id = models.CharField(
+        max_length=256,
+        blank=True,
+        default="",
+        help_text="Bot's Slack team id (required if platform is Slack)",
+    )
     slack_channel_id = models.CharField(
         max_length=256,
         blank=True,

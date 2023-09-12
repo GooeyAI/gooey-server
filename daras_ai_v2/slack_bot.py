@@ -5,7 +5,7 @@ from typing import TypedDict
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_response
 from daras_ai_v2.text_splitter import text_splitter
-from daras_ai_v2.asr import run_google_translate, audio_url_to_wav, audio_bytes_to_wav
+from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
 from daras_ai_v2.bots import BotInterface
 
 from langcodes import Language
@@ -34,6 +34,7 @@ class SlackMessage(TypedDict):
     files: list[dict]
     actions: list[dict]
     msg_id: str
+    team_id: str
 
 
 class SlackBot(BotInterface):
@@ -54,7 +55,20 @@ class SlackBot(BotInterface):
         if message.get("actions"):
             self.input_type = "interactive"
 
-        bi: BotIntegration = BotIntegration.objects.get(slack_channel_id=self.bot_id)
+        if self.bot_id.startswith("D"):
+            # this is a DM, as per Sean's request, we just use the first bot integration found for this team
+            bi: BotIntegration = BotIntegration.objects.filter(slack_team_id=message["team_id"]).first()  # type: ignore
+            if not bi:
+                raise Exception(
+                    "DM not possible: No bot integration found for team "
+                    + message["team_id"]
+                )
+        else:
+            # public or private channel (group DMs are not supported)
+            bi: BotIntegration = BotIntegration.objects.get(
+                slack_channel_id=self.bot_id
+            )
+
         self.name = bi.name
         self.slack_access_token = bi.slack_access_token
         self.convo = Conversation.objects.get_or_create(
