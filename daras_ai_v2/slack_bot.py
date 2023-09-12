@@ -20,6 +20,7 @@ I'll respond to any text and audio messages in this channel while keeping track 
 
 I have been configured for $user_language and will respond to you in that language.
 """.strip()
+SLACK_READ_MSG = "Results may take up to 1 minute, we appreciate your patience."
 
 SLACK_MAX_SIZE = 4000
 
@@ -115,6 +116,14 @@ class SlackBot(BotInterface):
         if should_translate and self.language and self.language != "en":
             text = run_google_translate([text], self.language)[0]
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
+
+        if self.read_msg != self.input_message["thread_ts"]:
+            delete_msg(
+                channel=self.bot_id,
+                thread_ts=self.read_msg,
+                token=self.slack_access_token,
+            )
+
         for doc in splits[:-1]:
             reply(
                 text=doc.text,
@@ -139,7 +148,25 @@ class SlackBot(BotInterface):
         return msg_id
 
     def mark_read(self):
-        pass
+        self.read_msg = reply(
+            text=SLACK_READ_MSG,
+            channel=self.bot_id,
+            thread_ts=self.input_message["thread_ts"],
+            token=self.slack_access_token,
+        )
+
+
+def delete_msg(
+    channel: str,
+    thread_ts: str,
+    token: str,
+):
+    res = requests.post(
+        "https://slack.com/api/chat.delete",
+        json={"channel": channel, "ts": thread_ts},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    res.raise_for_status()
 
 
 def reply(
