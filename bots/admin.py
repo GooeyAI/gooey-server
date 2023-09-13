@@ -166,7 +166,6 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                 "fields": [
                     "show_feedback_buttons",
                     "analysis_run",
-                    "enable_analysis",
                     "view_analysis_results",
                 ]
             },
