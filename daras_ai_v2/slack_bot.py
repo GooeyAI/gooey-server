@@ -37,6 +37,8 @@ class SlackMessage(TypedDict):
 
 
 class SlackBot(BotInterface):
+    _read_msg_id: str | None = None
+
     def __init__(
         self,
         message: SlackMessage,
@@ -117,10 +119,7 @@ class SlackBot(BotInterface):
             text = run_google_translate([text], self.language)[0]
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
 
-        if (
-            hasattr(self, "_read_msg_id")
-            and self._read_msg_id != self.input_message["thread_ts"]
-        ):
+        if self._read_msg_id and self._read_msg_id != self.input_message["thread_ts"]:
             delete_msg(
                 channel=self.bot_id,
                 thread_ts=self._read_msg_id,
