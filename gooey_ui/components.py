@@ -26,8 +26,8 @@ plotly_chart = dummy
 dataframe = dummy
 
 
-def countdown_timer(**props):
-    return _node("countdown-timer", duration=props.get("duration", 10))
+def countdown_timer(duration: int = 10):
+    return _node("countdown-timer", duration=duration)
 
 
 def nav_tabs():
