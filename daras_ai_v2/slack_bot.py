@@ -57,7 +57,7 @@ class SlackBot(BotInterface):
         bi: BotIntegration = BotIntegration.objects.get(slack_channel_id=self.bot_id)
         self.name = bi.name
         self.slack_access_token = bi.slack_access_token
-        self.read_msg = bi.slack_read_receipt_msg
+        self.read_msg = bi.slack_read_receipt_msg.strip()
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
             slack_user_id=self.user_id,
@@ -117,10 +117,10 @@ class SlackBot(BotInterface):
             text = run_google_translate([text], self.language)[0]
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
 
-        if self.read_msg != self.input_message["thread_ts"]:
+        if self.read_msg_id != self.input_message["thread_ts"]:
             delete_msg(
                 channel=self.bot_id,
-                thread_ts=self.read_msg,
+                thread_ts=self.read_msg_id,
                 token=self.slack_access_token,
             )
 
@@ -150,7 +150,7 @@ class SlackBot(BotInterface):
     def mark_read(self):
         if not self.read_msg:
             return
-        self.read_msg = reply(
+        self.read_msg_id = reply(
             text=run_google_translate([self.read_msg], self.language)[0],
             channel=self.bot_id,
             thread_ts=self.input_message["thread_ts"],
