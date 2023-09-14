@@ -902,10 +902,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                         st.session_state.setdefault(
                             "slack_read_receipt", bi.slack_read_receipt_msg
                         )
-                        bi.slack_read_receipt_msg = st.text_input(
-                            "Read Receipt", key="slack_read_receipt"
+                        read_msg = st.text_input(
+                            "Read Receipt (leave blank to disable)",
+                            key="slack_read_receipt",
+                            placeholder=bi.slack_read_receipt_msg,
                         )
-                        bi.save()
+                        if st.button("Update"):
+                            bi.slack_read_receipt_msg = read_msg
+                            bi.save()
             if not pressed:
                 continue
             if is_connected:
