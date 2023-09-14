@@ -119,7 +119,9 @@ class SlackBot(BotInterface):
             text = run_google_translate([text], self.language)[0]
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
 
-        if self._read_msg_id and self._read_msg_id != self.input_message["thread_ts"]:
+        if self._read_msg_id and self._read_msg_id != self.input_message.get(
+            "thread_ts"
+        ):
             delete_msg(
                 channel=self.bot_id,
                 thread_ts=self._read_msg_id,
