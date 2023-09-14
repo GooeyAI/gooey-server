@@ -148,6 +148,8 @@ class SlackBot(BotInterface):
         return msg_id
 
     def mark_read(self):
+        if not self.read_msg:
+            return
         self.read_msg = reply(
             text=run_google_translate([self.read_msg], self.language)[0],
             channel=self.bot_id,
