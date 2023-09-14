@@ -117,10 +117,13 @@ class SlackBot(BotInterface):
             text = run_google_translate([text], self.language)[0]
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
 
-        if self.read_msg_id != self.input_message["thread_ts"]:
+        if (
+            hasattr(self, "_read_msg_id")
+            and self._read_msg_id != self.input_message["thread_ts"]
+        ):
             delete_msg(
                 channel=self.bot_id,
-                thread_ts=self.read_msg_id,
+                thread_ts=self._read_msg_id,
                 token=self.slack_access_token,
             )
 
@@ -150,7 +153,7 @@ class SlackBot(BotInterface):
     def mark_read(self):
         if not self.read_msg:
             return
-        self.read_msg_id = reply(
+        self._read_msg_id = reply(
             text=run_google_translate([self.read_msg], self.language)[0],
             channel=self.bot_id,
             thread_ts=self.input_message["thread_ts"],
