@@ -552,11 +552,6 @@ class Conversation(models.Model):
         default="",
         help_text="Slack channel id, can be different than the bot integration's main channel",
     )
-    slack_channel_hook_url = models.TextField(
-        blank=True,
-        default="",
-        help_text="Slack channel hook url, can be different than the bot integration's main channel (required if platform is Slack)",
-    )
     slack_use_threads = models.BooleanField(
         default=True,
         help_text="True if bot should reply in threads, otherwise it should post to the top level (required if platform is Slack)",

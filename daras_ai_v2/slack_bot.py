@@ -57,16 +57,30 @@ class SlackBot(BotInterface):
         if message.get("actions"):
             self.input_type = "interactive"
 
-        bi: BotIntegration = BotIntegration.objects.get(
-            slack_team_id=message["team_id"], slack_channel_id=self.bot_id
-        )
+        try:
+            # Try to find an existing conversation, this could either be a personal channel or the main channel the integration was added to
+            self.convo = Conversation.objects.get(
+                slack_team_id=message["team_id"],
+                slack_channel_id=self.bot_id,
+                slack_user_id=self.user_id,
+            )
+            bi: BotIntegration = self.convo.bot_integration
+        except Conversation.DoesNotExist:
+            # No existing conversation, this is not an existing personal channel
+            # Try to find the bot integration for this main channel and use it to create a new conversation
+            bi: BotIntegration = BotIntegration.objects.get(
+                slack_team_id=message["team_id"], slack_channel_id=self.bot_id
+            )
+            self.convo = Conversation(
+                bot_integration=bi,
+                slack_user_id=self.user_id,
+                slack_team_id=message["team_id"],
+                slack_channel_id=self.bot_id,
+            )
+            self.convo.save()
         self.name = bi.name
         self.slack_access_token = bi.slack_access_token
         self.read_msg = bi.slack_read_receipt_msg.strip()
-        self.convo = Conversation.objects.get_or_create(
-            bot_integration=bi,
-            slack_user_id=self.user_id,
-        )[0]
         self._unpack_bot_integration(bi)
 
     def get_input_text(self) -> str | None:
@@ -137,7 +151,9 @@ class SlackBot(BotInterface):
                 audio=audio,
                 video=video,
                 channel=self.bot_id,
-                thread_ts=self.input_message["thread_ts"],
+                thread_ts=""
+                if not self.convo.slack_use_threads
+                else self.input_message["thread_ts"],
                 username=self.name,
                 token=self.slack_access_token,
                 buttons=[],
@@ -147,7 +163,9 @@ class SlackBot(BotInterface):
             audio=audio,
             video=video,
             channel=self.bot_id,
-            thread_ts=self.input_message["thread_ts"],
+            thread_ts=""
+            if not self.convo.slack_use_threads
+            else self.input_message["thread_ts"],
             username=self.name,
             token=self.slack_access_token,
             buttons=buttons or [],
@@ -160,7 +178,9 @@ class SlackBot(BotInterface):
         self._read_msg_id = reply(
             text=run_google_translate([self.read_msg], self.language)[0],
             channel=self.bot_id,
-            thread_ts=self.input_message["thread_ts"],
+            thread_ts=""
+            if not self.convo.slack_use_threads
+            else self.input_message["thread_ts"],
             token=self.slack_access_token,
         )
 
@@ -176,6 +196,132 @@ def delete_msg(
         headers={"Authorization": f"Bearer {token}"},
     )
     res.raise_for_status()
+
+
+def yield_member_ids(
+    channel: str,
+    token: str,
+    cursor: str | None = None,
+):
+    config = {"channel": channel, "limit": 1000}
+    config.update({"cursor": cursor} if cursor else {})
+    res = requests.get(
+        "https://slack.com/api/conversations.members",
+        params=config,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    res.raise_for_status()
+    res = res.json()
+    print(res)
+    if res.get("ok"):
+        for member in res["members"]:
+            yield member
+        cursor = res.get("response_metadata").get("next_cursor")
+        if not cursor:
+            return
+        for member in yield_member_ids(channel, token, cursor):
+            yield member
+
+
+def create_personal_channels(
+    token: str,
+    bi: BotIntegration,
+):
+    print("creating personal channels")
+    main_channel_id = bi.slack_channel_id
+    main_channel_name = bi.slack_channel_name
+    team_id = bi.slack_team_id
+    assert main_channel_id and main_channel_name and team_id, (
+        "id: "
+        + str(main_channel_id)
+        + " name: "
+        + main_channel_name
+        + " team: "
+        + team_id
+    )
+    print("for users:")
+    print(list(yield_member_ids(main_channel_id, token)))
+    for user_id in yield_member_ids(main_channel_id, token):
+        create_personal_channel(
+            user_id=user_id,
+            main_channel_name=main_channel_name,
+            token=token,
+            bi=bi,
+            team_id=team_id,
+        )
+
+
+def format_name(channel_name: str) -> str:
+    lowered = channel_name.lower().replace(" ", "_")
+    return lowered.strip(
+        lowered.strip(
+            "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm1234567890-_"
+        )
+    )
+
+
+def create_personal_channel(
+    user_id: str,
+    main_channel_name: str,
+    token: str,
+    bi: BotIntegration,
+    team_id: str,
+):
+    personal_channel_id = create_channel(
+        channel_name=format_name(main_channel_name + "-" + user_id),
+        is_private=True,
+        token=token,
+    )
+    _, created = Conversation.objects.get_or_create(
+        slack_user_id=user_id,
+        slack_team_id=team_id,
+        slack_channel_id=personal_channel_id,
+        defaults=dict(
+            bot_integration=bi,
+            slack_use_threads=False,
+        ),
+    )
+    assert created, "Personal conversation already exists"
+    res = requests.post(
+        "https://slack.com/api/conversations.invite",
+        json={
+            "channel": personal_channel_id,
+            "users": user_id,
+        },
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+    res.raise_for_status()
+    res = res.json()
+    if not res.get("ok") and res["error"] not in [
+        "already_in_channel",
+        "cant_invite_self",
+    ]:
+        raise Exception(res["error"])  # will throw if user could not be invited
+
+
+def create_channel(
+    channel_name: str,
+    is_private: bool,
+    token: str,
+):
+    res = requests.post(
+        "https://slack.com/api/conversations.create",
+        json={
+            "name": channel_name,
+            "is_private": is_private,
+        },
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+    res.raise_for_status()
+    res = res.json()
+    if res.get("ok"):
+        return res["channel"]["id"]
+    else:
+        raise Exception(res["error"])  # will throw if, e.g., channel already exists
 
 
 def reply(

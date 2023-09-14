@@ -12,7 +12,12 @@ from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
 
-from daras_ai_v2.slack_bot import SlackBot, SlackMessage, invite_bot_account_to_channel
+from daras_ai_v2.slack_bot import (
+    SlackBot,
+    SlackMessage,
+    invite_bot_account_to_channel,
+    create_personal_channels,
+)
 from django.db import transaction
 
 router = APIRouter()
@@ -32,13 +37,11 @@ slack_connect_url = furl(
                 "groups:history",
                 "groups:read",
                 "groups:write",
+                "groups:write.invites",
                 "incoming-webhook",
                 "remote_files:read",
                 "remote_files:share",
                 "remote_files:write",
-                "im:history",
-                "im:read",
-                "im:write",
             ]
         ),
         user_scope=",".join(
@@ -113,6 +116,8 @@ def slack_connect_redirect(request: Request):
         )
         if not created:
             BotIntegration.objects.filter(pk=bi.pk).update(**config)
+
+    create_personal_channels(slack_access_token, bi)
 
     return HTMLResponse(
         f"Sucessfully Connected to {slack_workspace} workspace on {slack_channel}! You may now close this page."

@@ -26,9 +26,6 @@ def migrate_info_to_conversation(apps, schema_editor):
         if bi.platform == Platform.SLACK:
             conv.slack_team_id = conv.slack_team_id or bi.slack_team_id
             conv.slack_channel_id = conv.slack_channel_id or bi.slack_channel_id
-            conv.slack_channel_hook_url = (
-                conv.slack_channel_hook_url or bi.slack_channel_hook_url
-            )
             conv.save()
 
 
@@ -38,15 +35,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="conversation",
-            name="slack_channel_hook_url",
-            field=models.TextField(
-                blank=True,
-                default="",
-                help_text="Slack channel hook url, can be different than the bot integration's main channel (required if platform is Slack)",
-            ),
-        ),
         migrations.AddField(
             model_name="conversation",
             name="slack_channel_id",
