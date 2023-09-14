@@ -9,6 +9,7 @@ from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.functional import map_parallel, apply_parallel
 from daras_ai_v2.language_model import LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.prompt_vars import prompt_vars_widget
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import CitationStyles
 from daras_ai_v2.serp_search import get_related_questions_from_serp_api
@@ -54,14 +55,10 @@ class RelatedQnADocPage(BasePage):
         return "This workflow gets the related queries for your Google search, searches your custom domain and builds answers using the results and GPT."
 
     def render_form_v2(self):
-        st.text_input("##### Search Query", key="search_query")
-        document_uploader("##### Documents")
+        DocSearchPage.render_form_v2(self)
 
     def validate_form_v2(self):
-        assert st.session_state.get(
-            "search_query", ""
-        ).strip(), "Please enter a search query"
-        assert st.session_state.get("documents"), "Please provide at least 1 Document"
+        DocSearchPage.validate_form_v2(self)
 
     def render_output(self):
         render_qna_outputs(st.session_state, 300)
@@ -75,17 +72,7 @@ class RelatedQnADocPage(BasePage):
         render_qna_outputs(state, 200, show_count=1)
 
     def render_settings(self):
-        st.text_area(
-            "### Task Instructions",
-            key="task_instructions",
-            height=300,
-        )
-
-        language_model_settings()
-
-        st.write("---")
-
-        serp_search_settings()
+        DocSearchPage.render_settings(self)
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage

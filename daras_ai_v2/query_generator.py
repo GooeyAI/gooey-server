@@ -5,6 +5,7 @@ from daras_ai_v2.language_model import (
     model_max_tokens,
     LargeLanguageModels,
 )
+from daras_ai_v2.prompt_vars import render_prompt_vars
 
 
 def generate_final_search_query(
@@ -18,12 +19,14 @@ def generate_final_search_query(
         context = request.dict()
         if response:
             context |= response.dict()
-    query_instructions = jinja2.Template(instructions).render(**context).strip()
+    instructions = render_prompt_vars(instructions, context).strip()
+    if not instructions:
+        return ""
     model = LargeLanguageModels[request.selected_model]
     max_tokens = model_max_tokens[model] // 8  # just a sane default
     return run_language_model(
         model=request.selected_model,
-        prompt=query_instructions,
+        prompt=instructions,
         max_tokens=max_tokens,
         quality=request.quality,
         temperature=request.sampling_temperature,

@@ -1,3 +1,5 @@
+import typing
+
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -9,6 +11,7 @@ from daras_ai_v2.language_model import (
     LargeLanguageModels,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.prompt_vars import prompt_vars_widget
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.serp_search import get_related_questions_from_serp_api
 from daras_ai_v2.serp_search_locations import (
@@ -55,13 +58,10 @@ class RelatedQnAPage(BasePage):
         return "This workflow gets the related queries for your Google search, searches your custom domain and builds answers using the results and GPT."
 
     def render_form_v2(self):
-        st.text_input("##### Google Search Query", key="search_query")
-        st.text_input("Search on a specific site *(optional)*", key="site_filter")
+        GoogleGPTPage.render_form_v2(self)
 
     def validate_form_v2(self):
-        assert st.session_state.get(
-            "search_query", ""
-        ).strip(), "Please enter a search query"
+        GoogleGPTPage.validate_form_v2(self)
 
     def render_output(self):
         render_qna_outputs(st.session_state, 300)
@@ -75,19 +75,7 @@ class RelatedQnAPage(BasePage):
         render_qna_outputs(state, 200, show_count=1)
 
     def render_settings(self):
-        st.text_area(
-            "### Task Instructions",
-            key="task_instructions",
-            height=300,
-        )
-
-        language_model_settings()
-        st.write("---")
-
-        doc_search_settings(asr_allowed=False)
-        st.write("---")
-
-        serp_search_settings()
+        GoogleGPTPage.render_settings(self)
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage

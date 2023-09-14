@@ -20,6 +20,8 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.prompt_vars import prompt_vars_widget, render_prompt_vars
+from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
     render_output_with_refs,
@@ -70,6 +72,8 @@ class DocSearchPage(BasePage):
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
 
+        variables: dict[str, typing.Any] | None
+
     class ResponseModel(BaseModel):
         output_text: list[str]
 
@@ -80,6 +84,7 @@ class DocSearchPage(BasePage):
     def render_form_v2(self):
         st.text_area("##### Search Query", key="search_query")
         document_uploader("##### Documents")
+        prompt_vars_widget("task_instructions", "query_instructions")
 
     def validate_form_v2(self):
         search_query = st.session_state.get("search_query", "").strip()
@@ -164,16 +169,16 @@ class DocSearchPage(BasePage):
             raise EmptySearchResults(request.search_query)
 
         response.final_prompt = ""
+        # add search results to the prompt
+        response.final_prompt += references_as_prompt(response.references) + "\n\n"
+        # add task instructions
         task_instructions = (request.task_instructions or "").strip()
         if not task_instructions:
             response.output_text = []
             return
-        # add time to instructions
-        utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
-        task_instructions = task_instructions.replace("{{ datetime.utcnow }}", utcnow)
-        # add search results to the prompt
-        response.final_prompt += references_as_prompt(response.references) + "\n\n"
-        # add task instructions
+        task_instructions = render_prompt_vars(
+            prompt=task_instructions, state=request.dict() | response.dict()
+        )
         response.final_prompt += task_instructions.strip() + "\n\n"
         # add the question
         response.final_prompt += f"Question: {request.search_query}\nAnswer:"

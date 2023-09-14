@@ -15,6 +15,7 @@ from bots.models import Workflow
 from daras_ai.image_input import (
     truncate_text_words,
 )
+from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
 from daras_ai_v2.query_generator import generate_final_search_query
 from recipes.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
@@ -234,6 +235,8 @@ class VideoBotsPage(BasePage):
 
         user_language: str | None
 
+        variables: dict[str, typing.Any] | None
+
     class ResponseModel(BaseModel):
         final_prompt: str
         raw_input_text: str | None
@@ -303,6 +306,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 ##### 📄 Documents (*optional*)
 Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
 """
+        )
+
+        prompt_vars_widget(
+            "bot_script",
+            "task_instructions",
+            "query_instructions",
+            "keyword_instructions",
         )
 
     def render_usage_guide(self):
@@ -554,9 +564,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         # consturct the system prompt
         if system_message:
-            # add time to prompt
-            utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
-            system_message = system_message.replace("{{ datetime.utcnow }}", utcnow)
+            system_message = render_prompt_vars(system_message, state)
             # insert to top
             system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": system_message}
         else:
@@ -637,9 +645,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             state["references"] = references
         # if doc search is successful, add the search results to the user prompt
         if references:
+            # add task instructions
+            task_instructions = render_prompt_vars(request.task_instructions, state)
             user_prompt["content"] = (
                 references_as_prompt(references)
-                + f"\n**********\n{request.task_instructions.strip()}\n**********\n"
+                + f"\n**********\n{task_instructions.strip()}\n**********\n"
                 + user_prompt["content"]
             )
 
