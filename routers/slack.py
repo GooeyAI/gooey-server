@@ -97,6 +97,8 @@ def slack_connect_redirect(request: Request):
         slack_channel_hook_url=slack_channel_hook_url,
         billing_account_uid=request.user.uid,
         slack_team_id=slack_team_id,
+        slack_team_name=slack_workspace,
+        slack_channel_name=slack_channel,
     )
 
     with transaction.atomic():
