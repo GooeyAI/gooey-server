@@ -29,6 +29,7 @@ class _AnimationPrompt(typing.TypedDict):
 AnimationPrompts = list[_AnimationPrompt]
 
 CREDITS_PER_FRAME = 1.5
+MODEL_RUNTIME_PER_FRAME = 2.7
 
 
 def input_prompt_to_animation_prompts(input_prompt: str):
@@ -418,6 +419,19 @@ Choose fps for the video.
         if output_video:
             st.write("Output Video")
             st.video(output_video)
+
+    def render_output_timer(self):
+        max_frames = st.session_state.get("max_frames", 20)
+        estimated_runtime_seconds = max_frames * MODEL_RUNTIME_PER_FRAME
+        st.markdown("Estimated time to complete:")
+        st.countdown_timer(duration=estimated_runtime_seconds)
+        if self.request.user.email:
+            st.markdown(
+                f"We'll email {self.request.user.email} when your workflow is done."
+            )
+        st.markdown(
+            "In the meantime, check out 🔖 [Examples](https://gooey.ai/animation-generator/examples/) for more inspiration."
+        )
 
     def render_example(self, state: dict):
         display = self.preview_input(state)

@@ -9,6 +9,7 @@ from recipes.TextToSpeech import TextToSpeechPage
 from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/lipsync_meta_img.gif"
+MODEL_RUNTIME_PER_TEXT_LENGTH = 0.025
 
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
@@ -97,6 +98,22 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     def render_settings(self):
         LipsyncPage.render_settings(self)
         TextToSpeechPage.render_settings(self)
+
+    def render_output_timer(self):
+        text_length = len(st.session_state["text_prompt"].strip())
+        estimated_runtime_seconds = (
+            text_length * MODEL_RUNTIME_PER_TEXT_LENGTH if text_length > 0 else 20
+        )
+
+        st.markdown("Estimated time to complete:")
+        st.countdown_timer(duration=int(estimated_runtime_seconds))
+        if self.request.user.email:
+            st.markdown(
+                f"We'll email {self.request.user.email} when your workflow is done."
+            )
+        st.markdown(
+            "In the meantime, check out 🔖 [Examples](https://gooey.ai/lipsync-maker/examples) for more inspiration."
+        )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         yield from TextToSpeechPage.run(self, state)

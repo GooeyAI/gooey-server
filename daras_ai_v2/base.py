@@ -412,6 +412,9 @@ class BasePage:
     def render_output(self):
         self.render_example(st.session_state)
 
+    def render_output_timer(self):
+        pass
+
     def render_form_v2(self):
         pass
 
@@ -606,8 +609,11 @@ class BasePage:
 
         run_status = st.session_state.get(StateKeys.run_status)
         if run_status:
-            st.caption("Your changes are saved in the above URL. Save it for later!")
+            st.caption(
+                "Your changes & output (when completed) are saved in the above URL. Save it for later!"
+            )
             html_spinner(run_status)
+            self.render_output_timer()
         else:
             err_msg = st.session_state.get(StateKeys.error_msg)
             run_time = st.session_state.get(StateKeys.run_time, 0)
