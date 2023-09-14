@@ -542,6 +542,25 @@ class Conversation(models.Model):
         db_index=True,
         help_text="User's Slack ID (required if platform is Slack)",
     )
+    slack_team_id = models.TextField(
+        blank=True,
+        default="",
+        help_text="Slack team id, duplicate of bot integration value for indexing (required if platform is Slack)",
+    )
+    slack_channel_id = models.TextField(
+        blank=True,
+        default="",
+        help_text="Slack channel id, can be different than the bot integration's main channel",
+    )
+    slack_channel_hook_url = models.TextField(
+        blank=True,
+        default="",
+        help_text="Slack channel hook url, can be different than the bot integration's main channel (required if platform is Slack)",
+    )
+    slack_use_threads = models.BooleanField(
+        default=True,
+        help_text="True if bot should reply in threads, otherwise it should post to the top level (required if platform is Slack)",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -552,6 +571,7 @@ class Conversation(models.Model):
             models.Index(fields=["bot_integration", "fb_page_id", "ig_account_id"]),
             models.Index(fields=["bot_integration", "wa_phone_number"]),
             models.Index(fields=["bot_integration", "slack_user_id"]),
+            models.Index(fields=["slack_team_id", "slack_user_id", "slack_channel_id"]),
         ]
 
     def __str__(self):

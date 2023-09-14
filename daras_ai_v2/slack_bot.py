@@ -55,20 +55,9 @@ class SlackBot(BotInterface):
         if message.get("actions"):
             self.input_type = "interactive"
 
-        if self.bot_id.startswith("D"):
-            # this is a DM, as per Sean's request, we just use the first bot integration found for this team
-            bi: BotIntegration = BotIntegration.objects.filter(slack_team_id=message["team_id"]).first()  # type: ignore
-            if not bi:
-                raise Exception(
-                    "DM not possible: No bot integration found for team "
-                    + message["team_id"]
-                )
-        else:
-            # public or private channel (group DMs are not supported)
-            bi: BotIntegration = BotIntegration.objects.get(
-                slack_channel_id=self.bot_id
-            )
-
+        bi: BotIntegration = BotIntegration.objects.get(
+            slack_team_id=message["team_id"], slack_channel_id=self.bot_id
+        )
         self.name = bi.name
         self.slack_access_token = bi.slack_access_token
         self.read_msg = bi.slack_read_receipt_msg
