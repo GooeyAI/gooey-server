@@ -20,7 +20,6 @@ I'll respond to any text and audio messages in this channel while keeping track 
 
 I have been configured for $user_language and will respond to you in that language.
 """.strip()
-SLACK_READ_MSG = "Results may take up to 1 minute, we appreciate your patience."
 
 SLACK_MAX_SIZE = 4000
 
@@ -58,6 +57,7 @@ class SlackBot(BotInterface):
         bi: BotIntegration = BotIntegration.objects.get(slack_channel_id=self.bot_id)
         self.name = bi.name
         self.slack_access_token = bi.slack_access_token
+        self.read_msg = bi.slack_read_receipt_msg
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
             slack_user_id=self.user_id,
@@ -149,7 +149,7 @@ class SlackBot(BotInterface):
 
     def mark_read(self):
         self.read_msg = reply(
-            text=SLACK_READ_MSG,
+            text=run_google_translate([self.read_msg], self.language)[0],
             channel=self.bot_id,
             thread_ts=self.input_message["thread_ts"],
             token=self.slack_access_token,
