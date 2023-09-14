@@ -899,13 +899,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             with col3:
                 if bi.platform == Platform.SLACK:
                     with st.expander("📨 Slack Settings"):
+                        read_receipt_key = "slack_read_receipt_" + str(bi.id)
                         st.session_state.setdefault(
-                            "slack_read_receipt_" + str(bi.id),
+                            read_receipt_key,
                             bi.slack_read_receipt_msg,
                         )
                         read_msg = st.text_input(
                             "Read Receipt (leave blank to disable)",
-                            key="slack_read_receipt_" + str(bi.id),
+                            key=read_receipt_key,
                             placeholder=bi.slack_read_receipt_msg,
                         )
                         if st.button("Update"):
