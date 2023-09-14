@@ -100,6 +100,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "wa_phone_number",
         "created_at",
         "updated_at",
+        "saved_run",
         "analysis_run",
     ]
     list_filter = ["platform"]
@@ -165,7 +166,6 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                 "fields": [
                     "show_feedback_buttons",
                     "analysis_run",
-                    "enable_analysis",
                     "view_analysis_results",
                 ]
             },
@@ -234,7 +234,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     .order_by("-count")
                     .values_list(key, "count")
                 )
-                if val
+                if val is not None
             ]
             for key in nested_keys
         }

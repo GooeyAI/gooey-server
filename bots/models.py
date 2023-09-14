@@ -405,10 +405,6 @@ class BotIntegration(models.Model):
         default=None,
         help_text="If provided, the message content will be analyzed for this bot using this saved run",
     )
-    enable_analysis = models.BooleanField(
-        default=False,
-        help_text="Enable analysis for this bot (DEPRECATED)",
-    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
