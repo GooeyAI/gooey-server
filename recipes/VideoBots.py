@@ -904,7 +904,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                         )
                         read_msg = st.text_input(
                             "Read Receipt (leave blank to disable)",
-                            key="slack_read_receipt_" + +bi.id,
+                            key="slack_read_receipt_" + bi.id,
                             placeholder=bi.slack_read_receipt_msg,
                         )
                         if st.button("Update"):
