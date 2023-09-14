@@ -71,6 +71,7 @@ class SlackBot(BotInterface):
 
         self.name = bi.name
         self.slack_access_token = bi.slack_access_token
+        self.read_msg = bi.slack_read_receipt_msg
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
             slack_user_id=self.user_id,
@@ -129,6 +130,14 @@ class SlackBot(BotInterface):
         if should_translate and self.language and self.language != "en":
             text = run_google_translate([text], self.language)[0]
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
+
+        if self.read_msg != self.input_message["thread_ts"]:
+            delete_msg(
+                channel=self.bot_id,
+                thread_ts=self.read_msg,
+                token=self.slack_access_token,
+            )
+
         for doc in splits[:-1]:
             reply(
                 text=doc.text,
@@ -153,7 +162,27 @@ class SlackBot(BotInterface):
         return msg_id
 
     def mark_read(self):
-        pass
+        if not self.read_msg:
+            return
+        self.read_msg = reply(
+            text=run_google_translate([self.read_msg], self.language)[0],
+            channel=self.bot_id,
+            thread_ts=self.input_message["thread_ts"],
+            token=self.slack_access_token,
+        )
+
+
+def delete_msg(
+    channel: str,
+    thread_ts: str,
+    token: str,
+):
+    res = requests.post(
+        "https://slack.com/api/chat.delete",
+        json={"channel": channel, "ts": thread_ts},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    res.raise_for_status()
 
 
 def reply(

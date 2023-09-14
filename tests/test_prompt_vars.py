@@ -24,4 +24,5 @@ from daras_ai_v2.prompt_vars import render_prompt_vars
     ],
 )
 def test_prompt_vars(prompt, state, variables, expected):
-    assert render_prompt_vars(prompt, state=state, variables=variables) == expected
+    state["variables"] = variables
+    assert render_prompt_vars(prompt, state) == expected

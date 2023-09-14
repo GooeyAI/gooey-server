@@ -16,6 +16,8 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
+from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
     render_output_with_refs,
@@ -95,6 +97,8 @@ class GoogleGPTPage(BasePage):
             "dense_weight"
         ].field_info
 
+        variables: dict[str, typing.Any] | None
+
     class ResponseModel(BaseModel):
         output_text: list[str]
 
@@ -108,6 +112,7 @@ class GoogleGPTPage(BasePage):
     def render_form_v2(self):
         st.text_area("##### Google Search Query", key="search_query")
         st.text_input("Search on a specific site *(optional)*", key="site_filter")
+        prompt_vars_widget("task_instructions", "query_instructions")
 
     def validate_form_v2(self):
         assert st.session_state.get(
@@ -211,19 +216,9 @@ class GoogleGPTPage(BasePage):
 
         query_instructions = (request.query_instructions or "").strip()
         if query_instructions:
-            query_instructions = jinja2.Template(query_instructions).render(
-                **request.dict()
-            )
-            final_search_query = run_language_model(
-                model=request.selected_model,
-                prompt=query_instructions,
-                max_tokens=model_max_tokens[model] // 2,
-                quality=request.quality,
-                temperature=request.sampling_temperature,
-                avoid_repetition=request.avoid_repetition,
-            )[0]
-            response.final_search_query = (
-                final_search_query.strip().strip('"').strip("'")
+            yield "Generating final search query..."
+            response.final_search_query = generate_final_search_query(
+                request=request, response=response, instructions=query_instructions
             )
         else:
             response.final_search_query = request.search_query
@@ -264,14 +259,12 @@ class GoogleGPTPage(BasePage):
             raise EmptySearchResults(request.search_query)
 
         response.final_prompt = ""
-        # add time to instructions
-        utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
-        task_instructions = request.task_instructions.replace(
-            "{{ datetime.utcnow }}", utcnow
-        )
         # add search results to the prompt
         response.final_prompt += references_as_prompt(response.references) + "\n\n"
         # add task instructions
+        task_instructions = render_prompt_vars(
+            prompt=request.task_instructions, state=request.dict() | response.dict()
+        )
         response.final_prompt += task_instructions.strip() + "\n\n"
         # add the question
         response.final_prompt += f"Question: {request.search_query}\nAnswer:"
