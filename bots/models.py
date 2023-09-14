@@ -395,6 +395,11 @@ class BotIntegration(models.Model):
         help_text="Bot's Slack access token (required if platform is Slack)",
         editable=False,
     )
+    slack_read_receipt_msg = models.TextField(
+        blank=True,
+        default="Results may take up to 1 minute, we appreciate your patience.",
+        help_text="Bot's Slack read receipt message - if set, and platform is Slack, the bot will send this message to mark the user message as read and then delete it when it has a response ready",
+    )
 
     analysis_run = models.ForeignKey(
         "bots.SavedRun",

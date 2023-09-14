@@ -881,7 +881,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         current_sr = self.get_sr_from_query_params_dict(gooey_get_query_params())
         for bi in integrations:
             is_connected = bi.saved_run == current_sr
-            col1, col2, *_ = st.columns([1, 1, 2])
+            col1, col2, col3, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()
                 st.markdown(
@@ -896,6 +896,16 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     "🔌💔️ Disconnect" if is_connected else "🖇️ Connect",
                     key=f"btn_connect_{bi.id}",
                 )
+            with col3:
+                if bi.platform == Platform.SLACK:
+                    with st.expander("📨 Slack Settings"):
+                        st.session_state.setdefault(
+                            "slack_read_receipt", bi.slack_read_receipt_msg
+                        )
+                        bi.slack_read_receipt_msg = st.text_input(
+                            "Read Receipt", key="slack_read_receipt"
+                        )
+                        bi.save()
             if not pressed:
                 continue
             if is_connected:
