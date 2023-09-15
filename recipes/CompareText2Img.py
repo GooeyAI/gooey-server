@@ -118,6 +118,9 @@ class CompareText2ImgPage(BasePage):
     def render_usage_guide(self):
         youtube_video("TxT-mTYP0II")
 
+    def render_additional_usage_guide(self):
+        youtube_video("L75DzTrMVgk")
+
     def render_description(self):
         st.markdown(
             """

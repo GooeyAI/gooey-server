@@ -218,10 +218,18 @@ class BasePage:
 
                 col1, col2 = st.columns(2)
                 with col1:
-                    self._render_help()
+                    placeholder = st.div()
+                    if hasattr(self, "render_usage_guide"):
+                        with placeholder:
+                            st.write(
+                                """
+                            ## How to Use This Recipe
+                            """
+                            )
                 with col2:
                     self._render_save_options()
 
+                self._render_help()
                 self.render_related_workflows()
 
             case MenuTabs.examples:
@@ -488,33 +496,31 @@ class BasePage:
                         st.write("##### 👣 Steps")
 
     def _render_help(self):
-        placeholder = st.div()
-        try:
-            self.render_usage_guide()
-        except NotImplementedError:
-            pass
-        else:
-            with placeholder:
-                st.write(
+        col1, col2 = st.columns(2)
+        with col1:
+            try:
+                self.render_usage_guide()
+            except NotImplementedError:
+                pass
+            with st.expander(
+                f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**"
+            ):
+                st.markdown(
                     """
-                    ## How to Use This Recipe
-                    """
+                    <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
+                    <iframe src="https://e.widgetbot.io/channels/643360566970155029/1046049067337273444" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
-
-        with st.expander(
-            f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**"
-        ):
-            st.markdown(
-                """
-                <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
-                <iframe src="https://e.widgetbot.io/channels/643360566970155029/1046049067337273444" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+        with col2:
+            self.render_additional_usage_guide()
 
     def render_usage_guide(self):
         raise NotImplementedError
+
+    def render_additional_usage_guide(self):
+        pass
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         # initialize request and response
@@ -638,14 +644,14 @@ class BasePage:
 
     def on_submit(self):
         example_id, run_id, uid = self.create_new_run()
-        if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
-            st.session_state[StateKeys.run_status] = None
-            st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
-                example_id, run_id, uid
-            )
-            self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
-        else:
-            self.call_runner_task(example_id, run_id, uid)
+        # if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
+        #     st.session_state[StateKeys.run_status] = None
+        #     st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
+        #         example_id, run_id, uid
+        #     )
+        #     self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
+        # else:
+        self.call_runner_task(example_id, run_id, uid)
         raise QueryParamsRedirectException(
             self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
         )
