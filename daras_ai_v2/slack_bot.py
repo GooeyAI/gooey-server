@@ -267,11 +267,18 @@ def create_personal_channel(
     bi: BotIntegration,
     team_id: str,
 ):
-    personal_channel_id = create_channel(
-        channel_name=format_name(main_channel_name + "-" + user_id),
-        is_private=True,
-        token=token,
-    )
+    try:
+        personal_channel_id = create_channel(
+            channel_name=format_name(main_channel_name + "-" + user_id),
+            is_private=True,
+            token=token,
+        )
+    except Exception as e:
+        if e.args[0] == "name_taken":
+            # channel has already been created by our bot
+            return
+        else:
+            raise e
     res = requests.post(
         "https://slack.com/api/conversations.setTopic",
         json={
