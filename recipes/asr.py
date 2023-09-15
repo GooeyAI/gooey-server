@@ -23,6 +23,8 @@ from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 
+DEFAULT_ASR_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3b98d906-538b-11ee-9c77-02420a000193/Speech1%201.png.png"
+
 
 class AsrPage(BasePage):
     title = "Speech Recognition & Translation"
@@ -43,6 +45,9 @@ class AsrPage(BasePage):
     class ResponseModel(BaseModel):
         raw_output_text: list[str] | None
         output_text: list[str | AsrOutputJson]
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_ASR_META_IMG
 
     def preview_description(self, state: dict):
         return "Transcribe mp3, WhatsApp audio + wavs with OpenAI's Whisper or AI4Bharat / Bhashini ASR models. Optionally translate to any language too."

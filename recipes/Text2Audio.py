@@ -17,6 +17,8 @@ from daras_ai_v2.img_model_settings_widgets import (
     num_outputs_setting,
 )
 
+DEFAULT_TEXT2AUDIO_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc6e894-538b-11ee-a837-02420a000190/text2audio1%201.png.png"
+
 
 class Text2AudioModels(Enum):
     audio_ldm = "AudioLDM (CVSSP)"
@@ -57,6 +59,9 @@ class Text2AudioPage(BasePage):
         output_audios: dict[
             typing.Literal[tuple(e.name for e in Text2AudioModels)], list[str]
         ]
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_TEXT2AUDIO_META_IMG
 
     def render_form_v2(self):
         st.text_area(

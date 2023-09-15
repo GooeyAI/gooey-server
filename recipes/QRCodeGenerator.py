@@ -35,6 +35,7 @@ from url_shortener.models import ShortenedURL
 from daras_ai_v2.loom_video_widget import youtube_video
 
 ATTEMPTS = 1
+DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f09c8cfa-5393-11ee-a837-02420a000190/ai%20art%20qr%20codes1%201.png.png"
 
 
 class QRCodeGeneratorPage(BasePage):
@@ -88,6 +89,9 @@ class QRCodeGeneratorPage(BasePage):
         raw_images: list[str]
         shortened_url: str | None
         cleaned_qr_code: str
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_QR_CODE_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.CompareText2Img import CompareText2ImgPage
