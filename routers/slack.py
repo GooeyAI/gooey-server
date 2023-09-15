@@ -17,6 +17,7 @@ from daras_ai_v2.slack_bot import (
     SlackMessage,
     invite_bot_account_to_channel,
     create_personal_channels,
+    create_personal_channel,
 )
 from django.db import transaction
 
@@ -171,6 +172,24 @@ def slack_event(
         application_id = data["api_app_id"]
         event = data["event"]
         if event["type"] == "message":
+            if event.get("subtype") == "channel_join":
+
+                def create_personal():
+                    bi: BotIntegration | None = BotIntegration.objects.filter(
+                        slack_team_id=workspace_id,
+                        slack_channel_id=event["channel"],
+                    ).first()
+                    if bi:
+                        create_personal_channel(
+                            event["user"],
+                            bi.slack_channel_name,
+                            bi.slack_access_token,
+                            bi,
+                            bi.slack_team_id,
+                        )
+
+                background_tasks.add_task(create_personal)
+                return Response("OK")
             if event.get("subtype", "text") not in [
                 "text",
                 "slack_audio",
