@@ -1,21 +1,14 @@
-import typing
-
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.doc_search_settings_widgets import doc_search_settings
 from daras_ai_v2.functional import apply_parallel
 from daras_ai_v2.language_model import (
     LargeLanguageModels,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
-from daras_ai_v2.prompt_vars import prompt_vars_widget
-from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.serp_search import get_related_questions_from_serp_api
 from daras_ai_v2.serp_search_locations import (
-    serp_search_settings,
     SerpSearchLocation,
     SerpSearchType,
 )
@@ -50,7 +43,6 @@ class RelatedQnAPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
-        final_search_query: str
         output_queries: list[RelatedGoogleGPTResponse]
         serp_results: dict
 
@@ -93,12 +85,6 @@ class RelatedQnAPage(BasePage):
         return 'Input your Google Search query and discover related Q&As that your audience is asking, so you can create content that is more relevant and engaging. This workflow finds the related queries (aka "People also ask") for your Google search, browses through the URL you provide for all related results from your query and finally, generates cited answers from those results. A great way to quickly improve your website\'s SEO rank if you already rank well for a given query.'
 
     def render_steps(self):
-        final_search_query = st.session_state.get("final_search_query")
-        if final_search_query:
-            st.text_area(
-                "**Final Search Query**", value=final_search_query, disabled=True
-            )
-
         serp_results = st.session_state.get(
             "serp_results", st.session_state.get("scaleserp_results")
         )
@@ -121,21 +107,12 @@ class RelatedQnAPage(BasePage):
         request: "RelatedQnAPage.RequestModel",
         response: "RelatedQnAPage.ResponseModel",
     ):
-        query_instructions = (request.query_instructions or "").strip()
-        if query_instructions:
-            yield "Generating final search query..."
-            response.final_search_query = generate_final_search_query(
-                request=request, response=response, instructions=query_instructions
-            )
-        else:
-            response.final_search_query = request.search_query
-
         yield "Googling Related Questions..."
         (
             response.serp_results,
             related_questions,
         ) = get_related_questions_from_serp_api(
-            response.final_search_query,
+            request.search_query,
             search_location=request.serp_search_location,
         )
 
@@ -149,7 +126,7 @@ class RelatedQnAPage(BasePage):
             message=f"Generating answers using {LargeLanguageModels[request.selected_model].value}...",
         )
         if not response.output_queries:
-            raise EmptySearchResults(response.final_search_query)
+            raise EmptySearchResults(request.search_query)
 
 
 def run_google_gpt(
