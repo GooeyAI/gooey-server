@@ -57,27 +57,27 @@ class SlackBot(BotInterface):
         if message.get("actions"):
             self.input_type = "interactive"
 
-        try:
-            # Try to find an existing conversation, this could either be a personal channel or the main channel the integration was added to
-            self.convo = Conversation.objects.get(
-                slack_team_id=message["team_id"],
-                slack_channel_id=self.bot_id,
-                slack_user_id=self.user_id,
-            )
+        # Try to find an existing conversation, this could either be a personal channel or the main channel the integration was added to
+        convo = Conversation.objects.filter(
+            slack_team_id=message["team_id"],
+            slack_channel_id=self.bot_id,
+            slack_user_id=self.user_id,
+        ).first()  # if multiple integrations are added to the same channel, we only handle the first one (this should not happen)
+        if convo:
+            self.convo = convo
             bi: BotIntegration = self.convo.bot_integration
-        except Conversation.DoesNotExist:
+        else:
             # No existing conversation, this is not an existing personal channel
             # Try to find the bot integration for this main channel and use it to create a new conversation
             bi: BotIntegration = BotIntegration.objects.get(
                 slack_team_id=message["team_id"], slack_channel_id=self.bot_id
             )
-            self.convo = Conversation(
-                bot_integration=bi,
+            self.convo, _ = Conversation.objects.get_or_create(
                 slack_user_id=self.user_id,
-                slack_team_id=message["team_id"],
+                slack_team_id=bi.slack_team_id,
                 slack_channel_id=self.bot_id,
+                bot_integration=bi,
             )
-            self.convo.save()
         self.name = bi.name
         self.slack_access_token = bi.slack_access_token
         self.read_msg = bi.slack_read_receipt_msg.strip()
