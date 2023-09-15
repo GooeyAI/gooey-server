@@ -586,6 +586,10 @@ class Conversation(models.Model):
 
     get_display_name.short_description = "User"
 
+    @property
+    def is_private_channel(self):
+        return self.slack_channel_id != self.bot_integration.slack_channel_id
+
     def last_active_delta(self) -> datetime.timedelta:
         return abs(self.messages.latest().created_at - self.created_at)
 
