@@ -385,7 +385,7 @@ class BotIntegration(models.Model):
     slack_team_name = models.TextField(
         blank=True,
         default="",
-        help_text="Bot's Slack team/workspace name (only for display, required if platform is Slack)",
+        help_text="Bot's Slack team/workspace name (only for display and if platform is Slack)",
     )
     slack_channel_id = models.CharField(
         max_length=256,
@@ -398,7 +398,7 @@ class BotIntegration(models.Model):
     slack_channel_name = models.TextField(
         blank=True,
         default="",
-        help_text="Bot's Slack channel name (only for display, required if platform is Slack)",
+        help_text="Bot's Slack channel name (only for display and if platform is Slack)",
     )
     slack_channel_hook_url = models.TextField(
         blank=True,
@@ -446,8 +446,11 @@ class BotIntegration(models.Model):
             or self.fb_page_name
             or self.wa_phone_number_id
             or self.fb_page_id
-            or self.slack_team_name + " - " + self.slack_channel_name
         )
+        if self.slack_team_name and self.slack_channel_name:
+            orig_name = (
+                orig_name or self.slack_team_name + " - " + self.slack_channel_name
+            )
         if self.name and orig_name and self.name != orig_name:
             return f"{self.name} ({orig_name})"
         else:

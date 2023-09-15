@@ -280,7 +280,7 @@ def create_personal_channel(
             "channel": personal_channel_id,
             "topic": "Your personal conversation with "
             + bi.name
-            + ". This has a separate conversation history from the main channel and people in the Workspace can't see what you are asking.",
+            + ". This is a separate conversation history from the main channel and people in the Workspace can't see what you are asking.",
         },
         headers={
             "Authorization": f"Bearer {token}",

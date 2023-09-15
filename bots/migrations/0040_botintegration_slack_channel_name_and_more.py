@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             field=models.TextField(
                 blank=True,
                 default="",
-                help_text="Bot's Slack channel name (only for display, required if platform is Slack)",
+                help_text="Bot's Slack channel name (only for display and if platform is Slack)",
             ),
         ),
         migrations.AddField(
@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
             field=models.TextField(
                 blank=True,
                 default="",
-                help_text="Bot's Slack team/workspace name (only for display, required if platform is Slack)",
+                help_text="Bot's Slack team/workspace name (only for display and if platform is Slack)",
             ),
         ),
     ]
