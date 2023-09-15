@@ -272,6 +272,19 @@ def create_personal_channel(
         is_private=True,
         token=token,
     )
+    res = requests.post(
+        "https://slack.com/api/conversations.setTopic",
+        json={
+            "channel": personal_channel_id,
+            "topic": "Your personal conversation with "
+            + bi.name
+            + ". This has a separate conversation history from the main channel and people in the Workspace can't see what you are asking.",
+        },
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+    res.raise_for_status()
     _, created = Conversation.objects.get_or_create(
         slack_user_id=user_id,
         slack_team_id=team_id,

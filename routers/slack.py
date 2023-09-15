@@ -38,6 +38,7 @@ slack_connect_url = furl(
                 "groups:read",
                 "groups:write",
                 "groups:write.invites",
+                "groups:write.topic",
                 "incoming-webhook",
                 "remote_files:read",
                 "remote_files:share",
