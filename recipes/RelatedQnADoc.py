@@ -140,15 +140,15 @@ def run_doc_search(
 
 
 def render_qna_outputs(state, height, show_count=None):
-    output_queries = state.get("output_queries", [])
-    for output in output_queries[:show_count]:
-        output_text = output.get("output_text", [])
+    output_queries = state.get("output_queries", [])[:show_count]
+    for i, result in enumerate(output_queries):
+        output_text = result.get("output_text", [])
         if not output_text:
             continue
-        references = output.get("references", [])
-        st.write(f"**{output.get('search_query')}**")
+        references = result.get("references", [])
+        st.write(f"##### _{i + 1}. {result.get('search_query')}_")
         render_output_with_refs(
             {"output_text": output_text, "references": references}, height
         )
         render_sources_widget(references)
-        st.write("---")
+        st.write("<br>")

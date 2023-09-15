@@ -15,6 +15,12 @@ T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]
 
 
+def _default_format(value: typing.Any) -> str:
+    if value is None:
+        return "---"
+    return str(value)
+
+
 def dummy(*args, **kwargs):
     return state.NestingCtx()
 
@@ -239,10 +245,13 @@ def text_area(
     if label_visibility != "visible":
         label = None
     if disabled:
-        style.setdefault("height", f"{height}px"),
+        max_height = f"{height}px"
+        rows = nrows_for_text(value, height, min_rows=1)
     else:
-        style.setdefault("maxHeight", "90vh"),
-        props.setdefault("rows", nrows_for_text(value, height))
+        max_height = "90vh"
+        rows = nrows_for_text(value, height)
+    style.setdefault("maxHeight", max_height)
+    props.setdefault("rows", rows)
     state.RenderTreeNode(
         name="textarea",
         props=dict(
@@ -276,7 +285,7 @@ def nrows_for_text(
 def multiselect(
     label: str,
     options: typing.Sequence[T],
-    format_func: typing.Callable[[T], typing.Any] = str,
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
     key: str = None,
     help: str = None,
     allow_none: bool = False,
@@ -317,7 +326,7 @@ def multiselect(
 def selectbox(
     label: str,
     options: typing.Sequence[T],
-    format_func: typing.Callable[[T], typing.Any] = str,
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
     key: str = None,
     help: str = None,
     *,
@@ -333,7 +342,7 @@ def selectbox(
     if not key:
         key = md5_values("select", label, options, help, label_visibility)
     value = state.session_state.get(key)
-    if value not in options:
+    if key not in state.session_state or value not in options:
         value = default_value or options[0]
     state.session_state.setdefault(key, value)
     state.RenderTreeNode(
@@ -505,7 +514,7 @@ def table(df: "pd.DataFrame"):
 def radio(
     label: str,
     options: typing.Sequence[T],
-    format_func: typing.Callable[[T], typing.Any] = str,
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
     key: str = None,
     help: str = None,
     *,
@@ -518,7 +527,7 @@ def radio(
     if not key:
         key = md5_values("radio", label, options, help, label_visibility)
     value = state.session_state.get(key)
-    if value not in options:
+    if key not in state.session_state or value not in options:
         value = options[0]
     state.session_state.setdefault(key, value)
     if label_visibility != "visible":
@@ -663,9 +672,10 @@ def _input_widget(
     default_value_attr: str = "defaultValue",
     **kwargs,
 ) -> typing.Any:
-    if key:
-        assert not value, "only one of value or key can be provided"
-    else:
+    # if key:
+    #     assert not value, "only one of value or key can be provided"
+    # else:
+    if not key:
         key = md5_values("input", input_type, label, help, label_visibility)
     value = state.session_state.setdefault(key, value)
     if label_visibility != "visible":

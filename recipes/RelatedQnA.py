@@ -55,6 +55,24 @@ class RelatedQnAPage(BasePage):
     def validate_form_v2(self):
         GoogleGPTPage.validate_form_v2(self)
 
+    def render_steps(self):
+        serp_results = st.session_state.get(
+            "serp_results", st.session_state.get("scaleserp_results")
+        )
+        if serp_results:
+            st.write("**Web Search Results**")
+            st.json(serp_results)
+
+        output_queries = st.session_state.get("output_queries", [])
+        for i, result in enumerate(output_queries):
+            st.write("---")
+            st.write(f"##### {i+1}. _{result.get('search_query')}_")
+            serp_results = result.get("serp_results", result.get("scaleserp_results"))
+            if serp_results:
+                st.write("**Web Search Results**")
+                st.json(serp_results)
+            render_doc_search_step(result)
+
     def render_output(self):
         render_qna_outputs(st.session_state, 300)
 
@@ -83,24 +101,6 @@ class RelatedQnAPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return 'Input your Google Search query and discover related Q&As that your audience is asking, so you can create content that is more relevant and engaging. This workflow finds the related queries (aka "People also ask") for your Google search, browses through the URL you provide for all related results from your query and finally, generates cited answers from those results. A great way to quickly improve your website\'s SEO rank if you already rank well for a given query.'
-
-    def render_steps(self):
-        serp_results = st.session_state.get(
-            "serp_results", st.session_state.get("scaleserp_results")
-        )
-        if serp_results:
-            st.write("**Web Search Results**")
-            st.json(serp_results)
-
-        output_queries = st.session_state.get("output_queries", [])
-        for i, result in enumerate(output_queries):
-            st.write("---")
-            st.write(f"##### {i+1}. _{result.get('search_query')}_")
-            serp_results = result.get("serp_results", result.get("scaleserp_results"))
-            if serp_results:
-                st.write("**Web Search Results**")
-                st.json(serp_results)
-            render_doc_search_step(result)
 
     def run_v2(
         self,
