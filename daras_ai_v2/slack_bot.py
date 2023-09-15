@@ -112,7 +112,6 @@ class SlackBot(BotInterface):
             data=data,
             content_type=mime_type,
         )
-        # print("found audio url: " + audio_url)
         return audio_url
 
     def get_interactive_msg_info(self) -> tuple[str, str]:
@@ -212,7 +211,6 @@ def yield_member_ids(
     )
     res.raise_for_status()
     res = res.json()
-    print(res)
     if res.get("ok"):
         for member in res["members"]:
             yield member
@@ -227,7 +225,6 @@ def create_personal_channels(
     token: str,
     bi: BotIntegration,
 ):
-    print("creating personal channels")
     main_channel_id = bi.slack_channel_id
     main_channel_name = bi.slack_channel_name
     team_id = bi.slack_team_id
@@ -239,8 +236,6 @@ def create_personal_channels(
         + " team: "
         + team_id
     )
-    print("for users:")
-    print(list(yield_member_ids(main_channel_id, token)))
     for user_id in yield_member_ids(main_channel_id, token):
         create_personal_channel(
             user_id=user_id,
@@ -441,7 +436,6 @@ def send_confirmation_msg(bot: BotIntegration):
         target_language=bot.user_language,
         source_language="en",
     )[0]
-    print("confirmation msg: " + text)
     res = requests.post(
         str(bot.slack_channel_hook_url),
         json={"text": text},
@@ -458,4 +452,3 @@ def invite_bot_account_to_channel(channel: str, bot_user_id: str, token: str):
         },
     )
     res.raise_for_status()
-    print("invited " + bot_user_id + " to " + channel)
