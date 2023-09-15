@@ -17,6 +17,8 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.pt import PromptTree
 
+DEFAULT_SMARTGPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/e02d1582-538a-11ee-9d7b-02420a000194/smartgpt%201.png.png"
+
 
 class SmartGPTPage(BasePage):
     title = "SmartGPT"
@@ -44,6 +46,9 @@ class SmartGPTPage(BasePage):
         output_text: list[str]
 
         prompt_tree: PromptTree | None
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_SMARTGPT_META_IMG
 
     def render_form_v2(self):
         st.text_area(

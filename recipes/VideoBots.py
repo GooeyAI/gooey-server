@@ -59,6 +59,8 @@ from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
 
+DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c8b24b0c-538a-11ee-a1a3-02420a00018d/meta%20tags1%201.png.png"
+
 BOT_SCRIPT_RE = re.compile(
     # start of line
     r"^"
@@ -253,6 +255,9 @@ class VideoBotsPage(BasePage):
         references: list[SearchReference] | None
         final_search_query: str | None
         final_keyword_query: str | None
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_COPILOT_META_IMG
 
     def related_workflows(self):
         from recipes.LipsyncTTS import LipsyncTTSPage

@@ -16,7 +16,7 @@ from recipes.DocSearch import render_doc_search_step, EmptySearchResults
 from recipes.GoogleGPT import GoogleGPTPage
 from recipes.RelatedQnADoc import render_qna_outputs
 
-DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
+DEFAULT_SEO_CONTENT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9b415768-5393-11ee-a837-02420a000190/RQnA%20SEO%20content%201.png.png"
 
 
 class RelatedGoogleGPTResponse(GoogleGPTPage.ResponseModel):
@@ -45,6 +45,9 @@ class RelatedQnAPage(BasePage):
     class ResponseModel(BaseModel):
         output_queries: list[RelatedGoogleGPTResponse]
         serp_results: dict
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_SEO_CONTENT_META_IMG
 
     def render_description(self) -> str:
         return "This workflow gets the related queries for your Google search, searches your custom domain and builds answers using the results and GPT."
