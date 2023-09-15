@@ -73,7 +73,7 @@ class BotIntegrationAdminForm(forms.ModelForm):
                     "--show-on-1": "fb_page_id,fb_page_name,fb_page_access_token",
                     "--show-on-2": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username",
                     "--show-on-3": "wa_phone_number,wa_phone_number_id",
-                    "--show-on-4": "slack_channel_id,slack_channel_hook_url,slack_access_token",
+                    "--show-on-4": "slack_team_id,slack_team_name,slack_channel_id,slack_channel_name,slack_channel_hook_url,slack_access_token,slack_read_receipt_msg",
                 },
             ),
         }
@@ -112,7 +112,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
     readonly_fields = [
         "fb_page_access_token",
         "slack_access_token",
-        "view_analysis_results",
+        # "view_analysis_results",
         "view_conversations",
         "view_messsages",
         "created_at",
@@ -146,6 +146,10 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     "slack_channel_id",
                     "slack_channel_hook_url",
                     "slack_access_token",
+                    "slack_read_receipt_msg",
+                    "slack_team_id",
+                    "slack_team_name",
+                    "slack_channel_name",
                 ]
             },
         ),
@@ -166,7 +170,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                 "fields": [
                     "show_feedback_buttons",
                     "analysis_run",
-                    "view_analysis_results",
+                    # "view_analysis_results",
                 ]
             },
         ),
