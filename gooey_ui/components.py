@@ -26,8 +26,11 @@ plotly_chart = dummy
 dataframe = dummy
 
 
-def countdown_timer(duration: int = 10):
-    return _node("countdown-timer", duration=duration)
+def countdown_timer(
+    duration: int = 10,
+    text: str = "Please wait a bit! Your run is taking longer than we expected.",
+):
+    return _node("countdown-timer", duration=duration, text=text)
 
 
 def nav_tabs():

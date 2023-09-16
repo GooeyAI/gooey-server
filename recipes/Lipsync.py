@@ -20,6 +20,7 @@ from io import BytesIO
 
 CREDITS_PER_MB = 2
 MODEL_RUNTIME_PER_SEC_AUDIO = 0.2
+audio_length_cache = {}
 
 
 class LipsyncPage(BasePage):
@@ -72,7 +73,10 @@ class LipsyncPage(BasePage):
         )
 
         st.markdown("Estimated time to complete:")
-        st.countdown_timer(duration=int(estimated_runtime_seconds))
+        st.countdown_timer(
+            duration=int(estimated_runtime_seconds),
+            text="Please wait a bit! Your run is taking longer than we expected.",
+        )
         if self.request.user.email:
             st.markdown(
                 f"We'll email {self.request.user.email} when your workflow is done."
@@ -169,12 +173,17 @@ class LipsyncPage(BasePage):
 
 
 def get_audio_length(url):
+    if url in audio_length_cache:
+        return audio_length_cache[url]
+
     try:
         response = requests.get(url)
         if response.status_code == 200:
             audio_data = BytesIO(response.content)
             audio = AudioSegment.from_file(audio_data)
             duration_in_seconds = len(audio) / 1000
+
+            audio_length_cache[url] = duration_in_seconds
             return duration_in_seconds
         else:
             return None

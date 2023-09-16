@@ -424,7 +424,10 @@ Choose fps for the video.
         max_frames = st.session_state.get("max_frames", 20)
         estimated_runtime_seconds = max_frames * MODEL_RUNTIME_PER_FRAME
         st.markdown("Estimated time to complete:")
-        st.countdown_timer(duration=estimated_runtime_seconds)
+        st.countdown_timer(
+            duration=int(estimated_runtime_seconds),
+            text="Please wait a bit! Your run is taking longer than we expected.",
+        )
         if self.request.user.email:
             st.markdown(
                 f"We'll email {self.request.user.email} when your workflow is done."
