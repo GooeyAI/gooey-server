@@ -159,6 +159,7 @@ class SlackBot(BotInterface):
             channel=self.bot_id,
             thread_ts=self.input_message["thread_ts"],
             token=self.slack_access_token,
+            username=self.name,
         )
 
 
