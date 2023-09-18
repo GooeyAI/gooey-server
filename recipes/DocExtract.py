@@ -21,7 +21,7 @@ from daras_ai_v2.asr import (
     run_google_translate,
     audio_url_to_wav,
 )
-from daras_ai_v2.azure_doc_extract import azure_pdf_extract
+from daras_ai_v2.azure_doc_extract import azure_doc_extract_pages
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -376,7 +376,7 @@ def process_source(
             transcript = run_asr(content_url, request.selected_asr_model)
         elif "application/pdf" in doc_meta.mime_type:
             yield "Extracting PDF"
-            transcript = str(azure_pdf_extract(content_url)[0])
+            transcript = str(azure_doc_extract_pages(content_url)[0])
         else:
             raise NotImplementedError(
                 f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"
