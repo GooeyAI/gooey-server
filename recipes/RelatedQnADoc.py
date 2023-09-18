@@ -1,20 +1,13 @@
-import typing
-
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.doc_search_settings_widgets import document_uploader
-from daras_ai_v2.functional import map_parallel, apply_parallel
+from daras_ai_v2.functional import apply_parallel
 from daras_ai_v2.language_model import LargeLanguageModels
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
-from daras_ai_v2.prompt_vars import prompt_vars_widget
-from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import CitationStyles
 from daras_ai_v2.serp_search import get_related_questions_from_serp_api
 from daras_ai_v2.serp_search_locations import (
-    serp_search_settings,
     SerpSearchLocation,
     SerpSearchType,
 )
@@ -47,7 +40,6 @@ class RelatedQnADocPage(BasePage):
         pass
 
     class ResponseModel(BaseModel):
-        final_search_query: str
         output_queries: list[RelatedDocSearchResponse]
         serp_results: dict
 
@@ -91,12 +83,6 @@ class RelatedQnADocPage(BasePage):
         return 'This workflow finds the related queries (aka "People also ask") for a Google search, searches your doc, pdf or file (from a URL or via an upload) and then generates answers using vector DB results from your docs.'
 
     def render_steps(self):
-        final_search_query = st.session_state.get("final_search_query")
-        if final_search_query:
-            st.text_area(
-                "**Final Search Query**", value=final_search_query, disabled=True
-            )
-
         serp_results = st.session_state.get(
             "serp_results", st.session_state.get("scaleserp_results")
         )
@@ -115,21 +101,12 @@ class RelatedQnADocPage(BasePage):
         request: "RelatedQnADocPage.RequestModel",
         response: "RelatedQnADocPage.ResponseModel",
     ):
-        query_instructions = (request.query_instructions or "").strip()
-        if query_instructions:
-            yield "Generating final search query..."
-            response.final_search_query = generate_final_search_query(
-                request=request, response=response, instructions=query_instructions
-            )
-        else:
-            response.final_search_query = request.search_query
-
         yield "Googling Related Questions..."
         (
             response.serp_results,
             related_questions,
         ) = get_related_questions_from_serp_api(
-            response.final_search_query,
+            request.search_query,
             search_location=request.serp_search_location,
         )
 
@@ -143,7 +120,7 @@ class RelatedQnADocPage(BasePage):
             message=f"Generating answers using {LargeLanguageModels[request.selected_model].value}...",
         )
         if not response.output_queries:
-            raise EmptySearchResults(response.final_search_query)
+            raise EmptySearchResults(request.search_query)
 
 
 def run_doc_search(

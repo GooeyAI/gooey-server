@@ -122,10 +122,8 @@ class DocSearchPage(BasePage):
             height=300,
         )
         st.write("---")
-
         language_model_settings()
         st.write("---")
-
         doc_search_settings()
 
     def preview_image(self, state: dict) -> str | None:

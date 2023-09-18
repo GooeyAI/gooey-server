@@ -177,6 +177,7 @@ class VideoBotsPage(BasePage):
         "documents": [],
         "task_instructions": "Make sure to use only the following search results to guide your response. "
         'If the Search Results do not contain enough information, say "I don\'t know".',
+        "query_instructions": "<Chat History> \n{{ messages }} \n\n<Last Message> \n{{ input_prompt }} \n\n<Instructions> \nGiven the conversation, only rephrase the last message to be a standalone statement in 2nd person's perspective. Make sure you include only the relevant parts of the conversation required to answer the follow-up question, and not the answer to the question. If the conversation is irrelevant to the current question being asked, discard it. Don't use quotes in your response. \n\n<Query Sentence>",
         "max_references": 3,
         "max_context_words": 200,
         "scroll_jump": 5,

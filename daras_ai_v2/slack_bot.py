@@ -181,6 +181,7 @@ class SlackBot(BotInterface):
             if not self.convo.slack_use_threads
             else self.input_message["thread_ts"],
             token=self.slack_access_token,
+            username=self.name,
         )
 
 

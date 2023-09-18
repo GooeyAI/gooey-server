@@ -139,13 +139,12 @@ class GoogleGPTPage(BasePage):
             key="task_instructions",
             height=300,
         )
-
-        language_model_settings()
-        doc_search_settings(asr_allowed=False)
-
         st.write("---")
-
+        language_model_settings()
+        st.write("---")
         serp_search_settings()
+        st.write("---")
+        doc_search_settings(asr_allowed=False)
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage
@@ -226,18 +225,18 @@ class GoogleGPTPage(BasePage):
         yield "Googling..."
         if request.site_filter:
             f = furl(request.site_filter)
-            serp_search_query = f"site:{f.host}{f.path} {response.final_search_query}"
-        else:
-            serp_search_query = response.final_search_query
+            response.final_search_query = (
+                f"site:{f.host}{f.path} {response.final_search_query}"
+            )
         response.serp_results, links = get_links_from_serp_api(
-            serp_search_query,
+            response.final_search_query,
             search_type=request.serp_search_type,
             search_location=request.serp_search_location,
         )
         # extract links & their corresponding titles
         link_titles = {item.url: f"{item.title} | {item.snippet}" for item in links}
         if not link_titles:
-            raise EmptySearchResults(serp_search_query)
+            raise EmptySearchResults(response.final_search_query)
 
         # run vector search on links
         response.references = yield from get_top_k_references(
@@ -245,7 +244,7 @@ class GoogleGPTPage(BasePage):
                 {
                     **request.dict(),
                     "documents": list(link_titles.keys()),
-                    "search_query": response.final_search_query,
+                    "search_query": request.search_query,
                 },
             ),
         )
