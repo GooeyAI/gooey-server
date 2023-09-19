@@ -619,11 +619,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
-                yield "Exctracting keywords..."
+                yield "Extracting keywords..."
                 state["final_keyword_query"] = generate_final_search_query(
                     request=request,
                     instructions=keyword_instructions,
-                    context={**state, "messages": chat_history},
+                    context={**state, "messages": f'{user_prompt["role"]}: """{user_prompt["content"]}"""'},
                 )
 
             # perform doc search

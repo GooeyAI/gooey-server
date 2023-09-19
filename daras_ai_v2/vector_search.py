@@ -124,12 +124,13 @@ def get_top_k_references(
     if sparse_weight:
         # get sparse scores
         tokenized_corpus = [
-            bm25_tokenizer(ref["title"]) + bm25_tokenizer(ref["snippet"])
+            bm25_tokenizer(ref["title"], n_gram=2)
+            + bm25_tokenizer(ref["snippet"], n_gram=2)
             for ref, _ in embeds
         ]
         bm25 = BM25Okapi(tokenized_corpus, k1=2, b=0.3)
         sparse_query_tokenized = bm25_tokenizer(
-            request.keyword_query or request.search_query
+            request.keyword_query or request.search_query, n_gram=2
         )
         if sparse_query_tokenized:
             sparse_scores = np.array(bm25.get_scores(sparse_query_tokenized))
@@ -175,8 +176,17 @@ def get_top_k_references(
 bm25_split_re = re.compile(rf"[{puncts}\s]")
 
 
-def bm25_tokenizer(text: str) -> list[str]:
-    return [t for t in bm25_split_re.split(text.lower()) if t]
+def bm25_tokenizer(text: str, n_gram=2) -> list[str]:
+    tokens = bm25_split_re.split(text.lower())
+    n_grams = []
+
+    n_grams.extend(tokens)
+    if n_gram == 2:
+        for i in range(len(tokens) - 1):
+            n_gram_text = " ".join(tokens[i:i + 2])
+            n_grams.append(n_gram_text)
+    
+    return n_grams
 
 
 def references_as_prompt(references: list[SearchReference], sep="\n\n") -> str:
