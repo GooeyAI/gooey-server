@@ -10,13 +10,13 @@ from starlette.background import BackgroundTasks
 from starlette.responses import RedirectResponse, HTMLResponse
 
 from bots.models import BotIntegration, Platform
+from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
 from daras_ai_v2.slack_bot import (
     SlackBot,
     SlackMessage,
     invite_bot_account_to_channel,
-    create_personal_channels_for_all_members,
     create_personal_channel,
     SlackAPIError,
     fetch_user_info,
@@ -130,7 +130,7 @@ def slack_connect_redirect(request: Request):
             bi.refresh_from_db()
 
     if bi.slack_create_personal_channels:
-        create_personal_channels_for_all_members(bi)
+        create_personal_channels_for_all_members.delay(bi.id)
 
     return HTMLResponse(
         f"Sucessfully Connected to {slack_team_name} workspace on #{slack_channel_name}! You may now close this page."

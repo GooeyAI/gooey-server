@@ -10,7 +10,7 @@ from requests import Response
 from sentry_sdk import capture_exception
 
 from bots.models import BotIntegration, Platform, Conversation
-from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_response
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
 from daras_ai_v2.bots import BotInterface
 from daras_ai_v2.functional import fetch_parallel
@@ -207,11 +207,6 @@ def delete_msg(
     parse_slack_response(res)
 
 
-def create_personal_channels_for_all_members(bi: BotIntegration):
-    for user in fetch_channel_members(bi.slack_channel_id, bi.slack_access_token):
-        create_personal_channel(bi, user)
-
-
 def fetch_channel_members(
     channel: str,
     token: str,
@@ -227,7 +222,9 @@ def fetch_channel_members(
     )
     data = parse_slack_response(res)
     yield from fetch_parallel(
-        lambda user_id: fetch_user_info(user_id, token), data["members"]
+        lambda user_id: fetch_user_info(user_id, token),
+        data["members"],
+        max_workers=10,
     )
     cursor = data.get("response_metadata", {}).get("next_cursor")
     if not cursor:
@@ -327,14 +324,21 @@ def create_personal_channel(
         channel_id, channel_name = create_personal_channel_brute_force(
             bi, user_name, max_tries
         )
-    # set the topic and invite the user to the channel
+    try:
+        # set the topic and invite the user to the channel
+        invite_user_to_channel(
+            user_id=user_id,
+            channel_id=channel_id,
+            token=bi.slack_access_token,
+        )
+    except SlackAPIError as e:
+        # skip if the user is restricted
+        if e.error in ["user_is_ultra_restricted", "user_is_restricted"]:
+            return
+        else:
+            raise
     set_slack_channel_topic(
         bot_name=bi.name,
-        channel_id=channel_id,
-        token=bi.slack_access_token,
-    )
-    invite_user_to_channel(
-        user_id=user_id,
         channel_id=channel_id,
         token=bi.slack_access_token,
     )
@@ -605,7 +609,7 @@ def invite_bot_account_to_channel(channel: str, bot_user_id: str, token: str):
 def parse_slack_response(res: Response):
     res.raise_for_status()
     data = res.json()
-    print(">", res.request.url.split("/")[-1] + ":", data)
+    print(f'> {res.request.url.split("/")[-1]}: {data}')
     if data.get("ok"):
         return data
     else:

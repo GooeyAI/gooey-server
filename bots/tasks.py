@@ -3,9 +3,17 @@ import json
 from celery import shared_task
 
 from app_users.models import AppUser
-from bots.models import Message, CHATML_ROLE_ASSISSTANT
-from daras_ai_v2.functional import flatten
+from bots.models import Message, CHATML_ROLE_ASSISSTANT, BotIntegration
+from daras_ai_v2.functional import flatten, map_parallel
+from daras_ai_v2.slack_bot import fetch_channel_members, create_personal_channel
 from daras_ai_v2.vector_search import references_as_prompt
+
+
+@shared_task
+def create_personal_channels_for_all_members(bi_id: int):
+    bi = BotIntegration.objects.get(id=bi_id)
+    users = list(fetch_channel_members(bi.slack_channel_id, bi.slack_access_token))
+    map_parallel(lambda user: create_personal_channel(bi, user), users, max_workers=10)
 
 
 @shared_task
