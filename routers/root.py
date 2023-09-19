@@ -248,6 +248,7 @@ def st_page(
             uid=uid,
             example_id=example_id,
         )
+        + [dict(tagName="link", rel="canonical", href=f"/{latest_slug}/{tab}")]
         # + [
         #     dict(tagName="link", rel="icon", href="/static/favicon.ico"),
         #     dict(tagName="link", rel="stylesheet", href="/static/css/app.css"),
