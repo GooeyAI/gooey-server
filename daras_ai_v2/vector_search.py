@@ -183,9 +183,9 @@ def bm25_tokenizer(text: str, n_gram=2) -> list[str]:
     n_grams.extend(tokens)
     if n_gram == 2:
         for i in range(len(tokens) - 1):
-            n_gram_text = " ".join(tokens[i:i + 2])
+            n_gram_text = " ".join(tokens[i : i + 2])
             n_grams.append(n_gram_text)
-    
+
     return n_grams
 
 
