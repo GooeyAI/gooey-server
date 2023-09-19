@@ -167,7 +167,7 @@ class BasePage:
 
         root_url = self.app_url(example_id=example_id)
         st.write(
-            f'## <a style="text-decoration: none;" target="_top" href="{root_url}">{st.session_state.get(StateKeys.page_title)}</a>',
+            f'# <a style="text-decoration: none;" target="_top" href="{root_url}">{st.session_state.get(StateKeys.page_title)}</a>',
             unsafe_allow_html=True,
         )
         st.write(st.session_state.get(StateKeys.page_notes))
