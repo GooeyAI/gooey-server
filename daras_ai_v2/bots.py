@@ -182,6 +182,9 @@ def _on_msg(bot: BotInterface):
             else:
                 # set the asr output as the input text
                 input_text = result["output"]["output_text"][0].strip()
+                if not input_text:
+                    bot.send_msg(text=DEFAULT_RESPONSE)
+                    return
                 # send confirmation of asr
                 bot.send_msg(text=AUDIO_ASR_CONFIRMATION.format(input_text))
         case "text":

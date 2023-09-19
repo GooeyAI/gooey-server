@@ -57,7 +57,7 @@ class SlackBot(BotInterface):
         self.input_type = "text"
         files = message.get("files", [])
         if files:
-            self.input_type = files[0].get("media_display_type", "")
+            self.input_type = files[0].get("mimetype", "").split("/")[0]
         if message.get("actions"):
             self.input_type = "interactive"
 
@@ -97,22 +97,23 @@ class SlackBot(BotInterface):
         return self.input_message["text"]
 
     def get_input_audio(self) -> str | None:
+        # get the first input file and its mime type
         files = self.input_message.get("files", [])
         if not files:
             return None
-        url = files[0].get("url_private_download", "")
-        if not url:
+        file = files[0]
+        url = file.get("url_private_download")
+        mime_type = file.get("mimetype")
+        if not (url and mime_type):
             return None
+        assert (
+            "audio/" in mime_type or "video/" in mime_type
+        ), f"Unsupported mime type {mime_type} for {url}"
         # download file from slack
         r = requests.get(
             url, headers={"Authorization": f"Bearer {self.slack_access_token}"}
         )
         r.raise_for_status()
-        # ensure file is audio/video
-        mime_type = get_mimetype_from_response(r)
-        assert (
-            "audio/" in mime_type or "video/" in mime_type
-        ), f"Invalid mime type {mime_type} for {url}"
         # convert to wav
         data, _ = audio_bytes_to_wav(r.content)
         mime_type = "audio/wav"
