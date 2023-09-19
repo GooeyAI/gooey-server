@@ -875,7 +875,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
             billing_account_uid=self.request.user.uid
-        ).order_by("platform")
+        ).order_by("platform", "-created_at")
         if not integrations:
             return
 
@@ -902,23 +902,39 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     with st.expander("📨 Slack Settings"):
                         read_receipt_key = "slack_read_receipt_" + str(bi.id)
                         st.session_state.setdefault(
-                            read_receipt_key,
-                            bi.slack_read_receipt_msg,
+                            read_receipt_key, bi.slack_read_receipt_msg
                         )
                         read_msg = st.text_input(
                             "Read Receipt (leave blank to disable)",
                             key=read_receipt_key,
                             placeholder=bi.slack_read_receipt_msg,
                         )
+                        bot_name_key = "slack_bot_name_" + str(bi.id)
+                        st.session_state.setdefault(bot_name_key, bi.name)
+                        bot_name = st.text_input(
+                            "Channel Specific Bot Name (to be displayed in Slack)",
+                            key=bot_name_key,
+                            placeholder=bi.name,
+                        )
+                        if st.button("Reset to Default"):
+                            bi.name = st.session_state.get(
+                                StateKeys.page_title, bi.name
+                            )
+                            bi.slack_read_receipt_msg = BotIntegration._meta.get_field(
+                                "slack_read_receipt_msg"
+                            ).default
+                            bi.save()
+                            st.experimental_rerun()
                         if st.button("Update"):
                             bi.slack_read_receipt_msg = read_msg
+                            bi.name = bot_name
                             bi.save()
+                            st.experimental_rerun()
             if not pressed:
                 continue
             if is_connected:
                 bi.saved_run = None
             else:
-                bi.name = st.session_state.get(StateKeys.page_title, bi.name)
                 bi.saved_run = current_sr
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg

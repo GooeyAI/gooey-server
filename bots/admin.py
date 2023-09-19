@@ -69,11 +69,11 @@ class BotIntegrationAdminForm(forms.ModelForm):
         widgets = {
             "platform": forms.Select(
                 attrs={
-                    "--hideshow-fields": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username,wa_phone_number,wa_phone_number_id,slack_channel_id,slack_channel_hook_url,slack_access_token",
+                    "--hideshow-fields": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username,wa_phone_number,wa_phone_number_id,slack_team_id,slack_team_name,slack_channel_id,slack_channel_name,slack_channel_hook_url,slack_access_token,slack_read_receipt_msg,slack_create_personal_channels",
                     "--show-on-1": "fb_page_id,fb_page_name,fb_page_access_token",
                     "--show-on-2": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username",
                     "--show-on-3": "wa_phone_number,wa_phone_number_id",
-                    "--show-on-4": "slack_channel_id,slack_channel_hook_url,slack_access_token",
+                    "--show-on-4": "slack_team_id,slack_team_name,slack_channel_id,slack_channel_name,slack_channel_hook_url,slack_access_token,slack_read_receipt_msg,slack_create_personal_channels",
                 },
             ),
         }
@@ -93,13 +93,16 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "fb_page_id",
         "wa_phone_number",
         "slack_channel_id",
+        "billing_account_uid",
     ]
     list_display = [
-        "__str__",
+        "name",
+        "get_display_name",
         "platform",
         "wa_phone_number",
         "created_at",
         "updated_at",
+        "billing_account_uid",
         "saved_run",
         "analysis_run",
     ]
@@ -112,6 +115,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
     readonly_fields = [
         "fb_page_access_token",
         "slack_access_token",
+        "slack_channel_hook_url",
         "view_analysis_results",
         "view_conversations",
         "view_messsages",
@@ -143,9 +147,14 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     "ig_username",
                     "wa_phone_number",
                     "wa_phone_number_id",
+                    "slack_team_id",
+                    "slack_team_name",
                     "slack_channel_id",
+                    "slack_channel_name",
                     "slack_channel_hook_url",
                     "slack_access_token",
+                    "slack_read_receipt_msg",
+                    "slack_create_personal_channels",
                 ]
             },
         ),
@@ -397,7 +406,7 @@ class MessageAdmin(admin.ModelAdmin):
         "role",
         "created_at",
         "feedbacks",
-        "wa_delivered",
+        "msg_delivered",
     ]
     readonly_fields = [
         "conversation",
@@ -405,7 +414,7 @@ class MessageAdmin(admin.ModelAdmin):
         "content",
         "display_content",
         "created_at",
-        "wa_msg_id",
+        "platform_msg_id",
         "saved_run",
         "analysis_run",
         "prev_msg_content",
@@ -435,7 +444,7 @@ class MessageAdmin(admin.ModelAdmin):
                         "conversation",
                         "role",
                         "created_at",
-                        "wa_msg_id",
+                        "platform_msg_id",
                     ]
                 },
             ),
@@ -480,16 +489,19 @@ class MessageAdmin(admin.ModelAdmin):
         )
         return fieldsets
 
-    def wa_delivered(self, msg: Message):
+    def msg_delivered(self, msg: Message):
         if (
+            # user messages are delivered already
             msg.role != CHATML_ROLE_ASSISSTANT
-            or msg.conversation.bot_integration.platform != Platform.WHATSAPP
+            # we only have delivery status for whatsapp and slack
+            or msg.conversation.bot_integration.platform
+            not in [Platform.WHATSAPP, Platform.SLACK]
         ):
             raise Message.DoesNotExist
-        return bool(msg.wa_msg_id)
+        return bool(msg.platform_msg_id)
 
-    wa_delivered.short_description = "Delivered"
-    wa_delivered.boolean = True
+    msg_delivered.short_description = "Delivered"
+    msg_delivered.boolean = True
 
     def prev_msg_content(self, message: Message):
         prev_msg = message.get_previous_by_created_at()
