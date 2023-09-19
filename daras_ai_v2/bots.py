@@ -157,8 +157,9 @@ def _on_msg(bot: BotInterface):
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
-    # mark message as read
-    bot.mark_read()
+    if bot.input_type != "interactive":
+        # mark message as read
+        bot.mark_read()
     # get the attached billing account
     billing_account_user = AppUser.objects.get_or_create_from_uid(
         bot.billing_account_uid
