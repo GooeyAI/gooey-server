@@ -875,7 +875,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
             billing_account_uid=self.request.user.uid
-        ).order_by("platform")
+        ).order_by("platform", "-created_at")
         if not integrations:
             return
 
@@ -902,8 +902,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     with st.expander("📨 Slack Settings"):
                         read_receipt_key = "slack_read_receipt_" + str(bi.id)
                         st.session_state.setdefault(
-                            read_receipt_key,
-                            bi.slack_read_receipt_msg,
+                            read_receipt_key, bi.slack_read_receipt_msg
                         )
                         read_msg = st.text_input(
                             "Read Receipt (leave blank to disable)",
@@ -911,10 +910,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                             placeholder=bi.slack_read_receipt_msg,
                         )
                         bot_name_key = "slack_bot_name_" + str(bi.id)
-                        st.session_state.setdefault(
-                            bot_name_key,
-                            bi.name,
-                        )
+                        st.session_state.setdefault(bot_name_key, bi.name)
                         bot_name = st.text_input(
                             "Channel Specific Bot Name (to be displayed in Slack)",
                             key=bot_name_key,

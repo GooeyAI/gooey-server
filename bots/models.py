@@ -337,7 +337,7 @@ class BotIntegration(models.Model):
         default=None,
         null=True,
         unique=True,
-        help_text="Bot's Facebook page id (required if platform is Facebook/Instagram)",
+        help_text="Bot's Facebook page id (mandatory)",
     )
     fb_page_name = models.TextField(
         default="",
@@ -347,7 +347,7 @@ class BotIntegration(models.Model):
     fb_page_access_token = models.TextField(
         blank=True,
         default="",
-        help_text="Bot's Facebook page access token (required if platform is Facebook/Instagram)",
+        help_text="Bot's Facebook page access token (mandatory)",
         editable=False,
     )
     ig_account_id = models.CharField(
@@ -356,13 +356,14 @@ class BotIntegration(models.Model):
         default=None,
         null=True,
         unique=True,
-        help_text="Bot's Instagram account id (required if platform is Instagram)",
+        help_text="Bot's Instagram account id (mandatory)",
     )
     ig_username = models.TextField(
         blank=True,
         default="",
         help_text="Bot's Instagram username (only for display)",
     )
+
     wa_phone_number = PhoneNumberField(
         blank=True,
         default="",
@@ -374,47 +375,52 @@ class BotIntegration(models.Model):
         default=None,
         null=True,
         unique=True,
-        help_text="Bot's WhatsApp phone number id (required if platform is WhatsApp)",
+        help_text="Bot's WhatsApp phone number id (mandatory)",
     )
+
     slack_team_id = models.CharField(
         max_length=256,
         blank=True,
-        default="",
-        help_text="Bot's Slack team id (required if platform is Slack)",
+        default=None,
+        null=True,
+        help_text="Bot's Slack team id (mandatory)",
     )
     slack_team_name = models.TextField(
         blank=True,
         default="",
-        help_text="Bot's Slack team/workspace name (only for display and if platform is Slack)",
+        help_text="Bot's Slack team/workspace name (only for display)",
     )
     slack_channel_id = models.CharField(
         max_length=256,
         blank=True,
         default=None,
         null=True,
-        unique=True,
-        help_text="Bot's Slack channel id (required if platform is Slack)",
+        help_text="Bot's Public Slack channel id (mandatory)",
     )
     slack_channel_name = models.TextField(
         blank=True,
         default="",
-        help_text="Bot's Slack channel name (only for display and if platform is Slack)",
+        help_text="Bot's Public Slack channel name without # (only for display)",
     )
     slack_channel_hook_url = models.TextField(
         blank=True,
         default="",
-        help_text="Bot's Slack channel hook url (required if platform is Slack)",
+        help_text="Bot's Slack channel hook url (mandatory)",
     )
     slack_access_token = models.TextField(
         blank=True,
         default="",
-        help_text="Bot's Slack access token (required if platform is Slack)",
+        help_text="Bot's Slack access token (mandatory)",
         editable=False,
     )
     slack_read_receipt_msg = models.TextField(
         blank=True,
         default="Results may take up to 1 minute, we appreciate your patience.",
         help_text="Bot's Slack read receipt message - if set, and platform is Slack, the bot will send this message to mark the user message as read and then delete it when it has a response ready",
+    )
+    slack_create_personal_channels = models.BooleanField(
+        default=True,
+        help_text="If set, the bot will create a personal channel for each user in the public channel",
     )
 
     analysis_run = models.ForeignKey(
@@ -434,27 +440,34 @@ class BotIntegration(models.Model):
 
     class Meta:
         ordering = ["-updated_at"]
+        unique_together = [
+            ("slack_channel_id", "slack_team_id"),
+        ]
         indexes = [
             models.Index(fields=["billing_account_uid", "platform"]),
             models.Index(fields=["fb_page_id", "ig_account_id"]),
         ]
 
     def __str__(self):
-        orig_name = (
+        platform_name = self.get_display_name()
+        if self.name and platform_name and self.name != platform_name:
+            return f"{self.name} ({platform_name})"
+        else:
+            return self.name or platform_name
+
+    def get_display_name(self):
+        return (
             (self.wa_phone_number and self.wa_phone_number.as_international)
             or self.ig_username
             or self.fb_page_name
             or self.wa_phone_number_id
             or self.fb_page_id
-        )
-        if self.slack_team_name and self.slack_channel_name:
-            orig_name = (
-                orig_name or self.slack_team_name + " - " + self.slack_channel_name
+            or " | #".join(
+                filter(None, [self.slack_team_name, self.slack_channel_name])
             )
-        if self.name and orig_name and self.name != orig_name:
-            return f"{self.name} ({orig_name})"
-        else:
-            return self.name or orig_name
+        )
+
+    get_display_name.short_description = "Bot"
 
 
 class ConvoState(models.IntegerChoices):
@@ -509,7 +522,7 @@ class Conversation(models.Model):
         blank=True,
         default="",
         db_index=True,
-        help_text="User's Facebook page id (required if platform is Facebook/Instagram)",
+        help_text="User's Facebook page id (mandatory)",
     )
     fb_page_name = models.TextField(
         default="",
@@ -519,7 +532,7 @@ class Conversation(models.Model):
     fb_page_access_token = models.TextField(
         blank=True,
         default="",
-        help_text="User's Facebook page access token (required if platform is Facebook/Instagram)",
+        help_text="User's Facebook page access token (mandatory)",
         editable=False,
     )
     ig_account_id = models.TextField(
@@ -533,31 +546,48 @@ class Conversation(models.Model):
         default="",
         help_text="User's Instagram username (only for display)",
     )
+
     wa_phone_number = PhoneNumberField(
         blank=True,
         default="",
         db_index=True,
         help_text="User's WhatsApp phone number (required if platform is WhatsApp)",
     )
+
     slack_user_id = models.TextField(
+        max_length=256,
         blank=True,
-        default="",
-        db_index=True,
-        help_text="User's Slack ID (required if platform is Slack)",
+        default=None,
+        null=True,
+        help_text="User's Slack ID (mandatory)",
     )
     slack_team_id = models.TextField(
+        max_length=256,
+        blank=True,
+        default=None,
+        null=True,
+        help_text="Slack team id - redundant with bot integration (mandatory)",
+    )
+    slack_user_name = models.TextField(
         blank=True,
         default="",
-        help_text="Slack team id, duplicate of bot integration value for indexing (required if platform is Slack)",
+        help_text="User's name in slack (only for display)",
     )
     slack_channel_id = models.TextField(
+        max_length=256,
+        blank=True,
+        default=None,
+        null=True,
+        help_text="Slack channel id, can be different than the bot integration's public channel (mandatory)",
+    )
+    slack_channel_name = models.TextField(
         blank=True,
         default="",
-        help_text="Slack channel id, can be different than the bot integration's main channel",
+        help_text="Bot's Slack channel name without # (only for display)",
     )
-    slack_use_threads = models.BooleanField(
-        default=True,
-        help_text="True if bot should reply in threads, otherwise it should post to the top level (required if platform is Slack)",
+    slack_channel_is_personal = models.BooleanField(
+        default=False,
+        help_text="Whether this is a personal slack channel between the bot and the user",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -565,11 +595,20 @@ class Conversation(models.Model):
     objects = ConversationQuerySet.as_manager()
 
     class Meta:
+        unique_together = [
+            ("slack_channel_id", "slack_user_id", "slack_team_id"),
+        ]
         indexes = [
             models.Index(fields=["bot_integration", "fb_page_id", "ig_account_id"]),
             models.Index(fields=["bot_integration", "wa_phone_number"]),
-            models.Index(fields=["bot_integration", "slack_user_id"]),
-            models.Index(fields=["slack_team_id", "slack_user_id", "slack_channel_id"]),
+            models.Index(
+                fields=[
+                    "bot_integration",
+                    "slack_user_id",
+                    "slack_team_id",
+                    "slack_channel_is_personal",
+                ],
+            ),
         ]
 
     def __str__(self):
@@ -580,15 +619,14 @@ class Conversation(models.Model):
             (self.wa_phone_number and self.wa_phone_number.as_international)
             or self.ig_username
             or self.fb_page_name
+            or " in #".join(
+                filter(None, [self.slack_user_name, self.slack_channel_name])
+            )
             or self.fb_page_id
             or self.slack_user_id
         )
 
     get_display_name.short_description = "User"
-
-    @property
-    def is_private_channel(self):
-        return self.slack_channel_id != self.bot_integration.slack_channel_id
 
     def last_active_delta(self) -> datetime.timedelta:
         return abs(self.messages.latest().created_at - self.created_at)
@@ -664,10 +702,10 @@ class Message(models.Model):
         help_text="The saved run that generated this message",
     )
 
-    wa_msg_id = models.TextField(
+    platform_msg_id = models.TextField(
         blank=True,
         default="",
-        help_text="WhatsApp message id (required if platform is WhatsApp)",
+        help_text="The platform's delivered message id",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -41,6 +41,21 @@ def apply_parallel(
         return ret
 
 
+def fetch_parallel(
+    fn: typing.Callable[[T], R],
+    *iterables: typing.Sequence[T],
+    max_workers: int = None,
+) -> typing.Generator[R, None, None]:
+    assert iterables, "fetch_parallel() requires at least one iterable"
+    max_workers = max_workers or max(map(len, iterables))
+    if not max_workers:
+        return
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        fs = [pool.submit(fn, *args) for args in zip(*iterables)]
+        for fut in as_completed(fs):
+            yield fut.result()
+
+
 def flatmap_parallel(
     fn: typing.Callable[[T], list[R]],
     *iterables: typing.Sequence[T],
