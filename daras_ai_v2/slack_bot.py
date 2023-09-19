@@ -43,6 +43,7 @@ class SlackMessage(TypedDict):
 
 class SlackBot(BotInterface):
     _read_msg_id: str | None = None
+    _file: dict | None = None
 
     def __init__(
         self,
@@ -89,11 +90,11 @@ class SlackBot(BotInterface):
         self.input_type = "text"
         files = message.get("files", [])
         if files:
-            file = files[0]  # we only process the first file for now
+            self._file = files[0]  # we only process the first file for now
             # Additional check required to access file info - https://api.slack.com/apis/channels-between-orgs#check_file_info
-            if file.get("file_access") == "check_file_info":
-                file = fetch_file_info(file["id"], bi.slack_access_token)
-            self.input_type = file.get("mimetype", "").split("/")[0] or "unknown"
+            if self._file.get("file_access") == "check_file_info":
+                self._file = fetch_file_info(self._file["id"], bi.slack_access_token)
+            self.input_type = self._file.get("mimetype", "").split("/")[0] or "unknown"
         if message.get("actions"):
             self.input_type = "interactive"
 
@@ -101,13 +102,10 @@ class SlackBot(BotInterface):
         return self.input_message.get("text")
 
     def get_input_audio(self) -> str | None:
-        # get the first input file and its mime type
-        files = self.input_message.get("files", [])
-        if not files:
+        if not self._file:
             return None
-        file = files[0]
-        url = file.get("url_private_download")
-        mime_type = file.get("mimetype")
+        url = self._file.get("url_private_download")
+        mime_type = self._file.get("mimetype")
         if not (url and mime_type):
             return None
         assert (
