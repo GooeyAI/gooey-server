@@ -112,7 +112,7 @@ def send_email_on_completion(page: BasePage, sr: SavedRun):
     ):
         return
     to_address = (
-        AppUser.objects.filter(uid=sr.uid).values_list("email", flat=True).first()
+        AppUser.objects.filter(uid=sr.user.uid).values_list("email", flat=True).first()
     )
     if not to_address:
         return

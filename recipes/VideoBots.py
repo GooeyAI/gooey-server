@@ -874,7 +874,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         st.button("🔄 Refresh")
 
         integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
-            billing_account_uid=self.request.user.uid
+            user=self.request.user
         ).order_by("platform", "-created_at")
         if not integrations:
             return

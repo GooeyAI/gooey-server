@@ -381,14 +381,14 @@ class BasePage:
         return SavedRun.objects.get_or_create(
             workflow=self.workflow,
             run_id__isnull=True,
-            uid__isnull=True,
+            user__isnull=True,
             example_id__isnull=True,
         )[0]
 
     def run_doc_sr(
         self, run_id: str, uid: str, create: bool = False, parent: SavedRun = None
     ) -> SavedRun:
-        config = dict(workflow=self.workflow, uid=uid, run_id=run_id)
+        config = dict(workflow=self.workflow, user__uid=uid, run_id=run_id)
         if create:
             return SavedRun.objects.get_or_create(
                 **config, defaults=dict(parent=parent)
@@ -872,7 +872,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         run_history = list(
             SavedRun.objects.filter(
                 workflow=self.workflow,
-                uid=uid,
+                user=self.request.user,
                 updated_at__lt=before,
             )[:25]
         )

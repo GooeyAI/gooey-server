@@ -108,7 +108,7 @@ def slack_connect_redirect(request: Request):
     config = dict(
         slack_access_token=slack_access_token,
         slack_channel_hook_url=slack_channel_hook_url,
-        billing_account_uid=request.user.uid,
+        user=request.user,
         slack_team_name=slack_team_name,
         slack_channel_name=slack_channel_name,
     )

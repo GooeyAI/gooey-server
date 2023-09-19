@@ -88,8 +88,8 @@ def main():
     saved_runs_qs = SavedRun.objects.filter(
         **time_selector,
         run_id__isnull=False,
-        uid__isnull=False,
-        uid__in=app_users.values("uid"),
+        user__isnull=False,
+        user__uid__in=app_users.values("uid"),
     )
 
     sorted_workflows = list(Workflow)
@@ -147,7 +147,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
                         "created_at": sr.created_at.astimezone(timezone),
                         "workflow": sr.get_workflow_display(),
                         "run_id": sr.run_id,
-                        "uid": sr.uid,
+                        "uid": sr.user.uid,
                         "url": sr.get_app_url(),
                         "run_time": str(sr.run_time),
                         "run_status": sr.run_status,

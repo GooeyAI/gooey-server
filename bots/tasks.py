@@ -28,7 +28,6 @@ def msg_analysis(msg_id: int):
     assert analysis_sr, "bot integration must have an analysis run"
 
     # make the api call
-    billing_account = AppUser.objects.get(uid=bi.billing_account_uid)
     variables = dict(
         user_msg=msg.get_previous_by_created_at().content,
         assistant_msg=msg.content,
@@ -36,7 +35,7 @@ def msg_analysis(msg_id: int):
         references=references_as_prompt(msg.saved_run.state.get("references", [])),
     )
     result, sr = analysis_sr.submit_api_call(
-        current_user=billing_account,
+        current_user=bi.user,
         request_body=dict(variables=variables),
     )
 

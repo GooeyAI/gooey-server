@@ -44,7 +44,7 @@ def fb_connect_redirect(request: Request):
 
     map_parallel(_subscribe_to_page, fb_pages)
     integrations = BotIntegration.objects.reset_fb_pages_for_user(
-        request.user.uid, fb_pages
+        request.user, fb_pages
     )
 
     page_names = ", ".join(map(str, integrations))

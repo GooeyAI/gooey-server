@@ -125,7 +125,21 @@ class SavedRun(models.Model):
     )
     example_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
-    uid = models.CharField(max_length=128, default=None, null=True, blank=True)
+    uid = models.CharField(
+        max_length=128,
+        default=None,
+        null=True,
+        blank=True,
+        help_text="DEPRECATED: use user filed instead",
+    )
+    user = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        default=None,
+        related_name="saved_runs",
+    )
 
     state = models.JSONField(default=dict, blank=True, encoder=PostgresJSONEncoder)
 
@@ -259,7 +273,7 @@ def _parse_dt(dt) -> datetime.datetime | None:
 class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
     def reset_fb_pages_for_user(
-        self, uid: str, fb_pages: list[dict]
+        self, user: AppUser, fb_pages: list[dict]
     ) -> list["BotIntegration"]:
         saved = []
         for fb_page in fb_pages:
@@ -274,7 +288,7 @@ class BotIntegrationQuerySet(models.QuerySet):
                 )
             except BotIntegration.DoesNotExist:
                 bi = BotIntegration(fb_page_id=fb_page_id)
-            bi.billing_account_uid = uid
+            bi.user = user
             bi.fb_page_name = fb_page["name"]
             # bi.fb_user_access_token = user_access_token
             bi.fb_page_access_token = fb_page["access_token"]
@@ -294,7 +308,7 @@ class BotIntegrationQuerySet(models.QuerySet):
         # delete pages that are no longer connected for this user
         self.filter(
             Q(platform=Platform.FACEBOOK) | Q(platform=Platform.INSTAGRAM),
-            billing_account_uid=uid,
+            user=user,
         ).exclude(
             id__in=[bi.id for bi in saved],
         ).delete()
@@ -316,9 +330,18 @@ class BotIntegration(models.Model):
         help_text="The saved run that the bot is based on",
     )
     billing_account_uid = models.TextField(
-        help_text="The gooey account uid where the credits will be deducted from",
+        help_text="DEPRECATED: use user field instead",
         db_index=True,
     )
+    user = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.CASCADE,
+        null=True,
+        default=None,
+        related_name="bot_integrations",
+        help_text="The gooey account uid where the credits will be deducted from",
+    )
+
     user_language = models.TextField(
         default="en",
         help_text="The response language (same as user language in video bots)",
@@ -444,7 +467,7 @@ class BotIntegration(models.Model):
             ("slack_channel_id", "slack_team_id"),
         ]
         indexes = [
-            models.Index(fields=["billing_account_uid", "platform"]),
+            models.Index(fields=["user", "platform"]),
             models.Index(fields=["fb_page_id", "ig_account_id"]),
         ]
 

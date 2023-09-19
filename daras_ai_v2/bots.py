@@ -22,6 +22,7 @@ from daras_ai_v2.asr import AsrModels, run_google_translate
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from gooeysite.bg_db_conn import db_middleware
+from routers.api import submit_api_call
 
 
 async def request_json(request: Request):
@@ -35,7 +36,6 @@ async def request_urlencoded_body(request: Request):
 class BotInterface:
     input_message: dict
     platform: Platform
-    billing_account_uid: str
     page_cls: typing.Type[BasePage] | None
     query_params: dict
     bot_id: str
@@ -76,13 +76,12 @@ class BotInterface:
             self.query_params = self.page_cls.clean_query_params(
                 example_id=bi.saved_run.example_id,
                 run_id=bi.saved_run.run_id,
-                uid=bi.saved_run.uid,
+                uid=bi.saved_run.user.uid,
             )
         else:
             self.page_cls = None
             self.query_params = {}
 
-        self.billing_account_uid = bi.billing_account_uid
         self.language = bi.user_language
         self.show_feedback_buttons = bi.show_feedback_buttons
 
@@ -160,10 +159,6 @@ def _on_msg(bot: BotInterface):
     if bot.input_type != "interactive":
         # mark message as read
         bot.mark_read()
-    # get the attached billing account
-    billing_account_user = AppUser.objects.get_or_create_from_uid(
-        bot.billing_account_uid
-    )[0]
     # get the user's input
     # print("input type:", bot.input_type)
     match bot.input_type:
@@ -173,7 +168,7 @@ def _on_msg(bot: BotInterface):
             return
         case "audio" | "video":
             try:
-                result = _handle_audio_msg(billing_account_user, bot)
+                result = _handle_audio_msg(bot)
                 speech_run = result.get("url")
             except HTTPException as e:
                 traceback.print_exc()
@@ -349,7 +344,7 @@ def _handle_interactive_msg(bot: BotInterface):
     )
 
 
-def _handle_audio_msg(billing_account_user, bot: BotInterface):
+def _handle_audio_msg(bot: BotInterface):
     from recipes.asr import AsrPage
     from routers.api import call_api
 
@@ -374,18 +369,53 @@ def _handle_audio_msg(billing_account_user, bot: BotInterface):
         case _:
             selected_model = AsrModels.whisper_large_v2.name
 
-    result = call_api(
+    # result = call_api(
+    #     page_cls=AsrPage,
+    #     user=bot.convo.bot_integration.user,
+    #     request_body={
+    #         "documents": [input_audio],
+    #         "selected_model": selected_model,
+    #         "google_translate_target": None,
+    #         "language": language,
+    #     },
+    #     query_params={},
+    # )
+    self, result, run_id, uid = submit_api_call(
         page_cls=AsrPage,
-        user=billing_account_user,
         request_body={
             "documents": [input_audio],
             "selected_model": selected_model,
             "google_translate_target": None,
             "language": language,
         },
+        user=bot.convo.bot_integration.user,
         query_params={},
     )
-    return result
+    # wait for the result
+    result.get(disable_sync_subtasks=False)
+    state = self.run_doc_sr(run_id, uid).to_dict()
+    # check for errors
+    return state
+    # err_msg = state.get(StateKeys.error_msg)
+    # if err_msg:
+    #     raise HTTPException(
+    #         status_code=500,
+    #         detail={
+    #             "id": run_id,
+    #             "url": web_url,
+    #             "created_at": created_at,
+    #             "error": err_msg,
+    #         },
+    #     )
+    # else:
+    #     # return updated state
+    #     return {
+    #         "id": run_id,
+    #         "url": web_url,
+    #         "created_at": created_at,
+    #         "output": state,
+    #     }
+    # return result
 
 
 class ButtonIds:

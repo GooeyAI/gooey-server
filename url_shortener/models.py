@@ -21,7 +21,7 @@ class ShortenedURLQuerySet(models.QuerySet):
             SavedRun.objects.get_or_create(
                 workflow=workflow,
                 run_id=run_id,
-                uid=uid,
+                user__uid=uid,
             )[0],
         )
         return surl, created

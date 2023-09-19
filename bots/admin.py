@@ -15,6 +15,8 @@ from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
 from furl import furl
 
+from app_users.admin import AppUserAdmin
+from app_users.models import AppUser
 from bots.admin_links import list_related_html_url, open_in_new_tab, change_obj_url
 from bots.models import (
     FeedbackComment,
@@ -88,7 +90,6 @@ class BotIntegrationAdminForm(forms.ModelForm):
 class BotIntegrationAdmin(admin.ModelAdmin):
     search_fields = [
         "name",
-        "billing_account_uid",
         "user_language",
         "fb_page_id",
         "fb_page_name",
@@ -103,7 +104,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "slack_channel_name",
         "slack_channel_hook_url",
         "slack_access_token",
-    ]
+    ] + ["user__" + field for field in AppUserAdmin.search_fields]
     list_display = [
         "name",
         "get_display_name",
@@ -111,7 +112,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "wa_phone_number",
         "created_at",
         "updated_at",
-        "billing_account_uid",
+        "user",
         "saved_run",
         "analysis_run",
     ]
@@ -119,7 +120,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
     form = BotIntegrationAdminForm
 
-    autocomplete_fields = ["saved_run", "analysis_run"]
+    autocomplete_fields = ["saved_run", "analysis_run", "user"]
 
     readonly_fields = [
         "fb_page_access_token",
@@ -140,6 +141,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     "name",
                     "saved_run",
                     "billing_account_uid",
+                    "user",
                     "user_language",
                 ],
             },
