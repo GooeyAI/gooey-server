@@ -69,7 +69,8 @@ class BotInterface:
         ext = mimetypes.guess_extension(mime_type) or ""
         return f"{self.platform}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
 
-    def _unpack_bot_integration(self, bi: BotIntegration):
+    def _unpack_bot_integration(self):
+        bi = self.convo.bot_integration
         if bi.saved_run:
             self.page_cls = Workflow(bi.saved_run.workflow).page_cls
             self.query_params = self.page_cls.clean_query_params(
@@ -305,6 +306,9 @@ def _handle_interactive_msg(bot: BotInterface):
             try:
                 context_msg = Message.objects.get(platform_msg_id=context_msg_id)
             except Message.DoesNotExist as e:
+                traceback.print_exc()
+                capture_exception(e)
+                # send error msg as repsonse
                 bot.send_msg(text=ERROR_MSG.format(e))
                 return
             if button_id == ButtonIds.feedback_thumbs_up:

@@ -35,7 +35,7 @@ class WhatsappBot(BotInterface):
             bot_integration=bi,
             wa_phone_number="+" + self.user_id,
         )[0]
-        self._unpack_bot_integration(bi)
+        self._unpack_bot_integration()
 
     def get_input_text(self) -> str | None:
         try:
@@ -325,7 +325,7 @@ class FacebookBot(BotInterface):
                 fb_page_id=self.user_id,
                 ig_account_id=self.user_id,
             )[0]
-        self._unpack_bot_integration(bi)
+        self._unpack_bot_integration()
         self.bot_id = bi.fb_page_id
 
         self._access_token = bi.fb_page_access_token
