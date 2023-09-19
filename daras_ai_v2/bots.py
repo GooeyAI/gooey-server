@@ -70,12 +70,17 @@ class BotInterface:
         return f"{self.platform}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
 
     def _unpack_bot_integration(self, bi: BotIntegration):
-        self.page_cls = Workflow(bi.saved_run.workflow).page_cls
-        self.query_params = self.page_cls.clean_query_params(
-            example_id=bi.saved_run.example_id,
-            run_id=bi.saved_run.run_id,
-            uid=bi.saved_run.uid,
-        )
+        if bi.saved_run:
+            self.page_cls = Workflow(bi.saved_run.workflow).page_cls
+            self.query_params = self.page_cls.clean_query_params(
+                example_id=bi.saved_run.example_id,
+                run_id=bi.saved_run.run_id,
+                uid=bi.saved_run.uid,
+            )
+        else:
+            self.page_cls = None
+            self.query_params = {}
+
         self.billing_account_uid = bi.billing_account_uid
         self.language = bi.user_language
         self.show_feedback_buttons = bi.show_feedback_buttons
@@ -177,15 +182,21 @@ def _on_msg(bot: BotInterface):
             else:
                 # set the asr output as the input text
                 input_text = result["output"]["output_text"][0].strip()
+                if not input_text:
+                    bot.send_msg(text=DEFAULT_RESPONSE)
+                    return
                 # send confirmation of asr
                 bot.send_msg(text=AUDIO_ASR_CONFIRMATION.format(input_text))
         case "text":
-            input_text = bot.get_input_text()
+            input_text = (bot.get_input_text() or "").strip()
+            if not input_text:
+                bot.send_msg(text=DEFAULT_RESPONSE)
+                return
         case _:
             bot.send_msg(text=INVALID_INPUT_FORMAT.format(bot.input_type))
             return
     # handle reset keyword
-    if input_text.strip().lower() == RESET_KEYWORD:
+    if input_text.lower() == RESET_KEYWORD:
         # clear saved messages
         bot.convo.messages.all().delete()
         # reset convo state
@@ -274,9 +285,9 @@ def _process_and_send_msg(
     )
     if not msgs_to_save:
         return
-    # save the whatsapp message id for the sent message
-    if bot.platform in [Platform.WHATSAPP, Platform.SLACK] and msg_id:
-        msgs_to_save[-1].wa_msg_id = msg_id
+    # save the message id for the sent message
+    if msg_id:
+        msgs_to_save[-1].platform_msg_id = msg_id
     # save the messages
     for msg in msgs_to_save:
         msg.save()
@@ -292,7 +303,7 @@ def _handle_interactive_msg(bot: BotInterface):
         # handle feedback button press
         case ButtonIds.feedback_thumbs_up | ButtonIds.feedback_thumbs_down:
             try:
-                context_msg = Message.objects.get(wa_msg_id=context_msg_id)
+                context_msg = Message.objects.get(platform_msg_id=context_msg_id)
             except Message.DoesNotExist as e:
                 bot.send_msg(text=ERROR_MSG.format(e))
                 return
@@ -337,6 +348,10 @@ def _handle_audio_msg(billing_account_user, bot: BotInterface):
     from recipes.asr import AsrPage
     from routers.api import call_api
 
+    input_audio = bot.get_input_audio()
+    if not input_audio:
+        raise HTTPException(status_code=400, detail="No audio found in request.")
+
     # run asr
     language = None
     match bot.language.lower():
@@ -353,11 +368,12 @@ def _handle_audio_msg(billing_account_user, bot: BotInterface):
             selected_model = AsrModels.usm.name
         case _:
             selected_model = AsrModels.whisper_large_v2.name
+
     result = call_api(
         page_cls=AsrPage,
         user=billing_account_user,
         request_body={
-            "documents": [bot.get_input_audio()],
+            "documents": [input_audio],
             "selected_model": selected_model,
             "google_translate_target": None,
             "language": language,

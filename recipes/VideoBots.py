@@ -15,6 +15,8 @@ from bots.models import Workflow
 from daras_ai.image_input import (
     truncate_text_words,
 )
+from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
+from daras_ai_v2.query_generator import generate_final_search_query
 from recipes.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
     run_google_translate,
@@ -175,6 +177,7 @@ class VideoBotsPage(BasePage):
         "documents": [],
         "task_instructions": "Make sure to use only the following search results to guide your response. "
         'If the Search Results do not contain enough information, say "I don\'t know".',
+        "query_instructions": "<Chat History> \n{{ messages }} \n\n<Last Message> \n{{ input_prompt }} \n\n<Instructions> \nGiven the conversation, only rephrase the last message to be a standalone statement in 2nd person's perspective. Make sure you include only the relevant parts of the conversation required to answer the follow-up question, and not the answer to the question. If the conversation is irrelevant to the current question being asked, discard it. Don't use quotes in your response. \n\n<Query Sentence>",
         "max_references": 3,
         "max_context_words": 200,
         "scroll_jump": 5,
@@ -232,6 +235,8 @@ class VideoBotsPage(BasePage):
         use_url_shortener: bool | None
 
         user_language: str | None
+
+        variables: dict[str, typing.Any] | None
 
     class ResponseModel(BaseModel):
         final_prompt: str
@@ -302,6 +307,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 ##### 📄 Documents (*optional*)
 Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
 """
+        )
+
+        prompt_vars_widget(
+            "bot_script",
+            "task_instructions",
+            "query_instructions",
+            "keyword_instructions",
         )
 
     def render_usage_guide(self):
@@ -553,9 +565,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         # consturct the system prompt
         if system_message:
-            # add time to prompt
-            utcnow = datetime.datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z")
-            system_message = system_message.replace("{{ datetime.utcnow }}", utcnow)
+            system_message = render_prompt_vars(system_message, state)
             # insert to top
             system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": system_message}
         else:
@@ -596,17 +606,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
                 yield "Generating search query..."
-                query_instructions = jinja2.Template(query_instructions).render(
-                    {**state, "messages": chat_history},
+                state["final_search_query"] = generate_final_search_query(
+                    request=request,
+                    instructions=query_instructions,
+                    context={**state, "messages": chat_history},
                 )
-                state["final_search_query"] = run_language_model(
-                    model=request.selected_model,
-                    prompt=query_instructions,
-                    max_tokens=model_max_tokens[model] // 2,
-                    quality=request.quality,
-                    temperature=request.sampling_temperature,
-                    avoid_repetition=request.avoid_repetition,
-                )[0].strip()
             else:
                 query_msgs.reverse()
                 state["final_search_query"] = "\n---\n".join(
@@ -616,17 +620,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
                 yield "Exctracting keywords..."
-                keyword_instructions = jinja2.Template(keyword_instructions).render(
-                    {**state, "messages": chat_history},
+                state["final_keyword_query"] = generate_final_search_query(
+                    request=request,
+                    instructions=keyword_instructions,
+                    context={**state, "messages": chat_history},
                 )
-                state["final_keyword_query"] = run_language_model(
-                    model=request.selected_model,
-                    prompt=keyword_instructions,
-                    max_tokens=model_max_tokens[model] // 2,
-                    quality=request.quality,
-                    temperature=request.sampling_temperature,
-                    avoid_repetition=request.avoid_repetition,
-                )[0].strip()
 
             # perform doc search
             references = yield from get_top_k_references(
@@ -648,9 +646,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             state["references"] = references
         # if doc search is successful, add the search results to the user prompt
         if references:
+            # add task instructions
+            task_instructions = render_prompt_vars(request.task_instructions, state)
             user_prompt["content"] = (
                 references_as_prompt(references)
-                + f"\n**********\n{request.task_instructions.strip()}\n**********\n"
+                + f"\n**********\n{task_instructions.strip()}\n**********\n"
                 + user_prompt["content"]
             )
 
@@ -875,14 +875,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
             billing_account_uid=self.request.user.uid
-        ).order_by("platform")
+        ).order_by("platform", "-created_at")
         if not integrations:
             return
 
         current_sr = self.get_sr_from_query_params_dict(gooey_get_query_params())
         for bi in integrations:
             is_connected = bi.saved_run == current_sr
-            col1, col2, *_ = st.columns([1, 1, 2])
+            col1, col2, col3, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()
                 st.markdown(
@@ -897,12 +897,44 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     "🔌💔️ Disconnect" if is_connected else "🖇️ Connect",
                     key=f"btn_connect_{bi.id}",
                 )
+            with col3:
+                if bi.platform == Platform.SLACK:
+                    with st.expander("📨 Slack Settings"):
+                        read_receipt_key = "slack_read_receipt_" + str(bi.id)
+                        st.session_state.setdefault(
+                            read_receipt_key, bi.slack_read_receipt_msg
+                        )
+                        read_msg = st.text_input(
+                            "Read Receipt (leave blank to disable)",
+                            key=read_receipt_key,
+                            placeholder=bi.slack_read_receipt_msg,
+                        )
+                        bot_name_key = "slack_bot_name_" + str(bi.id)
+                        st.session_state.setdefault(bot_name_key, bi.name)
+                        bot_name = st.text_input(
+                            "Channel Specific Bot Name (to be displayed in Slack)",
+                            key=bot_name_key,
+                            placeholder=bi.name,
+                        )
+                        if st.button("Reset to Default"):
+                            bi.name = st.session_state.get(
+                                StateKeys.page_title, bi.name
+                            )
+                            bi.slack_read_receipt_msg = BotIntegration._meta.get_field(
+                                "slack_read_receipt_msg"
+                            ).default
+                            bi.save()
+                            st.experimental_rerun()
+                        if st.button("Update"):
+                            bi.slack_read_receipt_msg = read_msg
+                            bi.name = bot_name
+                            bi.save()
+                            st.experimental_rerun()
             if not pressed:
                 continue
             if is_connected:
                 bi.saved_run = None
             else:
-                bi.name = st.session_state.get(StateKeys.page_title, bi.name)
                 bi.saved_run = current_sr
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg

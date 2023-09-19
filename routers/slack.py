@@ -1,19 +1,26 @@
-import requests
-from furl import furl
 import json
 
+import requests
+from django.db import transaction
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
+from furl import furl
 from requests.auth import HTTPBasicAuth
 from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
 from starlette.responses import RedirectResponse, HTMLResponse
 
 from bots.models import BotIntegration, Platform
+from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
-
-from daras_ai_v2.slack_bot import SlackBot, SlackMessage, invite_bot_account_to_channel
-from django.db import transaction
+from daras_ai_v2.slack_bot import (
+    SlackBot,
+    SlackMessage,
+    invite_bot_account_to_channel,
+    create_personal_channel,
+    SlackAPIError,
+    fetch_user_info,
+)
 
 router = APIRouter()
 
@@ -32,10 +39,13 @@ slack_connect_url = furl(
                 "groups:history",
                 "groups:read",
                 "groups:write",
+                "groups:write.invites",
+                "groups:write.topic",
                 "incoming-webhook",
                 "remote_files:read",
                 "remote_files:share",
                 "remote_files:write",
+                "users:read",
             ]
         ),
         user_scope=",".join(
@@ -44,7 +54,6 @@ slack_connect_url = furl(
                 "channels:write.invites",
                 "groups:write",
                 "groups:write.invites",
-                # "chat:write",
             ]
         ),
     ),
@@ -66,49 +75,65 @@ def slack_connect_redirect(request: Request):
             + retry_button,
             status_code=400,
         )
-    res = requests.post(
+    r = requests.post(
         furl(
             "https://slack.com/api/oauth.v2.access",
             query_params=dict(code=code),
         ).url,
         auth=HTTPBasicAuth(settings.SLACK_CLIENT_ID, settings.SLACK_CLIENT_SECRET),
     )
-    res.raise_for_status()
-    print(res.text)
-    res = res.json()
-    slack_access_token = res["access_token"]
-    slack_workspace = res["team"]["name"]
-    slack_channel = res["incoming_webhook"]["channel"]
-    slack_channel_id = res["incoming_webhook"]["channel_id"]
-    slack_channel_hook_url = res["incoming_webhook"]["url"]
-    slack_bot_user_id = res["bot_user_id"]
-    slack_user_access_token = res["authed_user"]["access_token"]
+    r.raise_for_status()
+    print("> slack_connect_redirect:", r.text)
 
-    invite_bot_account_to_channel(
-        slack_channel_id, slack_bot_user_id, slack_user_access_token
-    )
+    data = r.json()
+    slack_access_token = data["access_token"]
+    slack_team_id = data["team"]["id"]
+    slack_team_name = data["team"]["name"]
+    slack_channel_id = data["incoming_webhook"]["channel_id"]
+    slack_channel_name = data["incoming_webhook"]["channel"].strip("#")
+    slack_channel_hook_url = data["incoming_webhook"]["url"]
+    slack_bot_user_id = data["bot_user_id"]
+    slack_user_access_token = data["authed_user"]["access_token"]
+
+    try:
+        invite_bot_account_to_channel(
+            slack_channel_id, slack_bot_user_id, slack_user_access_token
+        )
+    except SlackAPIError as e:
+        capture_exception(e)
+        return HTMLResponse(
+            f"<p>Oh No! Something went wrong here.</p><p>{repr(e)}</p>" + retry_button,
+            status_code=400,
+        )
 
     config = dict(
         slack_access_token=slack_access_token,
         slack_channel_hook_url=slack_channel_hook_url,
         billing_account_uid=request.user.uid,
+        slack_team_name=slack_team_name,
+        slack_channel_name=slack_channel_name,
     )
 
     with transaction.atomic():
         bi, created = BotIntegration.objects.get_or_create(
             slack_channel_id=slack_channel_id,
+            slack_team_id=slack_team_id,
             defaults=dict(
                 **config,
-                name=slack_workspace + " - " + slack_channel,
+                name=f"{slack_team_name} | #{slack_channel_name}",
                 platform=Platform.SLACK,
                 show_feedback_buttons=True,
             ),
         )
         if not created:
             BotIntegration.objects.filter(pk=bi.pk).update(**config)
+            bi.refresh_from_db()
+
+    if bi.slack_create_personal_channels:
+        create_personal_channels_for_all_members.delay(bi.id)
 
     return HTMLResponse(
-        f"Sucessfully Connected to {slack_workspace} workspace on {slack_channel}! You may now close this page."
+        f"Sucessfully Connected to {slack_team_name} workspace on #{slack_channel_name}! You may now close this page."
     )
 
 
@@ -118,28 +143,28 @@ def slack_interaction(
     data: dict = Depends(request_urlencoded_body),
 ):
     data = json.loads(data.get("payload", ["{}"])[0])
-    print("slack_interaction: " + str(data))
+    print("> slack_interaction:", data)
     if not data:
         raise HTTPException(400, "No payload")
     if data["token"] != settings.SLACK_VERIFICATION_TOKEN:
         raise HTTPException(403, "Only accepts requests from Slack")
-    if data["type"] == "block_actions":
-        workspace_id = data["team"]["id"]
-        application_id = data["api_app_id"]
-        bot = SlackBot(
-            SlackMessage(
-                workspace_id=workspace_id,
-                application_id=application_id,
-                channel=data["channel"]["id"],
-                thread_ts=data["container"]["thread_ts"],
-                text="",
-                user=data["user"]["id"],
-                files=[],
-                actions=data["actions"],
-                msg_id=data["container"]["message_ts"],
-            )
+    if data["type"] != "block_actions":
+        return
+    bot = SlackBot(
+        SlackMessage(
+            application_id=data["api_app_id"],
+            channel=data["channel"]["id"],
+            thread_ts=data["container"]["thread_ts"],
+            text="",
+            user_id=data["user"]["id"],
+            # user_name=data["user"]["id"],
+            files=[],
+            actions=data["actions"],
+            msg_id=data["container"]["message_ts"],
+            team_id=data["team"]["id"],
         )
-        background_tasks.add_task(_on_msg, bot)
+    )
+    background_tasks.add_task(_on_msg, bot)
 
 
 @router.post("/__/slack/event/")
@@ -151,41 +176,67 @@ def slack_event(
         raise HTTPException(403, "Only accepts requests from Slack")
     if data["type"] == "url_verification":
         return data["challenge"]
-    print("slack_eventhook: " + str(data))
-    if data["type"] == "event_callback":
-        workspace_id = data["team_id"]
-        application_id = data["api_app_id"]
-        event = data["event"]
-        if event["type"] == "message":
-            if event.get("subtype", "text") not in [
-                "text",
-                "slack_audio",
-                "file_share",
-            ]:
-                print("ignoring message subtype: " + event.get("subtype"))
-                return Response("OK")  # ignore messages from bots, and service messages
-            try:
+    print("> slack_event:", data)
+    _handle_slack_event(data, background_tasks)
+    return Response("OK")
+
+
+def _handle_slack_event(data: dict, background_tasks: BackgroundTasks):
+    if data["type"] != "event_callback":
+        return
+    event = data["event"]
+    if event["type"] != "message":
+        return
+
+    try:
+        match event.get("subtype", "any"):
+            case "channel_join":
+                bi = BotIntegration.objects.get(
+                    slack_channel_id=event["channel"],
+                    slack_team_id=data["team_id"],
+                )
+                if not bi.slack_create_personal_channels:
+                    return
+                try:
+                    user = fetch_user_info(event["user"], bi.slack_access_token)
+                except SlackAPIError as e:
+                    if e.error == "missing_scope":
+                        print(f"Error: Missing scopes for - {event!r}")
+                        capture_exception(e)
+                    else:
+                        raise
+                else:
+                    create_personal_channel(bi, user)
+
+            case "any" | "slack_audio" | "file_share":
+                files = event.get("files", [])
+                if not files:
+                    event.get("messsage", {}).get("files", [])
+                if not files:
+                    attachments = event.get("attachments", [])
+                    files = [
+                        file
+                        for attachment in attachments
+                        for file in attachment.get("files", [])
+                    ]
                 bot = SlackBot(
                     SlackMessage(
-                        workspace_id=workspace_id,
-                        application_id=application_id,
+                        application_id=(data["api_app_id"]),
                         channel=event["channel"],
                         thread_ts=event["event_ts"],
                         text=event.get("text", ""),
-                        user=event["user"],
-                        files=event.get("files", []),
+                        user_id=event["user"],
+                        files=files,
                         actions=[],
                         msg_id=event["ts"],
+                        team_id=event.get("team", data["team_id"]),
                     )
                 )
-            except BotIntegration.DoesNotExist as e:
-                capture_exception(e)
-                print("contacted from an on-monitored channel, ignoring:", e)
-                return Response(
-                    "OK"
-                )  # contacted from a channel that this integration has not been explicitly connected to (we recieve events from all channels in WorkSpace), ignore message
-            background_tasks.add_task(_on_msg, bot)
-    return Response("OK")
+                background_tasks.add_task(_on_msg, bot)
+
+    except BotIntegration.DoesNotExist as e:
+        print(f"Error: contacted from an unknown channel - {e!r}")
+        capture_exception(e)
 
 
 @router.get("/__/slack/redirect/shortcuts/")

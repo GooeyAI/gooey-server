@@ -22,7 +22,7 @@ def get_related_questions_from_serp_api(
         search_type=SerpSearchType.SEARCH,
         search_location=search_location,
     )
-    items = data.get("peopleAlsoAsk", []) + data.get("relatedSearches", [])
+    items = data.get("peopleAlsoAsk", []) or data.get("relatedSearches", [])
     related_questions = [
         q for item in items if (q := item.get("question") or item.get("query"))
     ]

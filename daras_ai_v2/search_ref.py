@@ -202,8 +202,6 @@ def parse_refs(
 
 def render_output_with_refs(state, height):
     output_text = state.get("output_text", [])
-    if output_text:
-        gooey_ui.write("**Answer**")
     for text in output_text:
         html = render_text_with_refs(text, state.get("references", []))
         scrollable_html(html, height=height)

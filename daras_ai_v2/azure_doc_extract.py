@@ -13,11 +13,11 @@ from time import sleep
 auth_headers = {"Ocp-Apim-Subscription-Key": settings.AZURE_FORM_RECOGNIZER_KEY}
 
 
-def azure_pdf_extract(pdf_url: str):
+def azure_doc_extract_pages(pdf_url: str, model_id: str = "prebuilt-layout"):
     r = requests.post(
         str(
             furl(settings.AZURE_FORM_RECOGNIZER_ENDPOINT)
-            / "formrecognizer/documentModels/prebuilt-document:analyze"
+            / f"formrecognizer/documentModels/{model_id}:analyze"
         ),
         params={"api-version": "2023-07-31"},
         headers=auth_headers,
@@ -45,7 +45,6 @@ def azure_pdf_extract(pdf_url: str):
                 sleep(1)
 
 
-@redis_cache_decorator
 def extract_records(result: dict, page_num: int) -> list[dict]:
     table_polys = extract_tables(result, page_num)
     records = []
