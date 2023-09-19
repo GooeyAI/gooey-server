@@ -54,13 +54,6 @@ class SlackBot(BotInterface):
         self.bot_id = message["channel"]
         self.user_id = message["user_id"]
 
-        self.input_type = "text"
-        files = message.get("files", [])
-        if files:
-            self.input_type = files[0].get("mimetype", "").split("/")[0]
-        if message.get("actions"):
-            self.input_type = "interactive"
-
         # Try to find an existing conversation, this could either be a personal channel or the main channel the integration was added to
         try:
             self.convo = Conversation.objects.get(
@@ -93,8 +86,19 @@ class SlackBot(BotInterface):
 
         self._thread_ts = message["thread_ts"]
 
+        self.input_type = "text"
+        files = message.get("files", [])
+        if files:
+            file = files[0]  # we only process the first file for now
+            # Additional check required to access file info - https://api.slack.com/apis/channels-between-orgs#check_file_info
+            if file.get("file_access") == "check_file_info":
+                file = fetch_file_info(file["id"], bi.slack_access_token)
+            self.input_type = file.get("mimetype", "").split("/")[0] or "unknown"
+        if message.get("actions"):
+            self.input_type = "interactive"
+
     def get_input_text(self) -> str | None:
-        return self.input_message["text"]
+        return self.input_message.get("text")
 
     def get_input_audio(self) -> str | None:
         # get the first input file and its mime type
@@ -273,6 +277,16 @@ def fetch_user_info(user_id: str, token: str) -> dict[str, typing.Any]:
     )
     data = parse_slack_response(res)
     return data["user"]
+
+
+def fetch_file_info(file_id: str, token: str) -> dict[str, typing.Any]:
+    res = requests.get(
+        "https://slack.com/api/files.info",
+        params={"file": file_id},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    data = parse_slack_response(res)
+    return data["file"]
 
 
 # https://api.slack.com/methods/conversations.rename#naming

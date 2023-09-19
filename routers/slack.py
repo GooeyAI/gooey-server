@@ -1,8 +1,9 @@
-import requests
-from furl import furl
 import json
 
+import requests
+from django.db import transaction
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
+from furl import furl
 from requests.auth import HTTPBasicAuth
 from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
@@ -11,7 +12,6 @@ from starlette.responses import RedirectResponse, HTMLResponse
 from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
-
 from daras_ai_v2.slack_bot import (
     SlackBot,
     SlackMessage,
@@ -21,7 +21,6 @@ from daras_ai_v2.slack_bot import (
     SlackAPIError,
     fetch_user_info,
 )
-from django.db import transaction
 
 router = APIRouter()
 
@@ -190,7 +189,7 @@ def _handle_slack_event(data: dict, background_tasks: BackgroundTasks):
         return
 
     try:
-        match event.get("subtype", "text"):
+        match event.get("subtype", "any"):
             case "channel_join":
                 bi = BotIntegration.objects.get(
                     slack_channel_id=event["channel"],
@@ -209,7 +208,17 @@ def _handle_slack_event(data: dict, background_tasks: BackgroundTasks):
                 else:
                     create_personal_channel(bi, user)
 
-            case "text" | "slack_audio" | "file_share":
+            case "any" | "slack_audio" | "file_share":
+                files = event.get("files", [])
+                if not files:
+                    event.get("messsage", {}).get("files", [])
+                if not files:
+                    attachments = event.get("attachments", [])
+                    files = [
+                        file
+                        for attachment in attachments
+                        for file in attachment.get("files", [])
+                    ]
                 bot = SlackBot(
                     SlackMessage(
                         application_id=(data["api_app_id"]),
@@ -217,7 +226,7 @@ def _handle_slack_event(data: dict, background_tasks: BackgroundTasks):
                         thread_ts=event["event_ts"],
                         text=event.get("text", ""),
                         user_id=event["user"],
-                        files=event.get("files", []),
+                        files=files,
                         actions=[],
                         msg_id=event["ts"],
                         team_id=event.get("team", data["team_id"]),
