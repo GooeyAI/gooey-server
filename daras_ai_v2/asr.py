@@ -117,7 +117,7 @@ def google_translate_languages() -> dict[str, str]:
     parent = f"projects/{project}/locations/global"
     client = translate.TranslationServiceClient()
     supported_languages = client.get_supported_languages(
-        parent, display_language_code="en"
+        parent=parent, display_language_code="en"
     )
     return {
         lang.language_code: lang.display_name
@@ -126,18 +126,38 @@ def google_translate_languages() -> dict[str, str]:
     }
 
 
+def _get_asr_languages(selected_model: AsrModels) -> set[str]:
+    forced_lang = forced_asr_languages.get(selected_model)
+    if forced_lang:
+        return {forced_lang}
+
+    return asr_supported_languages.get(selected_model, set())
+
+
 def asr_language_selector(
-    selected_model: AsrModels,
+    selected_model: AsrModels | list[AsrModels],
     label="##### Spoken Language",
     key="language",
 ):
-    # don't show language selector for models with forced language
-    forced_lang = forced_asr_languages.get(selected_model)
-    if forced_lang:
-        st.session_state[key] = forced_lang
-        return forced_lang
+    if not isinstance(selected_model, list):
+        selected_model = [selected_model]
+    languages = set.intersection(
+        *[
+            set(
+                map(lambda l: langcodes.Language.get(l).language, _get_asr_languages(m))
+            )
+            for m in selected_model
+        ]
+    )
 
-    options = [None, *asr_supported_languages.get(selected_model, [])]
+    if len(languages) < 1:
+        st.session_state[key] = None
+        return
+    elif len(languages) == 1:
+        st.session_state[key] = languages.pop()
+        return
+
+    options = [None, *languages]
 
     # handle non-canonical language codes
     old_val = st.session_state.get(key)
@@ -264,32 +284,59 @@ def get_google_auth_session():
 
 def run_asr(
     audio_url: str,
-    selected_model: str,
+    selected_model: str | list[str],
     language: str = None,
     output_format: str = "text",
-) -> str | AsrOutputJson:
+) -> str | AsrOutputJson | list[str | AsrOutputJson]:
     """
     Run ASR on audio.
     Args:
         audio_url (str): url of audio to be transcribed.
-        selected_model (str): ASR model to use.
+        selected_model (str): ASR model(s) to use.
         language: language of the audio
         output_format: format of the output
     Returns:
         str: Transcribed text.
     """
-    import google.cloud.speech_v2 as cloud_speech
-    from google.api_core.client_options import ClientOptions
-    from google.cloud.texttospeech_v1 import AudioEncoding
 
-    selected_model = AsrModels[selected_model]
-    output_format = AsrOutputFormat[output_format]
+    if not isinstance(selected_model, list):
+        selected_model = [selected_model]
+    selected_models = [AsrModels[m] for m in selected_model]
+    output_format: AsrOutputFormat = AsrOutputFormat[output_format]
     is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
     if is_youtube_url:
         audio_url, size = download_youtube_to_wav(audio_url)
     else:
         audio_url, size = audio_url_to_wav(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
+
+    outputs = map_parallel(
+        lambda model: _run_asr_one_model(
+            model,
+            output_format,
+            audio_url,
+            language,
+            is_short,
+        ),
+        selected_models,
+    )
+
+    if len(outputs) == 1:
+        return outputs[0]
+    else:
+        return outputs
+
+
+def _run_asr_one_model(
+    selected_model: AsrModels,
+    output_format: AsrOutputFormat,
+    audio_url: str,
+    language: str | None,
+    is_short: bool,
+) -> str | AsrOutputJson:
+    import google.cloud.speech_v2 as cloud_speech
+    from google.api_core.client_options import ClientOptions
+    from google.cloud.texttospeech_v1 import AudioEncoding
 
     if selected_model == AsrModels.deepgram:
         r = requests.post(

@@ -12,14 +12,13 @@ from daras_ai_v2.asr import (
     run_google_translate,
     AsrOutputFormat,
     AsrOutputJson,
-    forced_asr_languages,
     asr_language_selector,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
 )
-from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.enum_selector_widget import enum_selector, enum_multiselect
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
@@ -34,7 +33,9 @@ class AsrPage(BasePage):
 
     class RequestModel(BaseModel):
         documents: list[str]
-        selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
+        selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | list[
+            typing.Literal[tuple(e.name for e in AsrModels)]
+        ] | None
         language: str | None
         google_translate_target: str | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
@@ -79,14 +80,19 @@ class AsrPage(BasePage):
         )
         col1, col2 = st.columns(2, responsive=False)
         with col1:
-            selected_model = enum_selector(
+            if not isinstance(st.session_state.get("selected_model"), list):
+                st.session_state["selected_model"] = [
+                    st.session_state["selected_model"]
+                ]
+            selected_model = enum_multiselect(
                 AsrModels,
-                label="##### ASR Model",
+                label="##### ASR Models",
+                checkboxes=False,
                 key="selected_model",
-                use_selectbox=True,
+                allow_none=False,
             )
         with col2:
-            asr_language_selector(AsrModels[selected_model])
+            asr_language_selector([AsrModels[m] for m in selected_model])
 
     def render_settings(self):
         google_translate_language_selector()
@@ -99,7 +105,18 @@ class AsrPage(BasePage):
         assert st.session_state.get("documents"), "Please provide at least 1 Audio File"
 
     def render_output(self):
-        text_outputs("**Transcription**", key="output_text", height=300)
+        text_outputs(
+            "**Transcription**",
+            key="output_text",
+            height=300,
+            captions=[
+                "Transcribed with " + AsrModels[model].value
+                for _ in st.session_state.get("documents", [])
+                for model in st.session_state.get(
+                    "selected_model", [AsrModels.whisper_large_v2.name]
+                )
+            ],
+        )
 
     def render_example(self, state: dict):
         render_documents(state)
@@ -120,17 +137,28 @@ class AsrPage(BasePage):
         request: AsrPage.RequestModel = self.RequestModel.parse_obj(state)
 
         # Run ASR
-        selected_model = AsrModels[request.selected_model]
-        yield f"Running {selected_model.value}..."
+        selected_models: list[str] = request.selected_model or [
+            AsrModels.whisper_large_v2.name
+        ]
+        if not isinstance(selected_models, list):
+            selected_models = [selected_models]
+        yield f"Running {', '.join([AsrModels[m].value for m in selected_models])}..."
         asr_output = map_parallel(
             lambda audio: run_asr(
                 audio_url=audio,
-                selected_model=request.selected_model,
+                selected_model=selected_models,
                 language=request.language,
                 output_format=request.output_format,
             ),
             request.documents,
         )
+        if len(selected_models) != 1:
+            # flatten
+            asr_output = [out for model_out in asr_output for out in model_out]
+        str_asr_output: list[str] = [
+            out if not isinstance(out, AsrModels) else out.get("text", "").strip()
+            for out in asr_output
+        ]
 
         # Run Translation
         if request.google_translate_target:
@@ -138,11 +166,9 @@ class AsrPage(BasePage):
             state["raw_output_text"] = asr_output
             # Run Translation
             state["output_text"] = run_google_translate(
-                asr_output,
+                str_asr_output,
                 target_language=request.google_translate_target,
-                source_language=forced_asr_languages.get(
-                    selected_model, request.language
-                ),
+                source_language=request.language,
             )
         else:
             # Save the raw ASR text for details view

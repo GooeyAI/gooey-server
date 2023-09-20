@@ -9,6 +9,7 @@ def text_outputs(
     key: str = None,
     value: str = None,
     height: int = 200,
+    captions: list[str] | None = None,
 ):
     value = value or st.session_state.get(key)
     match value:
@@ -24,6 +25,8 @@ def text_outputs(
                     idx=idx,
                     value=str(text),
                 )
+                if captions:
+                    st.caption(captions[idx])
         case _:
             st.div()
 
