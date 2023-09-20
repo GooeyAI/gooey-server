@@ -15,7 +15,6 @@ from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
 from daras_ai_v2.slack_bot import (
     SlackBot,
-    SlackMessage,
     invite_bot_account_to_channel,
     create_personal_channel,
     SlackAPIError,
@@ -151,18 +150,11 @@ def slack_interaction(
     if data["type"] != "block_actions":
         return
     bot = SlackBot(
-        SlackMessage(
-            application_id=data["api_app_id"],
-            channel=data["channel"]["id"],
-            thread_ts=data["container"]["thread_ts"],
-            text="",
-            user_id=data["user"]["id"],
-            # user_name=data["user"]["id"],
-            files=[],
-            actions=data["actions"],
-            msg_id=data["container"]["message_ts"],
-            team_id=data["team"]["id"],
-        )
+        message_ts=data["container"]["message_ts"],
+        team_id=data["team"]["id"],
+        user_id=data["user"]["id"],
+        channel_id=data["channel"]["id"],
+        actions=data["actions"],
     )
     background_tasks.add_task(_on_msg, bot)
 
@@ -181,27 +173,26 @@ def slack_event(
     return Response("OK")
 
 
-def _handle_slack_event(data: dict, background_tasks: BackgroundTasks):
-    if data["type"] != "event_callback":
+def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
+    if event["type"] != "event_callback":
         return
-    event = data["event"]
-    if event["type"] != "message":
+    message = event["event"]
+    if message["type"] != "message":
         return
-
     try:
-        match event.get("subtype", "any"):
+        match message.get("subtype", "any"):
             case "channel_join":
                 bi = BotIntegration.objects.get(
-                    slack_channel_id=event["channel"],
-                    slack_team_id=data["team_id"],
+                    slack_channel_id=message["channel"],
+                    slack_team_id=event["team_id"],
                 )
                 if not bi.slack_create_personal_channels:
                     return
                 try:
-                    user = fetch_user_info(event["user"], bi.slack_access_token)
+                    user = fetch_user_info(message["user"], bi.slack_access_token)
                 except SlackAPIError as e:
                     if e.error == "missing_scope":
-                        print(f"Error: Missing scopes for - {event!r}")
+                        print(f"Error: Missing scopes for - {message!r}")
                         capture_exception(e)
                     else:
                         raise
@@ -209,28 +200,23 @@ def _handle_slack_event(data: dict, background_tasks: BackgroundTasks):
                     create_personal_channel(bi, user)
 
             case "any" | "slack_audio" | "file_share":
-                files = event.get("files", [])
+                files = message.get("files", [])
                 if not files:
-                    event.get("messsage", {}).get("files", [])
+                    message.get("messsage", {}).get("files", [])
                 if not files:
-                    attachments = event.get("attachments", [])
+                    attachments = message.get("attachments", [])
                     files = [
                         file
                         for attachment in attachments
                         for file in attachment.get("files", [])
                     ]
                 bot = SlackBot(
-                    SlackMessage(
-                        application_id=(data["api_app_id"]),
-                        channel=event["channel"],
-                        thread_ts=event["event_ts"],
-                        text=event.get("text", ""),
-                        user_id=event["user"],
-                        files=files,
-                        actions=[],
-                        msg_id=event["ts"],
-                        team_id=event.get("team", data["team_id"]),
-                    )
+                    message_ts=message["ts"],
+                    team_id=message.get("team", event["team_id"]),
+                    channel_id=message["channel"],
+                    user_id=message["user"],
+                    text=message.get("text", ""),
+                    files=files,
                 )
                 background_tasks.add_task(_on_msg, bot)
 

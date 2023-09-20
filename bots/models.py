@@ -704,7 +704,9 @@ class Message(models.Model):
 
     platform_msg_id = models.TextField(
         blank=True,
-        default="",
+        null=True,
+        default=None,
+        unique=True,
         help_text="The platform's delivered message id",
     )
 

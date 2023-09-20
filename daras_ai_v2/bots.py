@@ -69,7 +69,8 @@ class BotInterface:
         ext = mimetypes.guess_extension(mime_type) or ""
         return f"{self.platform}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
 
-    def _unpack_bot_integration(self, bi: BotIntegration):
+    def _unpack_bot_integration(self):
+        bi = self.convo.bot_integration
         if bi.saved_run:
             self.page_cls = Workflow(bi.saved_run.workflow).page_cls
             self.query_params = self.page_cls.clean_query_params(
@@ -156,8 +157,9 @@ def _on_msg(bot: BotInterface):
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
-    # mark message as read
-    bot.mark_read()
+    if bot.input_type != "interactive":
+        # mark message as read
+        bot.mark_read()
     # get the attached billing account
     billing_account_user = AppUser.objects.get_or_create_from_uid(
         bot.billing_account_uid
@@ -305,6 +307,9 @@ def _handle_interactive_msg(bot: BotInterface):
             try:
                 context_msg = Message.objects.get(platform_msg_id=context_msg_id)
             except Message.DoesNotExist as e:
+                traceback.print_exc()
+                capture_exception(e)
+                # send error msg as repsonse
                 bot.send_msg(text=ERROR_MSG.format(e))
                 return
             if button_id == ButtonIds.feedback_thumbs_up:
