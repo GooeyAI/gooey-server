@@ -23,4 +23,4 @@ redis: redis-server
 
 celery: poetry run celery -A celeryapp worker
 
-ui: /bin/zsh -c "cd ../gooey-ui/; PORT=3000 npm run dev"
+ui: cd ../gooey-ui/; PORT=3000 npm run dev
