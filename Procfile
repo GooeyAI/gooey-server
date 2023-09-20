@@ -17,10 +17,6 @@ admin: poetry run python manage.py runserver 127.0.0.1:8000
 
 dashboard: poetry run streamlit run Home.py --server.port 8501 --server.headless true
 
-rabbitmq: rabbitmq-server
-
-redis: redis-server
-
 celery: poetry run celery -A celeryapp worker
 
 ui: cd ../gooey-ui/; PORT=3000 npm run dev
