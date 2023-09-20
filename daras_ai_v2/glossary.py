@@ -42,54 +42,36 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL):
         yield None, None
         return
 
-    # obtain read lock (to allow multiple translation requests to use the same glossary resource)
+    # I could not get this to work with concurrent translate requests without locking everything :(
     with AsyncAtomic():
         resource, created = GlossaryResources.objects.select_for_update().get_or_create(
             f_url=f_url
         )
-        resource.times_locked_for_read += 1
-        resource.uses += 1
-        resource.save()
 
-    # make sure we don't exceed the max number of glossary resources allowed by GCP
-    first_nonlocked = None
-    with AsyncAtomic():
-        if created and GlossaryResources.objects.count() > MAX_GLOSSARY_RESOURCES:
+        # make sure we don't exceed the max number of glossary resources allowed by GCP (we add a safety buffer of 100 for local development)
+        if created and GlossaryResources.objects.count() > MAX_GLOSSARY_RESOURCES - 100:
             first_nonlocked = (
                 GlossaryResources.objects.order_by("uses", "last_used")
                 .select_for_update(
                     skip_locked=True
                 )  # important: prevents deadlock and locks this row from being selected for read
-                .filter(times_locked_for_read=0)
                 .first()
             )
             assert first_nonlocked
             first_nonlocked.delete()
-    if first_nonlocked:
-        try:
-            _delete_glossary(glossary_name=first_nonlocked.get_clean_name())
-        except:
-            pass  # great error handling
+            try:
+                _delete_glossary(glossary_name=first_nonlocked.get_clean_name())
+            except:
+                pass  # great error handling
 
-    # write lock to prevent bad interleavings of _update_glossary's internal create and delete operations
-    with AsyncAtomic():
-        resource = GlossaryResources.objects.select_for_update().get(f_url=f_url)
         doc_meta = doc_url_to_metadata(f_url)
-        df = _update_glossary(f_url, doc_meta, glossary_name=resource.get_clean_name())
+        _update_glossary(f_url, doc_meta, glossary_name=resource.get_clean_name())
         path = _get_glossary(glossary_name=resource.get_clean_name())
 
-    try:
-        # The read lock should prevent most race conditions.
-        # The only possible data race, I believe, is if the glossary resource is deleted during translation
-        # which would only happen if the glossary is a google sheet that has just been updated and two
-        # translate requests are running concurrently. I couldn't find a better way to allow concurrent
-        # translation requests.
-        yield path, df
-    finally:
-        # release read lock
-        with AsyncAtomic():
-            resource = GlossaryResources.objects.select_for_update().get(f_url=f_url)
-            resource.times_locked_for_read -= 1
+        try:
+            yield path
+        finally:
+            resource.uses += 1
             resource.save()
 
 

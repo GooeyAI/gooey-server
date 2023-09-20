@@ -8,7 +8,6 @@ class GlossaryResources(models.Model):
     f_url = CustomURLField(unique=True)
     uses = models.IntegerField(default=0)
     last_used = models.DateTimeField(auto_now=True)
-    times_locked_for_read = models.IntegerField(default=0)
     glossary_name = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
 
     class Meta:

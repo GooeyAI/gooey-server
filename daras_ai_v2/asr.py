@@ -189,7 +189,9 @@ def run_google_translate(
         language_codes = [detection["language"] for detection in detections]
 
     return map_parallel(
-        lambda text, source: _translate_text(text, source, target_language),
+        lambda text, source: _translate_text(
+            text, source, target_language, glossary_url or DEFAULT_GLOSSARY_URL
+        ),
         texts,
         language_codes,
     )
@@ -225,7 +227,7 @@ def _translate_text(
         "transliteration_config": {"enable_transliteration": enable_transliteration},
     }
 
-    with glossary_resource(glossary_url) as (uri, _):
+    with glossary_resource(glossary_url) as uri:
         config.update(
             {
                 "glossaryConfig": {
