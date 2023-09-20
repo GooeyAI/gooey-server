@@ -250,6 +250,7 @@ def st_page(
         )
         / latest_slug
         / tab
+        / "/"  # preserve trailing slash
     )
 
     ret |= {
