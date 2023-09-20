@@ -41,6 +41,7 @@ app = APIRouter()
 
 DEFAULT_LOGIN_REDIRECT = "/explore/"
 DEFAULT_LOGOUT_REDIRECT = "/"
+CANONICAL_URL_ROOT = "https://gooey.ai"
 
 
 @app.get("/sitemap.xml/")
@@ -248,7 +249,7 @@ def st_page(
             uid=uid,
             example_id=example_id,
         )
-        + [dict(tagName="link", rel="canonical", href=f"/{latest_slug}/{tab}")]
+        + [dict(tagName="link", rel="canonical", href=f"{CANONICAL_URL_ROOT}/{latest_slug}/{tab}")]
         # + [
         #     dict(tagName="link", rel="icon", href="/static/favicon.ico"),
         #     dict(tagName="link", rel="stylesheet", href="/static/css/app.css"),
