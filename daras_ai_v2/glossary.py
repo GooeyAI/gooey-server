@@ -1,15 +1,13 @@
 import gooey_ui as st
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from contextlib import contextmanager
+from glossary_resources.models import GlossaryResources, AsyncAtomic
 
 DEFAULT_GLOSSARY_URL = "https://docs.google.com/spreadsheets/d/1IRHKcOC86oZXwMB0hR7eej7YVg5kUHpriZymwYQcQX4/edit?usp=sharing"  # only viewing access
 PROJECT_ID = "dara-c1b52"  # GCP project id
-GLOSSARY_NAME = "glossary"  # name you want to give this glossary resource
 LOCATION = "us-central1"  # data center location
 BUCKET_NAME = "gooey-server-glossary"  # name of bucket
-BLOB_NAME = "glossary.csv"  # name of blob
-GLOSSARY_URI = (
-    "gs://" + BUCKET_NAME + "/" + BLOB_NAME
-)  # the uri of the glossary uploaded to Cloud Storage
+MAX_GLOSSARY_RESOURCES = 10_000  # https://cloud.google.com/translate/quotas
 
 
 # ================================ Glossary UI ================================
@@ -19,6 +17,7 @@ def glossary_input(
 ):
     from daras_ai_v2.doc_search_settings_widgets import document_uploader
 
+    st.session_state.setdefault(key, DEFAULT_GLOSSARY_URL)
     glossary_url = document_uploader(
         label=label,
         key=key,
@@ -32,13 +31,75 @@ def glossary_input(
 
 
 # ================================ Glossary Logic ================================
+@contextmanager
+def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL):
+    """
+    Obtains a glossary resource for use in translation requests.
+    """
+    from daras_ai_v2.vector_search import doc_url_to_metadata
+
+    if not f_url:
+        yield None, None
+        return
+
+    # obtain read lock (to allow multiple translation requests to use the same glossary resource)
+    with AsyncAtomic():
+        resource, created = GlossaryResources.objects.select_for_update().get_or_create(
+            f_url=f_url
+        )
+        resource.times_locked_for_read += 1
+        resource.uses += 1
+        resource.save()
+
+    # make sure we don't exceed the max number of glossary resources allowed by GCP
+    first_nonlocked = None
+    with AsyncAtomic():
+        if created and GlossaryResources.objects.count() > MAX_GLOSSARY_RESOURCES:
+            first_nonlocked = (
+                GlossaryResources.objects.order_by("uses", "last_used")
+                .select_for_update(
+                    skip_locked=True
+                )  # important: prevents deadlock and locks this row from being selected for read
+                .filter(times_locked_for_read=0)
+                .first()
+            )
+            assert first_nonlocked
+            first_nonlocked.delete()
+    if first_nonlocked:
+        try:
+            _delete_glossary(glossary_name=first_nonlocked.get_clean_name())
+        except:
+            pass  # great error handling
+
+    # write lock to prevent bad interleavings of _update_glossary's internal create and delete operations
+    with AsyncAtomic():
+        resource = GlossaryResources.objects.select_for_update().get(f_url=f_url)
+        doc_meta = doc_url_to_metadata(f_url)
+        df = _update_glossary(f_url, doc_meta, glossary_name=resource.get_clean_name())
+        path = _get_glossary(glossary_name=resource.get_clean_name())
+
+    try:
+        # The read lock should prevent most race conditions.
+        # The only possible data race, I believe, is if the glossary resource is deleted during translation
+        # which would only happen if the glossary is a google sheet that has just been updated and two
+        # translate requests are running concurrently. I couldn't find a better way to allow concurrent
+        # translation requests.
+        yield path, df
+    finally:
+        # release read lock
+        with AsyncAtomic():
+            resource = GlossaryResources.objects.select_for_update().get(f_url=f_url)
+            resource.times_locked_for_read -= 1
+            resource.save()
+
+
 def _update_or_create_glossary(f_url: str) -> tuple[str, "pd.DataFrame"]:
     """
     Update or create a glossary resource
     Args:
         f_url: url of the glossary file
     Returns:
-        name: path to the glossary resource
+        path: path to the glossary resource (for use in translation requests)
         df: pandas DataFrame of the glossary
     """
     from daras_ai_v2.vector_search import doc_url_to_metadata
@@ -51,45 +112,47 @@ def _update_or_create_glossary(f_url: str) -> tuple[str, "pd.DataFrame"]:
 
 
 @redis_cache_decorator
-def _update_glossary(f_url: str, doc_meta) -> "pd.DataFrame":
+def _update_glossary(
+    f_url: str, doc_meta, glossary_name: str = "glossary"
+) -> "pd.DataFrame":
     """Goes through the full process of uploading the glossary from the url"""
     from daras_ai_v2.vector_search import download_table_doc
 
     df = download_table_doc(f_url, doc_meta)
 
-    _upload_glossary_to_bucket(df)
+    _upload_glossary_to_bucket(df, glossary_name=glossary_name)
     # delete existing glossary
     try:
-        _delete_glossary()
+        _delete_glossary(glossary_name=glossary_name)
     except:
-        pass
+        pass  # great error handling
     # create new glossary
     languages = [
         lan_code
         for lan_code in df.columns.tolist()
         if lan_code not in ["pos", "description"]
-    ]  # these are not languages
-    _create_glossary(languages)
+    ]  # "pos" and "description" are not languages but still allowed by the google spec in the glossary csv
+    _create_glossary(languages, glossary_name=glossary_name)
 
     return df
 
 
-def _get_glossary():
+def _get_glossary(glossary_name: str = "glossary"):
     """Get information about the glossary."""
     from google.cloud import translate_v3beta1
 
     client = translate_v3beta1.TranslationServiceClient()
 
-    name = client.glossary_path(PROJECT_ID, LOCATION, GLOSSARY_NAME)
+    path = client.glossary_path(PROJECT_ID, LOCATION, glossary_name)
 
-    response = client.get_glossary(name=name)
+    response = client.get_glossary(name=path)
     print("Glossary name: {}".format(response.name))
     print("Entry count: {}".format(response.entry_count))
     print("Input URI: {}".format(response.input_config.gcs_source.input_uri))
-    return name
+    return path
 
 
-def _upload_glossary_to_bucket(df):
+def _upload_glossary_to_bucket(df, glossary_name: str = "glossary"):
     """Uploads a pandas DataFrame to the bucket."""
     # import gcloud storage
     from google.cloud import storage
@@ -97,6 +160,7 @@ def _upload_glossary_to_bucket(df):
     csv = df.to_csv(index=False)
 
     # initialize the storage client and give it the bucket and the blob name
+    BLOB_NAME, _ = _parse_glossary_name(glossary_name)
     storage_client = storage.Client()
     bucket = storage_client.bucket(BUCKET_NAME)
     blob = bucket.blob(BLOB_NAME)
@@ -105,20 +169,20 @@ def _upload_glossary_to_bucket(df):
     blob.upload_from_string(csv)
 
 
-def _delete_glossary(timeout=180):
+def _delete_glossary(timeout=180, glossary_name: str = "glossary"):
     """Delete the glossary resource so a new one can be created."""
     from google.cloud import translate_v3beta1
 
     client = translate_v3beta1.TranslationServiceClient()
 
-    name = client.glossary_path(PROJECT_ID, LOCATION, GLOSSARY_NAME)
+    path = client.glossary_path(PROJECT_ID, LOCATION, glossary_name)
 
-    operation = client.delete_glossary(name=name)
+    operation = client.delete_glossary(name=path)
     result = operation.result(timeout)
     print("Deleted: {}".format(result.name))
 
 
-def _create_glossary(languages):
+def _create_glossary(languages, glossary_name: str = "glossary"):
     """Creates a GCP glossary resource."""
     from google.cloud import translate_v3beta1
     from google.api_core.exceptions import AlreadyExists
@@ -127,7 +191,8 @@ def _create_glossary(languages):
     client = translate_v3beta1.TranslationServiceClient()
 
     # Set glossary resource name
-    name = client.glossary_path(PROJECT_ID, LOCATION, GLOSSARY_NAME)
+    _, GLOSSARY_URI = _parse_glossary_name(glossary_name)
+    path = client.glossary_path(PROJECT_ID, LOCATION, glossary_name)
 
     # Set language codes
     language_codes_set = translate_v3beta1.Glossary.LanguageCodesSet(
@@ -140,7 +205,7 @@ def _create_glossary(languages):
 
     # Set glossary resource information
     glossary = translate_v3beta1.Glossary(
-        name=name, language_codes_set=language_codes_set, input_config=input_config
+        name=path, language_codes_set=language_codes_set, input_config=input_config
     )
 
     parent = f"projects/{PROJECT_ID}/locations/{LOCATION}"
@@ -151,65 +216,24 @@ def _create_glossary(languages):
     try:
         operation = client.create_glossary(parent=parent, glossary=glossary)
         operation.result(timeout=90)
-        print("Created glossary " + GLOSSARY_NAME + ".")
+        print("Created glossary " + glossary_name + ".")
     except AlreadyExists:
         print(
             "The glossary "
-            + GLOSSARY_NAME
+            + glossary_name
             + " already exists. No new glossary was created."
         )
 
 
-# def _translate_text(
-#     cls,
-#     text: str,
-#     source_language: str,
-#     target_language: str,
-#     enable_transliteration: bool = True,
-#     glossary_url: str | None = None,
-# ):
-#     is_romanized, source_language = cls.parse_detected_language(source_language)
-#     enable_transliteration = (
-#         is_romanized
-#         and enable_transliteration
-#         and source_language in cls._can_transliterate
-#     )
-#     # prevent incorrect API calls
-#     if source_language == target_language:
-#         return text
-
-#     config = {
-#         "source_language_code": source_language,
-#         "target_language_code": target_language,
-#         "contents": text,
-#         "mime_type": "text/plain",
-#         "transliteration_config": {
-#             "enable_transliteration": enable_transliteration
-#         },
-#     }
-
-#     if glossary_url and not enable_transliteration:
-#         # glossary does not work with transliteration
-#         uri = _update_or_create_glossary(glossary_url)
-#         config.update(
-#             {
-#                 "glossaryConfig": {
-#                     "glossary": uri,
-#                     "ignoreCase": True,
-#                 }
-#             }
-#         )
-
-#     authed_session, project = cls.get_google_auth_session()
-#     res = authed_session.post(
-#         f"{GOOGLE_V3_ENDPOINT}{project}/locations/{LOCATION}:translateText",
-#         json.dumps(config),
-#         headers={
-#             "Content-Type": "application/json",
-#         },
-#     )
-#     res.raise_for_status()
-#     data = res.json()
-#     result = data["glossaryTranslations"][0] if uri else data["translations"][0]
-
-#     return result["translatedText"]
+def _parse_glossary_name(glossary_name: str = "glossary"):
+    """
+    Parses the glossary name into the bucket name and blob name.
+    Args:
+        glossary_name: name of the glossary resource
+    Returns:
+        blob_name: name of the blob
+        glossary_uri: uri of the glossary uploaded to Cloud Storage
+    """
+    blob_name = glossary_name + ".csv"
+    glossary_uri = "gs://" + BUCKET_NAME + "/" + blob_name
+    return blob_name, glossary_uri

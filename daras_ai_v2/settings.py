@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "app_users",
     "url_shortener",
+    "glossary_resources",
 ]
 
 MIDDLEWARE = [

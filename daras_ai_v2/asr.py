@@ -17,6 +17,11 @@ from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
 )
+from daras_ai_v2.glossary import (
+    DEFAULT_GLOSSARY_URL,
+    LOCATION,
+    glossary_resource,
+)
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -117,7 +122,7 @@ def google_translate_languages() -> dict[str, str]:
     parent = f"projects/{project}/locations/global"
     client = translate.TranslationServiceClient()
     supported_languages = client.get_supported_languages(
-        parent, display_language_code="en"
+        parent=parent, display_language_code="en"
     )
     return {
         lang.language_code: lang.display_name
@@ -162,6 +167,7 @@ def run_google_translate(
     texts: list[str],
     target_language: str,
     source_language: str = None,
+    glossary_url: str = DEFAULT_GLOSSARY_URL,
 ) -> list[str]:
     """
     Translate text using the Google Translate API.
@@ -189,12 +195,21 @@ def run_google_translate(
     )
 
 
-def _translate_text(text: str, source_language: str, target_language: str):
+def _translate_text(
+    text: str,
+    source_language: str,
+    target_language: str,
+    glossary_url: str = DEFAULT_GLOSSARY_URL,
+) -> str:
     is_romanized = source_language.endswith("-Latn")
     source_language = source_language.replace("-Latn", "")
     enable_transliteration = (
         is_romanized and source_language in TRANSLITERATION_SUPPORTED
     )
+    glossary_url = (
+        glossary_url if not enable_transliteration else ""
+    )  # glossary does not work with transliteration
+
     # prevent incorrect API calls
     if source_language == target_language or not text:
         return text
@@ -202,29 +217,34 @@ def _translate_text(text: str, source_language: str, target_language: str):
     if source_language == "wo-SN" or target_language == "wo-SN":
         return _MinT_translate_one_text(text, source_language, target_language)
 
-    authed_session, project = get_google_auth_session()
-    res = authed_session.post(
-        f"https://translation.googleapis.com/v3/projects/{project}/locations/global:translateText",
-        json.dumps(
-            {
-                "source_language_code": source_language,
-                "target_language_code": target_language,
-                "contents": text,
-                "mime_type": "text/plain",
-                "transliteration_config": {
-                    "enable_transliteration": enable_transliteration
-                },
-            }
-        ),
-        headers={
-            "Content-Type": "application/json",
-        },
-    )
-    res.raise_for_status()
-    data = res.json()
-    result = data["translations"][0]
+    config = {
+        "source_language_code": source_language,
+        "target_language_code": target_language,
+        "contents": text,
+        "mime_type": "text/plain",
+        "transliteration_config": {"enable_transliteration": enable_transliteration},
+    }
 
-    return result["translatedText"].strip()
+    with glossary_resource(glossary_url) as (uri, _):
+        config.update(
+            {
+                "glossaryConfig": {
+                    "glossary": uri,
+                    "ignoreCase": True,
+                }
+            }
+        )
+
+        authed_session, project = get_google_auth_session()
+        res = authed_session.post(
+            f"https://translation.googleapis.com/v3/projects/{project}/locations/{'global' if not uri else LOCATION}:translateText",
+            json=config,
+        )
+        res.raise_for_status()
+        data = res.json()
+        result = data["glossaryTranslations"][0] if uri else data["translations"][0]
+
+        return result["translatedText"].strip()
 
 
 _session = None

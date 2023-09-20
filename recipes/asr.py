@@ -15,6 +15,7 @@ from daras_ai_v2.asr import (
     forced_asr_languages,
     asr_language_selector,
 )
+from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
@@ -37,6 +38,7 @@ class AsrPage(BasePage):
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
         google_translate_target: str | None
+        glossary_url: str | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
 
     class ResponseModel(BaseModel):
@@ -90,6 +92,7 @@ class AsrPage(BasePage):
 
     def render_settings(self):
         google_translate_language_selector()
+        glossary_input()
         st.write("---")
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
