@@ -240,6 +240,16 @@ def st_page(
         )
     except RedirectException as e:
         return RedirectResponse(e.url, status_code=e.status_code)
+
+    # Canonical URLs should not include uid or run_id (don't index specific runs).
+    # In the case of examples, all tabs other than "Run" are duplicates of the page
+    # without the `example_id`, and so their canonical shouldn't include `example_id`
+    canonical = furl(CANONICAL_URL_ROOT).add(
+        path=f"{latest_slug}/{tab}/",
+        args={"example_id": example_id} if tab == "" and example_id else {},
+    )
+    canonical.path.normalize()
+
     ret |= {
         "meta": build_meta_tags(
             url=str(request.url),
@@ -249,7 +259,7 @@ def st_page(
             uid=uid,
             example_id=example_id,
         )
-        + [dict(tagName="link", rel="canonical", href=f"{CANONICAL_URL_ROOT}/{latest_slug}/{tab}")]
+        + [dict(tagName="link", rel="canonical", href=canonical.url)]
         # + [
         #     dict(tagName="link", rel="icon", href="/static/favicon.ico"),
         #     dict(tagName="link", rel="stylesheet", href="/static/css/app.css"),
