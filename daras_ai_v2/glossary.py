@@ -1,7 +1,8 @@
 import gooey_ui as st
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from contextlib import contextmanager
-from glossary_resources.models import GlossaryResources, AsyncAtomic
+from glossary_resources.models import GlossaryResources
+from django.db import transaction
 
 DEFAULT_GLOSSARY_URL = "https://docs.google.com/spreadsheets/d/1IRHKcOC86oZXwMB0hR7eej7YVg5kUHpriZymwYQcQX4/edit?usp=sharing"  # only viewing access
 PROJECT_ID = "dara-c1b52"  # GCP project id
@@ -43,7 +44,7 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL):
         return
 
     # I could not get this to work with concurrent translate requests without locking everything :(
-    with AsyncAtomic():
+    with transaction.atomic():
         resource, created = GlossaryResources.objects.select_for_update().get_or_create(
             f_url=f_url
         )
