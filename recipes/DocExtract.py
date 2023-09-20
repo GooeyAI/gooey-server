@@ -8,6 +8,7 @@ from django.db.models import IntegerChoices
 from furl import furl
 from pydantic import BaseModel
 from pypdf import PdfWriter, PdfReader
+from daras_ai_v2.loom_video_widget import youtube_video
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -102,6 +103,9 @@ class DocExtractPage(BasePage):
         render_documents(state)
         st.write("**Google Sheets URL**")
         st.write(state.get("sheet_url"))
+
+    def render_usage_guide(self):
+        youtube_video("p7ZLb-loR_4")
 
     def render_settings(self):
         st.text_area(

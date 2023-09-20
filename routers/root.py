@@ -41,7 +41,6 @@ app = APIRouter()
 
 DEFAULT_LOGIN_REDIRECT = "/explore/"
 DEFAULT_LOGOUT_REDIRECT = "/"
-CANONICAL_URL_ROOT = "https://gooey.ai"
 
 
 @app.get("/sitemap.xml/")
@@ -244,11 +243,14 @@ def st_page(
     # Canonical URLs should not include uid or run_id (don't index specific runs).
     # In the case of examples, all tabs other than "Run" are duplicates of the page
     # without the `example_id`, and so their canonical shouldn't include `example_id`
-    canonical = furl(CANONICAL_URL_ROOT).add(
-        path=f"{latest_slug}/{tab}/",
-        args={"example_id": example_id} if tab == "" and example_id else {},
+    canonical_url = str(
+        furl(
+            str(settings.APP_BASE_URL),
+            query_params={"example_id": example_id} if not tab and example_id else {},
+        )
+        / latest_slug
+        / tab
     )
-    canonical.path.normalize()
 
     ret |= {
         "meta": build_meta_tags(
@@ -259,7 +261,7 @@ def st_page(
             uid=uid,
             example_id=example_id,
         )
-        + [dict(tagName="link", rel="canonical", href=canonical.url)]
+        + [dict(tagName="link", rel="canonical", href=canonical_url)]
         # + [
         #     dict(tagName="link", rel="icon", href="/static/favicon.ico"),
         #     dict(tagName="link", rel="stylesheet", href="/static/css/app.css"),
