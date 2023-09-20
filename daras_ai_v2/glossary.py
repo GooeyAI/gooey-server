@@ -76,24 +76,6 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL):
             resource.save()
 
 
-def _update_or_create_glossary(f_url: str) -> tuple[str, "pd.DataFrame"]:
-    """
-    Update or create a glossary resource
-    Args:
-        f_url: url of the glossary file
-    Returns:
-        path: path to the glossary resource (for use in translation requests)
-        df: pandas DataFrame of the glossary
-    """
-    from daras_ai_v2.vector_search import doc_url_to_metadata
-
-    print("Updating/Creating glossary...")
-    f_url = f_url or DEFAULT_GLOSSARY_URL
-    doc_meta = doc_url_to_metadata(f_url)
-    df = _update_glossary(f_url, doc_meta)
-    return _get_glossary(), df
-
-
 @redis_cache_decorator
 def _update_glossary(
     f_url: str, doc_meta, glossary_name: str = "glossary"

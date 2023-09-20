@@ -1,7 +1,6 @@
 from django.db import models
 from bots.custom_fields import CustomURLField
 import uuid
-from asgiref.sync import sync_to_async
 
 
 class GlossaryResources(models.Model):
