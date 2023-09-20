@@ -2,12 +2,17 @@
 
 * Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile)
 * Install [poetry](https://python-poetry.org/docs/)
-* Create & active a virtualenv (e.g. `poetry shell`)
+* Create & activate a virtualenv (e.g. `poetry shell`)
 * Run `poetry install --with dev`
+* Install [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/), [rabbitmq](https://www.rabbitmq.com/install-homebrew.html), and [postgresql](https://formulae.brew.sh/formula/postgresql@15) (e.g. `brew install redis rabbitmq postgresql@15`)
+* Enable background services for `redis`, `rabbitmq`, and `postgresql` (e.g. with `brew services start redis` and similar for `rabbitmq` and `postgresql`)
+* Create a user and database for gooey in PostgreSQL:
+  * `createuser gooey --pwprompt` (when prompted for password, enter `gooey`)
+  * `createdb gooey -O gooey`
+  * make sure you are able to access the database with `psql -W -U gooey gooey` (and when prompted for password, entering `gooey`)
 * Create an `.env` file from `.env.example` (Read [12factor.net/config](https://12factor.net/config))
 * Run `./manage.py migrate`
-* Install the zbar shared library (`brew install zbar`)
-* Install [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/) and [rabbitmq](https://www.rabbitmq.com/install-homebrew.html)
+* Install the zbar library (`brew install zbar`)
 
 ## Run
 
@@ -25,16 +30,14 @@ Currently they are these:
 | API + GUI Server | 8080 |
 | Admin site       | 8000 |
 | Usage dashboard  | 8501 |
-| Redis            | 6379 |
-| RabbitMQ         | 5672 |
 | Celery           | -    |
 | UI               | 3000 |
 
-This default startup assumes that Redis and RabbitMQ are installed, but not
-running as system services (e.g. with `brew services`) already. It also assumes
-that the gooey-ui repo can be found at `../gooey-ui/` (adjacent to where the
-gooey-server repo sits). You can open the Procfile and comment any of these
-if you want to run it in some other way.
+This default startup assumes that Redis, RabbitMQ, and PostgreSQL are installed and running
+as background services on ports 6379, 5672, and 5432 respectively. 
+It also assumes that the gooey-ui repo can be found at `../gooey-ui/` (adjacent to where the
+gooey-server repo sits). You can open the Procfile and comment this out if you don't need
+to run it.
 
 **Note:** the Celery worker must be manually restarted on code changes. You
 can do this by stopping and starting Honcho.
@@ -42,12 +45,6 @@ can do this by stopping and starting Honcho.
 ## To run any recipe 
 
 * Save `serviceAccountKey.json` to project root
-* Install & start [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/)
-* Install & start [rabbitmq](https://www.rabbitmq.com/install-homebrew.html)
-* Run the celery worker (**Note:** you must manually restart it on code changes)
-```bash
-celery -A celeryapp worker
-```
 
 ## To connect to our GPU cluster 
 
