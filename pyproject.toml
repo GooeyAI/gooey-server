@@ -79,6 +79,7 @@ rank-bm25 = "^0.2.2"
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"
 ipython = "^8.5.0"
+honcho = "^1.1.0"
 
 [build-system]
 requires = ["poetry-core"]
