@@ -644,14 +644,14 @@ class BasePage:
 
     def on_submit(self):
         example_id, run_id, uid = self.create_new_run()
-        # if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
-        #     st.session_state[StateKeys.run_status] = None
-        #     st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
-        #         example_id, run_id, uid
-        #     )
-        #     self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
-        # else:
-        self.call_runner_task(example_id, run_id, uid)
+        if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
+            st.session_state[StateKeys.run_status] = None
+            st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
+                example_id, run_id, uid
+            )
+            self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
+        else:
+            self.call_runner_task(example_id, run_id, uid)
         raise QueryParamsRedirectException(
             self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
         )
