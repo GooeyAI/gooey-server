@@ -6,9 +6,8 @@
 * Run `poetry install --with dev`
 * Install [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/), [rabbitmq](https://www.rabbitmq.com/install-homebrew.html), and [postgresql](https://formulae.brew.sh/formula/postgresql@15) (e.g. `brew install redis rabbitmq postgresql@15`)
 * Enable background services for `redis`, `rabbitmq`, and `postgresql` (e.g. with `brew services start redis` and similar for `rabbitmq` and `postgresql`)
-* Create a user and database for gooey in PostgreSQL:
-  * `createuser gooey --pwprompt` (when prompted for password, enter `gooey`)
-  * `createdb gooey -O gooey`
+* Use `sqlcreate` helper to create a user and database for gooey:
+  * `./manage.py sqlcreate | psql postgres`
   * make sure you are able to access the database with `psql -W -U gooey gooey` (and when prompted for password, entering `gooey`)
 * Create an `.env` file from `.env.example` (Read [12factor.net/config](https://12factor.net/config))
 * Run `./manage.py migrate`
