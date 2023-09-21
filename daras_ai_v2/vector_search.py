@@ -177,7 +177,7 @@ bm25_split_re = re.compile(rf"[{puncts}\s]")
 
 
 def bm25_tokenizer(text: str, n_gram=2) -> list[str]:
-    tokens = bm25_split_re.split(text.lower())
+    tokens = np.array(bm25_split_re.split(text.lower()))
     n_grams = []
 
     n_grams.extend(tokens)
