@@ -2,7 +2,7 @@ import ast
 
 import parse
 from glom import glom
-from html2text import html2text
+from markdownify import markdownify as md
 
 input_spec_parse_pattern = "{" * 5 + "}" * 5
 
@@ -24,3 +24,7 @@ def daras_ai_format_str(format_str, variables, do_html2text=False):
             variable_value = variable_value.strip()
         format_str = format_str.replace("{{" + spec + "}}", str(variable_value))
     return format_str
+
+
+def html2text(html):
+    return md(html, heading_style="setext")
