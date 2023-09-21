@@ -122,7 +122,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             page_cls=page_cls,
             user=user,
             request_body=page_request.dict(),
-            query_params=request.query_params,
+            query_params=dict(request.query_params),
         )
 
     @app.post(
@@ -176,7 +176,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             page_cls=page_cls,
             user=user,
             request_body=page_request.dict(),
-            query_params=request.query_params,
+            query_params=dict(request.query_params),
             run_async=True,
         )
         response.headers["Location"] = ret["status_url"]
