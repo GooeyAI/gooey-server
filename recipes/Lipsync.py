@@ -15,7 +15,7 @@ from daras_ai_v2.loom_video_widget import youtube_video
 
 CREDITS_PER_MB = 2
 
-DEFAULT_LIPSYNC_GIF = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/13a80d08-538c-11ee-9c77-02420a000193/lipsync%20audio%201.gif.png"
+DEFAULT_LIPSYNC_GIF = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/91acbbde-5857-11ee-920a-02420a000194/lipsync%20audio.png.png"
 
 
 class LipsyncPage(BasePage):
