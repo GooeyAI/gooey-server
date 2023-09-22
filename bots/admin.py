@@ -26,6 +26,7 @@ from bots.models import (
     Conversation,
     BotIntegration,
 )
+from bots.tasks import create_personal_channels_for_all_members
 from gooeysite.custom_widgets import JSONEditorWidget
 
 
@@ -82,6 +83,15 @@ class BotIntegrationAdminForm(forms.ModelForm):
         js = [
             "https://cdn.jsdelivr.net/gh/scientifichackers/django-hideshow@0.0.1/hideshow.js",
         ]
+
+
+def create_personal_channels(modeladmin, request, queryset):
+    for bi in queryset:
+        create_personal_channels_for_all_members.delay(bi.id)
+    modeladmin.message_user(
+        request,
+        f"Started creating personal channels for {queryset.count()} bots in the background.",
+    )
 
 
 @admin.register(BotIntegration)
@@ -189,6 +199,8 @@ class BotIntegrationAdmin(admin.ModelAdmin):
             },
         ),
     ]
+
+    actions = [create_personal_channels]
 
     @admin.display(description="Messages")
     def view_messsages(self, bi: BotIntegration):
