@@ -266,8 +266,17 @@ def slack_connect_redirect_shortcuts(request: Request):
             "<p>Oh No! Something went wrong here.</p>"
             "<p>Conversation not found. Please make sure this channel is connected to the gooey bot</p>"
             + retry_button,
+            status_code=404,
+        )
+
+    if not convo.bot_integration.saved_run_id:
+        return HTMLResponse(
+            "<p>Oh No! Something went wrong here.</p>"
+            "<p>Please make sure this bot is connected to a gooey run or example</p>"
+            + retry_button,
             status_code=400,
         )
+    sr = convo.bot_integration.saved_run
 
     payload = json.dumps(
         dict(
@@ -275,6 +284,8 @@ def slack_connect_redirect_shortcuts(request: Request):
             slack_channel_id=convo.slack_channel_id,
             slack_user_access_token=access_token,
             slack_team_id=team_id,
+            gooey_example_id=sr.example_id,
+            gooey_run_id=sr.run_id,
         ),
         indent=2,
     )
