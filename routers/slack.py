@@ -9,7 +9,7 @@ from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
 from starlette.responses import RedirectResponse, HTMLResponse
 
-from bots.models import BotIntegration, Platform
+from bots.models import BotIntegration, Platform, Conversation
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
@@ -225,9 +225,17 @@ def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
         capture_exception(e)
 
 
+@router.get("/__/slack/oauth/shortcuts/")
+def slack_oauth_shortcuts(dm: bool = False):
+    return RedirectResponse(str(get_slack_shortcuts_connect_url(dm)))
+
+
 @router.get("/__/slack/redirect/shortcuts/")
-def slack_connect_redirect_shortcuts(request: Request):
-    retry_button = f'<a href="{slack_connect_url}">Retry</a>'
+def slack_connect_redirect_shortcuts(
+    request: Request,
+    dm: bool = False,
+):
+    retry_button = f'<a href="{get_slack_shortcuts_connect_url(dm)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -239,19 +247,53 @@ def slack_connect_redirect_shortcuts(request: Request):
     res = requests.post(
         furl(
             "https://slack.com/api/oauth.v2.access",
-            query_params=dict(code=code, redirect_uri=slack_shortcuts_redirect_uri),
+            query_params=dict(
+                code=code, redirect_uri=get_slack_shortcuts_redirect_uri(dm)
+            ),
         ).url,
         auth=HTTPBasicAuth(settings.SLACK_CLIENT_ID, settings.SLACK_CLIENT_SECRET),
     )
     res.raise_for_status()
-    print(res.text)
     res = res.json()
+    print("> slack_connect_redirect_shortcuts:", res)
+
+    channel_id = res["incoming_webhook"]["channel_id"]
+    channel_name = res["incoming_webhook"]["channel"].strip("#")
+    team_id = res["team"]["id"]
+    user_id = res["authed_user"]["id"]
+    access_token = res["authed_user"]["access_token"]
+
+    if dm:
+        try:
+            convo = Conversation.objects.get(
+                bot_integration__slack_channel_id=channel_id,
+                bot_integration__slack_team_id=team_id,
+                slack_user_id=user_id,
+                slack_team_id=team_id,
+                slack_channel_is_personal=True,
+            )
+        except Conversation.DoesNotExist:
+            bi = BotIntegration.objects.get(
+                slack_channel_id=channel_id,
+                slack_team_id=team_id,
+            )
+            user = fetch_user_info(user_id, bi.slack_access_token)
+            convo = create_personal_channel(bi=bi, user=user)
+        if not convo:
+            return HTMLResponse(
+                f"<p>Oh No! Something went wrong here.</p><p>Error: Could not create personal channel.</p>"
+                + retry_button,
+                status_code=400,
+            )
+        channel_id = convo.slack_channel_id
+        channel_name = convo.slack_channel_name
+
     payload = json.dumps(
         dict(
-            slack_channel=res["incoming_webhook"]["channel"].strip("#"),
-            slack_channel_id=res["incoming_webhook"]["channel_id"],
-            slack_user_access_token=res["authed_user"]["access_token"],
-            slack_team_id=res["team"]["id"],
+            slack_channel=channel_name,
+            slack_channel_id=channel_id,
+            slack_user_access_token=access_token,
+            slack_team_id=team_id,
         ),
         indent=2,
     )
@@ -284,7 +326,20 @@ def slack_connect_redirect_shortcuts(request: Request):
     )
 
 
-slack_shortcuts_redirect_uri = (
-    furl(settings.APP_BASE_URL)
-    / router.url_path_for(slack_connect_redirect_shortcuts.__name__)
-).url
+def get_slack_shortcuts_connect_url(dm: bool = False):
+    return furl(
+        "https://slack.com/oauth/v2/authorize",
+        query_params=dict(
+            client_id=settings.SLACK_CLIENT_ID,
+            scope=",".join(["incoming-webhook"]),
+            user_scope=",".join(["chat:write"]),
+            redirect_uri=get_slack_shortcuts_redirect_uri(dm),
+        ),
+    )
+
+
+def get_slack_shortcuts_redirect_uri(dm: bool = False) -> str:
+    return (
+        furl(settings.APP_BASE_URL, query_params=dict(dm=dm))
+        / router.url_path_for(slack_connect_redirect_shortcuts.__name__)
+    ).url
