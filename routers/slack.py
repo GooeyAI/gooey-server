@@ -258,40 +258,26 @@ def slack_connect_redirect_shortcuts(
     print("> slack_connect_redirect_shortcuts:", res)
 
     channel_id = res["incoming_webhook"]["channel_id"]
-    channel_name = res["incoming_webhook"]["channel"].strip("#")
-    team_id = res["team"]["id"]
     user_id = res["authed_user"]["id"]
+    team_id = res["team"]["id"]
     access_token = res["authed_user"]["access_token"]
 
-    if dm:
-        try:
-            convo = Conversation.objects.get(
-                bot_integration__slack_channel_id=channel_id,
-                bot_integration__slack_team_id=team_id,
-                slack_user_id=user_id,
-                slack_team_id=team_id,
-                slack_channel_is_personal=True,
-            )
-        except Conversation.DoesNotExist:
-            bi = BotIntegration.objects.get(
-                slack_channel_id=channel_id,
-                slack_team_id=team_id,
-            )
-            user = fetch_user_info(user_id, bi.slack_access_token)
-            convo = create_personal_channel(bi=bi, user=user)
-        if not convo:
-            return HTMLResponse(
-                f"<p>Oh No! Something went wrong here.</p><p>Error: Could not create personal channel.</p>"
-                + retry_button,
-                status_code=400,
-            )
-        channel_id = convo.slack_channel_id
-        channel_name = convo.slack_channel_name
+    try:
+        convo = Conversation.objects.get(
+            slack_channel_id=channel_id, slack_user_id=user_id, slack_team_id=team_id
+        )
+    except Conversation.DoesNotExist:
+        return HTMLResponse(
+            "<p>Oh No! Something went wrong here.</p>"
+            "<p>Conversation not found. Please make sure this channel is connected to the gooey bot</p>"
+            + retry_button,
+            status_code=400,
+        )
 
     payload = json.dumps(
         dict(
-            slack_channel=channel_name,
-            slack_channel_id=channel_id,
+            slack_channel=convo.slack_channel_name,
+            slack_channel_id=convo.slack_channel_id,
             slack_user_access_token=access_token,
             slack_team_id=team_id,
         ),
