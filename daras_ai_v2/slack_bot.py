@@ -334,7 +334,11 @@ def create_personal_channel(
         )
     except SlackAPIError as e:
         # skip if the user is restricted
-        if e.error in ["user_is_ultra_restricted", "user_is_restricted"]:
+        if e.error in [
+            "user_is_ultra_restricted",
+            "user_is_restricted",
+            "user_team_not_in_channel",
+        ]:
             return
         else:
             raise
