@@ -226,16 +226,13 @@ def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
 
 
 @router.get("/__/slack/oauth/shortcuts/")
-def slack_oauth_shortcuts(dm: bool = False):
-    return RedirectResponse(str(get_slack_shortcuts_connect_url(dm)))
+def slack_oauth_shortcuts():
+    return RedirectResponse(str(slack_shortcuts_connect_url))
 
 
 @router.get("/__/slack/redirect/shortcuts/")
-def slack_connect_redirect_shortcuts(
-    request: Request,
-    dm: bool = False,
-):
-    retry_button = f'<a href="{get_slack_shortcuts_connect_url(dm)}">Retry</a>'
+def slack_connect_redirect_shortcuts(request: Request):
+    retry_button = f'<a href="{slack_shortcuts_connect_url}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -247,9 +244,7 @@ def slack_connect_redirect_shortcuts(
     res = requests.post(
         furl(
             "https://slack.com/api/oauth.v2.access",
-            query_params=dict(
-                code=code, redirect_uri=get_slack_shortcuts_redirect_uri(dm)
-            ),
+            query_params=dict(code=code, redirect_uri=slack_shortcuts_redirect_uri),
         ).url,
         auth=HTTPBasicAuth(settings.SLACK_CLIENT_ID, settings.SLACK_CLIENT_SECRET),
     )
@@ -312,20 +307,17 @@ def slack_connect_redirect_shortcuts(
     )
 
 
-def get_slack_shortcuts_connect_url(dm: bool = False):
-    return furl(
-        "https://slack.com/oauth/v2/authorize",
-        query_params=dict(
-            client_id=settings.SLACK_CLIENT_ID,
-            scope=",".join(["incoming-webhook"]),
-            user_scope=",".join(["chat:write"]),
-            redirect_uri=get_slack_shortcuts_redirect_uri(dm),
-        ),
-    )
+slack_shortcuts_redirect_uri = (
+    furl(settings.APP_BASE_URL)
+    / router.url_path_for(slack_connect_redirect_shortcuts.__name__)
+).url
 
-
-def get_slack_shortcuts_redirect_uri(dm: bool = False) -> str:
-    return (
-        furl(settings.APP_BASE_URL, query_params=dict(dm=dm))
-        / router.url_path_for(slack_connect_redirect_shortcuts.__name__)
-    ).url
+slack_shortcuts_connect_url = furl(
+    "https://slack.com/oauth/v2/authorize",
+    query_params=dict(
+        client_id=settings.SLACK_CLIENT_ID,
+        scope=",".join(["incoming-webhook"]),
+        user_scope=",".join(["chat:write"]),
+        redirect_uri=slack_shortcuts_redirect_uri,
+    ),
+)
