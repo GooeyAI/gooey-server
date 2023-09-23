@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import datetime
 import html
 import inspect
@@ -102,6 +103,7 @@ class BasePage:
         self.tab = tab
         self.request = request
         self.run_user = run_user
+        self.executor = ThreadPoolExecutor()
 
     @classmethod
     def app_url(cls, example_id=None, run_id=None, uid=None, tab_name=None) -> str:

@@ -1,3 +1,4 @@
+import time
 import typing
 
 import requests
@@ -17,6 +18,7 @@ from daras_ai_v2.stable_diffusion import (
     controlnet,
     ControlNetModels,
 )
+MODEL_RUNTIME_PER_TEXT_LENGTH = 0.2
 
 
 class Img2ImgPage(BasePage):
@@ -124,6 +126,15 @@ class Img2ImgPage(BasePage):
         for img in output_images:
             st.image(img, caption="```" + text_prompt.replace("\n", "") + "```")
 
+    def render_output_timer(self):
+        if self.request.user.email:
+            st.markdown(
+                f"We'll email {self.request.user.email} when your workflow is done."
+            )
+        st.markdown(
+            "In the meantime, check out 🔖 [Examples](https://gooey.ai/ai-photo-editor/examples/) for more inspiration."
+        )
+
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
         with col2:
@@ -137,13 +148,26 @@ class Img2ImgPage(BasePage):
             st.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
+        text_length = len(st.session_state["text_prompt"].strip())
+        estimated_runtime_seconds = int(
+            text_length * MODEL_RUNTIME_PER_TEXT_LENGTH if text_length > 0 else 15
+        )
+
+        future = self.executor.submit(self.run_job, state)
+
+        while not future.done():
+            estimated_runtime_seconds -= 1
+            if estimated_runtime_seconds > 0:
+                yield f'Generating Image... <br><span style="font-size: 1rem">{int(estimated_runtime_seconds)}s left</span>'
+            else:
+                yield f'Generating Image... <br><span style="font-size: 1rem">Please wait a bit.</span>'
+            time.sleep(1)
+
+    def run_job(self, state: dict):
         request: Img2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
 
         init_image = request.input_image
         init_image_bytes = requests.get(init_image).content
-
-        yield "Generating Image..."
-
         if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
             state["output_images"] = instruct_pix2pix(
                 prompt=request.text_prompt,

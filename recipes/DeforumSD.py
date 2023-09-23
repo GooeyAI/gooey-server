@@ -1,3 +1,4 @@
+import time
 import typing
 import uuid
 
@@ -29,7 +30,7 @@ class _AnimationPrompt(typing.TypedDict):
 AnimationPrompts = list[_AnimationPrompt]
 
 CREDITS_PER_FRAME = 1.5
-MODEL_RUNTIME_PER_FRAME = 2.7
+MODEL_RUNTIME_PER_FRAME = 2.4
 
 
 def input_prompt_to_animation_prompts(input_prompt: str):
@@ -421,13 +422,6 @@ Choose fps for the video.
             st.video(output_video)
 
     def render_output_timer(self):
-        max_frames = st.session_state.get("max_frames", 20)
-        estimated_runtime_seconds = max_frames * MODEL_RUNTIME_PER_FRAME
-        st.markdown("Estimated time to complete:")
-        st.countdown_timer(
-            duration=int(estimated_runtime_seconds),
-            text="Please wait a bit! Your run is taking longer than we expected.",
-        )
         if self.request.user.email:
             st.markdown(
                 f"We'll email {self.request.user.email} when your workflow is done."
@@ -454,8 +448,21 @@ Choose fps for the video.
         return display
 
     def run(self, state: dict):
+        max_frames = st.session_state.get("max_frames", 20)
+        estimated_runtime_seconds = max_frames * MODEL_RUNTIME_PER_FRAME
+
+        future = self.executor.submit(self.run_job, state)
+
+        while not future.done():
+            estimated_runtime_seconds -= 1
+            if estimated_runtime_seconds > 0:
+                yield f'Running... <br><span style="font-size: 1rem">{int(estimated_runtime_seconds)}s left</span>'
+            else:
+                yield f'Running... <br><span style="font-size: 1rem">Please wait a bit.</span>'
+            time.sleep(1)
+
+    def run_job(self, state):
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
-        yield
 
         if not self.request.user.disable_safety_checker:
             safety_checker(self.preview_input(state))
