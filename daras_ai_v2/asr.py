@@ -117,7 +117,7 @@ def google_translate_languages() -> dict[str, str]:
     parent = f"projects/{project}/locations/global"
     client = translate.TranslationServiceClient()
     supported_languages = client.get_supported_languages(
-        parent, display_language_code="en"
+        parent=parent, display_language_code="en"
     )
     return {
         lang.language_code: lang.display_name
