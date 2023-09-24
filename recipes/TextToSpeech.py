@@ -12,7 +12,7 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, storage_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.gpu_server import GpuEndpoints
+from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
@@ -40,6 +40,8 @@ class TextToSpeechPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
+        "seamless_input_language": "eng",
+        "seamless_output_language": "eng",
     }
 
     class RequestModel(BaseModel):
@@ -57,6 +59,9 @@ class TextToSpeechPage(BasePage):
         google_pitch: float | None
 
         bark_history_prompt: str | None
+
+        seamless_input_language: str | None
+        seamless_output_language: str | None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -179,7 +184,23 @@ class TextToSpeechPage(BasePage):
                         break
                     else:
                         time.sleep(0.1)
-
+            case TextToSpeechProviders.SEAMLESS:
+                data = call_celery_task(
+                    "seamless",
+                    pipeline=dict(
+                        model_id="seamlessM4T_large",
+                    ),
+                    inputs=dict(
+                        text=text,
+                        task="T2ST",
+                        tgt_lang=state["seamless_output_language"],
+                        src_lang=state["seamless_input_language"],
+                    ),
+                )
+                audio_url = upload_file_from_bytes(
+                    "seamless_gen.wav", data.get("audio")
+                )
+                state["audio_url"] = audio_url
             case TextToSpeechProviders.GOOGLE_TTS:
                 voice_name = (
                     state["google_voice_name"]
