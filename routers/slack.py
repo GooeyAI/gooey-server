@@ -9,13 +9,12 @@ from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
 from starlette.responses import RedirectResponse, HTMLResponse
 
-from bots.models import BotIntegration, Platform
+from bots.models import BotIntegration, Platform, Conversation
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
 from daras_ai_v2.slack_bot import (
     SlackBot,
-    SlackMessage,
     invite_bot_account_to_channel,
     create_personal_channel,
     SlackAPIError,
@@ -151,18 +150,11 @@ def slack_interaction(
     if data["type"] != "block_actions":
         return
     bot = SlackBot(
-        SlackMessage(
-            application_id=data["api_app_id"],
-            channel=data["channel"]["id"],
-            thread_ts=data["container"]["thread_ts"],
-            text="",
-            user_id=data["user"]["id"],
-            # user_name=data["user"]["id"],
-            files=[],
-            actions=data["actions"],
-            msg_id=data["container"]["message_ts"],
-            team_id=data["team"]["id"],
-        )
+        message_ts=data["container"]["message_ts"],
+        team_id=data["team"]["id"],
+        user_id=data["user"]["id"],
+        channel_id=data["channel"]["id"],
+        actions=data["actions"],
     )
     background_tasks.add_task(_on_msg, bot)
 
@@ -181,27 +173,26 @@ def slack_event(
     return Response("OK")
 
 
-def _handle_slack_event(data: dict, background_tasks: BackgroundTasks):
-    if data["type"] != "event_callback":
+def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
+    if event["type"] != "event_callback":
         return
-    event = data["event"]
-    if event["type"] != "message":
+    message = event["event"]
+    if message["type"] != "message":
         return
-
     try:
-        match event.get("subtype", "any"):
+        match message.get("subtype", "any"):
             case "channel_join":
                 bi = BotIntegration.objects.get(
-                    slack_channel_id=event["channel"],
-                    slack_team_id=data["team_id"],
+                    slack_channel_id=message["channel"],
+                    slack_team_id=event["team_id"],
                 )
                 if not bi.slack_create_personal_channels:
                     return
                 try:
-                    user = fetch_user_info(event["user"], bi.slack_access_token)
+                    user = fetch_user_info(message["user"], bi.slack_access_token)
                 except SlackAPIError as e:
                     if e.error == "missing_scope":
-                        print(f"Error: Missing scopes for - {event!r}")
+                        print(f"Error: Missing scopes for - {message!r}")
                         capture_exception(e)
                     else:
                         raise
@@ -209,28 +200,23 @@ def _handle_slack_event(data: dict, background_tasks: BackgroundTasks):
                     create_personal_channel(bi, user)
 
             case "any" | "slack_audio" | "file_share":
-                files = event.get("files", [])
+                files = message.get("files", [])
                 if not files:
-                    event.get("messsage", {}).get("files", [])
+                    message.get("messsage", {}).get("files", [])
                 if not files:
-                    attachments = event.get("attachments", [])
+                    attachments = message.get("attachments", [])
                     files = [
                         file
                         for attachment in attachments
                         for file in attachment.get("files", [])
                     ]
                 bot = SlackBot(
-                    SlackMessage(
-                        application_id=(data["api_app_id"]),
-                        channel=event["channel"],
-                        thread_ts=event["event_ts"],
-                        text=event.get("text", ""),
-                        user_id=event["user"],
-                        files=files,
-                        actions=[],
-                        msg_id=event["ts"],
-                        team_id=event.get("team", data["team_id"]),
-                    )
+                    message_ts=message["ts"],
+                    team_id=message.get("team", event["team_id"]),
+                    channel_id=message["channel"],
+                    user_id=message["user"],
+                    text=message.get("text", ""),
+                    files=files,
                 )
                 background_tasks.add_task(_on_msg, bot)
 
@@ -239,9 +225,14 @@ def _handle_slack_event(data: dict, background_tasks: BackgroundTasks):
         capture_exception(e)
 
 
+@router.get("/__/slack/oauth/shortcuts/")
+def slack_oauth_shortcuts():
+    return RedirectResponse(str(slack_shortcuts_connect_url))
+
+
 @router.get("/__/slack/redirect/shortcuts/")
 def slack_connect_redirect_shortcuts(request: Request):
-    retry_button = f'<a href="{slack_connect_url}">Retry</a>'
+    retry_button = f'<a href="{slack_shortcuts_connect_url}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -258,14 +249,43 @@ def slack_connect_redirect_shortcuts(request: Request):
         auth=HTTPBasicAuth(settings.SLACK_CLIENT_ID, settings.SLACK_CLIENT_SECRET),
     )
     res.raise_for_status()
-    print(res.text)
     res = res.json()
+    print("> slack_connect_redirect_shortcuts:", res)
+
+    channel_id = res["incoming_webhook"]["channel_id"]
+    user_id = res["authed_user"]["id"]
+    team_id = res["team"]["id"]
+    access_token = res["authed_user"]["access_token"]
+
+    try:
+        convo = Conversation.objects.get(
+            slack_channel_id=channel_id, slack_user_id=user_id, slack_team_id=team_id
+        )
+    except Conversation.DoesNotExist:
+        return HTMLResponse(
+            "<p>Oh No! Something went wrong here.</p>"
+            "<p>Conversation not found. Please make sure this channel is connected to the gooey bot</p>"
+            + retry_button,
+            status_code=404,
+        )
+
+    if not convo.bot_integration.saved_run_id:
+        return HTMLResponse(
+            "<p>Oh No! Something went wrong here.</p>"
+            "<p>Please make sure this bot is connected to a gooey run or example</p>"
+            + retry_button,
+            status_code=400,
+        )
+    sr = convo.bot_integration.saved_run
+
     payload = json.dumps(
         dict(
-            slack_channel=res["incoming_webhook"]["channel"].strip("#"),
-            slack_channel_id=res["incoming_webhook"]["channel_id"],
-            slack_user_access_token=res["authed_user"]["access_token"],
-            slack_team_id=res["team"]["id"],
+            slack_channel=convo.slack_channel_name,
+            slack_channel_id=convo.slack_channel_id,
+            slack_user_access_token=access_token,
+            slack_team_id=team_id,
+            gooey_example_id=sr.example_id,
+            gooey_run_id=sr.run_id,
         ),
         indent=2,
     )
@@ -302,3 +322,13 @@ slack_shortcuts_redirect_uri = (
     furl(settings.APP_BASE_URL)
     / router.url_path_for(slack_connect_redirect_shortcuts.__name__)
 ).url
+
+slack_shortcuts_connect_url = furl(
+    "https://slack.com/oauth/v2/authorize",
+    query_params=dict(
+        client_id=settings.SLACK_CLIENT_ID,
+        scope=",".join(["incoming-webhook"]),
+        user_scope=",".join(["chat:write"]),
+        redirect_uri=slack_shortcuts_redirect_uri,
+    ),
+)

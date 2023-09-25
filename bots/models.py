@@ -53,7 +53,7 @@ class Workflow(models.IntegerChoices):
     IMG_2_IMG = (12, "Img2Img")
     FACE_INPAINTING = (13, "Face Inpainting")
     GOOGLE_IMAGE_GEN = (14, "Google Image Gen")
-    COMPARE_UPSCALER = (15, "Comapre AI Upscalers")
+    COMPARE_UPSCALER = (15, "Compare AI Upscalers")
     SEO_SUMMARY = (16, "SEO Summary")
     EMAIL_FACE_INPAINTING = (17, "Email Face Inpainting")
     SOCIAL_LOOKUP_EMAIL = (18, "Social Lookup Email")
@@ -704,7 +704,9 @@ class Message(models.Model):
 
     platform_msg_id = models.TextField(
         blank=True,
-        default="",
+        null=True,
+        default=None,
+        unique=True,
         help_text="The platform's delivered message id",
     )
 

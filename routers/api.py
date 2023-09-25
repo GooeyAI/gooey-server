@@ -122,7 +122,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             page_cls=page_cls,
             user=user,
             request_body=page_request.dict(),
-            query_params=request.query_params,
+            query_params=dict(request.query_params),
         )
 
     @app.post(
@@ -176,7 +176,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             page_cls=page_cls,
             user=user,
             request_body=page_request.dict(),
-            query_params=request.query_params,
+            query_params=dict(request.query_params),
             run_async=True,
         )
         response.headers["Location"] = ret["status_url"]
@@ -328,6 +328,7 @@ def submit_api_call(
     self = page_cls(request=SimpleNamespace(user=user))
 
     # get saved state from db
+    query_params.setdefault("uid", user.uid)
     state = self.get_sr_from_query_params_dict(query_params).to_dict()
     if state is None:
         raise HTTPException(status_code=404)

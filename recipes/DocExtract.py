@@ -8,6 +8,7 @@ from django.db.models import IntegerChoices
 from furl import furl
 from pydantic import BaseModel
 from pypdf import PdfWriter, PdfReader
+from daras_ai_v2.loom_video_widget import youtube_video
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -36,6 +37,8 @@ from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.settings import service_account_key_path
 from daras_ai_v2.vector_search import doc_url_to_metadata, DocMetadata
 from recipes.DocSearch import render_documents
+
+DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6c8f6876-538c-11ee-bea7-02420a000195/youtube%20bot%201.png.png"
 
 
 class Columns(IntegerChoices):
@@ -81,6 +84,9 @@ class DocExtractPage(BasePage):
     class ResponseModel(BaseModel):
         pass
 
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_YOUTUBE_BOT_META_IMG
+
     def render_form_v2(self):
         document_uploader(
             "##### 🤖 Youtube URLS",
@@ -102,6 +108,9 @@ class DocExtractPage(BasePage):
         render_documents(state)
         st.write("**Google Sheets URL**")
         st.write(state.get("sheet_url"))
+
+    def render_usage_guide(self):
+        youtube_video("p7ZLb-loR_4")
 
     def render_settings(self):
         st.text_area(

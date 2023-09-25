@@ -1,47 +1,49 @@
 ## Setup
+
 * Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile)
 * Install [poetry](https://python-poetry.org/docs/)
-* Create & active a virtualenv (e.g. `poetry shell`)
+* Create & activate a virtualenv (e.g. `poetry shell`)
 * Run `poetry install --with dev`
+* Install [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/), [rabbitmq](https://www.rabbitmq.com/install-homebrew.html), and [postgresql](https://formulae.brew.sh/formula/postgresql@15) (e.g. `brew install redis rabbitmq postgresql@15`)
+* Enable background services for `redis`, `rabbitmq`, and `postgresql` (e.g. with `brew services start redis` and similar for `rabbitmq` and `postgresql`)
+* Use `sqlcreate` helper to create a user and database for gooey:
+  * `./manage.py sqlcreate | psql postgres`
+  * make sure you are able to access the database with `psql -W -U gooey gooey` (and when prompted for password, entering `gooey`)
 * Create an `.env` file from `.env.example` (Read [12factor.net/config](https://12factor.net/config))
 * Run `./manage.py migrate`
+* Install the zbar library (`brew install zbar`)
 
 ## Run
 
-### API + GUI server
+You can start all required processes in one command with Honcho:
 
-```bash
-uvicorn server:app --host 0.0.0.0 --port 8080 --reload
+```shell
+$ poetry run honcho start
 ```
 
-Open [localhost:8080](localhost:8080) in your browser
+The processes that it starts are defined in [`Procfile`](Procfile).
+Currently they are these:
 
-### Admin Site
+| Service          | Port |
+| -------          | ---- |
+| API + GUI Server | 8080 |
+| Admin site       | 8000 |
+| Usage dashboard  | 8501 |
+| Celery           | -    |
+| UI               | 3000 |
 
-```bash
-python3 manage.py runserver 0.0.0.0:8000
-```
+This default startup assumes that Redis, RabbitMQ, and PostgreSQL are installed and running
+as background services on ports 6379, 5672, and 5432 respectively. 
+It also assumes that the gooey-ui repo can be found at `../gooey-ui/` (adjacent to where the
+gooey-server repo sits). You can open the Procfile and comment this out if you don't need
+to run it.
 
-Open [localhost:8000](localhost:8000) in your browser
-
-
-### Usage Dashboard
-
-```
-streamlit run Home.py --server.port 8501
-```
-
-Open [localhost:8501](localhost:8501) in your browser
+**Note:** the Celery worker must be manually restarted on code changes. You
+can do this by stopping and starting Honcho.
 
 ## To run any recipe 
 
 * Save `serviceAccountKey.json` to project root
-* Install & start [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/)
-* Install & start [rabbitmq](https://www.rabbitmq.com/install-homebrew.html)
-* Run the celery worker (**Note:** you must manually restart it on code changes)
-```bash
-celery -A celeryapp worker
-```
 
 ## To connect to our GPU cluster 
 

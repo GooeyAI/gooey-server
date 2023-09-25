@@ -26,6 +26,7 @@ from bots.models import (
     Conversation,
     BotIntegration,
 )
+from bots.tasks import create_personal_channels_for_all_members
 from gooeysite.custom_widgets import JSONEditorWidget
 
 
@@ -84,16 +85,34 @@ class BotIntegrationAdminForm(forms.ModelForm):
         ]
 
 
+def create_personal_channels(modeladmin, request, queryset):
+    for bi in queryset:
+        create_personal_channels_for_all_members.delay(bi.id)
+    modeladmin.message_user(
+        request,
+        f"Started creating personal channels for {queryset.count()} bots in the background.",
+    )
+
+
 @admin.register(BotIntegration)
 class BotIntegrationAdmin(admin.ModelAdmin):
     search_fields = [
         "name",
+        "billing_account_uid",
+        "user_language",
+        "fb_page_id",
+        "fb_page_name",
+        "fb_page_access_token",
         "ig_account_id",
         "ig_username",
-        "fb_page_id",
         "wa_phone_number",
+        "wa_phone_number_id",
+        "slack_team_id",
+        "slack_team_name",
         "slack_channel_id",
-        "billing_account_uid",
+        "slack_channel_name",
+        "slack_channel_hook_url",
+        "slack_access_token",
     ]
     list_display = [
         "name",
@@ -180,6 +199,8 @@ class BotIntegrationAdmin(admin.ModelAdmin):
             },
         ),
     ]
+
+    actions = [create_personal_channels]
 
     @admin.display(description="Messages")
     def view_messsages(self, bi: BotIntegration):
@@ -343,7 +364,17 @@ class ConversationAdmin(admin.ModelAdmin):
     list_filter = ["bot_integration", "created_at", LastActiveDeltaFilter]
     autocomplete_fields = ["bot_integration"]
     search_fields = [
+        "fb_page_id",
+        "fb_page_name",
+        "fb_page_access_token",
+        "ig_account_id",
+        "ig_username",
         "wa_phone_number",
+        "slack_user_id",
+        "slack_team_id",
+        "slack_user_name",
+        "slack_channel_id",
+        "slack_channel_name",
     ] + [f"bot_integration__{field}" for field in BotIntegrationAdmin.search_fields]
     actions = [export_to_csv, export_to_excel]
 
@@ -395,10 +426,11 @@ class MessageAdmin(admin.ModelAdmin):
         "created_at",
     ]
     search_fields = [
-        "analysis_result",
         "role",
         "content",
         "display_content",
+        "platform_msg_id",
+        "analysis_result",
     ] + [f"conversation__{field}" for field in ConversationAdmin.search_fields]
     list_display = [
         "__str__",

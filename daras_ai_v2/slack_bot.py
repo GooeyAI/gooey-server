@@ -29,38 +29,34 @@ I have been configured for $user_language and will respond to you in that langua
 SLACK_MAX_SIZE = 3000
 
 
-class SlackMessage(TypedDict):
-    application_id: str
-    channel: str
-    thread_ts: str
-    text: str
-    user_id: str
-    files: list[dict]
-    actions: list[dict]
-    msg_id: str
-    team_id: str
-
-
 class SlackBot(BotInterface):
-    _read_msg_id: str | None = None
-    _file: dict | None = None
+    platform = Platform.SLACK
+
+    _read_rcpt_ts: str | None = None
 
     def __init__(
         self,
-        message: SlackMessage,
+        *,
+        message_ts: str,
+        team_id: str,
+        channel_id: str,
+        user_id: str,
+        text: str = "",
+        files: list[dict] = None,
+        actions: list[dict] = None,
     ):
-        self.input_message = message  # type: ignore
-        self.platform = Platform.SLACK
-
-        self.bot_id = message["channel"]
-        self.user_id = message["user_id"]
+        self._msg_ts = message_ts
+        self._team_id = team_id
+        self.bot_id = channel_id
+        self.user_id = user_id
+        self._text = text
 
         # Try to find an existing conversation, this could either be a personal channel or the main channel the integration was added to
         try:
             self.convo = Conversation.objects.get(
                 slack_channel_id=self.bot_id,
                 slack_user_id=self.user_id,
-                slack_team_id=message["team_id"],
+                slack_team_id=self._team_id,
             )
         except Conversation.DoesNotExist:
             # No existing conversation found, this could be a personal channel or the main channel the integration was added to
@@ -68,38 +64,38 @@ class SlackBot(BotInterface):
             self.convo = Conversation.objects.get_or_create(
                 slack_channel_id=self.bot_id,
                 slack_user_id=self.user_id,
-                slack_team_id=message["team_id"],
+                slack_team_id=self._team_id,
                 defaults=dict(
                     bot_integration=BotIntegration.objects.get(
                         slack_channel_id=self.bot_id,
-                        slack_team_id=message["team_id"],
+                        slack_team_id=self._team_id,
                     ),
                 ),
             )[0]
 
         fetch_missing_convo_metadata(self.convo)
+        self._access_token = self.convo.bot_integration.slack_access_token
 
-        bi = self.convo.bot_integration
-        self.name = bi.name
-        self.slack_access_token = bi.slack_access_token
-        self.read_msg = bi.slack_read_receipt_msg.strip()
-        self._unpack_bot_integration(bi)
-
-        self._thread_ts = message["thread_ts"]
-
-        self.input_type = "text"
-        files = message.get("files", [])
         if files:
             self._file = files[0]  # we only process the first file for now
             # Additional check required to access file info - https://api.slack.com/apis/channels-between-orgs#check_file_info
             if self._file.get("file_access") == "check_file_info":
-                self._file = fetch_file_info(self._file["id"], bi.slack_access_token)
+                self._file = fetch_file_info(self._file["id"], self._access_token)
             self.input_type = self._file.get("mimetype", "").split("/")[0] or "unknown"
-        if message.get("actions"):
+        else:
+            self._file = None
+            self.input_type = "text"
+
+        if actions:
+            self._actions = actions
             self.input_type = "interactive"
+        else:
+            self._actions = None
+
+        self._unpack_bot_integration()
 
     def get_input_text(self) -> str | None:
-        return self.input_message.get("text")
+        return self._text
 
     def get_input_audio(self) -> str | None:
         if not self._file:
@@ -112,9 +108,7 @@ class SlackBot(BotInterface):
             "audio/" in mime_type or "video/" in mime_type
         ), f"Unsupported mime type {mime_type} for {url}"
         # download file from slack
-        r = requests.get(
-            url, headers={"Authorization": f"Bearer {self.slack_access_token}"}
-        )
+        r = requests.get(url, headers={"Authorization": f"Bearer {self._access_token}"})
         r.raise_for_status()
         # convert to wav
         data, _ = audio_bytes_to_wav(r.content)
@@ -128,10 +122,8 @@ class SlackBot(BotInterface):
         return audio_url
 
     def get_interactive_msg_info(self) -> tuple[str, str]:
-        return (
-            self.input_message["actions"][0]["value"],
-            self.input_message["msg_id"],
-        )
+        button_id = self._actions[0]["value"]
+        return button_id, self._msg_ts
 
     def send_msg(
         self,
@@ -147,50 +139,50 @@ class SlackBot(BotInterface):
         if should_translate and self.language and self.language != "en":
             text = run_google_translate([text], self.language)[0]
 
-        if self._read_msg_id and self._read_msg_id != self._thread_ts:
+        if self._read_rcpt_ts and self._read_rcpt_ts != self._msg_ts:
             delete_msg(
                 channel=self.bot_id,
-                thread_ts=self._read_msg_id,
-                token=self.slack_access_token,
+                thread_ts=self._read_rcpt_ts,
+                token=self._access_token,
             )
-            self._read_msg_id = None
+            self._read_rcpt_ts = None
 
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
         for doc in splits[:-1]:
-            self._thread_ts = chat_post_message(
+            self._msg_ts = chat_post_message(
                 text=doc.text,
                 channel=self.bot_id,
                 channel_is_personal=self.convo.slack_channel_is_personal,
-                thread_ts=self._thread_ts,
-                username=self.name,
-                token=self.slack_access_token,
+                thread_ts=self._msg_ts,
+                username=self.convo.bot_integration.name,
+                token=self._access_token,
             )
-        self._thread_ts = chat_post_message(
+        self._msg_ts = chat_post_message(
             text=splits[-1].text,
             audio=audio,
             video=video,
             channel=self.bot_id,
             channel_is_personal=self.convo.slack_channel_is_personal,
-            thread_ts=self._thread_ts,
-            username=self.name,
-            token=self.slack_access_token,
+            thread_ts=self._msg_ts,
+            username=self.convo.bot_integration.name,
+            token=self._access_token,
             buttons=buttons or [],
         )
-        return self._thread_ts
+        return self._msg_ts
 
     def mark_read(self):
-        if not self.read_msg:
+        text = self.convo.bot_integration.slack_read_receipt_msg.strip()
+        if not text:
             return
-        text = self.read_msg
         if self.language and self.language != "en":
             text = run_google_translate([text], self.language)[0]
-        self._read_msg_id = chat_post_message(
+        self._read_rcpt_ts = chat_post_message(
             text=text,
             channel=self.bot_id,
             channel_is_personal=self.convo.slack_channel_is_personal,
-            thread_ts=self._thread_ts,
-            token=self.slack_access_token,
-            username=self.name,
+            thread_ts=self._msg_ts,
+            token=self._access_token,
+            username=self.convo.bot_integration.name,
         )
 
 
@@ -239,7 +231,7 @@ def fetch_missing_convo_metadata(convo: Conversation):
         if not convo.slack_user_name:
             user_data = fetch_user_info(convo.slack_user_id, token)
             Conversation.objects.filter(id=convo.id).update(
-                slack_user_name=user_data["real_name"]
+                slack_user_name=get_slack_user_name(user_data)
             )
         if not convo.slack_channel_name:
             channel_data = fetch_channel_info(convo.slack_channel_id, token)
@@ -252,6 +244,15 @@ def fetch_missing_convo_metadata(convo: Conversation):
             capture_exception(e)
         else:
             raise
+
+
+def get_slack_user_name(user: dict) -> str | None:
+    return (
+        user.get("real_name")
+        or user.get("profile", {}).get("display_name")
+        or user.get("name")
+        or ""
+    )
 
 
 def fetch_channel_info(channel: str, token: str) -> dict[str, typing.Any]:
@@ -306,7 +307,7 @@ def create_personal_channel(
     if user["is_bot"]:
         return None
     user_id = user["id"]
-    user_name = user["real_name"]
+    user_name = get_slack_user_name(user)
     team_id = user["team_id"]
     # lookup the personal convo with this bot and user
     convo_lookup = dict(
@@ -333,7 +334,11 @@ def create_personal_channel(
         )
     except SlackAPIError as e:
         # skip if the user is restricted
-        if e.error in ["user_is_ultra_restricted", "user_is_restricted"]:
+        if e.error in [
+            "user_is_ultra_restricted",
+            "user_is_restricted",
+            "user_team_not_in_channel",
+        ]:
             return
         else:
             raise
@@ -550,26 +555,21 @@ def create_file_block(
     ]
 
 
-def create_button_block(
-    buttons: list[
-        dict[{"type": str, "chat_post_message": dict[{"id": str, "title": str}]}]
-    ]
-) -> list[dict]:
+def create_button_block(buttons: list[dict]) -> list[dict]:
     if not buttons:
         return []
-    elements = []
-    for button in buttons:
-        element = {}
-        element["type"] = "button"
-        element["text"] = {"type": "plain_text", "text": button["reply"]["title"]}
-        element["value"] = button["reply"]["id"]
-        element["action_id"] = "button_" + button["reply"]["id"]
-        elements.append(element)
-
     return [
         {
             "type": "actions",
-            "elements": elements,
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": button["reply"]["title"]},
+                    "value": button["reply"]["id"],
+                    "action_id": "button_" + button["reply"]["id"],
+                }
+                for button in buttons
+            ],
         }
     ]
 
