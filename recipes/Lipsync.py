@@ -15,6 +15,8 @@ from daras_ai_v2.loom_video_widget import youtube_video
 
 CREDITS_PER_MB = 2
 
+DEFAULT_LIPSYNC_GIF = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/91acbbde-5857-11ee-920a-02420a000194/lipsync%20audio.png.png"
+
 
 class LipsyncPage(BasePage):
     title = "Lip Syncing"
@@ -32,6 +34,9 @@ class LipsyncPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_video: str
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_LIPSYNC_GIF
 
     def render_form_v2(self) -> bool:
         st.file_uploader(

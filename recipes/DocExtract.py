@@ -38,6 +38,8 @@ from daras_ai_v2.settings import service_account_key_path
 from daras_ai_v2.vector_search import doc_url_to_metadata, DocMetadata
 from recipes.DocSearch import render_documents
 
+DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6c8f6876-538c-11ee-bea7-02420a000195/youtube%20bot%201.png.png"
+
 
 class Columns(IntegerChoices):
     webpage_url = 1, "Source"
@@ -81,6 +83,9 @@ class DocExtractPage(BasePage):
 
     class ResponseModel(BaseModel):
         pass
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_YOUTUBE_BOT_META_IMG
 
     def render_form_v2(self):
         document_uploader(
