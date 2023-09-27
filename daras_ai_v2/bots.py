@@ -44,7 +44,7 @@ class BotInterface:
     language: str
     show_feedback_buttons: bool = False
     convo: Conversation
-    recieved_msg_id: str | None
+    recieved_msg_id: str = None
 
     def send_msg(
         self,
