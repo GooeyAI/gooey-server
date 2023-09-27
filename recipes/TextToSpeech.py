@@ -12,7 +12,7 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, storage_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task
+from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
@@ -185,7 +185,7 @@ class TextToSpeechPage(BasePage):
                     else:
                         time.sleep(0.1)
             case TextToSpeechProviders.SEAMLESS:
-                data = call_celery_task(
+                data = call_celery_task_outfile(
                     "seamless",
                     pipeline=dict(
                         model_id="seamlessM4T_large",
@@ -196,11 +196,10 @@ class TextToSpeechPage(BasePage):
                         tgt_lang=state["seamless_output_language"],
                         src_lang=state["seamless_input_language"],
                     ),
+                    content_type="audio/wav",
+                    filename="seamless_gen.wav",
                 )
-                audio_url = upload_file_from_bytes(
-                    "seamless_gen.wav", data.get("audio")
-                )
-                state["audio_url"] = audio_url
+                state["audio_url"] = data[0]
             case TextToSpeechProviders.GOOGLE_TTS:
                 voice_name = (
                     state["google_voice_name"]
