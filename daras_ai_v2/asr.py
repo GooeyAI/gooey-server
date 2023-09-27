@@ -42,7 +42,7 @@ class AsrModels(Enum):
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
     usm = "Chirp / USM (Google)"
     deepgram = "Deepgram"
-    seamless = "Seamless M4T (Facebook Research)"
+    seamless_m4t = "Seamless M4T (Facebook Research)"
 
 
 asr_model_ids = {
@@ -52,7 +52,7 @@ asr_model_ids = {
     AsrModels.vakyansh_bhojpuri: "Harveenchadha/vakyansh-wav2vec2-bhojpuri-bhom-60",
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
-    AsrModels.seamless: "seamlessM4T_large",
+    AsrModels.seamless_m4t: "seamlessM4T_large",
 }
 
 forced_asr_languages = {
@@ -67,7 +67,7 @@ asr_supported_languages = {
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: WHISPER_SUPPORTED,
-    AsrModels.seamless: SEAMLESS_SUPPORTED,
+    AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
 }
 
 
@@ -333,11 +333,11 @@ def run_asr(
         return "\n".join(
             f"Speaker {chunk['speaker']}: {chunk['text']}" for chunk in chunks
         )
-    elif selected_model == AsrModels.seamless:
+    elif selected_model == AsrModels.seamless_m4t:
         data = call_celery_task(
             "seamless",
             pipeline=dict(
-                model_id=asr_model_ids[AsrModels.seamless],
+                model_id=asr_model_ids[AsrModels.seamless_m4t],
             ),
             inputs=dict(
                 audio=audio_url,
