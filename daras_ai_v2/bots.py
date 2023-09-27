@@ -44,6 +44,7 @@ class BotInterface:
     language: str
     show_feedback_buttons: bool = False
     convo: Conversation
+    recieved_msg_id: str | None
 
     def send_msg(
         self,
@@ -88,9 +89,6 @@ class BotInterface:
 
     def get_interactive_msg_info(self) -> tuple[str, str]:
         raise NotImplementedError("This bot does not support interactive messages.")
-
-    def get_recieved_msg_id(self) -> str | None:
-        return None
 
 
 PAGE_NOT_CONNECTED_ERROR = (
@@ -294,8 +292,8 @@ def _process_and_send_msg(
     if msg_id:
         msgs_to_save[-1].platform_msg_id = msg_id
     # save the message id for the received message
-    if bot.get_recieved_msg_id():
-        msgs_to_save[0].platform_msg_id = bot.get_recieved_msg_id()
+    if bot.recieved_msg_id:
+        msgs_to_save[0].platform_msg_id = bot.recieved_msg_id
     # save the messages
     for msg in msgs_to_save:
         msg.save()

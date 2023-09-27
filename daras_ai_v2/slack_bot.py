@@ -33,7 +33,6 @@ class SlackBot(BotInterface):
     platform = Platform.SLACK
 
     _read_rcpt_ts: str | None = None
-    _bot_res_ts: str | None = None
 
     def __init__(
         self,
@@ -46,7 +45,7 @@ class SlackBot(BotInterface):
         files: list[dict] = None,
         actions: list[dict] = None,
     ):
-        self._msg_ts = message_ts
+        self.recieved_msg_id = self._msg_ts = message_ts
         self._team_id = team_id
         self.bot_id = channel_id
         self.user_id = user_id
@@ -126,9 +125,6 @@ class SlackBot(BotInterface):
         button_id = self._actions[0]["value"]
         return button_id, self._msg_ts
 
-    def get_recieved_msg_id(self) -> str:
-        return self._msg_ts
-
     def send_msg(
         self,
         *,
@@ -153,7 +149,7 @@ class SlackBot(BotInterface):
 
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
         for doc in splits[:-1]:
-            self._bot_res_ts = chat_post_message(
+            self._msg_ts = chat_post_message(
                 text=doc.text,
                 channel=self.bot_id,
                 channel_is_personal=self.convo.slack_channel_is_personal,
@@ -161,7 +157,7 @@ class SlackBot(BotInterface):
                 username=self.convo.bot_integration.name,
                 token=self._access_token,
             )
-        self._bot_res_ts = chat_post_message(
+        self._msg_ts = chat_post_message(
             text=splits[-1].text,
             audio=audio,
             video=video,
@@ -172,7 +168,7 @@ class SlackBot(BotInterface):
             token=self._access_token,
             buttons=buttons or [],
         )
-        return self._bot_res_ts
+        return self._msg_ts
 
     def mark_read(self):
         text = self.convo.bot_integration.slack_read_receipt_msg.strip()
