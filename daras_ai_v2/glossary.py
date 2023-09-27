@@ -1,7 +1,7 @@
 import gooey_ui as st
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from contextlib import contextmanager
-from glossary_resources.models import GlossaryResources
+from glossary_resources.models import GlossaryResource
 from django.db.models import F
 import requests
 from time import sleep
@@ -45,11 +45,11 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
         yield None
         return
 
-    resource, created = GlossaryResources.objects.get_or_create(f_url=f_url)
+    resource, created = GlossaryResource.objects.get_or_create(f_url=f_url)
 
     # make sure we don't exceed the max number of glossary resources allowed by GCP (we add a safety buffer of 100 for local development)
-    if created and GlossaryResources.objects.count() > MAX_GLOSSARY_RESOURCES - 100:
-        for gloss in GlossaryResources.objects.order_by("uses", "last_used")[:10]:
+    if created and GlossaryResource.objects.count() > MAX_GLOSSARY_RESOURCES - 100:
+        for gloss in GlossaryResource.objects.order_by("uses", "last_used")[:10]:
             _delete_glossary(glossary_name=gloss.get_clean_name())
             gloss.delete()
 
@@ -69,7 +69,9 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
         else:
             raise e
     finally:
-        GlossaryResources.objects.filter(pk=resource.pk).update(uses=F("uses") + 1)
+        GlossaryResource.objects.filter(pk=resource.pk).update(
+            useage_count=F("useage_count") + 1
+        )
 
 
 @redis_cache_decorator
