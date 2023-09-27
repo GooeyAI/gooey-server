@@ -3,6 +3,8 @@ from daras_ai_v2.redis_cache import redis_cache_decorator
 from contextlib import contextmanager
 from glossary_resources.models import GlossaryResources
 from django.db import transaction
+import requests
+from time import sleep
 
 DEFAULT_GLOSSARY_URL = "https://docs.google.com/spreadsheets/d/1IRHKcOC86oZXwMB0hR7eej7YVg5kUHpriZymwYQcQX4/edit?usp=sharing"  # only viewing access
 PROJECT_ID = "dara-c1b52"  # GCP project id
@@ -33,47 +35,42 @@ def glossary_input(
 
 # ================================ Glossary Logic ================================
 @contextmanager
-def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL):
+def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
     """
     Obtains a glossary resource for use in translation requests.
     """
     from daras_ai_v2.vector_search import doc_url_to_metadata
 
     if not f_url:
-        yield None, None
+        yield None
         return
 
-    # I could not get this to work with concurrent translate requests without locking everything :(
-    with transaction.atomic():
-        resource, created = GlossaryResources.objects.select_for_update().get_or_create(
-            f_url=f_url
-        )
+    resource, created = GlossaryResources.objects.get_or_create(f_url=f_url)
 
-        # make sure we don't exceed the max number of glossary resources allowed by GCP (we add a safety buffer of 100 for local development)
-        if created and GlossaryResources.objects.count() > MAX_GLOSSARY_RESOURCES - 100:
-            first_nonlocked = (
-                GlossaryResources.objects.order_by("uses", "last_used")
-                .select_for_update(
-                    skip_locked=True
-                )  # important: prevents deadlock and locks this row from being selected for read
-                .first()
-            )
-            assert first_nonlocked
-            first_nonlocked.delete()
-            try:
-                _delete_glossary(glossary_name=first_nonlocked.get_clean_name())
-            except:
-                pass  # great error handling
+    # make sure we don't exceed the max number of glossary resources allowed by GCP (we add a safety buffer of 100 for local development)
+    if created and GlossaryResources.objects.count() > MAX_GLOSSARY_RESOURCES - 100:
+        for gloss in GlossaryResources.objects.order_by("uses", "last_used")[:10]:
+            _delete_glossary(glossary_name=gloss.get_clean_name())
+            gloss.delete()
 
-        doc_meta = doc_url_to_metadata(f_url)
-        _update_glossary(f_url, doc_meta, glossary_name=resource.get_clean_name())
-        path = _get_glossary(glossary_name=resource.get_clean_name())
+    doc_meta = doc_url_to_metadata(f_url)
+    # create glossary if it doesn't exist, update if it has changed
+    _update_glossary(f_url, doc_meta, glossary_name=resource.get_clean_name())
+    path = _get_glossary(glossary_name=resource.get_clean_name())
 
-        try:
-            yield path
-        finally:
-            resource.uses += 1
-            resource.save()
+    try:
+        yield path
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 400 and e.response.json().get("error", {}).get(
+            "message", ""
+        ).startswith("Invalid resource name"):
+            sleep(1)
+            yield glossary_resource(f_url, max_tries - 1)
+        else:
+            raise e
+    finally:
+        resource.uses += 1
+        resource.save()
 
 
 @redis_cache_decorator
@@ -82,6 +79,7 @@ def _update_glossary(
 ) -> "pd.DataFrame":
     """Goes through the full process of uploading the glossary from the url"""
     from daras_ai_v2.vector_search import download_table_doc
+    from google.api_core.exceptions import NotFound
 
     df = download_table_doc(f_url, doc_meta)
 
@@ -89,8 +87,8 @@ def _update_glossary(
     # delete existing glossary
     try:
         _delete_glossary(glossary_name=glossary_name)
-    except:
-        pass  # great error handling
+    except NotFound:
+        pass  # glossary already deleted, moving on
     # create new glossary
     languages = [
         lan_code
