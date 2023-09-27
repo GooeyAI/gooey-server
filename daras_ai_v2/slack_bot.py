@@ -45,7 +45,7 @@ class SlackBot(BotInterface):
         files: list[dict] = None,
         actions: list[dict] = None,
     ):
-        self._msg_ts = message_ts
+        self.recieved_msg_id = self._msg_ts = message_ts
         self._team_id = team_id
         self.bot_id = channel_id
         self.user_id = user_id
