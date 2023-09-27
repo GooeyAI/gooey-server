@@ -48,4 +48,4 @@ def test_slack_get_response_for_msg_id(transactional_db):
         headers={"Authorization": f"Bearer {auth_token}"},
     )
     assert r.status_code == 200
-    assert r.json().get("output_text") == ["hello, world!"]
+    assert r.json().get("content") == "hello, world!"

@@ -384,7 +384,7 @@ def slack_get_response_for_msg_id(
     if not output_text:
         return {"status": "no_output"}
 
+    content = output_text[0]
     if remove_refs:
-        output_text = "".join(snippet for snippet, _ in parse_refs(output_text, []))
-
-    return {"status": "ok", "output_text": output_text}
+        content = "".join(snippet for snippet, _ in parse_refs(content, []))
+    return {"status": "ok", "content": content}
