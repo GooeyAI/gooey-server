@@ -2,7 +2,7 @@ import gooey_ui as st
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from contextlib import contextmanager
 from glossary_resources.models import GlossaryResources
-from django.db import transaction
+from django.db.models import F
 import requests
 from time import sleep
 
@@ -69,8 +69,7 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
         else:
             raise e
     finally:
-        resource.uses += 1
-        resource.save()
+        GlossaryResources.objects.filter(pk=resource.pk).update(uses=F("uses") + 1)
 
 
 @redis_cache_decorator
