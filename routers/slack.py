@@ -368,7 +368,6 @@ def slack_auth_header(
 @router.get("/__/slack/get-response-for-msg/{msg_id}/")
 def slack_get_response_for_msg_id(
     msg_id: str,
-    remove_refs: bool = True,
     slack_user: dict = Depends(slack_auth_header),
 ):
     try:
@@ -384,11 +383,13 @@ def slack_get_response_for_msg_id(
     ):
         raise HTTPException(403, "Not authorized")
 
-    output_text = response_msg.saved_run.state.get("output_text")
+    state = response_msg.saved_run.state
+    output_text = (
+        state.get("raw_tts_text")
+        or state.get("raw_output_text")
+        or state.get("output_text")
+    )
     if not output_text:
         return {"status": "no_output"}
 
-    content = output_text[0]
-    if remove_refs:
-        content = "".join(snippet for snippet, _ in parse_refs(content, []))
-    return {"status": "ok", "content": content}
+    return {"status": "ok", "content": output_text[0]}
