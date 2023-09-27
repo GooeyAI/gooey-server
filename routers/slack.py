@@ -239,7 +239,9 @@ def slack_oauth_shortcuts():
 
 
 @router.get("/__/slack/redirect/shortcuts/")
-def slack_connect_redirect_shortcuts(request: Request):
+def slack_connect_redirect_shortcuts(
+    request: Request, shortcut_name: str = "Start Copilot"
+):
     retry_button = f'<a href="{slack_shortcuts_connect_url}">Retry</a>'
 
     code = request.query_params.get("code")
@@ -286,17 +288,22 @@ def slack_connect_redirect_shortcuts(request: Request):
         )
     sr = convo.bot_integration.saved_run
 
-    payload = json.dumps(
-        dict(
-            slack_channel=convo.slack_channel_name,
-            slack_channel_id=convo.slack_channel_id,
-            slack_user_access_token=access_token,
-            slack_team_id=team_id,
-            gooey_example_id=sr.example_id,
-            gooey_run_id=sr.run_id,
-        ),
-        indent=2,
+    slack_creds = dict(
+        slack_channel=convo.slack_channel_name,
+        slack_channel_id=convo.slack_channel_id,
+        slack_user_access_token=access_token,
+        slack_team_id=team_id,
+        gooey_example_id=sr.example_id,
+        gooey_run_id=sr.run_id,
     )
+    shortcut_url = furl(
+        "shortcuts://run-shortcut",
+        query_params=dict(
+            name=shortcut_name,
+            input=json.dumps({"slack_creds": slack_creds}),
+        ),
+    ).tostr(query_quote_plus=False)
+
     return HTMLResponse(
         # language=HTML
         """
@@ -305,24 +312,21 @@ def slack_connect_redirect_shortcuts(request: Request):
         </head>
         <body style="font-size: 1.2rem; text-align: center; font-family: sans-serif">
             <p>
-                <textarea style="font-family: monospace; width: 100%%;" rows=5 id="foo">%(payload)s</textarea>
+                <textarea style="font-family: monospace; width: 100%%;" rows=5 id="foo">%(slack_creds)s</textarea>
             </p>
-
             <p>
-                <button id="new-copy" style="padding: 2rem; font-size: 1.5rem;">
-                    Click here to Complete Setup
-                </button>
+                <a href="%(shortcut_url)s">
+                    <button id="new-copy" style="padding: 2rem; font-size: 1.5rem;">
+                        Click here to Complete Setup
+                    </button>
+                </a>
             </p>
-
-            <script>
-                document.getElementById("new-copy").addEventListener("click", event => {
-                    navigator.clipboard.writeText(%(payload)r);
-                    document.body.innerText = "Setup Complete! You can close this window now."
-                });
-            </script>
         </body>
         """
-        % dict(payload=payload)
+        % dict(
+            slack_creds=json.dumps(slack_creds, indent=2),
+            shortcut_url=shortcut_url,
+        )
     )
 
 
