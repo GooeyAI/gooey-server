@@ -178,7 +178,7 @@ def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
         return
     message = event["event"]
     try:
-        match message.get("type", "any"):
+        match message.get("type"):
             case "member_joined_channel":
                 bi = BotIntegration.objects.get(
                     slack_channel_id=message["channel"],
@@ -196,31 +196,32 @@ def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
                         raise
                 else:
                     create_personal_channel(bi, user)
+
             case "message":
-                if message.get("subtype", "any") in [
-                    "any",
-                    "slack_audio",
-                    "file_share",
-                ]:
-                    files = message.get("files", [])
-                    if not files:
-                        message.get("message", {}).get("files", [])
-                    if not files:
-                        attachments = message.get("attachments", [])
-                        files = [
-                            file
-                            for attachment in attachments
-                            for file in attachment.get("files", [])
-                        ]
-                    bot = SlackBot(
-                        message_ts=message["ts"],
-                        team_id=message.get("team", event["team_id"]),
-                        channel_id=message["channel"],
-                        user_id=message["user"],
-                        text=message.get("text", ""),
-                        files=files,
-                    )
-                    background_tasks.add_task(_on_msg, bot)
+                # Ignore subtypes other than slack_audio and file_share. If there's no subtype, assume text
+                subtype = message.get("subtype")
+                if subtype and subtype not in ["slack_audio", "file_share"]:
+                    return
+
+                files = message.get("files", [])
+                if not files:
+                    message.get("message", {}).get("files", [])
+                if not files:
+                    attachments = message.get("attachments", [])
+                    files = [
+                        file
+                        for attachment in attachments
+                        for file in attachment.get("files", [])
+                    ]
+                bot = SlackBot(
+                    message_ts=message["ts"],
+                    team_id=message.get("team", event["team_id"]),
+                    channel_id=message["channel"],
+                    user_id=message["user"],
+                    text=message.get("text", ""),
+                    files=files,
+                )
+                background_tasks.add_task(_on_msg, bot)
 
     except BotIntegration.DoesNotExist as e:
         print(f"Error: contacted from an unknown channel - {e!r}")
