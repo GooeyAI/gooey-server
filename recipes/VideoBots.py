@@ -244,6 +244,7 @@ class VideoBotsPage(BasePage):
         final_prompt: str
         raw_input_text: str | None
         raw_output_text: list[str] | None
+        raw_tts_text: list[str] | None
         output_text: list[str]
 
         # tts
@@ -734,11 +735,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 source_language="en",
                 target_language=request.user_language,
             )
-
-        tts_text = [
-            "".join(snippet for snippet, _ in parse_refs(text, references))
-            for text in output_text
-        ]
+            state["raw_tts_text"] = [
+                "".join(snippet for snippet, _ in parse_refs(text, references))
+                for text in output_text
+            ]
 
         if references:
             citation_style = (
@@ -754,7 +754,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         if not request.tts_provider:
             return
         tts_state = dict(state)
-        for text in tts_text:
+        for text in state.get("raw_tts_text", state["raw_output_text"]):
             tts_state["text_prompt"] = text
             yield from TextToSpeechPage().run(tts_state)
             state["output_audio"].append(tts_state["audio_url"])
