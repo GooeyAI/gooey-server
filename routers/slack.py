@@ -2,24 +2,29 @@ import json
 
 import requests
 from django.db import transaction
-from fastapi import APIRouter, HTTPException, Depends, Request, Response
+from fastapi import APIRouter, HTTPException, Depends, Request, Response, Header
 from furl import furl
+from requests import HTTPError
 from requests.auth import HTTPBasicAuth
 from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
 from starlette.responses import RedirectResponse, HTMLResponse
 
-from bots.models import BotIntegration, Platform, Conversation
+from bots.models import BotIntegration, Platform, Conversation, Message
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
+from daras_ai_v2.search_ref import parse_refs
 from daras_ai_v2.slack_bot import (
     SlackBot,
     invite_bot_account_to_channel,
     create_personal_channel,
     SlackAPIError,
     fetch_user_info,
+    parse_slack_response,
 )
+from gooey_token_authentication1.token_authentication import auth_keyword
+from recipes.VideoBots import VideoBotsPage
 
 router = APIRouter()
 
@@ -335,3 +340,51 @@ slack_shortcuts_connect_url = furl(
         redirect_uri=slack_shortcuts_redirect_uri,
     ),
 )
+
+
+def slack_auth_header(
+    authorization: str = Header(
+        alias="Authorization",
+        description=f"Bearer $SLACK_AUTH_TOKEN",
+    ),
+) -> dict:
+    r = requests.post(
+        "https://slack.com/api/auth.test", headers={"Authorization": authorization}
+    )
+    try:
+        return parse_slack_response(r)
+    except HTTPError:
+        raise HTTPException(
+            status_code=r.status_code, detail=r.content, headers=r.headers
+        )
+    except SlackAPIError as e:
+        raise HTTPException(500, {"error": e.error})
+
+
+@router.get("/__/slack/get-response-for-msg/{msg_id}/")
+def slack_get_response_for_msg_id(
+    msg_id: str,
+    remove_refs: bool = True,
+    slack_user: dict = Depends(slack_auth_header),
+):
+    try:
+        msg = Message.objects.get(platform_msg_id=msg_id)
+        response_msg = msg.get_next_by_created_at()
+    except Message.DoesNotExist:
+        return {"status": "not_found"}
+
+    if msg.conversation.slack_team_id != slack_user.get(
+        "team_id",
+    ) and msg.conversation.slack_user_id != slack_user.get(
+        "user_id",
+    ):
+        raise HTTPException(403, "Not authorized")
+
+    output_text = response_msg.saved_run.state.get("output_text")
+    if not output_text:
+        return {"status": "no_output"}
+
+    if remove_refs:
+        output_text = "".join(snippet for snippet, _ in parse_refs(output_text, []))
+
+    return {"status": "ok", "output_text": output_text}
