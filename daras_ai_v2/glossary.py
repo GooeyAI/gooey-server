@@ -49,7 +49,9 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
 
     # make sure we don't exceed the max number of glossary resources allowed by GCP (we add a safety buffer of 100 for local development)
     if created and GlossaryResource.objects.count() > MAX_GLOSSARY_RESOURCES - 100:
-        for gloss in GlossaryResource.objects.order_by("uses", "last_used")[:10]:
+        for gloss in GlossaryResource.objects.order_by("useage_count", "last_updated")[
+            :10
+        ]:
             _delete_glossary(glossary_name=gloss.get_clean_name())
             gloss.delete()
 
