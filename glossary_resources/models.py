@@ -20,5 +20,8 @@ class GlossaryResource(models.Model):
             ),
         ]
 
+    def __str__(self):
+        return f"{self.f_url} ({self.useage_count} uses)"
+
     def get_clean_name(self):
         return str(self.glossary_name).lower()
