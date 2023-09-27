@@ -40,6 +40,7 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
     Obtains a glossary resource for use in translation requests.
     """
     from daras_ai_v2.vector_search import doc_url_to_metadata
+    from google.api_core.exceptions import NotFound
 
     if not f_url:
         yield None
@@ -52,8 +53,12 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
         for gloss in GlossaryResource.objects.order_by("useage_count", "last_updated")[
             :10
         ]:
-            _delete_glossary(glossary_name=gloss.get_clean_name())
-            gloss.delete()
+            try:
+                _delete_glossary(glossary_name=gloss.get_clean_name())
+            except NotFound:
+                pass  # glossary already deleted, let's delete the model and move on
+            finally:
+                gloss.delete()
 
     doc_meta = doc_url_to_metadata(f_url)
     # create glossary if it doesn't exist, update if it has changed
