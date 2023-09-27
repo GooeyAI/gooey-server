@@ -25,33 +25,21 @@ def document_uploader(
     if st.checkbox("Enter Custom URLs", key=checkbox_key):
         if not custom_key in st.session_state:
             st.session_state[custom_key] = "\n".join(documents)
-        if accept_multiple_files:
-            text_value = st.text_area(
-                label,
-                key=custom_key,
-                label_visibility="collapsed",
-                height=150,
-                style={
-                    "whiteSpace": "pre",
-                    "overflowWrap": "normal",
-                    "overflowX": "scroll",
-                    "fontFamily": "monospace",
-                    "fontSize": "0.9rem",
-                },
-            )
-        else:
-            text_value = st.text_input(
-                label,
-                label_visibility="collapsed",
-                key=custom_key,
-                style={
-                    "whiteSpace": "pre",
-                    "overflowWrap": "normal",
-                    "overflowX": "scroll",
-                    "fontFamily": "monospace",
-                    "fontSize": "0.9rem",
-                },
-            )
+        fn = st.text_area if accept_multiple_files else st.text_input
+        kwargs = dict(height=150) if accept_multiple_files else {}
+        text_value = fn(
+            label,
+            key=custom_key,
+            label_visibility="collapsed",
+            style={
+                "whiteSpace": "pre",
+                "overflowWrap": "normal",
+                "overflowX": "scroll",
+                "fontFamily": "monospace",
+                "fontSize": "0.9rem",
+            },
+            **kwargs,
+        )
         st.session_state[key] = text_value.strip().splitlines()
     else:
         st.session_state.pop(custom_key, None)

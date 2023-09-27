@@ -24,7 +24,7 @@ def glossary_input(
     glossary_url = document_uploader(
         label=label,
         key=key,
-        accept=["csv", "xlsx", "xls", "gsheet", "ods", "tsv"],
+        accept=[".csv", ".xlsx", ".xls", ".gsheet", ".ods", ".tsv"],
         accept_multiple_files=False,
     )
     st.caption(
