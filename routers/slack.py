@@ -182,7 +182,7 @@ def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
             case "member_joined_channel":
                 bi = BotIntegration.objects.get(
                     slack_channel_id=message["channel"],
-                    slack_team_id=event["team"],
+                    slack_team_id=message["team"],
                 )
                 if not bi.slack_create_personal_channels:
                     return
