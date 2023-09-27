@@ -11,6 +11,14 @@ class GlossaryResource(models.Model):
 
     class Meta:
         ordering = ["useage_count", "last_updated"]
+        indexes = [
+            models.Index(
+                fields=[
+                    "useage_count",
+                    "last_updated",
+                ]
+            ),
+        ]
 
     def get_clean_name(self):
         return str(self.glossary_name).lower()
