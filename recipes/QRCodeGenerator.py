@@ -1,4 +1,5 @@
 import typing
+import time
 
 import numpy as np
 import qrcode
@@ -57,6 +58,8 @@ class QRCodeGeneratorPage(BasePage):
     class RequestModel(BaseModel):
         qr_code_data: str | None
         qr_code_input_image: str | None
+
+        vcard_data: dict | None
 
         use_url_shortener: bool | None
 
@@ -117,40 +120,160 @@ class QRCodeGeneratorPage(BasePage):
             placeholder="Bright sunshine coming through the cracks of a wet, cave wall of big rocks",
         )
 
+        VCARD_CAPTION = "Save some trees with the coolest reusable business card ever (get it printed on metal for ultimate wow factor)! 🌳 These special vCard QR codes can contain your contact information and will automatically enter them into the contacts of whoever scans them!"
         st.session_state.setdefault(
-            "__enable_qr_code_input_image",
-            bool(st.session_state.get("qr_code_input_image")),
+            "__use_vcard", bool(st.session_state.get("vcard_data"))
         )
-        if st.checkbox(
-            f"Upload an existing QR Code", key="__enable_qr_code_input_image"
-        ):
-            st.file_uploader(
-                """
-                ### 📷 QR Code Image
-                It will be reformatted and cleaned
-                """,
-                key="qr_code_input_image",
-                accept=["image/*"],
+        if st.checkbox("📇 vCard", key="__use_vcard"):
+            st.caption(VCARD_CAPTION)
+            fields = st.session_state.get("vcard_data", {})
+            for field in fields:
+                st.session_state["__" + field] = fields.get(field, None)
+            fields = {}
+            fields["format_name"] = st.text_input(
+                "Name",
+                key="__format_name",
+                placeholder="Supreme Overlord Alex Metzger, PhD",
             )
-            st.session_state["qr_code_data"] = None
+            with st.expander("Optional Fields"):
+                fields["email"] = st.text_input(
+                    "Email", key="__email", placeholder="example@gmail.com"
+                )
+                fields["gender"] = st.text_input(
+                    "Gender", key="__gender", placeholder="F"
+                )
+                fields["birthday_year"] = st.text_input(
+                    "Birthday Year", key="__birthday_year", placeholder="1990"
+                )
+                fields["birthday_month"] = st.text_input(
+                    "Birthday Month", key="__birthday_month", placeholder="01"
+                )
+                fields["birthday_day"] = st.text_input(
+                    "Birthday Day", key="__birthday_day", placeholder="01"
+                )
+                fields["family_name"] = st.text_input(
+                    "Family Name", key="__family_name", placeholder="Metzger"
+                )
+                fields["given_name"] = st.text_input(
+                    "Given Name", key="__given_name", placeholder="Alexander"
+                )
+                fields["middle_names"] = st.text_input(
+                    "Additional/Middle Names", key="__middle_names", placeholder="Le"
+                )
+                fields["honorific_prefixes"] = st.text_input(
+                    "Honorific Prefixes",
+                    key="__honorific_prefixes",
+                    placeholder="Supreme, Overlord",
+                )
+                fields["honorific_suffixes"] = st.text_input(
+                    "Honorific Suffixes", key="__honorific_suffixes", placeholder="PhD"
+                )
+                fields["impp"] = st.text_input(
+                    "Instant Messenger Handle",
+                    key="__impp",
+                    placeholder="aim:johndoe@aol.com",
+                )
+                fields["address"] = st.text_input(
+                    "Address",
+                    key="__address",
+                    placeholder="123 Main St, San Francisco, CA 94105",
+                )
+                fields["calendar_url"] = st.text_input(
+                    "Calendar URL",
+                    key="__calendar_url",
+                    placeholder="https://calendar.google.com/calendar/u/0/r",
+                )
+                fields["comma_separated_categories"] = st.text_input(
+                    "Keywords",
+                    key="__comma_separated_categories",
+                    placeholder="tennis player, software engineer",
+                )
+                fields["kind"] = st.radio(
+                    "Kind",
+                    key="__kind",
+                    options=[
+                        "individual",
+                        "application",
+                        "group",
+                        "location",
+                        "organization",
+                    ],
+                )
+                fields["language"] = st.text_input(
+                    "Language", key="__language", placeholder="en-US"
+                )
+                fields["organization"] = st.text_input(
+                    "Organization", key="__organization", placeholder="Gooey.AI"
+                )
+                fields["photo_url"] = st.file_uploader(
+                    "Photo", key="__photo_url", accept=["image/*"]
+                )
+                fields["logo_url"] = st.file_uploader(
+                    "Logo", key="__logo_url", accept=["image/*"]
+                )
+                fields["role"] = st.text_input(
+                    "Role", key="__role", placeholder="Intern"
+                )
+                fields["timezone"] = st.text_input(
+                    "Timezone", key="__timezone", placeholder="America/Los_Angeles"
+                )
+                fields["job_title"] = st.text_input(
+                    "Job Title", key="__job_title", placeholder="Supreme Overlord"
+                )
+                st.session_state["__urls"] = "\n".join(
+                    st.session_state.get("__urls", [])
+                )
+                fields["urls"] = st.text_area(
+                    "URLs",
+                    key="__urls",
+                    placeholder="https://www.gooey.ai\nhttps://farmer.chat",
+                ).split("\n")
+                fields["tel"] = st.text_input(
+                    "Phone Number", key="__tel", placeholder="+1 (420) 669-6969"
+                )
+            st.session_state["vcard_data"] = fields
         else:
-            st.text_area(
-                """
-                ### 🔗 URL
-                Enter your URL below. Shorter links give more visually appealing results. 
-                """,
-                key="qr_code_data",
-                placeholder="https://www.gooey.ai",
+            st.caption(VCARD_CAPTION)
+            st.session_state["vcard_data"] = None
+            st.session_state.setdefault(
+                "__enable_qr_code_input_image",
+                bool(st.session_state.get("qr_code_input_image")),
             )
+            if st.checkbox(
+                f"Upload an existing QR Code", key="__enable_qr_code_input_image"
+            ):
+                st.file_uploader(
+                    """
+                    ### 📷 QR Code Image
+                    It will be reformatted and cleaned
+                    """,
+                    key="qr_code_input_image",
+                    accept=["image/*"],
+                )
+                st.session_state["qr_code_data"] = None
+            else:
+                st.text_area(
+                    """
+                    ### 🔗 URL
+                    Enter your URL below. Shorter links give more visually appealing results. 
+                    """,
+                    key="qr_code_data",
+                    placeholder="https://www.gooey.ai",
+                )
             st.session_state["qr_code_input_image"] = None
-
-        st.checkbox("🔗 Shorten URL", key="use_url_shortener")
-        st.caption(
-            'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
-        )
+            st.checkbox("🔗 Shorten URL", key="use_url_shortener")
+            st.caption(
+                'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
+            )
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
+
+        if st.session_state["vcard_data"]:
+            assert st.session_state["vcard_data"][
+                "format_name"
+            ], "Please provide a name"
+            return
 
         qr_code_data = st.session_state.get("qr_code_data")
         qr_code_input_image = st.session_state.get("qr_code_input_image")
@@ -324,6 +447,15 @@ Here is the final output:
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
 
+        if request.vcard_data:
+            yield "Saving vCard..."
+            plain_text = format_vcard_string(**request.vcard_data)
+            request.qr_code_data = upload_file_from_bytes(
+                "vCard.vcf", plain_text.encode(), "text/vcard"
+            )
+            request.use_url_shortener = True
+            request.qr_code_input_image = None
+
         yield "Generating QR Code..."
         image, qr_code_data, did_shorten = generate_and_upload_qr_code(
             request, self.request.user
@@ -454,3 +586,94 @@ def extract_qr_code_data(img: np.ndarray) -> str:
 
 class InvalidQRCode(AssertionError):
     pass
+
+
+def format_vcard_string(
+    *,
+    format_name: str,
+    email: str | None = None,
+    gender: str | None = None,
+    birthday_year: str | None = None,
+    birthday_month: str | None = None,
+    birthday_day: str | None = None,
+    family_name: str | None = None,
+    given_name: str | None = None,
+    middle_names: str | None = None,
+    honorific_prefixes: str | None = None,
+    honorific_suffixes: str | None = None,
+    impp: str | None = None,
+    address: str | None = None,
+    calendar_url: str | None = None,
+    comma_separated_categories: str | None = None,
+    kind: str | None = None,
+    language: str | None = None,
+    organization: str | None = None,
+    photo_url: str | None = None,
+    logo_url: str | None = None,
+    role: str | None = None,
+    timezone: str | None = None,
+    job_title: str | None = None,
+    urls: list[str] = [],
+    tel: str | None = None,
+) -> str:
+    vcard_string = "BEGIN:VCARD\nVERSION:4.0\n"
+    if format_name:
+        vcard_string += f"FN:{format_for_vcard(format_name)}\n"
+    else:
+        raise ValueError("Please provide a name")
+    if email:
+        vcard_string += f"EMAIL:{format_for_vcard(email)}\n"
+    if gender:
+        vcard_string += f"GENDER:{format_for_vcard(gender)}\n"
+    if birthday_year or birthday_month or birthday_day:
+        vcard_string += f'BDAY:{format_for_vcard((birthday_year or "--") + (birthday_month or "--").rjust(2, "0") + (birthday_day  or "--").rjust(2, "0"))}\n'
+    if (
+        family_name
+        or given_name
+        or middle_names
+        or honorific_prefixes
+        or honorific_suffixes
+    ):
+        vcard_string += f'N:{format_for_vcard(family_name or "")};{format_for_vcard(given_name or "")};{format_for_vcard(middle_names or "")};{format_for_vcard(honorific_prefixes or "")};{format_for_vcard(honorific_suffixes or "")}\n'
+    if impp:
+        vcard_string += f"IMPP:{format_for_vcard(impp)}\n"
+    if address:
+        vcard_string += f"ADR:{format_for_vcard(address)}\n"
+    if calendar_url:
+        vcard_string += f"CALURI:{format_for_vcard(calendar_url)}\n"
+    if comma_separated_categories:
+        vcard_string += f"CATEGORIES:{format_for_vcard(comma_separated_categories)}\n"
+    if kind:
+        vcard_string += f"KIND:{format_for_vcard(kind)}\n"
+    if language:
+        vcard_string += f"LANG:{format_for_vcard(language)}\n"
+    if organization:
+        vcard_string += f"ORG:{format_for_vcard(organization)}\n"
+    if photo_url:
+        vcard_string += f"PHOTO;MEDIATYPE=image/jpeg:{format_for_vcard(photo_url)}\n"
+    if logo_url:
+        vcard_string += f"LOGO;MEDIATYPE=image/jpeg:{format_for_vcard(logo_url)}\n"
+    if role:
+        vcard_string += f"ROLE:{format_for_vcard(role)}\n"
+    if timezone:
+        vcard_string += f"TZ:{format_for_vcard(timezone)}\n"
+    if job_title:
+        vcard_string += f"TITLE:{format_for_vcard(job_title)}\n"
+    if urls:
+        for url in urls:
+            vcard_string += f"URL:{format_for_vcard(url)}\n"
+    if tel:
+        vcard_string += f"TEL;TYPE=cell:{format_for_vcard(tel)}\n"
+    return (
+        vcard_string
+        + f"REV:{str(time.time()).strip('.')}\nPRODID:-//GooeyAI//NONSGML Gooey vCard V1.0//EN\nEND:VCARD"
+    )
+
+
+def format_for_vcard(vcard_string: str) -> str:
+    vcard_string = vcard_string.replace("\n", "\\n").replace(";", "\\;")
+    if len(vcard_string) > 75:
+        vcard_string = "\n ".join(
+            vcard_string[i : i + 74] for i in range(0, len(vcard_string), 74)
+        )
+    return vcard_string
