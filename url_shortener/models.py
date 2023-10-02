@@ -119,6 +119,9 @@ class ShortenedURL(models.Model):
     disabled = models.BooleanField(
         default=False, help_text="Disable this shortened url"
     )
+    use_analytics = models.BooleanField(
+        default=False, help_text="Collect detailed analytics for this shortened url"
+    )
 
     objects = ShortenedURLQuerySet.as_manager()
 
@@ -134,3 +137,58 @@ class ShortenedURL(models.Model):
 
     def __str__(self):
         return self.shortened_url() + " -> " + self.url
+
+
+class ClickAnalytic(models.Model):
+    shortened_url = models.ForeignKey(
+        "url_shortener.ShortenedURL",
+        on_delete=models.DO_NOTHING,
+        related_name="click_analytic",
+    )
+    ip_address = models.GenericIPAddressField(
+        help_text="The IP address of the user who clicked the shortened url"
+    )
+    user_agent = models.CharField(
+        max_length=512,
+        blank=True,
+        help_text="The user agent of the user who clicked the shortened url",
+    )
+    platform = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text="The platform of the user who clicked the shortened url (mobile vs. desktop)",
+    )
+    operating_system = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text="The operating system of the user who clicked the shortened url",
+    )
+    device_model = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text="The device model of the user who clicked the shortened url",
+    )
+    location_data = models.JSONField(
+        blank=True,
+        help_text="The location data of the user who clicked the shortened url",
+    )
+    country_name = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text="The country name of the user who clicked the shortened url",
+    )
+    city_name = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text="The city name of the user who clicked the shortened url",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        get_latest_by = "created_at"
+        verbose_name = "Click Analytic"
+
+    def __str__(self):
+        return f"{self.ip_address} clicked on {self.shortened_url.shortened_url()} -> {self.shortened_url.url}"
