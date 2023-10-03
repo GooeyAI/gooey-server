@@ -1,5 +1,6 @@
 import typing
 import time
+import glom
 
 import numpy as np
 import qrcode
@@ -12,6 +13,7 @@ from pyzbar import pyzbar
 import base64
 
 import gooey_ui as st
+from daras_ai_v2 import db, settings
 from app_users.models import AppUser
 from bots.models import Workflow
 from daras_ai.image_input import (
@@ -170,6 +172,35 @@ class QRCodeGeneratorPage(BasePage):
             fields = st.session_state.get("vcard_data", {})
             for field in fields:
                 st.session_state.setdefault("__" + field, fields.get(field, None))
+
+            if st.button("Import from Email"):
+                if not fields.get("email"):
+                    st.caption("Please provide an email address below")
+                else:
+                    (
+                        photo_url,
+                        name,
+                        url,
+                        title,
+                        company,
+                        gender,
+                        notes,
+                    ) = get_account_info_from_email(fields["email"])
+                    if name:
+                        st.session_state["__format_name"] = name
+                    if photo_url:
+                        st.session_state["__photo_url"] = photo_url
+                    if url:
+                        st.session_state["__urls"] = [url]
+                    if title:
+                        st.session_state["__job_title"] = title
+                    if company:
+                        st.session_state["__organization"] = company
+                    if gender:
+                        st.session_state["__gender"] = gender
+                    if notes:
+                        st.session_state["__note"] = notes
+
             fields = {}
             fields["format_name"] = st.text_input(
                 "Name (Required)",
@@ -195,8 +226,10 @@ class QRCodeGeneratorPage(BasePage):
                 key="__urls",
                 placeholder="https://www.gooey.ai\nhttps://farmer.chat",
             ).split("\n")
-            fields["photo_url"] = st.file_uploader(
-                "Photo", key="__photo_url", accept=["image/*"]
+            fields["photo_url"] = (
+                st.file_uploader("Photo", key="__photo_url", accept=["image/*"])
+                if not st.session_state.get("__photo_url")
+                else st.text_input("Photo", key="__photo_url")
             )
             st.session_state.setdefault("__compress_photo", True)
             fields["compress_photo"] = st.checkbox(
@@ -728,3 +761,103 @@ def format_for_vcard(vcard_string: str, prefix: str = "", truncate: bool = True)
             vcard_string[i : i + 74] for i in range(0, len(vcard_string), 74)
         )
     return vcard_string
+
+
+@st.cache_data()
+def get_account_info_from_email(email: str):
+    doc_ref = db.get_doc_ref(email, collection_id="apollo_io_photo_cache")
+
+    doc = db.get_or_create_doc(doc_ref).to_dict()
+    photo_url = doc.get("photo_url")
+    name = doc.get("name")
+    url = doc.get("url")
+    title = doc.get("title")
+    company = doc.get("company")
+    gender = doc.get("gender")
+    notes = doc.get("notes")
+    if photo_url and name and url and title and company and gender and notes:
+        return photo_url, name, url, title, company, gender, notes
+
+    r = requests.get(
+        f"https://api.us-east-1-main.seon.io/SeonRestService/email-api/v2.2/{email}",
+        headers={"X-API-KEY": settings.SEON_API_KEY},  # type: ignore
+    )
+    r.raise_for_status()
+
+    account_details = glom.glom(r.json(), "data.account_details", default={})
+    for spec in [
+        "linkedin.photo",
+        "facebook.photo",
+        "google.photo",
+        "skype.photo",
+        "foursquare.photo",
+    ]:
+        photo = glom.glom(account_details, spec, default=None)
+        if not photo:
+            continue
+
+        photo_url = upload_file_from_bytes(
+            "face_photo.png", requests.get(photo).content
+        )
+        doc_ref.set({"photo_url": photo_url})
+        break
+    for spec in [
+        "linkedin.name" "facebook.name",
+        "airbnb.first_name",
+        "gravatar.name",
+        "skype.name",
+        "flickr.username",
+    ]:
+        name = glom.glom(account_details, spec, default=None)
+        if not name:
+            continue
+        doc_ref.set({"name": name})
+        break
+    for spec in [
+        "linkedin.url",
+        "linkedin.website",
+        "facebook.url",
+        "gravatar.profile_url",
+        "foursquare.profile_url",
+    ]:
+        url = glom.glom(account_details, spec, default=None)
+        if not url:
+            continue
+        doc_ref.set({"url": url})
+        break
+    for spec in [
+        "linkedin.title",
+        "airbnb.work",
+    ]:
+        title = glom.glom(account_details, spec, default=None)
+        if not title:
+            continue
+        doc_ref.set({"title": title})
+        break
+    for spec in [
+        "linkedin.company",
+    ]:
+        company = glom.glom(account_details, spec, default=None)
+        if not company:
+            continue
+        doc_ref.set({"company": company})
+        break
+    for spec in [
+        "skype.gender",
+    ]:
+        gender = glom.glom(account_details, spec, default=None)
+        if not gender:
+            continue
+        doc_ref.set({"gender": gender})
+        break
+    for spec in [
+        "skype.bio",
+        "airbnb.about",
+    ]:
+        notes = glom.glom(account_details, spec, default=None)
+        if not notes:
+            continue
+        doc_ref.set({"notes": notes})
+        break
+
+    return photo_url, name, url, title, company, gender, notes
