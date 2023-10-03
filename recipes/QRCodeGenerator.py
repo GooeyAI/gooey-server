@@ -120,10 +120,24 @@ class QRCodeGeneratorPage(BasePage):
             placeholder="Bright sunshine coming through the cracks of a wet, cave wall of big rocks",
         )
 
+        st.session_state.setdefault(
+            "__qr_input_type_index",
+            0
+            if st.session_state.get("qr_code_data")
+            else 1
+            if st.session_state.get("vcard_data")
+            else 2,
+        )
         (url, vCard, existing), index = st.controllable_tabs(
             ["URL/TXT Content 🖊️", "Contact vCard 📇", "Existing QR Code 📷"],
             key="__qr_input_type_index",
         )
+        if index == 1 or index == 2:
+            st.session_state["qr_code_data"] = None
+        if index == 0 or index == 2:
+            st.session_state["vcard_data"] = {}
+        if index == 0 or index == 1:
+            st.session_state["qr_code_input_image"] = None
 
         with url:
             st.text_area(
@@ -263,13 +277,6 @@ class QRCodeGeneratorPage(BasePage):
                     "Phone Number", key="__tel", placeholder="+1 (420) 669-6969"
                 )
             st.session_state["vcard_data"] = fields
-
-        if index == 1 or index == 2:
-            st.session_state["qr_code_data"] = None
-        if index == 0 or index == 2:
-            st.session_state["vcard_data"] = {}
-        if index == 0 or index == 1:
-            st.session_state["qr_code_input_image"] = None
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
