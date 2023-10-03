@@ -9,6 +9,7 @@ from django.core.validators import URLValidator
 from furl import furl
 from pydantic import BaseModel
 from pyzbar import pyzbar
+import base64
 
 import gooey_ui as st
 from app_users.models import AppUser
@@ -17,6 +18,7 @@ from daras_ai.image_input import (
     upload_file_from_bytes,
     bytes_to_cv2_img,
     cv2_img_to_bytes,
+    resize_img_scale,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.descriptions import prompting101
@@ -192,6 +194,14 @@ class QRCodeGeneratorPage(BasePage):
             ).split("\n")
             fields["photo_url"] = st.file_uploader(
                 "Photo", key="__photo_url", accept=["image/*"]
+            )
+            st.session_state.setdefault("__compress_photo", True)
+            fields["compress_photo"] = st.checkbox(
+                "Compress and Base64 Encode Photo",
+                key="__compress_photo",
+            )
+            st.caption(
+                "The photo will have lower resolution and the vCard file will take longer to download. This is necessary for it to work on Apple devices 🙄"
             )
             with st.expander("More Contact Fields"):
                 fields["gender"] = st.text_input(
@@ -631,6 +641,7 @@ def format_vcard_string(
     urls: list[str] = [],
     tel: str | None = None,
     note: str | None = None,
+    compress_photo: bool = False,
 ) -> str:
     vcard_string = "BEGIN:VCARD\nVERSION:4.0\n"
     if format_name:
@@ -654,7 +665,7 @@ def format_vcard_string(
     if impp:
         vcard_string += f"IMPP:{format_for_vcard(impp)}\n"
     if address:
-        vcard_string += f"ADR:{format_for_vcard(address)}\n"
+        vcard_string += format_for_vcard(address, prefix="ADR:", truncate=False) + "\n"
     if calendar_url:
         vcard_string += f"CALURI:{format_for_vcard(calendar_url)}\n"
     if comma_separated_categories:
@@ -666,9 +677,9 @@ def format_vcard_string(
     if organization:
         vcard_string += f"ORG:{format_for_vcard(organization)}\n"
     if photo_url:
-        vcard_string += f"PHOTO;MEDIATYPE=image/jpeg:{format_for_vcard(photo_url)}\n"
+        vcard_string += f"PHOTO;{format_vcard_image(photo_url, compress_photo)}\n"
     if logo_url:
-        vcard_string += f"LOGO;MEDIATYPE=image/jpeg:{format_for_vcard(logo_url)}\n"
+        vcard_string += f"LOGO;{format_vcard_image(logo_url, compress_photo)}\n"
     if role:
         vcard_string += f"ROLE:{format_for_vcard(role)}\n"
     if timezone:
@@ -681,15 +692,31 @@ def format_vcard_string(
     if tel:
         vcard_string += f"TEL;TYPE=cell:{format_for_vcard(tel)}\n"
     if note:
-        vcard_string += f"NOTE:{format_for_vcard(note)}\n"
+        vcard_string += format_for_vcard(note, prefix="NOTE:", truncate=False) + "\n"
     return (
         vcard_string
         + f"REV:{str(time.time()).strip('.')}\nPRODID:-//GooeyAI//NONSGML Gooey vCard V1.0//EN\nEND:VCARD"
     )
 
 
-def format_for_vcard(vcard_string: str) -> str:
-    vcard_string = vcard_string.replace("\n", "\\n").replace(";", "\\;")
+def format_vcard_image(url: str, compress_and_base64: bool) -> str:
+    if not compress_and_base64:
+        return format_for_vcard(url, prefix="MEDIATYPE=image/jpeg:", truncate=False)
+    # this is necessary because some devices (*cough* apple) don't support vcard images that are not base64 encoded
+    bytes = requests.get(url).content
+    downscaled = resize_img_scale(bytes, (400, 400))
+    base64_encoded = base64.b64encode(downscaled)
+    return format_for_vcard(
+        base64_encoded.decode("utf-8"),
+        prefix="ENCODING=BASE64;TYPE=JPEG:",
+        truncate=False,
+    )
+
+
+def format_for_vcard(vcard_string: str, prefix: str = "", truncate: bool = True) -> str:
+    vcard_string = prefix + vcard_string.replace("\n", "\\n").replace(";", "\\;")
+    if truncate:
+        return vcard_string[:75]
     if len(vcard_string) > 75:
         vcard_string = "\n ".join(
             vcard_string[i : i + 74] for i in range(0, len(vcard_string), 74)
