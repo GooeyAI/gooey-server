@@ -241,7 +241,7 @@ def text_area(
         key = md5_values(
             "textarea", label, height, help, value, placeholder, label_visibility
         )
-    value = state.session_state.setdefault(key, value)
+    value = str(state.session_state.setdefault(key, value))
     if label_visibility != "visible":
         label = None
     if disabled:
@@ -460,6 +460,10 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
             defaultInspectDepth=3 if expanded else depth,
         ),
     ).mount()
+
+
+def data_table(file_url: str):
+    return _node("data-table", fileUrl=file_url)
 
 
 def table(df: "pd.DataFrame"):

@@ -3,12 +3,13 @@ import typing
 from enum import Enum
 
 import jinja2
+from typing_extensions import TypedDict
 
 import gooey_ui
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 
 
-class SearchReference(typing.TypedDict):
+class SearchReference(TypedDict):
     url: str
     title: str
     snippet: str

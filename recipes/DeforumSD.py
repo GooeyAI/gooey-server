@@ -3,6 +3,7 @@ import uuid
 
 from django.db.models import TextChoices
 from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 import gooey_ui as st
 from app_users.models import AppUser
@@ -21,7 +22,7 @@ class AnimationModels(TextChoices):
     epicdream = ("epicdream.safetensors", "epiCDream (epinikion)")
 
 
-class _AnimationPrompt(typing.TypedDict):
+class _AnimationPrompt(TypedDict):
     frame: str
     prompt: str
 
