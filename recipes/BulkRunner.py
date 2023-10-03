@@ -157,12 +157,15 @@ class BulkRunnerPage(BasePage):
             output_columns_old = st.session_state.pop("output_columns", {})
             output_columns_new = st.session_state.setdefault("output_columns", {})
 
+            prev_fields = st.session_state.get("--prev-output-fields")
             fields = {**output_fields, "error_msg": "Error Msg", "run_url": "Run URL"}
+            did_change = prev_fields is not None and prev_fields != fields
+            st.session_state["--prev-output-fields"] = fields
             for field, title in fields.items():
                 col = st.text_input(
                     label="`" + title + "`",
                     key="--output-mapping:" + field,
-                    value=output_columns_old.get(field, title),
+                    value=output_columns_old.get(field, title if did_change else None),
                 )
                 if col:
                     output_columns_new[field] = col
