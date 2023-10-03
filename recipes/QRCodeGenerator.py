@@ -778,11 +778,19 @@ def get_account_info_from_email(email: str):
     if photo_url and name and url and title and company and gender and notes:
         return photo_url, name, url, title, company, gender, notes
 
-    r = requests.get(
-        f"https://api.us-east-1-main.seon.io/SeonRestService/email-api/v2.2/{email}",
-        headers={"X-API-KEY": settings.SEON_API_KEY},  # type: ignore
-    )
-    r.raise_for_status()
+    try:
+        r = requests.get(
+            f"https://api.seon.io/SeonRestService/email-api/v2.2/{email}",
+            headers={"X-API-KEY": settings.SEON_API_KEY},  # type: ignore
+        )
+        r.raise_for_status()
+    except requests.exceptions.HTTPError:
+        ## region fallback for US devs
+        r = requests.get(
+            f"https://api.us-east-1-main.seon.io/SeonRestService/email-api/v2.2/{email}",
+            headers={"X-API-KEY": settings.SEON_API_KEY},  # type: ignore
+        )
+        r.raise_for_status()
 
     account_details = glom.glom(r.json(), "data.account_details", default={})
     for spec in [
