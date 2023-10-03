@@ -1,4 +1,6 @@
-from daras_ai_v2.search_ref import parse_refs
+import pytest
+
+from daras_ai_v2.search_ref import parse_refs, generate_footnote_symbol
 
 
 def test_ref_parser():
@@ -126,3 +128,21 @@ def test_ref_parser():
             },
         ),
     ]
+
+
+def test_generate_footnote_symbol():
+    assert generate_footnote_symbol(0) == "*"
+    assert generate_footnote_symbol(1) == "†"
+    assert generate_footnote_symbol(13) == "✡"
+    assert generate_footnote_symbol(14) == "**"
+    assert generate_footnote_symbol(15) == "††"
+    assert generate_footnote_symbol(27) == "✡✡"
+    assert generate_footnote_symbol(28) == "***"
+    assert generate_footnote_symbol(29) == "†††"
+    assert generate_footnote_symbol(41) == "✡✡✡"
+    assert generate_footnote_symbol(70) == "******"
+    assert generate_footnote_symbol(71) == "††††††"
+
+    # testing with non-integer index
+    with pytest.raises(TypeError):
+        generate_footnote_symbol(1.5)

@@ -33,6 +33,7 @@ def test_slack_get_response_for_msg_id(transactional_db):
         platform_msg_id="response-msg",
         saved_run=SavedRun.objects.create(
             state=VideoBotsPage.ResponseModel(
+                raw_tts_text=["hello, world!"],
                 output_text=["hello, world! [2]"],
                 final_prompt="",
                 output_audio=[],
