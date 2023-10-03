@@ -186,7 +186,10 @@ class QRCodeGeneratorPage(BasePage):
             fields["organization"] = st.text_input(
                 "Organization", key="__organization", placeholder="Gooey.AI"
             )
-            st.session_state["__urls"] = "\n".join(st.session_state.get("__urls", []))
+            urls = st.session_state.get("__urls", [])
+            st.session_state["__urls"] = (
+                "\n".join(urls) if isinstance(urls, list) else urls
+            )
             fields["urls"] = st.text_area(
                 "Link(s)",
                 key="__urls",
@@ -217,6 +220,9 @@ class QRCodeGeneratorPage(BasePage):
                     key="__note",
                     placeholder="- awesome person\n- loves pizza\n- plays tons of chess\n- absolutely a genius",
                 )
+                st.session_state["__address"] = st.session_state.get(
+                    "__address", ""
+                ).replace(";", "\n")
                 fields["address"] = st.text_area(
                     "Address",
                     key="__address",
