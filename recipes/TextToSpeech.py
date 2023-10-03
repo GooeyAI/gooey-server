@@ -229,19 +229,13 @@ class TextToSpeechPage(BasePage):
                 default_voice_model = next(iter(ELEVEN_LABS_MODELS.values()))
 
                 voice_id = ELEVEN_LABS_VOICES.get(
-                    state.get("elevenlabs_voice_name"),
-                    default_voice_id
+                    state.get("elevenlabs_voice_name"), default_voice_id
                 )
                 voice_model = ELEVEN_LABS_MODELS.get(
-                    state.get("elevenlabs_model"),
-                    default_voice_model,
+                    state.get("elevenlabs_model"), default_voice_model
                 )
-                stability = state.get(
-                    "elevenlabs_stability", 0.5,
-                )
-                similarity_boost = state.get(
-                    "elevenlabs_similarity_boost", 0.75,
-                )
+                stability = state.get("elevenlabs_stability", 0.5)
+                similarity_boost = state.get("elevenlabs_similarity_boost", 0.75)
 
                 response = requests.post(
                     f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
@@ -261,8 +255,9 @@ class TextToSpeechPage(BasePage):
                 response.raise_for_status()
 
                 yield "Uploading Audio file..."
-                state["audio_url"] = upload_file_from_bytes("elevenlabs_gen.mp3", response.content)
-
+                state["audio_url"] = upload_file_from_bytes(
+                    "elevenlabs_gen.mp3", response.content
+                )
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
