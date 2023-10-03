@@ -10,6 +10,9 @@ from PIL import Image, ImageOps
 
 from daras_ai_v2 import settings
 
+if False:
+    from firebase_admin import storage
+
 
 def resize_img_pad(img_bytes: bytes, size: tuple[int, int]) -> bytes:
     img_cv2 = bytes_to_cv2_img(img_bytes)
@@ -54,15 +57,10 @@ def upload_file_from_bytes(
     data: bytes,
     content_type: str = None,
 ) -> str:
-    from firebase_admin import storage
-
     if not content_type:
         content_type = mimetypes.guess_type(filename)[0]
     content_type = content_type or "application/octet-stream"
-
-    filename = safe_filename(filename)
-    bucket = storage.bucket(settings.GS_BUCKET_NAME)
-    blob = bucket.blob(f"daras_ai/media/{uuid.uuid1()}/{filename}")
+    blob = storage_blob_for(filename)
     blob.upload_from_string(data, content_type=content_type)
     return blob.public_url
 

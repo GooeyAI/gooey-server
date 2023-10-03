@@ -14,7 +14,7 @@ CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
 
 
-def test_add_balance_direct():
+def test_add_balance_direct(transactional_db):
     pk = AppUser.objects.create(balance=0, is_anonymous=False).pk
     amounts = [[random.randint(-100, 10_000) for _ in range(100)] for _ in range(5)]
 
@@ -28,7 +28,7 @@ def test_add_balance_direct():
     assert AppUser.objects.get(pk=pk).balance == sum(map(sum, amounts))
 
 
-def test_create_bot_integration_conversation_message():
+def test_create_bot_integration_conversation_message(transactional_db):
     # Create a new BotIntegration with WhatsApp as the platform
     bot_integration = BotIntegration.objects.create(
         name="My Bot Integration",

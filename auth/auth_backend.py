@@ -6,36 +6,37 @@ from starlette.authentication import AuthCredentials, AuthenticationBackend
 from starlette.concurrency import run_in_threadpool
 
 from app_users.models import AppUser
-from daras_ai_v2.crypto import get_random_string, get_random_doc_id
+from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE, ANONYMOUS_USER_COOKIE
 from gooeysite.bg_db_conn import db_middleware
 
 # quick and dirty way to bypass authentication for testing
-_forced_auth_user = []
+authlocal = []
 
 
 @contextmanager
 def force_authentication():
-    user = AppUser.objects.create(
-        is_anonymous=True, uid=get_random_doc_id(), balance=10**9
+    authlocal.append(
+        AppUser.objects.get_or_create(
+            email="tests@pytest.org",
+            defaults=dict(is_anonymous=True, uid=get_random_doc_id(), balance=10**9),
+        )[0]
     )
     try:
-        _forced_auth_user.append(user)
-        yield
+        yield authlocal[0]
     finally:
-        _forced_auth_user.clear()
+        authlocal.clear()
 
 
 class SessionAuthBackend(AuthenticationBackend):
     async def authenticate(self, conn):
-        return await run_in_threadpool(authenticate, conn)
+        if authlocal:
+            return AuthCredentials(["authenticated"]), authlocal[0]
+        return await run_in_threadpool(_authenticate, conn)
 
 
 @db_middleware
-def authenticate(conn):
-    if _forced_auth_user:
-        return AuthCredentials(["authenticated"]), _forced_auth_user[0]
-
+def _authenticate(conn):
     session_cookie = conn.session.get(FIREBASE_SESSION_COOKIE)
     if not session_cookie:
         # Session cookie is unavailable. Check if anonymous user is available.
@@ -51,7 +52,7 @@ def authenticate(conn):
         # Session cookie is unavailable. Force user to login.
         return AuthCredentials(), None
 
-    user = verify_session_cookie(session_cookie)
+    user = _verify_session_cookie(session_cookie)
     if not user:
         # Session cookie was invalid
         conn.session.pop(FIREBASE_SESSION_COOKIE, None)
@@ -60,7 +61,7 @@ def authenticate(conn):
     return AuthCredentials(["authenticated"]), user
 
 
-def verify_session_cookie(firebase_cookie: str) -> UserRecord | None:
+def _verify_session_cookie(firebase_cookie: str) -> UserRecord | None:
     # Verify the session cookie. In this case an additional check is added to detect
     # if the user's Firebase session was revoked, user deleted/disabled, etc.
     try:

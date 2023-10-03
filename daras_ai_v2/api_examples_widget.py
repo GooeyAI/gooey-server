@@ -6,7 +6,7 @@ import gooey_ui as st
 from furl import furl
 
 from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
-from gooey_token_authentication1.token_authentication import auth_keyword
+from auth.token_authentication import auth_keyword
 
 
 def get_filenames(request_body):

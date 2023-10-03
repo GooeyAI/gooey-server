@@ -1,3 +1,5 @@
+import logging
+
 import anyio
 from decouple import config
 
@@ -18,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from auth_backend import (
+from auth.auth_backend import (
     SessionAuthBackend,
 )
 from daras_ai_v2 import settings
@@ -67,10 +69,14 @@ async def health():
 
 @app.add_middleware
 def request_time_middleware(app):
+    logger = logging.getLogger("uvicorn.time")
+
     async def middleware(scope, receive, send):
         start_time = time()
         await app(scope, receive, send)
         response_time = (time() - start_time) * 1000
-        print(f"{scope.get('method')} {scope.get('path')} - {response_time:.3f} ms")
+        logger.info(
+            f"{scope.get('method')} {scope.get('path')} - {response_time:.3f} ms"
+        )
 
     return middleware

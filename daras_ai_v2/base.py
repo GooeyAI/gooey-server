@@ -365,30 +365,35 @@ class BasePage:
         example_id, run_id, uid = extract_query_params(query_params)
         return self.get_sr_from_query_params(example_id, run_id, uid)
 
-    def get_sr_from_query_params(self, example_id, run_id, uid) -> SavedRun:
+    @classmethod
+    def get_sr_from_query_params(
+        cls, example_id: str, run_id: str, uid: str
+    ) -> SavedRun:
         try:
             if run_id and uid:
-                sr = self.run_doc_sr(run_id, uid)
+                sr = cls.run_doc_sr(run_id, uid)
             elif example_id:
-                sr = self.example_doc_sr(example_id)
+                sr = cls.example_doc_sr(example_id)
             else:
-                sr = self.recipe_doc_sr()
+                sr = cls.recipe_doc_sr()
             return sr
         except SavedRun.DoesNotExist:
             raise HTTPException(status_code=404)
 
-    def recipe_doc_sr(self) -> SavedRun:
+    @classmethod
+    def recipe_doc_sr(cls) -> SavedRun:
         return SavedRun.objects.get_or_create(
-            workflow=self.workflow,
+            workflow=cls.workflow,
             run_id__isnull=True,
             uid__isnull=True,
             example_id__isnull=True,
         )[0]
 
+    @classmethod
     def run_doc_sr(
-        self, run_id: str, uid: str, create: bool = False, parent: SavedRun = None
+        cls, run_id: str, uid: str, create: bool = False, parent: SavedRun = None
     ) -> SavedRun:
-        config = dict(workflow=self.workflow, uid=uid, run_id=run_id)
+        config = dict(workflow=cls.workflow, uid=uid, run_id=run_id)
         if create:
             return SavedRun.objects.get_or_create(
                 **config, defaults=dict(parent=parent)
@@ -396,8 +401,9 @@ class BasePage:
         else:
             return SavedRun.objects.get(**config)
 
-    def example_doc_sr(self, example_id: str, create: bool = False) -> SavedRun:
-        config = dict(workflow=self.workflow, example_id=example_id)
+    @classmethod
+    def example_doc_sr(cls, example_id: str, create: bool = False) -> SavedRun:
+        config = dict(workflow=cls.workflow, example_id=example_id)
         if create:
             return SavedRun.objects.get_or_create(**config)[0]
         else:
@@ -851,7 +857,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             workflow=self.workflow,
             hidden=False,
             example_id__isnull=False,
-        ).exclude()[:50]
+        )[:50]
 
         grid_layout(3, example_runs, _render)
 
