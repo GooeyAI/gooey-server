@@ -93,7 +93,7 @@ class BulkRunnerPage(BasePage):
                 field_props = schema["properties"][field]
                 title = field_props["title"]
                 keys = None
-                if field_props["type"] == "array":
+                if is_arr(field_props):
                     try:
                         ref = field_props["items"]["$ref"]
                         props = schema["definitions"][ref]["properties"]
@@ -103,7 +103,7 @@ class BulkRunnerPage(BasePage):
                             keys = {k: k for k in sr.state[field][0].keys()}
                         except (KeyError, IndexError, AttributeError):
                             pass
-                elif field_props["type"] == "object":
+                elif field_props.get("type") == "object":
                     try:
                         keys = {k: k for k in sr.state[field].keys()}
                     except (KeyError, AttributeError):
@@ -277,7 +277,7 @@ def build_requests_for_df(df, request, df_ix, arr_len):
         for field, col in request.input_columns.items():
             parts = field.split(".")
             field_props = properties.get(parts[0]) or properties.get(parts)
-            if field_props["type"] == "array":
+            if is_arr(field_props):
                 arr = request_body.setdefault(parts[0], [])
                 for arr_ix in range(arr_len):
                     value = df.at[df_ix + arr_ix, col]
@@ -289,7 +289,7 @@ def build_requests_for_df(df, request, df_ix, arr_len):
                         if len(arr) <= arr_ix:
                             arr.append(None)
                         arr[arr_ix] = value
-            elif len(parts) > 1 and field_props["type"] == "object":
+            elif len(parts) > 1 and field_props.get("type") == "object":
                 obj = request_body.setdefault(parts[0], {})
                 obj[parts[1]] = df.at[df_ix, col]
             else:
@@ -312,7 +312,7 @@ def slice_request_df(df, request):
         properties = schema["properties"]
 
         for field, col in request.input_columns.items():
-            if properties.get(field.split(".")[0])["type"] != "array":
+            if is_arr(properties.get(field.split(".")[0])):
                 non_array_cols.add(col)
     non_array_df = df[list(non_array_cols)]
 
@@ -325,6 +325,16 @@ def slice_request_df(df, request):
             arr_len += 1
         yield df_ix, arr_len
         df_ix += arr_len
+
+
+def is_arr(field_props: dict) -> bool:
+    try:
+        return field_props["type"] == "array"
+    except KeyError:
+        for props in field_props.get("anyOf", []):
+            if props["type"] == "array":
+                return True
+    return False
 
 
 def _read_df(f: str) -> "pd.DataFrame":
