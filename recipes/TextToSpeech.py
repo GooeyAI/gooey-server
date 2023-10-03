@@ -16,6 +16,8 @@ from daras_ai_v2.gpu_server import GpuEndpoints
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
+    ELEVEN_LABS_VOICES,
+    ELEVEN_LABS_MODELS,
     text_to_speech_settings,
     TextToSpeechProviders,
 )
@@ -40,6 +42,8 @@ class TextToSpeechPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
+        "elevenlabs_stability": 0.5,
+        "elevenlabs_similarity_boost": 0.75,
     }
 
     class RequestModel(BaseModel):
@@ -216,6 +220,49 @@ class TextToSpeechPage(BasePage):
                 state["audio_url"] = upload_file_from_bytes(
                     f"google_tts_gen.mp3", response.audio_content
                 )
+
+            case TextToSpeechProviders.ELEVEN_LABS:
+                # default to first voice ID in the mapping
+                default_voice_id = next(iter(ELEVEN_LABS_VOICES.values()))
+
+                # default to first model ID in the mapping
+                default_voice_model = next(iter(ELEVEN_LABS_MODELS.values()))
+
+                voice_id = ELEVEN_LABS_VOICES.get(
+                    state.get("elevenlabs_voice_name"),
+                    default_voice_id
+                )
+                voice_model = ELEVEN_LABS_MODELS.get(
+                    state.get("elevenlabs_model"),
+                    default_voice_model,
+                )
+                stability = state.get(
+                    "elevenlabs_stability", 0.5,
+                )
+                similarity_boost = state.get(
+                    "elevenlabs_similarity_boost", 0.75,
+                )
+
+                response = requests.post(
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+                    headers={
+                        "xi-api-key": settings.ELEVEN_LABS_API_KEY,
+                        "Accept": "audio/mpeg",
+                    },
+                    json={
+                        "text": text,
+                        "model_id": voice_model,
+                        "voice_settings": {
+                            "stability": stability,
+                            "similarity_boost": similarity_boost,
+                        },
+                    },
+                )
+                response.raise_for_status()
+
+                yield "Uploading Audio file..."
+                state["audio_url"] = upload_file_from_bytes("elevenlabs_gen.mp3", response.content)
+
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage

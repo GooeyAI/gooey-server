@@ -24,6 +24,22 @@ class TextToSpeechProviders(Enum):
     GOOGLE_TTS = "Google Cloud Text-to-Speech"
     UBERDUCK = "uberduck.ai"
     BARK = "Bark (suno-ai)"
+    ELEVEN_LABS = "ElevenLabs"
+
+
+# mapping from title in UI -> voice ID
+ELEVEN_LABS_VOICES = {
+    "Indian Man With A Deep Voice": "syN7Wt0nfLXAqq9LI9R6",
+    "[aaa] Ramakrishnan - INDIAN TEACHER. CEREBRAL AND THOUGHTFUL PRONUNCIATION 🔥": "99XLBDkANYZ0Ww7MKN8d",
+    "[ElevenVoices] Riya - Indian Female Young Adult": "TSh1KthMgVjY3BfYFkwS",
+    "Wise Grandma  slow, seductive, pleasant, mature": "dvRCseVM0rT31i8clSVy",
+    "[ElevenVoices] Rahul - Indian Male Young Adult": "prqKmUi0Zo7WBmA81Vy4",
+}
+
+ELEVEN_LABS_MODELS = {
+    "Multilingual V2": "eleven_multilingual_v2",
+    "English V1 - Low latency English TTS": "eleven_monolingual_v1",
+}
 
 
 BARK_SUPPORTED_LANGS = [
@@ -140,6 +156,55 @@ def text_to_speech_settings():
                     max_value=3.0,
                     step=0.25,
                     key="uberduck_speaking_rate",
+                )
+
+        case TextToSpeechProviders.ELEVEN_LABS.name:
+            with col2:
+                st.selectbox(
+                    """
+                    ###### Voice name (ElevenLabs)
+                    """,
+                    key="elevenlabs_voice_name",
+                    format_func=str,
+                    options=ELEVEN_LABS_VOICES.keys(),
+                )
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.slider(
+                    """
+                    ###### Stability
+                    *A lower stability provides a broader emotional range.
+                    A value lower than 0.3 can lead to too much instability.
+                    [Read more](https://docs.elevenlabs.io/speech-synthesis/voice-settings#stability).*
+                    """,
+                    min_value=0,
+                    max_value=1.0,
+                    step=0.05,
+                    key="elevenlabs_stability",
+                )
+            with col2:
+                st.slider(
+                    """
+                    ###### Similarity Boost
+                    *Dictates how hard the model should try to replicate the original voice.
+                    [Read more](https://docs.elevenlabs.io/speech-synthesis/voice-settings#similarity).*
+                    """,
+                    min_value=0,
+                    max_value=1.0,
+                    step=0.05,
+                    key="elevenlabs_similarity_boost",
+                )
+
+            col1, _ = st.columns(2)
+            with col1:
+                st.selectbox(
+                    """
+                    ###### Voice Model
+                    """,
+                    key="elevenlabs_model",
+                    options=ELEVEN_LABS_MODELS.keys(),
+                    format_func=str,
                 )
 
 
