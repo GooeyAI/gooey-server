@@ -120,15 +120,46 @@ class QRCodeGeneratorPage(BasePage):
             placeholder="Bright sunshine coming through the cracks of a wet, cave wall of big rocks",
         )
 
-        VCARD_CAPTION = "Save some trees with the coolest reusable business card ever (get it printed on metal for ultimate wow factor)! 🌳 These special vCard QR codes can contain your contact information and will automatically enter them into the contacts of whoever scans them!"
-        st.session_state.setdefault(
-            "__use_vcard", bool(st.session_state.get("vcard_data"))
+        (url, vCard, existing), index = st.controllable_tabs(
+            ["URL/TXT Content 🖊️", "Contact vCard 📇", "Existing QR Code 📷"],
+            key="__qr_input_type_index",
         )
-        if st.checkbox("📇 vCard", key="__use_vcard"):
-            st.caption(VCARD_CAPTION)
+
+        with url:
+            st.text_area(
+                """
+                    ### 🔗 URL
+                    Enter your URL below. Shorter links give more visually appealing results.
+                    """,
+                key="qr_code_data",
+                placeholder="https://www.gooey.ai",
+            )
+            st.checkbox("🔗 Shorten URL", key="use_url_shortener")
+            st.caption(
+                'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
+            )
+
+        with existing:
+            st.file_uploader(
+                """
+                ### 📷 QR Code Image
+                It will be reformatted and cleaned
+                """,
+                key="qr_code_input_image",
+                accept=["image/*"],
+            )
+            st.checkbox("🔗 Shorten URL", key="use_url_shortener")
+            st.caption(
+                'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
+            )
+
+        with vCard:
+            st.caption(
+                "We'll use the prompt above to create a beautiful QR code that when scanned on a phone, will add the info below as a contact. Great for conferences and geeky parties."
+            )
             fields = st.session_state.get("vcard_data", {})
             for field in fields:
-                st.session_state["__" + field] = fields.get(field, None)
+                st.session_state.setdefault("__" + field, fields.get(field, None))
             fields = {}
             fields["format_name"] = st.text_input(
                 "Name",
@@ -232,44 +263,18 @@ class QRCodeGeneratorPage(BasePage):
                     "Phone Number", key="__tel", placeholder="+1 (420) 669-6969"
                 )
             st.session_state["vcard_data"] = fields
-        else:
-            st.caption(VCARD_CAPTION)
-            st.session_state["vcard_data"] = None
-            st.session_state.setdefault(
-                "__enable_qr_code_input_image",
-                bool(st.session_state.get("qr_code_input_image")),
-            )
-            if st.checkbox(
-                f"Upload an existing QR Code", key="__enable_qr_code_input_image"
-            ):
-                st.file_uploader(
-                    """
-                    ### 📷 QR Code Image
-                    It will be reformatted and cleaned
-                    """,
-                    key="qr_code_input_image",
-                    accept=["image/*"],
-                )
-                st.session_state["qr_code_data"] = None
-            else:
-                st.text_area(
-                    """
-                    ### 🔗 URL
-                    Enter your URL below. Shorter links give more visually appealing results. 
-                    """,
-                    key="qr_code_data",
-                    placeholder="https://www.gooey.ai",
-                )
+
+        if index == 1 or index == 2:
+            st.session_state["qr_code_data"] = None
+        if index == 0 or index == 2:
+            st.session_state["vcard_data"] = {}
+        if index == 0 or index == 1:
             st.session_state["qr_code_input_image"] = None
-            st.checkbox("🔗 Shorten URL", key="use_url_shortener")
-            st.caption(
-                'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
-            )
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
 
-        if st.session_state["vcard_data"]:
+        if st.session_state.get("vcard_data"):
             assert st.session_state["vcard_data"][
                 "format_name"
             ], "Please provide a name"
