@@ -132,12 +132,6 @@ class QRCodeGeneratorPage(BasePage):
             ["URL/TXT Content 🖊️", "Contact vCard 📇", "Existing QR Code 📷"],
             key="__qr_input_type_index",
         )
-        if index == 1 or index == 2:
-            st.session_state["qr_code_data"] = None
-        if index == 0 or index == 2:
-            st.session_state["vcard_data"] = {}
-        if index == 0 or index == 1:
-            st.session_state["qr_code_input_image"] = None
 
         with url:
             st.text_area(
@@ -176,17 +170,49 @@ class QRCodeGeneratorPage(BasePage):
                 st.session_state.setdefault("__" + field, fields.get(field, None))
             fields = {}
             fields["format_name"] = st.text_input(
-                "Name",
+                "Name (Required)",
                 key="__format_name",
                 placeholder="Supreme Overlord Alex Metzger, PhD",
             )
-            with st.expander("Optional Fields"):
-                fields["email"] = st.text_input(
-                    "Email", key="__email", placeholder="example@gmail.com"
-                )
+            fields["email"] = st.text_input(
+                "Email", key="__email", placeholder="example@gmail.com"
+            )
+            fields["tel"] = st.text_input(
+                "Phone Number", key="__tel", placeholder="+1 (420) 669-6969"
+            )
+            fields["role"] = st.text_input("Role", key="__role", placeholder="Intern")
+            fields["organization"] = st.text_input(
+                "Organization", key="__organization", placeholder="Gooey.AI"
+            )
+            st.session_state["__urls"] = "\n".join(st.session_state.get("__urls", []))
+            fields["urls"] = st.text_area(
+                "Link(s)",
+                key="__urls",
+                placeholder="https://www.gooey.ai\nhttps://farmer.chat",
+            ).split("\n")
+            fields["photo_url"] = st.file_uploader(
+                "Photo", key="__photo_url", accept=["image/*"]
+            )
+            with st.expander("More Contact Fields"):
                 fields["gender"] = st.text_input(
                     "Gender", key="__gender", placeholder="F"
                 )
+                fields["calendar_url"] = st.text_input(
+                    "Calendar Link ([calend.ly](calend.ly))",
+                    key="__calendar_url",
+                    placeholder="https://calendar.google.com/calendar/u/0/r",
+                )
+                fields["note"] = st.text_area(
+                    "Notes",
+                    key="__note",
+                    placeholder="- awesome person\n- loves pizza\n- plays tons of chess\n- absolutely a genius",
+                )
+                fields["address"] = st.text_area(
+                    "Address",
+                    key="__address",
+                    placeholder="123 Main St\nSan Francisco\nCA 94105",
+                ).replace("\n", ";")
+            with st.expander("Advanced Contact Fields"):
                 fields["birthday_year"] = st.text_input(
                     "Birthday Year", key="__birthday_year", placeholder="1990"
                 )
@@ -218,16 +244,6 @@ class QRCodeGeneratorPage(BasePage):
                     key="__impp",
                     placeholder="aim:johndoe@aol.com",
                 )
-                fields["address"] = st.text_input(
-                    "Address",
-                    key="__address",
-                    placeholder="123 Main St, San Francisco, CA 94105",
-                )
-                fields["calendar_url"] = st.text_input(
-                    "Calendar URL",
-                    key="__calendar_url",
-                    placeholder="https://calendar.google.com/calendar/u/0/r",
-                )
                 fields["comma_separated_categories"] = st.text_input(
                     "Keywords",
                     key="__comma_separated_categories",
@@ -247,17 +263,8 @@ class QRCodeGeneratorPage(BasePage):
                 fields["language"] = st.text_input(
                     "Language", key="__language", placeholder="en-US"
                 )
-                fields["organization"] = st.text_input(
-                    "Organization", key="__organization", placeholder="Gooey.AI"
-                )
-                fields["photo_url"] = st.file_uploader(
-                    "Photo", key="__photo_url", accept=["image/*"]
-                )
                 fields["logo_url"] = st.file_uploader(
                     "Logo", key="__logo_url", accept=["image/*"]
-                )
-                fields["role"] = st.text_input(
-                    "Role", key="__role", placeholder="Intern"
                 )
                 fields["timezone"] = st.text_input(
                     "Timezone", key="__timezone", placeholder="America/Los_Angeles"
@@ -265,18 +272,14 @@ class QRCodeGeneratorPage(BasePage):
                 fields["job_title"] = st.text_input(
                     "Job Title", key="__job_title", placeholder="Supreme Overlord"
                 )
-                st.session_state["__urls"] = "\n".join(
-                    st.session_state.get("__urls", [])
-                )
-                fields["urls"] = st.text_area(
-                    "URLs",
-                    key="__urls",
-                    placeholder="https://www.gooey.ai\nhttps://farmer.chat",
-                ).split("\n")
-                fields["tel"] = st.text_input(
-                    "Phone Number", key="__tel", placeholder="+1 (420) 669-6969"
-                )
             st.session_state["vcard_data"] = fields
+
+        if index == 1 or index == 2:
+            st.session_state["qr_code_data"] = None
+        if index == 0 or index == 2:
+            st.session_state["vcard_data"] = {}
+        if index == 0 or index == 1:
+            st.session_state["qr_code_input_image"] = None
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Please provide a prompt"
@@ -627,6 +630,7 @@ def format_vcard_string(
     job_title: str | None = None,
     urls: list[str] = [],
     tel: str | None = None,
+    note: str | None = None,
 ) -> str:
     vcard_string = "BEGIN:VCARD\nVERSION:4.0\n"
     if format_name:
@@ -676,6 +680,8 @@ def format_vcard_string(
             vcard_string += f"URL:{format_for_vcard(url)}\n"
     if tel:
         vcard_string += f"TEL;TYPE=cell:{format_for_vcard(tel)}\n"
+    if note:
+        vcard_string += f"NOTE:{format_for_vcard(note)}\n"
     return (
         vcard_string
         + f"REV:{str(time.time()).strip('.')}\nPRODID:-//GooeyAI//NONSGML Gooey vCard V1.0//EN\nEND:VCARD"
