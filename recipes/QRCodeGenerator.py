@@ -178,7 +178,7 @@ class QRCodeGeneratorPage(BasePage):
             )
             fields = {"email": fields.get("email", "")}
             if st.button(
-                "<u>Import other contact info</u> from my email - magic!", 
+                "<u>Import other contact info</u> from my email - magic!",
                 className="link-button",
             ):
                 if not fields.get("email"):
