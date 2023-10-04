@@ -507,7 +507,7 @@ Here is the final output:
             if isinstance(request.vcard_data, str):
                 plain_text = requests.get(request.vcard_data).text
             else:
-                plain_text = format_vcard_string(**request.vcard_data)
+                plain_text = format_vcard_string(**request.vcard_data.__dict__)
             request.qr_code_data = upload_file_from_bytes(
                 "vCard.vcf", plain_text.encode(), "text/vcard"
             )
