@@ -1,3 +1,4 @@
+import textwrap
 import typing
 
 from pydantic import BaseModel
@@ -6,7 +7,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from recipes.DeforumSD import safety_checker
 from recipes.Lipsync import LipsyncPage
-from recipes.TextToSpeech import TextToSpeechPage
+from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
 from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/lipsync_meta_img.gif"
@@ -150,17 +151,23 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         self.render_example(st.session_state)
 
     def get_raw_price(self, state: dict):
-        return LipsyncPage.get_raw_price(self, state) + \
-                TextToSpeechPage.get_raw_price(self, state)
+        # _get_tts_provider comes from TextToSpeechPage
+        if self._get_tts_provider(state) == TextToSpeechProviders.ELEVEN_LABS:
+            return LipsyncPage.get_raw_price(self, state) + \
+                    TextToSpeechPage.get_raw_price(self, state)
+        else:
+            return LipsyncPage.get_raw_price(self, state)
 
     def additional_notes(self):
-        notes = f"""
-*Cost = Lipsync Cost + TTS Cost*
-"""
-        if lipsync_notes := LipsyncPage.additional_notes(self):
-            notes += "\n" + f"*Lipsync* {lipsync_notes}"
+        lipsync_notes = LipsyncPage.additional_notes(self)
         if tts_notes := TextToSpeechPage.additional_notes(self):
-            notes += "\n" + f"*TTS* {tts_notes}"
+            notes = textwrap.dedent(f"""\
+                - *Lipsync* {lipsync_notes.strip()}
+                - *TTS* {tts_notes.strip()}
+            """)
+        else:
+            notes = lipsync_notes
+
         return notes
 
     def render_usage_guide(self):

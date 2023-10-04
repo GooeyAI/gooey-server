@@ -126,8 +126,8 @@ class TextToSpeechPage(BasePage):
 
     def _get_eleven_labs_price(self, state: dict):
         text = state.get("text_prompt", "")
-        # 4 credits for 10 words ~ 50 chars
-        return (len(text) / 50) * 4
+        # 0.079 credits / character ~ 4 credits / 10 words
+        return len(text) * 0.079
 
     def _get_tts_provider(self, state: dict):
         tts_provider = state.get(
@@ -140,7 +140,7 @@ class TextToSpeechPage(BasePage):
         tts_provider = st.session_state.get("tts_provider")
         if tts_provider == TextToSpeechProviders.ELEVEN_LABS.name:
             return """
-    *Eleven Labs cost ≈ 4 credits for every 50 characters ≈ 0.4 credits per word*
+    *Eleven Labs cost ≈ 4 credits per 10 words*
             """
         else:
             return ""
