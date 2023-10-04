@@ -42,6 +42,8 @@ class TextToSpeechPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
+        "elevenlabs_voice_name": "syN7Wt0nfLXAqq9LI9R6",
+        "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
     }
@@ -250,17 +252,19 @@ class TextToSpeechPage(BasePage):
 
             case TextToSpeechProviders.ELEVEN_LABS:
                 # default to first voice ID in the mapping
-                default_voice_id = next(iter(ELEVEN_LABS_VOICES.values()))
+                default_voice_id = next(iter(ELEVEN_LABS_VOICES))
 
                 # default to first model ID in the mapping
-                default_voice_model = next(iter(ELEVEN_LABS_MODELS.values()))
+                default_voice_model = next(iter(ELEVEN_LABS_MODELS))
 
-                voice_id = ELEVEN_LABS_VOICES.get(
-                    state.get("elevenlabs_voice_name"), default_voice_id
-                )
-                voice_model = ELEVEN_LABS_MODELS.get(
-                    state.get("elevenlabs_model"), default_voice_model
-                )
+                voice_id = state.get("elevenlabs_voice_name", default_voice_id)
+                voice_model = state.get("elevenlabs_model", default_voice_model)
+
+                if voice_id not in ELEVEN_LABS_VOICES:
+                    raise ValueError(f"Invalid voice_name: {voice_id}")
+                if voice_model not in ELEVEN_LABS_MODELS:
+                    raise ValueError(f"Invalid model: {voice_model}")
+
                 stability = state.get("elevenlabs_stability", 0.5)
                 similarity_boost = state.get("elevenlabs_similarity_boost", 0.75)
 

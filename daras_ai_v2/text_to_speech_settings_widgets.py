@@ -29,16 +29,16 @@ class TextToSpeechProviders(Enum):
 
 # mapping from title in UI -> voice ID
 ELEVEN_LABS_VOICES = {
-    "Indian Man With A Deep Voice": "syN7Wt0nfLXAqq9LI9R6",
-    "[aaa] Ramakrishnan - INDIAN TEACHER. CEREBRAL AND THOUGHTFUL PRONUNCIATION 🔥": "99XLBDkANYZ0Ww7MKN8d",
-    "[ElevenVoices] Riya - Indian Female Young Adult": "TSh1KthMgVjY3BfYFkwS",
-    "Wise Grandma  slow, seductive, pleasant, mature": "dvRCseVM0rT31i8clSVy",
-    "[ElevenVoices] Rahul - Indian Male Young Adult": "prqKmUi0Zo7WBmA81Vy4",
+    "syN7Wt0nfLXAqq9LI9R6": "Indian Man With A Deep Voice",
+    "99XLBDkANYZ0Ww7MKN8d": "[aaa] Ramakrishnan - INDIAN TEACHER. CEREBRAL AND THOUGHTFUL PRONUNCIATION 🔥",
+    "TSh1KthMgVjY3BfYFkwS": "[ElevenVoices] Riya - Indian Female Young Adult",
+    "dvRCseVM0rT31i8clSVy": "Wise Grandma  slow, seductive, pleasant, mature",
+    "prqKmUi0Zo7WBmA81Vy4": "[ElevenVoices] Rahul - Indian Male Young Adult",
 }
 
 ELEVEN_LABS_MODELS = {
-    "Multilingual V2": "eleven_multilingual_v2",
-    "English V1 - Low latency English TTS": "eleven_monolingual_v1",
+    "eleven_multilingual_v2": "Multilingual V2",
+    "eleven_monolingual_v1": "English V1 - Low latency English TTS",
 }
 
 
@@ -165,7 +165,7 @@ def text_to_speech_settings():
                     ###### Voice name (ElevenLabs)
                     """,
                     key="elevenlabs_voice_name",
-                    format_func=str,
+                    format_func=ELEVEN_LABS_VOICES.__getitem__,
                     options=ELEVEN_LABS_VOICES.keys(),
                 )
 
@@ -203,8 +203,8 @@ def text_to_speech_settings():
                     ###### Voice Model
                     """,
                     key="elevenlabs_model",
+                    format_func=ELEVEN_LABS_MODELS.__getitem__,
                     options=ELEVEN_LABS_MODELS.keys(),
-                    format_func=str,
                 )
 
 
