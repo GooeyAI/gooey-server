@@ -62,6 +62,11 @@ class TextToSpeechPage(BasePage):
 
         bark_history_prompt: str | None
 
+        elevenlabs_voice_name: str | None
+        elevenlabs_model: str | None
+        elevenlabs_stability: float | None
+        elevenlabs_similarity_boost: float | None
+
     class ResponseModel(BaseModel):
         audio_url: str
 
@@ -99,6 +104,14 @@ class TextToSpeechPage(BasePage):
     def render_settings(self):
         text_to_speech_settings()
 
+    def get_raw_price(self, state: dict):
+        tts_provider = self._get_tts_provider(state)
+        match tts_provider:
+            case TextToSpeechProviders.ELEVEN_LABS:
+                return self._get_eleven_labs_price(state)
+            case _:
+                return super().get_raw_price(state)
+
     def render_usage_guide(self):
         youtube_video("aD4N-g9qqhc")
         # loom_video("2d853b7442874b9cbbf3f27b98594add")
@@ -111,14 +124,30 @@ class TextToSpeechPage(BasePage):
         else:
             st.div()
 
+    def _get_eleven_labs_price(self, state: dict):
+        text = state.get("text_prompt", "")
+        # 4 credits for 10 words ~ 50 chars
+        return (len(text) / 50) * 4
+
+    def _get_tts_provider(self, state: dict):
+        tts_provider = state.get(
+            "tts_provider", TextToSpeechProviders.UBERDUCK.name
+        )
+        # TODO: validate tts_provider before state lookup
+        return TextToSpeechProviders[tts_provider]
+
+    def additional_notes(self):
+        tts_provider = st.session_state.get("tts_provider")
+        if tts_provider == TextToSpeechProviders.ELEVEN_LABS.name:
+            return """
+    *Eleven Labs cost ≈ 4 credits for every 50 characters ≈ 0.4 credits per word*
+            """
+        else:
+            return ""
+
     def run(self, state: dict):
         text = state["text_prompt"].strip()
-        tts_provider = (
-            state["tts_provider"]
-            if "tts_provider" in state
-            else TextToSpeechProviders.UBERDUCK.name
-        )
-        provider = TextToSpeechProviders[tts_provider]
+        provider = self._get_tts_provider(state)
         yield f"Generating audio using {provider.value} ..."
         match provider:
             case TextToSpeechProviders.BARK:

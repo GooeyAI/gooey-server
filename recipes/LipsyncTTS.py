@@ -37,6 +37,11 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         google_speaking_rate: float | None
         google_pitch: float | None
 
+        elevenlabs_voice_name: str | None
+        elevenlabs_model: str | None
+        elevenlabs_stability: float | None
+        elevenlabs_similarity_boost: float | None
+
     class ResponseModel(BaseModel):
         output_video: str
 
@@ -143,6 +148,20 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     def render_output(self):
         self.render_example(st.session_state)
+
+    def get_raw_price(self, state: dict):
+        return LipsyncPage.get_raw_price(self, state) + \
+                TextToSpeechPage.get_raw_price(self, state)
+
+    def additional_notes(self):
+        notes = f"""
+*Cost = Lipsync Cost + TTS Cost*
+"""
+        if lipsync_notes := LipsyncPage.additional_notes(self):
+            notes += "\n" + f"*Lipsync* {lipsync_notes}"
+        if tts_notes := TextToSpeechPage.additional_notes(self):
+            notes += "\n" + f"*TTS* {tts_notes}"
+        return notes
 
     def render_usage_guide(self):
         youtube_video("RRmwQR-IytI")
