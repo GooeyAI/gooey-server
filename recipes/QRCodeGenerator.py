@@ -183,7 +183,7 @@ class QRCodeGeneratorPage(BasePage):
                     "background": "none", 
                     "border": 0, 
                     "color": "black", 
-                    "padding": 0
+                    "padding": 0,
                 },
             ):
                 if not fields.get("email"):
