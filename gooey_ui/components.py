@@ -62,6 +62,11 @@ def html(body: str, **props):
     return _node("html", body=body, **props)
 
 
+def only_loading_html(body: str, **props):
+    props["className"] = props.get("className", "") + " gui-html-container"
+    return _node("loading", body=body, **props)
+
+
 def write(*objs: typing.Any, unsafe_allow_html=False, **props):
     for obj in objs:
         markdown(

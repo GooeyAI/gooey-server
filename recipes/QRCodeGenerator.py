@@ -63,7 +63,7 @@ class QRCodeGeneratorPage(BasePage):
         qr_code_data: str | None
         qr_code_input_image: str | None
 
-        vcard_data: dict | None
+        vcard_data: dict | str | None
 
         use_url_shortener: bool | None
 
@@ -169,96 +169,120 @@ class QRCodeGeneratorPage(BasePage):
             st.caption(
                 "We'll use the prompt above to create a beautiful QR code that when scanned on a phone, will add the info below as a contact. Great for conferences and geeky parties."
             )
-            fields = st.session_state.get("vcard_data", {})
-            for field in fields:
-                st.session_state.setdefault("__" + field, fields.get(field, None))
-
-            fields["email"] = st.text_input(
-                "Email", key="__email", placeholder="dev@gooey.ai"
+            st.session_state.setdefault(
+                "__upload_vcard",
+                isinstance(st.session_state.get("vcard_data", {}), str),
             )
-            fields = {"email": fields.get("email", "")}
-            if st.button(
-                "<u>Import other contact info</u> from my email - magic!",
-                className="link-button",
+            if st.checkbox(
+                "Upload vCard (e.g. from MacOS Contacts export or another website)",
+                key="__upload_vcard",
             ):
-                if not fields.get("email"):
-                    st.caption("Please provide an email address to import from")
-                else:
-                    (
-                        photo_url,
-                        name,
-                        url,
-                        title,
-                        company,
-                        gender,
-                        notes,
-                    ) = get_account_info_from_email(fields["email"])
-                    if name:
-                        st.session_state["__format_name"] = name
-                    if photo_url:
-                        st.session_state["__photo_url"] = photo_url
-                    if url:
-                        st.session_state["__urls"] = [url]
-                    if title:
-                        st.session_state["__job_title"] = title
-                    if company:
-                        st.session_state["__organization"] = company
-                    if gender:
-                        st.session_state["__gender"] = gender
-                    if notes:
-                        st.session_state["__note"] = notes
-                    if name or photo_url or url or title or company or gender or notes:
-                        st.experimental_rerun()
+                st.session_state["vcard_data"] = st.file_uploader(
+                    "", accept=["text/vcard"]
+                )
+            else:
+                fields = st.session_state.get("vcard_data", {})
+                if isinstance(fields, str):
+                    fields = {}
+                for field in fields:
+                    st.session_state.setdefault("__" + field, fields.get(field, None))
 
-            fields["format_name"] = st.text_input(
-                "Name*",
-                key="__format_name",
-                placeholder="Supreme Overlord Alex Metzger, PhD",
-            )
-            fields["tel"] = st.text_input(
-                "Phone Number", key="__tel", placeholder="+1 (420) 669-6969"
-            )
-            fields["role"] = st.text_input("Role", key="__role", placeholder="Intern")
-            fields["organization"] = st.text_input(
-                "Organization", key="__organization", placeholder="Gooey.AI"
-            )
-            urls = st.session_state.get("__urls", [])
-            st.session_state["__urls"] = (
-                "\n".join(urls) if isinstance(urls, list) else urls
-            )
-            fields["urls"] = st.text_area(
-                "Link(s)",
-                key="__urls",
-                placeholder="https://www.gooey.ai\nhttps://farmer.chat",
-            ).split("\n")
-            fields["photo_url"] = (
-                st.file_uploader("Photo", key="__photo_url", accept=["image/*"])
-                if not st.session_state.get("__photo_url")
-                else st.text_input("Photo", key="__photo_url")
-            )
-            with st.expander("More Contact Fields"):
-                fields["gender"] = st.text_input(
-                    "Gender", key="__gender", placeholder="F"
+                fields["email"] = st.text_input(
+                    "Email", key="__email", placeholder="dev@gooey.ai"
                 )
-                fields["calendar_url"] = st.text_input(
-                    "Calendar Link ([calend.ly](calend.ly))",
-                    key="__calendar_url",
-                    placeholder="https://calendar.google.com/calendar/u/0/r",
+                fields = {"email": fields.get("email", "")}
+                if st.button(
+                    "<u>Import other contact info</u> from my email - magic!",
+                    className="link-button",
+                ):
+                    if not fields.get("email"):
+                        st.caption("Please provide an email address to import from")
+                    else:
+                        (
+                            photo_url,
+                            name,
+                            url,
+                            title,
+                            company,
+                            gender,
+                            notes,
+                        ) = get_account_info_from_email(fields["email"])
+                        if name:
+                            st.session_state["__format_name"] = name
+                        if photo_url:
+                            st.session_state["__photo_url"] = photo_url
+                        if url:
+                            st.session_state["__urls"] = [url]
+                        if title:
+                            st.session_state["__job_title"] = title
+                        if company:
+                            st.session_state["__organization"] = company
+                        if gender:
+                            st.session_state["__gender"] = gender
+                        if notes:
+                            st.session_state["__note"] = notes
+                        if (
+                            name
+                            or photo_url
+                            or url
+                            or title
+                            or company
+                            or gender
+                            or notes
+                        ):
+                            st.experimental_rerun()
+
+                fields["format_name"] = st.text_input(
+                    "Name*",
+                    key="__format_name",
+                    placeholder="Supreme Overlord Alex Metzger, PhD",
                 )
-                fields["note"] = st.text_area(
-                    "Notes",
-                    key="__note",
-                    placeholder="- awesome person\n- loves pizza\n- plays tons of chess\n- absolutely a genius",
+                fields["tel"] = st.text_input(
+                    "Phone Number", key="__tel", placeholder="+1 (420) 669-6969"
                 )
-                st.session_state["__address"] = st.session_state.get(
-                    "__address", ""
-                ).replace(";", "\n")
-                fields["address"] = st.text_area(
-                    "Address",
-                    key="__address",
-                    placeholder="123 Main St\nSan Francisco\nCA 94105",
-                ).replace("\n", ";")
-            st.session_state["vcard_data"] = fields
+                fields["role"] = st.text_input(
+                    "Role", key="__role", placeholder="Intern"
+                )
+                fields["organization"] = st.text_input(
+                    "Organization", key="__organization", placeholder="Gooey.AI"
+                )
+                urls = st.session_state.get("__urls", [])
+                st.session_state["__urls"] = (
+                    "\n".join(urls) if isinstance(urls, list) else urls
+                )
+                fields["urls"] = st.text_area(
+                    "Link(s)",
+                    key="__urls",
+                    placeholder="https://www.gooey.ai\nhttps://farmer.chat",
+                ).split("\n")
+                fields["photo_url"] = (
+                    st.file_uploader("Photo", key="__photo_url", accept=["image/*"])
+                    if not st.session_state.get("__photo_url")
+                    else st.text_input("Photo", key="__photo_url")
+                )
+                with st.expander("More Contact Fields"):
+                    fields["gender"] = st.text_input(
+                        "Gender", key="__gender", placeholder="F"
+                    )
+                    fields["calendar_url"] = st.text_input(
+                        "Calendar Link ([calend.ly](calend.ly))",
+                        key="__calendar_url",
+                        placeholder="https://calendar.google.com/calendar/u/0/r",
+                    )
+                    fields["note"] = st.text_area(
+                        "Notes",
+                        key="__note",
+                        placeholder="- awesome person\n- loves pizza\n- plays tons of chess\n- absolutely a genius",
+                    )
+                    st.session_state["__address"] = st.session_state.get(
+                        "__address", ""
+                    ).replace(";", "\n")
+                    fields["address"] = st.text_area(
+                        "Address",
+                        key="__address",
+                        placeholder="123 Main St\nSan Francisco\nCA 94105",
+                    ).replace("\n", ";")
+                st.session_state["vcard_data"] = fields
 
         if index == 1 or index == 2:
             st.session_state["qr_code_data"] = None
@@ -271,9 +295,10 @@ class QRCodeGeneratorPage(BasePage):
         assert st.session_state["text_prompt"], "Please provide a prompt"
 
         if st.session_state.get("vcard_data"):
-            assert st.session_state["vcard_data"][
-                "format_name"
-            ], "Please provide a name"
+            assert (
+                isinstance(st.session_state["vcard_data"], str)
+                or st.session_state["vcard_data"]["format_name"]
+            ), "Please provide a name"
             return
 
         qr_code_data = st.session_state.get("qr_code_data")
@@ -450,7 +475,10 @@ Here is the final output:
 
         if request.vcard_data:
             yield "Saving vCard..."
-            plain_text = format_vcard_string(**request.vcard_data)
+            if isinstance(request.vcard_data, str):
+                plain_text = requests.get(request.vcard_data).text
+            else:
+                plain_text = format_vcard_string(**request.vcard_data)
             request.qr_code_data = upload_file_from_bytes(
                 "vCard.vcf", plain_text.encode(), "text/vcard"
             )
