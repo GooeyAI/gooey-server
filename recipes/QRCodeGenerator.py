@@ -272,9 +272,6 @@ class QRCodeGeneratorPage(BasePage):
                 fields["role"] = st.text_input(
                     "Role", key="__role", placeholder="Intern"
                 )
-                fields["organization"] = st.text_input(
-                    "Organization", key="__organization", placeholder="Gooey.AI"
-                )
                 urls = st.session_state.get("__urls", [])
                 st.session_state["__urls"] = (
                     "\n".join(urls) if isinstance(urls, list) else urls
@@ -705,6 +702,8 @@ def format_vcard_string(
         vcard_string += f"CATEGORIES:{format_for_vcard(comma_separated_categories)}\n"
     if kind:
         vcard_string += f"KIND:{format_for_vcard(kind)}\n"
+    else:
+        vcard_string += "KIND:individual\n"
     if language:
         vcard_string += f"LANG:{format_for_vcard(language)}\n"
     if organization:
