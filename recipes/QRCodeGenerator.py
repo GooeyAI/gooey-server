@@ -164,7 +164,9 @@ class QRCodeGeneratorPage(BasePage):
                 accept=["image/*"],
             )
         else:
-            self._set_active_qr_input_field(st.session_state, "qr_code_data", default="")
+            self._set_active_qr_input_field(
+                st.session_state, "qr_code_data", default=""
+            )
             st.text_area(
                 """
                 ### 🔗 URL
