@@ -1,4 +1,3 @@
-import textwrap
 import typing
 
 from pydantic import BaseModel
@@ -153,18 +152,19 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     def get_raw_price(self, state: dict):
         # _get_tts_provider comes from TextToSpeechPage
         if self._get_tts_provider(state) == TextToSpeechProviders.ELEVEN_LABS:
-            return LipsyncPage.get_raw_price(self, state) + \
-                    TextToSpeechPage.get_raw_price(self, state)
+            return LipsyncPage.get_raw_price(
+                self, state
+            ) + TextToSpeechPage.get_raw_price(self, state)
         else:
             return LipsyncPage.get_raw_price(self, state)
 
     def additional_notes(self):
         lipsync_notes = LipsyncPage.additional_notes(self)
         if tts_notes := TextToSpeechPage.additional_notes(self):
-            notes = textwrap.dedent(f"""\
+            notes = f"""
                 - *Lipsync* {lipsync_notes.strip()}
                 - *TTS* {tts_notes.strip()}
-            """)
+            """
         else:
             notes = lipsync_notes
 
