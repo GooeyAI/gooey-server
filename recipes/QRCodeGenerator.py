@@ -106,6 +106,36 @@ class QRCodeGeneratorPage(BasePage):
             EmailFaceInpaintingPage,
         ]
 
+    def _set_active_qr_input_field(self, state: dict, active_field: str, default=None):
+        """
+        There must be only one active QR-data input field at a time. The
+        variables in state need to be set as per that. e.g. if qr_code_data
+        is active, then other fields such as qr_code_input_image must be set
+        to None.
+
+        At the same time, we shouldn't lose data because a customer is
+        trying out different modes on the UI.
+
+        This helper method implements that by:
+        - caching any previous form data from other fields with hidden keys
+        - restoring previously saved data for this field
+        """
+        all_fields = ["qr_code_data", "qr_code_input_image"]
+        if active_field not in all_fields:
+            raise Exception(f"Invalid qr code input field: {active_field}")
+
+        format_saved_key = lambda k: f"__saved_{k}"
+
+        # save all fields other than active_field
+        for field in all_fields:
+            if field != active_field and state.get(field) is not None:
+                state[format_saved_key(field)] = state[field]
+                state[field] = None
+
+        # restore active field
+        if state.get(active_field) is None:
+            state[active_field] = state.pop(format_saved_key(active_field), default)
+
     def render_form_v2(self):
         st.text_area(
             """
@@ -124,6 +154,7 @@ class QRCodeGeneratorPage(BasePage):
         if st.checkbox(
             f"Upload an existing QR Code", key="__enable_qr_code_input_image"
         ):
+            self._set_active_qr_input_field(st.session_state, "qr_code_input_image")
             st.file_uploader(
                 """
                 ### 📷 QR Code Image
@@ -132,8 +163,8 @@ class QRCodeGeneratorPage(BasePage):
                 key="qr_code_input_image",
                 accept=["image/*"],
             )
-            st.session_state["qr_code_data"] = None
         else:
+            self._set_active_qr_input_field(st.session_state, "qr_code_data", default="")
             st.text_area(
                 """
                 ### 🔗 URL
@@ -142,7 +173,6 @@ class QRCodeGeneratorPage(BasePage):
                 key="qr_code_data",
                 placeholder="https://www.gooey.ai",
             )
-            st.session_state["qr_code_input_image"] = None
 
         st.checkbox("🔗 Shorten URL", key="use_url_shortener")
         st.caption(
