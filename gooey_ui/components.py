@@ -158,7 +158,16 @@ def controllable_tabs(
 ) -> tuple[list[state.NestingCtx], int]:
     index = state.session_state.get(key, 0)
     for i, label in enumerate(labels):
-        if button(label, key=f"tab-{i}", type="primary", disabled=i == index):
+        if button(
+            label,
+            key=f"tab-{i}",
+            type="primary",
+            className="replicate-nav",
+            style={
+                "background": "black" if i == index else "white",
+                "color": "white" if i == index else "black",
+            },
+        ):
             state.session_state[key] = index = i
             state.experimental_rerun()
     ctxs = []
