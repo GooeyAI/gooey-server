@@ -130,9 +130,7 @@ class TextToSpeechPage(BasePage):
         return len(text) * 0.079
 
     def _get_tts_provider(self, state: dict):
-        tts_provider = state.get(
-            "tts_provider", TextToSpeechProviders.UBERDUCK.name
-        )
+        tts_provider = state.get("tts_provider", TextToSpeechProviders.UBERDUCK.name)
         # TODO: validate tts_provider before state lookup
         return TextToSpeechProviders[tts_provider]
 
