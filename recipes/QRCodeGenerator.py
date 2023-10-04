@@ -43,6 +43,35 @@ ATTEMPTS = 1
 DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f09c8cfa-5393-11ee-a837-02420a000190/ai%20art%20qr%20codes1%201.png.png"
 
 
+class vCardObject(BaseModel):
+    format_name: str
+    email: str | None
+    gender: str | None
+    birthday_year: str | None
+    birthday_month: str | None
+    birthday_day: str | None
+    family_name: str | None
+    given_name: str | None
+    middle_names: str | None
+    honorific_prefixes: str | None
+    honorific_suffixes: str | None
+    impp: str | None
+    address: str | None
+    calendar_url: str | None
+    comma_separated_categories: str | None
+    kind: str | None
+    language: str | None
+    organization: str | None
+    photo_url: str | None
+    logo_url: str | None
+    role: str | None
+    timezone: str | None
+    job_title: str | None
+    urls: list[str] | None
+    tel: str | None
+    note: str | None
+
+
 class QRCodeGeneratorPage(BasePage):
     title = "AI Art QR Code"
     workflow = Workflow.QR_CODE
@@ -63,7 +92,7 @@ class QRCodeGeneratorPage(BasePage):
         qr_code_data: str | None
         qr_code_input_image: str | None
 
-        vcard_data: dict | str | None
+        vcard_data: vCardObject | str | None
 
         use_url_shortener: bool | None
 
