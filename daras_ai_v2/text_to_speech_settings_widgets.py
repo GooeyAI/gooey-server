@@ -27,7 +27,7 @@ class TextToSpeechProviders(Enum):
     ELEVEN_LABS = "ElevenLabs"
 
 
-# mapping from title in UI -> voice ID
+# Mapping from Eleven Labs Voice ID -> Title in UI
 ELEVEN_LABS_VOICES = {
     "syN7Wt0nfLXAqq9LI9R6": "Indian Man With A Deep Voice",
     "99XLBDkANYZ0Ww7MKN8d": "[aaa] Ramakrishnan - INDIAN TEACHER. CEREBRAL AND THOUGHTFUL PRONUNCIATION 🔥",
@@ -36,11 +36,11 @@ ELEVEN_LABS_VOICES = {
     "prqKmUi0Zo7WBmA81Vy4": "[ElevenVoices] Rahul - Indian Male Young Adult",
 }
 
+# Mapping from Model ID -> Title in UI
 ELEVEN_LABS_MODELS = {
     "eleven_multilingual_v2": "Multilingual V2",
     "eleven_monolingual_v1": "English V1 - Low latency English TTS",
 }
-
 
 BARK_SUPPORTED_LANGS = [
     ("English", "en"),

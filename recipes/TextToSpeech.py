@@ -133,14 +133,14 @@ class TextToSpeechPage(BasePage):
 
     def _get_tts_provider(self, state: dict):
         tts_provider = state.get("tts_provider", TextToSpeechProviders.UBERDUCK.name)
-        # TODO: validate tts_provider before state lookup
+        # TODO: validate tts_provider before lookup?
         return TextToSpeechProviders[tts_provider]
 
     def additional_notes(self):
         tts_provider = st.session_state.get("tts_provider")
         if tts_provider == TextToSpeechProviders.ELEVEN_LABS.name:
             return """
-    *Eleven Labs cost ≈ 4 credits per 10 words*
+                *Eleven Labs cost ≈ 4 credits per 10 words*
             """
         else:
             return ""
