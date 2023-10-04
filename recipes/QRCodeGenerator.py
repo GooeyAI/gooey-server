@@ -133,7 +133,7 @@ class QRCodeGeneratorPage(BasePage):
             else 2,
         )
         (url, vCard, existing), index = st.controllable_tabs(
-            ["URL/TXT Content 🖊️", "Contact vCard 📇", "Existing QR Code 📷"],
+            ["🖊️ Link or Text", "📇 Contact vCard", "📷 Existing QR Code"],
             key="__qr_input_type_index",
         )
 
@@ -173,9 +173,13 @@ class QRCodeGeneratorPage(BasePage):
             for field in fields:
                 st.session_state.setdefault("__" + field, fields.get(field, None))
 
-            if st.button("Import from Email"):
+            fields["email"] = st.text_input(
+                "Email", key="__email", placeholder="dev@gooey.ai"
+            )
+            fields = {"email": fields.get("email", "")}
+            if st.button("<u>Import other contact info</u> from my email - magic!", style={"background": "none", "border": 0, "color": "black", "padding": 0}):
                 if not fields.get("email"):
-                    st.caption("Please provide an email address below")
+                    st.caption("Please provide an email address to import from")
                 else:
                     (
                         photo_url,
@@ -200,15 +204,13 @@ class QRCodeGeneratorPage(BasePage):
                         st.session_state["__gender"] = gender
                     if notes:
                         st.session_state["__note"] = notes
+                    if name or photo_url or url or title or company or gender or notes:
+                        st.experimental_rerun()
 
-            fields = {}
             fields["format_name"] = st.text_input(
-                "Name (Required)",
+                "Name*",
                 key="__format_name",
                 placeholder="Supreme Overlord Alex Metzger, PhD",
-            )
-            fields["email"] = st.text_input(
-                "Email", key="__email", placeholder="example@gmail.com"
             )
             fields["tel"] = st.text_input(
                 "Phone Number", key="__tel", placeholder="+1 (420) 669-6969"
@@ -230,14 +232,6 @@ class QRCodeGeneratorPage(BasePage):
                 st.file_uploader("Photo", key="__photo_url", accept=["image/*"])
                 if not st.session_state.get("__photo_url")
                 else st.text_input("Photo", key="__photo_url")
-            )
-            st.session_state.setdefault("__compress_photo", True)
-            fields["compress_photo"] = st.checkbox(
-                "Compress and Base64 Encode Photo",
-                key="__compress_photo",
-            )
-            st.caption(
-                "The photo will have lower resolution and the vCard file will take longer to download. This is necessary for it to work on Apple devices 🙄"
             )
             with st.expander("More Contact Fields"):
                 fields["gender"] = st.text_input(
@@ -261,66 +255,6 @@ class QRCodeGeneratorPage(BasePage):
                     key="__address",
                     placeholder="123 Main St\nSan Francisco\nCA 94105",
                 ).replace("\n", ";")
-            with st.expander("Advanced Contact Fields"):
-                fields["birthday_year"] = st.text_input(
-                    "Birthday Year", key="__birthday_year", placeholder="1990"
-                )
-                fields["birthday_month"] = st.text_input(
-                    "Birthday Month", key="__birthday_month", placeholder="01"
-                )
-                fields["birthday_day"] = st.text_input(
-                    "Birthday Day", key="__birthday_day", placeholder="01"
-                )
-                fields["family_name"] = st.text_input(
-                    "Family Name", key="__family_name", placeholder="Metzger"
-                )
-                fields["given_name"] = st.text_input(
-                    "Given Name", key="__given_name", placeholder="Alexander"
-                )
-                fields["middle_names"] = st.text_input(
-                    "Additional/Middle Names", key="__middle_names", placeholder="Le"
-                )
-                fields["honorific_prefixes"] = st.text_input(
-                    "Honorific Prefixes",
-                    key="__honorific_prefixes",
-                    placeholder="Supreme, Overlord",
-                )
-                fields["honorific_suffixes"] = st.text_input(
-                    "Honorific Suffixes", key="__honorific_suffixes", placeholder="PhD"
-                )
-                fields["impp"] = st.text_input(
-                    "Instant Messenger Handle",
-                    key="__impp",
-                    placeholder="aim:johndoe@aol.com",
-                )
-                fields["comma_separated_categories"] = st.text_input(
-                    "Keywords",
-                    key="__comma_separated_categories",
-                    placeholder="tennis player, software engineer",
-                )
-                fields["kind"] = st.radio(
-                    "Kind",
-                    key="__kind",
-                    options=[
-                        "individual",
-                        "application",
-                        "group",
-                        "location",
-                        "organization",
-                    ],
-                )
-                fields["language"] = st.text_input(
-                    "Language", key="__language", placeholder="en-US"
-                )
-                fields["logo_url"] = st.file_uploader(
-                    "Logo", key="__logo_url", accept=["image/*"]
-                )
-                fields["timezone"] = st.text_input(
-                    "Timezone", key="__timezone", placeholder="America/Los_Angeles"
-                )
-                fields["job_title"] = st.text_input(
-                    "Job Title", key="__job_title", placeholder="Supreme Overlord"
-                )
             st.session_state["vcard_data"] = fields
 
         if index == 1 or index == 2:
@@ -680,7 +614,7 @@ def format_vcard_string(
     urls: list[str] = [],
     tel: str | None = None,
     note: str | None = None,
-    compress_photo: bool = False,
+    compress_photo: bool = True,
 ) -> str:
     vcard_string = "BEGIN:VCARD\nVERSION:4.0\n"
     if format_name:
