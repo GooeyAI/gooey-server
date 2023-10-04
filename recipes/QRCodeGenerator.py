@@ -177,7 +177,15 @@ class QRCodeGeneratorPage(BasePage):
                 "Email", key="__email", placeholder="dev@gooey.ai"
             )
             fields = {"email": fields.get("email", "")}
-            if st.button("<u>Import other contact info</u> from my email - magic!", style={"background": "none", "border": 0, "color": "black", "padding": 0}):
+            if st.button(
+                "<u>Import other contact info</u> from my email - magic!", 
+                style={
+                    "background": "none", 
+                    "border": 0, 
+                    "color": "black", 
+                    "padding": 0
+                },
+            ):
                 if not fields.get("email"):
                     st.caption("Please provide an email address to import from")
                 else:
