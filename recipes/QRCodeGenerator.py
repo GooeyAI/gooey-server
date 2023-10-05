@@ -155,18 +155,25 @@ class QRCodeGeneratorPage(BasePage):
 
         st.session_state.setdefault(
             "__qr_input_type_index",
-            0
+            "0"
             if st.session_state.get("qr_code_data")
-            else 1
+            else "1"
             if st.session_state.get("vcard_data")
-            else 2,
+            else "2",
         )
-        (url, vCard, existing), index = st.controllable_tabs(
-            ["🖊️ Link or Text", "📇 Contact vCard", "📷 Existing QR Code"],
+        st.radio(
+            "",
+            options=["0", "1", "2"],
             key="__qr_input_type_index",
+            format_func=lambda x: [
+                "🖊️ Link or Text",
+                "📇 Contact vCard",
+                "📷 Existing QR Code",
+            ][int(x)],
         )
+        index = st.session_state.get("__qr_input_type_index", "0")
 
-        with url:
+        if index == "0":
             st.text_area(
                 """
                     ### 🔗 URL
@@ -180,7 +187,7 @@ class QRCodeGeneratorPage(BasePage):
                 'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
             )
 
-        with existing:
+        if index == "2":
             st.file_uploader(
                 """
                 ### 📷 QR Code Image
@@ -194,7 +201,8 @@ class QRCodeGeneratorPage(BasePage):
                 'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
             )
 
-        with vCard:
+        if index == "1":
+            print("hi")
             st.caption(
                 "We'll use the prompt above to create a beautiful QR code that when scanned on a phone, will add the info below as a contact. Great for conferences and geeky parties."
             )
