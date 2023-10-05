@@ -19,7 +19,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
 )
 from daras_ai_v2.enum_selector_widget import enum_selector, enum_multiselect
-from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.functional import flatmap_parallel
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 
@@ -44,7 +44,7 @@ class AsrPage(BasePage):
 
     class ResponseModel(BaseModel):
         raw_output_text: list[str] | None
-        output_text: list[str | AsrOutputJson]
+        output_text: list[str] | list[AsrOutputJson]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_ASR_META_IMG
@@ -85,10 +85,9 @@ class AsrPage(BasePage):
         )
         col1, col2 = st.columns(2, responsive=False)
         with col1:
-            if not isinstance(st.session_state.get("selected_model"), list):
-                st.session_state["selected_model"] = [
-                    st.session_state["selected_model"]
-                ]
+            selected_model = st.session_state.get("selected_model")
+            if isinstance(selected_model, str):
+                st.session_state["selected_model"] = [selected_model]
             selected_model = enum_multiselect(
                 AsrModels,
                 label="##### ASR Models",
@@ -142,26 +141,21 @@ class AsrPage(BasePage):
         request: AsrPage.RequestModel = self.RequestModel.parse_obj(state)
 
         # Run ASR
-        selected_models: list[str] = request.selected_model or [
-            AsrModels.whisper_large_v2.name
-        ]
-        if not isinstance(selected_models, list):
+        selected_models = request.selected_model
+        if isinstance(selected_models, str):
             selected_models = [selected_models]
         yield f"Running {', '.join([AsrModels[m].value for m in selected_models])}..."
-        asr_output = map_parallel(
+        asr_output = flatmap_parallel(
             lambda audio: run_asr(
                 audio_url=audio,
-                selected_model=selected_models,
+                selected_models=selected_models,
                 language=request.language,
                 output_format=request.output_format,
             ),
             request.documents,
         )
-        if len(selected_models) != 1:
-            # flatten
-            asr_output = [out for model_out in asr_output for out in model_out]
         str_asr_output: list[str] = [
-            out if not isinstance(out, AsrModels) else out.get("text", "").strip()
+            out.get("text", "").strip() if isinstance(out, dict) else out
             for out in asr_output
         ]
 

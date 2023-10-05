@@ -382,7 +382,7 @@ def process_source(
             or "audio/" in doc_meta.mime_type
         ):
             yield "Transcribing"
-            transcript = run_asr(content_url, request.selected_asr_model)
+            transcript = run_asr(content_url, [request.selected_asr_model])[0]
         elif "application/pdf" in doc_meta.mime_type:
             yield "Extracting PDF"
             transcript = str(azure_doc_extract_pages(content_url)[0])
