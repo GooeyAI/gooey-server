@@ -1,3 +1,5 @@
+import typing
+
 import gooey_ui as st
 
 from daras_ai_v2 import settings
@@ -12,8 +14,18 @@ def is_user_uploaded_url(url: str) -> bool:
 
 def document_uploader(
     label: str,
-    key="documents",
-    accept=(".pdf", ".txt", ".docx", ".md", ".html", ".wav", ".ogg", ".mp3", ".aac"),
+    key: str = "documents",
+    accept: typing.Iterable[str] = (
+        ".pdf",
+        ".txt",
+        ".docx",
+        ".md",
+        ".html",
+        ".wav",
+        ".ogg",
+        ".mp3",
+        ".aac",
+    ),
     accept_multiple_files=True,
 ):
     st.write(label, className="gui-input")
@@ -62,6 +74,7 @@ def document_uploader(
             accept=accept,
             accept_multiple_files=accept_multiple_files,
         )
+    return st.session_state.get(key, [])
 
 
 def doc_search_settings(

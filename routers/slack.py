@@ -2,14 +2,15 @@ import json
 
 import requests
 from django.db import transaction
-from fastapi import APIRouter, HTTPException, Depends, Request, Response
+from fastapi import APIRouter, HTTPException, Depends, Request, Response, Header
 from furl import furl
+from requests import HTTPError
 from requests.auth import HTTPBasicAuth
 from sentry_sdk import capture_exception
 from starlette.background import BackgroundTasks
 from starlette.responses import RedirectResponse, HTMLResponse
 
-from bots.models import BotIntegration, Platform, Conversation
+from bots.models import BotIntegration, Platform, Conversation, Message
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
@@ -19,6 +20,7 @@ from daras_ai_v2.slack_bot import (
     create_personal_channel,
     SlackAPIError,
     fetch_user_info,
+    parse_slack_response,
 )
 
 router = APIRouter()
@@ -177,14 +179,12 @@ def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
     if event["type"] != "event_callback":
         return
     message = event["event"]
-    if message["type"] != "message":
-        return
     try:
-        match message.get("subtype", "any"):
-            case "channel_join":
+        match message.get("type"):
+            case "member_joined_channel":
                 bi = BotIntegration.objects.get(
                     slack_channel_id=message["channel"],
-                    slack_team_id=event["team_id"],
+                    slack_team_id=message["team"],
                 )
                 if not bi.slack_create_personal_channels:
                     return
@@ -199,10 +199,15 @@ def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
                 else:
                     create_personal_channel(bi, user)
 
-            case "any" | "slack_audio" | "file_share":
+            case "message":
+                # Ignore subtypes other than slack_audio and file_share. If there's no subtype, assume text
+                subtype = message.get("subtype")
+                if subtype and subtype not in ["slack_audio", "file_share"]:
+                    return
+
                 files = message.get("files", [])
                 if not files:
-                    message.get("messsage", {}).get("files", [])
+                    message.get("message", {}).get("files", [])
                 if not files:
                     attachments = message.get("attachments", [])
                     files = [
@@ -231,7 +236,9 @@ def slack_oauth_shortcuts():
 
 
 @router.get("/__/slack/redirect/shortcuts/")
-def slack_connect_redirect_shortcuts(request: Request):
+def slack_connect_redirect_shortcuts(
+    request: Request, shortcut_name: str = "Start Copilot"
+):
     retry_button = f'<a href="{slack_shortcuts_connect_url}">Retry</a>'
 
     code = request.query_params.get("code")
@@ -278,17 +285,22 @@ def slack_connect_redirect_shortcuts(request: Request):
         )
     sr = convo.bot_integration.saved_run
 
-    payload = json.dumps(
-        dict(
-            slack_channel=convo.slack_channel_name,
-            slack_channel_id=convo.slack_channel_id,
-            slack_user_access_token=access_token,
-            slack_team_id=team_id,
-            gooey_example_id=sr.example_id,
-            gooey_run_id=sr.run_id,
-        ),
-        indent=2,
+    slack_creds = dict(
+        slack_channel=convo.slack_channel_name,
+        slack_channel_id=convo.slack_channel_id,
+        slack_user_access_token=access_token,
+        slack_team_id=team_id,
+        gooey_example_id=sr.example_id,
+        gooey_run_id=sr.run_id,
     )
+    shortcut_url = furl(
+        "shortcuts://run-shortcut",
+        query_params=dict(
+            name=shortcut_name,
+            input=json.dumps({"slack_creds": slack_creds}),
+        ),
+    ).tostr(query_quote_plus=False)
+
     return HTMLResponse(
         # language=HTML
         """
@@ -297,24 +309,21 @@ def slack_connect_redirect_shortcuts(request: Request):
         </head>
         <body style="font-size: 1.2rem; text-align: center; font-family: sans-serif">
             <p>
-                <textarea style="font-family: monospace; width: 100%%;" rows=5 id="foo">%(payload)s</textarea>
+                <textarea style="font-family: monospace; width: 100%%;" rows=5 id="foo">%(slack_creds)s</textarea>
             </p>
-
             <p>
-                <button id="new-copy" style="padding: 2rem; font-size: 1.5rem;">
-                    Click here to Complete Setup
-                </button>
+                <a href="%(shortcut_url)s">
+                    <button id="new-copy" style="padding: 2rem; font-size: 1.5rem;">
+                        Click here to Complete Setup
+                    </button>
+                </a>
             </p>
-
-            <script>
-                document.getElementById("new-copy").addEventListener("click", event => {
-                    navigator.clipboard.writeText(%(payload)r);
-                    document.body.innerText = "Setup Complete! You can close this window now."
-                });
-            </script>
         </body>
         """
-        % dict(payload=payload)
+        % dict(
+            slack_creds=json.dumps(slack_creds, indent=2),
+            shortcut_url=shortcut_url,
+        )
     )
 
 
@@ -332,3 +341,52 @@ slack_shortcuts_connect_url = furl(
         redirect_uri=slack_shortcuts_redirect_uri,
     ),
 )
+
+
+def slack_auth_header(
+    authorization: str = Header(
+        alias="Authorization",
+        description=f"Bearer $SLACK_AUTH_TOKEN",
+    ),
+) -> dict:
+    r = requests.post(
+        "https://slack.com/api/auth.test", headers={"Authorization": authorization}
+    )
+    try:
+        return parse_slack_response(r)
+    except HTTPError:
+        raise HTTPException(
+            status_code=r.status_code, detail=r.content, headers=r.headers
+        )
+    except SlackAPIError as e:
+        raise HTTPException(500, {"error": e.error})
+
+
+@router.get("/__/slack/get-response-for-msg/{msg_id}/")
+def slack_get_response_for_msg_id(
+    msg_id: str,
+    slack_user: dict = Depends(slack_auth_header),
+):
+    try:
+        msg = Message.objects.get(platform_msg_id=msg_id)
+        response_msg = msg.get_next_by_created_at()
+    except Message.DoesNotExist:
+        return {"status": "not_found"}
+
+    if msg.conversation.slack_team_id != slack_user.get(
+        "team_id",
+    ) and msg.conversation.slack_user_id != slack_user.get(
+        "user_id",
+    ):
+        raise HTTPException(403, "Not authorized")
+
+    state = response_msg.saved_run.state
+    output_text = (
+        state.get("raw_tts_text")
+        or state.get("raw_output_text")
+        or state.get("output_text")
+    )
+    if not output_text:
+        return {"status": "no_output"}
+
+    return {"status": "ok", "content": output_text[0]}

@@ -29,7 +29,7 @@ from daras_ai_v2.base import (
     BasePage,
     StateKeys,
 )
-from gooey_token_authentication1.token_authentication import api_auth_header
+from auth.token_authentication import api_auth_header
 
 app = APIRouter()
 

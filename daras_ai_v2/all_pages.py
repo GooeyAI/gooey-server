@@ -3,6 +3,7 @@ import typing
 
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
+from recipes.BulkRunner import BulkRunnerPage
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
 from recipes.CompareText2Img import CompareText2ImgPage
@@ -71,6 +72,7 @@ all_home_pages = [
     ImageSegmentationPage,
     CompareUpscalerPage,
     DocExtractPage,
+    BulkRunnerPage,
 ]
 
 # exposed as API
