@@ -418,26 +418,7 @@ def split_sections(sections: str, *, chunk_overlap: int, chunk_size: int):
                 header += f"{role}={content}\n"
 
 
-@redis_cache_decorator
-def doc_url_to_text_pages(
-    *,
-    f_url: str,
-    doc_meta: DocMetadata,
-    google_translate_target: str | None,
-    selected_asr_model: str | None,
-) -> list[str]:
-    """
-    Download document from url and convert to text pages.
-
-    Args:
-        f_url: url of document
-        doc_meta: document metadata
-        google_translate_target: target language for google translate
-        selected_asr_model: selected ASR model (used for audio files)
-
-    Returns:
-        list of text pages
-    """
+def _download_doc_content(f_url: str, doc_meta: DocMetadata):
     f = furl(f_url)
     f_name = doc_meta.name
     if is_gdrive_url(f):
@@ -465,6 +446,30 @@ def doc_url_to_text_pages(
             else:
                 f_bytes = codec.decode(f_bytes)[0].encode()
         ext = guess_ext_from_response(r)
+    return ext, f_name, f_bytes
+
+
+@redis_cache_decorator
+def doc_url_to_text_pages(
+    *,
+    f_url: str,
+    doc_meta: DocMetadata,
+    google_translate_target: str | None,
+    selected_asr_model: str | None,
+) -> list[str]:
+    """
+    Download document from url and convert to text pages.
+
+    Args:
+        f_url: url of document
+        doc_meta: document metadata
+        google_translate_target: target language for google translate
+        selected_asr_model: selected ASR model (used for audio files)
+
+    Returns:
+        list of text pages
+    """
+    ext, f_name, f_bytes = _download_doc_content(f_url, doc_meta)
     # convert document to text pages
     match ext:
         case ".pdf":
@@ -541,33 +546,7 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
 
 
 def download_table_doc(f_url: str, doc_meta: DocMetadata) -> "pd.DataFrame":
-    f = furl(f_url)
-    f_name = doc_meta.name
-    if is_gdrive_url(f):
-        # download from google drive
-        f_bytes, ext = gdrive_download(f, doc_meta.mime_type)
-    else:
-        # download from url
-        try:
-            r = requests.get(
-                f_url,
-                headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-                timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
-            )
-            r.raise_for_status()
-        except requests.RequestException as e:
-            print(f"ignore error while downloading {f_url}: {e}")
-            return []
-        f_bytes = r.content
-        # if it's a known encoding, standardize to utf-8
-        if r.encoding:
-            try:
-                codec = codecs.lookup(r.encoding)
-            except LookupError:
-                pass
-            else:
-                f_bytes = codec.decode(f_bytes)[0].encode()
-        ext = guess_ext_from_response(r)
+    ext, f_name, f_bytes = _download_doc_content(f_url, doc_meta)
     match ext:
         case ".csv" | ".xlsx" | ".tsv" | ".ods" | ".gsheet":
             import pandas as pd
