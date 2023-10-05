@@ -49,15 +49,15 @@ class Text2ImgModels(Enum):
 
 
 text2img_model_ids = {
-    Text2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
     Text2ImgModels.sd_1_5: "runwayml/stable-diffusion-v1-5",
+    Text2ImgModels.sd_2: "stabilityai/stable-diffusion-2-1",
+    Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
+    Text2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
     Text2ImgModels.openjourney: "prompthero/openjourney",
     Text2ImgModels.openjourney_2: "prompthero/openjourney-v2",
-    Text2ImgModels.analog_diffusion: "wavymulder/Analog-Diffusion",
-    Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Text2ImgModels.rodent_diffusion_1_5: "devxpy/rodent-diffusion-1-5",
-    Text2ImgModels.dream_shaper: "Lykon/DreamShaper",
+    Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
     Text2ImgModels.deepfloyd_if: [
         "DeepFloyd/IF-I-XL-v1.0",
         "DeepFloyd/IF-II-L-v1.0",

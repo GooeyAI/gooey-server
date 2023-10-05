@@ -75,11 +75,10 @@ def gfpgan(img: str, scale: int = 1) -> bytes:
     elif scale != 2:
         scale *= 2
 
-    return call_gpu_server_b64(
-        endpoint=GpuEndpoints.gfpgan,
-        input_data={
-            "img": img,
-            "version": "v1.4",
-            "scale": scale,
-        },
-    )[0]
+    # https://replicate.com/nightmareai/real-esrgan/versions/42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b#output-schema
+    model = replicate.models.get("tencentarc/gfpgan")
+    version = model.versions.get(
+        "9283608cc6b7be6b65a8e44983db012355fde4132009bf99d976b2f0896856a3"
+    )
+    img = version.predict(img=img, version="v1.4", scale=scale)
+    return requests.get(img).content

@@ -12,7 +12,7 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, storage_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.gpu_server import GpuEndpoints
+from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
@@ -151,30 +151,18 @@ class TextToSpeechPage(BasePage):
         yield f"Generating audio using {provider.value} ..."
         match provider:
             case TextToSpeechProviders.BARK:
-                blob = storage_blob_for(f"bark_tts.wav")
-                r = requests.post(
-                    str(GpuEndpoints.bark),
-                    json={
-                        "pipeline": dict(
-                            upload_urls=[
-                                blob.generate_signed_url(
-                                    version="v4",
-                                    # This URL is valid for 15 minutes
-                                    expiration=datetime.timedelta(minutes=30),
-                                    # Allow PUT requests using this URL.
-                                    method="PUT",
-                                    content_type="audio/wav",
-                                ),
-                            ],
-                        ),
-                        "inputs": dict(
-                            prompt=text.split("---"),
-                            # history_prompt=history_prompt,
-                        ),
-                    },
-                )
-                r.raise_for_status()
-                state["audio_url"] = blob.public_url
+                state["audio_url"] = call_celery_task_outfile(
+                    "bark",
+                    pipeline=dict(
+                        model_id="bark",
+                    ),
+                    inputs=dict(
+                        prompt=text.split("---"),
+                        # history_prompt=history_prompt,
+                    ),
+                    filename="bark_tts.wav",
+                    content_type="audio/wav",
+                )[0]
 
             case TextToSpeechProviders.UBERDUCK:
                 voicemodel_uuid = (

@@ -226,7 +226,6 @@ API_BASE_URL = config("API_BASE_URL", "/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
-GPU_SERVER_2 = furl(config("GPU_SERVER_2", "http://gpu-2.gooey.ai"))
 
 SERPER_API_KEY = config("SERPER_API_KEY", None)
 
