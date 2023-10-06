@@ -131,7 +131,8 @@ def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
 
 
 def caption(body: str, **props):
-    markdown(body, style={"fontSize": "0.9rem"}, className="text-muted", **props)
+    style = props.setdefault("style", {"fontSize": "0.9rem"})
+    markdown(body, className="text-muted", **props)
 
 
 def option_menu(*args, options, **kwargs):
@@ -391,12 +392,13 @@ def button(
 form_submit_button = button
 
 
-def expander(label: str, *, expanded: bool = False):
+def expander(label: str, *, expanded: bool = False, **props):
     node = state.RenderTreeNode(
         name="expander",
         props=dict(
             label=dedent(label),
             open=expanded,
+            **props,
         ),
     )
     node.mount()

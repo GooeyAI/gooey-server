@@ -270,9 +270,16 @@ def text_to_speech_settings():
                     key="elevenlabs_similarity_boost",
                 )
 
-            with st.expander("Eleven Labs Supported Languages"):
-                st.caption("With Multilingual V2 voice model")
-                st.caption(", ".join(ELEVEN_LABS_SUPPORTED_LANGS))
+            with st.expander(
+                "Eleven Labs Supported Languages",
+                style={"fontSize": "0.9rem", "textDecoration": "underline"},
+            ):
+                st.caption(
+                    "With Multilingual V2 voice model", style={"fontSize": "0.8rem"}
+                )
+                st.caption(
+                    ", ".join(ELEVEN_LABS_SUPPORTED_LANGS), style={"fontSize": "0.8rem"}
+                )
 
 
 @st.cache_data()
