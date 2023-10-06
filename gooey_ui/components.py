@@ -158,6 +158,32 @@ def tabs(labels: list[str]) -> list[state.NestingCtx]:
     return [state.NestingCtx(tab) for tab in parent.children]
 
 
+def controllable_tabs(
+    labels: list[str], key: str
+) -> tuple[list[state.NestingCtx], int]:
+    index = state.session_state.get(key, 0)
+    for i, label in enumerate(labels):
+        if button(
+            label,
+            key=f"tab-{i}",
+            type="primary",
+            className="replicate-nav",
+            style={
+                "background": "black" if i == index else "white",
+                "color": "white" if i == index else "black",
+            },
+        ):
+            state.session_state[key] = index = i
+            state.experimental_rerun()
+    ctxs = []
+    for i, label in enumerate(labels):
+        if i == index:
+            ctxs += [div(className="tab-content")]
+        else:
+            ctxs += [div(className="tab-content", style={"display": "none"})]
+    return ctxs, index
+
+
 def columns(
     spec,
     *,
