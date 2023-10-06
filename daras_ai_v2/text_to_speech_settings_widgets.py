@@ -202,6 +202,14 @@ def text_to_speech_settings():
                     format_func=str,
                     options=ELEVEN_LABS_VOICES.keys(),
                 )
+                st.selectbox(
+                    """
+                    ###### Voice Model
+                    """,
+                    key="elevenlabs_model",
+                    format_func=ELEVEN_LABS_MODELS.__getitem__,
+                    options=ELEVEN_LABS_MODELS.keys(),
+                )
 
             col1, col2 = st.columns(2)
             with col1:
