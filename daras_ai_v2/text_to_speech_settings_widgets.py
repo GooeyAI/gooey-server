@@ -76,6 +76,9 @@ ELEVEN_LABS_MODELS = {
     "eleven_monolingual_v1": "English V1 - Low latency English TTS",
 }
 
+ELEVEN_LABS_SUPPORTED_LANGS = ["English", "Chinese", "Spanish", "Hindi", "Portuguese", "French", "German", "Japanese", "Arabic", "Korean", "Indonesian", "Italian", "Dutch", "Turkish", "Polish", "Swedish", "Filipino", "Malay", "Romanian", "Ukrainian", "Greek", "Czech", "Danish", "Finnish", "Bulgarian", "Croatian", "Slovak", "Tamil"]
+
+
 BARK_SUPPORTED_LANGS = [
     ("English", "en"),
     ("German", "de"),
@@ -238,16 +241,9 @@ def text_to_speech_settings():
                     key="elevenlabs_similarity_boost",
                 )
 
-            col1, _ = st.columns(2)
-            with col1:
-                st.selectbox(
-                    """
-                    ###### Voice Model
-                    """,
-                    key="elevenlabs_model",
-                    format_func=ELEVEN_LABS_MODELS.__getitem__,
-                    options=ELEVEN_LABS_MODELS.keys(),
-                )
+            with st.expander("Eleven Labs Supported Languages"):
+                st.caption("With Multilingual V2 voice model")
+                st.caption(", ".join(ELEVEN_LABS_SUPPORTED_LANGS))
 
 
 @st.cache_data()
