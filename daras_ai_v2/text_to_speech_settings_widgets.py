@@ -22,9 +22,9 @@ UBERDUCK_VOICES = {
 
 class TextToSpeechProviders(Enum):
     GOOGLE_TTS = "Google Cloud Text-to-Speech"
+    ELEVEN_LABS = "ElevenLabs"
     UBERDUCK = "uberduck.ai"
     BARK = "Bark (suno-ai)"
-    ELEVEN_LABS = "ElevenLabs"
 
 
 # Mapping from Eleven Labs Voice Name -> Voice ID
