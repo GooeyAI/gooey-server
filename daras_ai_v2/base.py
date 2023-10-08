@@ -714,7 +714,8 @@ class BasePage:
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs). 
+You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs)
+unless you sign in with email (which gives {settings.EMAIL_USER_FREE_CREDITS} Gooey.AI credits).
 You can <a href="/pricing/" target="_blank">purchase more</a> if you run out of credits.
             """
         else:
