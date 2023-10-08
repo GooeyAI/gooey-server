@@ -150,6 +150,7 @@ class AppUser(models.Model):
         self.display_name = user.display_name or ""
         self.email = user.email
         self.phone_number = user.phone_number
+        provider_list = user.provider_data
         self.created_at = timezone.datetime.fromtimestamp(
             user.user_metadata.creation_timestamp / 1000
         )
@@ -175,14 +176,15 @@ class AppUser(models.Model):
         self.is_anonymous = is_anonymous_now
 
         # get existing balance or set free credits
+        default_balance = settings.LOGIN_USER_FREE_CREDITS
+        if self.is_anonymous:
+            default_balance = settings.ANON_USER_FREE_CREDITS
+        elif provider_list[-1].provider_id == "password":
+            default_balance = settings.EMAIL_USER_FREE_CREDITS
         self.balance = db.get_doc_field(
             doc_ref=db.get_user_doc_ref(user.uid),
             field=db.USER_BALANCE_FIELD,
-            default=(
-                settings.ANON_USER_FREE_CREDITS
-                if self.is_anonymous
-                else settings.LOGIN_USER_FREE_CREDITS
-            ),
+            default=default_balance,
         )
 
         return self
