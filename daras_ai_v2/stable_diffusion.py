@@ -15,8 +15,6 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import (
-    call_gpu_server_b64,
-    GpuEndpoints,
     b64_img_decode,
     call_sd_multi,
 )
@@ -271,18 +269,6 @@ def text2img(
     _resolution_check(width, height, max_size=(1024, 1024))
 
     match selected_model:
-        case Text2ImgModels.jack_qiao.name:
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.glid_3_xl_stable,
-                input_data={
-                    "prompt": prompt,
-                    "num_inference_steps": num_inference_steps,
-                    "num_outputs": num_outputs,
-                    "negative_prompt": negative_prompt or "",
-                    "width": width,
-                    "height": height,
-                },
-            )
         case Text2ImgModels.dall_e.name:
             import openai
 
@@ -352,24 +338,6 @@ def img2img(
     _resolution_check(width, height)
 
     match selected_model:
-        case Img2ImgModels.jack_qiao.name:
-            out_imgs = call_gpu_server_b64(
-                endpoint=GpuEndpoints.glid_3_xl_stable,
-                input_data={
-                    "prompt": prompt,
-                    "num_inference_steps": num_inference_steps,
-                    "init_image": init_image,
-                    # "edit_image": edit_image,
-                    # "mask": mask,
-                    "num_outputs": num_outputs,
-                    "negative_prompt": negative_prompt or "",
-                    # "outpaint": "expand",
-                    "skip_timesteps": int(num_inference_steps * (1 - prompt_strength)),
-                    "width": width,
-                    "height": height,
-                    "seed": seed,
-                },
-            )
         case Img2ImgModels.dall_e.name:
             import openai
 

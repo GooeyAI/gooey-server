@@ -11,9 +11,7 @@ from daras_ai_v2 import settings
 
 
 class GpuEndpoints:
-    glid_3_xl_stable = settings.GPU_SERVER_1.copy().set(port=5002)
     deepfloyd_if = settings.GPU_SERVER_1.copy().set(port=5018) / "deepfloyd_if"
-    sd_2 = settings.GPU_SERVER_1.copy().set(port=5011)
 
 
 def call_gpu_server_b64(*, endpoint: str, input_data: dict) -> list[bytes]:
