@@ -546,6 +546,30 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 st.write(f"**Generated Audio {idx + 1}**")
                 st.audio(audio_url)
 
+    def get_raw_price(self, state: dict):
+        match state.get("tts_provider"):
+            case TextToSpeechProviders.ELEVEN_LABS.name:
+                output_text_list = state.get(
+                    "raw_tts_text", state.get("raw_output_text", [])
+                )
+                tts_state = {"text_prompt": "".join(output_text_list)}
+                return super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
+                    tts_state
+                )
+            case _:
+                return super().get_raw_price(state)
+
+    def additional_notes(self):
+        tts_provider = st.session_state.get("tts_provider")
+        match tts_provider:
+            case TextToSpeechProviders.ELEVEN_LABS.name:
+                return f"""
+                    - *Base cost = {super().get_raw_price(st.session_state)} credits*
+                    - *Additional Eleven Labs cost ≈ 4 credits per 10 words of the output*
+                """
+            case _:
+                return ""
+
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
