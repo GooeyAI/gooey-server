@@ -51,7 +51,6 @@ class Text2ImgModels(Enum):
     protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
     dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     dall_e = "Dall-E (OpenAI)"
-    wuerstchen = "Wuerstchen"
 
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
     deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
