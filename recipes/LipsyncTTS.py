@@ -17,6 +17,13 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     workflow = Workflow.LIPSYNC_TTS
     slug_versions = ["LipsyncTTS", "lipsync-maker"]
 
+    sane_defaults = {
+        "elevenlabs_voice_name": "Rachel",
+        "elevenlabs_model": "eleven_multilingual_v2",
+        "elevenlabs_stability": 0.5,
+        "elevenlabs_similarity_boost": 0.75,
+    }
+
     class RequestModel(BaseModel):
         input_face: str
         input_audio: str | None
@@ -36,6 +43,8 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         google_voice_name: str | None
         google_speaking_rate: float | None
         google_pitch: float | None
+
+        bark_history_prompt: str | None
 
         elevenlabs_voice_name: str | None
         elevenlabs_model: str | None
