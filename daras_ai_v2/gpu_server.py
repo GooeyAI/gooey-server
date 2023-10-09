@@ -107,7 +107,7 @@ def call_celery_task_outfile(
     task_name: str,
     *,
     pipeline: dict,
-    inputs,
+    inputs: dict,
     content_type: str,
     filename: str,
     num_outputs: int = 1,
@@ -147,7 +147,7 @@ def call_celery_task(
     task_name: str,
     *,
     pipeline: dict,
-    inputs,
+    inputs: dict,
     queue_prefix: str = "gooey-gpu",
 ):
     queue = os.path.join(queue_prefix, pipeline["model_id"].strip()).strip("/")

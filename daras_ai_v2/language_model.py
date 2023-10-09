@@ -54,6 +54,10 @@ class LargeLanguageModels(Enum):
 
     code_davinci_002 = "Codex [Deprecated] (openai)"
 
+    @classmethod
+    def _deprecated(cls):
+        return {cls.code_davinci_002}
+
     def is_chat_model(self) -> bool:
         return self in [
             LargeLanguageModels.gpt_4,
