@@ -1,7 +1,10 @@
 from enum import Enum
 
-from daras_ai.image_input import bytes_to_cv2_img, cv2_img_to_bytes
-from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
+import requests
+
+from daras_ai_v2.gpu_server import (
+    call_celery_task_outfile,
+)
 
 
 class ImageSegmentationModels(Enum):
@@ -10,18 +13,26 @@ class ImageSegmentationModels(Enum):
 
 
 def u2net(input_image: str) -> bytes:
-    return call_gpu_server_b64(
-        endpoint=GpuEndpoints.u2net,
-        input_data={
-            "image": input_image,
-        },
+    url = call_celery_task_outfile(
+        "u2net",
+        pipeline=dict(model_id="u2net"),
+        inputs={"images": [input_image]},
+        content_type="image/png",
+        filename="u2net.png",
     )[0]
+    r = requests.get(url)
+    r.raise_for_status()
+    return r.content
 
 
 def dis(input_image: str) -> bytes:
-    return call_gpu_server_b64(
-        endpoint=GpuEndpoints.dichotomous_image_segmentation,
-        input_data={
-            "input_image": input_image,
-        },
+    url = call_celery_task_outfile(
+        "dis",
+        pipeline=dict(model_id="isnet-general-use.pth"),
+        inputs={"images": [input_image]},
+        content_type="image/png",
+        filename="dis.png",
     )[0]
+    r = requests.get(url)
+    r.raise_for_status()
+    return r.content

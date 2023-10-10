@@ -19,7 +19,6 @@ from daras_ai_v2.img_model_settings_widgets import (
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.repositioning import (
-    reposition_object,
     reposition_object_img_bytes,
     repositioning_preview_widget,
 )

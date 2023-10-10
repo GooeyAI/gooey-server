@@ -162,6 +162,10 @@ class VideoBotsPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
+        "elevenlabs_voice_name": "Rachel",
+        "elevenlabs_model": "eleven_multilingual_v2",
+        "elevenlabs_stability": 0.5,
+        "elevenlabs_similarity_boost": 0.75,
         # gpt3
         "selected_model": LargeLanguageModels.text_davinci_003.name,
         "avoid_repetition": True,
@@ -200,6 +204,11 @@ class VideoBotsPage(BasePage):
         google_voice_name: str | None
         google_speaking_rate: float | None
         google_pitch: float | None
+        bark_history_prompt: str | None
+        elevenlabs_voice_name: str | None
+        elevenlabs_model: str | None
+        elevenlabs_stability: float | None
+        elevenlabs_similarity_boost: float | None
 
         # llm settings
         selected_model: typing.Literal[
@@ -545,6 +554,30 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             for idx, audio_url in enumerate(st.session_state.get("output_audio", [])):
                 st.write(f"**Generated Audio {idx + 1}**")
                 st.audio(audio_url)
+
+    def get_raw_price(self, state: dict):
+        match state.get("tts_provider"):
+            case TextToSpeechProviders.ELEVEN_LABS.name:
+                output_text_list = state.get(
+                    "raw_tts_text", state.get("raw_output_text", [])
+                )
+                tts_state = {"text_prompt": "".join(output_text_list)}
+                return super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
+                    tts_state
+                )
+            case _:
+                return super().get_raw_price(state)
+
+    def additional_notes(self):
+        tts_provider = st.session_state.get("tts_provider")
+        match tts_provider:
+            case TextToSpeechProviders.ELEVEN_LABS.name:
+                return f"""
+                    - *Base cost = {super().get_raw_price(st.session_state)} credits*
+                    - *Additional Eleven Labs cost ≈ 4 credits per 10 words of the output*
+                """
+            case _:
+                return ""
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)

@@ -6,7 +6,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from recipes.DeforumSD import safety_checker
 from recipes.Lipsync import LipsyncPage
-from recipes.TextToSpeech import TextToSpeechPage
+from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
 from daras_ai_v2.loom_video_widget import youtube_video
 
 DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/lipsync_meta_img.gif"
@@ -16,6 +16,13 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lipsync Video with Any Text"
     workflow = Workflow.LIPSYNC_TTS
     slug_versions = ["LipsyncTTS", "lipsync-maker"]
+
+    sane_defaults = {
+        "elevenlabs_voice_name": "Rachel",
+        "elevenlabs_model": "eleven_multilingual_v2",
+        "elevenlabs_stability": 0.5,
+        "elevenlabs_similarity_boost": 0.75,
+    }
 
     class RequestModel(BaseModel):
         input_face: str
@@ -36,6 +43,13 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         google_voice_name: str | None
         google_speaking_rate: float | None
         google_pitch: float | None
+
+        bark_history_prompt: str | None
+
+        elevenlabs_voice_name: str | None
+        elevenlabs_model: str | None
+        elevenlabs_stability: float | None
+        elevenlabs_similarity_boost: float | None
 
     class ResponseModel(BaseModel):
         output_video: str
@@ -143,6 +157,27 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     def render_output(self):
         self.render_example(st.session_state)
+
+    def get_raw_price(self, state: dict):
+        # _get_tts_provider comes from TextToSpeechPage
+        if self._get_tts_provider(state) == TextToSpeechProviders.ELEVEN_LABS:
+            return LipsyncPage.get_raw_price(
+                self, state
+            ) + TextToSpeechPage.get_raw_price(self, state)
+        else:
+            return LipsyncPage.get_raw_price(self, state)
+
+    def additional_notes(self):
+        lipsync_notes = LipsyncPage.additional_notes(self)
+        if tts_notes := TextToSpeechPage.additional_notes(self):
+            notes = f"""
+                - *Lipsync* {lipsync_notes.strip()}
+                - *TTS* {tts_notes.strip()}
+            """
+        else:
+            notes = lipsync_notes
+
+        return notes
 
     def render_usage_guide(self):
         youtube_video("RRmwQR-IytI")

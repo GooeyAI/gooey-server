@@ -81,7 +81,7 @@ def model_selector(
     col1, col2 = st.columns(2)
     with col1:
         selected_model = enum_selector(
-            Img2ImgModels,
+            models_enum,
             label="""
             ### 🤖 Choose your preferred AI Model
             """,
@@ -101,7 +101,7 @@ def model_selector(
         ):
             if "selected_controlnet_model" in st.session_state:
                 st.session_state["selected_controlnet_model"] = None
-        else:
+        elif models_enum is Img2ImgModels:
             enum_multiselect(
                 ControlNetModels,
                 label=controlnet_explanation,
@@ -109,12 +109,12 @@ def model_selector(
                 checkboxes=False,
                 allow_none=not require_controlnet,
             )
-        with col2:
-            controlnet_settings(
-                extra_explanations=extra_explanations,
-                low_explanation=low_explanation,
-                high_explanation=high_explanation,
-            )
+            with col2:
+                controlnet_settings(
+                    extra_explanations=extra_explanations,
+                    low_explanation=low_explanation,
+                    high_explanation=high_explanation,
+                )
     return selected_model
 
 
@@ -410,7 +410,7 @@ def prompt_strength_setting(selected_model: str = None):
 
 
 def negative_prompt_setting(selected_model: str = None):
-    if selected_model in [Text2ImgModels.dall_e.name, InpaintingModels.runway_ml.name]:
+    if selected_model in [Text2ImgModels.dall_e.name]:
         return
 
     st.text_area(

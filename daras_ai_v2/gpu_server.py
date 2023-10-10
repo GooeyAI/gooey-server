@@ -11,34 +11,6 @@ from daras_ai_v2 import settings
 
 
 class GpuEndpoints:
-    wav2lip = settings.GPU_SERVER_1.copy().set(port=5001)
-    glid_3_xl_stable = settings.GPU_SERVER_1.copy().set(port=5002)
-    gfpgan = settings.GPU_SERVER_1.copy().set(port=5003)
-    dichotomous_image_segmentation = settings.GPU_SERVER_1.copy().set(port=5004)
-    # flan_t5 = f"{settings.GPU_SERVER_2}:5005"
-    # runway_ml_inpainting = f"{settings.GPU_SERVER_2}:5006"
-    u2net = settings.GPU_SERVER_1.copy().set(port=5007)
-    # deforum_sd = f"{settings.GPU_SERVER_2}:5008"
-    sd_2 = settings.GPU_SERVER_1.copy().set(port=5011)
-    # sd_multi = settings.GPU_SERVER_1.copy().set(port=5012)
-    # real_esrgan = settings.GPU_SERVER_1furl().set(port=5013)
-    # defourm_sd = settings.GPU_SERVER_2.copy().set(port=5014) / "deforum"
-
-    lavis = settings.GPU_SERVER_1.copy().set(port=5015)
-    vqa = lavis / "vqa"
-    image_captioning = lavis / "image-captioning"
-
-    _asr = settings.GPU_SERVER_1.copy().set(port=5016)
-    whisper = _asr / "whisper"
-    nemo_asr = _asr / "nemo/asr"
-
-    _asr_fast = settings.GPU_SERVER_1.copy().set(port=5019)
-    whisper_fast = _asr_fast / "whisper"
-    nemo_asr_fast = _asr_fast / "nemo/asr"
-
-    audio_ldm = settings.GPU_SERVER_1.copy().set(port=5017) / "audio_ldm"
-    bark = settings.GPU_SERVER_1.copy().set(port=5017) / "bark"
-
     deepfloyd_if = settings.GPU_SERVER_1.copy().set(port=5018) / "deepfloyd_if"
 
 
