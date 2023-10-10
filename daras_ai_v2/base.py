@@ -1047,12 +1047,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         assert self.request.user, "request.user must be set to check credits"
         return self.request.user.balance >= self.get_price_roundoff(st.session_state)
 
-    def deduct_credits(self, state: dict):
+    def deduct_credits(self, state: dict) -> int:
         assert self.request, "request must be set to deduct credits"
         assert self.request.user, "request.user must be set to deduct credits"
 
         amount = self.get_price_roundoff(state)
         self.request.user.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
+        return amount
 
     def get_price_roundoff(self, state: dict) -> int:
         # don't allow fractional pricing for now, min 1 credit

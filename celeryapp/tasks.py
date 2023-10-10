@@ -87,7 +87,7 @@ def gui_runner(
             # run completed
             except StopIteration:
                 run_time += time() - start_time
-                page.deduct_credits(st.session_state)
+                sr.price = page.deduct_credits(st.session_state)
                 break
             # render errors nicely
             except Exception as e:

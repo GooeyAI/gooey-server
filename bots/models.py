@@ -121,6 +121,7 @@ class SavedRun(models.Model):
         related_name="children",
     )
 
+    price = models.IntegerField(default=0)
     workflow = models.IntegerField(
         choices=Workflow.choices, default=Workflow.VIDEO_BOTS
     )
