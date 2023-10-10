@@ -303,7 +303,8 @@ def build_requests_for_df(df, request, df_ix, arr_len):
 def slice_request_df(df, request):
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
-    non_array_cols = set()
+    arr_cols = set()
+    non_arr_cols = set()
     for url_ix, url in enumerate(request.run_urls):
         f = furl(url)
         slug = f.path.segments[0]
@@ -313,14 +314,21 @@ def slice_request_df(df, request):
 
         for field, col in request.input_columns.items():
             if is_arr(properties.get(field.split(".")[0])):
-                non_array_cols.add(col)
-    non_array_df = df[list(non_array_cols)]
+                arr_cols.add(col)
+            else:
+                non_arr_cols.add(col)
+    array_df = df[list(arr_cols)]
+    non_array_df = df[list(non_arr_cols)]
 
     df_ix = 0
     while df_ix < len(df):
         arr_len = 1
         while df_ix + arr_len < len(df):
-            if not non_array_df.iloc[df_ix + arr_len].isnull().all():
+            if (
+                not arr_cols
+                or array_df.iloc[df_ix + arr_len].isnull().all()
+                or not non_array_df.iloc[df_ix + arr_len].isnull().all()
+            ):
                 break
             arr_len += 1
         yield df_ix, arr_len
