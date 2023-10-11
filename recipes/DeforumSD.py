@@ -442,7 +442,7 @@ Choose fps for the video.
         yield
 
         if not self.request.user.disable_safety_checker:
-            safety_checker(self.preview_input(state))
+            safety_checker_text(self.preview_input(state))
 
         state["output_video"] = call_celery_task_outfile(
             "deforum",
@@ -470,7 +470,7 @@ Choose fps for the video.
         )[0]
 
 
-def safety_checker(text_input: str):
+def safety_checker_text(text_input: str):
     # ge the billing account for the checker
     billing_account = AppUser.objects.get_or_create_from_email(
         settings.SAFTY_CHECKER_BILLING_EMAIL

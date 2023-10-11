@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from recipes.DeforumSD import safety_checker
+from recipes.DeforumSD import safety_checker_text
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -115,7 +115,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         if not self.request.user.disable_safety_checker:
-            safety_checker(state["text_prompt"])
+            safety_checker_text(state["text_prompt"])
 
         yield from TextToSpeechPage.run(self, state)
         # IMP: Copy output of TextToSpeechPage "audio_url" to Lipsync as "input_audio"

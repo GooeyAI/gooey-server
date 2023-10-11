@@ -17,8 +17,8 @@ from daras_ai_v2.stable_diffusion import (
     controlnet,
     ControlNetModels,
 )
-from daras_ai_v2.azure_image_moderation import check_image
-from recipes.DeforumSD import safety_checker
+from daras_ai_v2.azure_image_moderation import safety_checker_image
+from recipes.DeforumSD import safety_checker_text
 
 
 class Img2ImgPage(BasePage):
@@ -147,8 +147,8 @@ class Img2ImgPage(BasePage):
         yield "Generating Image..."
 
         if not self.request.user.disable_safety_checker:
-            safety_checker(request.text_prompt)
-            check_image(request.input_image)
+            safety_checker_text(request.text_prompt)
+            safety_checker_image(request.input_image)
 
         if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
             state["output_images"] = instruct_pix2pix(
