@@ -216,7 +216,9 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
     @admin.display(description="Analysis Results")
     def view_analysis_results(self, bi: BotIntegration):
-        msgs = Message.objects.filter(conversation__bot_integration=bi,).exclude(
+        msgs = Message.objects.filter(
+            conversation__bot_integration=bi,
+        ).exclude(
             analysis_result={},
         )
         max_depth = 3
