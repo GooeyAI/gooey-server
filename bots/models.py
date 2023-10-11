@@ -194,6 +194,8 @@ class SavedRun(models.Model):
             ret[StateKeys.hidden] = self.hidden
         if self.is_flagged:
             ret["is_flagged"] = self.is_flagged
+        if self.price:
+            ret["price"] = self.price
         return ret
 
     def set(self, state: dict):
