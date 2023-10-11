@@ -6,10 +6,7 @@ from recipes.CompareLLM import CompareLLMPage
 
 
 def safety_checker(*, text: str | None = None, image: str | None = None):
-    if text is None and image is None:
-        # fail early -
-        # the caller code is not correct if both text and image are None
-        raise Exception("safety_checker: nothing to check")
+    assert text or image, "safety_checker: at least one of text, image is required"
 
     if text:
         safety_checker_text(text)
