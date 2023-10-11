@@ -147,9 +147,8 @@ def get_top_k_references(
     ) * k
 
     # Final ranking
-    top_k = np.argpartition(rrf_scores, -request.max_references)[
-        -request.max_references :
-    ]
+    max_references = min(request.max_references, len(rrf_scores))
+    top_k = np.argpartition(rrf_scores, -max_references)[-max_references:]
     final_ranks = sorted(
         top_k,
         key=lambda idx: rrf_scores[idx],
