@@ -30,7 +30,7 @@ def is_image_nsfw(image_url: str, cache: bool = False) -> bool:
     return response["IsImageAdultClassified"]
 
 
-def check_image(image_url: str, cache: bool = False) -> None:
+def safety_checker_image(image_url: str, cache: bool = False) -> None:
     if is_image_nsfw(image_url=image_url, cache=cache):
         raise ValueError(
             "Your request was rejected as a result of our safety system. "
