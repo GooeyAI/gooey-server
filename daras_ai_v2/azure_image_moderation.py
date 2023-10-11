@@ -28,12 +28,3 @@ def run_moderator(image_url: str, cache: bool) -> dict[str, Any]:
 def is_image_nsfw(image_url: str, cache: bool = False) -> bool:
     response = run_moderator(image_url=image_url, cache=cache)
     return response["IsImageAdultClassified"]
-
-
-def safety_checker_image(image_url: str, cache: bool = False) -> None:
-    if is_image_nsfw(image_url=image_url, cache=cache):
-        raise ValueError(
-            "Your request was rejected as a result of our safety system. "
-            "Your input image may contain contents that are not allowed "
-            "by our safety system."
-        )
