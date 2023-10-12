@@ -5,7 +5,7 @@ import pandas as pd
 import requests
 from fastapi import HTTPException
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -20,13 +20,26 @@ CACHED_COLUMNS = "__cached_columns"
 
 
 class BulkRunnerPage(BasePage):
-    title = "Bulk Runner"
+    title = "Bulk Runner & Evaluator"
     workflow = Workflow.BULK_RUNNER
     slug_versions = ["bulk-runner", "bulk"]
 
     class RequestModel(BaseModel):
-        documents: list[str]
-        run_urls: list[str]
+        documents: list[str] = Field(
+            title="Input Data Spreadsheet",
+            description="""
+Upload or link to a CSV or google sheet that contains your sample input data. 
+For example, for Copilot, this would sample questions or for Art QR Code, would would be pairs of image descriptions and URLs. 
+Remember to includes header names in your CSV too.
+            """,
+        )
+        run_urls: list[str] = Field(
+            title="Gooey Workflow URL(s)",
+            description="""
+Paste in one or more Gooey.AI workflow links (on separate lines). 
+You can add multiple URLs runs from the same recipe (e.g. two versions of your copilot) and we'll run the inputs over both of them.
+            """,
+        )
 
         input_columns: dict[str, str]
         output_columns: dict[str, str]
@@ -43,12 +56,17 @@ class BulkRunnerPage(BasePage):
         run_urls = st.session_state.get("run_urls", "")
         st.session_state.setdefault("__run_urls", "\n".join(run_urls))
         run_urls = (
-            st.text_area("##### Run URL(s)", key="__run_urls").strip().splitlines()
+            st.text_area(
+                f"##### {self.RequestModel.__fields__['run_urls'].field_info.title}\n{self.RequestModel.__fields__['run_urls'].field_info.description or ''}",
+                key="__run_urls",
+            )
+            .strip()
+            .splitlines()
         )
         st.session_state["run_urls"] = run_urls
 
         files = document_uploader(
-            "##### Upload a File",
+            f"##### {self.RequestModel.__fields__['documents'].field_info.title}\n{self.RequestModel.__fields__['documents'].field_info.description or ''}",
             accept=(".csv", ".xlsx", ".xls", ".json", ".tsv", ".xml"),
         )
 
@@ -124,16 +142,32 @@ class BulkRunnerPage(BasePage):
         if not columns:
             return
 
+        st.write(
+            """
+##### Input Data Preview
+Here's how we've parsed your data.             
+            """
+        )
+
         for file in files:
             st.data_table(file)
 
         if not (required_input_fields or optional_input_fields):
             return
 
+        st.write(
+            """
+---
+Please select which CSV column corresponds to your workflow's input fields.
+For the outputs, please fill in what the column name should be that corresponds to each output too.
+To understand what each field represents, check out our [API docs](https://api.gooey.ai/docs).
+            """
+        )
+
         col1, col2 = st.columns(2)
 
         with col1:
-            st.write("##### Input Columns")
+            st.write("##### Inputs")
 
             input_columns_old = st.session_state.pop("input_columns", {})
             input_columns_new = st.session_state.setdefault("input_columns", {})
@@ -152,7 +186,7 @@ class BulkRunnerPage(BasePage):
                 st.write("---")
 
         with col2:
-            st.write("##### Output Columns")
+            st.write("##### Outputs")
 
             output_columns_old = st.session_state.pop("output_columns", {})
             output_columns_new = st.session_state.setdefault("output_columns", {})
@@ -261,6 +295,35 @@ class BulkRunnerPage(BasePage):
                         content_type="text/csv",
                     )
                     response.output_documents[doc_ix] = f
+
+    def preview_description(self, state: dict) -> str:
+        return """
+Which AI model actually works best for your needs? 
+Upload your own data and evaluate any Gooey.AI workflow, LLM or AI model against any other. 
+Great for large data sets, AI model evaluation, task automation, parallel processing and automated testing. 
+To get started, paste in a Gooey.AI workflow, upload a CSV of your test data (with header names!), check the mapping of headers to workflow inputs and tap Submit. 
+More tips in the Details below.        
+        """
+
+    def render_description(self):
+        st.write(
+            """
+Building complex AI workflows like copilot) and then evaluating each iteration is complex. 
+Workflows are affected by the particular LLM used (GPT4 vs PalM2), their vector DB knowledge sets (e.g. your google docs), how synthetic data creation happened (e.g. how you transformed your video transcript or PDF into structured data), which translation or speech engine you used and your LLM prompts. Every change can affect the quality of your outputs. 
+
+1. This bulk tool enables you to do two incredible things:
+2. Upload your own set of inputs (e.g. typical questions to your bot) to any gooey workflow (e.g. /copilot) and run them in bulk to generate outputs or answers. 
+3. Compare the results of competing workflows to determine which one generates better outputs. 
+
+To get started:
+1. Enter the Gooey.AI Workflow URLs that you'd like to run in bulk
+2. Enter a csv of sample inputs to run in bulk
+3. Ensure that the mapping between your inputs and API parameters of the Gooey.AI workflow are correctly mapped. 
+4. Tap Submit. 
+5. Wait for results
+6. Make a change to your Gooey Workflow, copy its URL and repeat Step 1 (or just add the link to see the results of both workflows together)            
+        """
+        )
 
 
 def build_requests_for_df(df, request, df_ix, arr_len):
