@@ -236,6 +236,14 @@ class QRCodeGeneratorPage(BasePage):
                             notes,
                             address,
                         ) = get_account_info_from_email(fields["email"])
+                        st.session_state["__email_imported"] = {
+                            "photo_url": photo_url,
+                            "name": name,
+                            "urls": urls,
+                            "title": title,
+                            "notes": notes,
+                            "address": address,
+                        }
                         if name:
                             st.session_state["__format_name"] = name
                         if photo_url:
@@ -334,6 +342,10 @@ class QRCodeGeneratorPage(BasePage):
         prompting101()
 
     def render_steps(self):
+        email_import = st.session_state.get("__email_imported")
+        if email_import:
+            st.markdown("#### Import contact info from email")
+            st.json(email_import)
         shortened_url = st.session_state.get("shortened_url", False)
         if shortened_url:
             st.markdown(
