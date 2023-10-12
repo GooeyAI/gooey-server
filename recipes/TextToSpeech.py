@@ -239,6 +239,12 @@ class TextToSpeechPage(BasePage):
                 )
 
             case TextToSpeechProviders.ELEVEN_LABS:
+                assert self.is_current_user_paying() or self.is_current_user_admin(), (
+                    """
+                    Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
+                    """
+                )
+
                 # default to first in the mapping
                 default_voice_model = next(iter(ELEVEN_LABS_MODELS))
                 default_voice_name = next(iter(ELEVEN_LABS_VOICES))

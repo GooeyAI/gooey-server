@@ -1106,6 +1106,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         email = self.request.user.email
         return email and email in settings.ADMIN_EMAILS
 
+    def is_current_user_paying(self) -> bool:
+        return bool(self.request and self.request.user and self.request.user.is_paying)
+
 
 def get_example_request_body(
     request_model: typing.Type[BaseModel],
