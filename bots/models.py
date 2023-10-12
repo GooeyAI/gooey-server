@@ -774,6 +774,40 @@ class Message(models.Model):
         return Truncator(self.display_content).words(30)
 
 
+class FeedbackQuerySet(models.QuerySet):
+    def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.all().prefetch_related("message", "message__conversation")
+        rows = []
+        for feedback in qs[:10000]:
+            feedback: Feedback
+            row = {
+                "USER": feedback.message.conversation.get_display_name(),
+                "BOT": str(feedback.message.conversation.bot_integration),
+                "USER MESSAGE CREATED AT": feedback.message.get_previous_by_created_at()
+                .created_at.astimezone(tz)
+                .replace(tzinfo=None),
+                "USER MESSAGE (ENGLISH)": feedback.message.get_previous_by_created_at().content,
+                "USER MESSAGE (ORIGINAL)": feedback.message.get_previous_by_created_at().display_content,
+                "BOT MESSAGE CREATED AT": feedback.message.created_at.astimezone(
+                    tz
+                ).replace(tzinfo=None),
+                "BOT MESSAGE (ENGLISH)": feedback.message.content,
+                "BOT MESSAGE (ORIGINAL)": feedback.message.display_content,
+                "FEEDBACK RATING": feedback.rating,
+                "FEEDBACK (ORIGINAL)": feedback.text,
+                "FEEDBACK (ENGLISH)": feedback.text_english,
+                "FEEDBACK CREATED AT": feedback.created_at.astimezone(tz).replace(
+                    tzinfo=None
+                ),
+                "QUESTION_ANSWERED": feedback.message.question_answered,
+            }
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
+
 class Feedback(models.Model):
     message = models.ForeignKey(
         "Message", on_delete=models.CASCADE, related_name="feedbacks"
@@ -827,6 +861,8 @@ class Feedback(models.Model):
         default=FeedbackCreator.UNSPECIFIED,
     )
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = FeedbackQuerySet.as_manager()
 
     class Meta:
         ordering = ("-created_at",)
