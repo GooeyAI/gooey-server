@@ -104,7 +104,7 @@ class TextToSpeechPage(BasePage):
         assert st.session_state["text_prompt"], "Text input cannot be empty"
 
     def render_settings(self):
-        text_to_speech_settings()
+        text_to_speech_settings(page=self)
 
     def get_raw_price(self, state: dict):
         tts_provider = self._get_tts_provider(state)

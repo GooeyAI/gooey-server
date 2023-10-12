@@ -134,7 +134,7 @@ BARK_ALLOWED_PROMPTS = {
 }
 
 
-def text_to_speech_settings():
+def text_to_speech_settings(page=None):
     st.write(
         """
         ##### 🗣️ Voice Settings
@@ -226,6 +226,12 @@ def text_to_speech_settings():
 
         case TextToSpeechProviders.ELEVEN_LABS.name:
             with col2:
+                if not (
+                    page
+                    and (page.is_current_user_paying() or page.is_current_user_admin())
+                ):
+                    st.caption("Note: Eleven Labs is only available for paying users.")
+
                 st.selectbox(
                     """
                     ###### Voice name (ElevenLabs)

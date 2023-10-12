@@ -375,7 +375,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.write("---")
             st.session_state["tts_provider"] = None
         else:
-            text_to_speech_settings()
+            text_to_speech_settings(page=self)
 
         st.write("---")
         if not "__enable_video" in st.session_state:
