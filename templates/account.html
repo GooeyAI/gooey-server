@@ -44,12 +44,10 @@
         <div class="credits-container">
             <h2>Remaining Credits: {{ humanize.intcomma(user_credits) }}</h2>
             <p>
-                Each new account receives {{ settings.LOGIN_USER_FREE_CREDITS }} Gooey.AI credits.
-                <br>
                 Every time you submit a workflow or make an API call,
                 we deduct credits from your account.
                 <br>
-                Most workflows cost around {{ settings.CREDITS_TO_DEDUCT_PER_RUN }} credits. You can buy more credits
+                Most workflows cost ~5-50 credits, depending on their complexity + LLM & GPU costs. You can buy more credits
                 below or <a href="{{ settings.GRANT_URL }}" target="_blank">apply for a grant</a>.
             </p>
         </div>
