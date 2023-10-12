@@ -230,7 +230,12 @@ def text_to_speech_settings(page=None):
                     page
                     and (page.is_current_user_paying() or page.is_current_user_admin())
                 ):
-                    st.caption("Note: Eleven Labs is only available for paying users.")
+                    st.caption(
+                        """
+                        Note: Please purchase Gooey.AI credits to use ElevenLabs voices
+                        <a href="/account">here</a>.
+                        """
+                    )
 
                 st.selectbox(
                     """
