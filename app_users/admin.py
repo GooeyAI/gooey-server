@@ -15,6 +15,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "email",
         "phone_number",
         "balance",
+        "is_paying",
         "is_anonymous",
         "is_disabled",
         "created_at",
@@ -30,6 +31,7 @@ class AppUserAdmin(admin.ModelAdmin):
     list_filter = [
         "is_anonymous",
         "is_disabled",
+        "is_paying",
         "created_at",
         "upgraded_from_anonymous_at",
     ]

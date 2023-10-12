@@ -89,6 +89,7 @@ class AppUser(models.Model):
     photo_url = CustomURLField(default="", blank=True)
 
     stripe_customer_id = models.CharField(max_length=255, default="", blank=True)
+    is_paying = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
     upgraded_from_anonymous_at = models.DateTimeField(null=True, blank=True)
@@ -140,7 +141,8 @@ class AppUser(models.Model):
     def add_balance_direct(self, amount):
         obj: AppUser = self.__class__.objects.select_for_update().get(pk=self.pk)
         obj.balance += amount
-        obj.save(update_fields=["balance"])
+        obj.is_paying = True
+        obj.save(update_fields=["balance", "is_paying"])
         return obj
 
     def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
