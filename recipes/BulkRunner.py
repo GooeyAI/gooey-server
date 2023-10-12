@@ -1,8 +1,6 @@
 import io
 import typing
 
-import pandas as pd
-import requests
 from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
@@ -14,6 +12,10 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.query_params_util import extract_query_params
+from daras_ai_v2.vector_search import (
+    doc_url_to_metadata,
+    download_content_bytes,
+)
 from recipes.DocSearch import render_documents
 
 CACHED_COLUMNS = "__cached_columns"
@@ -71,15 +73,17 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
         )
 
         if files:
+            dfs = map_parallel(_read_df, files)
             st.session_state[CACHED_COLUMNS] = list(
                 {
                     col: None
-                    for df in map_parallel(_read_df, files)
+                    for df in dfs
                     for col in df.columns
                     if not col.startswith("Unnamed:")
                 }
             )
         else:
+            dfs = []
             st.session_state.pop(CACHED_COLUMNS, None)
 
         required_input_fields = {}
@@ -145,12 +149,26 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
         st.write(
             """
 ##### Input Data Preview
-Here's how we've parsed your data.             
+Here's how we've parsed your data.          
             """
         )
 
-        for file in files:
-            st.data_table(file)
+        for df in dfs:
+            st.text_area(
+                "",
+                value=df.to_string(
+                    max_cols=10, max_rows=10, max_colwidth=40, show_dimensions=True
+                ),
+                label_visibility="collapsed",
+                disabled=True,
+                style={
+                    "white-space": "pre",
+                    "overflow": "scroll",
+                    "font-family": "monospace",
+                    "font-size": "0.9rem",
+                },
+                height=250,
+            )
 
         if not (required_input_fields or optional_input_fields):
             return
@@ -218,6 +236,8 @@ To understand what each field represents, check out our [API docs](https://api.g
         request: "BulkRunnerPage.RequestModel",
         response: "BulkRunnerPage.ResponseModel",
     ) -> typing.Iterator[str | None]:
+        import pandas as pd
+
         response.output_documents = []
 
         for doc_ix, doc in enumerate(request.documents):
@@ -408,21 +428,25 @@ def is_arr(field_props: dict) -> bool:
     return False
 
 
-def _read_df(f: str) -> "pd.DataFrame":
+def _read_df(f_url: str) -> "pd.DataFrame":
     import pandas as pd
 
-    r = requests.get(f)
-    r.raise_for_status()
-    if f.endswith(".csv"):
-        df = pd.read_csv(io.StringIO(r.text))
-    elif f.endswith(".xlsx") or f.endswith(".xls"):
-        df = pd.read_excel(io.BytesIO(r.content))
-    elif f.endswith(".json"):
-        df = pd.read_json(io.StringIO(r.text))
-    elif f.endswith(".tsv"):
-        df = pd.read_csv(io.StringIO(r.text), sep="\t")
-    elif f.endswith(".xml"):
-        df = pd.read_xml(io.StringIO(r.text))
-    else:
-        raise ValueError(f"Unsupported file type: {f}")
-    return df.dropna(how="all", axis=1).dropna(how="all", axis=0)
+    doc_meta = doc_url_to_metadata(f_url)
+    f_bytes, ext = download_content_bytes(f_url=f_url, mime_type=doc_meta.mime_type)
+
+    f = io.BytesIO(f_bytes)
+    match ext:
+        case ".csv":
+            df = pd.read_csv(f)
+        case ".tsv":
+            df = pd.read_csv(f, sep="\t")
+        case ".xls" | ".xlsx":
+            df = pd.read_excel(f)
+        case ".json":
+            df = pd.read_json(f)
+        case ".xml":
+            df = pd.read_xml(f)
+        case _:
+            raise ValueError(f"Unsupported file type: {f_url}")
+
+    return df.dropna(how="all", axis=1).dropna(how="all", axis=0).fillna("")
