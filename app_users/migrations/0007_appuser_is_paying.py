@@ -21,5 +21,5 @@ class Migration(migrations.Migration):
             name="is_paying",
             field=models.BooleanField(default=False),
         ),
-        migrations.RunPython(set_is_paying_from_stripe_customer_id)
+        migrations.RunPython(set_is_paying_from_stripe_customer_id),
     ]
