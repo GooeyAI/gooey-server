@@ -583,11 +583,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
         if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
-            assert self.is_current_user_paying() or self.is_current_user_admin(), (
-                """
+            assert (
+                self.is_current_user_paying() or self.is_current_user_admin()
+            ), """
                 Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
                 """
-            )
 
         user_input = request.input_prompt.strip()
         if not user_input:
