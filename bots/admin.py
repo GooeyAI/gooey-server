@@ -587,13 +587,13 @@ class FeedbackAdmin(admin.ModelAdmin):
     def feedback_text_as_link(self, feedback: Feedback):
         return change_obj_url(feedback, label=feedback.text_english)
 
-    feedback_text_as_link.short_description = "Feedback Text (English)"
+    feedback_text_as_link.short_description = "Feedback Text"
 
     def prev_msg_content(self, feedback: Feedback):
         prev_msg = feedback.message.get_previous_by_created_at()
         return change_obj_url(prev_msg, label=prev_msg.content)
 
-    prev_msg_content.short_description = "User Message (English)"
+    prev_msg_content.short_description = "User Message"
 
     def prev_msg_display_content(self, feedback: Feedback):
         prev_msg = feedback.message.get_previous_by_created_at()
@@ -615,7 +615,7 @@ class FeedbackAdmin(admin.ModelAdmin):
     def messsage_content(self, feedback: Feedback):
         return change_obj_url(feedback.message, label=feedback.message.content)
 
-    messsage_content.short_description = "Bot Response (English)"
+    messsage_content.short_description = "Bot Response"
 
     def messsage_display_content(self, feedback: Feedback):
         return change_obj_url(feedback.message, label=feedback.message.display_content)
