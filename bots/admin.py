@@ -287,6 +287,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "created_at",
         "run_time",
         "updated_at",
+        "price",
     ]
     list_filter = ["workflow"]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
