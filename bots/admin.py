@@ -509,7 +509,12 @@ class FeedbackCommentInline(admin.StackedInline):
 @admin.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):
     autocomplete_fields = ["message"]
-    list_filter = ["rating", "status", "message__conversation__bot_integration"]
+    list_filter = [
+        "rating",
+        "status",
+        "message__conversation__bot_integration",
+        "message__conversation",
+    ]
     search_fields = (
         ["text", "text_english"]
         + [f"message__{field}" for field in MessageAdmin.search_fields]
@@ -519,9 +524,12 @@ class FeedbackAdmin(admin.ModelAdmin):
         ]
     )
     list_display = [
-        "__str__",
         "prev_msg_content",
-        "text",
+        "messsage_content",
+        "rating",
+        "feedback_text_as_link",
+        "conversation_link",
+        "created_at",
     ]
     readonly_fields = [
         "created_at",
@@ -535,6 +543,7 @@ class FeedbackAdmin(admin.ModelAdmin):
         "rating",
     ]
     inlines = [FeedbackCommentInline]
+    actions = [export_to_csv, export_to_excel]
 
     fieldsets = (
         (
@@ -574,6 +583,11 @@ class FeedbackAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+    def feedback_text_as_link(self, feedback: Feedback):
+        return change_obj_url(feedback, label=feedback.text_english)
+
+    feedback_text_as_link.short_description = "Feedback Text (English)"
 
     def prev_msg_content(self, feedback: Feedback):
         prev_msg = feedback.message.get_previous_by_created_at()
