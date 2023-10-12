@@ -162,7 +162,7 @@ class QRCodeGeneratorPage(BasePage):
             else 2,
         )
         (url, vCard, existing), index = st.controllable_tabs(
-            ["🖊️ Link or Text", "📇 Contact vCard", "📷 Existing QR Code"],
+            ["🖊️ URL or Text", "📇 Contact vCard", "📷 Existing QR Code"],
             key="__qr_input_type_index",
         )
 
