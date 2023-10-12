@@ -232,7 +232,7 @@ class SocialLookupEmailPage(BasePage):
 
 
 @redis_cache_decorator
-def get_profile_for_email(email_address):
+def get_profile_for_email(email_address) -> dict | None:
     r = requests.post(
         "https://api.apollo.io/v1/people/match",
         json={

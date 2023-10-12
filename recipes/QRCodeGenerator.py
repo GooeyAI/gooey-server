@@ -230,35 +230,25 @@ class QRCodeGeneratorPage(BasePage):
                         (
                             photo_url,
                             name,
-                            url,
+                            urls,
                             title,
-                            company,
-                            gender,
+                            _,
                             notes,
+                            address,
                         ) = get_account_info_from_email(fields["email"])
                         if name:
                             st.session_state["__format_name"] = name
                         if photo_url:
                             st.session_state["__photo_url"] = photo_url
                         if url:
-                            st.session_state["__urls"] = [url]
+                            st.session_state["__urls"] = urls
                         if title:
-                            st.session_state["__job_title"] = title
-                        if company:
-                            st.session_state["__organization"] = company
-                        if gender:
-                            st.session_state["__gender"] = gender
+                            st.session_state["__role"] = title
                         if notes:
                             st.session_state["__note"] = notes
-                        if (
-                            name
-                            or photo_url
-                            or url
-                            or title
-                            or company
-                            or gender
-                            or notes
-                        ):
+                        if address:
+                            st.session_state["__address"] = address
+                        if name or photo_url or url or title or notes or address:
                             st.experimental_rerun()
 
                 fields["format_name"] = st.text_input(
@@ -758,107 +748,40 @@ def format_for_vcard(vcard_string: str, prefix: str = "", truncate: bool = True)
 
 @st.cache_data()
 def get_account_info_from_email(email: str):
-    doc_ref = db.get_doc_ref(email, collection_id="apollo_io_photo_cache")
+    from recipes.SocialLookupEmail import get_profile_for_email
+
+    doc_ref = db.get_doc_ref(email, collection_id="apollo_io_cache")
 
     doc = db.get_or_create_doc(doc_ref).to_dict()
-    photo_url = doc.get("photo_url")
-    name = doc.get("name")
-    url = doc.get("url")
-    title = doc.get("title")
-    company = doc.get("company")
-    gender = doc.get("gender")
-    notes = doc.get("notes")
-    if photo_url and name and url and title and company and gender and notes:
-        return photo_url, name, url, title, company, gender, notes
+    photo_url: str = doc.get("photo_url")
+    name: str = doc.get("name")
+    urls: str = doc.get("urls")
+    title: str = doc.get("title")
+    company: str = doc.get("company")
+    notes: str = doc.get("notes")
+    address: str = doc.get("address")
+    if photo_url and name and urls and title and company and notes and address:
+        return photo_url, name, urls.split(";"), title, company, notes, address
 
-    try:
-        r = requests.get(
-            f"https://api.seon.io/SeonRestService/email-api/v2.2/{email}",
-            headers={"X-API-KEY": settings.SEON_API_KEY},  # type: ignore
-        )
-        r.raise_for_status()
-    except requests.exceptions.HTTPError:
-        ## region fallback for US devs
-        r = requests.get(
-            f"https://api.us-east-1-main.seon.io/SeonRestService/email-api/v2.2/{email}",
-            headers={"X-API-KEY": settings.SEON_API_KEY},  # type: ignore
-        )
-        r.raise_for_status()
+    person = get_profile_for_email(email) or {}
 
-    account_details = glom.glom(r.json(), "data.account_details", default={})
-    for spec in [
-        "linkedin.photo",
-        "facebook.photo",
-        "google.photo",
-        "skype.photo",
-        "foursquare.photo",
-    ]:
-        photo = glom.glom(account_details, spec, default=None)
-        if not photo:
-            continue
+    photo_url = person.get("photo_url", photo_url)
+    name = person.get("name", name)
+    unique_urls = set([u for u in urls.split(";") if u] if urls else "")
+    for field in ["github_url", "linkedin_url", "facebook_url", "twitter_url"]:
+        unique_urls.add(person.get(field, ""))
+    unique_urls.discard("")
+    unique_urls.discard(None)
+    urls = ";".join(unique_urls)
+    title = person.get("title", title)
+    company = person.get("organization", {}).get("name", company)
+    notes = person.get("headline", notes)
+    address = (
+        person.get("city", "")
+        + ";"
+        + person.get("state", "")
+        + ";"
+        + person.get("country", "")
+    )
 
-        photo_url = upload_file_from_bytes(
-            "face_photo.png", requests.get(photo).content
-        )
-        doc_ref.set({"photo_url": photo_url})
-        break
-    for spec in [
-        "linkedin.name" "facebook.name",
-        "airbnb.first_name",
-        "gravatar.name",
-        "skype.name",
-        "flickr.username",
-    ]:
-        name = glom.glom(account_details, spec, default=None)
-        if not name:
-            continue
-        doc_ref.set({"name": name})
-        break
-    for spec in [
-        "linkedin.url",
-        "linkedin.website",
-        "facebook.url",
-        "gravatar.profile_url",
-        "foursquare.profile_url",
-    ]:
-        url = glom.glom(account_details, spec, default=None)
-        if not url:
-            continue
-        doc_ref.set({"url": url})
-        break
-    for spec in [
-        "linkedin.title",
-        "airbnb.work",
-    ]:
-        title = glom.glom(account_details, spec, default=None)
-        if not title:
-            continue
-        doc_ref.set({"title": title})
-        break
-    for spec in [
-        "linkedin.company",
-    ]:
-        company = glom.glom(account_details, spec, default=None)
-        if not company:
-            continue
-        doc_ref.set({"company": company})
-        break
-    for spec in [
-        "skype.gender",
-    ]:
-        gender = glom.glom(account_details, spec, default=None)
-        if not gender:
-            continue
-        doc_ref.set({"gender": gender})
-        break
-    for spec in [
-        "skype.bio",
-        "airbnb.about",
-    ]:
-        notes = glom.glom(account_details, spec, default=None)
-        if not notes:
-            continue
-        doc_ref.set({"notes": notes})
-        break
-
-    return photo_url, name, url, title, company, gender, notes
+    return photo_url, name, urls.split(";"), title, company, notes, address

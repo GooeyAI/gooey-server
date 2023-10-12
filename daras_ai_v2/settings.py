@@ -255,6 +255,7 @@ DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
 
 SEON_API_KEY = config("SEON_API_KEY", None)
+APOLLO_API_KEY = config("APOLLO_API_KEY", None)
 
 FB_APP_ID = config("FB_APP_ID", "")
 FB_APP_SECRET = config("FB_APP_SECRET", "")
