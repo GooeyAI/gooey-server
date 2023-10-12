@@ -4,8 +4,8 @@ from django.db import migrations, models
 
 
 def set_is_paying_from_stripe_customer_id(apps, schema_editor):
-    AppUsers = apps.get_model("app_users", "appuser")
-    AppUsers.objects.filter(stripe_customer_id__isnull=False).update(is_paying=True)
+    AppUser = apps.get_model("app_users", "appuser")
+    AppUser.objects.exclude(stripe_customer_id="").update(is_paying=True)
 
 
 class Migration(migrations.Migration):
