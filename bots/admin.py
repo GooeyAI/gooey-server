@@ -585,6 +585,7 @@ class FeedbackAdmin(admin.ModelAdmin):
         "rating",
         "feedback_text_as_link",
         "conversation_link",
+        "view_feedback_in_convo",
         "created_at",
     ]
     readonly_fields = [
@@ -644,6 +645,21 @@ class FeedbackAdmin(admin.ModelAdmin):
         return change_obj_url(feedback, label=feedback.text_english)
 
     feedback_text_as_link.short_description = "Feedback Text"
+
+    def lookup_allowed(self, key, value):
+        if key in ("message__conversation__id__exact"):
+            return True
+        return super().lookup_allowed(key, value)
+
+    def view_feedback_in_convo(self, feedback: Feedback):
+        return list_related_html_url(
+            Feedback.objects,
+            "message__conversation__id__exact",
+            feedback.message.conversation.id,
+            show_add=False,
+        )
+
+    view_feedback_in_convo.short_description = "View Feedback from this Conversation"
 
     def prev_msg_content(self, feedback: Feedback):
         prev_msg = feedback.message.get_previous_by_created_at()
