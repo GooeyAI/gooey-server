@@ -22,9 +22,9 @@ def step2(user_id: int, ref: firestore.DocumentReference):
     doc = ref.get().to_dict()
     print(doc)
     AppUserTransaction.objects.get_or_create(
-        user_id=user_id,
         invoice_id=ref.id,
         defaults=dict(
+            user_id=user_id,
             amount=doc.get("amount"),
             end_balance=doc.get("end_balance"),
             created_at=doc.get("timestamp"),
