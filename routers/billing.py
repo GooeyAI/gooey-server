@@ -242,6 +242,9 @@ def _handle_invoice_paid(uid: str, invoice_data):
     amount = line_items.data[0].quantity
     user = AppUser.objects.get_or_create_from_uid(uid)[0]
     user.add_balance(amount, invoice_id)
+    if not user.is_paying:
+        user.is_paying = True
+        user.save(update_fields=["is_paying"])
 
 
 @router.post("/__/stripe/cancel-subscription")

@@ -121,7 +121,6 @@ class AppUser(models.Model):
         # Also we're not using .update() here because it won't give back the updated end balance
         user: AppUser = AppUser.objects.select_for_update().get(pk=self.pk)
         user.balance += amount
-        user.is_paying = True
         user.save(update_fields=["balance", "is_paying"])
 
         return AppUserTransaction.objects.create(
