@@ -107,6 +107,15 @@ class AppUser(models.Model):
         return self.display_name.split(" ")[0]
 
     def add_balance(self, amount: int, invoice_id: str, **invoice_items):
+        """
+        Used to add/deduct credits when they are added or consumed.
+
+        When credits are bought with stripe -- invoice_id is the stripe
+        invoice ID.
+        When credits are deducted due to a run -- invoice_id is of the
+        form "gooey_in_{uuid}"
+        """
+
         from google.cloud import firestore
         from google.cloud.firestore_v1.transaction import Transaction
 
@@ -142,7 +151,7 @@ class AppUser(models.Model):
         obj: AppUser = self.__class__.objects.select_for_update().get(pk=self.pk)
         obj.balance += amount
         obj.is_paying = True
-        obj.save(update_fields=["balance", "is_paying"])
+        obj.save(update_fields=["balance"])
         return obj
 
     def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
