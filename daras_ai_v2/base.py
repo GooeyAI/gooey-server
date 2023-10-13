@@ -1,7 +1,6 @@
 import datetime
 import html
 import inspect
-import math
 import typing
 import urllib
 import urllib.parse
@@ -11,6 +10,7 @@ from random import Random
 from time import sleep
 from types import SimpleNamespace
 
+import math
 import requests
 import sentry_sdk
 from django.utils import timezone
@@ -24,7 +24,7 @@ from sentry_sdk.tracing import (
 from starlette.requests import Request
 
 import gooey_ui as st
-from app_users.models import AppUser
+from app_users.models import AppUser, AppUserTransaction
 from bots.models import SavedRun, Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -1047,13 +1047,14 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         assert self.request.user, "request.user must be set to check credits"
         return self.request.user.balance >= self.get_price_roundoff(st.session_state)
 
-    def deduct_credits(self, state: dict) -> int:
-        assert self.request, "request must be set to deduct credits"
-        assert self.request.user, "request.user must be set to deduct credits"
+    def deduct_credits(self, state: dict) -> tuple[AppUserTransaction, int]:
+        assert (
+            self.request and self.request.user
+        ), "request.user must be set to deduct credits"
 
         amount = self.get_price_roundoff(state)
-        self.request.user.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
-        return amount
+        txn = self.request.user.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
+        return txn, amount
 
     def get_price_roundoff(self, state: dict) -> int:
         # don't allow fractional pricing for now, min 1 credit

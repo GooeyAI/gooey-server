@@ -1,5 +1,3 @@
-import datetime
-
 import requests
 import stripe
 from django.db import models, IntegrityError, transaction
@@ -106,44 +104,33 @@ class AppUser(models.Model):
             return ""
         return self.display_name.split(" ")[0]
 
-    def add_balance(self, amount: int, invoice_id: str, **invoice_items):
-        from google.cloud import firestore
-        from google.cloud.firestore_v1.transaction import Transaction
-
-        @firestore.transactional
-        @db_middleware
-        def _update_user_balance_in_txn(txn: Transaction):
-            user_doc_ref = db.get_user_doc_ref(self.uid)
-
-            invoice_ref: firestore.DocumentReference
-            invoice_ref = user_doc_ref.collection("invoices").document(invoice_id)
-            # if an invoice entry exists
-            if invoice_ref.get(transaction=txn).exists:
-                # avoid updating twice for same invoice
-                return
-
-            obj = self.add_balance_direct(amount)
-
-            # create invoice entry
-            txn.create(
-                invoice_ref,
-                {
-                    "amount": amount,
-                    "end_balance": obj.balance,
-                    "timestamp": datetime.datetime.utcnow(),
-                    **invoice_items,
-                },
-            )
-
-        _update_user_balance_in_txn(db.get_client().transaction())
-
+    @db_middleware
     @transaction.atomic
-    def add_balance_direct(self, amount):
-        obj: AppUser = self.__class__.objects.select_for_update().get(pk=self.pk)
-        obj.balance += amount
-        obj.is_paying = True
-        obj.save(update_fields=["balance", "is_paying"])
-        return obj
+    def add_balance(self, amount: int, invoice_id: str) -> "AppUserTransaction":
+        # if an invoice entry exists
+        txn = AppUserTransaction.objects.filter(
+            user=self, invoice_id=invoice_id
+        ).exists()
+        if txn:
+            # avoid updating twice for same invoice
+            return txn
+
+        # select_for_update() is very important here
+        # transaction.atomic alone is not enough!
+        # It won't lock this row for reads, and multiple threads can update the same row leading incorrect balance
+        #
+        # Also we're not using .update() here because it won't give back the updated end balance
+        user: AppUser = AppUser.objects.select_for_update().get(pk=self.pk)
+        user.balance += amount
+        user.is_paying = True
+        user.save(update_fields=["balance", "is_paying"])
+
+        return AppUserTransaction.objects.create(
+            user=self,
+            invoice_id=invoice_id,
+            amount=amount,
+            end_balance=user.balance,
+        )
 
     def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
         # copy data from firebase user
@@ -219,3 +206,20 @@ class AppUser(models.Model):
             self.stripe_customer_id = customer.id
             self.save()
             return customer
+
+
+class AppUserTransaction(models.Model):
+    user = models.ForeignKey(
+        "AppUser", on_delete=models.CASCADE, related_name="transactions"
+    )
+    invoice_id = models.CharField(max_length=255)
+    amount = models.IntegerField()
+    end_balance = models.IntegerField()
+    created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
+
+    class Meta:
+        unique_together = ["user", "invoice_id"]
+        verbose_name = "Transaction"
+
+    def __str__(self):
+        return f"{self.invoice_id} ({self.amount})"

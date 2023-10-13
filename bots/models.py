@@ -4,6 +4,7 @@ from multiprocessing.pool import ThreadPool
 
 import pytz
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
@@ -12,6 +13,7 @@ from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
 from app_users.models import AppUser
+from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder
 
 if typing.TYPE_CHECKING:
@@ -121,7 +123,6 @@ class SavedRun(models.Model):
         related_name="children",
     )
 
-    price = models.IntegerField(default=0)
     workflow = models.IntegerField(
         choices=Workflow.choices, default=Workflow.VIDEO_BOTS
     )
@@ -136,8 +137,19 @@ class SavedRun(models.Model):
     run_status = models.TextField(default="", blank=True)
     page_title = models.TextField(default="", blank=True)
     page_notes = models.TextField(default="", blank=True)
+
     hidden = models.BooleanField(default=False)
     is_flagged = models.BooleanField(default=False)
+
+    price = models.IntegerField(default=0)
+    transaction = models.ForeignKey(
+        "app_users.AppUserTransaction",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        default=None,
+        related_name="saved_runs",
+    )
 
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -250,6 +262,10 @@ class SavedRun(models.Model):
                 ),
             )
         return result, page.run_doc_sr(run_id, uid)
+
+    @admin.display(description="Open in Gooey")
+    def open_in_gooey(self):
+        return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
 
 
 def _parse_dt(dt) -> datetime.datetime | None:

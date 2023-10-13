@@ -296,6 +296,8 @@ class SavedRunAdmin(admin.ModelAdmin):
         "open_in_gooey",
         "parent",
         "view_bots",
+        "price",
+        "transaction",
         "created_at",
         "updated_at",
         "run_time",
@@ -311,11 +313,6 @@ class SavedRunAdmin(admin.ModelAdmin):
         return list_related_html_url(saved_run.botintegrations)
 
     view_bots.short_description = "View Bots"
-
-    def open_in_gooey(self, saved_run: SavedRun):
-        return open_in_new_tab(saved_run.get_app_url(), label=saved_run.get_app_url())
-
-    open_in_gooey.short_description = "Open in Gooey"
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):
