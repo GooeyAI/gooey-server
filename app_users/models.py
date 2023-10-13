@@ -107,6 +107,15 @@ class AppUser(models.Model):
     @db_middleware
     @transaction.atomic
     def add_balance(self, amount: int, invoice_id: str) -> "AppUserTransaction":
+        """
+        Used to add/deduct credits when they are bought or consumed.
+
+        When credits are bought with stripe -- invoice_id is the stripe
+        invoice ID.
+        When credits are deducted due to a run -- invoice_id is of the
+        form "gooey_in_{uuid}"
+        """
+
         # if an invoice entry exists
         try:
             # avoid updating twice for same invoice
@@ -121,7 +130,7 @@ class AppUser(models.Model):
         # Also we're not using .update() here because it won't give back the updated end balance
         user: AppUser = AppUser.objects.select_for_update().get(pk=self.pk)
         user.balance += amount
-        user.save(update_fields=["balance", "is_paying"])
+        user.save(update_fields=["balance"])
 
         return AppUserTransaction.objects.create(
             user=self,
