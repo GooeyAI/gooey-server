@@ -108,12 +108,11 @@ class AppUser(models.Model):
     @transaction.atomic
     def add_balance(self, amount: int, invoice_id: str) -> "AppUserTransaction":
         # if an invoice entry exists
-        txn = AppUserTransaction.objects.filter(
-            user=self, invoice_id=invoice_id
-        ).exists()
-        if txn:
+        try:
             # avoid updating twice for same invoice
-            return txn
+            return AppUserTransaction.objects.get(invoice_id=invoice_id)
+        except AppUserTransaction.DoesNotExist:
+            pass
 
         # select_for_update() is very important here
         # transaction.atomic alone is not enough!
