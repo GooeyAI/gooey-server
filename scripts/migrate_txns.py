@@ -7,9 +7,9 @@ from daras_ai_v2 import db
 
 
 def run():
-    with ThreadPoolExecutor(1000) as pool:
+    with ThreadPoolExecutor(500) as pool:
         for user in AppUser.objects.all():
-            step1(pool, user.id, user.uid)
+            pool.submit(step1, pool, user.id, user.uid)
 
 
 def step1(pool: ThreadPoolExecutor, user_id: int, uid: str):

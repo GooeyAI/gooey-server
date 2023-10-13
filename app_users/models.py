@@ -212,13 +212,12 @@ class AppUserTransaction(models.Model):
     user = models.ForeignKey(
         "AppUser", on_delete=models.CASCADE, related_name="transactions"
     )
-    invoice_id = models.CharField(max_length=255)
+    invoice_id = models.CharField(max_length=255, unique=True)
     amount = models.IntegerField()
     end_balance = models.IntegerField()
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
 
     class Meta:
-        unique_together = ["user", "invoice_id"]
         verbose_name = "Transaction"
 
     def __str__(self):
