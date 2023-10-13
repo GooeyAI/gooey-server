@@ -94,9 +94,9 @@ class SavedRunInline(admin.StackedInline):
         return False
 
 
-class HasSavedRunFilter(admin.SimpleListFilter):
-    title = "Has saved run"
-    parameter_name = "has_saved_run"
+class IsStripeFilter(admin.SimpleListFilter):
+    title = "Is Stripe Invoice"
+    parameter_name = "is_stripe_invoice"
 
     def lookups(self, request, model_admin):
         return (
@@ -108,7 +108,10 @@ class HasSavedRunFilter(admin.SimpleListFilter):
         value = self.value()
         if value is None:
             return queryset
-        return queryset.exclude(saved_runs__isnull=bool(int(value))).distinct()
+        if int(value):
+            return queryset.filter(invoice_id__startswith="in_")
+        else:
+            return queryset.exclude(invoice_id__startswith="in_")
 
 
 @admin.register(models.AppUserTransaction)
@@ -122,6 +125,6 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         "end_balance",
     ]
     readonly_fields = ["created_at"]
-    list_filter = ["created_at", HasSavedRunFilter]
+    list_filter = ["created_at", IsStripeFilter]
     inlines = [SavedRunInline]
     ordering = ["-created_at"]
