@@ -585,7 +585,6 @@ class FeedbackAdmin(admin.ModelAdmin):
         "rating",
         "feedback_text_as_link",
         "conversation_link",
-        "view_feedback_in_convo",
         "created_at",
     ]
     readonly_fields = [
@@ -595,6 +594,7 @@ class FeedbackAdmin(admin.ModelAdmin):
         "prev_msg_display_content",
         "messsage_display_content",
         "conversation_link",
+        "view_feedback_in_convo",
         "run_id",
         "text_english",
         "rating",
@@ -609,6 +609,7 @@ class FeedbackAdmin(admin.ModelAdmin):
                 "fields": [
                     "rating",
                     "conversation_link",
+                    "view_feedback_in_convo",
                     "run_id",
                 ]
             },
