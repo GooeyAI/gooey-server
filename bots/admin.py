@@ -570,7 +570,6 @@ class FeedbackAdmin(admin.ModelAdmin):
         "rating",
         "status",
         "message__conversation__bot_integration",
-        "message__conversation",
     ]
     search_fields = (
         ["text", "text_english"]
