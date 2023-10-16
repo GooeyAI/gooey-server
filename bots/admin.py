@@ -1,19 +1,15 @@
 import datetime
-import json
 
 import django.db.models
 from django import forms
 from django.conf import settings
 from django.contrib import admin
-from django.db import DataError
-from django.db.models import Max, Count, F, Func
+from django.db.models import Max, Count, F
 from django.http import HttpResponse
 from django.template import loader
-from django.urls import reverse
 from django.utils import dateformat
 from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
-from furl import furl
 
 from bots.admin_links import list_related_html_url, open_in_new_tab, change_obj_url
 from bots.models import (
@@ -27,6 +23,9 @@ from bots.models import (
     BotIntegration,
 )
 from bots.tasks import create_personal_channels_for_all_members
+from gooeysite.custom_filters import (
+    related_json_field_summary,
+)
 from gooeysite.custom_widgets import JSONEditorWidget
 
 
@@ -221,55 +220,13 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         ).exclude(
             analysis_result={},
         )
-        max_depth = 3
-        field = "analysis_result"
-        nested_keys = [field]
-        for i in range(max_depth):
-            next_keys = []
-            for parent in nested_keys:
-                try:
-                    next_keys.extend(
-                        f"{parent}__{child}"
-                        for child in (
-                            msgs.values(parent)
-                            .annotate(
-                                keys=Func(F(parent), function="jsonb_object_keys")
-                            )
-                            .order_by()
-                            .distinct()
-                            .values_list("keys", flat=True)
-                        )
-                    )
-                except DataError:
-                    next_keys.append(parent)
-            nested_keys = next_keys
-        results = {
-            key.split(field + "__")[-1]: [
-                (
-                    json.dumps(val).strip('"'),
-                    count,
-                    furl(
-                        reverse(
-                            f"admin:{Message._meta.app_label}_{Message.__name__.lower()}_changelist"
-                        ),
-                        query_params={
-                            f"conversation__bot_integration__id__exact": bi.id,
-                            key: val,
-                        },
-                    ),
-                )
-                for val, count in (
-                    msgs.values(key)
-                    .annotate(count=Count("id"))
-                    .order_by("-count")
-                    .values_list(key, "count")
-                )
-                if val is not None
-            ]
-            for key in nested_keys
-        }
-        if not results:
-            raise Message.DoesNotExist
+        results = related_json_field_summary(
+            Message.objects,
+            "analysis_result",
+            qs=msgs,
+            query_param="conversation__bot_integration__id__exact",
+            instance_id=bi.id,
+        )
         html = loader.render_to_string(
             "anaylsis_result.html", context=dict(results=results)
         )

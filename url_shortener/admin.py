@@ -1,10 +1,17 @@
-from django.contrib import admin
+import json
 
-from bots.admin import SavedRunAdmin, export_to_csv, export_to_excel
-from bots.admin_links import list_related_html_url
-from url_shortener import models
+from django.contrib import admin
+from django.template import loader
+from django.utils.safestring import mark_safe
 
 from app_users.admin import AppUserAdmin
+from bots.admin import SavedRunAdmin, export_to_csv, export_to_excel
+from bots.admin_links import list_related_html_url
+from gooeysite.custom_filters import (
+    json_field_nested_lookup_keys,
+    related_json_field_summary,
+)
+from url_shortener import models
 
 
 @admin.register(models.ShortenedURL)
@@ -28,7 +35,6 @@ class ShortenedURLAdmin(admin.ModelAdmin):
         "disabled",
         "created_at",
         "updated_at",
-        "use_analytics",
     ]
     readonly_fields = [
         "clicks",
@@ -36,7 +42,8 @@ class ShortenedURLAdmin(admin.ModelAdmin):
         "updated_at",
         "shortened_url",
         "get_saved_runs",
-        "get_click_analytics",
+        "view_visitors",
+        "view_visitor_summary",
     ]
     exclude = ["saved_runs"]
     ordering = ["created_at"]
@@ -51,60 +58,67 @@ class ShortenedURLAdmin(admin.ModelAdmin):
     def get_saved_runs(self, obj: models.ShortenedURL):
         return list_related_html_url(obj.saved_runs, show_add=False)
 
-    @admin.display(description="Analytic Clicks")
-    def get_click_analytics(self, obj: models.ShortenedURL):
-        if not obj.use_analytics:
-            return []
-        return list_related_html_url(
-            models.ClickAnalytic.objects.filter(shortened_url__pk=obj.pk),
-            query_param="shortened_url__id__exact",
-            instance_id=obj.pk,
-            show_add=False,
-        )
+    @admin.display(description="Visitors")
+    def view_visitors(self, obj: models.ShortenedURL):
+        return list_related_html_url(obj.visitors, instance_id=obj.pk)
+
+    @admin.display(description="Visitor Summary")
+    def view_visitor_summary(self, surl: models.ShortenedURL):
+        html = ""
+        for field in ["browser", "device", "os", "location_data"]:
+            results = related_json_field_summary(surl.visitors, field)
+            html += "<h2>" + field.replace("_", " ").capitalize() + "</h2>"
+            html += loader.render_to_string(
+                "anaylsis_result.html", context=dict(results=results)
+            )
+        html = mark_safe(html)
+        return html
 
 
-@admin.register(models.ClickAnalytic)
-class ClickAnalyticAdmin(admin.ModelAdmin):
+def jsonfieldlistfilter(field: str):
+    class JSONFieldListFilter(admin.SimpleListFilter):
+        title = field
+        parameter_name = field
+
+        def lookups(self, request, model_admin):
+            qs = model_admin.model.objects.all()
+            lookups = json_field_nested_lookup_keys(qs, field)
+            return [
+                (
+                    json.dumps([k, v]),
+                    f'{k.split(field + "__")[-1]} = {v}',
+                )
+                for k in lookups
+                for v in qs.values_list(k, flat=True).distinct()
+            ]
+
+        def queryset(self, request, queryset):
+            val = self.value()
+            if val is None:
+                return queryset
+            k, v = json.loads(val)
+            return queryset.filter(**{k: v})
+
+    return JSONFieldListFilter
+
+
+@admin.register(models.VisitorClickInfo)
+class VisitorClickInfoAdmin(admin.ModelAdmin):
     list_filter = [
-        "shortened_url__url",
+        jsonfieldlistfilter("browser"),
+        jsonfieldlistfilter("device"),
+        jsonfieldlistfilter("os"),
+        jsonfieldlistfilter("location_data"),
         "created_at",
     ]
-    search_fields = (
-        ["ip_address"]
-        + [
-            f"shortened_url__saved_runs__{field}"
-            for field in SavedRunAdmin.search_fields
-        ]
-        + [f"shortened_url__user__{field}" for field in AppUserAdmin.search_fields]
-        + [f"shortened_url__{field}" for field in ShortenedURLAdmin.search_fields]
-    )
+    search_fields = ["ip_address", "user_agent", "location_data"] + [
+        f"shortened_url__{field}" for field in ShortenedURLAdmin.search_fields
+    ]
     list_display = [
-        "ip_address",
-        "platform",
-        "operating_system",
-        "device_model",
-        "country_name",
-        "city_name",
-        "created_at",
-        "location_data",
+        "__str__",
         "user_agent",
-        "get_saved_runs",
-    ]
-    readonly_fields = [
-        "ip_address",
-        "platform",
-        "operating_system",
-        "device_model",
-        "country_name",
-        "city_name",
-        "created_at",
         "location_data",
-        "user_agent",
+        "created_at",
     ]
-    exclude = ["saved_runs"]
     ordering = ["created_at"]
     actions = [export_to_csv, export_to_excel]
-
-    @admin.display(description="Saved Runs")
-    def get_saved_runs(self, obj: models.ClickAnalytic):
-        return list_related_html_url(obj.shortened_url.saved_runs, show_add=False)
