@@ -6,13 +6,12 @@ from django import forms
 from django.conf import settings
 from django.contrib import admin
 from django.db.models import Max, Count, F
-from django.http import HttpResponse
 from django.template import loader
 from django.utils import dateformat
 from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
 
-from bots.admin_links import list_related_html_url, open_in_new_tab, change_obj_url
+from bots.admin_links import list_related_html_url, change_obj_url
 from bots.models import (
     FeedbackComment,
     CHATML_ROLE_ASSISSTANT,
@@ -24,43 +23,11 @@ from bots.models import (
     BotIntegration,
 )
 from bots.tasks import create_personal_channels_for_all_members
+from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
 )
 from gooeysite.custom_widgets import JSONEditorWidget
-
-
-@admin.action(description="Export to CSV")
-def export_to_csv(
-    modeladmin,
-    request,
-    queryset,
-):
-    filename = _get_filename()
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
-    queryset.to_df().to_csv(response, index=False)
-    return response
-
-
-@admin.action(description="Export to Excel")
-def export_to_excel(
-    modeladmin,
-    request,
-    queryset,
-):
-    filename = _get_filename()
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
-    queryset.to_df().to_excel(response, index=False)
-    return response
-
-
-def _get_filename():
-    filename = f"Gooey.AI Table {dateformat.format(datetime.datetime.now(), settings.DATETIME_FORMAT)}"
-    return filename
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
