@@ -31,7 +31,11 @@ def json_field_nested_lookup_keys(
 
 
 def related_json_field_summary(
-    manager, field, qs=None, query_param=None, instance_id=None
+    manager,
+    field: str,
+    qs: QuerySet = None,
+    query_param: str = None,
+    instance_id: int = None,
 ):
     if query_param is None:
         try:

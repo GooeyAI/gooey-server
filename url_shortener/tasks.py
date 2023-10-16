@@ -20,9 +20,9 @@ def save_click_info(surl_id: int, ip_address: str, user_agent: str):
 
     res = requests.get(str(furl("https://iplist.cc/api/") / ip_address))
     if res.ok:
-        location_data = res.json()
+        ip_data = res.json()
     else:
-        location_data = {}
+        ip_data = {}
 
     VisitorClickInfo.objects.create(
         shortened_url_id=surl_id,
@@ -31,5 +31,5 @@ def save_click_info(surl_id: int, ip_address: str, user_agent: str):
         browser=browser,
         device=device,
         os=os,
-        location_data=location_data,
+        ip_data=ip_data,
     )

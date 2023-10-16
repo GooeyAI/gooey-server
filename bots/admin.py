@@ -1,4 +1,5 @@
 import datetime
+import json
 
 import django.db.models
 from django import forms
@@ -372,6 +373,25 @@ class FeedbackInline(admin.TabularInline):
     readonly_fields = ["created_at"]
 
 
+class AnalysisResultFilter(admin.SimpleListFilter):
+    title = "analysis_result"
+    parameter_name = "analysis_result"
+
+    def lookups(self, request, model_admin):
+        val = self.value()
+        if val is None:
+            return []
+        k, v = json.loads(val)
+        return [(val, f"{k.split(self.parameter_name + '__')[-1]} = {v}")]
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val is None:
+            return queryset
+        k, v = json.loads(val)
+        return queryset.filter(**{k: v})
+
+
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
     autocomplete_fields = ["conversation"]
@@ -379,6 +399,7 @@ class MessageAdmin(admin.ModelAdmin):
         "role",
         "conversation__bot_integration",
         "created_at",
+        AnalysisResultFilter,
     ]
     search_fields = [
         "role",

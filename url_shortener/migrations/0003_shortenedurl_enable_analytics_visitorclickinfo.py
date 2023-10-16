@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
                 ("device", models.JSONField(blank=True)),
                 ("os", models.JSONField(blank=True)),
                 (
-                    "location_data",
+                    "ip_data",
                     models.JSONField(
                         blank=True,
                         help_text="The location data of the user who clicked the shortened url",
