@@ -155,9 +155,9 @@ class VisitorClickInfo(models.Model):
     browser = models.JSONField(blank=True)
     device = models.JSONField(blank=True)
     os = models.JSONField(blank=True)
-    location_data = models.JSONField(
+    ip_data = models.JSONField(
         blank=True,
-        help_text="The location data of the user who clicked the shortened url",
+        help_text="IP address information fetched using https://iplist.cc/",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

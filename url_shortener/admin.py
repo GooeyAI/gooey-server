@@ -37,11 +37,11 @@ class ShortenedURLAdmin(admin.ModelAdmin):
         "updated_at",
     ]
     readonly_fields = [
-        "clicks",
         "created_at",
         "updated_at",
         "shortened_url",
         "get_saved_runs",
+        "clicks",
         "view_visitors",
         "view_visitor_summary",
     ]
@@ -65,7 +65,7 @@ class ShortenedURLAdmin(admin.ModelAdmin):
     @admin.display(description="Visitor Summary")
     def view_visitor_summary(self, surl: models.ShortenedURL):
         html = ""
-        for field in ["browser", "device", "os", "location_data"]:
+        for field in ["browser", "device", "os", "ip_data"]:
             results = related_json_field_summary(surl.visitors, field)
             html += "<h2>" + field.replace("_", " ").capitalize() + "</h2>"
             html += loader.render_to_string(
@@ -77,7 +77,7 @@ class ShortenedURLAdmin(admin.ModelAdmin):
 
 def jsonfieldlistfilter(field: str):
     class JSONFieldListFilter(admin.SimpleListFilter):
-        title = field
+        title = field.replace("_", " ").capitalize()
         parameter_name = field
 
         def lookups(self, request, model_admin):
@@ -108,16 +108,16 @@ class VisitorClickInfoAdmin(admin.ModelAdmin):
         jsonfieldlistfilter("browser"),
         jsonfieldlistfilter("device"),
         jsonfieldlistfilter("os"),
-        jsonfieldlistfilter("location_data"),
+        jsonfieldlistfilter("ip_data"),
         "created_at",
     ]
-    search_fields = ["ip_address", "user_agent", "location_data"] + [
+    search_fields = ["ip_address", "user_agent", "ip_data"] + [
         f"shortened_url__{field}" for field in ShortenedURLAdmin.search_fields
     ]
     list_display = [
         "__str__",
         "user_agent",
-        "location_data",
+        "ip_data",
         "created_at",
     ]
     ordering = ["created_at"]
