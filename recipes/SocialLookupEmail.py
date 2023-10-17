@@ -7,6 +7,7 @@ from pydantic import BaseModel
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.text_format import daras_ai_format_str
+from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -71,6 +72,7 @@ class SocialLookupEmailPage(BasePage):
     def render_description(self):
         st.write(
             """
+            
     This recipe takes an email address and a sample email body. It attempts to pull the social profile of the email address and then personlize the email using AI.
 
     How It Works:
@@ -235,10 +237,7 @@ class SocialLookupEmailPage(BasePage):
 def get_profile_for_email(email_address) -> dict | None:
     r = requests.post(
         "https://api.apollo.io/v1/people/match",
-        json={
-            "api_key": "BOlC1SGQWNuP3D70WA_-yw",
-            "email": email_address,
-        },
+        json={"api_key": settings.APOLLO_API_KEY, "email": email_address},
     )
     r.raise_for_status()
 

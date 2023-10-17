@@ -1,6 +1,5 @@
 import typing
-import time
-import glom
+from enum import Enum
 
 import numpy as np
 import qrcode
@@ -10,17 +9,14 @@ from django.core.validators import URLValidator
 from furl import furl
 from pydantic import BaseModel
 from pyzbar import pyzbar
-import base64
 
 import gooey_ui as st
-from daras_ai_v2 import db, settings
 from app_users.models import AppUser
 from bots.models import Workflow
 from daras_ai.image_input import (
     upload_file_from_bytes,
     bytes_to_cv2_img,
     cv2_img_to_bytes,
-    resize_img_scale,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.descriptions import prompting101
@@ -28,6 +24,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     output_resolution_setting,
     img_model_settings,
 )
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.repositioning import reposition_object, repositioning_preview_widget
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
@@ -36,40 +33,20 @@ from daras_ai_v2.stable_diffusion import (
     Img2ImgModels,
     Schedulers,
 )
+from daras_ai_v2.vcard import VCARD
+from recipes.EmailFaceInpainting import get_photo_for_email
+from recipes.SocialLookupEmail import get_profile_for_email
 from url_shortener.models import ShortenedURL
-from daras_ai_v2.loom_video_widget import youtube_video
 
 ATTEMPTS = 1
 DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f09c8cfa-5393-11ee-a837-02420a000190/ai%20art%20qr%20codes1%201.png.png"
 
 
-class vCardObject(BaseModel):
-    format_name: str
-    email: str | None
-    gender: str | None
-    birthday_year: str | None
-    birthday_month: str | None
-    birthday_day: str | None
-    family_name: str | None
-    given_name: str | None
-    middle_names: str | None
-    honorific_prefixes: str | None
-    honorific_suffixes: str | None
-    impp: str | None
-    address: str | None
-    calendar_url: str | None
-    comma_separated_categories: str | None
-    kind: str | None
-    language: str | None
-    organization: str | None
-    photo_url: str | None
-    logo_url: str | None
-    role: str | None
-    timezone: str | None
-    job_title: str | None
-    urls: list[str] | None
-    tel: str | None
-    note: str | None
+class QrSources(Enum):
+    qr_code_data = "🔗 URL or Text"
+    vcard_data = "👩‍🦰 Contact Info"
+    vcard_file = "📇 Contact File"
+    qr_code_input_image = "📷 Existing QR Code"
 
 
 class QRCodeGeneratorPage(BasePage):
@@ -91,8 +68,8 @@ class QRCodeGeneratorPage(BasePage):
     class RequestModel(BaseModel):
         qr_code_data: str | None
         qr_code_input_image: str | None
-
-        vcard_data: vCardObject | str | None
+        vcard_data: VCARD | None
+        vcard_file: str | None
 
         use_url_shortener: bool | None
 
@@ -153,183 +130,65 @@ class QRCodeGeneratorPage(BasePage):
             placeholder="Bright sunshine coming through the cracks of a wet, cave wall of big rocks",
         )
 
-        st.session_state.setdefault(
-            "__qr_input_type_index",
-            0
-            if st.session_state.get("qr_code_data")
-            else 1
-            if st.session_state.get("vcard_data")
-            else 2,
-        )
-        (url, vCard, existing), index = st.controllable_tabs(
-            ["🖊️ URL or Text", "📇 Contact vCard", "📷 Existing QR Code"],
-            key="__qr_input_type_index",
-        )
+        qr_code_source_key = "__qr_code_source"
+        if qr_code_source_key not in st.session_state:
+            for key in QrSources._member_names_:
+                if st.session_state.get(key):
+                    st.session_state[qr_code_source_key] = key
+                    break
 
-        with url:
-            st.text_area(
-                """
-                    ### 🔗 URL
+        source = st.radio(
+            "",
+            options=QrSources._member_names_,
+            key=qr_code_source_key,
+            format_func=lambda s: QrSources[s].value,
+        )
+        _set_selected_qr_input_field(source)
+        match source:
+            case QrSources.qr_code_data.name:
+                st.text_area(
+                    """
                     Enter your URL below. Shorter links give more visually appealing results.
                     """,
-                key="qr_code_data",
-                placeholder="https://www.gooey.ai",
-            )
-            st.checkbox("🔗 Shorten URL", key="use_url_shortener")
-            st.caption(
-                'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
-            )
+                    key="qr_code_data",
+                    placeholder="https://www.gooey.ai",
+                )
+                st.checkbox("🔗 Shorten URL", key="use_url_shortener")
+                st.caption(
+                    'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
+                )
 
-        with existing:
-            st.file_uploader(
-                """
-                ### 📷 QR Code Image
-                It will be reformatted and cleaned
-                """,
-                key="qr_code_input_image",
-                accept=["image/*"],
-            )
-            st.checkbox("🔗 Shorten URL", key="use_url_shortener")
-            st.caption(
-                'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
-            )
+            case QrSources.qr_code_input_image.name:
+                st.file_uploader(
+                    """
+                    It will be reformatted and cleaned
+                    """,
+                    key="qr_code_input_image",
+                    accept=["image/*"],
+                )
+                st.checkbox("🔗 Shorten URL", key="use_url_shortener")
+                st.caption(
+                    'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
+                )
 
-        with vCard:
-            st.caption(
-                "We'll use the prompt above to create a beautiful QR code that when scanned on a phone, will add the info below as a contact. Great for conferences and geeky parties."
-            )
-            st.session_state.setdefault(
-                "__upload_vcard",
-                isinstance(st.session_state.get("vcard_data", {}), str),
-            )
-            if st.checkbox(
-                "Upload vCard (e.g. from MacOS Contacts export or another website)",
-                key="__upload_vcard",
-            ):
-                st.session_state["vcard_data"] = st.file_uploader(
-                    "", accept=["text/vcard"]
+            case QrSources.vcard_data.name:
+                st.caption(
+                    "We'll use the prompt above to create a beautiful QR code that when scanned on a phone, will add the info below as a contact. Great for conferences and geeky parties."
                 )
-            else:
-                fields = st.session_state.get("vcard_data", {})
-                if isinstance(fields, str):
-                    fields = {}
-                for field in fields:
-                    st.session_state.setdefault("__" + field, fields.get(field, None))
+                vcard_form()
 
-                fields["email"] = st.text_input(
-                    "Email", key="__email", placeholder="dev@gooey.ai"
+            case QrSources.vcard_file.name:
+                st.session_state["vcard_file"] = st.file_uploader(
+                    "Upload vCard (e.g. from MacOS Contacts export or another website)",
+                    accept=["text/vcard"],
+                    key="vcard_file",
                 )
-                fields = {"email": fields.get("email", "")}
-                if st.button(
-                    "<u>Import other contact info</u> from my email - magic!",
-                    className="link-button",
-                ):
-                    if not fields.get("email"):
-                        st.caption("Please provide an email address to import from")
-                    else:
-                        (
-                            photo_url,
-                            name,
-                            urls,
-                            title,
-                            _,
-                            notes,
-                            address,
-                        ) = get_account_info_from_email(fields["email"])
-                        st.session_state["__email_imported"] = {
-                            "photo_url": photo_url,
-                            "name": name,
-                            "urls": urls,
-                            "title": title,
-                            "notes": notes,
-                            "address": address,
-                        }
-                        if name:
-                            st.session_state["__format_name"] = name
-                        if photo_url:
-                            st.session_state["__photo_url"] = photo_url
-                        if url:
-                            st.session_state["__urls"] = urls
-                        if title:
-                            st.session_state["__role"] = title
-                        if notes:
-                            st.session_state["__note"] = notes
-                        if address:
-                            st.session_state["__address"] = address
-                        if name or photo_url or url or title or notes or address:
-                            st.experimental_rerun()
-
-                fields["format_name"] = st.text_input(
-                    "Name*",
-                    key="__format_name",
-                    placeholder="Supreme Overlord Alex Metzger, PhD",
-                )
-                fields["tel"] = st.text_input(
-                    "Phone Number", key="__tel", placeholder="+1 (420) 669-6969"
-                )
-                fields["role"] = st.text_input(
-                    "Role", key="__role", placeholder="Intern"
-                )
-                urls = st.session_state.get("__urls", [])
-                st.session_state["__urls"] = (
-                    "\n".join(urls) if isinstance(urls, list) else urls
-                )
-                fields["urls"] = st.text_area(
-                    "Link(s)",
-                    key="__urls",
-                    placeholder="https://www.gooey.ai\nhttps://farmer.chat",
-                ).split("\n")
-                fields["photo_url"] = (
-                    st.file_uploader("Photo", key="__photo_url", accept=["image/*"])
-                    if not st.session_state.get("__photo_url")
-                    else st.text_input("Photo", key="__photo_url")
-                )
-                with st.expander("More Contact Fields"):
-                    fields["gender"] = st.text_input(
-                        "Gender", key="__gender", placeholder="F"
-                    )
-                    fields["calendar_url"] = st.text_input(
-                        "Calendar Link ([calend.ly](calend.ly))",
-                        key="__calendar_url",
-                        placeholder="https://calendar.google.com/calendar/u/0/r",
-                    )
-                    fields["note"] = st.text_area(
-                        "Notes",
-                        key="__note",
-                        placeholder="- awesome person\n- loves pizza\n- plays tons of chess\n- absolutely a genius",
-                    )
-                    st.session_state["__address"] = st.session_state.get(
-                        "__address", ""
-                    ).replace(";", "\n")
-                    fields["address"] = st.text_area(
-                        "Address",
-                        key="__address",
-                        placeholder="123 Main St\nSan Francisco\nCA 94105",
-                    ).replace("\n", ";")
-                st.session_state["vcard_data"] = fields
-
-        if index == 1 or index == 2:
-            st.session_state["qr_code_data"] = None
-        if index == 0 or index == 2:
-            st.session_state["vcard_data"] = {}
-        if index == 0 or index == 1:
-            st.session_state["qr_code_input_image"] = None
 
     def validate_form_v2(self):
-        assert st.session_state["text_prompt"], "Please provide a prompt"
-
-        if st.session_state.get("vcard_data"):
-            assert (
-                isinstance(st.session_state["vcard_data"], str)
-                or st.session_state["vcard_data"]["format_name"]
-            ), "Please provide a name"
-            return
-
-        qr_code_data = st.session_state.get("qr_code_data")
-        qr_code_input_image = st.session_state.get("qr_code_input_image")
-        assert (
-            qr_code_data or qr_code_input_image
-        ), "Please provide QR Code URL, text content, or upload an image"
+        assert st.session_state.get("text_prompt"), "Please provide a prompt"
+        assert any(
+            st.session_state.get(k) for k in QrSources._member_names_
+        ), "Please provide QR Code URL, text content, contact info, or upload an image"
 
     def render_description(self):
         st.markdown(
@@ -346,7 +205,7 @@ class QRCodeGeneratorPage(BasePage):
         if email_import:
             st.markdown("#### Import contact info from email")
             st.json(email_import)
-        shortened_url = st.session_state.get("shortened_url", False)
+        shortened_url = st.session_state.get("shortened_url")
         if shortened_url:
             st.markdown(
                 f"""
@@ -481,7 +340,11 @@ Here is the final output:
     def _render_outputs(self, state: dict):
         for img in state.get("output_images", []):
             st.image(img)
-            qr_code_data = state.get("qr_code_data")
+            qr_code_data = (
+                state.get("qr_code_data")
+                or state.get("vcard_data", {}).get("format_name")
+                or state.get("vcard_file")
+            )
             if not qr_code_data:
                 continue
             shortened_url = state.get("shortened_url")
@@ -501,12 +364,14 @@ Here is the final output:
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        if request.vcard_data:
+        if request.vcard_data or request.vcard_file:
             yield "Saving vCard..."
-            if isinstance(request.vcard_data, str):
-                plain_text = requests.get(request.vcard_data).text
+            if request.vcard_file:
+                r = requests.get(request.vcard_file)
+                r.raise_for_status()
+                plain_text = r.text
             else:
-                plain_text = format_vcard_string(**request.vcard_data.__dict__)
+                plain_text = request.vcard_data.to_vcf_str()
             request.qr_code_data = upload_file_from_bytes(
                 "vCard.vcf", plain_text.encode(), "text/vcard"
             )
@@ -570,6 +435,126 @@ Here is the final output:
 
     def render_usage_guide(self):
         youtube_video("Q1D6B_-UoxY")
+
+
+def vcard_form(key="vcard_data") -> VCARD:
+    vcard_data = st.session_state.get(key, {})
+    # populate inputs
+    for k in VCARD.__fields__.keys():
+        st.session_state.setdefault(f"__vcard_data__{k}", vcard_data.get(k) or "")
+    vcard = VCARD.construct()
+
+    vcard.email = st.text_input(
+        "Email", key="__vcard_data__email", placeholder="dev@gooey.ai"
+    )
+
+    if vcard.email and st.button(
+        "<u>Import other contact info</u> from my email - magic!",
+        className="link-button",
+    ):
+        imported_vcard = get_vcard_from_email(vcard.email)
+        if not imported_vcard or not imported_vcard.format_name:
+            st.error("No contact info found for that email")
+        else:
+            vcard = imported_vcard
+            # clear inputs
+            st.js(
+                # language=js
+                """
+                const form = document.getElementById("gooey-form");
+                Object.entries(fields).forEach(([k, v]) => {
+                    const field = form["__vcard_data__" + k];
+                    if (field) field.value = v;
+                });
+                """,
+                fields=vcard.dict(),
+            )
+
+    vcard.format_name = st.text_input(
+        "Name*",
+        key="__vcard_data__format_name",
+        placeholder="Supreme Overlord Alex Metzger, PhD",
+    )
+    vcard.tel = st.text_input(
+        "Phone Number",
+        key="__vcard_data__tel",
+        placeholder="+1 (420) 669-6969",
+    )
+    vcard.role = st.text_input("Role", key="__vcard_data__role", placeholder="Intern")
+
+    st.session_state.setdefault("__vcard_data__urls_text", "\n".join(vcard.urls or []))
+    vcard.urls = (
+        st.text_area(
+            "Link(s)",
+            placeholder="https://www.gooey.ai\nhttps://farmer.chat",
+            key="__vcard_data__urls_text",
+        )
+        .strip()
+        .splitlines()
+    )
+
+    vcard.photo_url = st.text_input(
+        "Photo URL",
+        key="__vcard_data__photo_url",
+        placeholder="https://www.gooey.ai/static/images/logo.png",
+    )
+
+    with st.expander("More Contact Fields"):
+        vcard.gender = st.text_input(
+            "Gender", key="__vcard_data__gender", placeholder="F"
+        )
+        vcard.calendar_url = st.text_input(
+            "Calendar Link ([calend.ly](calend.ly))",
+            key="__vcard_data__calendar_url",
+            placeholder="https://calendar.google.com/calendar/u/0/r",
+        )
+        vcard.note = st.text_area(
+            "Notes",
+            key="__vcard_data__note",
+            placeholder="- awesome person\n- loves pizza\n- plays tons of chess\n- absolutely a genius",
+        )
+        vcard.address = st.text_area(
+            "Address",
+            key="__vcard_data__address",
+            placeholder="123 Main St, San Francisco, CA 94105",
+        )
+
+    st.session_state["vcard_data"] = vcard.dict()
+    return vcard
+
+
+def _set_selected_qr_input_field(
+    selected: str, format_saved_key=lambda k: f"__saved_{k}"
+):
+    """
+    There must be only one active QR-data input field at a time. The
+    variables in state need to be set as per that. e.g. if qr_code_data
+    is active, then other fields such as qr_code_input_image must be set
+    to None.
+    At the same time, we shouldn't lose data because a customer is
+    trying out different modes on the UI.
+    This helper method implements that by:
+    - caching any previous form data from other fields with hidden keys
+    - restoring previously saved data for this field
+    """
+    state = st.session_state
+
+    all_fields = QrSources._member_names_
+    if selected not in all_fields:
+        raise Exception(f"Invalid qr code input field: {selected}")
+
+    # save all fields other than active_field
+    for other in all_fields:
+        if other != selected and state.get(other):
+            state[format_saved_key(other)] = state[other]
+            state.pop(other, None)
+
+    # restore active field
+    if not state.get(selected):
+        try:
+            state[selected] = state.pop(format_saved_key(selected))
+        except KeyError:
+            pass
 
 
 def is_url(url: str) -> bool:
@@ -645,155 +630,26 @@ class InvalidQRCode(AssertionError):
     pass
 
 
-def format_vcard_string(
-    *,
-    format_name: str,
-    email: str | None = None,
-    gender: str | None = None,
-    birthday_year: str | None = None,
-    birthday_month: str | None = None,
-    birthday_day: str | None = None,
-    family_name: str | None = None,
-    given_name: str | None = None,
-    middle_names: str | None = None,
-    honorific_prefixes: str | None = None,
-    honorific_suffixes: str | None = None,
-    impp: str | None = None,
-    address: str | None = None,
-    calendar_url: str | None = None,
-    comma_separated_categories: str | None = None,
-    kind: str | None = None,
-    language: str | None = None,
-    organization: str | None = None,
-    photo_url: str | None = None,
-    logo_url: str | None = None,
-    role: str | None = None,
-    timezone: str | None = None,
-    job_title: str | None = None,
-    urls: list[str] = [],
-    tel: str | None = None,
-    note: str | None = None,
-    compress_photo: bool = True,
-) -> str:
-    vcard_string = "BEGIN:VCARD\nVERSION:4.0\n"
-    if format_name:
-        vcard_string += f"FN:{format_for_vcard(format_name)}\n"
-    else:
-        raise ValueError("Please provide a name")
-    if email:
-        vcard_string += f"EMAIL:{format_for_vcard(email)}\n"
-    if gender:
-        vcard_string += f"GENDER:{format_for_vcard(gender)}\n"
-    if birthday_year or birthday_month or birthday_day:
-        vcard_string += f'BDAY:{format_for_vcard((birthday_year or "--") + (birthday_month or "--").rjust(2, "0") + (birthday_day  or "--").rjust(2, "0"))}\n'
-    if (
-        family_name
-        or given_name
-        or middle_names
-        or honorific_prefixes
-        or honorific_suffixes
-    ):
-        vcard_string += f'N:{format_for_vcard(family_name or "")};{format_for_vcard(given_name or "")};{format_for_vcard(middle_names or "")};{format_for_vcard(honorific_prefixes or "")};{format_for_vcard(honorific_suffixes or "")}\n'
-    if impp:
-        vcard_string += f"IMPP:{format_for_vcard(impp)}\n"
-    if address:
-        vcard_string += format_for_vcard(address, prefix="ADR:", truncate=False) + "\n"
-    if calendar_url:
-        vcard_string += f"CALURI:{format_for_vcard(calendar_url)}\n"
-    if comma_separated_categories:
-        vcard_string += f"CATEGORIES:{format_for_vcard(comma_separated_categories)}\n"
-    if kind:
-        vcard_string += f"KIND:{format_for_vcard(kind)}\n"
-    else:
-        vcard_string += "KIND:individual\n"
-    if language:
-        vcard_string += f"LANG:{format_for_vcard(language)}\n"
-    if organization:
-        vcard_string += f"ORG:{format_for_vcard(organization)}\n"
-    if photo_url:
-        vcard_string += f"PHOTO;{format_vcard_image(photo_url, compress_photo)}\n"
-    if logo_url:
-        vcard_string += f"LOGO;{format_vcard_image(logo_url, compress_photo)}\n"
-    if role:
-        vcard_string += f"ROLE:{format_for_vcard(role)}\n"
-    if timezone:
-        vcard_string += f"TZ:{format_for_vcard(timezone)}\n"
-    if job_title:
-        vcard_string += f"TITLE:{format_for_vcard(job_title)}\n"
-    if urls:
-        for url in urls:
-            vcard_string += f"URL:{format_for_vcard(url)}\n"
-    if tel:
-        vcard_string += f"TEL;TYPE=cell:{format_for_vcard(tel)}\n"
-    if note:
-        vcard_string += format_for_vcard(note, prefix="NOTE:", truncate=False) + "\n"
-    return (
-        vcard_string
-        + f"REV:{str(time.time()).strip('.')}\nPRODID:-//GooeyAI//NONSGML Gooey vCard V1.0//EN\nEND:VCARD"
+def get_vcard_from_email(
+    email: str, url_fields=("github_url", "linkedin_url", "facebook_url", "twitter_url")
+) -> VCARD | None:
+    person = get_profile_for_email(email)
+    if not person:
+        return None
+    photo_url = get_photo_for_email(email)
+    return VCARD(
+        email=email,
+        format_name=person.get("name") or "",
+        tel=person.get("phone"),
+        role=person.get("title"),
+        photo_url=photo_url,
+        urls=list(set(filter(None, [person.get(field, "") for field in url_fields]))),
+        note=person.get("headline"),
+        organization=person.get("organization", {}).get("name"),
+        address=", ".join(
+            filter(
+                None,
+                [person.get("city"), person.get("state"), person.get("country")],
+            )
+        ),
     )
-
-
-def format_vcard_image(url: str, compress_and_base64: bool) -> str:
-    if not compress_and_base64:
-        return format_for_vcard(url, prefix="MEDIATYPE=image/jpeg:", truncate=False)
-    # this is necessary because some devices (*cough* apple) don't support vcard images that are not base64 encoded
-    bytes = requests.get(url).content
-    downscaled = resize_img_scale(bytes, (400, 400))
-    base64_encoded = base64.b64encode(downscaled)
-    return format_for_vcard(
-        base64_encoded.decode("utf-8"),
-        prefix="ENCODING=BASE64;TYPE=JPEG:",
-        truncate=False,
-    )
-
-
-def format_for_vcard(vcard_string: str, prefix: str = "", truncate: bool = True) -> str:
-    vcard_string = prefix + vcard_string.replace("\n", "\\n").replace(";", "\\;")
-    if truncate:
-        return vcard_string[:75]
-    if len(vcard_string) > 75:
-        vcard_string = "\n ".join(
-            vcard_string[i : i + 74] for i in range(0, len(vcard_string), 74)
-        )
-    return vcard_string
-
-
-@st.cache_data()
-def get_account_info_from_email(email: str):
-    from recipes.SocialLookupEmail import get_profile_for_email
-
-    doc_ref = db.get_doc_ref(email, collection_id="apollo_io_cache")
-
-    doc = db.get_or_create_doc(doc_ref).to_dict()
-    photo_url: str = doc.get("photo_url")
-    name: str = doc.get("name")
-    urls: str = doc.get("urls")
-    title: str = doc.get("title")
-    company: str = doc.get("company")
-    notes: str = doc.get("notes")
-    address: str = doc.get("address")
-    if photo_url and name and urls and title and company and notes and address:
-        return photo_url, name, urls.split(";"), title, company, notes, address
-
-    person = get_profile_for_email(email) or {}
-
-    photo_url = person.get("photo_url", photo_url)
-    name = person.get("name", name)
-    unique_urls = set([u for u in urls.split(";") if u] if urls else "")
-    for field in ["github_url", "linkedin_url", "facebook_url", "twitter_url"]:
-        unique_urls.add(person.get(field, ""))
-    unique_urls.discard("")
-    unique_urls.discard(None)
-    urls = ";".join(unique_urls)
-    title = person.get("title", title)
-    company = person.get("organization", {}).get("name", company)
-    notes = person.get("headline", notes)
-    address = (
-        person.get("city", "")
-        + ";"
-        + person.get("state", "")
-        + ";"
-        + person.get("country", "")
-    )
-
-    return photo_url, name, urls.split(";"), title, company, notes, address
