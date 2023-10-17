@@ -1,4 +1,5 @@
 import json
+import typing
 
 from django.db import DataError
 from django.db.models import F, Func, QuerySet, Count
@@ -7,7 +8,10 @@ from furl import furl
 
 
 def json_field_nested_lookup_keys(
-    qs: QuerySet, field: str, max_depth: int = 3
+    qs: QuerySet,
+    field: str,
+    max_depth: int = 3,
+    exclude_keys: typing.Iterable[str] = (),
 ) -> list[str]:
     nested_keys = [field]
     for _ in range(max_depth):
@@ -23,6 +27,7 @@ def json_field_nested_lookup_keys(
                         .distinct()
                         .values_list("keys", flat=True)
                     )
+                    if not child in exclude_keys
                 )
             except DataError:
                 next_keys.append(parent)
@@ -36,6 +41,7 @@ def related_json_field_summary(
     qs: QuerySet = None,
     query_param: str = None,
     instance_id: int = None,
+    exclude_keys: typing.Iterable[str] = (),
 ):
     if query_param is None:
         try:
@@ -56,7 +62,7 @@ def related_json_field_summary(
     if qs is None:
         qs = manager.all()
 
-    nested_keys = json_field_nested_lookup_keys(qs, field)
+    nested_keys = json_field_nested_lookup_keys(qs, field, exclude_keys=exclude_keys)
 
     results = {
         key.split(field + "__")[-1]: [
