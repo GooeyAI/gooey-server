@@ -52,6 +52,10 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
     def fields_to_save(self) -> [str]:
         return super().fields_to_save() + [CACHED_COLUMNS]
 
+    def validate_form_v2(self):
+        run_urls = st.session_state.get("run_urls", "")
+        assert run_urls, "Please profide a run url"
+
     def render_form_v2(self):
         from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
