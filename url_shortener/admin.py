@@ -23,6 +23,7 @@ EXCLUDE_KEYS = {
     "start",
     "end",
     "code",
+    "count",
     "route",
 }
 
