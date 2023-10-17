@@ -31,6 +31,18 @@ def build_meta_tags(
     )
     image = meta_preview_url(page.preview_image(state), page.fallback_preivew_image())
 
+    return raw_build_meta_tags(
+        url=url, title=title, description=description, image=image,
+    )
+
+
+def raw_build_meta_tags(
+    *,
+    url: str,
+    title: str,
+    description: str | None = None,
+    image: str | None = None,
+) -> list[dict[str, str]]:
     ret = [
         dict(title=title),
         dict(name="title", content=title),
