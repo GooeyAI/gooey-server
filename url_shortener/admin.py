@@ -14,6 +14,17 @@ from gooeysite.custom_filters import (
 )
 from url_shortener import models
 
+JSON_FIELDS = ["browser", "device", "os", "ip_data"]
+
+EXCLUDE_KEYS = {
+    "version",
+    "version_string",
+    "ip",
+    "asn_start",
+    "asn_end",
+    "asn_code",
+}
+
 
 @admin.register(models.ShortenedURL)
 class ShortenedURLAdmin(admin.ModelAdmin):
@@ -66,8 +77,10 @@ class ShortenedURLAdmin(admin.ModelAdmin):
     @admin.display(description="Visitor Summary")
     def view_visitor_summary(self, surl: models.ShortenedURL):
         html = ""
-        for field in ["browser", "device", "os", "ip_data"]:
-            results = related_json_field_summary(surl.visitors, field)
+        for field in JSON_FIELDS:
+            results = related_json_field_summary(
+                surl.visitors, field, exclude_keys=EXCLUDE_KEYS
+            )
             html += "<h2>" + field.replace("_", " ").capitalize() + "</h2>"
             html += loader.render_to_string(
                 "anaylsis_result.html", context=dict(results=results)
@@ -76,14 +89,19 @@ class ShortenedURLAdmin(admin.ModelAdmin):
         return html
 
 
-def jsonfieldlistfilter(field: str):
+def jsonfieldlistfilter(
+    field: str,
+    exclude_keys=EXCLUDE_KEYS,
+):
     class JSONFieldListFilter(admin.SimpleListFilter):
         title = field.replace("_", " ").capitalize()
         parameter_name = field
 
         def lookups(self, request, model_admin):
             qs = model_admin.model.objects.all()
-            lookups = json_field_nested_lookup_keys(qs, field)
+            lookups = json_field_nested_lookup_keys(
+                qs, field, exclude_keys=exclude_keys
+            )
             return [
                 (
                     json.dumps([k, v]),
@@ -106,12 +124,8 @@ def jsonfieldlistfilter(field: str):
 @admin.register(models.VisitorClickInfo)
 class VisitorClickInfoAdmin(admin.ModelAdmin):
     list_filter = [
-        jsonfieldlistfilter("browser"),
-        jsonfieldlistfilter("device"),
-        jsonfieldlistfilter("os"),
-        jsonfieldlistfilter("ip_data"),
         "created_at",
-    ]
+    ] + [jsonfieldlistfilter(name) for name in JSON_FIELDS]
     search_fields = ["ip_address", "user_agent", "ip_data"] + [
         f"shortened_url__{field}" for field in ShortenedURLAdmin.search_fields
     ]
@@ -122,4 +136,5 @@ class VisitorClickInfoAdmin(admin.ModelAdmin):
         "created_at",
     ]
     ordering = ["created_at"]
+    autocomplete_fields = ["shortened_url"]
     actions = [export_to_csv, export_to_excel]
