@@ -192,21 +192,21 @@ async def request_json(request: Request):
 def explore_page(request: Request, json_data: dict = Depends(request_json)):
     import explore
 
-    title = "Explore AI workflows"
-    description = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
-
     ret = st.runner(
         lambda: page_wrapper(
             request=request,
-            render_fn=explore.get_render_fn(title=title, description=description),
+            render_fn=explore.get_render_fn(
+                title="Explore",
+                description="DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS",
+            ),
         ),
         **json_data,
     )
     ret |= {
         "meta": raw_build_meta_tags(
             url=str(request.url),
-            title=title,
-            description=description,
+            title="Explore AI workflows",
+            description="Find, fork and run your field’s favorite AI recipes on Gooey.AI",
         ),
     }
     return ret
