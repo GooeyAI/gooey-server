@@ -58,7 +58,7 @@ def section_heading(title: str, margin_top: str = "1rem", margin_bottom: str = "
             "margin-bottom": margin_bottom,
         },
     ):
-        with gui.tag("span", style={"background-color": "yellow"}):
+        with gui.tag("span", style={"background-color": "#A5FFEE"}):
             gui.html(title.upper())
 
 
