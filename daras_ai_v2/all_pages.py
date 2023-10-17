@@ -75,9 +75,7 @@ all_home_pages_by_category = {
 }
 
 all_home_pages = [
-    page
-    for page_group in all_home_pages_by_category.values()
-    for page in page_group
+    page for page_group in all_home_pages_by_category.values() for page in page_group
 ]
 
 # exposed as API

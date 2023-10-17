@@ -30,18 +30,34 @@ def get_render_fn(title: str, description: str):
     return render
 
 
-def heading(title: str, description: str, margin_top: str = "2rem", margin_bottom: str ="2rem"):
+def heading(
+    title: str, description: str, margin_top: str = "2rem", margin_bottom: str = "2rem"
+):
     with gui.tag(
-            "div", style={"margin-top": margin_top, "margin-bottom": margin_bottom}
+        "div", style={"margin-top": margin_top, "margin-bottom": margin_bottom}
     ):
-        with gui.tag("p", style={"margin-top": "0rem", "margin-bottom": "0rem"}, className="text-muted"):
+        with gui.tag(
+            "p",
+            style={"margin-top": "0rem", "margin-bottom": "0rem"},
+            className="text-muted",
+        ):
             gui.html(description.upper())
-        with gui.tag("h1", style={"margin-top": "0px", "margin-bottom": "0px", "font-weight": "500"}):
+        with gui.tag(
+            "h1",
+            style={"margin-top": "0px", "margin-bottom": "0px", "font-weight": "500"},
+        ):
             gui.html(title)
 
 
 def section_heading(title: str, margin_top: str = "1rem", margin_bottom: str = "1rem"):
-    with gui.tag("h5", style={"font-weight": "600", "margin-top": margin_top, "margin-bottom": margin_bottom}):
+    with gui.tag(
+        "h5",
+        style={
+            "font-weight": "600",
+            "margin-top": margin_top,
+            "margin-bottom": margin_bottom,
+        },
+    ):
         with gui.tag("span", style={"background-color": "yellow"}):
             gui.html(title.upper())
 

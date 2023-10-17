@@ -32,7 +32,10 @@ def build_meta_tags(
     image = meta_preview_url(page.preview_image(state), page.fallback_preivew_image())
 
     return raw_build_meta_tags(
-        url=url, title=title, description=description, image=image,
+        url=url,
+        title=title,
+        description=description,
+        image=image,
     )
 
 
