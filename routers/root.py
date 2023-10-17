@@ -198,9 +198,9 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
     ret = st.runner(
         lambda: page_wrapper(
             request=request,
-            render_fn=explore.get_render_fn(title=title, description=description)
+            render_fn=explore.get_render_fn(title=title, description=description),
         ),
-        **json_data
+        **json_data,
     )
     ret |= {
         "meta": raw_build_meta_tags(
