@@ -20,9 +20,10 @@ EXCLUDE_KEYS = {
     "version",
     "version_string",
     "ip",
-    "asn_start",
-    "asn_end",
-    "asn_code",
+    "start",
+    "end",
+    "code",
+    "route",
 }
 
 
@@ -89,10 +90,7 @@ class ShortenedURLAdmin(admin.ModelAdmin):
         return html
 
 
-def jsonfieldlistfilter(
-    field: str,
-    exclude_keys=EXCLUDE_KEYS,
-):
+def jsonfieldlistfilter(field: str):
     class JSONFieldListFilter(admin.SimpleListFilter):
         title = field.replace("_", " ").capitalize()
         parameter_name = field
@@ -100,7 +98,7 @@ def jsonfieldlistfilter(
         def lookups(self, request, model_admin):
             qs = model_admin.model.objects.all()
             lookups = json_field_nested_lookup_keys(
-                qs, field, exclude_keys=exclude_keys
+                qs, field, exclude_keys=EXCLUDE_KEYS
             )
             return [
                 (
