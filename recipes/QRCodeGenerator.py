@@ -575,7 +575,8 @@ def generate_and_upload_qr_code(
             qr_code_data = download_qr_code_data(request.qr_code_input_image)
         else:
             qr_code_data = request.qr_code_data
-        qr_code_data = qr_code_data.strip()
+        if isinstance(qr_code_data, str):
+            qr_code_data = qr_code_data.strip()
         if not qr_code_data:
             raise ValueError("Please provide QR Code URL, text content, or an image")
         using_shortened_url = request.use_url_shortener and is_url(qr_code_data)
