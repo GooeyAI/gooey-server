@@ -44,8 +44,8 @@ DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.co
 
 class QrSources(Enum):
     qr_code_data = "🔗 URL or Text"
-    vcard_data = "👩‍🦰 Contact Info"
-    vcard_file = "📇 Contact File"
+    qr_code_vcard = "👩‍🦰 Contact Info"
+    qr_code_file = "📄 Upload File"
     qr_code_input_image = "📷 Existing QR Code"
 
 
@@ -68,8 +68,8 @@ class QRCodeGeneratorPage(BasePage):
     class RequestModel(BaseModel):
         qr_code_data: str | None
         qr_code_input_image: str | None
-        vcard_data: VCARD | None
-        vcard_file: str | None
+        qr_code_vcard: VCARD | None
+        qr_code_file: str | None
 
         use_url_shortener: bool | None
 
@@ -136,13 +136,13 @@ class QRCodeGeneratorPage(BasePage):
                 if st.session_state.get(key):
                     st.session_state[qr_code_source_key] = key
                     break
-
         source = st.radio(
             "",
             options=QrSources._member_names_,
             key=qr_code_source_key,
             format_func=lambda s: QrSources[s].value,
         )
+
         _set_selected_qr_input_field(source)
         match source:
             case QrSources.qr_code_data.name:
@@ -150,12 +150,8 @@ class QRCodeGeneratorPage(BasePage):
                     """
                     Enter your URL below. Shorter links give more visually appealing results.
                     """,
-                    key="qr_code_data",
+                    key=QrSources.qr_code_data.name,
                     placeholder="https://www.gooey.ai",
-                )
-                st.checkbox("🔗 Shorten URL", key="use_url_shortener")
-                st.caption(
-                    'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
                 )
 
             case QrSources.qr_code_input_image.name:
@@ -163,26 +159,30 @@ class QRCodeGeneratorPage(BasePage):
                     """
                     It will be reformatted and cleaned
                     """,
-                    key="qr_code_input_image",
+                    key=QrSources.qr_code_input_image.name,
                     accept=["image/*"],
                 )
-                st.checkbox("🔗 Shorten URL", key="use_url_shortener")
-                st.caption(
-                    'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
-                )
 
-            case QrSources.vcard_data.name:
+            case QrSources.qr_code_vcard.name:
                 st.caption(
                     "We'll use the prompt above to create a beautiful QR code that when scanned on a phone, will add the info below as a contact. Great for conferences and geeky parties."
                 )
-                vcard_form()
+                vcard_form(key=QrSources.qr_code_vcard.name)
 
-            case QrSources.vcard_file.name:
-                st.session_state["vcard_file"] = st.file_uploader(
-                    "Upload vCard (e.g. from MacOS Contacts export or another website)",
-                    accept=["text/vcard"],
-                    key="vcard_file",
+            case QrSources.qr_code_file.name:
+                st.file_uploader(
+                    "Upload any file. Contact cards and PDFs work great.",
+                    key=QrSources.qr_code_file.name,
                 )
+
+        if source != QrSources.qr_code_vcard:
+            st.checkbox(
+                "🔗 Shorten URL",
+                key="use_url_shortener",
+            )
+            st.caption(
+                'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
+            )
 
     def validate_form_v2(self):
         assert st.session_state.get("text_prompt"), "Please provide a prompt"
@@ -341,9 +341,10 @@ Here is the final output:
         for img in state.get("output_images", []):
             st.image(img)
             qr_code_data = (
-                state.get("qr_code_data")
-                or state.get("vcard_data", {}).get("format_name")
-                or state.get("vcard_file")
+                state.get(QrSources.qr_code_data.name)
+                or state.get(QrSources.qr_code_input_image.name)
+                or state.get(QrSources.qr_code_vcard.name, {}).get("format_name")
+                or state.get(QrSources.qr_code_file.name)
             )
             if not qr_code_data:
                 continue
@@ -363,20 +364,6 @@ Here is the final output:
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
-
-        if request.vcard_data or request.vcard_file:
-            yield "Saving vCard..."
-            if request.vcard_file:
-                r = requests.get(request.vcard_file)
-                r.raise_for_status()
-                plain_text = r.text
-            else:
-                plain_text = request.vcard_data.to_vcf_str()
-            request.qr_code_data = upload_file_from_bytes(
-                "vCard.vcf", plain_text.encode(), "text/vcard"
-            )
-            request.use_url_shortener = True
-            request.qr_code_input_image = None
 
         yield "Generating QR Code..."
         image, qr_code_data, did_shorten = generate_and_upload_qr_code(
@@ -437,7 +424,7 @@ Here is the final output:
         youtube_video("Q1D6B_-UoxY")
 
 
-def vcard_form(key="vcard_data") -> VCARD:
+def vcard_form(*, key: str) -> VCARD:
     vcard_data = st.session_state.get(key, {})
     # populate inputs
     for k in VCARD.__fields__.keys():
@@ -462,9 +449,11 @@ def vcard_form(key="vcard_data") -> VCARD:
                 # language=js
                 """
                 const form = document.getElementById("gooey-form");
+                if (!form) return;
                 Object.entries(fields).forEach(([k, v]) => {
                     const field = form["__vcard_data__" + k];
-                    if (field) field.value = v;
+                    if (!field) return;
+                    field.value = v;
                 });
                 """,
                 fields=vcard.dict(),
@@ -519,7 +508,7 @@ def vcard_form(key="vcard_data") -> VCARD:
             placeholder="123 Main St, San Francisco, CA 94105",
         )
 
-    st.session_state["vcard_data"] = vcard.dict()
+    st.session_state[key] = vcard.dict()
     return vcard
 
 
@@ -570,22 +559,32 @@ def generate_and_upload_qr_code(
     request: QRCodeGeneratorPage.RequestModel,
     user: AppUser,
 ) -> tuple[str, str, bool]:
-    qr_code_data = request.qr_code_data
-    if request.qr_code_input_image:
-        qr_code_data = download_qr_code_data(request.qr_code_input_image)
-
-    if isinstance(qr_code_data, str):
-        qr_code_data = qr_code_data.strip()
-    if not qr_code_data:
-        raise ValueError("Please provide QR Code URL, text content, or an image")
-
-    shortened = request.use_url_shortener and is_url(qr_code_data)
-    if shortened:
+    if request.qr_code_vcard:
+        vcf_str = request.qr_code_vcard.to_vcf_str()
         qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
-            url=qr_code_data,
+            content=vcf_str,
+            content_type="text/vcard",
             user=user,
             workflow=Workflow.QR_CODE,
         )[0].shortened_url()
+        using_shortened_url = True
+    else:
+        if request.qr_code_file:
+            qr_code_data = request.qr_code_file
+        elif request.qr_code_input_image:
+            qr_code_data = download_qr_code_data(request.qr_code_input_image)
+        else:
+            qr_code_data = request.qr_code_data
+        qr_code_data = qr_code_data.strip()
+        if not qr_code_data:
+            raise ValueError("Please provide QR Code URL, text content, or an image")
+        using_shortened_url = request.use_url_shortener and is_url(qr_code_data)
+        if using_shortened_url:
+            qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
+                url=qr_code_data,
+                user=user,
+                workflow=Workflow.QR_CODE,
+            )[0].shortened_url()
 
     img_cv2 = generate_qr_code(qr_code_data)
 
@@ -600,7 +599,7 @@ def generate_and_upload_qr_code(
     )
 
     img_url = upload_file_from_bytes("cleaned_qr.png", cv2_img_to_bytes(img_cv2))
-    return img_url, qr_code_data, shortened
+    return img_url, qr_code_data, using_shortened_url
 
 
 def generate_qr_code(qr_code_data: str) -> np.ndarray:

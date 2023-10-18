@@ -104,7 +104,8 @@ class VCARD(BaseModel):
                 "BEGIN:VCARD",
                 "VERSION:4.0",
                 *lines,
-                f"REV:{int(time.time() * 1000)}",
+                ## this tends to generate a new file every time, not sure if it's useful?
+                # f"REV:{int(time.time() * 1000)}",
                 "PRODID:-//GooeyAI//NONSGML Gooey vCard V1.0//EN",
                 "END:VCARD",
             ]

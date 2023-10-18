@@ -41,7 +41,7 @@ class ShortenedURLAdmin(admin.ModelAdmin):
         + [f"user__{field}" for field in AppUserAdmin.search_fields]
     )
     list_display = [
-        "url",
+        "src",
         "user",
         "shortened_url",
         "clicks",
@@ -60,7 +60,7 @@ class ShortenedURLAdmin(admin.ModelAdmin):
         "view_visitor_summary",
     ]
     exclude = ["saved_runs"]
-    ordering = ["created_at"]
+    ordering = ["-created_at"]
     actions = [export_to_csv, export_to_excel]
 
     @admin.display(ordering="max_clicks", description="Max Clicks")
@@ -134,6 +134,6 @@ class VisitorClickInfoAdmin(admin.ModelAdmin):
         "ip_data",
         "created_at",
     ]
-    ordering = ["created_at"]
+    ordering = ["-created_at"]
     autocomplete_fields = ["shortened_url"]
     actions = [export_to_csv, export_to_excel]

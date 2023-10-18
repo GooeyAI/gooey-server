@@ -25,6 +25,14 @@ def url_shortener(hashid: str, request: Request):
         save_click_info.delay(
             surl.id, request.client.host, request.headers.get("user-agent", "")
         )
-    return RedirectResponse(
-        url=surl.url, status_code=303  # because youtu.be redirects are 303
-    )
+    if surl.url:
+        return RedirectResponse(
+            url=surl.url, status_code=303  # because youtu.be redirects are 303
+        )
+    elif surl.content:
+        return Response(
+            content=surl.content,
+            media_type=surl.content_type or "text/plain",
+        )
+    else:
+        return Response(status_code=204)
