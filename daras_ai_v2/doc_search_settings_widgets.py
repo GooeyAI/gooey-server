@@ -14,8 +14,18 @@ def is_user_uploaded_url(url: str) -> bool:
 
 def document_uploader(
     label: str,
-    key="documents",
-    accept=(".pdf", ".txt", ".docx", ".md", ".html", ".wav", ".ogg", ".mp3", ".aac"),
+    key: str = "documents",
+    accept: typing.Iterable[str] = (
+        ".pdf",
+        ".txt",
+        ".docx",
+        ".md",
+        ".html",
+        ".wav",
+        ".ogg",
+        ".mp3",
+        ".aac",
+    ),
     accept_multiple_files=True,
 ):
     st.write(label, className="gui-input")
