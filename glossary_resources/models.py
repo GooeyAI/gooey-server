@@ -24,4 +24,4 @@ class GlossaryResource(models.Model):
         return f"{self.f_url} ({self.usage_count} uses)"
 
     def get_clean_name(self):
-        return str(self.glossary_name).lower()
+        return "glossary-" + str(self.glossary_name).lower()

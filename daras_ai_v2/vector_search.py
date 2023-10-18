@@ -434,7 +434,7 @@ def _download_doc_content(f_url: str, doc_meta: DocMetadata):
             r.raise_for_status()
         except requests.RequestException as e:
             print(f"ignore error while downloading {f_url}: {e}")
-            return []
+            return "", "", b""
         f_bytes = r.content
         # if it's a known encoding, standardize to utf-8
         if r.encoding:
