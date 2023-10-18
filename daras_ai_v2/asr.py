@@ -17,6 +17,7 @@ from daras_ai_v2.gpu_server import (
     GpuEndpoints,
     call_celery_task,
 )
+from daras_ai_v2.redis_cache import redis_cache_decorator
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -105,7 +106,7 @@ def google_translate_language_selector(
     )
 
 
-@st.cache_data()
+@redis_cache_decorator
 def google_translate_languages() -> dict[str, str]:
     """
     Get list of supported languages for Google Translate.

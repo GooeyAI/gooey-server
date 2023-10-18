@@ -18,8 +18,6 @@ from daras_ai_v2.vector_search import (
 )
 from recipes.DocSearch import render_documents
 
-CACHED_COLUMNS = "__cached_columns"
-
 
 class BulkRunnerPage(BasePage):
     title = "Bulk Runner & Evaluator"
@@ -49,9 +47,6 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
     class ResponseModel(BaseModel):
         output_documents: list[str]
 
-    def fields_to_save(self) -> [str]:
-        return super().fields_to_save() + [CACHED_COLUMNS]
-
     def render_form_v2(self):
         from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
@@ -71,20 +66,6 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
             f"##### {self.RequestModel.__fields__['documents'].field_info.title}\n{self.RequestModel.__fields__['documents'].field_info.description or ''}",
             accept=(".csv", ".xlsx", ".xls", ".json", ".tsv", ".xml"),
         )
-
-        if files:
-            dfs = map_parallel(_read_df, files)
-            st.session_state[CACHED_COLUMNS] = list(
-                {
-                    col: None
-                    for df in dfs
-                    for col in df.columns
-                    if not col.startswith("Unnamed:")
-                }
-            )
-        else:
-            dfs = []
-            st.session_state.pop(CACHED_COLUMNS, None)
 
         required_input_fields = {}
         optional_input_fields = {}
@@ -142,33 +123,14 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
                 for field, model_field in page_cls.ResponseModel.__fields__.items()
             }
 
-        columns = st.session_state.get(CACHED_COLUMNS, [])
-        if not columns:
-            return
-
         st.write(
             """
 ##### Input Data Preview
-Here's how we've parsed your data.          
+Here's what you uploaded:          
             """
         )
-
-        for df in dfs:
-            st.text_area(
-                "",
-                value=df.to_string(
-                    max_cols=10, max_rows=10, max_colwidth=40, show_dimensions=True
-                ),
-                label_visibility="collapsed",
-                disabled=True,
-                style={
-                    "white-space": "pre",
-                    "overflow": "scroll",
-                    "font-family": "monospace",
-                    "font-size": "0.9rem",
-                },
-                height=250,
-            )
+        for file in files:
+            st.data_table(file)
 
         if not (required_input_fields or optional_input_fields):
             return
@@ -190,7 +152,7 @@ To understand what each field represents, check out our [API docs](https://api.g
             input_columns_old = st.session_state.pop("input_columns", {})
             input_columns_new = st.session_state.setdefault("input_columns", {})
 
-            column_options = [None, *columns]
+            column_options = [None, *get_columns(files)]
             for fields in (required_input_fields, optional_input_fields):
                 for field, title in fields.items():
                     col = st.selectbox(
@@ -426,6 +388,19 @@ def is_arr(field_props: dict) -> bool:
             if props["type"] == "array":
                 return True
     return False
+
+
+@st.cache_in_session_state
+def get_columns(files: list[str]) -> list[str]:
+    dfs = map_parallel(_read_df, files)
+    return list(
+        {
+            col: None
+            for df in dfs
+            for col in df.columns
+            if not col.startswith("Unnamed:")
+        }
+    )
 
 
 def _read_df(f_url: str) -> "pd.DataFrame":

@@ -4,6 +4,7 @@ import gooey_ui as st
 from google.cloud import texttospeech
 
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.redis_cache import redis_cache_decorator
 
 UBERDUCK_VOICES = {
     "Aiden Botha": "b01cf18d-0f10-46dd-adc6-562b599fdae4",
@@ -293,8 +294,8 @@ def text_to_speech_settings(page=None):
                 )
 
 
-@st.cache_data()
-def google_tts_voices() -> dict[texttospeech.Voice, str]:
+@redis_cache_decorator
+def google_tts_voices() -> dict[str, str]:
     voices: list[texttospeech.Voice] = (
         texttospeech.TextToSpeechClient().list_voices().voices
     )
