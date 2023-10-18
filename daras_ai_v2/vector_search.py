@@ -448,6 +448,13 @@ def _download_doc_content(f_url: str, doc_meta: DocMetadata):
     return ext, f_name, f_bytes
 
 
+def download_content_bytes(f_url: str, mime_type: str):
+    ext, _, f_bytes = _download_doc_content(
+        f_url, DocMetadata(name="", etag="", mime_type=mime_type)
+    )
+    return f_bytes, ext
+
+
 @redis_cache_decorator
 def doc_url_to_text_pages(
     *,
@@ -486,7 +493,7 @@ def doc_url_to_text_pages(
                 )
             pages = [run_asr(f_url, selected_model=selected_asr_model, language="en")]
         case _:
-            df = bytes_to_df(f_name=f_name, f_bytes=f_bytes, ext=ext)
+            df = bytes_to_df(f_name=f_name, f_bytes=f_bytes, ext=ext).fillna("")
             assert (
                 "snippet" in df.columns or "sections" in df.columns
             ), f'uploaded spreadsheet must contain a "snippet" or "sections" column - {f_name !r}'
@@ -514,9 +521,13 @@ def bytes_to_df(
             df = pd.read_json(f, dtype=str)
         case ".xml":
             df = pd.read_xml(f, dtype=str)
+        case ".ods":
+            df = pd.read_excel(f, engine="odf", dtype=str)
+        case ".gsheet":
+            df = pd.read_csv(f, dtype=str)
         case _:
             raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
-    return df.fillna("")
+    return df
 
 
 def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
@@ -558,15 +569,7 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
 
 def download_table_doc(f_url: str, doc_meta: DocMetadata) -> "pd.DataFrame":
     ext, f_name, f_bytes = _download_doc_content(f_url, doc_meta)
-    match ext:
-        case ".csv" | ".xlsx" | ".tsv" | ".ods" | ".gsheet":
-            import pandas as pd
-
-            df = pd.read_csv(io.BytesIO(f_bytes), dtype=str).dropna()
-        case _:
-            raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
-
-    return df
+    return bytes_to_df(f_name=f_name, f_bytes=f_bytes, ext=ext).dropna()
 
 
 def render_sources_widget(refs: list[SearchReference]):
