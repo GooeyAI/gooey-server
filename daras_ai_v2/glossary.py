@@ -50,7 +50,7 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
 
     # make sure we don't exceed the max number of glossary resources allowed by GCP (we add a safety buffer of 100 for local development)
     if created and GlossaryResource.objects.count() > MAX_GLOSSARY_RESOURCES - 100:
-        for gloss in GlossaryResource.objects.order_by("useage_count", "last_updated")[
+        for gloss in GlossaryResource.objects.order_by("usage_count", "last_updated")[
             :10
         ]:
             try:
@@ -77,7 +77,7 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
             raise e
     finally:
         GlossaryResource.objects.filter(pk=resource.pk).update(
-            useage_count=F("useage_count") + 1
+            usage_count=F("usage_count") + 1
         )
 
 
