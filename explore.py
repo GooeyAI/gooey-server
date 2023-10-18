@@ -4,30 +4,34 @@ from daras_ai_v2.all_pages import all_home_pages_by_category
 from daras_ai_v2.grid_layout_widget import grid_layout
 
 
-def get_render_fn(title: str, description: str):
-    def render():
-        def _render(page_cls):
-            page = page_cls()
-            state = page.recipe_doc_sr().to_dict()
+META_TITLE = "Explore AI workflows"
+META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
 
-            with gui.link(to=page.app_url()):
-                gui.markdown(f"### {page.title}")
+TITLE = "Explore"
+DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 
-            preview = page.preview_description(state)
-            if preview:
-                gui.write(truncate_text_words(preview, 150))
-            else:
-                page.render_description()
 
-            page.render_example(state)
+def render():
+    def _render(page_cls):
+        page = page_cls()
+        state = page.recipe_doc_sr().to_dict()
 
-        heading(title=title, description=description)
-        for category, pages in all_home_pages_by_category.items():
-            separator()
-            section_heading(category)
-            grid_layout(3, pages, _render, separator=False)
+        with gui.link(to=page.app_url()):
+            gui.markdown(f"### {page.title}")
 
-    return render
+        preview = page.preview_description(state)
+        if preview:
+            gui.write(truncate_text_words(preview, 150))
+        else:
+            page.render_description()
+
+        page.render_example(state)
+
+    heading(title=TITLE, description=DESCRIPTION)
+    for category, pages in all_home_pages_by_category.items():
+        gui.write("---")
+        section_heading(category)
+        grid_layout(3, pages, _render, separator=False)
 
 
 def heading(
@@ -60,9 +64,3 @@ def section_heading(title: str, margin_top: str = "1rem", margin_bottom: str = "
     ):
         with gui.tag("span", style={"background-color": "#A5FFEE"}):
             gui.html(title.upper())
-
-
-def separator(*, style: dict[str, str] | None = None):
-    style = style or {}
-    style_html = "".join([f"{kv[0]}: {kv[1]};" for kv in style.items()])
-    gui.html(f"""<hr style="{ style_html }">""")
