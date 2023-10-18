@@ -147,9 +147,8 @@ def get_top_k_references(
     ) * k
 
     # Final ranking
-    top_k = np.argpartition(rrf_scores, -request.max_references)[
-        -request.max_references :
-    ]
+    max_references = min(request.max_references, len(rrf_scores))
+    top_k = np.argpartition(rrf_scores, -max_references)[-max_references:]
     final_ranks = sorted(
         top_k,
         key=lambda idx: rrf_scores[idx],
@@ -459,13 +458,11 @@ def doc_url_to_text_pages(
 ) -> list[str]:
     """
     Download document from url and convert to text pages.
-
     Args:
         f_url: url of document
         doc_meta: document metadata
         google_translate_target: target language for google translate
         selected_asr_model: selected ASR model (used for audio files)
-
     Returns:
         list of text pages
     """
@@ -483,25 +480,43 @@ def doc_url_to_text_pages(
                 raise ValueError(
                     "For transcribing audio/video, please choose an ASR model from the settings!"
                 )
-            if is_gdrive_url(f):
+            if is_gdrive_url(furl(f_url)):
                 f_url = upload_file_from_bytes(
                     f_name, f_bytes, content_type=doc_meta.mime_type
                 )
             pages = [run_asr(f_url, selected_model=selected_asr_model, language="en")]
-        case ".csv" | ".xlsx" | ".tsv" | ".ods":
-            import pandas as pd
-
-            df = pd.read_csv(io.BytesIO(f_bytes), dtype=str).fillna("")
+        case _:
+            df = bytes_to_df(f_name=f_name, f_bytes=f_bytes, ext=ext)
             assert (
                 "snippet" in df.columns or "sections" in df.columns
             ), f'uploaded spreadsheet must contain a "snippet" or "sections" column - {f_name !r}'
-            pages = df
+            return df
+    return pages
+
+
+def bytes_to_df(
+    *,
+    f_name: str,
+    f_bytes: bytes,
+    ext: str,
+) -> "pd.DataFrame":
+    import pandas as pd
+
+    f = io.BytesIO(f_bytes)
+    match ext:
+        case ".csv":
+            df = pd.read_csv(f, dtype=str)
+        case ".tsv":
+            df = pd.read_csv(f, sep="\t", dtype=str)
+        case ".xls" | ".xlsx":
+            df = pd.read_excel(f, dtype=str)
+        case ".json":
+            df = pd.read_json(f, dtype=str)
+        case ".xml":
+            df = pd.read_xml(f, dtype=str)
         case _:
             raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
-    # optionally, translate text
-    if google_translate_target:
-        pages = run_google_translate(pages, google_translate_target)
-    return pages
+    return df.fillna("")
 
 
 def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
@@ -539,10 +554,6 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
         print("\t$ " + " ".join(args))
         subprocess.check_call(args)
         return outfile.read()
-
-        refs = st.session_state.get("references", [])
-        if not refs:
-            return
 
 
 def download_table_doc(f_url: str, doc_meta: DocMetadata) -> "pd.DataFrame":

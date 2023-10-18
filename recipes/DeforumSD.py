@@ -3,17 +3,15 @@ import uuid
 
 from django.db.models import TextChoices
 from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 import gooey_ui as st
-from app_users.models import AppUser
 from bots.models import Workflow
-from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.functional import flatten
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
-from recipes.CompareLLM import CompareLLMPage
+from daras_ai_v2.safety_checker import safety_checker
 
 
 class AnimationModels(TextChoices):
@@ -21,7 +19,7 @@ class AnimationModels(TextChoices):
     epicdream = ("epicdream.safetensors", "epiCDream (epinikion)")
 
 
-class _AnimationPrompt(typing.TypedDict):
+class _AnimationPrompt(TypedDict):
     frame: str
     prompt: str
 
@@ -441,7 +439,7 @@ Choose fps for the video.
         yield
 
         if not self.request.user.disable_safety_checker:
-            safety_checker(self.preview_input(state))
+            safety_checker(text=self.preview_input(state))
 
         state["output_video"] = call_celery_task_outfile(
             "deforum",
@@ -467,37 +465,3 @@ Choose fps for the video.
             content_type="video/mp4",
             filename=f"gooey.ai animation {request.animation_prompts}.mp4",
         )[0]
-
-
-def safety_checker(text_input: str):
-    # ge the billing account for the checker
-    billing_account = AppUser.objects.get_or_create_from_email(
-        settings.SAFTY_CHECKER_BILLING_EMAIL
-    )[0]
-
-    # run in a thread to avoid messing up threadlocals
-    result, sr = (
-        CompareLLMPage()
-        .example_doc_sr(settings.SAFTY_CHECKER_EXAMPLE_ID)
-        .submit_api_call(
-            current_user=billing_account,
-            request_body=dict(variables=dict(input=text_input)),
-        )
-    )
-
-    # wait for checker
-    result.get(disable_sync_subtasks=False)
-    sr.refresh_from_db()
-    # if checker failed, raise error
-    if sr.error_msg:
-        raise RuntimeError(sr.error_msg)
-
-    # check for flagged
-    for text in flatten(sr.state["output_text"].values()):
-        lines = text.strip().splitlines()
-        if not lines:
-            continue
-        if lines[-1].upper().endswith("FLAGGED"):
-            raise ValueError(
-                "Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system."
-            )

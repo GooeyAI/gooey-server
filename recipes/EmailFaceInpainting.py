@@ -3,9 +3,9 @@ import typing
 
 import glom
 import requests
-import gooey_ui as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import db, settings
@@ -347,7 +347,6 @@ class TwitterError(Exception):
     pass
 
 
-@st.cache_data()
 def get_photo_for_email(email_address):
     doc_ref = db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
 
@@ -382,7 +381,6 @@ def get_photo_for_email(email_address):
         return photo_url
 
 
-@st.cache_data()
 def get_photo_for_twitter_handle(twitter_handle):
     doc_ref = db.get_doc_ref(twitter_handle, collection_id="twitter_photo_cache")
 

@@ -1,3 +1,5 @@
+import typing
+
 import gooey_ui as st
 
 from daras_ai_v2 import settings
@@ -50,6 +52,7 @@ def document_uploader(
             accept=accept,
             accept_multiple_files=accept_multiple_files,
         )
+    return st.session_state.get(key, [])
 
 
 def doc_search_settings(

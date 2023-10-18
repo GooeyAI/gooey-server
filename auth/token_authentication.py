@@ -1,8 +1,10 @@
+import threading
+
 from fastapi import Header
 from fastapi.exceptions import HTTPException
 
 from app_users.models import AppUser
-from auth_backend import _forced_auth_user
+from auth.auth_backend import authlocal
 from daras_ai_v2 import db
 from daras_ai_v2.crypto import PBKDF2PasswordHasher
 
@@ -15,9 +17,8 @@ def api_auth_header(
         description=f"{auth_keyword} $GOOEY_API_KEY",
     ),
 ) -> AppUser:
-    if _forced_auth_user:
-        return _forced_auth_user[0]
-
+    if authlocal:
+        return authlocal[0]
     return authenticate(authorization)
 
 

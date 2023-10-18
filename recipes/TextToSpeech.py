@@ -12,10 +12,12 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, storage_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.gpu_server import GpuEndpoints
+from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
+    ELEVEN_LABS_VOICES,
+    ELEVEN_LABS_MODELS,
     text_to_speech_settings,
     TextToSpeechProviders,
 )
@@ -40,6 +42,10 @@ class TextToSpeechPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
+        "elevenlabs_voice_name": "Rachel",
+        "elevenlabs_model": "eleven_multilingual_v2",
+        "elevenlabs_stability": 0.5,
+        "elevenlabs_similarity_boost": 0.75,
     }
 
     class RequestModel(BaseModel):
@@ -57,6 +63,11 @@ class TextToSpeechPage(BasePage):
         google_pitch: float | None
 
         bark_history_prompt: str | None
+
+        elevenlabs_voice_name: str | None
+        elevenlabs_model: str | None
+        elevenlabs_stability: float | None
+        elevenlabs_similarity_boost: float | None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -93,7 +104,15 @@ class TextToSpeechPage(BasePage):
         assert st.session_state["text_prompt"], "Text input cannot be empty"
 
     def render_settings(self):
-        text_to_speech_settings()
+        text_to_speech_settings(page=self)
+
+    def get_raw_price(self, state: dict):
+        tts_provider = self._get_tts_provider(state)
+        match tts_provider:
+            case TextToSpeechProviders.ELEVEN_LABS:
+                return self._get_eleven_labs_price(state)
+            case _:
+                return super().get_raw_price(state)
 
     def render_usage_guide(self):
         youtube_video("aD4N-g9qqhc")
@@ -107,41 +126,43 @@ class TextToSpeechPage(BasePage):
         else:
             st.div()
 
+    def _get_eleven_labs_price(self, state: dict):
+        text = state.get("text_prompt", "")
+        # 0.079 credits / character ~ 4 credits / 10 words
+        return len(text) * 0.079
+
+    def _get_tts_provider(self, state: dict):
+        tts_provider = state.get("tts_provider", TextToSpeechProviders.UBERDUCK.name)
+        # TODO: validate tts_provider before lookup?
+        return TextToSpeechProviders[tts_provider]
+
+    def additional_notes(self):
+        tts_provider = st.session_state.get("tts_provider")
+        if tts_provider == TextToSpeechProviders.ELEVEN_LABS.name:
+            return """
+                *Eleven Labs cost ≈ 4 credits per 10 words*
+            """
+        else:
+            return ""
+
     def run(self, state: dict):
         text = state["text_prompt"].strip()
-        tts_provider = (
-            state["tts_provider"]
-            if "tts_provider" in state
-            else TextToSpeechProviders.UBERDUCK.name
-        )
-        provider = TextToSpeechProviders[tts_provider]
+        provider = self._get_tts_provider(state)
         yield f"Generating audio using {provider.value} ..."
         match provider:
             case TextToSpeechProviders.BARK:
-                blob = storage_blob_for(f"bark_tts.wav")
-                r = requests.post(
-                    str(GpuEndpoints.bark),
-                    json={
-                        "pipeline": dict(
-                            upload_urls=[
-                                blob.generate_signed_url(
-                                    version="v4",
-                                    # This URL is valid for 15 minutes
-                                    expiration=datetime.timedelta(minutes=30),
-                                    # Allow PUT requests using this URL.
-                                    method="PUT",
-                                    content_type="audio/wav",
-                                ),
-                            ],
-                        ),
-                        "inputs": dict(
-                            prompt=text.split("---"),
-                            # history_prompt=history_prompt,
-                        ),
-                    },
-                )
-                r.raise_for_status()
-                state["audio_url"] = blob.public_url
+                state["audio_url"] = call_celery_task_outfile(
+                    "bark",
+                    pipeline=dict(
+                        model_id="bark",
+                    ),
+                    inputs=dict(
+                        prompt=text.split("---"),
+                        # history_prompt=history_prompt,
+                    ),
+                    filename="bark_tts.wav",
+                    content_type="audio/wav",
+                )[0]
 
             case TextToSpeechProviders.UBERDUCK:
                 voicemodel_uuid = (
@@ -215,6 +236,53 @@ class TextToSpeechPage(BasePage):
                 yield "Uploading Audio file..."
                 state["audio_url"] = upload_file_from_bytes(
                     f"google_tts_gen.mp3", response.audio_content
+                )
+
+            case TextToSpeechProviders.ELEVEN_LABS:
+                assert (
+                    self.is_current_user_paying() or self.is_current_user_admin()
+                ), """
+                    Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
+                    """
+
+                # default to first in the mapping
+                default_voice_model = next(iter(ELEVEN_LABS_MODELS))
+                default_voice_name = next(iter(ELEVEN_LABS_VOICES))
+
+                voice_model = state.get("elevenlabs_model", default_voice_model)
+                voice_name = state.get("elevenlabs_voice_name", default_voice_name)
+
+                # validate voice_model / voice_name
+                if voice_model not in ELEVEN_LABS_MODELS:
+                    raise ValueError(f"Invalid model: {voice_model}")
+                if voice_name not in ELEVEN_LABS_VOICES:
+                    raise ValueError(f"Invalid voice_name: {voice_name}")
+                else:
+                    voice_id = ELEVEN_LABS_VOICES[voice_name]
+
+                stability = state.get("elevenlabs_stability", 0.5)
+                similarity_boost = state.get("elevenlabs_similarity_boost", 0.75)
+
+                response = requests.post(
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+                    headers={
+                        "xi-api-key": settings.ELEVEN_LABS_API_KEY,
+                        "Accept": "audio/mpeg",
+                    },
+                    json={
+                        "text": text,
+                        "model_id": voice_model,
+                        "voice_settings": {
+                            "stability": stability,
+                            "similarity_boost": similarity_boost,
+                        },
+                    },
+                )
+                response.raise_for_status()
+
+                yield "Uploading Audio file..."
+                state["audio_url"] = upload_file_from_bytes(
+                    "elevenlabs_gen.mp3", response.content
                 )
 
     def related_workflows(self) -> list:

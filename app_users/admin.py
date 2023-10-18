@@ -1,7 +1,8 @@
 from django.contrib import admin
 
 from app_users import models
-from bots.admin_links import open_in_new_tab
+from bots.admin_links import open_in_new_tab, list_related_html_url
+from bots.models import SavedRun
 
 
 # Register your models here.
@@ -15,6 +16,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "email",
         "phone_number",
         "balance",
+        "is_paying",
         "is_anonymous",
         "is_disabled",
         "created_at",
@@ -30,12 +32,14 @@ class AppUserAdmin(admin.ModelAdmin):
     list_filter = [
         "is_anonymous",
         "is_disabled",
+        "is_paying",
         "created_at",
         "upgraded_from_anonymous_at",
     ]
     readonly_fields = [
         "created_at",
         "upgraded_from_anonymous_at",
+        "view_transactions",
         "open_in_firebase",
         "open_in_stripe",
     ]
@@ -62,3 +66,65 @@ class AppUserAdmin(admin.ModelAdmin):
         )
 
     open_in_stripe.short_description = "Open in Stripe"
+
+    @admin.display(description="View transactions")
+    def view_transactions(self, user: models.AppUser):
+        return list_related_html_url(user.transactions, show_add=False)
+
+
+class SavedRunInline(admin.StackedInline):
+    model = SavedRun
+    extra = 0
+    fields = readonly_fields = [
+        "open_in_gooey",
+        "price",
+        "created_at",
+        "updated_at",
+        "run_time",
+    ]
+    show_change_link = True
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class IsStripeFilter(admin.SimpleListFilter):
+    title = "Is Stripe Invoice"
+    parameter_name = "is_stripe_invoice"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("1", "Yes"),
+            ("0", "No"),
+        )
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value is None:
+            return queryset
+        if int(value):
+            return queryset.filter(invoice_id__startswith="in_")
+        else:
+            return queryset.exclude(invoice_id__startswith="in_")
+
+
+@admin.register(models.AppUserTransaction)
+class AppUserTransactionAdmin(admin.ModelAdmin):
+    autocomplete_fields = ["user"]
+    list_display = [
+        "invoice_id",
+        "user",
+        "amount",
+        "created_at",
+        "end_balance",
+    ]
+    readonly_fields = ["created_at"]
+    list_filter = ["created_at", IsStripeFilter]
+    inlines = [SavedRunInline]
+    ordering = ["-created_at"]

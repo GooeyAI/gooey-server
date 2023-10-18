@@ -9,12 +9,6 @@ API_KEYS_COLLECTION = "api_keys"
 
 USER_BALANCE_FIELD = "balance"
 
-EXAMPLES_COLLECTION = "examples"
-USER_RUNS_COLLECTION = "user_runs"
-
-USER_CHAT_HISTORY_COLLECTION = "user_chat_history"
-
-CONNECTED_BOTS_COLLECTION = "connected_bots"
 
 _client = None
 
@@ -48,20 +42,6 @@ def get_or_create_doc(
         doc_ref.create({})
         doc = doc_ref.get()
     return doc
-
-
-def get_collection_ref(
-    collection_id=DEFAULT_COLLECTION,
-    *,
-    document_id: str = None,
-    sub_collection_id: str = None,
-) -> firestore.CollectionReference:
-    db = firestore.Client()
-    db_collection = db.collection(collection_id)
-    if sub_collection_id:
-        doc_ref = db_collection.document(document_id)
-        db_collection = doc_ref.collection(sub_collection_id)
-    return db_collection
 
 
 def get_doc_ref(

@@ -3,12 +3,13 @@ import typing
 from enum import Enum
 
 import jinja2
+from typing_extensions import TypedDict
 
 import gooey_ui
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 
 
-class SearchReference(typing.TypedDict):
+class SearchReference(TypedDict):
     url: str
     title: str
     snippet: str
@@ -19,16 +20,22 @@ class CitationStyles(Enum):
     number = "Numbers ( [1] [2] [3] ..)"
     title = "Source Title ( [Source 1] [Source 2] [Source 3] ..)"
     url = "Source URL ( [https://source1.com] [https://source2.com] [https://source3.com] ..)"
+    symbol = "Symbols ( [*] [†] [‡] ..)"
 
     markdown = "Markdown ( [Source 1](https://source1.com) [Source 2](https://source2.com) [Source 3](https://source3.com) ..)"
     html = "HTML ( <a href='https://source1.com'>Source 1</a> <a href='https://source2.com'>Source 2</a> <a href='https://source3.com'>Source 3</a> ..)"
     slack_mrkdwn = "Slack mrkdwn ( <https://source1.com|Source 1> <https://source2.com|Source 2> <https://source3.com|Source 3> ..)"
     plaintext = "Plain Text / WhatsApp ( [Source 1 https://source1.com] [Source 2 https://source2.com] [Source 3 https://source3.com] ..)"
 
-    number_markdown = " Markdown Numbers + Footnotes"
+    number_markdown = "Markdown Numbers + Footnotes"
     number_html = "HTML Numbers + Footnotes"
     number_slack_mrkdwn = "Slack mrkdown Numbers + Footnotes"
     number_plaintext = "Plain Text / WhatsApp Numbers + Footnotes"
+
+    symbol_markdown = "Markdown Symbols + Footnotes"
+    symbol_html = "HTML Symbols + Footnotes"
+    symbol_slack_mrkdwn = "Slack mrkdown Symbols + Footnotes"
+    symbol_plaintext = "Plain Text / WhatsApp Symbols + Footnotes"
 
 
 def remove_quotes(snippet: str) -> str:
@@ -63,25 +70,16 @@ def apply_response_template(
             match citation_style:
                 case CitationStyles.number | CitationStyles.number_plaintext:
                     cites = " ".join(f"[{ref_num}]" for ref_num in ref_map.keys())
-                case CitationStyles.number_html:
-                    cites = " ".join(
-                        html_link(f"[{ref_num}]", ref["url"])
-                        for ref_num, ref in ref_map.items()
-                    )
-                case CitationStyles.number_markdown:
-                    cites = " ".join(
-                        markdown_link(f"[{ref_num}]", ref["url"])
-                        for ref_num, ref in ref_map.items()
-                    )
-                case CitationStyles.number_slack_mrkdwn:
-                    cites = " ".join(
-                        slack_mrkdwn_link(f"[{ref_num}]", ref["url"])
-                        for ref_num, ref in ref_map.items()
-                    )
                 case CitationStyles.title:
                     cites = " ".join(f"[{ref['title']}]" for ref in ref_map.values())
                 case CitationStyles.url:
                     cites = " ".join(f"[{ref['url']}]" for ref in ref_map.values())
+                case CitationStyles.symbol | CitationStyles.symbol_plaintext:
+                    cites = " ".join(
+                        f"[{generate_footnote_symbol(ref_num - 1)}]"
+                        for ref_num in ref_map.keys()
+                    )
+
                 case CitationStyles.markdown:
                     cites = " ".join(ref_to_markdown(ref) for ref in ref_map.values())
                 case CitationStyles.html:
@@ -93,6 +91,44 @@ def apply_response_template(
                 case CitationStyles.plaintext:
                     cites = " ".join(
                         f'[{ref["title"]} {ref["url"]}]'
+                        for ref_num, ref in ref_map.items()
+                    )
+
+                case CitationStyles.number_markdown:
+                    cites = " ".join(
+                        markdown_link(f"[{ref_num}]", ref["url"])
+                        for ref_num, ref in ref_map.items()
+                    )
+                case CitationStyles.number_html:
+                    cites = " ".join(
+                        html_link(f"[{ref_num}]", ref["url"])
+                        for ref_num, ref in ref_map.items()
+                    )
+                case CitationStyles.number_slack_mrkdwn:
+                    cites = " ".join(
+                        slack_mrkdwn_link(f"[{ref_num}]", ref["url"])
+                        for ref_num, ref in ref_map.items()
+                    )
+
+                case CitationStyles.symbol_markdown:
+                    cites = " ".join(
+                        markdown_link(
+                            f"[{generate_footnote_symbol(ref_num - 1)}]", ref["url"]
+                        )
+                        for ref_num, ref in ref_map.items()
+                    )
+                case CitationStyles.symbol_html:
+                    cites = " ".join(
+                        html_link(
+                            f"[{generate_footnote_symbol(ref_num - 1)}]", ref["url"]
+                        )
+                        for ref_num, ref in ref_map.items()
+                    )
+                case CitationStyles.symbol_slack_mrkdwn:
+                    cites = " ".join(
+                        slack_mrkdwn_link(
+                            f"[{generate_footnote_symbol(ref_num - 1)}]", ref["url"]
+                        )
                         for ref_num, ref in ref_map.items()
                     )
                 case None:
@@ -125,6 +161,31 @@ def apply_response_template(
                 formatted += "\n\n"
                 formatted += "\n".join(
                     f'{ref_num}. {ref["title"]} {ref["url"]}'
+                    for ref_num, ref in sorted(all_refs.items())
+                )
+
+            case CitationStyles.symbol_markdown:
+                formatted += "\n\n"
+                formatted += "\n".join(
+                    f"{generate_footnote_symbol(ref_num - 1)} {ref_to_markdown(ref)}"
+                    for ref_num, ref in sorted(all_refs.items())
+                )
+            case CitationStyles.symbol_html:
+                formatted += "<br><br>"
+                formatted += "<br>".join(
+                    f"{generate_footnote_symbol(ref_num - 1)} {ref_to_html(ref)}"
+                    for ref_num, ref in sorted(all_refs.items())
+                )
+            case CitationStyles.symbol_slack_mrkdwn:
+                formatted += "\n\n"
+                formatted += "\n".join(
+                    f"{generate_footnote_symbol(ref_num - 1)} {ref_to_slack_mrkdwn(ref)}"
+                    for ref_num, ref in sorted(all_refs.items())
+                )
+            case CitationStyles.symbol_plaintext:
+                formatted += "\n\n"
+                formatted += "\n".join(
+                    f'{generate_footnote_symbol(ref_num - 1)}. {ref["title"]} {ref["url"]}'
                     for ref_num, ref in sorted(all_refs.items())
                 )
 
@@ -205,3 +266,9 @@ def render_output_with_refs(state, height):
     for text in output_text:
         html = render_text_with_refs(text, state.get("references", []))
         scrollable_html(html, height=height)
+
+
+FOOTNOTE_SYMBOLS = ["*", "†", "‡", "§", "¶", "#", "♠", "♥", "♦", "♣", "✠", "☮", "☯", "✡"]  # fmt: skip
+def generate_footnote_symbol(idx: int) -> str:
+    quotient, remainder = divmod(idx, len(FOOTNOTE_SYMBOLS))
+    return FOOTNOTE_SYMBOLS[remainder] * (quotient + 1)

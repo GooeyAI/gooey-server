@@ -131,7 +131,8 @@ def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
 
 
 def caption(body: str, **props):
-    markdown(body, style={"fontSize": "0.9rem"}, className="text-muted", **props)
+    style = props.setdefault("style", {"fontSize": "0.9rem"})
+    markdown(body, className="text-muted", **props)
 
 
 def option_menu(*args, options, **kwargs):
@@ -150,6 +151,32 @@ def tabs(labels: list[str]) -> list[state.NestingCtx]:
         ],
     ).mount()
     return [state.NestingCtx(tab) for tab in parent.children]
+
+
+def controllable_tabs(
+    labels: list[str], key: str
+) -> tuple[list[state.NestingCtx], int]:
+    index = state.session_state.get(key, 0)
+    for i, label in enumerate(labels):
+        if button(
+            label,
+            key=f"tab-{i}",
+            type="primary",
+            className="replicate-nav",
+            style={
+                "background": "black" if i == index else "white",
+                "color": "white" if i == index else "black",
+            },
+        ):
+            state.session_state[key] = index = i
+            state.experimental_rerun()
+    ctxs = []
+    for i, label in enumerate(labels):
+        if i == index:
+            ctxs += [div(className="tab-content")]
+        else:
+            ctxs += [div(className="tab-content", style={"display": "none"})]
+    return ctxs, index
 
 
 def columns(
@@ -241,7 +268,7 @@ def text_area(
         key = md5_values(
             "textarea", label, height, help, value, placeholder, label_visibility
         )
-    value = state.session_state.setdefault(key, value)
+    value = str(state.session_state.setdefault(key, value))
     if label_visibility != "visible":
         label = None
     if disabled:
@@ -391,12 +418,13 @@ def button(
 form_submit_button = button
 
 
-def expander(label: str, *, expanded: bool = False):
+def expander(label: str, *, expanded: bool = False, **props):
     node = state.RenderTreeNode(
         name="expander",
         props=dict(
             label=dedent(label),
             open=expanded,
+            **props,
         ),
     )
     node.mount()
@@ -460,6 +488,10 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
             defaultInspectDepth=3 if expanded else depth,
         ),
     ).mount()
+
+
+def data_table(file_url: str):
+    return _node("data-table", fileUrl=file_url)
 
 
 def table(df: "pd.DataFrame"):
@@ -699,3 +731,13 @@ def dedent(text: str | None) -> str | None:
     if not text:
         return text
     return textwrap.dedent(text)
+
+
+def js(src: str, **kwargs):
+    state.RenderTreeNode(
+        name="script",
+        props=dict(
+            src=src,
+            args=kwargs,
+        ),
+    ).mount()

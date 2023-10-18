@@ -1,5 +1,7 @@
+import hashlib
 import threading
 import typing
+from functools import wraps
 
 from pydantic import BaseModel
 
@@ -42,6 +44,35 @@ def get_session_state() -> dict[str, typing.Any]:
 
 def set_session_state(state: dict[str, typing.Any]):
     threadlocal.session_state = state
+
+
+F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
+
+
+def cache_in_session_state(fn: F = None, key="__cache__") -> F:
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            # hash the args and kwargs so they are not too long
+            args_hash = hashlib.sha256(f"{args}{kwargs}".encode()).hexdigest()
+            # create a readable cache key
+            cache_key = fn.__name__ + ":" + args_hash
+            state = get_session_state()
+            try:
+                # if the cache exists, return it
+                result = state[key][cache_key]
+            except KeyError:
+                # otherwise, run the function and cache the result
+                result = fn(*args, **kwargs)
+                state.setdefault(key, {})[cache_key] = result
+            return result
+
+        return wrapper
+
+    if fn:
+        return decorator(fn)
+    else:
+        return decorator
 
 
 Style = dict[str, str | None]

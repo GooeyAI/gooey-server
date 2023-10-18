@@ -1,16 +1,13 @@
-import datetime
 import typing
 from enum import Enum
 
-import requests
-import gooey_ui as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from bots.models import Workflow
-from daras_ai.image_input import storage_blob_for
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.gpu_server import GpuEndpoints
+from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.img_model_settings_widgets import (
     negative_prompt_setting,
     guidance_scale_setting,
@@ -103,44 +100,31 @@ class Text2AudioPage(BasePage):
         state["output_audios"] = output_audios = {}
 
         for selected_model in request.selected_models:
-            yield f"Running {Text2AudioModels[selected_model].value}..."
+            model = Text2AudioModels[selected_model]
+            model_id = text2audio_model_ids[model]
 
-            blobs = [
-                storage_blob_for(f"gooey.ai - {request.text_prompt} ({i + 1}).wav")
-                for i in range(request.num_outputs)
-            ]
-            r = requests.post(
-                str(GpuEndpoints.audio_ldm),
-                json={
-                    "pipeline": {
-                        "model_id": "cvssp/audioldm",
-                        "upload_urls": [
-                            blob.generate_signed_url(
-                                version="v4",
-                                # This URL is valid for 15 minutes
-                                expiration=datetime.timedelta(minutes=30),
-                                # Allow PUT requests using this URL.
-                                method="PUT",
-                                content_type="audio/wav",
-                            )
-                            for blob in blobs
-                        ],
-                        "seed": request.seed,
-                    },
-                    "inputs": {
-                        "prompt": [request.text_prompt],
-                        "negative_prompt": [request.negative_prompt]
-                        if request.negative_prompt
-                        else None,
-                        "num_waveforms_per_prompt": request.num_outputs,
-                        "num_inference_steps": request.quality,
-                        "guidance_scale": request.guidance_scale,
-                        "audio_length_in_s": request.duration_sec,
-                    },
-                },
+            yield f"Running {model.value}..."
+
+            output_audios[selected_model] = call_celery_task_outfile(
+                "audio_ldm",
+                pipeline=dict(
+                    model_id=model_id,
+                    seed=request.seed,
+                ),
+                inputs=dict(
+                    prompt=[request.text_prompt],
+                    negative_prompt=[request.negative_prompt]
+                    if request.negative_prompt
+                    else None,
+                    num_waveforms_per_prompt=request.num_outputs,
+                    num_inference_steps=request.quality,
+                    guidance_scale=request.guidance_scale,
+                    audio_length_in_s=request.duration_sec,
+                ),
+                filename=f"gooey.ai - {request.text_prompt}.wav",
+                content_type="audio/wav",
+                num_outputs=request.num_outputs,
             )
-            r.raise_for_status()
-            output_audios[selected_model] = [blob.public_url for blob in blobs]
 
     def render_output(self):
         _render_output(st.session_state)

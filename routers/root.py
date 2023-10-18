@@ -21,9 +21,6 @@ from starlette.responses import (
 
 import gooey_ui as st
 from app_users.models import AppUser
-from auth_backend import (
-    FIREBASE_SESSION_COOKIE,
-)
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages, normalize_slug, page_slug_map
@@ -32,6 +29,7 @@ from daras_ai_v2.base import (
     RedirectException,
 )
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
+from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
 from daras_ai_v2.meta_content import build_meta_tags
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates

@@ -27,6 +27,14 @@ class EmbeddingModels(models.TextChoices):
         "Multilingual E5 Large (Liang Wang)",
         "intfloat/multilingual-e5-large",
     )
+    gte_large = (
+        "General Text Embeddings Large (Dingkun Long)",
+        "thenlper/gte-large",
+    )
+    gte_base = (
+        "General Text Embeddings Base (Dingkun Long)",
+        "thenlper/gte-base",
+    )
 
 
 class EmbeddingsPage(BasePage):

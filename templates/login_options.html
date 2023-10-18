@@ -8,11 +8,12 @@
 {% block content %}
     <div data-replace-login-spinner style="text-align: center; padding: 2rem">
         <h3>Sign in to Gooey.AI</h3>
-        <p>By signing in you get free credits, run history, API access & much more.</p>
+        <p>Sign in to access your run history, API key & more. New verified accounts receive 1000 credits. 💰</p>
         <div id="firebaseui-spinner">
             <h4 style="padding: 1rem">Loading...</h4>
         </div>
         <div style="padding: 1rem" id="firebaseui-auth-container"></div>
+        <p class="text-muted" style="font-size: 10px">💰 Sign up via Email does not activate credits. Please choose one of the top options instead.</p>
     </div>
     <script src="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.js"></script>
     <script src="/static/js/login_options.js?v=2"></script>

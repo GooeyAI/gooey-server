@@ -2,7 +2,6 @@ import hashlib
 import json
 import threading
 import typing
-from functools import lru_cache
 from time import time
 
 import redis
@@ -10,15 +9,10 @@ from fastapi.encoders import jsonable_encoder
 
 from daras_ai_v2 import settings
 
-threadlocal = threading.local()
-
-
-@lru_cache
-def get_redis():
-    return redis.Redis.from_url(settings.REDIS_URL)
-
-
 T = typing.TypeVar("T")
+
+threadlocal = threading.local()
+r = redis.Redis.from_url(settings.REDIS_URL)
 
 
 def realtime_clear_subs():
@@ -36,7 +30,6 @@ def get_subscriptions() -> list[str]:
 def realtime_pull(channels: list[str]) -> list[typing.Any]:
     channels = [f"gooey-gui/state/{channel}" for channel in channels]
     threadlocal.channels = channels
-    r = get_redis()
     out = [
         json.loads(value) if (value := r.get(channel)) else None for channel in channels
     ]
@@ -45,7 +38,6 @@ def realtime_pull(channels: list[str]) -> list[typing.Any]:
 
 def realtime_push(channel: str, value: typing.Any = "ping"):
     channel = f"gooey-gui/state/{channel}"
-    r = get_redis()
     msg = json.dumps(jsonable_encoder(value))
     r.set(channel, msg)
     r.publish(channel, json.dumps(time()))

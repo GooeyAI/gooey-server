@@ -22,6 +22,7 @@ from daras_ai_v2.glossary import (
     LOCATION,
     glossary_resource,
 )
+from daras_ai_v2.redis_cache import redis_cache_decorator
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -110,7 +111,7 @@ def google_translate_language_selector(
     )
 
 
-@st.cache_data()
+@redis_cache_decorator
 def google_translate_languages() -> dict[str, str]:
     """
     Get list of supported languages for Google Translate.
@@ -406,19 +407,15 @@ def run_asr(
             if result.alternatives
         )
     elif "nemo" in selected_model.name:
-        r = requests.post(
-            str(GpuEndpoints.nemo_asr),
-            json={
-                "pipeline": dict(
-                    model_id=asr_model_ids[selected_model],
-                ),
-                "inputs": dict(
-                    audio=audio_url,
-                ),
-            },
+        data = call_celery_task(
+            "nemo_asr",
+            pipeline=dict(
+                model_id=asr_model_ids[selected_model],
+            ),
+            inputs=dict(
+                audio=audio_url,
+            ),
         )
-        r.raise_for_status()
-        data = r.json()
     # check if we should use the fast queue
     # call one of the self-hosted models
     else:
