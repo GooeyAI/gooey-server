@@ -148,7 +148,7 @@ class QRCodeGeneratorPage(BasePage):
             case QrSources.qr_code_data.name:
                 st.text_area(
                     """
-                    Enter your URL below. Shorter links give more visually appealing results.
+                    Enter your URL/Text below.
                     """,
                     key=QrSources.qr_code_data.name,
                     placeholder="https://www.gooey.ai",
