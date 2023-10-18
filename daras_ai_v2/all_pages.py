@@ -83,6 +83,7 @@ all_api_pages = all_home_pages.copy() + [
     ChyronPlantPage,
     LetterWriterPage,
     EmbeddingsPage,
+    RelatedQnADocPage,
 ]
 
 # pytest suite
