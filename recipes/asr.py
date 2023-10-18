@@ -40,7 +40,7 @@ class AsrPage(BasePage):
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
         google_translate_target: str | None
-        glossary_documents: list[str] | None
+        glossary_document: str
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
 
     class ResponseModel(BaseModel):
@@ -151,8 +151,8 @@ class AsrPage(BasePage):
                 source_language=forced_asr_languages.get(
                     selected_model, request.language
                 ),
-                glossary_url=request.glossary_documents[0]
-                if request.glossary_documents
+                glossary_url=request.glossary_document
+                if request.glossary_document
                 else "",
             )
         else:

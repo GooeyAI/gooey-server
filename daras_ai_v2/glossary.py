@@ -16,7 +16,7 @@ MAX_GLOSSARY_RESOURCES = 10_000  # https://cloud.google.com/translate/quotas
 # ================================ Glossary UI ================================
 def glossary_input(
     label="##### Glossary\nUpload a google sheet, csv, or xlsx file.",
-    key="glossary_documents",
+    key="glossary_document",
 ):
     from daras_ai_v2.doc_search_settings_widgets import document_uploader
 
