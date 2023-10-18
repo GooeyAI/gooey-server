@@ -67,6 +67,9 @@ MAX_SEED = 4294967294
 gooey_rng = Random()
 
 
+SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
+
+
 class StateKeys:
     page_title = "__title"
     page_notes = "__notes"
@@ -104,10 +107,17 @@ class BasePage:
         self.run_user = run_user
 
     @classmethod
-    def app_url(cls, example_id=None, run_id=None, uid=None, tab_name=None) -> str:
+    def app_url(
+        cls,
+        example_id=None,
+        run_id=None,
+        uid=None,
+        tab_name=None,
+        query_params: dict = None,
+    ) -> str:
         query_params = cls.clean_query_params(
             example_id=example_id, run_id=run_id, uid=uid
-        )
+        ) | (query_params or {})
         f = furl(settings.APP_BASE_URL, query_params=query_params) / (
             cls.slug_versions[-1] + "/"
         )
@@ -616,7 +626,7 @@ class BasePage:
             st.session_state.pop(StateKeys.pressed_randomize, None)
             submitted = True
 
-        if submitted:
+        if submitted or self.should_submit_after_login():
             self.on_submit()
 
         self._render_before_output()
@@ -654,6 +664,14 @@ class BasePage:
             self.call_runner_task(example_id, run_id, uid)
         raise QueryParamsRedirectException(
             self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
+        )
+
+    def should_submit_after_login(self) -> bool:
+        return (
+            st.get_query_params().get(SUBMIT_AFTER_LOGIN_Q)
+            and self.request
+            and self.request.user
+            and not self.request.user.is_anonymous
         )
 
     def create_new_run(self):
@@ -707,7 +725,9 @@ class BasePage:
     def generate_credit_error_message(self, example_id, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"
         if self.request.user.is_anonymous:
-            account_url.query.params["next"] = self.app_url(example_id, run_id, uid)
+            account_url.query.params["next"] = self.app_url(
+                example_id, run_id, uid, query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
+            )
             # language=HTML
             error_msg = f"""
 <p>
