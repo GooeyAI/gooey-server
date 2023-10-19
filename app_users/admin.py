@@ -40,6 +40,7 @@ class AppUserAdmin(admin.ModelAdmin):
     readonly_fields = [
         "created_at",
         "upgraded_from_anonymous_at",
+        "user_runs",
         "view_transactions",
         "open_in_firebase",
         "open_in_stripe",
