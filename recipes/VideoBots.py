@@ -251,9 +251,7 @@ class VideoBotsPage(BasePage):
 
     class ResponseModel(BaseModel):
         final_prompt: str
-        raw_input_text: str | None
-        raw_output_text: list[str] | None
-        raw_tts_text: list[str] | None
+
         output_text: list[str]
 
         # tts
@@ -261,6 +259,11 @@ class VideoBotsPage(BasePage):
 
         # lipsync
         output_video: list[str]
+
+        # intermediate text
+        raw_input_text: str | None
+        raw_tts_text: list[str] | None
+        raw_output_text: list[str] | None
 
         # doc search
         references: list[SearchReference] | None
