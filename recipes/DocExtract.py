@@ -22,6 +22,7 @@ from daras_ai_v2.asr import (
     run_google_translate,
     audio_url_to_wav,
 )
+from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.azure_doc_extract import azure_doc_extract_pages
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
@@ -69,6 +70,7 @@ class DocExtractPage(BasePage):
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         # language: str | None
         google_translate_target: str | None
+        glossary_document: str | None
 
         task_instructions: str | None
 
@@ -123,6 +125,7 @@ class DocExtractPage(BasePage):
         enum_selector(AsrModels, label="##### ASR Model", key="selected_asr_model")
         st.write("---")
         google_translate_language_selector()
+        glossary_input()
         st.write("---")
         # enum_selector(
         #     AsrOutputFormat, label="###### Output Format", key="output_format"
@@ -400,6 +403,7 @@ def process_source(
                 texts=[transcript],
                 target_language=request.google_translate_target,
                 # source_language=request.language,
+                glossary_url=request.glossary_document or "",
             )[0]
             update_cell(spreadsheet_id, row, Columns.translation.value, translation)
     else:

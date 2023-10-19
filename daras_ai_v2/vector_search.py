@@ -498,7 +498,7 @@ def doc_url_to_text_pages(
                 "snippet" in df.columns or "sections" in df.columns
             ), f'uploaded spreadsheet must contain a "snippet" or "sections" column - {f_name !r}'
             return df
-    return pages
+    return run_google_translate(pages, target_language=google_translate_target)
 
 
 def bytes_to_df(

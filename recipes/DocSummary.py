@@ -157,6 +157,7 @@ Prompt for merging several outputs together
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: DocSummaryPage.RequestModel = self.RequestModel.parse_obj(state)
+        request.chain_type = CombineDocumentsChains.map_reduce.name
 
         yield "Downloading documents..."
 

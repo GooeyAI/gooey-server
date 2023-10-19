@@ -20,6 +20,7 @@ from daras_ai_v2.gpu_server import (
 from daras_ai_v2.glossary import (
     DEFAULT_GLOSSARY_URL,
     glossary_resource,
+    supports_language_pair,
 )
 from daras_ai_v2.redis_cache import redis_cache_decorator
 
@@ -227,15 +228,19 @@ def _translate_text(
         "transliteration_config": {"enable_transliteration": enable_transliteration},
     }
 
-    with glossary_resource(glossary_url) as (uri, location):
-        config.update(
-            {
-                "glossaryConfig": {
-                    "glossary": uri,
-                    "ignoreCase": True,
+    with glossary_resource(glossary_url) as (uri, location, lang_codes):
+        if supports_language_pair(lang_codes, target_language, source_language):
+            config.update(
+                {
+                    "glossaryConfig": {
+                        "glossary": uri,
+                        "ignoreCase": True,
+                    }
                 }
-            }
-        )
+            )
+        else:
+            uri = None
+            location = "global"
 
         authed_session, project = get_google_auth_session()
         res = authed_session.post(

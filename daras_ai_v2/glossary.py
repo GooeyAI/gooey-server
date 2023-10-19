@@ -32,6 +32,25 @@ def glossary_input(
 
 
 # ================================ Glossary Logic ================================
+def supports_language_pair(
+    supported_lang_codes, target_language: str, source_language: str | None
+):
+    return any(
+        [
+            target_language.split("-")[0] == supported_lang.split("-")[0]
+            for supported_lang in supported_lang_codes
+        ]
+    ) and (
+        not source_language
+        or any(
+            [
+                source_language.split("-")[0] == supported_lang.split("-")[0]
+                for supported_lang in supported_lang_codes
+            ]
+        )
+    )
+
+
 @contextmanager
 def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
     """
@@ -41,7 +60,7 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
     from google.api_core.exceptions import NotFound
 
     if not f_url:
-        yield None, "global"
+        yield None, "global", {}
         return
 
     resource, created = GlossaryResource.objects.get_or_create(f_url=f_url)
@@ -71,14 +90,14 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
         project_id=resource.project_id,
         location=resource.location,
     )
-    path = _get_glossary(
+    path, lang_codes = _get_glossary(
         glossary_name=resource.get_clean_name(),
         project_id=resource.project_id,
         location=resource.location,
     )
 
     try:
-        yield path, resource.location
+        yield path, resource.location, lang_codes
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 400 and e.response.json().get("error", {}).get(
             "message", ""
@@ -142,7 +161,7 @@ def _get_glossary(
     print("Glossary name: {}".format(response.name))
     print("Entry count: {}".format(response.entry_count))
     print("Input URI: {}".format(response.input_config.gcs_source.input_uri))
-    return path
+    return path, response.language_codes_set.language_codes
 
 
 def _upload_glossary_to_bucket(df, glossary_name: str = "glossary"):
