@@ -26,7 +26,6 @@ class TextToSpeechProviders(Enum):
     ELEVEN_LABS = "Eleven Labs (Premium)"
     UBERDUCK = "uberduck.ai"
     BARK = "Bark (suno-ai)"
-    SEAMLESS = "SeamlessM4T T2ST (Facebook Research)"
 
 
 # Mapping from Eleven Labs Voice Name -> Voice ID
@@ -135,47 +134,6 @@ BARK_ALLOWED_PROMPTS = {
     for n in range(10)
 }
 
-# See page 14 of https://scontent-sea1-1.xx.fbcdn.net/v/t39.2365-6/369747868_602316515432698_2401716319310287708_n.pdf?_nc_cat=106&ccb=1-7&_nc_sid=3c67a6&_nc_ohc=_5cpNOcftdYAX8rCrVo&_nc_ht=scontent-sea1-1.xx&oh=00_AfDVkx7XubifELxmB_Un-yEYMJavBHFzPnvTbTlalbd_1Q&oe=65141B39
-# For now, below are listed the languages that support T2ST. Note that Seamless only accepts ISO 639-3 codes.
-SEAMLESS_SUPPORTED: dict[str, str] = {
-    "arb": "Modern Standard Arabic",
-    "ben": "Bengali",
-    "cat": "Catalan",
-    "ces": "Czech",
-    "cmn": "Mandarin Chinese",
-    "cym": "Welsch",
-    "dan": "Danish",
-    "deu": "German",
-    "eng": "English",
-    "est": "Estonian",
-    "fin": "Finnish",
-    "fra": "French",
-    "hin": "Hindi",
-    "ind": "Indonesian",
-    "ita": "Italian",
-    "jpn": "Japanese",
-    "kor": "Korean",
-    "mlt": "Maltese",
-    "nld": "Dutch",
-    "pes": "Western Persian",
-    "pol": "Polish",
-    "por": "Portuguese",
-    "ron": "Romanian",
-    "rus": "Russian",
-    "slk": "Slovak",
-    "spa": "Spanish",
-    "swe": "Swedish",
-    "swh": "Swahili",
-    "tel": "Telugu",
-    "tgl": "Tagalog",
-    "tha": "Thai",
-    "tur": "Turkish",
-    "ukr": "Ukrainian",
-    "urd": "Urdu",
-    "uzn": "Northern Uzbek",
-    "vie": "Vietnamese",
-}
-
 
 def text_to_speech_settings(page=None):
     st.write(
@@ -265,25 +223,6 @@ def text_to_speech_settings(page=None):
                     max_value=3.0,
                     step=0.25,
                     key="uberduck_speaking_rate",
-                )
-
-        case TextToSpeechProviders.SEAMLESS.name:
-            with col2:
-                st.selectbox(
-                    label="""
-                    ###### Seamless Input Language
-                    """,
-                    key="seamless_input_language",
-                    format_func=lambda option: SEAMLESS_SUPPORTED[option],
-                    options=SEAMLESS_SUPPORTED.keys(),
-                )
-                st.selectbox(
-                    label="""
-                    ###### Seamless Output Language
-                    """,
-                    key="seamless_output_language",
-                    format_func=lambda option: SEAMLESS_SUPPORTED[option],
-                    options=SEAMLESS_SUPPORTED.keys(),
                 )
 
         case TextToSpeechProviders.ELEVEN_LABS.name:

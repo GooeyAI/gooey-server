@@ -42,8 +42,6 @@ class TextToSpeechPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
-        "seamless_input_language": "eng",
-        "seamless_output_language": "eng",
         "elevenlabs_voice_name": "Rachel",
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
@@ -65,9 +63,6 @@ class TextToSpeechPage(BasePage):
         google_pitch: float | None
 
         bark_history_prompt: str | None
-
-        seamless_input_language: str | None
-        seamless_output_language: str | None
 
         elevenlabs_voice_name: str | None
         elevenlabs_model: str | None
@@ -205,22 +200,7 @@ class TextToSpeechPage(BasePage):
                         break
                     else:
                         time.sleep(0.1)
-            case TextToSpeechProviders.SEAMLESS:
-                data = call_celery_task_outfile(
-                    "seamless",
-                    pipeline=dict(
-                        model_id="seamlessM4T_large",
-                    ),
-                    inputs=dict(
-                        text=text,
-                        task="T2ST",
-                        tgt_lang=state["seamless_output_language"],
-                        src_lang=state["seamless_input_language"],
-                    ),
-                    content_type="audio/wav",
-                    filename="seamless_gen.wav",
-                )
-                state["audio_url"] = data[0]
+
             case TextToSpeechProviders.GOOGLE_TTS:
                 voice_name = (
                     state["google_voice_name"]
