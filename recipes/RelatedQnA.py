@@ -24,7 +24,7 @@ class RelatedGoogleGPTResponse(GoogleGPTPage.ResponseModel):
 
 
 class RelatedQnAPage(BasePage):
-    title = 'Generate “People Also Ask” SEO Content '
+    title = "Generate “People Also Ask” SEO Content "
     workflow = Workflow.RELATED_QNA_MAKER
     slug_versions = ["related-qna-maker"]
 
