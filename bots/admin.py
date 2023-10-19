@@ -22,6 +22,7 @@ from bots.models import (
     Conversation,
     BotIntegration,
 )
+from app_users.models import AppUser
 from bots.tasks import create_personal_channels_for_all_members
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
@@ -183,9 +184,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
     @admin.display(description="Analysis Results")
     def view_analysis_results(self, bi: BotIntegration):
-        msgs = Message.objects.filter(
-            conversation__bot_integration=bi,
-        ).exclude(
+        msgs = Message.objects.filter(conversation__bot_integration=bi,).exclude(
             analysis_result={},
         )
         results = related_json_field_summary(
@@ -208,7 +207,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "__str__",
         "example_id",
         "run_id",
-        "uid",
+        "view_user",
         "created_at",
         "run_time",
         "updated_at",
@@ -233,6 +232,14 @@ class SavedRunAdmin(admin.ModelAdmin):
     formfield_overrides = {
         django.db.models.JSONField: {"widget": JSONEditorWidget},
     }
+
+    def view_user(self, saved_run: SavedRun):
+        return change_obj_url(
+            AppUser.objects.get(uid=saved_run.uid),
+            label=f"{saved_run.uid}",
+        )
+
+    view_user.short_description = "View User"
 
     def view_bots(self, saved_run: SavedRun):
         return list_related_html_url(saved_run.botintegrations)

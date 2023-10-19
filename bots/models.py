@@ -255,7 +255,9 @@ class SavedRun(models.Model):
                 kwds=dict(
                     page_cls=Workflow(self.workflow).page_cls,
                     query_params=dict(
-                        example_id=self.example_id, run_id=self.run_id, uid=self.uid
+                        example_id=self.example_id,
+                        run_id=self.run_id,
+                        uid=self.uid,
                     ),
                     user=current_user,
                     request_body=request_body,
