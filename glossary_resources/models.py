@@ -8,6 +8,8 @@ class GlossaryResource(models.Model):
     usage_count = models.IntegerField(default=0)
     last_updated = models.DateTimeField(auto_now=True)
     glossary_name = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
+    project_id = models.CharField(max_length=100, default="dara-c1b52")
+    location = models.CharField(max_length=100, default="us-central1")
 
     class Meta:
         ordering = ["usage_count", "last_updated"]

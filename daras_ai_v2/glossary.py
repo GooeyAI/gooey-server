@@ -7,8 +7,6 @@ import requests
 from time import sleep
 
 DEFAULT_GLOSSARY_URL = "https://docs.google.com/spreadsheets/d/1IRHKcOC86oZXwMB0hR7eej7YVg5kUHpriZymwYQcQX4/edit?usp=sharing"  # only viewing access
-PROJECT_ID = "dara-c1b52"  # GCP project id
-LOCATION = "us-central1"  # data center location
 BUCKET_NAME = "gooey-server-glossary"  # name of bucket
 MAX_GLOSSARY_RESOURCES = 10_000  # https://cloud.google.com/translate/quotas
 
@@ -43,7 +41,7 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
     from google.api_core.exceptions import NotFound
 
     if not f_url:
-        yield None
+        yield None, "global"
         return
 
     resource, created = GlossaryResource.objects.get_or_create(f_url=f_url)
@@ -54,7 +52,11 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
             :10
         ]:
             try:
-                _delete_glossary(glossary_name=gloss.get_clean_name())
+                _delete_glossary(
+                    glossary_name=gloss.get_clean_name(),
+                    project_id=gloss.project_id,
+                    location=gloss.location,
+                )
             except NotFound:
                 pass  # glossary already deleted, let's delete the model and move on
             finally:
@@ -62,11 +64,21 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
 
     doc_meta = doc_url_to_metadata(f_url)
     # create glossary if it doesn't exist, update if it has changed
-    _update_glossary(f_url, doc_meta, glossary_name=resource.get_clean_name())
-    path = _get_glossary(glossary_name=resource.get_clean_name())
+    _update_glossary(
+        f_url,
+        doc_meta,
+        glossary_name=resource.get_clean_name(),
+        project_id=resource.project_id,
+        location=resource.location,
+    )
+    path = _get_glossary(
+        glossary_name=resource.get_clean_name(),
+        project_id=resource.project_id,
+        location=resource.location,
+    )
 
     try:
-        yield path
+        yield path, resource.location
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 400 and e.response.json().get("error", {}).get(
             "message", ""
@@ -83,7 +95,11 @@ def glossary_resource(f_url: str = DEFAULT_GLOSSARY_URL, max_tries=3):
 
 @redis_cache_decorator
 def _update_glossary(
-    f_url: str, doc_meta, glossary_name: str = "glossary"
+    f_url: str,
+    doc_meta,
+    glossary_name: str = "glossary",
+    project_id="dara-c1b52",
+    location="us-central1",
 ) -> "pd.DataFrame":
     """Goes through the full process of uploading the glossary from the url"""
     from daras_ai_v2.vector_search import download_table_doc
@@ -94,7 +110,9 @@ def _update_glossary(
     _upload_glossary_to_bucket(df, glossary_name=glossary_name)
     # delete existing glossary
     try:
-        _delete_glossary(glossary_name=glossary_name)
+        _delete_glossary(
+            glossary_name=glossary_name, project_id=project_id, location=location
+        )
     except NotFound:
         pass  # glossary already deleted, moving on
     # create new glossary
@@ -103,18 +121,22 @@ def _update_glossary(
         for lan_code in df.columns.tolist()
         if lan_code not in ["pos", "description"]
     ]  # "pos" and "description" are not languages but still allowed by the google spec in the glossary csv
-    _create_glossary(languages, glossary_name=glossary_name)
+    _create_glossary(
+        languages, glossary_name=glossary_name, project_id=project_id, location=location
+    )
 
     return df
 
 
-def _get_glossary(glossary_name: str = "glossary"):
+def _get_glossary(
+    glossary_name: str = "glossary", project_id="dara-c1b52", location="us-central1"
+):
     """Get information about the glossary."""
     from google.cloud import translate_v3beta1
 
     client = translate_v3beta1.TranslationServiceClient()
 
-    path = client.glossary_path(PROJECT_ID, LOCATION, glossary_name)
+    path = client.glossary_path(project_id, location, glossary_name)
 
     response = client.get_glossary(name=path)
     print("Glossary name: {}".format(response.name))
@@ -140,20 +162,30 @@ def _upload_glossary_to_bucket(df, glossary_name: str = "glossary"):
     blob.upload_from_string(csv)
 
 
-def _delete_glossary(timeout=180, glossary_name: str = "glossary"):
+def _delete_glossary(
+    timeout=180,
+    glossary_name: str = "glossary",
+    project_id="dara-c1b52",
+    location="us-central1",
+):
     """Delete the glossary resource so a new one can be created."""
     from google.cloud import translate_v3beta1
 
     client = translate_v3beta1.TranslationServiceClient()
 
-    path = client.glossary_path(PROJECT_ID, LOCATION, glossary_name)
+    path = client.glossary_path(project_id, location, glossary_name)
 
     operation = client.delete_glossary(name=path)
     result = operation.result(timeout)
     print("Deleted: {}".format(result.name))
 
 
-def _create_glossary(languages, glossary_name: str = "glossary"):
+def _create_glossary(
+    languages,
+    glossary_name: str = "glossary",
+    project_id="dara-c1b52",
+    location="us-central1",
+):
     """Creates a GCP glossary resource."""
     from google.cloud import translate_v3beta1
     from google.api_core.exceptions import AlreadyExists
@@ -163,7 +195,7 @@ def _create_glossary(languages, glossary_name: str = "glossary"):
 
     # Set glossary resource name
     _, GLOSSARY_URI = _parse_glossary_name(glossary_name)
-    path = client.glossary_path(PROJECT_ID, LOCATION, glossary_name)
+    path = client.glossary_path(project_id, location, glossary_name)
 
     # Set language codes
     language_codes_set = translate_v3beta1.Glossary.LanguageCodesSet(
@@ -179,7 +211,7 @@ def _create_glossary(languages, glossary_name: str = "glossary"):
         name=path, language_codes_set=language_codes_set, input_config=input_config
     )
 
-    parent = f"projects/{PROJECT_ID}/locations/{LOCATION}"
+    parent = f"projects/{project_id}/locations/{location}"
 
     # Create glossary resource
     # Handle exception for case in which a glossary

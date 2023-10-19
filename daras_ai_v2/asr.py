@@ -19,7 +19,6 @@ from daras_ai_v2.gpu_server import (
 )
 from daras_ai_v2.glossary import (
     DEFAULT_GLOSSARY_URL,
-    LOCATION,
     glossary_resource,
 )
 from daras_ai_v2.redis_cache import redis_cache_decorator
@@ -228,7 +227,7 @@ def _translate_text(
         "transliteration_config": {"enable_transliteration": enable_transliteration},
     }
 
-    with glossary_resource(glossary_url) as uri:
+    with glossary_resource(glossary_url) as (uri, location):
         config.update(
             {
                 "glossaryConfig": {
@@ -240,7 +239,7 @@ def _translate_text(
 
         authed_session, project = get_google_auth_session()
         res = authed_session.post(
-            f"https://translation.googleapis.com/v3/projects/{project}/locations/{'global' if not uri else LOCATION}:translateText",
+            f"https://translation.googleapis.com/v3/projects/{project}/locations/{location}:translateText",
             json=config,
         )
         res.raise_for_status()
