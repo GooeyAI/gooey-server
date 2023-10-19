@@ -106,7 +106,7 @@ For each output field in the Gooey.AI workflow, specify the column name that you
                 else:
                     input_fields = optional_input_fields
                 field_props = schema["properties"][field]
-                title = field_props["title"]
+                title = field_props.get("title", field.replace("_", " ").capitalize())
                 keys = None
                 if is_arr(field_props):
                     try:
