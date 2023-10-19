@@ -409,8 +409,8 @@ def slice_request_df(df, request):
         while df_ix + arr_len < len(df):
             if (
                 not arr_cols
-                or array_df.iloc[df_ix + arr_len].isnull().all()
-                or not non_array_df.iloc[df_ix + arr_len].isnull().all()
+                or not all(array_df.iloc[df_ix + arr_len])
+                or any(non_array_df.iloc[df_ix + arr_len])
             ):
                 break
             arr_len += 1
