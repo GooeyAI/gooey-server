@@ -1,6 +1,8 @@
+import datetime
 import io
 import typing
 
+from django.utils.timesince import timesince
 from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
@@ -41,8 +43,18 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
             """,
         )
 
-        input_columns: dict[str, str]
-        output_columns: dict[str, str]
+        input_columns: dict[str, str] = Field(
+            title="Input Column Mappings",
+            description="""
+For each input field in the Gooey.AI workflow, specify the column in your input data that corresponds to it.
+            """,
+        )
+        output_columns: dict[str, str] = Field(
+            title="Output Column Mappings",
+            description="""
+For each output field in the Gooey.AI workflow, specify the column name that you'd like to use for it in the output data.
+            """,
+        )
 
     class ResponseModel(BaseModel):
         output_documents: list[str]
@@ -94,7 +106,7 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
                 else:
                     input_fields = optional_input_fields
                 field_props = schema["properties"][field]
-                title = field_props["title"]
+                title = field_props.get("title", field.replace("_", " ").capitalize())
                 keys = None
                 if is_arr(field_props):
                     try:
@@ -144,45 +156,70 @@ To understand what each field represents, check out our [API docs](https://api.g
             """
         )
 
-        col1, col2 = st.columns(2)
+        visible_col1, visible_col2 = st.columns(2)
+        with st.expander("🤲 Show All Columns"):
+            hidden_col1, hidden_col2 = st.columns(2)
 
-        with col1:
+        with visible_col1:
             st.write("##### Inputs")
 
-            input_columns_old = st.session_state.pop("input_columns", {})
-            input_columns_new = st.session_state.setdefault("input_columns", {})
+        input_columns_old = st.session_state.pop("input_columns", {})
+        input_columns_new = st.session_state.setdefault("input_columns", {})
 
-            column_options = [None, *get_columns(files)]
-            for fields in (required_input_fields, optional_input_fields):
-                for field, title in fields.items():
+        column_options = [None, *get_columns(files)]
+        for fields, div in (
+            (required_input_fields, visible_col1),
+            (optional_input_fields, hidden_col1),
+        ):
+            for field, title in fields.items():
+                with div:
                     col = st.selectbox(
                         label="`" + title + "`",
                         options=column_options,
                         key="--input-mapping:" + field,
                         default_value=input_columns_old.get(field),
                     )
-                    if col:
-                        input_columns_new[field] = col
-                st.write("---")
+                if col:
+                    input_columns_new[field] = col
 
-        with col2:
+        with visible_col2:
             st.write("##### Outputs")
 
-            output_columns_old = st.session_state.pop("output_columns", {})
-            output_columns_new = st.session_state.setdefault("output_columns", {})
+        # only show the first output field by default, and hide others
+        try:
+            first_out_field = next(
+                field for field in output_fields if "output" in field
+            )
+        except StopIteration:
+            first_out_field = next(iter(output_fields))
 
-            prev_fields = st.session_state.get("--prev-output-fields")
-            fields = {**output_fields, "error_msg": "Error Msg", "run_url": "Run URL"}
-            did_change = prev_fields is not None and prev_fields != fields
-            st.session_state["--prev-output-fields"] = fields
+        visible_out_fields = {
+            first_out_field: output_fields[first_out_field],
+            "run_url": "Run URL",
+        }
+        hidden_out_fields = {
+            k: v for k, v in output_fields.items() if k not in visible_out_fields
+        } | {
+            "run_time": "Run Time",
+            "error_msg": "Error Msg",
+        }
+
+        output_columns_old = st.session_state.pop("output_columns", {})
+        output_columns_new = st.session_state.setdefault("output_columns", {})
+
+        for fields, div, checked in (
+            (visible_out_fields, visible_col2, True),
+            (hidden_out_fields, hidden_col2, False),
+        ):
             for field, title in fields.items():
-                col = st.text_input(
-                    label="`" + title + "`",
-                    key="--output-mapping:" + field,
-                    value=output_columns_old.get(field, title if did_change else None),
-                )
+                with div:
+                    col = st.checkbox(
+                        label="`" + title + "`",
+                        key="--output-mapping:" + field,
+                        value=bool(output_columns_old.get(field, checked)),
+                    )
                 if col:
-                    output_columns_new[field] = col
+                    output_columns_new[field] = title
 
     def render_example(self, state: dict):
         render_documents(state)
@@ -238,6 +275,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                     result.get(disable_sync_subtasks=False)
                     sr.refresh_from_db()
                     state = sr.to_dict()
+                    state["run_time"] = timesince(datetime.datetime.now() - sr.run_time)
                     state["run_url"] = sr.get_app_url()
                     state["error_msg"] = sr.error_msg
 
@@ -371,8 +409,8 @@ def slice_request_df(df, request):
         while df_ix + arr_len < len(df):
             if (
                 not arr_cols
-                or array_df.iloc[df_ix + arr_len].isnull().all()
-                or not non_array_df.iloc[df_ix + arr_len].isnull().all()
+                or not all(array_df.iloc[df_ix + arr_len])
+                or any(non_array_df.iloc[df_ix + arr_len])
             ):
                 break
             arr_len += 1
