@@ -1,7 +1,6 @@
 import datetime
 import html
 import inspect
-import math
 import typing
 import urllib
 import urllib.parse
@@ -11,6 +10,7 @@ from random import Random
 from time import sleep
 from types import SimpleNamespace
 
+import math
 import requests
 import sentry_sdk
 from django.utils import timezone
@@ -24,7 +24,7 @@ from sentry_sdk.tracing import (
 from starlette.requests import Request
 
 import gooey_ui as st
-from app_users.models import AppUser
+from app_users.models import AppUser, AppUserTransaction
 from bots.models import SavedRun, Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -67,6 +67,9 @@ MAX_SEED = 4294967294
 gooey_rng = Random()
 
 
+SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
+
+
 class StateKeys:
     page_title = "__title"
     page_notes = "__notes"
@@ -104,10 +107,17 @@ class BasePage:
         self.run_user = run_user
 
     @classmethod
-    def app_url(cls, example_id=None, run_id=None, uid=None, tab_name=None) -> str:
+    def app_url(
+        cls,
+        example_id=None,
+        run_id=None,
+        uid=None,
+        tab_name=None,
+        query_params: dict = None,
+    ) -> str:
         query_params = cls.clean_query_params(
             example_id=example_id, run_id=run_id, uid=uid
-        )
+        ) | (query_params or {})
         f = furl(settings.APP_BASE_URL, query_params=query_params) / (
             cls.slug_versions[-1] + "/"
         )
@@ -365,30 +375,35 @@ class BasePage:
         example_id, run_id, uid = extract_query_params(query_params)
         return self.get_sr_from_query_params(example_id, run_id, uid)
 
-    def get_sr_from_query_params(self, example_id, run_id, uid) -> SavedRun:
+    @classmethod
+    def get_sr_from_query_params(
+        cls, example_id: str, run_id: str, uid: str
+    ) -> SavedRun:
         try:
             if run_id and uid:
-                sr = self.run_doc_sr(run_id, uid)
+                sr = cls.run_doc_sr(run_id, uid)
             elif example_id:
-                sr = self.example_doc_sr(example_id)
+                sr = cls.example_doc_sr(example_id)
             else:
-                sr = self.recipe_doc_sr()
+                sr = cls.recipe_doc_sr()
             return sr
         except SavedRun.DoesNotExist:
             raise HTTPException(status_code=404)
 
-    def recipe_doc_sr(self) -> SavedRun:
+    @classmethod
+    def recipe_doc_sr(cls) -> SavedRun:
         return SavedRun.objects.get_or_create(
-            workflow=self.workflow,
+            workflow=cls.workflow,
             run_id__isnull=True,
             uid__isnull=True,
             example_id__isnull=True,
         )[0]
 
+    @classmethod
     def run_doc_sr(
-        self, run_id: str, uid: str, create: bool = False, parent: SavedRun = None
+        cls, run_id: str, uid: str, create: bool = False, parent: SavedRun = None
     ) -> SavedRun:
-        config = dict(workflow=self.workflow, uid=uid, run_id=run_id)
+        config = dict(workflow=cls.workflow, uid=uid, run_id=run_id)
         if create:
             return SavedRun.objects.get_or_create(
                 **config, defaults=dict(parent=parent)
@@ -396,8 +411,9 @@ class BasePage:
         else:
             return SavedRun.objects.get(**config)
 
-    def example_doc_sr(self, example_id: str, create: bool = False) -> SavedRun:
-        config = dict(workflow=self.workflow, example_id=example_id)
+    @classmethod
+    def example_doc_sr(cls, example_id: str, create: bool = False) -> SavedRun:
+        config = dict(workflow=cls.workflow, example_id=example_id)
         if create:
             return SavedRun.objects.get_or_create(**config)[0]
         else:
@@ -610,7 +626,7 @@ class BasePage:
             st.session_state.pop(StateKeys.pressed_randomize, None)
             submitted = True
 
-        if submitted:
+        if submitted or self.should_submit_after_login():
             self.on_submit()
 
         self._render_before_output()
@@ -648,6 +664,14 @@ class BasePage:
             self.call_runner_task(example_id, run_id, uid)
         raise QueryParamsRedirectException(
             self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
+        )
+
+    def should_submit_after_login(self) -> bool:
+        return (
+            st.get_query_params().get(SUBMIT_AFTER_LOGIN_Q)
+            and self.request
+            and self.request.user
+            and not self.request.user.is_anonymous
         )
 
     def create_new_run(self):
@@ -701,15 +725,17 @@ class BasePage:
     def generate_credit_error_message(self, example_id, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"
         if self.request.user.is_anonymous:
-            account_url.query.params["next"] = self.app_url(example_id, run_id, uid)
+            account_url.query.params["next"] = self.app_url(
+                example_id, run_id, uid, query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
+            )
             # language=HTML
             error_msg = f"""
 <p>
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Gooey.AI credits (for ~200 Runs). 
-You can <a href="/pricing/" target="_blank">purchase more</a> if you run out of credits.
+You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account 
+and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
             """
         else:
             # language=HTML
@@ -851,7 +877,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             workflow=self.workflow,
             hidden=False,
             example_id__isnull=False,
-        ).exclude()[:50]
+        )[:50]
 
         grid_layout(3, example_runs, _render)
 
@@ -1041,12 +1067,14 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         assert self.request.user, "request.user must be set to check credits"
         return self.request.user.balance >= self.get_price_roundoff(st.session_state)
 
-    def deduct_credits(self, state: dict):
-        assert self.request, "request must be set to deduct credits"
-        assert self.request.user, "request.user must be set to deduct credits"
+    def deduct_credits(self, state: dict) -> tuple[AppUserTransaction, int]:
+        assert (
+            self.request and self.request.user
+        ), "request.user must be set to deduct credits"
 
         amount = self.get_price_roundoff(state)
-        self.request.user.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
+        txn = self.request.user.add_balance(-amount, f"gooey_in_{uuid.uuid1()}")
+        return txn, amount
 
     def get_price_roundoff(self, state: dict) -> int:
         # don't allow fractional pricing for now, min 1 credit
@@ -1098,6 +1126,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             return False
         email = self.request.user.email
         return email and email in settings.ADMIN_EMAILS
+
+    def is_current_user_paying(self) -> bool:
+        return bool(self.request and self.request.user and self.request.user.is_paying)
 
 
 def get_example_request_body(

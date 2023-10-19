@@ -59,6 +59,8 @@ from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
 
+DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c8b24b0c-538a-11ee-a1a3-02420a00018d/meta%20tags1%201.png.png"
+
 BOT_SCRIPT_RE = re.compile(
     # start of line
     r"^"
@@ -160,6 +162,10 @@ class VideoBotsPage(BasePage):
         "google_speaking_rate": 1.0,
         "uberduck_voice_name": "Aiden Botha",
         "uberduck_speaking_rate": 1.0,
+        "elevenlabs_voice_name": "Rachel",
+        "elevenlabs_model": "eleven_multilingual_v2",
+        "elevenlabs_stability": 0.5,
+        "elevenlabs_similarity_boost": 0.75,
         # gpt3
         "selected_model": LargeLanguageModels.text_davinci_003.name,
         "avoid_repetition": True,
@@ -198,6 +204,11 @@ class VideoBotsPage(BasePage):
         google_voice_name: str | None
         google_speaking_rate: float | None
         google_pitch: float | None
+        bark_history_prompt: str | None
+        elevenlabs_voice_name: str | None
+        elevenlabs_model: str | None
+        elevenlabs_stability: float | None
+        elevenlabs_similarity_boost: float | None
 
         # llm settings
         selected_model: typing.Literal[
@@ -242,6 +253,7 @@ class VideoBotsPage(BasePage):
         final_prompt: str
         raw_input_text: str | None
         raw_output_text: list[str] | None
+        raw_tts_text: list[str] | None
         output_text: list[str]
 
         # tts
@@ -254,6 +266,9 @@ class VideoBotsPage(BasePage):
         references: list[SearchReference] | None
         final_search_query: str | None
         final_keyword_query: str | None
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_COPILOT_META_IMG
 
     def related_workflows(self):
         from recipes.LipsyncTTS import LipsyncTTSPage
@@ -360,7 +375,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.write("---")
             st.session_state["tts_provider"] = None
         else:
-            text_to_speech_settings()
+            text_to_speech_settings(page=self)
 
         st.write("---")
         if not "__enable_video" in st.session_state:
@@ -540,8 +555,39 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 st.write(f"**Generated Audio {idx + 1}**")
                 st.audio(audio_url)
 
+    def get_raw_price(self, state: dict):
+        match state.get("tts_provider"):
+            case TextToSpeechProviders.ELEVEN_LABS.name:
+                output_text_list = state.get(
+                    "raw_tts_text", state.get("raw_output_text", [])
+                )
+                tts_state = {"text_prompt": "".join(output_text_list)}
+                return super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
+                    tts_state
+                )
+            case _:
+                return super().get_raw_price(state)
+
+    def additional_notes(self):
+        tts_provider = st.session_state.get("tts_provider")
+        match tts_provider:
+            case TextToSpeechProviders.ELEVEN_LABS.name:
+                return f"""
+                    - *Base cost = {super().get_raw_price(st.session_state)} credits*
+                    - *Additional Eleven Labs cost ≈ 4 credits per 10 words of the output*
+                """
+            case _:
+                return ""
+
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
+
+        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
+            assert (
+                self.is_current_user_paying() or self.is_current_user_admin()
+            ), """
+                Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
+                """
 
         user_input = request.input_prompt.strip()
         if not user_input:
@@ -729,11 +775,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 source_language="en",
                 target_language=request.user_language,
             )
-
-        tts_text = [
-            "".join(snippet for snippet, _ in parse_refs(text, references))
-            for text in output_text
-        ]
+            state["raw_tts_text"] = [
+                "".join(snippet for snippet, _ in parse_refs(text, references))
+                for text in output_text
+            ]
 
         if references:
             citation_style = (
@@ -749,7 +794,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         if not request.tts_provider:
             return
         tts_state = dict(state)
-        for text in tts_text:
+        for text in state.get("raw_tts_text", state["raw_output_text"]):
             tts_state["text_prompt"] = text
             yield from TextToSpeechPage().run(tts_state)
             state["output_audio"].append(tts_state["audio_url"])

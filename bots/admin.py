@@ -5,17 +5,13 @@ import django.db.models
 from django import forms
 from django.conf import settings
 from django.contrib import admin
-from django.db import DataError
-from django.db.models import Max, Count, F, Func
-from django.http import HttpResponse
+from django.db.models import Max, Count, F
 from django.template import loader
-from django.urls import reverse
 from django.utils import dateformat
 from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
-from furl import furl
 
-from bots.admin_links import list_related_html_url, open_in_new_tab, change_obj_url
+from bots.admin_links import list_related_html_url, change_obj_url
 from bots.models import (
     FeedbackComment,
     CHATML_ROLE_ASSISSTANT,
@@ -27,40 +23,11 @@ from bots.models import (
     BotIntegration,
 )
 from bots.tasks import create_personal_channels_for_all_members
+from gooeysite.custom_actions import export_to_excel, export_to_csv
+from gooeysite.custom_filters import (
+    related_json_field_summary,
+)
 from gooeysite.custom_widgets import JSONEditorWidget
-
-
-@admin.action(description="Export to CSV")
-def export_to_csv(
-    modeladmin,
-    request,
-    queryset,
-):
-    filename = _get_filename()
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
-    queryset.to_df().to_csv(response, index=False)
-    return response
-
-
-@admin.action(description="Export to Excel")
-def export_to_excel(
-    modeladmin,
-    request,
-    queryset,
-):
-    filename = _get_filename()
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
-    queryset.to_df().to_excel(response, index=False)
-    return response
-
-
-def _get_filename():
-    filename = f"Gooey.AI Table {dateformat.format(datetime.datetime.now(), settings.DATETIME_FORMAT)}"
-    return filename
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
@@ -221,55 +188,13 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         ).exclude(
             analysis_result={},
         )
-        max_depth = 3
-        field = "analysis_result"
-        nested_keys = [field]
-        for i in range(max_depth):
-            next_keys = []
-            for parent in nested_keys:
-                try:
-                    next_keys.extend(
-                        f"{parent}__{child}"
-                        for child in (
-                            msgs.values(parent)
-                            .annotate(
-                                keys=Func(F(parent), function="jsonb_object_keys")
-                            )
-                            .order_by()
-                            .distinct()
-                            .values_list("keys", flat=True)
-                        )
-                    )
-                except DataError:
-                    next_keys.append(parent)
-            nested_keys = next_keys
-        results = {
-            key.split(field + "__")[-1]: [
-                (
-                    json.dumps(val).strip('"'),
-                    count,
-                    furl(
-                        reverse(
-                            f"admin:{Message._meta.app_label}_{Message.__name__.lower()}_changelist"
-                        ),
-                        query_params={
-                            f"conversation__bot_integration__id__exact": bi.id,
-                            key: val,
-                        },
-                    ),
-                )
-                for val, count in (
-                    msgs.values(key)
-                    .annotate(count=Count("id"))
-                    .order_by("-count")
-                    .values_list(key, "count")
-                )
-                if val is not None
-            ]
-            for key in nested_keys
-        }
-        if not results:
-            raise Message.DoesNotExist
+        results = related_json_field_summary(
+            Message.objects,
+            "analysis_result",
+            qs=msgs,
+            query_param="conversation__bot_integration__id__exact",
+            instance_id=bi.id,
+        )
         html = loader.render_to_string(
             "anaylsis_result.html", context=dict(results=results)
         )
@@ -287,6 +212,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "created_at",
         "run_time",
         "updated_at",
+        "price",
     ]
     list_filter = ["workflow"]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
@@ -295,6 +221,8 @@ class SavedRunAdmin(admin.ModelAdmin):
         "open_in_gooey",
         "parent",
         "view_bots",
+        "price",
+        "transaction",
         "created_at",
         "updated_at",
         "run_time",
@@ -310,11 +238,6 @@ class SavedRunAdmin(admin.ModelAdmin):
         return list_related_html_url(saved_run.botintegrations)
 
     view_bots.short_description = "View Bots"
-
-    def open_in_gooey(self, saved_run: SavedRun):
-        return open_in_new_tab(saved_run.get_app_url(), label=saved_run.get_app_url())
-
-    open_in_gooey.short_description = "Open in Gooey"
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):
@@ -417,6 +340,25 @@ class FeedbackInline(admin.TabularInline):
     readonly_fields = ["created_at"]
 
 
+class AnalysisResultFilter(admin.SimpleListFilter):
+    title = "analysis_result"
+    parameter_name = "analysis_result"
+
+    def lookups(self, request, model_admin):
+        val = self.value()
+        if val is None:
+            return []
+        k, v = json.loads(val)
+        return [(val, f"{k.split(self.parameter_name + '__')[-1]} = {v}")]
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val is None:
+            return queryset
+        k, v = json.loads(val)
+        return queryset.filter(**{k: v})
+
+
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
     autocomplete_fields = ["conversation"]
@@ -424,6 +366,7 @@ class MessageAdmin(admin.ModelAdmin):
         "role",
         "conversation__bot_integration",
         "created_at",
+        AnalysisResultFilter,
     ]
     search_fields = [
         "role",

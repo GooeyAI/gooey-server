@@ -14,6 +14,12 @@ def enum_multiselect(
     checkboxes=True,
     allow_none=True,
 ):
+    try:
+        deprecated = enum_cls._deprecated()
+    except AttributeError:
+        deprecated = set()
+    enums = [e for e in enum_cls if not e in deprecated]
+
     if checkboxes:
         if label:
             st.write(label)
@@ -31,13 +37,13 @@ def enum_multiselect(
             else:
                 selected.discard(e.name)
 
-        grid_layout(2, enum_cls, render, separator=False)
+        grid_layout(2, enums, render, separator=False)
         st.session_state[key] = list(selected)
 
         return selected
     else:
         return st.multiselect(
-            options=[e.name for e in enum_cls],
+            options=[e.name for e in enums],
             format_func=lambda k: enum_cls[k].value,
             label=label,
             key=key,
@@ -53,8 +59,13 @@ def enum_selector(
     exclude: list[E] | None = None,
     **kwargs,
 ) -> str:
+    try:
+        deprecated = enum_cls._deprecated()
+    except AttributeError:
+        deprecated = set()
+    enums = [e for e in enum_cls if not e in deprecated]
     label = label or enum_cls.__name__
-    options = [e.name for e in enum_cls]
+    options = [e.name for e in enums]
     if exclude:
         options = [o for o in options if o not in exclude]
     if allow_none:

@@ -256,7 +256,6 @@ class LetterWriterPage(BasePage):
         input_prompt = daras_ai_format_str(
             format_str=request.input_prompt,
             variables=response_json,
-            do_html2text=request.strip_html_2_text,
         )
 
         state["generated_input_prompt"] = input_prompt
