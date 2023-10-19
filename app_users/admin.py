@@ -12,6 +12,7 @@ from bots.models import SavedRun
 class AppUserAdmin(admin.ModelAdmin):
     list_display = [
         "uid",
+        "user_runs",
         "display_name",
         "email",
         "phone_number",
@@ -43,6 +44,15 @@ class AppUserAdmin(admin.ModelAdmin):
         "open_in_firebase",
         "open_in_stripe",
     ]
+
+    @admin.display(description="User Runs")
+    def user_runs(self, user: models.AppUser):
+        return list_related_html_url(
+            SavedRun.objects.filter(uid=user.uid),
+            query_param="uid",
+            instance_id=user.uid,
+            show_add=False,
+        )
 
     def open_in_firebase(self, user: models.AppUser):
         path = f"users/{user.uid}"
