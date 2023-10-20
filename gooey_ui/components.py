@@ -727,6 +727,22 @@ def _input_widget(
     return value
 
 
+def breadcrumbs(divider: str = "/", **props) -> state.NestingCtx:
+    style = props.pop("style", {}) | {"--bs-breadcrumb-divider": f"'{divider}'"}
+    with tag("nav", style=style, **props):
+        return tag("ol", className="breadcrumb mb-0")
+
+
+def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
+    className = "breadcrumb-item lead " + props.pop("className", "")
+    with tag("li", className=className, **props):
+        if link_to:
+            with tag("a", href=link_to):
+                html(inner_html)
+        else:
+            html(inner_html)
+
+
 def dedent(text: str | None) -> str | None:
     if not text:
         return text

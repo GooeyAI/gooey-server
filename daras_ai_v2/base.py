@@ -26,6 +26,7 @@ from starlette.requests import Request
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import SavedRun, Workflow
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -146,6 +147,14 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
+    def get_page_title(self) -> str | None:
+        if (page_title := st.session_state.get(StateKeys.page_title)) != self.title:
+            return page_title
+        elif (text_prompt := st.session_state.get("text_prompt")):
+            return truncate_text_words(text_prompt, maxlen=60)
+        else:
+            return self.title
+
     def render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
@@ -175,11 +184,20 @@ class BasePage:
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
-        root_url = self.app_url(example_id=example_id)
-        st.write(
-            f'# <a style="text-decoration: none;" target="_top" href="{root_url}">{st.session_state.get(StateKeys.page_title)}</a>',
-            unsafe_allow_html=True,
-        )
+        if example_id or run_id:
+            with st.breadcrumbs(className="mt-5"):
+                st.breadcrumb_item(
+                    self.title.upper(),
+                    link_to=self.app_url(),
+                    className="text-muted",
+                    style={"background-color": "#A5FFEE"}
+                )
+            st.write(f"# {self.get_page_title()}")
+        else:
+            with st.link(to=self.app_url(), className="text-decoration-none", target="_blank"):
+                st.write(f"# {self.title}")
+
+
         st.write(st.session_state.get(StateKeys.page_notes))
 
         try:
