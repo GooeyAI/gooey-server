@@ -150,7 +150,7 @@ class BasePage:
     def get_page_title(self) -> str | None:
         if (page_title := st.session_state.get(StateKeys.page_title)) != self.title:
             return page_title
-        elif (text_prompt := st.session_state.get("text_prompt")):
+        elif text_prompt := st.session_state.get("text_prompt"):
             return truncate_text_words(text_prompt, maxlen=60)
         else:
             return self.title
@@ -190,13 +190,14 @@ class BasePage:
                     self.title.upper(),
                     link_to=self.app_url(),
                     className="text-muted",
-                    style={"background-color": "#A5FFEE"}
+                    style={"background-color": "#A5FFEE"},
                 )
             st.write(f"# {self.get_page_title()}")
         else:
-            with st.link(to=self.app_url(), className="text-decoration-none", target="_blank"):
+            with st.link(
+                to=self.app_url(), className="text-decoration-none", target="_blank"
+            ):
                 st.write(f"# {self.title}")
-
 
         st.write(st.session_state.get(StateKeys.page_notes))
 
