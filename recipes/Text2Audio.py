@@ -34,6 +34,7 @@ class Text2AudioPage(BasePage):
     sane_defaults = dict(
         seed=42,
     )
+    fallback_title_field = "text_prompt"
 
     class RequestModel(BaseModel):
         text_prompt: str

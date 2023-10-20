@@ -46,6 +46,7 @@ class GoogleImageGenPage(BasePage):
         serp_search_type=SerpSearchType.SEARCH,
         serp_search_location=SerpSearchLocation.UNITED_STATES,
     )
+    fallback_title_field = "text_prompt"
 
     class RequestModel(GoogleSearchLocationMixin, BaseModel):
         search_query: str

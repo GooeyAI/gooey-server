@@ -92,6 +92,8 @@ class BasePage:
     slug_versions: list[str]
 
     sane_defaults: dict = {}
+    fallback_title_field: str | None = None  # for runs & examples
+
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
 
@@ -150,7 +152,7 @@ class BasePage:
     def get_page_title(self) -> str | None:
         if (page_title := st.session_state.get(StateKeys.page_title)) != self.title:
             return page_title
-        elif text_prompt := st.session_state.get("text_prompt"):
+        elif text_prompt := st.session_state.get(self.fallback_title_field):
             return truncate_text_words(text_prompt, maxlen=60)
         else:
             return self.title

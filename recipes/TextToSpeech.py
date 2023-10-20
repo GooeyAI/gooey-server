@@ -47,6 +47,7 @@ class TextToSpeechPage(BasePage):
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
     }
+    fallback_title_field = "text_prompt"
 
     class RequestModel(BaseModel):
         text_prompt: str

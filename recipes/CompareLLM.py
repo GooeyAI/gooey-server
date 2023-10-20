@@ -28,6 +28,7 @@ class CompareLLMPage(BasePage):
         "max_tokens": 500,
         "sampling_temperature": 0.7,
     }
+    fallback_title_field = "input_prompt"
 
     class RequestModel(BaseModel):
         input_prompt: str | None

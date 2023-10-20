@@ -26,6 +26,8 @@ class SmartGPTPage(BasePage):
     slug_versions = ["SmartGPT"]
     price = 20
 
+    fallback_title_field = "input_prompt"
+
     class RequestModel(BaseModel):
         input_prompt: str
 

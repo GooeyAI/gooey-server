@@ -44,6 +44,7 @@ class GoogleGPTPage(BasePage):
     title = "Web Search + GPT3"
     workflow = Workflow.GOOGLE_GPT
     slug_versions = ["google-gpt"]
+    fallback_title_field = "search_query"
 
     price = 175
 

@@ -33,6 +33,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         "upscale_factor": 1.0,
         "twitter_handle": "seanb",
     }
+    fallback_title_field = "text_prompt"
 
     class RequestModel(BaseModel):
         email_address: str | None

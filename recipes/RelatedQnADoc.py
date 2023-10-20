@@ -35,6 +35,7 @@ class RelatedQnADocPage(BasePage):
         serp_search_type=SerpSearchType.SEARCH,
         serp_search_location=SerpSearchLocation.UNITED_STATES,
     )
+    fallback_title_field = DocSearchPage.fallback_title_field
 
     class RequestModel(GoogleSearchMixin, DocSearchPage.RequestModel):
         pass

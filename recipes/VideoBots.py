@@ -190,6 +190,7 @@ class VideoBotsPage(BasePage):
         "use_url_shortener": False,
         "dense_weight": 1.0,
     }
+    fallback_title_field = "input_prompt"
 
     class RequestModel(BaseModel):
         input_prompt: str

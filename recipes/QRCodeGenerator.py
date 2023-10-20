@@ -60,6 +60,7 @@ class QRCodeGeneratorPage(BasePage):
         obj_pos_x=0.5,
         obj_pos_y=0.5,
     )
+    fallback_title_field = "text_prompt"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
