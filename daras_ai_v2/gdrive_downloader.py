@@ -32,12 +32,19 @@ def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
     service = discovery.build("drive", "v3")
     # get files in drive directly
     if f.host == "drive.google.com":
-        request = service.files().get_media(fileId=file_id)
+        request = service.files().get_media(
+            fileId=file_id,
+            supportsAllDrives=True,
+        )
         ext = mimetypes.guess_extension(mime_type)
     # export google docs to appropriate type
     else:
         mime_type, ext = docs_export_mimetype(f)
-        request = service.files().export_media(fileId=file_id, mimeType=mime_type)
+        request = service.files().export_media(
+            fileId=file_id,
+            mimeType=mime_type,
+            supportsAllDrives=True,
+        )
     # download
     file = io.BytesIO()
     downloader = MediaIoBaseDownload(file, request)
