@@ -90,6 +90,8 @@ class AsrPage(BasePage):
                 ".mp4",
                 ".webm",
                 ".amr",
+                ".aac",
+                ".m4a",
             ),
         )
         col1, col2 = st.columns(2, responsive=False)
