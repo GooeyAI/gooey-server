@@ -294,7 +294,7 @@ def run_asr(
     is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
     if is_youtube_url:
         audio_url, size = download_youtube_to_wav(audio_url)
-    elif is_gdrive_url:
+    elif is_gdrive_url(furl(audio_url)):
         meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
         anybytes, ext = gdrive_download(
             furl(audio_url), meta.get("mimeType", "audio/wav")
