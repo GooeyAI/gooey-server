@@ -80,7 +80,17 @@ class AsrPage(BasePage):
     def render_form_v2(self):
         document_uploader(
             "##### Audio Files",
-            accept=(".wav", ".ogg", ".mp3", ".aac", ".opus", ".oga", ".mp4", ".webm"),
+            accept=(
+                ".wav",
+                ".ogg",
+                ".mp3",
+                ".aac",
+                ".opus",
+                ".oga",
+                ".mp4",
+                ".webm",
+                ".amr",
+            ),
         )
         col1, col2 = st.columns(2, responsive=False)
         with col1:
