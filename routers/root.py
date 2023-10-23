@@ -215,9 +215,10 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
         lambda: page_wrapper(request=request, render_fn=explore.render),
         **json_data,
     )
+    canonical_url = str(furl(settings.APP_BASE_URL) / request.url.path)
     ret |= {
         "meta": raw_build_meta_tags(
-            url=str(request.url),
+            url=canonical_url,
             title=explore.META_TITLE,
             description=explore.META_DESCRIPTION,
         ),
@@ -283,7 +284,7 @@ def st_page(
 
     ret |= {
         "meta": build_meta_tags(
-            url=str(request.url),
+            url=canonical_url,
             page=page,
             state=state,
             run_id=run_id,
