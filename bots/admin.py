@@ -283,6 +283,7 @@ class ConversationAdmin(admin.ModelAdmin):
         "created_at",
         "view_last_msg",
         "view_messages",
+        "view_feedbacks",
     ]
     list_filter = ["bot_integration", "created_at", LastActiveDeltaFilter]
     autocomplete_fields = ["bot_integration"]
@@ -325,6 +326,15 @@ class ConversationAdmin(admin.ModelAdmin):
 
     view_messages.short_description = "Messages"
     view_messages.admin_order_field = "__msg_count"
+
+    @admin.display(description="View Feedbacks")
+    def view_feedbacks(self, convo: Conversation):
+        return list_related_html_url(
+            Feedback.objects.filter(message__conversation=convo),
+            "message__conversation__id__exact",
+            convo.id,
+            show_add=False,
+        )
 
     def view_last_active_delta(self, convo: Conversation):
         return timesince(datetime.datetime.now() - convo.last_active_delta())
@@ -509,11 +519,7 @@ class FeedbackCommentInline(admin.StackedInline):
 @admin.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):
     autocomplete_fields = ["message"]
-    list_filter = [
-        "rating",
-        "status",
-        "message__conversation__bot_integration",
-    ]
+    list_filter = ["rating", "status", "message__conversation__bot_integration"]
     search_fields = (
         ["text", "text_english"]
         + [f"message__{field}" for field in MessageAdmin.search_fields]
@@ -523,12 +529,12 @@ class FeedbackAdmin(admin.ModelAdmin):
         ]
     )
     list_display = [
-        "prev_msg_content",
-        "messsage_content",
-        "rating",
-        "feedback_text_as_link",
-        "conversation_link",
+        "__str__",
+        "prev_msg",
+        "msg",
+        "text",
         "created_at",
+        "conversation_link",
     ]
     readonly_fields = [
         "created_at",
@@ -537,8 +543,7 @@ class FeedbackAdmin(admin.ModelAdmin):
         "prev_msg_display_content",
         "messsage_display_content",
         "conversation_link",
-        "view_feedback_in_convo",
-        "run_id",
+        "saved_run",
         "text_english",
         "rating",
     ]
@@ -552,8 +557,7 @@ class FeedbackAdmin(admin.ModelAdmin):
                 "fields": [
                     "rating",
                     "conversation_link",
-                    "view_feedback_in_convo",
-                    "run_id",
+                    "saved_run",
                 ]
             },
         ),
@@ -585,39 +589,41 @@ class FeedbackAdmin(admin.ModelAdmin):
         ),
     )
 
-    def feedback_text_as_link(self, feedback: Feedback):
-        return change_obj_url(feedback, label=feedback.text_english)
-
-    feedback_text_as_link.short_description = "Feedback Text"
-
     def lookup_allowed(self, key, value):
-        if key in ("message__conversation__id__exact"):
+        if key in ["message__conversation__id__exact"]:
             return True
         return super().lookup_allowed(key, value)
 
-    def view_feedback_in_convo(self, feedback: Feedback):
-        return list_related_html_url(
-            Feedback.objects,
-            "message__conversation__id__exact",
-            feedback.message.conversation.id,
-            show_add=False,
-        )
-
-    view_feedback_in_convo.short_description = "View Feedback from this Conversation"
-
+    @admin.display(description="User Message (English)")
     def prev_msg_content(self, feedback: Feedback):
-        prev_msg = feedback.message.get_previous_by_created_at()
+        prev_msg = self.prev_msg(feedback)
         return change_obj_url(prev_msg, label=prev_msg.content)
 
-    prev_msg_content.short_description = "User Message"
-
+    @admin.display(description="User Message (Original)")
     def prev_msg_display_content(self, feedback: Feedback):
-        prev_msg = feedback.message.get_previous_by_created_at()
+        prev_msg = self.prev_msg(feedback)
         return change_obj_url(prev_msg, label=prev_msg.display_content)
 
-    prev_msg_display_content.short_description = "User Message (Original)"
+    @admin.display(description="User Message")
+    def prev_msg(self, feedback):
+        return feedback.message.get_previous_by_created_at()
 
-    def run_id(self, feedback: Feedback):
+    @admin.display(description="Bot Response (English)")
+    def messsage_content(self, feedback: Feedback):
+        msg = self.msg(feedback)
+        return change_obj_url(msg, label=msg.content)
+
+    @admin.display(description="Bot Response (Original)")
+    def messsage_display_content(self, feedback: Feedback):
+        msg = self.msg(feedback)
+        return change_obj_url(msg, label=msg.display_content)
+
+    @admin.display(description="Bot Response")
+    def msg(self, feedback: Feedback):
+        return feedback.message
+
+    @admin.display(description="Saved Run")
+    def saved_run(self, feedback: Feedback):
         return change_obj_url(feedback.message.conversation.bot_integration.saved_run)
 
     def conversation_link(self, feedback: Feedback):
@@ -627,13 +633,3 @@ class FeedbackAdmin(admin.ModelAdmin):
         )
 
     conversation_link.short_description = "Conversation"
-
-    def messsage_content(self, feedback: Feedback):
-        return change_obj_url(feedback.message, label=feedback.message.content)
-
-    messsage_content.short_description = "Bot Response"
-
-    def messsage_display_content(self, feedback: Feedback):
-        return change_obj_url(feedback.message, label=feedback.message.display_content)
-
-    messsage_display_content.short_description = "Bot Response (Original)"
