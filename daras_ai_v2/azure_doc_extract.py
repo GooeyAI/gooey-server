@@ -1,9 +1,10 @@
+import json
+import re
+
 import requests
 from furl import furl
-from tabulate import tabulate
 
 from daras_ai_v2 import settings
-from daras_ai_v2.redis_cache import redis_cache_decorator
 from gooeysite import wsgi
 
 assert wsgi
@@ -63,7 +64,12 @@ def extract_records(result: dict, page_num: int) -> list[dict]:
                     table["added"] = True
                 break
         else:
-            records.append({"role": para.get("role", ""), "content": para["content"]})
+            records.append(
+                {
+                    "role": para.get("role", ""),
+                    "content": remove_selection_marks(para["content"]).strip(),
+                }
+            )
     return records
 
 
@@ -132,7 +138,26 @@ def rect_contains(*, outer: list[int], inner: list[int]):
 
 
 def table_to_plain(table):
-    ret = [["" for _ in range(table["columnCount"])] for _ in range(table["rowCount"])]
+    arr = [["" for _ in range(table["columnCount"])] for _ in range(table["rowCount"])]
     for cell in table["cells"]:
-        ret[cell["rowIndex"]][cell["columnIndex"]] = cell["content"].strip()
-    return tabulate(ret, tablefmt="plain")
+        for i in range(cell.get("rowSpan", 1)):
+            row_idx = cell["rowIndex"] + i
+            for j in range(cell.get("columnSpan", 1)):
+                col_idx = cell["columnIndex"] + j
+                arr[row_idx][col_idx] = remove_selection_marks(cell["content"]).strip()
+
+    ## note:  ' |' ' |\n' ' |--' are individual tokens in the gpt-4 tokenizer, and must be handled with care
+    ret = ""
+    for i, row in enumerate(arr):
+        ret += " |" + " |".join(row) + " |\n"
+        if i == 0:
+            ret += " " + ("|--" * table["columnCount"]) + "|\n"
+
+    return ret
+
+
+selection_marks_re = re.compile(r":(un)?selected:")
+
+
+def remove_selection_marks(text):
+    return selection_marks_re.sub("", text)
