@@ -561,10 +561,10 @@ def audio_bytes_to_wav(audio_bytes: bytes) -> tuple[bytes | None, int]:
                 print("\t$ " + " ".join(args))
                 subprocess.check_call(args)
                 return outfile.read(), os.path.getsize(outfile.name)
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
         raise ValueError(
             "Invalid audio file. Could not convert audio to wav format. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
-        )
+        ) from e
 
 
 def check_wav_audio_format(filename: str) -> bool:

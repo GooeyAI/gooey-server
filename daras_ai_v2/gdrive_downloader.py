@@ -43,7 +43,6 @@ def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
         request = service.files().export_media(
             fileId=file_id,
             mimeType=mime_type,
-            supportsAllDrives=True,
         )
     # download
     file = io.BytesIO()
