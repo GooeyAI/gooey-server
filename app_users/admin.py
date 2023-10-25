@@ -12,7 +12,6 @@ from bots.models import SavedRun
 class AppUserAdmin(admin.ModelAdmin):
     list_display = [
         "uid",
-        "user_runs",
         "display_name",
         "email",
         "phone_number",
