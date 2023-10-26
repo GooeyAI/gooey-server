@@ -12,7 +12,6 @@ class GlossaryResource(models.Model):
     location = models.CharField(max_length=100, default="us-central1")
 
     class Meta:
-        ordering = ["usage_count", "last_updated"]
         indexes = [
             models.Index(
                 fields=[
