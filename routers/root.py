@@ -281,7 +281,9 @@ def st_page(
 
 
 def get_og_url_path(request) -> str:
-    return str(furl(settings.APP_BASE_URL) / request.url.full_path)
+    return str(
+        (furl(settings.APP_BASE_URL) / request.url.path).add(request.query_params)
+    )
 
 
 def get_run_user(request, uid) -> AppUser | None:
