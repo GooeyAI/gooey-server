@@ -50,6 +50,7 @@ class DocSummaryPage(BasePage):
         "quality": 1.0,
         "avoid_repetition": True,
         "selected_model": LargeLanguageModels.text_davinci_003.name,
+        "chain_type": CombineDocumentsChains.map_reduce.name,
     }
 
     class RequestModel(BaseModel):
@@ -157,7 +158,6 @@ Prompt for merging several outputs together
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: DocSummaryPage.RequestModel = self.RequestModel.parse_obj(state)
-        request.chain_type = CombineDocumentsChains.map_reduce.name
 
         yield "Downloading documents..."
 
