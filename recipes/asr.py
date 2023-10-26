@@ -40,7 +40,7 @@ class AsrPage(BasePage):
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
         google_translate_target: str | None
-        glossary_document: str
+        glossary_document: str | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
 
     class ResponseModel(BaseModel):
