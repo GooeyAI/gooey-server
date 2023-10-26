@@ -539,32 +539,33 @@ def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
 
 
 def audio_bytes_to_wav(audio_bytes: bytes) -> tuple[bytes | None, int]:
-    try:
-        with tempfile.NamedTemporaryFile() as infile:
-            infile.write(audio_bytes)
-            infile.flush()
+    with tempfile.NamedTemporaryFile() as infile:
+        infile.write(audio_bytes)
+        infile.flush()
 
-            if check_wav_audio_format(infile.name):
-                # already a wav file
-                return None, os.path.getsize(infile.name)
+        if check_wav_audio_format(infile.name):
+            # already a wav file
+            return None, os.path.getsize(infile.name)
 
-            with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
-                # convert audio to single channel wav
-                args = [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    infile.name,
-                    *FFMPEG_WAV_ARGS,
-                    outfile.name,
-                ]
-                print("\t$ " + " ".join(args))
-                subprocess.check_call(args)
-                return outfile.read(), os.path.getsize(outfile.name)
-    except subprocess.CalledProcessError as e:
-        raise ValueError(
-            "Invalid audio file. Could not convert audio to wav format. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
-        ) from e
+        with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
+            # convert audio to single channel wav
+            args = [
+                "ffmpeg",
+                "-y",
+                "-i",
+                infile.name,
+                *FFMPEG_WAV_ARGS,
+                outfile.name,
+            ]
+            print("\t$ " + " ".join(args))
+            try:
+                subprocess.check_output(args, stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as e:
+                ffmpeg_output_error = ValueError(e.output, e)
+                raise ValueError(
+                    "Invalid audio file. Could not convert audio to wav format. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
+                ) from ffmpeg_output_error
+            return outfile.read(), os.path.getsize(outfile.name)
 
 
 def check_wav_audio_format(filename: str) -> bool:
