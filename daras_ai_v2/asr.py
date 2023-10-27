@@ -13,11 +13,9 @@ import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.gpu_server import (
-    GpuEndpoints,
-    call_celery_task,
-)
+from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from time import sleep
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -29,6 +27,9 @@ CHIRP_SUPPORTED = {"af-ZA", "sq-AL", "am-ET", "ar-EG", "hy-AM", "as-IN", "ast-ES
 
 WHISPER_SUPPORTED = {"af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de", "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no", "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"}  # fmt: skip
 
+AZURE_SUPPORTED = {"af-ZA", "am-ET", "ar-AE", "ar-BH", "ar-DZ", "ar-EG", "ar-IL", "ar-IQ", "ar-JO", "ar-KW", "ar-LB", "ar-LY", "ar-MA", "ar-OM", "ar-PS", "ar-QA", "ar-SA", "ar-SY", "ar-TN", "ar-YE", "az-AZ", "bg-BG", "bn-IN", "bs-BA", "ca-ES", "cs-CZ", "cy-GB", "da-DK", "de-AT", "de-CH", "de-DE", "el-GR", "en-AU", "en-CA", "en-GB", "en-GH", "en-HK", "en-IE", "en-IN", "en-KE", "en-NG", "en-NZ", "en-PH", "en-SG", "en-TZ", "en-US", "en-ZA", "es-AR", "es-BO", "es-CL", "es-CO", "es-CR", "es-CU", "es-DO", "es-EC", "es-ES", "es-GQ", "es-GT", "es-HN", "es-MX", "es-NI", "es-PA", "es-PE", "es-PR", "es-PY", "es-SV", "es-US", "es-UY", "es-VE", "et-EE", "eu-ES", "fa-IR", "fi-FI", "fil-PH", "fr-BE", "fr-CA", "fr-CH", "fr-FR", "ga-IE", "gl-ES", "gu-IN", "he-IL", "hi-IN", "hr-HR", "hu-HU", "hy-AM", "id-ID", "is-IS", "it-CH", "it-IT", "ja-JP", "jv-ID", "ka-GE", "kk-KZ", "km-KH", "kn-IN", "ko-KR", "lo-LA", "lt-LT", "lv-LV", "mk-MK", "ml-IN", "mn-MN", "mr-IN", "ms-MY", "mt-MT", "my-MM", "nb-NO", "ne-NP", "nl-BE", "nl-NL", "pa-IN", "pl-PL", "ps-AF", "pt-BR", "pt-PT", "ro-RO", "ru-RU", "si-LK", "sk-SK", "sl-SI", "so-SO", "sq-AL", "sr-RS", "sv-SE", "sw-KE", "sw-TZ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-IN", "uz-UZ", "vi-VN", "wuu-CN", "yue-CN", "zh-CN", "zh-CN-shandong", "zh-CN-sichuan", "zh-HK", "zh-TW", "zu-ZA"}  # fmt: skip
+MAX_POLLS = 100
+
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
@@ -39,6 +40,7 @@ class AsrModels(Enum):
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
     usm = "Chirp / USM (Google)"
     deepgram = "Deepgram"
+    azure = "Azure Speech"
 
 
 asr_model_ids = {
@@ -62,6 +64,7 @@ asr_supported_languages = {
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: WHISPER_SUPPORTED,
+    AsrModels.azure: AZURE_SUPPORTED,
 }
 
 
@@ -292,7 +295,73 @@ def run_asr(
         audio_url, size = audio_url_to_wav(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
 
-    if selected_model == AsrModels.deepgram:
+    if selected_model == AsrModels.azure:
+        # transcription from audio url only supported via rest api or cli
+        # Start by initializing a request
+        payload = {
+            "contentUrls": [
+                audio_url,
+            ],
+            "displayName": "Gooey Transcription",
+            "model": None,
+            "locale": language or "en-US",
+            "properties": {
+                "wordLevelTimestampsEnabled": False,
+                "languageIdentification": {
+                    "candidateLocales": [  # 2-10 locales and one of them must be the actual locale
+                        "es-ES",
+                        "zh-CN",
+                        "da-DK",
+                        language or "en-US",
+                    ]
+                },
+            },
+        }
+        r = requests.post(
+            f"https://{settings.AZURE_SPEECH_REGION}.api.cognitive.microsoft.com/speechtotext/v3.1/transcriptions",
+            headers={
+                "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+        r.raise_for_status()
+        uri = r.json()["self"]
+
+        # poll for results
+        for _ in range(MAX_POLLS):
+            r = requests.get(
+                uri,
+                headers={
+                    "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
+                },
+            )
+            if not r.ok or not r.json()["status"] == "Succeeded":
+                sleep(1)
+                continue
+            r = requests.get(
+                uri + "/files",
+                headers={
+                    "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
+                },
+            )
+            r.raise_for_status()
+            transcriptions = []
+            for value in r.json()["values"]:
+                if value["kind"] == "Transcription":
+                    r = requests.get(
+                        value["links"]["contentUrl"],
+                        headers={
+                            "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY
+                        },
+                    )
+                    r.raise_for_status()
+                    transcriptions += [
+                        r.json()["combinedRecognizedPhrases"][0]["display"]
+                    ]
+            return "\n".join(transcriptions)
+        assert False, "Max polls exceeded, Azure speech did not yield a response"
+    elif selected_model == AsrModels.deepgram:
         r = requests.post(
             "https://api.deepgram.com/v1/listen",
             headers={
