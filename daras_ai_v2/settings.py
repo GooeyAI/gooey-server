@@ -153,7 +153,7 @@ USE_I18N = True
 
 USE_TZ = True
 
-DATETIME_FORMAT = "N j, D, Y, h:i:s A"
+DATETIME_FORMAT = "N j, h:i A"
 
 from django.conf.locale.en import formats as es_formats
 
