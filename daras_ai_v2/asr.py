@@ -11,6 +11,12 @@ from furl import furl
 
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
+from daras_ai_v2.gdrive_downloader import (
+    is_gdrive_url,
+    gdrive_download,
+    gdrive_metadata,
+    url_to_gdrive_file_id,
+)
 from daras_ai_v2 import settings
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gpu_server import (
@@ -307,6 +313,17 @@ def run_asr(
     is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
     if is_youtube_url:
         audio_url, size = download_youtube_to_wav(audio_url)
+    elif is_gdrive_url(furl(audio_url)):
+        meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
+        anybytes, ext = gdrive_download(
+            furl(audio_url), meta.get("mimeType", "audio/wav")
+        )
+        wavbytes, size = audio_bytes_to_wav(anybytes)
+        audio_url = upload_file_from_bytes(
+            filename=meta.get("name", "gdrive_audio"),
+            data=wavbytes,
+            content_type=meta.get("mimeType", "audio/wav"),
+        )
     else:
         audio_url, size = audio_url_to_wav(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
@@ -550,9 +567,22 @@ def audio_bytes_to_wav(audio_bytes: bytes) -> tuple[bytes | None, int]:
 
         with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
             # convert audio to single channel wav
-            args = ["ffmpeg", "-y", "-i", infile.name, *FFMPEG_WAV_ARGS, outfile.name]
+            args = [
+                "ffmpeg",
+                "-y",
+                "-i",
+                infile.name,
+                *FFMPEG_WAV_ARGS,
+                outfile.name,
+            ]
             print("\t$ " + " ".join(args))
-            subprocess.check_call(args)
+            try:
+                subprocess.check_output(args, stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as e:
+                ffmpeg_output_error = ValueError(e.output, e)
+                raise ValueError(
+                    "Invalid audio file. Could not convert audio to wav format. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
+                ) from ffmpeg_output_error
             return outfile.read(), os.path.getsize(outfile.name)
 
 
