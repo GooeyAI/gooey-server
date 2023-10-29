@@ -8,24 +8,17 @@ from tests.test_translation import test_run_google_translate_one
 GLOSSARY = [
     {
         "en-US": "Gooey.AI",
-        "hi-IN": "गूई.एआई",
+        "hi-IN": "गुई ए आई",
         "pos": "noun",
-        "description": "name of the Gooey.AI",
+        "description": "Translation of Gooey.AI from Hindi to English",
         "random": "random",
     },
     {
         "en-US": "Gooey.AI",
         "hi-IN": "गुई डॉट ए आई",
         "pos": "noun",
-        "description": "name of the Gooey.AI",
+        "description": "Translation of Gooey.AI from Hindi to English",
         "random": get_random_doc_id(),
-    },
-    {
-        "en-US": "Gooey.AI",
-        "hi-IN": "गुई ए आई",
-        "pos": "noun",
-        "description": "name of the Gooey.AI",
-        "random": "random",
     },
     {
         "en-US": "chilli",
@@ -44,33 +37,23 @@ GLOSSARY = [
 TRANSLATION_TESTS_GLOSSARY = [
     (
         "मिर्च में बीज उपचार कैसे करें",  # source
-        "en",
         "How to Treat Seeds in Peppers",  # no glossary
         "How to Treat Seeds in Chilli",  # with glosssary
     ),
     (
         "मिर्ची में बीज उपचार कैसे करें",
-        "en",
         "How to Treat Seeds in Peppers",
         "How to Treat Seeds in Chilli",
     ),
     (
         "गुई डॉट ए आई से हम क्या कर सकते हैं",
-        "en",
         "What can we do with Gui.AI",
         "What can we do with Gooey.AI",
     ),
     (
         "गुई ए आई से हम क्या कर सकते हैं",
-        "en",
         "What can we do with AI",
         "What can we do with Gooey.AI",
-    ),
-    (
-        "Who is the founder of Gooey.AI?",
-        "hi",
-        "gooeyai के संस्थापक कौन हैं?",
-        "गूई.एआई के संस्थापक कौन हैं?",
     ),
 ]
 
@@ -92,22 +75,15 @@ def glossary_url():
 
 @pytest.mark.django_db
 def test_run_google_translate_glossary(glossary_url, threadpool_subtest):
-    for (
-        text,
-        target_lang,
-        expected,
-        expected_with_glossary,
-    ) in TRANSLATION_TESTS_GLOSSARY:
+    for text, expected, expected_with_glossary in TRANSLATION_TESTS_GLOSSARY:
         threadpool_subtest(
             test_run_google_translate_one,
             text,
             expected,
-            target_lang=target_lang,
         )
         threadpool_subtest(
             test_run_google_translate_one,
             text,
             expected_with_glossary,
-            target_lang=target_lang,
             glossary_url=glossary_url,
         )

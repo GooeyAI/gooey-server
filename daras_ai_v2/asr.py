@@ -240,8 +240,11 @@ def _translate_text(
     )
     res.raise_for_status()
     data = res.json()
-    translations = data.get("glossaryTranslations", data["translations"])
-    return translations[0]["translatedText"].strip()
+    try:
+        result = data["glossaryTranslations"][0]["translatedText"]
+    except (KeyError, IndexError):
+        result = data["translations"][0]["translatedText"]
+    return result.strip()
 
 
 _session = None
