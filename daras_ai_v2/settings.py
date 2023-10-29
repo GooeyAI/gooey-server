@@ -211,8 +211,12 @@ if not firebase_admin._apps:
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
+GCP_PROJECT = config("GCP_PROJECT", default="dara-c1b52")
+GCP_REGION = config("GCP_REGION", default="us-central1")
+
 GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
-# GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
+GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
+
 UBERDUCK_KEY = config("UBERDUCK_KEY", None)
 UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 

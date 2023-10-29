@@ -151,9 +151,7 @@ class AsrPage(BasePage):
                 source_language=forced_asr_languages.get(
                     selected_model, request.language
                 ),
-                glossary_url=request.glossary_document
-                if request.glossary_document
-                else "",
+                glossary_url=request.glossary_document,
             )
         else:
             # Save the raw ASR text for details view

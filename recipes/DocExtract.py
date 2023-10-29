@@ -403,7 +403,7 @@ def process_source(
                 texts=[transcript],
                 target_language=request.google_translate_target,
                 # source_language=request.language,
-                glossary_url=request.glossary_document or "",
+                glossary_url=request.glossary_document,
             )[0]
             update_cell(spreadsheet_id, row, Columns.translation.value, translation)
     else:

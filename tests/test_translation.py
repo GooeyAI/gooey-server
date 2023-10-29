@@ -1,5 +1,6 @@
 from daras_ai_v2.asr import run_google_translate
 
+
 TRANSLATION_TESTS = [
     # hindi romanized
     (
@@ -44,11 +45,13 @@ TRANSLATION_TESTS = [
 
 def test_run_google_translate(threadpool_subtest):
     for text, expected in TRANSLATION_TESTS:
-        threadpool_subtest(_test_run_google_translate, text, expected)
+        threadpool_subtest(test_run_google_translate_one, text, expected)
 
 
-def _test_run_google_translate(text: str, expected: str):
-    actual = run_google_translate([text], "en")[0]
+def test_run_google_translate_one(
+    text: str, expected: str, glossary_url=None, target_lang="en"
+):
+    actual = run_google_translate([text], target_lang, glossary_url=glossary_url)[0]
     assert (
         actual.replace(".", "").replace(",", "").strip().lower()
         == expected.replace(".", "").replace(",", "").strip().lower()

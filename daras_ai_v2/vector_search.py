@@ -237,6 +237,7 @@ class DocMetadata(typing.NamedTuple):
     name: str
     etag: str | None
     mime_type: str | None
+    total_bytes: int = 0
 
 
 def doc_url_to_metadata(f_url: str) -> DocMetadata:
@@ -265,6 +266,7 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
         name = meta["name"]
         etag = meta.get("md5Checksum") or meta.get("modifiedTime")
         mime_type = meta["mimeType"]
+        total_bytes = int(meta.get("filesize") or 0)
     else:
         try:
             r = requests.head(
@@ -275,17 +277,19 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
             r.raise_for_status()
         except requests.RequestException as e:
             print(f"ignore error while downloading {f_url}: {e}")
+            name = None
             mime_type = None
             etag = None
-            name = None
+            total_bytes = 0
         else:
-            mime_type = get_mimetype_from_response(r)
-            etag = r.headers.get("etag", r.headers.get("last-modified"))
             name = (
                 r.headers.get("content-disposition", "")
                 .split("filename=")[-1]
                 .strip('"')
             )
+            etag = r.headers.get("etag", r.headers.get("last-modified"))
+            mime_type = get_mimetype_from_response(r)
+            total_bytes = int(r.headers.get("content-length") or 0)
     # extract filename from url as a fallback
     if not name:
         if is_user_uploaded_url(str(f)):
@@ -295,7 +299,7 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
     # guess mimetype from name as a fallback
     if not mime_type:
         mime_type = mimetypes.guess_type(name)[0]
-    return DocMetadata(name, etag, mime_type)
+    return DocMetadata(name, etag, mime_type, total_bytes)
 
 
 @redis_cache_decorator
@@ -417,44 +421,6 @@ def split_sections(sections: str, *, chunk_overlap: int, chunk_size: int):
                 header += f"{role}={content}\n"
 
 
-def _download_doc_content(f_url: str, doc_meta: DocMetadata):
-    f = furl(f_url)
-    f_name = doc_meta.name
-    if is_gdrive_url(f):
-        # download from google drive
-        f_bytes, ext = gdrive_download(f, doc_meta.mime_type)
-    else:
-        # download from url
-        try:
-            r = requests.get(
-                f_url,
-                headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-                timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
-            )
-            r.raise_for_status()
-        except requests.RequestException as e:
-            print(f"ignore error while downloading {f_url}: {e}")
-            return "", "", b""
-        f_bytes = r.content
-        # if it's a known encoding, standardize to utf-8
-        if r.encoding:
-            try:
-                codec = codecs.lookup(r.encoding)
-            except LookupError:
-                pass
-            else:
-                f_bytes = codec.decode(f_bytes)[0].encode()
-        ext = guess_ext_from_response(r)
-    return ext, f_name, f_bytes
-
-
-def download_content_bytes(f_url: str, mime_type: str):
-    ext, _, f_bytes = _download_doc_content(
-        f_url, DocMetadata(name="", etag="", mime_type=mime_type)
-    )
-    return f_bytes, ext
-
-
 @redis_cache_decorator
 def doc_url_to_text_pages(
     *,
@@ -462,18 +428,74 @@ def doc_url_to_text_pages(
     doc_meta: DocMetadata,
     google_translate_target: str | None,
     selected_asr_model: str | None,
-) -> list[str]:
+) -> typing.Union[list[str], "pd.DataFrame"]:
     """
     Download document from url and convert to text pages.
+
     Args:
         f_url: url of document
         doc_meta: document metadata
         google_translate_target: target language for google translate
         selected_asr_model: selected ASR model (used for audio files)
+
     Returns:
         list of text pages
     """
-    ext, f_name, f_bytes = _download_doc_content(f_url, doc_meta)
+    f_bytes, ext = download_content_bytes(f_url=f_url, mime_type=doc_meta.mime_type)
+    if not f_bytes:
+        return []
+    pages = bytes_to_text_pages_or_df(
+        f_url=f_url,
+        f_name=doc_meta.name,
+        f_bytes=f_bytes,
+        ext=ext,
+        mime_type=doc_meta.mime_type,
+        selected_asr_model=selected_asr_model,
+    )
+    # optionally, translate text
+    if google_translate_target and isinstance(pages, list):
+        pages = run_google_translate(pages, google_translate_target)
+    return pages
+
+
+def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
+    f = furl(f_url)
+    if is_gdrive_url(f):
+        # download from google drive
+        return gdrive_download(f, mime_type)
+    try:
+        # download from url
+        r = requests.get(
+            f_url,
+            headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
+            timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+        )
+        r.raise_for_status()
+    except requests.RequestException as e:
+        print(f"ignore error while downloading {f_url}: {e}")
+        return b"", ""
+    f_bytes = r.content
+    # if it's a known encoding, standardize to utf-8
+    if r.encoding:
+        try:
+            codec = codecs.lookup(r.encoding)
+        except LookupError:
+            pass
+        else:
+            f_bytes = codec.decode(f_bytes)[0].encode()
+    ext = guess_ext_from_response(r)
+    return f_bytes, ext
+
+
+def bytes_to_text_pages_or_df(
+    *,
+    f_url: str,
+    f_name: str,
+    f_bytes: bytes,
+    ext: str,
+    mime_type: str,
+    selected_asr_model: str | None,
+) -> typing.Union[list[str], "pd.DataFrame"]:
     # convert document to text pages
     match ext:
         case ".pdf":
@@ -488,17 +510,16 @@ def doc_url_to_text_pages(
                     "For transcribing audio/video, please choose an ASR model from the settings!"
                 )
             if is_gdrive_url(furl(f_url)):
-                f_url = upload_file_from_bytes(
-                    f_name, f_bytes, content_type=doc_meta.mime_type
-                )
+                f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
             pages = [run_asr(f_url, selected_model=selected_asr_model, language="en")]
         case _:
-            df = bytes_to_df(f_name=f_name, f_bytes=f_bytes, ext=ext).fillna("")
+            df = bytes_to_df(f_name=f_name, f_bytes=f_bytes, ext=ext)
             assert (
                 "snippet" in df.columns or "sections" in df.columns
             ), f'uploaded spreadsheet must contain a "snippet" or "sections" column - {f_name !r}'
             return df
-    return run_google_translate(pages, target_language=google_translate_target)
+
+    return pages
 
 
 def bytes_to_df(
@@ -521,13 +542,9 @@ def bytes_to_df(
             df = pd.read_json(f, dtype=str)
         case ".xml":
             df = pd.read_xml(f, dtype=str)
-        case ".ods":
-            df = pd.read_excel(f, engine="odf", dtype=str)
-        case ".gsheet":
-            df = pd.read_csv(f, dtype=str)
         case _:
             raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
-    return df
+    return df.fillna("")
 
 
 def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
@@ -565,11 +582,6 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
         print("\t$ " + " ".join(args))
         subprocess.check_call(args)
         return outfile.read()
-
-
-def download_table_doc(f_url: str, doc_meta: DocMetadata) -> "pd.DataFrame":
-    ext, f_name, f_bytes = _download_doc_content(f_url, doc_meta)
-    return bytes_to_df(f_name=f_name, f_bytes=f_bytes, ext=ext).dropna()
 
 
 def render_sources_widget(refs: list[SearchReference]):

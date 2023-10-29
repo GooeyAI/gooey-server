@@ -1,3 +1,4 @@
+import os
 import typing
 
 import gooey_ui as st
@@ -7,9 +8,13 @@ from daras_ai_v2.asr import AsrModels, google_translate_language_selector
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.search_ref import CitationStyles
 
+_user_media_url_prefix = os.path.join(
+    "storage.googleapis.com", settings.GS_BUCKET_NAME, settings.GS_MEDIA_PATH
+)
+
 
 def is_user_uploaded_url(url: str) -> bool:
-    return f"storage.googleapis.com/{settings.GS_BUCKET_NAME}/daras_ai" in url
+    return _user_media_url_prefix in url
 
 
 def document_uploader(
