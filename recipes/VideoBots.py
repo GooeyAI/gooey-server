@@ -415,7 +415,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         output_video = state.get("output_video")
         if output_video:
-            st.video(output_video[0])
+            st.video(output_video[0], autoplay=True)
 
         output_text = state.get("output_text")
         if output_text:
@@ -442,7 +442,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                         for idx, text in enumerate(output_text):
                             st.write(text)
                             try:
-                                st.video(output_video[idx])
+                                st.video(output_video[idx], autoplay=True)
                             except IndexError:
                                 try:
                                     st.audio(output_audio[idx])
