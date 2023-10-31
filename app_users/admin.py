@@ -12,12 +12,12 @@ from bots.models import SavedRun
 class AppUserAdmin(admin.ModelAdmin):
     list_display = [
         "uid",
-        "name",
+        "display_name",
         "email",
         "phone_number",
-        "bal",
-        "paid",
-        "created",
+        "balance",
+        "is_paying",
+        "created_at",
     ]
     search_fields = [
         "uid",
@@ -50,22 +50,6 @@ class AppUserAdmin(admin.ModelAdmin):
             instance_id=user.uid,
             show_add=False,
         )
-
-    @admin.display(description="Name")
-    def name(self, user: models.AppUser):
-        return user.display_name
-
-    @admin.display(description="Paid")
-    def paid(self, user: models.AppUser):
-        return user.is_paying
-
-    @admin.display(description="Bal")
-    def bal(self, user: models.AppUser):
-        return user.balance
-
-    @admin.display(description="Created")
-    def created(self, user: models.AppUser):
-        return user.created_at
 
     def open_in_firebase(self, user: models.AppUser):
         path = f"users/{user.uid}"
