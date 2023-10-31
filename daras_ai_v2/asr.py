@@ -346,7 +346,6 @@ def run_asr(
                 src_lang=language,
             ),
         )
-        return data["text"]
     elif selected_model == AsrModels.usm:
         # note: only us-central1 and a few other regions support chirp recognizers (so global can't be used)
         location = "us-central1"
