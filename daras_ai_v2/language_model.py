@@ -19,6 +19,7 @@ from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
+from daras_ai_v2.text_splitter import default_length_function
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
 
@@ -120,8 +121,6 @@ model_max_tokens = {
     LargeLanguageModels.llama2_70b_chat: 4096,
 }
 
-threadlocal = threading.local()
-
 
 def calc_gpt_tokens(
     text: str | list[str] | dict | list[dict],
@@ -129,11 +128,6 @@ def calc_gpt_tokens(
     sep: str = "",
     is_chat_model: bool = True,
 ) -> int:
-    try:
-        enc = threadlocal.gpt2enc
-    except AttributeError:
-        enc = tiktoken.get_encoding("gpt2")
-        threadlocal.gpt2enc = enc
     if isinstance(text, (str, dict)):
         messages = [text]
     else:
@@ -151,7 +145,7 @@ def calc_gpt_tokens(
             else str(entry)
         )
     )
-    return len(enc.encode(combined))
+    return default_length_function(combined)
 
 
 def get_openai_error_cls():

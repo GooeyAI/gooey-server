@@ -42,10 +42,10 @@ threadlocal = threading.local()
 
 def default_length_function(text: str) -> int:
     try:
-        enc = threadlocal.gpt2enc
+        enc = threadlocal.enc
     except AttributeError:
-        enc = tiktoken.get_encoding("gpt2")
-        threadlocal.gpt2enc = enc
+        enc = tiktoken.encoding_for_model("gpt-4")
+        threadlocal.enc = enc
     return len(enc.encode(text))
 
 
@@ -60,12 +60,14 @@ class Document:
         text: str,
         span: tuple[int, int],
         length_function: L = default_length_function,
+        **kwargs,
     ):
         self.text = text
         self.span = span
         self.start = self.span[0]
         self.end = self.span[1]
         self.length_function = length_function
+        self.kwargs = kwargs
 
     def __len__(self):
         if self._length is None:
