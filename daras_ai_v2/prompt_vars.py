@@ -61,6 +61,6 @@ def render_prompt_vars(
 def context_globals():
     return {
         "datetime": SimpleNamespace(
-            utcnow=datetime.utcnow().strftime("%B %d, %H:%M"),
+            utcnow=datetime.utcnow().strftime("%B %d, %Y %H:%M:%S %Z"),
         ),
     }
