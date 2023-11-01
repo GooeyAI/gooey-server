@@ -85,7 +85,6 @@ class SEOSummaryPage(BasePage):
         seed=42,
         # enable_blog_mode=False,
     )
-    fallback_title_field = "title"
 
     class RequestModel(GoogleSearchMixin, BaseModel):
         search_query: str

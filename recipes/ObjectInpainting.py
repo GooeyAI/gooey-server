@@ -40,7 +40,6 @@ class ObjectInpaintingPage(BasePage):
         "sd_2_upscaling": False,
         "seed": 42,
     }
-    fallback_title_field = "text_prompt"
 
     class RequestModel(BaseModel):
         input_image: str

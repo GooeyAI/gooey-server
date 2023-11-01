@@ -38,7 +38,6 @@ class RelatedQnAPage(BasePage):
         serp_search_type=SerpSearchType.SEARCH,
         serp_search_location=SerpSearchLocation.UNITED_STATES,
     )
-    fallback_title_field = GoogleGPTPage.fallback_title_field
 
     class RequestModel(GoogleGPTPage.RequestModel):
         pass

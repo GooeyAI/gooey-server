@@ -92,7 +92,6 @@ class BasePage:
     slug_versions: list[str]
 
     sane_defaults: dict = {}
-    fallback_title_field: str | None = None  # for runs & examples
 
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
@@ -150,12 +149,20 @@ class BasePage:
         return f"/v2/{self.slug_versions[0]}/"
 
     def get_page_title(self) -> str | None:
-        if (page_title := st.session_state.get(StateKeys.page_title)) != self.title:
+        state = st.session_state
+
+        page_title = state.get(StateKeys.page_title)
+        if page_title and page_title != self.title:
             return page_title
-        elif text_prompt := st.session_state.get(self.fallback_title_field):
-            return truncate_text_words(text_prompt, maxlen=60)
-        else:
-            return self.title
+        return truncate_text_words(
+            state.get("input_prompt")
+            or state.get("text_prompt")
+            or (state.get("animation_prompts") or [{}])[0].get("prompt")
+            or state.get("search_query")
+            or state.get("title")
+            or self.title,
+            maxlen=60,
+        )
 
     def render(self):
         with sentry_sdk.configure_scope() as scope:

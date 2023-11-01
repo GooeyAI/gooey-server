@@ -38,7 +38,6 @@ class FaceInpaintingPage(BasePage):
         "seed": 42,
         "upscale_factor": 1.0,
     }
-    fallback_title_field = "text_prompt"
 
     class RequestModel(BaseModel):
         input_image: str

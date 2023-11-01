@@ -41,7 +41,6 @@ class CompareText2ImgPage(BasePage):
         "sd_2_upscaling": False,
         "image_guidance_scale": 1.2,
     }
-    fallback_title_field = "text_prompt"
 
     class RequestModel(BaseModel):
         text_prompt: str
