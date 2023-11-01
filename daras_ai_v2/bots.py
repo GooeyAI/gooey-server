@@ -45,6 +45,8 @@ class BotInterface:
     show_feedback_buttons: bool = False
     convo: Conversation
     recieved_msg_id: str = None
+    glossary_user_to_internal: str | None = None
+    glossary_internal_to_user: str | None = None
 
     def send_msg(
         self,
@@ -78,6 +80,12 @@ class BotInterface:
                 example_id=bi.saved_run.example_id,
                 run_id=bi.saved_run.run_id,
                 uid=bi.saved_run.uid,
+            )
+            self.glossary_user_to_internal = bi.saved_run.state.get(
+                "glossary_document_user_to_internal"
+            )
+            self.glossary_internal_to_user = bi.saved_run.state.get(
+                "glossary_document_internal_to_user"
             )
         else:
             self.page_cls = None
@@ -233,7 +241,11 @@ def _handle_feedback_msg(bot: BotInterface, input_text):
     # save the feedback
     last_feedback.text = input_text
     # translate feedback to english
-    last_feedback.text_english = " ".join(run_google_translate([input_text], "en"))
+    last_feedback.text_english = " ".join(
+        run_google_translate(
+            [input_text], "en", glossary_url=bot.glossary_user_to_internal
+        )
+    )
     last_feedback.save()
     # send back a confimation msg
     bot.show_feedback_buttons = False  # don't show feedback for this confirmation

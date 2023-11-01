@@ -190,7 +190,6 @@ class VideoBotsPage(BasePage):
         "scroll_jump": 5,
         "use_url_shortener": False,
         "dense_weight": 1.0,
-        "internal_language": "en",
     }
 
     class RequestModel(BaseModel):
@@ -248,7 +247,7 @@ class VideoBotsPage(BasePage):
         use_url_shortener: bool | None
 
         user_language: str | None
-        internal_language: str | None
+        # internal_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
         glossary_document_user_to_internal: str | None
         glossary_document_internal_to_user: str | None
 
@@ -625,14 +624,12 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         bot_script = request.bot_script
 
         # translate input text
-        if request.user_language and request.user_language != (
-            request.internal_language or "en"
-        ):
+        if request.user_language and request.user_language != "en":
             yield f"Translating input to english..."
             user_input = run_google_translate(
                 texts=[user_input],
                 source_language=request.user_language,
-                target_language=request.internal_language or "en",
+                target_language="en",
                 glossary_url=request.glossary_document_user_to_internal,
             )[0]
 
@@ -798,13 +795,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         ]
 
         # translate response text
-        if request.user_language and request.user_language != (
-            request.internal_language or "en"
-        ):
+        if request.user_language and request.user_language != "en":
             yield f"Translating response to {request.user_language}..."
             output_text = run_google_translate(
                 texts=output_text,
-                source_language=request.internal_language or "en",
+                source_language="en",
                 target_language=request.user_language,
                 glossary_url=request.glossary_document_internal_to_user,
             )

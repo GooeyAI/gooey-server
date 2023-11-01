@@ -137,7 +137,9 @@ class SlackBot(BotInterface):
         if not text:
             return None
         if should_translate and self.language and self.language != "en":
-            text = run_google_translate([text], self.language)[0]
+            text = run_google_translate(
+                [text], self.language, glossary_url=self.glossary_internal_to_user
+            )[0]
 
         if self._read_rcpt_ts and self._read_rcpt_ts != self._msg_ts:
             delete_msg(
@@ -175,7 +177,9 @@ class SlackBot(BotInterface):
         if not text:
             return
         if self.language and self.language != "en":
-            text = run_google_translate([text], self.language)[0]
+            text = run_google_translate(
+                [text], self.language, glossary_url=self.glossary_internal_to_user
+            )[0]
         self._read_rcpt_ts = chat_post_message(
             text=text,
             channel=self.bot_id,
@@ -583,6 +587,7 @@ def send_confirmation_msg(bot: BotIntegration):
         [Template(SLACK_CONFIRMATION_MSG).safe_substitute(**substitutions)],
         target_language=bot.user_language,
         source_language="en",
+        glossary_url=bot.saved_run.state.get("glossary_document_internal_to_user"),
     )[0]
     res = requests.post(
         str(bot.slack_channel_hook_url),
