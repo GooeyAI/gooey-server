@@ -40,6 +40,9 @@ class GlossaryResourceQuerySet(models.QuerySet):
                         etag=doc_meta.etag,
                         mime_type=doc_meta.mime_type,
                     )
+                    GlossaryResource.objects.filter(pk=gr.pk).update(
+                        usage_count=models.F("usage_count") + 1
+                    )
                     gr.save()
                     return gr, True
             except IntegrityError:

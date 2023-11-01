@@ -167,8 +167,8 @@ def asr_language_selector(
 def run_google_translate(
     texts: list[str],
     target_language: str,
-    source_language: str = None,
-    glossary_url: str = None,
+    source_language: str | None = None,
+    glossary_url: str | None = None,
 ) -> list[str]:
     """
     Translate text using the Google Translate API.

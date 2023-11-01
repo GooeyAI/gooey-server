@@ -1,5 +1,3 @@
-import uuid
-
 import gooey_ui as gui
 from daras_ai_v2.asr import google_translate_languages
 
