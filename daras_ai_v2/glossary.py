@@ -3,13 +3,13 @@ from daras_ai_v2.asr import google_translate_languages
 
 
 def glossary_input(
-    label="##### Glossary\nUpload a google sheet, csv, or xlsx file.",
+    label="##### Glossary",
     key="glossary_document",
 ):
     from daras_ai_v2.doc_search_settings_widgets import document_uploader
 
     glossary_url = document_uploader(
-        label=label,
+        label=label + "\nUpload a google sheet, csv, or xlsx file.",
         key=key,
         accept=[".csv", ".xlsx", ".xls", ".gsheet", ".ods", ".tsv"],
         accept_multiple_files=False,

@@ -26,7 +26,11 @@ class GlossaryResourceQuerySet(models.QuerySet):
     def get_or_create_from_url(self, url: str) -> tuple["GlossaryResource", bool]:
         doc_meta = doc_url_to_metadata(url)
         try:
-            return GlossaryResource.objects.get(f_url=url), False
+            gr = GlossaryResource.objects.get(f_url=url)
+            GlossaryResource.objects.filter(pk=gr.pk).update(
+                usage_count=models.F("usage_count") + 1
+            )
+            return gr, False
         except GlossaryResource.DoesNotExist:
             try:
                 gr = create_glossary_cached(url, doc_meta)
@@ -39,9 +43,6 @@ class GlossaryResourceQuerySet(models.QuerySet):
                         name=doc_meta.name,
                         etag=doc_meta.etag,
                         mime_type=doc_meta.mime_type,
-                    )
-                    GlossaryResource.objects.filter(pk=gr.pk).update(
-                        usage_count=models.F("usage_count") + 1
                     )
                     gr.save()
                     return gr, True

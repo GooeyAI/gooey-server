@@ -40,6 +40,7 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_SYSTEM,
     model_max_tokens,
 )
+from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -189,6 +190,7 @@ class VideoBotsPage(BasePage):
         "scroll_jump": 5,
         "use_url_shortener": False,
         "dense_weight": 1.0,
+        "internal_language": "en",
     }
 
     class RequestModel(BaseModel):
@@ -246,6 +248,9 @@ class VideoBotsPage(BasePage):
         use_url_shortener: bool | None
 
         user_language: str | None
+        internal_language: str | None
+        glossary_document_user_to_internal: str | None
+        glossary_document_internal_to_user: str | None
 
         variables: dict[str, typing.Any] | None
 
@@ -366,6 +371,25 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
             """,
             key="user_language",
+        )
+        st.markdown(
+            """
+            ## 📖 Customize with Glossary
+            It is also possible to customize translations using a glossary. 
+            When translating user messages to English, each English term can correspond to multiple user language terms but a user language term cannot be translated into multiple English terms (i.e. the user language column should be unique).
+            When translating copilot responses back into the user language, multiple English terms can correspond to each user language term, but each English term can only correspond to one user language term (i.e. the English column should be unique).
+            We therefore provide two glossaries, one for translating user messages to English and one for translating copilot responses back into the user language respectively:
+            """
+        )
+        st.session_state.setdefault("glossary_document_user_to_internal", None)
+        st.session_state.setdefault("glossary_document_user_to_internal", None)
+        glossary_input(
+            "##### 📖 User Language to Copilot Glossary",
+            key="glossary_document_user_to_internal",
+        )
+        glossary_input(
+            "##### 📖 Copilot to User Language Glossary",
+            key="glossary_document_user_to_internal",
         )
         st.write("---")
 
@@ -601,12 +625,15 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         bot_script = request.bot_script
 
         # translate input text
-        if request.user_language and request.user_language != "en":
+        if request.user_language and request.user_language != (
+            request.internal_language or "en"
+        ):
             yield f"Translating input to english..."
             user_input = run_google_translate(
                 texts=[user_input],
                 source_language=request.user_language,
-                target_language="en",
+                target_language=request.internal_language or "en",
+                glossary_url=request.glossary_document_user_to_internal,
             )[0]
 
         # parse the bot script
@@ -771,12 +798,15 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         ]
 
         # translate response text
-        if request.user_language and request.user_language != "en":
+        if request.user_language and request.user_language != (
+            request.internal_language or "en"
+        ):
             yield f"Translating response to {request.user_language}..."
             output_text = run_google_translate(
                 texts=output_text,
-                source_language="en",
+                source_language=request.internal_language or "en",
                 target_language=request.user_language,
+                glossary_url=request.glossary_document_internal_to_user,
             )
             state["raw_tts_text"] = [
                 "".join(snippet for snippet, _ in parse_refs(text, references))
