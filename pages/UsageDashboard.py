@@ -44,6 +44,7 @@ def main():
         )
         timezone = pytz.timezone(timezone)
         now = datetime.datetime.now(timezone)
+        now = now.replace(hour=0, minute=0, second=0, microsecond=0)
     with col2:
         start_time = st.date_input(
             "Start Date", value=now - datetime.timedelta(days=30)
