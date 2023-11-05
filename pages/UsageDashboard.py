@@ -53,7 +53,7 @@ def main():
         end_time = st.date_input("End Date", value=now)
     time_selector = dict(created_at__gte=start_time, created_at__lte=end_time)
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
     with col1:
         exclude_anon = st.checkbox("Exclude Anonymous", value=True)
     with col2:
@@ -61,16 +61,17 @@ def main():
     with col3:
         exclude_disabled = st.checkbox("Exclude Banned", value=True)
     with col4:
-        exclude_free = st.checkbox("Exclude Free", value=True)
-    with col5:
-        exclude_paying = st.checkbox("Exclude Paying", value=True)
+        paying_filter = st.selectbox(
+            "Paying Status",
+            options=["All", "Free", "Paid"],
+        )
 
     app_users = get_filtered_app_users(
         exclude_anon=exclude_anon,
         exclude_disabled=exclude_disabled,
         exclude_team=exclude_team,
-        exclude_free=exclude_free,
-        exclude_paying=exclude_paying,
+        exclude_free=paying_filter == "Paid",
+        exclude_paying=paying_filter == "Free",
     )
 
     signups = app_users.filter(**time_selector).order_by("-created_at")
