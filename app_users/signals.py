@@ -17,3 +17,13 @@
 #             auth.delete_user(instance.uid)
 #         except auth.UserNotFoundError:
 #             pass
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+from app_users.models import AppUser
+
+
+@receiver(post_save, sender=AppUser)
+def on_AppUser_save(instance: AppUser, **kwargs):
+    AppUser.objects.filter(balance__gt=1000, is_paying=False).update(is_paying=True)
