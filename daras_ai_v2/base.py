@@ -464,7 +464,9 @@ class BasePage:
         with st.div(className="position-sticky bottom-0 bg-white"):
             st.write("---")
             col1, col2 = st.columns([2, 1], responsive=False)
-            col2.node.props["className"] += " d-flex justify-content-end align-items-center"
+            col2.node.props[
+                "className"
+            ] += " d-flex justify-content-end align-items-center"
             with col1:
                 st.caption(
                     f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()}) \\\n"
