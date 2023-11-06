@@ -449,10 +449,19 @@ class BasePage:
         if self.run_user.display_name:
             html += f"<div>{self.run_user.display_name}</div>"
         html += "</div>"
-        st.markdown(
-            html,
-            unsafe_allow_html=True,
-        )
+
+        if self.is_current_user_admin():
+            linkto = lambda: st.link(
+                to=self.app_url(
+                    tab_name=MenuTabs.paths[MenuTabs.history],
+                    query_params={"uid": self.run_user.uid},
+                )
+            )
+        else:
+            linkto = st.dummy
+
+        with linkto():
+            st.html(html)
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -889,6 +898,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             )
             raise RedirectException(str(redirect_url))
         uid = self.request.user.uid
+        if self.is_current_user_admin():
+            uid = self.request.query_params.get("uid", uid)
 
         before = gooey_get_query_params().get("updated_at__lt", None)
         if before:
