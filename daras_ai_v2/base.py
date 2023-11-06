@@ -460,8 +460,11 @@ class BasePage:
         else:
             return "/account/"
 
+    def get_submit_container_props(self):
+        return dict(className="position-sticky bottom-0 bg-white")
+
     def render_submit_button(self, key="--submit-1"):
-        with st.div(className="position-sticky bottom-0 bg-white"):
+        with st.div(**self.get_submit_container_props()):
             st.write("---")
             col1, col2 = st.columns([2, 1], responsive=False)
             col2.node.props[
