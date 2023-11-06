@@ -607,6 +607,7 @@ def text_input(
     )
     return value or ""
 
+
 def password_input(
     label: str,
     value: str = "",
@@ -632,6 +633,7 @@ def password_input(
         **props,
     )
     return value or ""
+
 
 def slider(
     label: str,

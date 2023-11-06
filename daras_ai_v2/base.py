@@ -1133,7 +1133,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return bool(self.request and self.request.user and self.request.user.is_paying)
 
     def is_current_user_owner(self) -> bool:
-        return bool(self.request and self.request.user and self.run_user == self.request.user)
+        return bool(
+            self.request and self.request.user and self.run_user == self.request.user
+        )
 
 
 def get_example_request_body(

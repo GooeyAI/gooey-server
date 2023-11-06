@@ -232,7 +232,10 @@ def text_to_speech_settings(page=None):
                 elevenlabs_use_custom_key = st.checkbox(
                     "Use custom API key + Voice ID",
                     key="__elevenlabs_use_custom_key",
-                    value=bool(st.session_state.get("elevenlabs_api_key") or st.session_state.get("elevenlabs_voice_id")),
+                    value=bool(
+                        st.session_state.get("elevenlabs_api_key")
+                        or st.session_state.get("elevenlabs_voice_id")
+                    ),
                 )
                 if elevenlabs_use_custom_key:
                     st.session_state["elevenlabs_voice_name"] = None
@@ -246,16 +249,26 @@ def text_to_speech_settings(page=None):
                     )
 
                     selected_voice_id = st.session_state.get("elevenlabs_voice_id")
-                    elevenlabs_voices = {selected_voice_id: selected_voice_id} if selected_voice_id else {}
+                    elevenlabs_voices = (
+                        {selected_voice_id: selected_voice_id}
+                        if selected_voice_id
+                        else {}
+                    )
 
                     if elevenlabs_api_key:
                         try:
-                            elevenlabs_voices = get_cached_elevenlabs_voices(st.session_state, elevenlabs_api_key)
+                            elevenlabs_voices = get_cached_elevenlabs_voices(
+                                st.session_state, elevenlabs_api_key
+                            )
                         except requests.exceptions.HTTPError as e:
-                            st.error(f"Invalid ElevenLabs API key. Failed to fetch voices: {e}")
+                            st.error(
+                                f"Invalid ElevenLabs API key. Failed to fetch voices: {e}"
+                            )
                         else:
                             if selected_voice_id not in elevenlabs_voices:
-                                st.error(f"Selected ElevenLabs voice ID is not available in your account: {selected_voice_id}")
+                                st.error(
+                                    f"Selected ElevenLabs voice ID is not available in your account: {selected_voice_id}"
+                                )
 
                     st.selectbox(
                         """
@@ -269,7 +282,10 @@ def text_to_speech_settings(page=None):
                 else:
                     if not (
                         page
-                        and (page.is_current_user_paying() or page.is_current_user_admin())
+                        and (
+                            page.is_current_user_paying()
+                            or page.is_current_user_admin()
+                        )
                     ):
                         st.caption(
                             """
@@ -279,7 +295,9 @@ def text_to_speech_settings(page=None):
                             """
                         )
                     else:
-                        st.session_state.update(elevenlabs_api_key=None, elevenlabs_voice_id=None)
+                        st.session_state.update(
+                            elevenlabs_api_key=None, elevenlabs_voice_id=None
+                        )
                         st.selectbox(
                             """
                             ###### Voice Name (ElevenLabs)
@@ -359,18 +377,14 @@ def get_cached_elevenlabs_voices(state, api_key) -> dict[str, str]:
 def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
     r = requests.get(
         "https://api.elevenlabs.io/v1/voices",
-        headers={"Accept": "application/json",
-                 "xi-api-key": api_key},
+        headers={"Accept": "application/json", "xi-api-key": api_key},
     )
     r.raise_for_status()
     sorted_voices = sorted(
         r.json()["voices"],
         key=lambda v: (int(v["category"] == "premade"), v["name"]),
     )
-    return {
-        v["voice_id"]: f"{v['name']} ({v['voice_id']})"
-        for v in sorted_voices
-    }
+    return {v["voice_id"]: f"{v['name']} ({v['voice_id']})" for v in sorted_voices}
 
 
 def _pretty_voice(voice) -> str:
