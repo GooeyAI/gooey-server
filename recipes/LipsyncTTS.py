@@ -23,6 +23,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
     }
+    private_fields = ["elevenlabs_api_key"]
 
     class RequestModel(BaseModel):
         input_face: str
@@ -47,6 +48,8 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         bark_history_prompt: str | None
 
         elevenlabs_voice_name: str | None
+        elevenlabs_api_key: str | None
+        elevenlabs_voice_id: str | None
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
