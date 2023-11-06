@@ -128,7 +128,7 @@ These instructions run before the workflow performs a search of the knowledge ba
     if keyword_instructions_allowed:
         st.text_area(
             """
-###### 🔑 Keyword Exctraction                 
+###### 🔑 Keyword Extraction                 
         """,
             key="keyword_instructions",
             height=300,

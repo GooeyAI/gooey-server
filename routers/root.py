@@ -217,7 +217,7 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
     )
     ret |= {
         "meta": raw_build_meta_tags(
-            url=str(request.url),
+            url=get_og_url_path(request),
             title=explore.META_TITLE,
             description=explore.META_DESCRIPTION,
         ),
@@ -283,7 +283,7 @@ def st_page(
 
     ret |= {
         "meta": build_meta_tags(
-            url=str(request.url),
+            url=get_og_url_path(request),
             page=page,
             state=state,
             run_id=run_id,
@@ -297,6 +297,12 @@ def st_page(
         # ],
     }
     return ret
+
+
+def get_og_url_path(request) -> str:
+    return str(
+        (furl(settings.APP_BASE_URL) / request.url.path).add(request.query_params)
+    )
 
 
 def get_run_user(request, uid) -> AppUser | None:

@@ -290,6 +290,9 @@ class VideoBotsPage(BasePage):
         return "Create customized chatbots from your own docs/PDF/webpages. Craft your own bot prompts using the creative GPT3, fast GPT 3.5-turbo or powerful GPT4 & optionally prevent hallucinations by constraining all answers to just your citations. Available as Facebook, Instagram, WhatsApp bots or via API. Add multi-lingual speech recognition and text-to-speech in 100+ languages and even video responses. Collect 👍🏾 👎🏽 feedback + see usage & retention graphs too! This is the workflow that powers https://Farmer.CHAT and it's yours to tweak."
         # return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
 
+    def get_submit_container_props(self):
+        return {}
+
     def render_description(self):
         st.write(
             """
@@ -415,7 +418,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         output_video = state.get("output_video")
         if output_video:
-            st.video(output_video[0])
+            st.video(output_video[0], autoplay=True)
 
         output_text = state.get("output_text")
         if output_text:
@@ -442,7 +445,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                         for idx, text in enumerate(output_text):
                             st.write(text)
                             try:
-                                st.video(output_video[idx])
+                                st.video(output_video[idx], autoplay=True)
                             except IndexError:
                                 try:
                                     st.audio(output_audio[idx])
@@ -668,7 +671,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
-                yield "Exctracting keywords..."
+                yield "Extracting keywords..."
                 state["final_keyword_query"] = generate_final_search_query(
                     request=request,
                     instructions=keyword_instructions,
