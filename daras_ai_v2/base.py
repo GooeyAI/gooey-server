@@ -470,32 +470,34 @@ class BasePage:
             return "/account/"
 
     def render_submit_button(self, key="--submit-1"):
-        col1, col2 = st.columns([2, 1], responsive=False)
-        col2.node.props["className"] += " d-flex justify-content-end align-items-center"
-        with col1:
-            st.caption(
-                f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()}) \\\n"
-                f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ ",
-            )
-            additional_notes = self.additional_notes()
-            if additional_notes:
-                st.caption(additional_notes)
-        with col2:
-            submitted = st.button(
-                "🏃 Submit",
-                key=key,
-                type="primary",
-                # disabled=bool(st.session_state.get(StateKeys.run_status)),
-            )
-        if not submitted:
-            return False
-        try:
-            self.validate_form_v2()
-        except AssertionError as e:
-            st.error(e)
-            return False
-        else:
-            return True
+        with st.div(className="position-sticky bottom-0 bg-white"):
+            st.write("---")
+            col1, col2 = st.columns([2, 1], responsive=False)
+            col2.node.props["className"] += " d-flex justify-content-end align-items-center"
+            with col1:
+                st.caption(
+                    f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()}) \\\n"
+                    f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ ",
+                )
+                additional_notes = self.additional_notes()
+                if additional_notes:
+                    st.caption(additional_notes)
+            with col2:
+                submitted = st.button(
+                    "🏃 Submit",
+                    key=key,
+                    type="primary",
+                    # disabled=bool(st.session_state.get(StateKeys.run_status)),
+                )
+            if not submitted:
+                return False
+            try:
+                self.validate_form_v2()
+            except AssertionError as e:
+                st.error(e)
+                return False
+            else:
+                return True
 
     def _render_step_row(self):
         with st.expander("**ℹ️ Details**"):
