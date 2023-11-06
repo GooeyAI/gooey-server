@@ -237,6 +237,11 @@ def st_page(
             state.update(db_state)
             for k, v in page.sane_defaults.items():
                 state.setdefault(k, v)
+
+            # pop private fields if not the owner
+            if not page.is_current_user_owner():
+                for k in page.private_fields:
+                    state.pop(k, None)
     if state is None:
         raise HTTPException(status_code=404)
 

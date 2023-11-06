@@ -607,6 +607,31 @@ def text_input(
     )
     return value or ""
 
+def password_input(
+    label: str,
+    value: str = "",
+    max_chars: str = None,
+    key: str = None,
+    help: str = None,
+    *,
+    placeholder: str = None,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    **props,
+) -> str:
+    value = _input_widget(
+        input_type="password",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        maxLength=max_chars,
+        placeholder=placeholder,
+        **props,
+    )
+    return value or ""
 
 def slider(
     label: str,

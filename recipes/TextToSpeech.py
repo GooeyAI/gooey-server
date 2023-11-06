@@ -47,6 +47,7 @@ class TextToSpeechPage(BasePage):
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
     }
+    private_fields = ["elevenlabs_api_key"]
 
     class RequestModel(BaseModel):
         text_prompt: str
@@ -65,9 +66,12 @@ class TextToSpeechPage(BasePage):
         bark_history_prompt: str | None
 
         elevenlabs_voice_name: str | None
+        elevenlabs_api_key: str | None
+        elevenlabs_voice_id: str | None
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
+
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -239,26 +243,9 @@ class TextToSpeechPage(BasePage):
                 )
 
             case TextToSpeechProviders.ELEVEN_LABS:
-                assert (
-                    self.is_current_user_paying() or self.is_current_user_admin()
-                ), """
-                    Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
-                    """
-
-                # default to first in the mapping
-                default_voice_model = next(iter(ELEVEN_LABS_MODELS))
-                default_voice_name = next(iter(ELEVEN_LABS_VOICES))
-
-                voice_model = state.get("elevenlabs_model", default_voice_model)
-                voice_name = state.get("elevenlabs_voice_name", default_voice_name)
-
-                # validate voice_model / voice_name
-                if voice_model not in ELEVEN_LABS_MODELS:
-                    raise ValueError(f"Invalid model: {voice_model}")
-                if voice_name not in ELEVEN_LABS_VOICES:
-                    raise ValueError(f"Invalid voice_name: {voice_name}")
-                else:
-                    voice_id = ELEVEN_LABS_VOICES[voice_name]
+                xi_api_key = self._get_elevenlabs_api_key(state)
+                voice_model = self._get_elevenlabs_voice_model(state)
+                voice_id = self._get_elevenlabs_voice_id(state)
 
                 stability = state.get("elevenlabs_stability", 0.5)
                 similarity_boost = state.get("elevenlabs_similarity_boost", 0.75)
@@ -266,7 +253,7 @@ class TextToSpeechPage(BasePage):
                 response = requests.post(
                     f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
                     headers={
-                        "xi-api-key": settings.ELEVEN_LABS_API_KEY,
+                        "xi-api-key": xi_api_key,
                         "Accept": "audio/mpeg",
                     },
                     json={
@@ -284,6 +271,35 @@ class TextToSpeechPage(BasePage):
                 state["audio_url"] = upload_file_from_bytes(
                     "elevenlabs_gen.mp3", response.content
                 )
+
+    def _get_elevenlabs_voice_model(self, state: dict[str, str]):
+        default_voice_model = next(iter(ELEVEN_LABS_MODELS))
+        voice_model = state.get("elevenlabs_voice_model", default_voice_model)
+        assert voice_model in ELEVEN_LABS_MODELS, f"Invalid model: {voice_model}"
+        return voice_model
+
+    def _get_elevenlabs_voice_id(self, state: dict[str, str]):
+        if state.get("elevenlabs_voice_id"):
+            assert state.get("elevenlabs_api_key"), "ElevenLabs API key is required to use a custom voice_id"
+            return state["elevenlabs_voice_id"]
+        else:
+            # default to first in the mapping
+            default_voice_name = next(iter(ELEVEN_LABS_VOICES))
+            voice_name = state.get("elevenlabs_voice_name", default_voice_name)
+            assert voice_name in ELEVEN_LABS_VOICES, f"Invalid voice_name: {voice_name}"
+            return ELEVEN_LABS_VOICES[voice_name]  # voice_name -> voice_id
+
+    def _get_elevenlabs_api_key(self, state: dict[str, str]):
+        # ElevenLabs is available for non-paying users with their own API key
+        if state.get("elevenlabs_api_key"):
+            return state["elevenlabs_api_key"]
+        else:
+            assert (
+                self.is_current_user_paying() or self.is_current_user_admin()
+            ), """
+                Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
+                """
+            return settings.ELEVEN_LABS_API_KEY
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage

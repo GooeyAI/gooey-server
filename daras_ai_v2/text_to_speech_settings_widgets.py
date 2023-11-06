@@ -1,5 +1,7 @@
+import hashlib
 from enum import Enum
 
+import requests
 import gooey_ui as st
 from google.cloud import texttospeech
 
@@ -227,25 +229,66 @@ def text_to_speech_settings(page=None):
 
         case TextToSpeechProviders.ELEVEN_LABS.name:
             with col2:
-                if not (
-                    page
-                    and (page.is_current_user_paying() or page.is_current_user_admin())
-                ):
-                    st.caption(
+                elevenlabs_use_custom_key = st.checkbox(
+                    "Use custom API key + Voice ID",
+                    key="__elevenlabs_use_custom_key",
+                    value=bool(st.session_state.get("elevenlabs_api_key") or st.session_state.get("elevenlabs_voice_id")),
+                )
+                if elevenlabs_use_custom_key:
+                    st.session_state["elevenlabs_voice_name"] = None
+                    elevenlabs_api_key = st.password_input(
                         """
-                        Note: Please purchase Gooey.AI credits to use ElevenLabs voices
-                        <a href="/account">here</a>.
-                        """
+                        ###### Your ElevenLabs API key
+                        *Refer <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">here</a>
+                        for how to obtain an API key from ElevenLabs.*
+                        """,
+                        key="elevenlabs_api_key",
                     )
 
-                st.selectbox(
-                    """
-                    ###### Voice name (ElevenLabs)
-                    """,
-                    key="elevenlabs_voice_name",
-                    format_func=str,
-                    options=ELEVEN_LABS_VOICES.keys(),
-                )
+                    selected_voice_id = st.session_state.get("elevenlabs_voice_id")
+                    elevenlabs_voices = {selected_voice_id: selected_voice_id} if selected_voice_id else {}
+
+                    if elevenlabs_api_key:
+                        try:
+                            elevenlabs_voices = get_cached_elevenlabs_voices(st.session_state, elevenlabs_api_key)
+                        except requests.exceptions.HTTPError as e:
+                            st.error(f"Invalid ElevenLabs API key. Failed to fetch voices: {e}")
+                        else:
+                            if selected_voice_id not in elevenlabs_voices:
+                                st.error(f"Selected ElevenLabs voice ID is not available in your account: {selected_voice_id}")
+
+                    st.selectbox(
+                        """
+                        ###### Voice ID (ElevenLabs)
+                        *Enter an API key to list the available voices in your account.*
+                        """,
+                        key="elevenlabs_voice_id",
+                        options=elevenlabs_voices.keys(),
+                        format_func=elevenlabs_voices.__getitem__,
+                    )
+                else:
+                    if not (
+                        page
+                        and (page.is_current_user_paying() or page.is_current_user_admin())
+                    ):
+                        st.caption(
+                            """
+                            Note: Please purchase Gooey.AI credits to use ElevenLabs voices
+                            <a href="/account">here</a>.<br/>
+                            Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
+                            """
+                        )
+                    else:
+                        st.session_state.update(elevenlabs_api_key=None, elevenlabs_voice_id=None)
+                        st.selectbox(
+                            """
+                            ###### Voice Name (ElevenLabs)
+                            """,
+                            key="elevenlabs_voice_name",
+                            format_func=str,
+                            options=ELEVEN_LABS_VOICES.keys(),
+                        )
+
                 st.selectbox(
                     """
                     ###### Voice Model
@@ -301,6 +344,33 @@ def google_tts_voices() -> dict[str, str]:
     )
     voices.sort(key=_voice_sort_key)
     return {voice.name: _pretty_voice(voice) for voice in voices}
+
+
+def get_cached_elevenlabs_voices(state, api_key) -> dict[str, str]:
+    api_key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:40]
+    state.setdefault("__elevenlabs_voices_cache", {})
+    if api_key_hash not in state["__elevenlabs_voices_cache"]:
+        state["__elevenlabs_voices_cache"] = {
+            api_key_hash: fetch_elevenlabs_voices(api_key)
+        }
+    return state["__elevenlabs_voices_cache"][api_key_hash]
+
+
+def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
+    r = requests.get(
+        "https://api.elevenlabs.io/v1/voices",
+        headers={"Accept": "application/json",
+                 "xi-api-key": api_key},
+    )
+    r.raise_for_status()
+    sorted_voices = sorted(
+        r.json()["voices"],
+        key=lambda v: (int(v["category"] == "premade"), v["name"]),
+    )
+    return {
+        v["voice_id"]: f"{v['name']} ({v['voice_id']})"
+        for v in sorted_voices
+    }
 
 
 def _pretty_voice(voice) -> str:

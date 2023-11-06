@@ -91,6 +91,8 @@ class BasePage:
     slug_versions: list[str]
 
     sane_defaults: dict = {}
+    private_fields: list = []
+
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
 
@@ -1129,6 +1131,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def is_current_user_paying(self) -> bool:
         return bool(self.request and self.request.user and self.request.user.is_paying)
+
+    def is_current_user_owner(self) -> bool:
+        return bool(self.request and self.request.user and self.run_user == self.request.user)
 
 
 def get_example_request_body(
