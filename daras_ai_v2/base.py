@@ -206,7 +206,7 @@ class BasePage:
             with st.link(
                 to=self.app_url(), className="text-decoration-none", target="_blank"
             ):
-                st.write(f"# {self.title}")
+                st.write(f"# {self.get_page_title()}")
 
         st.write(st.session_state.get(StateKeys.page_notes))
 
