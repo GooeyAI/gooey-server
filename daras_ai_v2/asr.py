@@ -579,7 +579,13 @@ def check_wav_audio_format(filename: str) -> bool:
         filename,
     ]
     print("\t$ " + " ".join(args))
-    data = json.loads(subprocess.check_output(args))
+    try:
+        data = json.loads(subprocess.check_output(args, stderr=subprocess.STDOUT))
+    except subprocess.CalledProcessError as e:
+        ffmpeg_output_error = ValueError(e.output, e)
+        raise ValueError(
+            "Invalid audio file. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
+        ) from ffmpeg_output_error
     return (
         len(data["streams"]) == 1
         and data["streams"][0]["codec_name"] == "pcm_s16le"

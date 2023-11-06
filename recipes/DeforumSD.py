@@ -415,13 +415,13 @@ Choose fps for the video.
         output_video = st.session_state.get("output_video")
         if output_video:
             st.write("Output Video")
-            st.video(output_video)
+            st.video(output_video, autoplay=True)
 
     def render_example(self, state: dict):
         display = self.preview_input(state)
         st.markdown("```lua\n" + display + "\n```")
 
-        st.video(state.get("output_video"))
+        st.video(state.get("output_video"), autoplay=True)
 
     def preview_input(self, state: dict) -> str:
         input_prompt = state.get("input_prompt")
