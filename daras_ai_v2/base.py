@@ -938,7 +938,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         grid_layout(3, run_history, _render)
 
         next_url = (
-            furl(self._get_current_app_url()) / MenuTabs.paths[MenuTabs.history] / "/"
+            furl(self._get_current_app_url(), query_params=self.request.query_params)
+            / MenuTabs.paths[MenuTabs.history]
+            / "/"
         )
         next_url.query.params.set(
             "updated_at__lt", run_history[-1].to_dict()["updated_at"]
