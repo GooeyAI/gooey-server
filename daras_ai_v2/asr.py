@@ -522,7 +522,17 @@ def _get_or_create_recognizer(
 def azure_asr(
     audio_url: str,
     language: str = "en-US",
-    candidate_languages: list[str] = ["es-ES", "zh-CN", "da-DK"],
+    candidate_languages: list[str] = [
+        "es-ES",
+        "zh-CN",
+        "ru-RU",
+        "fr-FR",
+        "de-DE",
+        "te-IN",
+        "ar-SA",
+        "hi-IN",
+        "ko-KR",
+    ],
 ):
     # transcription from audio url only supported via rest api or cli
     # Start by initializing a request
