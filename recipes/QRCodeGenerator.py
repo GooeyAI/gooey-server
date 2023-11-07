@@ -560,6 +560,8 @@ def generate_and_upload_qr_code(
     user: AppUser,
 ) -> tuple[str, str, bool]:
     if request.qr_code_vcard:
+        if request.qr_code_vcard.urls and request.qr_code_vcard.calendar_url:
+            request.qr_code_vcard.urls += [request.qr_code_vcard.calendar_url]
         vcf_str = request.qr_code_vcard.to_vcf_str()
         qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
             content=vcf_str,
