@@ -1678,19 +1678,23 @@ protobuf = ">=3.19.5,<3.20.0 || >3.20.0,<3.20.1 || >3.20.1,<4.21.0 || >4.21.0,<4
 
 [[package]]
 name = "google-cloud-translate"
-version = "2.0.4"
-description = "Google Cloud Translation API client library"
+version = "3.12.1"
+description = "Google Cloud Translate API client library"
 optional = false
-python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
+python-versions = ">=3.7"
 files = [
-    {file = "google-cloud-translate-2.0.4.tar.gz", hash = "sha256:4c80b1d737f922d6ac85e172836dceac46fa6482b156d45512e6782b7f4a87e2"},
-    {file = "google_cloud_translate-2.0.4-py2.py3-none-any.whl", hash = "sha256:65b37d49ecb841f34b63d2597d83e837803c926ab6cee24edef158a80efe3141"},
+    {file = "google-cloud-translate-3.12.1.tar.gz", hash = "sha256:661cb8879aa3c63a2f725a3ea68f90199bd354c95ca169cc2e83a5105987d29e"},
+    {file = "google_cloud_translate-3.12.1-py2.py3-none-any.whl", hash = "sha256:2a0f6aa398a64d7836d0f2880dfd023be0de05f8b688ac537825391014fc114a"},
 ]
 
 [package.dependencies]
-google-api-core = {version = ">=1.31.5,<2.0.dev0 || >2.3.0,<3.0.0dev", extras = ["grpc"]}
-google-cloud-core = ">=1.1.0,<3.0dev"
-protobuf = "<4.0.0dev"
+google-api-core = {version = ">=1.34.0,<2.0.dev0 || >=2.11.dev0,<3.0.0dev", extras = ["grpc"]}
+google-cloud-core = ">=1.4.4,<3.0.0dev"
+proto-plus = [
+    {version = ">=1.22.2,<2.0.0dev", markers = "python_version >= \"3.11\""},
+    {version = ">=1.22.0,<2.0.0dev", markers = "python_version < \"3.11\""},
+]
+protobuf = ">=3.19.5,<3.20.0 || >3.20.0,<3.20.1 || >3.20.1,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<5.0.0dev"
 
 [[package]]
 name = "google-crc32c"
@@ -4613,18 +4617,22 @@ files = [
 
 [[package]]
 name = "replicate"
-version = "0.4.0"
+version = "0.15.8"
 description = "Python client for Replicate"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.8"
 files = [
-    {file = "replicate-0.4.0.tar.gz", hash = "sha256:8347121312608750d94c6826729c62d0717a4bda8c6f339e47326695442257d1"},
+    {file = "replicate-0.15.8-py3-none-any.whl", hash = "sha256:a5a42e1b2f8a091325ebb7fb14f2c000e79bf818ef1d085730a8247fe28a9067"},
+    {file = "replicate-0.15.8.tar.gz", hash = "sha256:a6ca2be3ed5cfe6c3e24602caa61210279b821a5f91ccf818e4c5165ab8db51a"},
 ]
 
 [package.dependencies]
+httpx = ">=0.21.0,<1"
 packaging = "*"
-pydantic = "*"
-requests = "*"
+pydantic = ">1"
+
+[package.extras]
+dev = ["mypy", "pylint", "pytest", "pytest-asyncio", "pytest-recording", "respx", "ruff (>=0.1.3)"]
 
 [[package]]
 name = "requests"
@@ -6177,4 +6185,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "78fa25e27cbe5a456cab0ae17e431670dee1b34e4706a090918bad84045430fb"
+content-hash = "8e790e1ba90843a0ba41bc725d5310a0acb4d69c8d4e02a752d242e2e7909c50"

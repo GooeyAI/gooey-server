@@ -89,7 +89,7 @@ def gdrive_metadata(file_id: str) -> dict:
         .get(
             supportsAllDrives=True,
             fileId=file_id,
-            fields="name,md5Checksum,modifiedTime,mimeType",
+            fields="name,md5Checksum,modifiedTime,mimeType,size",
         )
         .execute()
     )

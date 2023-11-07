@@ -47,6 +47,7 @@ from daras_ai_v2.search_ref import (
     remove_quotes,
 )
 from daras_ai_v2.text_splitter import text_splitter, puncts, Document
+from files.models import FileMetadata
 
 
 class DocSearchRequest(BaseModel):
@@ -243,10 +244,14 @@ class DocMetadata(typing.NamedTuple):
     etag: str | None
     mime_type: str | None
 
+    @classmethod
+    def from_file_metadata(cls, meta: FileMetadata):
+        return cls(meta.name, meta.etag, meta.mime_type)
+
 
 def doc_url_to_metadata(f_url: str) -> DocMetadata:
     """
-    Fetches the google drive metadata for a document url
+    Fetches the metadata for a document url
 
     Args:
         f_url: document url
@@ -254,6 +259,10 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
     Returns:
         document metadata
     """
+    return DocMetadata.from_file_metadata(doc_url_to_file_metadata(f_url))
+
+
+def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
     f = furl(f_url.strip("/"))
     if is_gdrive_url(f):
         # extract filename from google drive metadata
@@ -270,6 +279,7 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
         name = meta["name"]
         etag = meta.get("md5Checksum") or meta.get("modifiedTime")
         mime_type = meta["mimeType"]
+        total_bytes = int(meta.get("size") or 0)
     else:
         try:
             r = requests.head(
@@ -280,17 +290,19 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
             r.raise_for_status()
         except requests.RequestException as e:
             print(f"ignore error while downloading {f_url}: {e}")
+            name = None
             mime_type = None
             etag = None
-            name = None
+            total_bytes = 0
         else:
-            mime_type = get_mimetype_from_response(r)
-            etag = r.headers.get("etag", r.headers.get("last-modified"))
             name = (
                 r.headers.get("content-disposition", "")
                 .split("filename=")[-1]
                 .strip('"')
             )
+            etag = r.headers.get("etag", r.headers.get("last-modified"))
+            mime_type = get_mimetype_from_response(r)
+            total_bytes = int(r.headers.get("content-length") or 0)
     # extract filename from url as a fallback
     if not name:
         if is_user_uploaded_url(str(f)):
@@ -300,7 +312,9 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
     # guess mimetype from name as a fallback
     if not mime_type:
         mime_type = mimetypes.guess_type(name)[0]
-    return DocMetadata(name, etag, mime_type)
+    return FileMetadata(
+        name=name, etag=etag, mime_type=mime_type, total_bytes=total_bytes
+    )
 
 
 @redis_cache_decorator

@@ -48,7 +48,7 @@ def threadpool_subtest(subtests, max_workers: int = 8):
     ts = []
 
     def submit(fn, *args, **kwargs):
-        msg = "--".join(map(str, args))
+        msg = "--".join(map(str, [*args, *kwargs.values()]))
 
         @wraps(fn)
         def runner(*args, **kwargs):

@@ -7,10 +7,11 @@ from enum import Enum
 import langcodes
 import requests
 import typing_extensions
+from django.db.models import F
 from furl import furl
 
 import gooey_ui as st
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2.gdrive_downloader import (
     is_gdrive_url,
     gdrive_download,
@@ -20,7 +21,6 @@ from daras_ai_v2.gdrive_downloader import (
 from daras_ai_v2 import settings
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gpu_server import (
-    GpuEndpoints,
     call_celery_task,
 )
 from daras_ai_v2.redis_cache import redis_cache_decorator
@@ -168,7 +168,8 @@ def asr_language_selector(
 def run_google_translate(
     texts: list[str],
     target_language: str,
-    source_language: str = None,
+    source_language: str | None = None,
+    glossary_url: str | None = None,
 ) -> list[str]:
     """
     Translate text using the Google Translate API.
@@ -176,6 +177,7 @@ def run_google_translate(
         texts (list[str]): Text to be translated.
         target_language (str): Language code to translate to.
         source_language (str): Language code to translate from.
+        glossary_url (str): URL of glossary file.
     Returns:
         list[str]: Translated text.
     """
@@ -190,18 +192,26 @@ def run_google_translate(
         language_codes = [detection["language"] for detection in detections]
 
     return map_parallel(
-        lambda text, source: _translate_text(text, source, target_language),
+        lambda text, source: _translate_text(
+            text, source, target_language, glossary_url
+        ),
         texts,
         language_codes,
     )
 
 
-def _translate_text(text: str, source_language: str, target_language: str):
+def _translate_text(
+    text: str,
+    source_language: str,
+    target_language: str,
+    glossary_url: str | None,
+) -> str:
     is_romanized = source_language.endswith("-Latn")
     source_language = source_language.replace("-Latn", "")
     enable_transliteration = (
         is_romanized and source_language in TRANSLITERATION_SUPPORTED
     )
+
     # prevent incorrect API calls
     if source_language == target_language or not text:
         return text
@@ -209,29 +219,42 @@ def _translate_text(text: str, source_language: str, target_language: str):
     if source_language == "wo-SN" or target_language == "wo-SN":
         return _MinT_translate_one_text(text, source_language, target_language)
 
+    config = {
+        "source_language_code": source_language,
+        "target_language_code": target_language,
+        "contents": text,
+        "mime_type": "text/plain",
+        "transliteration_config": {"enable_transliteration": enable_transliteration},
+    }
+
+    # glossary does not work with transliteration
+    if glossary_url and not enable_transliteration:
+        from glossary_resources.models import GlossaryResource
+
+        gr = GlossaryResource.objects.get_or_create_from_url(glossary_url)[0]
+        GlossaryResource.objects.filter(pk=gr.pk).update(
+            usage_count=F("usage_count") + 1
+        )
+        location = gr.location
+        config["glossary_config"] = {
+            "glossary": gr.get_glossary_path(),
+            "ignoreCase": True,
+        }
+    else:
+        location = "global"
+
     authed_session, project = get_google_auth_session()
     res = authed_session.post(
-        f"https://translation.googleapis.com/v3/projects/{project}/locations/global:translateText",
-        json.dumps(
-            {
-                "source_language_code": source_language,
-                "target_language_code": target_language,
-                "contents": text,
-                "mime_type": "text/plain",
-                "transliteration_config": {
-                    "enable_transliteration": enable_transliteration
-                },
-            }
-        ),
-        headers={
-            "Content-Type": "application/json",
-        },
+        f"https://translation.googleapis.com/v3/projects/{project}/locations/{location}:translateText",
+        json=config,
     )
     res.raise_for_status()
     data = res.json()
-    result = data["translations"][0]
-
-    return result["translatedText"].strip()
+    try:
+        result = data["glossaryTranslations"][0]["translatedText"]
+    except (KeyError, IndexError):
+        result = data["translations"][0]["translatedText"]
+    return result.strip()
 
 
 _session = None
@@ -346,8 +369,7 @@ def run_asr(
         )
 
     elif selected_model == AsrModels.usm:
-        # note: only us-central1 and a few other regions support chirp recognizers (so global can't be used)
-        location = "us-central1"
+        location = settings.GCP_REGION
 
         # Create a client
         options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
@@ -379,7 +401,7 @@ def run_asr(
             audio_channel_count=1,
         )
         audio = cloud_speech.BatchRecognizeFileMetadata()
-        audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
+        audio.uri = gs_url_to_uri(audio_url)
         # Specify that results should be inlined in the response (only possible for 1 audio file)
         output_config = cloud_speech.RecognitionOutputConfig()
         output_config.inline_response_config = cloud_speech.InlineOutputConfig()

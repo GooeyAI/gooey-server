@@ -1,4 +1,5 @@
 import hashlib
+import os.path
 import pickle
 import typing
 from functools import wraps, lru_cache
@@ -25,15 +26,17 @@ def redis_cache_decorator(fn: F) -> F:
         cache_key = f"gooey/redis-cache-decorator/v1/{fn.__name__}/{args_hash}"
         # get the redis cache
         redis_cache = get_redis_cache()
-        cache_val = redis_cache.get(cache_key)
-        # if the cache exists, return it
-        if cache_val:
-            return pickle.loads(cache_val)
-        # otherwise, run the function and cache the result
-        else:
-            result = fn(*args, **kwargs)
-            cache_val = pickle.dumps(result)
-            redis_cache.set(cache_key, cache_val)
-            return result
+        # lock the cache key so that only one thread can run the function
+        with redis_cache.lock(os.path.join(cache_key, "lock")):
+            cache_val = redis_cache.get(cache_key)
+            # if the cache exists, return it
+            if cache_val:
+                return pickle.loads(cache_val)
+            # otherwise, run the function and cache the result
+            else:
+                result = fn(*args, **kwargs)
+                cache_val = pickle.dumps(result)
+                redis_cache.set(cache_key, cache_val)
+                return result
 
     return wrapper
