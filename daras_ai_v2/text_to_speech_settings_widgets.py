@@ -239,11 +239,12 @@ def text_to_speech_settings(page=None):
                 )
                 if elevenlabs_use_custom_key:
                     st.session_state["elevenlabs_voice_name"] = None
-                    elevenlabs_api_key = st.password_input(
+                    elevenlabs_api_key = st.text_input(
                         """
                         ###### Your ElevenLabs API key
-                        *Refer <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">here</a>
-                        for how to obtain an API key from ElevenLabs.*
+                        *Read <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">this</a>
+                        to know how to obtain an API key from
+                        ElevenLabs.*
                         """,
                         key="elevenlabs_api_key",
                     )
@@ -264,16 +265,10 @@ def text_to_speech_settings(page=None):
                             st.error(
                                 f"Invalid ElevenLabs API key. Failed to fetch voices: {e}"
                             )
-                        else:
-                            if selected_voice_id not in elevenlabs_voices:
-                                st.error(
-                                    f"Selected ElevenLabs voice ID is not available in your account: {selected_voice_id}"
-                                )
 
                     st.selectbox(
                         """
                         ###### Voice ID (ElevenLabs)
-                        *Enter an API key to list the available voices in your account.*
                         """,
                         key="elevenlabs_voice_id",
                         options=elevenlabs_voices.keys(),
@@ -294,18 +289,18 @@ def text_to_speech_settings(page=None):
                             Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
                             """
                         )
-                    else:
-                        st.session_state.update(
-                            elevenlabs_api_key=None, elevenlabs_voice_id=None
-                        )
-                        st.selectbox(
-                            """
-                            ###### Voice Name (ElevenLabs)
-                            """,
-                            key="elevenlabs_voice_name",
-                            format_func=str,
-                            options=ELEVEN_LABS_VOICES.keys(),
-                        )
+
+                    st.session_state.update(
+                        elevenlabs_api_key=None, elevenlabs_voice_id=None
+                    )
+                    st.selectbox(
+                        """
+                        ###### Voice Name (ElevenLabs)
+                        """,
+                        key="elevenlabs_voice_name",
+                        format_func=str,
+                        options=ELEVEN_LABS_VOICES.keys(),
+                    )
 
                 st.selectbox(
                     """
@@ -363,6 +358,8 @@ def google_tts_voices() -> dict[str, str]:
     voices.sort(key=_voice_sort_key)
     return {voice.name: _pretty_voice(voice) for voice in voices}
 
+def _pretty_voice(voice) -> str:
+    return f"{voice.name} ({voice.ssml_gender.name.capitalize()})"
 
 def get_cached_elevenlabs_voices(state, api_key) -> dict[str, str]:
     api_key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:40]
@@ -384,11 +381,8 @@ def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
         r.json()["voices"],
         key=lambda v: (int(v["category"] == "premade"), v["name"]),
     )
-    return {v["voice_id"]: f"{v['name']} ({v['voice_id']})" for v in sorted_voices}
-
-
-def _pretty_voice(voice) -> str:
-    return f"{voice.name} ({voice.ssml_gender.name.capitalize()})"
+    describe_voice = lambda v: ", ".join(v["labels"].values())
+    return {v["voice_id"]: f"{v['name']} - {describe_voice(v)}" for v in sorted_voices}
 
 
 _lang_code_sort = ["en-US", "en-IN", "en-GB", "en-AU"]
