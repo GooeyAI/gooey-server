@@ -136,7 +136,7 @@ class QRCodeGeneratorPage(BasePage):
                 if st.session_state.get(key):
                     st.session_state[qr_code_source_key] = key
                     break
-        source = st.radio(
+        source = st.horizontal_radio(
             "",
             options=QrSources._member_names_,
             key=qr_code_source_key,

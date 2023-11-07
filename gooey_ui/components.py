@@ -553,6 +553,45 @@ def table(df: "pd.DataFrame"):
     ).mount()
 
 
+def horizontal_radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+) -> T | None:
+    if not options:
+        return None
+    options = list(options)
+    if not key:
+        key = md5_values("radio", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if key not in state.session_state or value not in options:
+        value = options[0]
+    state.session_state.setdefault(key, value)
+    if label_visibility != "visible":
+        label = None
+    markdown(label)
+    for option in options:
+        if button(
+            format_func(option),
+            key=f"tab-{key}-{option}",
+            type="primary",
+            className="replicate-nav",
+            style={
+                "background": "black" if value == option else "white",
+                "color": "white" if value == option else "black",
+            },
+            disabled=disabled,
+        ):
+            state.session_state[key] = value = option
+            state.experimental_rerun()
+    return value
+
+
 def radio(
     label: str,
     options: typing.Sequence[T],
