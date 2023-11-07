@@ -104,6 +104,8 @@ class QRCodeGeneratorPage(BasePage):
         cleaned_qr_code: str
 
     def preview_image(self, state: dict) -> str | None:
+        if len(state.get("output_images") or []) > 0:
+            return state["output_images"][0]
         return DEFAULT_QR_CODE_META_IMG
 
     def related_workflows(self) -> list:
