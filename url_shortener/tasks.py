@@ -1,5 +1,4 @@
 import requests
-import user_agents
 from furl import furl
 
 from celeryapp import app
@@ -8,6 +7,8 @@ from url_shortener.models import VisitorClickInfo
 
 @app.task
 def save_click_info(surl_id: int, ip_address: str, user_agent: str):
+    import user_agents
+
     if user_agent:
         ua_data = user_agents.parse(user_agent)
         browser = ua_data.browser._asdict()
