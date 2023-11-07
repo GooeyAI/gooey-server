@@ -279,7 +279,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
         name = meta["name"]
         etag = meta.get("md5Checksum") or meta.get("modifiedTime")
         mime_type = meta["mimeType"]
-        total_bytes = int(meta.get("filesize") or 0)
+        total_bytes = int(meta.get("size") or 0)
     else:
         try:
             r = requests.head(

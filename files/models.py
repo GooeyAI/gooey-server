@@ -1,4 +1,5 @@
 from django.db import models
+from django.template.defaultfilters import filesizeformat
 
 
 class FileMetadata(models.Model):
@@ -8,4 +9,7 @@ class FileMetadata(models.Model):
     total_bytes = models.PositiveIntegerField(default=0, blank=True)
 
     def __str__(self):
-        return f"{self.name or self.etag} ({self.mime_type})"
+        ret = f"{self.name or self.etag} ({self.mime_type})"
+        if self.total_bytes:
+            ret += f" - {filesizeformat(self.total_bytes)}"
+        return ret

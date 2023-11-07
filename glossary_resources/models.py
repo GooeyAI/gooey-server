@@ -27,7 +27,16 @@ class GlossaryResourceQuerySet(models.QuerySet):
     def get_or_create_from_url(self, url: str) -> tuple["GlossaryResource", bool]:
         metadata = doc_url_to_file_metadata(url)
         try:
-            return GlossaryResource.objects.get(f_url=url), False
+            return (
+                GlossaryResource.objects.get(
+                    f_url=url,
+                    metadata__name=metadata.name,
+                    metadata__etag=metadata.etag,
+                    metadata__mime_type=metadata.mime_type,
+                    metadata__total_bytes=metadata.total_bytes,
+                ),
+                False,
+            )
         except GlossaryResource.DoesNotExist:
             try:
                 gr = create_glossary_cached(
@@ -54,8 +63,10 @@ class GlossaryResourceQuerySet(models.QuerySet):
 def create_glossary_cached(url: str, doc_meta: DocMetadata) -> "GlossaryResource":
     f_bytes, ext = download_content_bytes(f_url=url, mime_type=doc_meta.name)
     df = bytes_to_df(f_name=doc_meta.name, f_bytes=f_bytes, ext=ext)
-    if not is_user_uploaded_url(url):
-        url = upload_file_from_bytes(
+    if is_user_uploaded_url(url):
+        glossary_url = url
+    else:
+        glossary_url = upload_file_from_bytes(
             doc_meta.name + ".csv",
             df.to_csv(index=False).encode(),
             content_type="text/csv",
@@ -65,11 +76,11 @@ def create_glossary_cached(url: str, doc_meta: DocMetadata) -> "GlossaryResource
         language_codes=get_langcodes_from_df(df),
         project_id=settings.GCP_PROJECT,
         location=settings.GCP_REGION,
-        glossary_uri=gs_url_to_uri(url),
+        glossary_url=glossary_url,
     )
     create_glossary(
         language_codes=gr.language_codes,
-        input_uri=gr.glossary_uri,
+        input_uri=gs_url_to_uri(gr.glossary_url),
         project_id=gr.project_id,
         location=gr.location,
         glossary_name=gr.glossary_name,
@@ -78,15 +89,15 @@ def create_glossary_cached(url: str, doc_meta: DocMetadata) -> "GlossaryResource
 
 
 class GlossaryResource(models.Model):
-    f_url = CustomURLField(unique=True)
+    f_url = CustomURLField(unique=True, verbose_name="File URL")
     metadata = models.ForeignKey(
         "files.FileMetadata",
         on_delete=models.CASCADE,
         related_name="glossary_resources",
     )
 
-    language_codes = models.JSONField()
-    glossary_uri = models.TextField()
+    language_codes = models.JSONField(default=list)
+    glossary_url = CustomURLField()
     glossary_id = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     project_id = models.CharField(max_length=100, default=settings.GCP_PROJECT)
     location = models.CharField(max_length=100, default=settings.GCP_REGION)
