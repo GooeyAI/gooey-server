@@ -280,14 +280,14 @@ class LastActiveDeltaFilter(admin.SimpleListFilter):
 class ConversationAdmin(admin.ModelAdmin):
     list_display = [
         "get_display_name",
-        "bot_integration",
-        "created_at",
-        "view_last_msg",
         "view_messages",
-        "view_last_active_delta",
         "d1",
         "d7",
         "d30",
+        "view_last_msg",
+        "bot_integration",
+        "created_at",
+        "view_last_active_delta",
     ]
     readonly_fields = [
         "created_at",
