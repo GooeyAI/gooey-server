@@ -3,6 +3,7 @@ import typing
 
 import requests
 from pydantic import BaseModel
+import glom
 
 import gooey_ui as st
 from bots.models import Workflow
@@ -12,6 +13,10 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from recipes.EmailFaceInpainting import (
+    get_stored_photo_for_email,
+    update_stored_photo_for_email,
+)
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/email%20ver%202.png"
@@ -246,3 +251,102 @@ def get_profile_for_email(email_address) -> dict | None:
         return
 
     return person
+
+
+def extend_profile_for_email(email_address, profile_to_extend) -> None:
+    seon_profile = get_profile_for_email_seon(email_address)
+    if not seon_profile:
+        return
+
+    account_details = glom.glom(seon_profile, "data.account_details", default={})
+    for spec in [
+        "linkedin.name",
+        "facebook.name",
+        "airbnb.first_name",
+        "skype.name",
+        "flickr.username",
+        "gravatar.name",
+    ]:
+        profile_to_extend["name"] = profile_to_extend.get("name") or glom.glom(
+            account_details, spec, default=None
+        )
+
+    for spec in ["linkedin.title"]:
+        profile_to_extend["title"] = profile_to_extend.get("title") or glom.glom(
+            account_details, spec, default=None
+        )
+
+    profile_to_extend["photo"] = profile_to_extend.get(
+        "photo"
+    ) or get_stored_photo_for_email(email_address)
+    profile_to_extend["photo"] = profile_to_extend.get(
+        "photo"
+    ) or update_stored_photo_for_email(email_address, seon_profile)
+
+    profile_to_extend["facebook_url"] = profile_to_extend.get(
+        "facebook_url"
+    ) or glom.glom(account_details, "facebook.url", default=None)
+    profile_to_extend["linkedin_url"] = profile_to_extend.get(
+        "linkedin_url"
+    ) or glom.glom(account_details, "linkedin.url", default=None)
+    profile_to_extend["twitter_url"] = profile_to_extend.get(
+        "twitter_url"
+    ) or glom.glom(account_details, "linkedin.twitter", default=None)
+
+    for spec in [
+        "skype.bio",
+        "foursquare.bio",
+    ]:
+        profile_to_extend["headline"] = profile_to_extend.get("headline") or glom.glom(
+            account_details, spec, default=None
+        )
+
+    profile_to_extend["organization"] = profile_to_extend.get("organization") or {}
+    for spec in [
+        "linkedin.company",
+    ]:
+        profile_to_extend["organization"]["name"] = profile_to_extend[
+            "organization"
+        ].get("name") or glom.glom(account_details, spec, default=None)
+
+    for spec in [
+        "skype.city",
+        "ok.city",
+    ]:
+        profile_to_extend["city"] = profile_to_extend.get("city") or glom.glom(
+            account_details, spec, default=None
+        )
+    for spec in [
+        "skype.state",
+        "airbnb.location",
+    ]:
+        profile_to_extend["state"] = profile_to_extend.get("state") or glom.glom(
+            account_details, spec, default=None
+        )
+    for spec in [
+        "skype.country",
+        "linkedin.location",
+        "gravatar.location",
+    ]:
+        profile_to_extend["country"] = profile_to_extend.get("country") or glom.glom(
+            account_details, spec, default=None
+        )
+
+
+@redis_cache_decorator
+def get_profile_for_email_seon(email_address) -> dict | None:
+    try:
+        r = requests.get(
+            f"https://api.seon.io/SeonRestService/email-api/v2.2/{email_address}",
+            headers={"X-API-KEY": settings.SEON_API_KEY},
+        )
+        r.raise_for_status()
+    except requests.exceptions.HTTPError:
+        # us region lock
+        r = requests.get(
+            f"https://api.us-east-1-main.seon.io/SeonRestService/email-api/v2.2/{email_address}",
+            headers={"X-API-KEY": settings.SEON_API_KEY},
+        )
+        r.raise_for_status()
+
+    return r.json()

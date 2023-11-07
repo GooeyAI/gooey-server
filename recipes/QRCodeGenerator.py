@@ -34,8 +34,7 @@ from daras_ai_v2.stable_diffusion import (
     Schedulers,
 )
 from daras_ai_v2.vcard import VCARD
-from recipes.EmailFaceInpainting import get_photo_for_email
-from recipes.SocialLookupEmail import get_profile_for_email
+from recipes.SocialLookupEmail import get_profile_for_email, extend_profile_for_email
 from url_shortener.models import ShortenedURL
 
 ATTEMPTS = 1
@@ -631,16 +630,19 @@ class InvalidQRCode(AssertionError):
 def get_vcard_from_email(
     email: str, url_fields=("github_url", "linkedin_url", "facebook_url", "twitter_url")
 ) -> VCARD | None:
-    person = get_profile_for_email(email)
+    try:
+        person = get_profile_for_email(email)
+        extend_profile_for_email(email, person)
+    except requests.exceptions.HTTPError:
+        return None
     if not person:
         return None
-    photo_url = get_photo_for_email(email)
     return VCARD(
         email=email,
         format_name=person.get("name") or "",
         tel=person.get("phone"),
         role=person.get("title"),
-        photo_url=photo_url,
+        photo_url=person.get("photo"),
         urls=list(set(filter(None, [person.get(field, "") for field in url_fields]))),
         note=person.get("headline"),
         organization=person.get("organization", {}).get("name"),
