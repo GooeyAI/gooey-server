@@ -580,11 +580,7 @@ def horizontal_radio(
             format_func(option),
             key=f"tab-{key}-{option}",
             type="primary",
-            className="replicate-nav",
-            style={
-                "background": "black" if value == option else "white",
-                "color": "white" if value == option else "black",
-            },
+            className="replicate-nav " + ("active" if value == option else ""),
             disabled=disabled,
         ):
             state.session_state[key] = value = option
