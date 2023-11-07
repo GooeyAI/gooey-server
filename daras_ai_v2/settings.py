@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
     "app_users",
+    "files",
     "url_shortener",
     "glossary_resources",
 ]

@@ -47,6 +47,7 @@ from daras_ai_v2.search_ref import (
     remove_quotes,
 )
 from daras_ai_v2.text_splitter import text_splitter, puncts, Document
+from files.models import FileMetadata
 
 
 class DocSearchRequest(BaseModel):
@@ -242,12 +243,15 @@ class DocMetadata(typing.NamedTuple):
     name: str
     etag: str | None
     mime_type: str | None
-    total_bytes: int = 0
+
+    @classmethod
+    def from_file_metadata(cls, meta: FileMetadata):
+        return cls(meta.name, meta.etag, meta.mime_type)
 
 
 def doc_url_to_metadata(f_url: str) -> DocMetadata:
     """
-    Fetches the google drive metadata for a document url
+    Fetches the metadata for a document url
 
     Args:
         f_url: document url
@@ -255,6 +259,10 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
     Returns:
         document metadata
     """
+    return DocMetadata.from_file_metadata(doc_url_to_file_metadata(f_url))
+
+
+def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
     f = furl(f_url.strip("/"))
     if is_gdrive_url(f):
         # extract filename from google drive metadata
@@ -304,7 +312,9 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
     # guess mimetype from name as a fallback
     if not mime_type:
         mime_type = mimetypes.guess_type(name)[0]
-    return DocMetadata(name, etag, mime_type, total_bytes)
+    return FileMetadata(
+        name=name, etag=etag, mime_type=mime_type, total_bytes=total_bytes
+    )
 
 
 @redis_cache_decorator

@@ -2,7 +2,6 @@ import uuid
 
 from django.db import models, IntegrityError, transaction
 
-from app_users.models import FileMetadata
 from bots.custom_fields import CustomURLField
 from daras_ai.image_input import gs_url_to_uri, upload_file_from_bytes
 from daras_ai_v2 import settings
@@ -14,32 +13,33 @@ from daras_ai_v2.glossary import (
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.vector_search import (
     doc_url_to_metadata,
+    doc_url_to_file_metadata,
 )
 from daras_ai_v2.vector_search import (
     download_content_bytes,
     bytes_to_df,
     DocMetadata,
 )
+from files.models import FileMetadata
 
 
 class GlossaryResourceQuerySet(models.QuerySet):
     def get_or_create_from_url(self, url: str) -> tuple["GlossaryResource", bool]:
-        doc_meta = doc_url_to_metadata(url)
+        metadata = doc_url_to_file_metadata(url)
         try:
             return GlossaryResource.objects.get(f_url=url), False
         except GlossaryResource.DoesNotExist:
             try:
-                gr = create_glossary_cached(url, doc_meta)
+                gr = create_glossary_cached(
+                    url, DocMetadata.from_file_metadata(metadata)
+                )
                 with transaction.atomic():
                     try:
                         gr.id = GlossaryResource.objects.get(f_url=url).id
                     except GlossaryResource.DoesNotExist:
                         pass
-                    gr.metadata = FileMetadata.objects.create(
-                        name=doc_meta.name,
-                        etag=doc_meta.etag,
-                        mime_type=doc_meta.mime_type,
-                    )
+                    metadata.save()
+                    gr.metadata = metadata
                     gr.save()
                     return gr, True
             except IntegrityError:
@@ -80,7 +80,7 @@ def create_glossary_cached(url: str, doc_meta: DocMetadata) -> "GlossaryResource
 class GlossaryResource(models.Model):
     f_url = CustomURLField(unique=True)
     metadata = models.ForeignKey(
-        "app_users.FileMetadata",
+        "files.FileMetadata",
         on_delete=models.CASCADE,
         related_name="glossary_resources",
     )
