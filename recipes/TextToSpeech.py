@@ -47,7 +47,6 @@ class TextToSpeechPage(BasePage):
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
     }
-    private_fields = ["elevenlabs_api_key"]
 
     class RequestModel(BaseModel):
         text_prompt: str
@@ -81,6 +80,16 @@ class TextToSpeechPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
 
+    def before_render(self):
+        super().before_render()
+        if st.session_state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
+            if elevenlabs_api_key := st.session_state.get("elevenlabs_api_key"):
+                self.request.session["state"] = dict(elevenlabs_api_key=elevenlabs_api_key)
+            elif "elevenlabs_api_key" in self.request.session.get("state", {}):
+                st.session_state["elevenlabs_api_key"] = self.request.session["state"][
+                    "elevenlabs_api_key"
+                ]
+
     def render_description(self):
         st.write(
             """
@@ -102,6 +111,12 @@ class TextToSpeechPage(BasePage):
             """,
             key="text_prompt",
         )
+
+    def fields_to_save(self):
+        fields = super().fields_to_save()
+        if "elevenlabs_api_key" in fields:
+            fields.remove("elevenlabs_api_key")
+        return fields
 
     def validate_form_v2(self):
         assert st.session_state["text_prompt"], "Text input cannot be empty"
@@ -130,9 +145,13 @@ class TextToSpeechPage(BasePage):
             st.div()
 
     def _get_eleven_labs_price(self, state: dict):
-        text = state.get("text_prompt", "")
-        # 0.079 credits / character ~ 4 credits / 10 words
-        return len(text) * 0.079
+        _, is_user_provided_key = self._get_elevenlabs_api_key(state)
+        if is_user_provided_key:
+            return 0
+        else:
+            text = state.get("text_prompt", "")
+            # 0.079 credits / character ~ 4 credits / 10 words
+            return len(text) * 0.079
 
     def _get_tts_provider(self, state: dict):
         tts_provider = state.get("tts_provider", TextToSpeechProviders.UBERDUCK.name)
@@ -142,9 +161,15 @@ class TextToSpeechPage(BasePage):
     def additional_notes(self):
         tts_provider = st.session_state.get("tts_provider")
         if tts_provider == TextToSpeechProviders.ELEVEN_LABS.name:
-            return """
-                *Eleven Labs cost ≈ 4 credits per 10 words*
-            """
+            _, is_user_provided_key = self._get_elevenlabs_api_key(st.session_state)
+            if is_user_provided_key:
+                return """
+                    *Eleven Labs cost ≈ No additional credit charge given we'll use your API key*
+                """
+            else:
+                return """
+                    *Eleven Labs cost ≈ 4 credits per 10 words*
+                """
         else:
             return ""
 
@@ -242,7 +267,7 @@ class TextToSpeechPage(BasePage):
                 )
 
             case TextToSpeechProviders.ELEVEN_LABS:
-                xi_api_key = self._get_elevenlabs_api_key(state)
+                xi_api_key, _ = self._get_elevenlabs_api_key(state)
                 voice_model = self._get_elevenlabs_voice_model(state)
                 voice_id = self._get_elevenlabs_voice_id(state)
 
@@ -290,17 +315,20 @@ class TextToSpeechPage(BasePage):
             assert voice_name in ELEVEN_LABS_VOICES, f"Invalid voice_name: {voice_name}"
             return ELEVEN_LABS_VOICES[voice_name]  # voice_name -> voice_id
 
-    def _get_elevenlabs_api_key(self, state: dict[str, str]):
+    def _get_elevenlabs_api_key(self, state: dict[str, str]) -> tuple[str, bool]:
+        """
+        Returns the 11labs API key and whether it is a user-provided key or the default key
+        """
         # ElevenLabs is available for non-paying users with their own API key
         if state.get("elevenlabs_api_key"):
-            return state["elevenlabs_api_key"]
+            return state["elevenlabs_api_key"], True
         else:
             assert (
                 self.is_current_user_paying() or self.is_current_user_admin()
             ), """
                 Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
                 """
-            return settings.ELEVEN_LABS_API_KEY
+            return settings.ELEVEN_LABS_API_KEY, False
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage

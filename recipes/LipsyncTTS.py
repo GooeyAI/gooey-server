@@ -23,7 +23,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
     }
-    private_fields = ["elevenlabs_api_key"]
 
     class RequestModel(BaseModel):
         input_face: str

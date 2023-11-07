@@ -25,7 +25,7 @@ UBERDUCK_VOICES = {
 
 class TextToSpeechProviders(Enum):
     GOOGLE_TTS = "Google Cloud Text-to-Speech"
-    ELEVEN_LABS = "Eleven Labs (Premium)"
+    ELEVEN_LABS = "Eleven Labs"
     UBERDUCK = "uberduck.ai"
     BARK = "Bark (suno-ai)"
 

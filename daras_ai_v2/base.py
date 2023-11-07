@@ -148,15 +148,21 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
-    def render(self):
+    def before_render(self):
+        """
+        Side-effects to apply before doing the actual render.
+        This shouldn't actually render anything to the page.
+        """
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+    def render(self):
+        self.before_render()
 
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         if st.session_state.get(StateKeys.run_status):
             channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
             output = realtime_pull([channel])[0]

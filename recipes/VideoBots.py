@@ -190,7 +190,6 @@ class VideoBotsPage(BasePage):
         "use_url_shortener": False,
         "dense_weight": 1.0,
     }
-    private_fields = ["elevenlabs_api_key"]
 
     class RequestModel(BaseModel):
         input_prompt: str
@@ -275,6 +274,16 @@ class VideoBotsPage(BasePage):
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COPILOT_META_IMG
+
+    def before_render(self):
+        super().before_render()
+        if st.session_state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
+            if elevenlabs_api_key := st.session_state.get("elevenlabs_api_key"):
+                self.request.session["state"] = dict(elevenlabs_api_key=elevenlabs_api_key)
+            elif "elevenlabs_api_key" in self.request.session.get("state", {}):
+                st.session_state["elevenlabs_api_key"] = self.request.session["state"][
+                    "elevenlabs_api_key"
+                ]
 
     def related_workflows(self):
         from recipes.LipsyncTTS import LipsyncTTSPage
@@ -403,7 +412,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             lipsync_settings()
 
     def fields_to_save(self) -> [str]:
-        return super().fields_to_save() + ["landbot_url"]
+        fields = super().fields_to_save() + ["landbot_url"]
+        if "elevenlabs_api_key" in fields:
+            fields.remove("elevenlabs_api_key")
+        return fields
 
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
