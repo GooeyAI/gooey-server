@@ -44,9 +44,9 @@ DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.co
 
 class QrSources(Enum):
     qr_code_data = "🔗 URL or Text"
-    qr_code_vcard = "👩‍🦰 Contact Info"
+    qr_code_vcard = "📇 Contact Card"
     qr_code_file = "📄 Upload File"
-    qr_code_input_image = "📷 Existing QR Code"
+    qr_code_input_image = "🏁 Existing QR Code"
 
 
 class QRCodeGeneratorPage(BasePage):
