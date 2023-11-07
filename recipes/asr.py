@@ -81,17 +81,79 @@ class AsrPage(BasePage):
         document_uploader(
             "##### Audio Files",
             accept=(
-                ".wav",
-                ".ogg",
-                ".mp3",
-                ".aac",
-                ".opus",
-                ".oga",
-                ".mp4",
-                ".webm",
+                ".aa",  # Audio formats that ffmpeg can demux and decode (https://ffmpeg.org/ffmpeg-formats.html)
                 ".amr",
-                ".aac",
+                ".aac",  # aac demuxer
+                ".m4p",
+                ".m4r",
+                ".mp3",
+                ".asf",  # asf demuxer
+                ".wma",
+                ".wmv",
+                ".xml",  # imf demuxer
+                ".mxf",
+                ".flv",  # flv, live_flv, kux demuxer
+                ".f4v",
+                ".f4p",
+                ".f4a",
+                ".f4b",
+                ".m3u8",  # HLS demuxer
+                ".mov",  # Demuxer for Quicktime File Format & ISO/IEC Base Media File Format (ISO/IEC 14496-12 or MPEG-4 Part 12, ISO/IEC 15444-12 or JPEG 2000 Part 12)
+                ".mp4",
                 ".m4a",
+                ".3gp",
+                ".3g2",
+                ".mj2",
+                ".psp",
+                ".m4b",
+                ".ism",
+                ".ismv",
+                ".isma",
+                ".f4v",
+                ".aax",  # Audible AAX
+                ".aiff",  # Audio Interchange File Format
+                ".aif",
+                ".aifc",
+                ".tun",  # Muxer for audio of High Voltage Software’s Lego Racers game
+                ".pcm",
+                ".ts",  # MPEG Transport Stream
+                ".tsv",
+                ".tsa",
+                ".m2t",
+                ".ogv",  # Ogg
+                ".oga",
+                ".ogx",
+                ".ogg",
+                ".opus",
+                ".ac3",  # Dolby Digital
+                ".adx",  # CRI ADX
+                ".aptx",  # aptX
+                ".aptxhd",
+                ".avs",  # AVS2-P2/IEEE1857.4 video.
+                ".avs2",
+                ".cavs",  # Chinese AVS (Audio Video Standard) video
+                ".drc",  # BBC Dirac video.
+                ".vc2",
+                ".dnxhd",  # Avid DNxHD video
+                ".dnxhr",
+                ".evc",  # MPEG-5 Essential Video Coding (EVC) / EVC / MPEG-5 Part 1 EVC video.
+                ".tco",  # ITU-T G.723.1 audio.
+                ".rco",
+                ".h264",  # ITU-T H.264 / MPEG-4 Part 10 AVC video.
+                ".264",
+                ".hevc",  # ITU-T H.265 / MPEG-H Part 2 HEVC video
+                ".h265",
+                ".265",
+                ".mp2",  # MPEG-1 Audio Layer II
+                ".m2a",
+                ".mpa",
+                ".yuv",  # raw video
+                ".rgb",
+                ".sbc",  # SBC (low-complexity subband codec) audio
+                ".msbc",
+                ".thd",  # Dolby TrueHD audio
+                ".webm",  # WebM
+                ".wav",  # Waveform Audio File Format
             ),
         )
         col1, col2 = st.columns(2, responsive=False)
