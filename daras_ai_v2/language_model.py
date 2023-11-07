@@ -19,6 +19,7 @@ from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
+from daras_ai_v2.text_splitter import default_length_function
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
 
@@ -38,6 +39,7 @@ class LLMApis(Enum):
 
 class LargeLanguageModels(Enum):
     gpt_4 = "GPT-4 (openai)"
+    gpt_4_turbo = "GPT-4 Turbo (openai)"
     gpt_3_5_turbo = "ChatGPT (openai)"
     gpt_3_5_turbo_16k = "ChatGPT 16k (openai)"
 
@@ -61,6 +63,7 @@ class LargeLanguageModels(Enum):
     def is_chat_model(self) -> bool:
         return self in [
             LargeLanguageModels.gpt_4,
+            LargeLanguageModels.gpt_4_turbo,
             LargeLanguageModels.gpt_3_5_turbo,
             LargeLanguageModels.gpt_3_5_turbo_16k,
             LargeLanguageModels.palm2_chat,
@@ -70,6 +73,7 @@ class LargeLanguageModels(Enum):
 
 engine_names = {
     LargeLanguageModels.gpt_4: "gpt-4",
+    LargeLanguageModels.gpt_4_turbo: "gpt-4-1106-preview",
     LargeLanguageModels.gpt_3_5_turbo: "gpt-3.5-turbo",
     LargeLanguageModels.gpt_3_5_turbo_16k: "gpt-3.5-turbo-16k",
     LargeLanguageModels.text_davinci_003: "text-davinci-003",
@@ -85,6 +89,7 @@ engine_names = {
 
 llm_api = {
     LargeLanguageModels.gpt_4: LLMApis.openai,
+    LargeLanguageModels.gpt_4_turbo: LLMApis.openai,
     LargeLanguageModels.gpt_3_5_turbo: LLMApis.openai,
     LargeLanguageModels.gpt_3_5_turbo_16k: LLMApis.openai,
     LargeLanguageModels.text_davinci_003: LLMApis.openai,
@@ -103,6 +108,8 @@ EMBEDDING_MODEL_MAX_TOKENS = 8191
 model_max_tokens = {
     # https://platform.openai.com/docs/models/gpt-4
     LargeLanguageModels.gpt_4: 8192,
+    # https://help.openai.com/en/articles/8555510-gpt-4-turbo
+    LargeLanguageModels.gpt_4_turbo: 128_000,
     # https://platform.openai.com/docs/models/gpt-3-5
     LargeLanguageModels.gpt_3_5_turbo: 4096,
     LargeLanguageModels.gpt_3_5_turbo_16k: 16_384,
@@ -120,8 +127,6 @@ model_max_tokens = {
     LargeLanguageModels.llama2_70b_chat: 4096,
 }
 
-threadlocal = threading.local()
-
 
 def calc_gpt_tokens(
     text: str | list[str] | dict | list[dict],
@@ -129,11 +134,6 @@ def calc_gpt_tokens(
     sep: str = "",
     is_chat_model: bool = True,
 ) -> int:
-    try:
-        enc = threadlocal.gpt2enc
-    except AttributeError:
-        enc = tiktoken.get_encoding("gpt2")
-        threadlocal.gpt2enc = enc
     if isinstance(text, (str, dict)):
         messages = [text]
     else:
@@ -151,7 +151,7 @@ def calc_gpt_tokens(
             else str(entry)
         )
     )
-    return len(enc.encode(combined))
+    return default_length_function(combined)
 
 
 def get_openai_error_cls():

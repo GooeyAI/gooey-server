@@ -7,12 +7,10 @@ import requests
 from django.db.models import IntegerChoices
 from furl import furl
 from pydantic import BaseModel
-from pypdf import PdfWriter, PdfReader
-from daras_ai_v2.loom_video_widget import youtube_video
 
 import gooey_ui as st
 from bots.models import Workflow
-from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
     google_translate_language_selector,
@@ -22,6 +20,7 @@ from daras_ai_v2.asr import (
     run_google_translate,
     audio_url_to_wav,
 )
+from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.azure_doc_extract import azure_doc_extract_pages
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
@@ -34,8 +33,9 @@ from daras_ai_v2.functional import (
 from daras_ai_v2.gdrive_downloader import is_gdrive_url, gdrive_download
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
+from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.settings import service_account_key_path
-from daras_ai_v2.vector_search import doc_url_to_metadata, DocMetadata
+from daras_ai_v2.vector_search import doc_url_to_metadata
 from recipes.DocSearch import render_documents
 
 DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6c8f6876-538c-11ee-bea7-02420a000195/youtube%20bot%201.png.png"
@@ -69,6 +69,7 @@ class DocExtractPage(BasePage):
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         # language: str | None
         google_translate_target: str | None
+        glossary_document: str | None
 
         task_instructions: str | None
 
@@ -123,6 +124,7 @@ class DocExtractPage(BasePage):
         enum_selector(AsrModels, label="##### ASR Model", key="selected_asr_model")
         st.write("---")
         google_translate_language_selector()
+        glossary_input()
         st.write("---")
         # enum_selector(
         #     AsrOutputFormat, label="###### Output Format", key="output_format"
@@ -259,6 +261,8 @@ def col_i2a(col: int) -> str:
 
 
 def extract_info(url: str) -> list[dict | None]:
+    from pypdf import PdfReader
+
     if is_yt_url(url):
         import yt_dlp
 
@@ -330,6 +334,8 @@ def process_source(
     row: int,
     entry: dict,
 ) -> typing.Iterator[str | None]:
+    from pypdf import PdfWriter
+
     webpage_url = entry["webpage_url"]
     doc_meta = entry.get("doc_meta")
 
@@ -400,6 +406,7 @@ def process_source(
                 texts=[transcript],
                 target_language=request.google_translate_target,
                 # source_language=request.language,
+                glossary_url=request.glossary_document,
             )[0]
             update_cell(spreadsheet_id, row, Columns.translation.value, translation)
     else:

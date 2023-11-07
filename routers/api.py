@@ -22,6 +22,7 @@ from starlette.requests import Request
 
 import gooey_ui as st
 from app_users.models import AppUser
+from auth.token_authentication import api_auth_header
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
@@ -29,7 +30,6 @@ from daras_ai_v2.base import (
     BasePage,
     StateKeys,
 )
-from auth.token_authentication import api_auth_header
 
 app = APIRouter()
 

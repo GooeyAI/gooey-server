@@ -1,17 +1,16 @@
-import math
 import mimetypes
+import os
 import re
 import uuid
 from pathlib import Path
 
+import math
 import numpy as np
 import requests
 from PIL import Image, ImageOps
+from furl import furl
 
 from daras_ai_v2 import settings
-
-if False:
-    from firebase_admin import storage
 
 
 def resize_img_pad(img_bytes: bytes, size: tuple[int, int]) -> bytes:
@@ -70,7 +69,9 @@ def storage_blob_for(filename: str) -> "storage.storage.Blob":
 
     filename = safe_filename(filename)
     bucket = storage.bucket(settings.GS_BUCKET_NAME)
-    blob = bucket.blob(f"daras_ai/media/{uuid.uuid1()}/{filename}")
+    blob = bucket.blob(
+        os.path.join(settings.GS_MEDIA_PATH, str(uuid.uuid1()), filename)
+    )
     return blob
 
 
@@ -143,3 +144,7 @@ def guess_ext_from_response(response: requests.Response) -> str:
 def get_mimetype_from_response(response: requests.Response) -> str:
     content_type = response.headers.get("Content-Type", "application/octet-stream")
     return content_type.split(";")[0]
+
+
+def gs_url_to_uri(url: str) -> str:
+    return "gs://" + "/".join(furl(url).path.segments)

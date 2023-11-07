@@ -7,10 +7,17 @@ from enum import Enum
 import langcodes
 import requests
 import typing_extensions
+from django.db.models import F
 from furl import furl
 
 import gooey_ui as st
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
+from daras_ai_v2.gdrive_downloader import (
+    is_gdrive_url,
+    gdrive_download,
+    gdrive_metadata,
+    url_to_gdrive_file_id,
+)
 from daras_ai_v2 import settings
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gpu_server import call_celery_task
@@ -165,7 +172,8 @@ def asr_language_selector(
 def run_google_translate(
     texts: list[str],
     target_language: str,
-    source_language: str = None,
+    source_language: str | None = None,
+    glossary_url: str | None = None,
 ) -> list[str]:
     """
     Translate text using the Google Translate API.
@@ -173,6 +181,7 @@ def run_google_translate(
         texts (list[str]): Text to be translated.
         target_language (str): Language code to translate to.
         source_language (str): Language code to translate from.
+        glossary_url (str): URL of glossary file.
     Returns:
         list[str]: Translated text.
     """
@@ -187,18 +196,26 @@ def run_google_translate(
         language_codes = [detection["language"] for detection in detections]
 
     return map_parallel(
-        lambda text, source: _translate_text(text, source, target_language),
+        lambda text, source: _translate_text(
+            text, source, target_language, glossary_url
+        ),
         texts,
         language_codes,
     )
 
 
-def _translate_text(text: str, source_language: str, target_language: str):
+def _translate_text(
+    text: str,
+    source_language: str,
+    target_language: str,
+    glossary_url: str | None,
+) -> str:
     is_romanized = source_language.endswith("-Latn")
     source_language = source_language.replace("-Latn", "")
     enable_transliteration = (
         is_romanized and source_language in TRANSLITERATION_SUPPORTED
     )
+
     # prevent incorrect API calls
     if source_language == target_language or not text:
         return text
@@ -206,29 +223,42 @@ def _translate_text(text: str, source_language: str, target_language: str):
     if source_language == "wo-SN" or target_language == "wo-SN":
         return _MinT_translate_one_text(text, source_language, target_language)
 
+    config = {
+        "source_language_code": source_language,
+        "target_language_code": target_language,
+        "contents": text,
+        "mime_type": "text/plain",
+        "transliteration_config": {"enable_transliteration": enable_transliteration},
+    }
+
+    # glossary does not work with transliteration
+    if glossary_url and not enable_transliteration:
+        from glossary_resources.models import GlossaryResource
+
+        gr = GlossaryResource.objects.get_or_create_from_url(glossary_url)[0]
+        GlossaryResource.objects.filter(pk=gr.pk).update(
+            usage_count=F("usage_count") + 1
+        )
+        location = gr.location
+        config["glossary_config"] = {
+            "glossary": gr.get_glossary_path(),
+            "ignoreCase": True,
+        }
+    else:
+        location = "global"
+
     authed_session, project = get_google_auth_session()
     res = authed_session.post(
-        f"https://translation.googleapis.com/v3/projects/{project}/locations/global:translateText",
-        json.dumps(
-            {
-                "source_language_code": source_language,
-                "target_language_code": target_language,
-                "contents": text,
-                "mime_type": "text/plain",
-                "transliteration_config": {
-                    "enable_transliteration": enable_transliteration
-                },
-            }
-        ),
-        headers={
-            "Content-Type": "application/json",
-        },
+        f"https://translation.googleapis.com/v3/projects/{project}/locations/{location}:translateText",
+        json=config,
     )
     res.raise_for_status()
     data = res.json()
-    result = data["translations"][0]
-
-    return result["translatedText"].strip()
+    try:
+        result = data["glossaryTranslations"][0]["translatedText"]
+    except (KeyError, IndexError):
+        result = data["translations"][0]["translatedText"]
+    return result.strip()
 
 
 _session = None
@@ -291,6 +321,17 @@ def run_asr(
     is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
     if is_youtube_url:
         audio_url, size = download_youtube_to_wav(audio_url)
+    elif is_gdrive_url(furl(audio_url)):
+        meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
+        anybytes, ext = gdrive_download(
+            furl(audio_url), meta.get("mimeType", "audio/wav")
+        )
+        wavbytes, size = audio_bytes_to_wav(anybytes)
+        audio_url = upload_file_from_bytes(
+            filename=meta.get("name", "gdrive_audio"),
+            data=wavbytes,
+            content_type=meta.get("mimeType", "audio/wav"),
+        )
     else:
         audio_url, size = audio_url_to_wav(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
@@ -398,8 +439,7 @@ def run_asr(
         )
 
     elif selected_model == AsrModels.usm:
-        # note: only us-central1 and a few other regions support chirp recognizers (so global can't be used)
-        location = "us-central1"
+        location = settings.GCP_REGION
 
         # Create a client
         options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
@@ -431,7 +471,7 @@ def run_asr(
             audio_channel_count=1,
         )
         audio = cloud_speech.BatchRecognizeFileMetadata()
-        audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
+        audio.uri = gs_url_to_uri(audio_url)
         # Specify that results should be inlined in the response (only possible for 1 audio file)
         output_config = cloud_speech.RecognitionOutputConfig()
         output_config.inline_response_config = cloud_speech.InlineOutputConfig()
@@ -601,9 +641,22 @@ def audio_bytes_to_wav(audio_bytes: bytes) -> tuple[bytes | None, int]:
 
         with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
             # convert audio to single channel wav
-            args = ["ffmpeg", "-y", "-i", infile.name, *FFMPEG_WAV_ARGS, outfile.name]
+            args = [
+                "ffmpeg",
+                "-y",
+                "-i",
+                infile.name,
+                *FFMPEG_WAV_ARGS,
+                outfile.name,
+            ]
             print("\t$ " + " ".join(args))
-            subprocess.check_call(args)
+            try:
+                subprocess.check_output(args, stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as e:
+                ffmpeg_output_error = ValueError(e.output, e)
+                raise ValueError(
+                    "Invalid audio file. Could not convert audio to wav format. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
+                ) from ffmpeg_output_error
             return outfile.read(), os.path.getsize(outfile.name)
 
 
@@ -618,7 +671,13 @@ def check_wav_audio_format(filename: str) -> bool:
         filename,
     ]
     print("\t$ " + " ".join(args))
-    data = json.loads(subprocess.check_output(args))
+    try:
+        data = json.loads(subprocess.check_output(args, stderr=subprocess.STDOUT))
+    except subprocess.CalledProcessError as e:
+        ffmpeg_output_error = ValueError(e.output, e)
+        raise ValueError(
+            "Invalid audio file. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
+        ) from ffmpeg_output_error
     return (
         len(data["streams"]) == 1
         and data["streams"][0]["codec_name"] == "pcm_s16le"

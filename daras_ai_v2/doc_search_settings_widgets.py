@@ -1,3 +1,4 @@
+import os
 import typing
 
 import gooey_ui as st
@@ -7,9 +8,13 @@ from daras_ai_v2.asr import AsrModels, google_translate_language_selector
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.search_ref import CitationStyles
 
+_user_media_url_prefix = os.path.join(
+    "storage.googleapis.com", settings.GS_BUCKET_NAME, settings.GS_MEDIA_PATH
+)
+
 
 def is_user_uploaded_url(url: str) -> bool:
-    return f"storage.googleapis.com/{settings.GS_BUCKET_NAME}/daras_ai" in url
+    return _user_media_url_prefix in url
 
 
 def document_uploader(
@@ -26,19 +31,29 @@ def document_uploader(
         ".mp3",
         ".aac",
     ),
-):
+    accept_multiple_files=True,
+) -> list[str] | str:
     st.write(label, className="gui-input")
     documents = st.session_state.get(key) or []
+    if isinstance(documents, str):
+        documents = [documents]
     has_custom_urls = not all(map(is_user_uploaded_url, documents))
     custom_key = "__custom_" + key
-    if st.checkbox("Enter Custom URLs", value=has_custom_urls):
+    if st.checkbox(
+        "Enter Custom URLs", key=f"__custom_checkbox_{key}", value=has_custom_urls
+    ):
         if not custom_key in st.session_state:
             st.session_state[custom_key] = "\n".join(documents)
-        text_value = st.text_area(
+        if accept_multiple_files:
+            widget = st.text_area
+            kwargs = dict(height=150)
+        else:
+            widget = st.text_input
+            kwargs = {}
+        text_value = widget(
             label,
             key=custom_key,
             label_visibility="collapsed",
-            height=150,
             style={
                 "whiteSpace": "pre",
                 "overflowWrap": "normal",
@@ -46,8 +61,12 @@ def document_uploader(
                 "fontFamily": "monospace",
                 "fontSize": "0.9rem",
             },
+            **kwargs,
         )
-        st.session_state[key] = text_value.strip().splitlines()
+        if accept_multiple_files:
+            st.session_state[key] = text_value.strip().splitlines()
+        else:
+            st.session_state[key] = text_value
     else:
         st.session_state.pop(custom_key, None)
         st.file_uploader(
@@ -55,7 +74,7 @@ def document_uploader(
             label_visibility="collapsed",
             key=key,
             accept=accept,
-            accept_multiple_files=True,
+            accept_multiple_files=accept_multiple_files,
         )
     return st.session_state.get(key, [])
 
@@ -128,7 +147,7 @@ These instructions run before the workflow performs a search of the knowledge ba
     if keyword_instructions_allowed:
         st.text_area(
             """
-###### 🔑 Keyword Exctraction                 
+###### 🔑 Keyword Extraction                 
         """,
             key="keyword_instructions",
             height=300,
