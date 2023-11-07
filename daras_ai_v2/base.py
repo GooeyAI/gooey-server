@@ -151,10 +151,7 @@ class BasePage:
     def get_page_title(self) -> str | None:
         state = st.session_state
 
-        page_title = state.get(StateKeys.page_title)
-        if page_title and page_title != self.title:
-            return page_title
-        return truncate_text_words(
+        return state.get(StateKeys.page_title) or truncate_text_words(
             state.get("input_prompt")
             or state.get("text_prompt")
             or (state.get("animation_prompts") or [{}])[0].get("prompt")
