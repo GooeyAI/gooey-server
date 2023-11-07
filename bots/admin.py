@@ -286,7 +286,8 @@ class ConversationAdmin(admin.ModelAdmin):
         "view_messages",
         "view_last_active_delta",
         "d1",
-        "d3",
+        "d7",
+        "d30",
     ]
     readonly_fields = [
         "created_at",
