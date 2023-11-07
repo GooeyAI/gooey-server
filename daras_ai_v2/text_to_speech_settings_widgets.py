@@ -358,8 +358,10 @@ def google_tts_voices() -> dict[str, str]:
     voices.sort(key=_voice_sort_key)
     return {voice.name: _pretty_voice(voice) for voice in voices}
 
+
 def _pretty_voice(voice) -> str:
     return f"{voice.name} ({voice.ssml_gender.name.capitalize()})"
+
 
 def get_cached_elevenlabs_voices(state, api_key) -> dict[str, str]:
     api_key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:40]

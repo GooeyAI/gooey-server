@@ -277,9 +277,14 @@ class VideoBotsPage(BasePage):
 
     def before_render(self):
         super().before_render()
-        if st.session_state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
+        if (
+            st.session_state.get("tts_provider")
+            == TextToSpeechProviders.ELEVEN_LABS.name
+        ):
             if elevenlabs_api_key := st.session_state.get("elevenlabs_api_key"):
-                self.request.session["state"] = dict(elevenlabs_api_key=elevenlabs_api_key)
+                self.request.session["state"] = dict(
+                    elevenlabs_api_key=elevenlabs_api_key
+                )
             elif "elevenlabs_api_key" in self.request.session.get("state", {}):
                 st.session_state["elevenlabs_api_key"] = self.request.session["state"][
                     "elevenlabs_api_key"
