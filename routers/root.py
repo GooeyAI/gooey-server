@@ -1,5 +1,6 @@
 import datetime
 import os.path
+import re
 import subprocess
 import tempfile
 import typing
@@ -39,6 +40,7 @@ app = APIRouter()
 
 DEFAULT_LOGIN_REDIRECT = "/explore/"
 DEFAULT_LOGOUT_REDIRECT = "/"
+MOBILE_UA_PATTERN = re.compile(r"(Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini)", re.MULTILINE)
 
 
 @app.get("/sitemap.xml/")
@@ -336,3 +338,23 @@ def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
 
     st.html(templates.get_template("footer.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))
+    if is_mobile(request):
+        render_on_mobile_only()
+
+
+def render_on_mobile_only() -> str:
+    # disable video autoplay on mobile
+    st.html("""
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            document.querySelectorAll("video").forEach(function(video) {
+                video.autoplay = false;
+            });
+        });
+    </script>
+    """)
+
+
+def is_mobile(request: Request) -> bool:
+    user_agent = request.headers.get("user-agent", "")
+    return bool(MOBILE_UA_PATTERN.search(user_agent))
