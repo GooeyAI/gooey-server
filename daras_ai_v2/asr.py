@@ -7,6 +7,7 @@ from enum import Enum
 import langcodes
 import requests
 import typing_extensions
+from django.db.models import F
 from furl import furl
 
 import gooey_ui as st
@@ -231,6 +232,9 @@ def _translate_text(
         from glossary_resources.models import GlossaryResource
 
         gr = GlossaryResource.objects.get_or_create_from_url(glossary_url)[0]
+        GlossaryResource.objects.filter(pk=gr.pk).update(
+            usage_count=F("usage_count") + 1
+        )
         location = gr.location
         config["glossary_config"] = {
             "glossary": gr.get_glossary_path(),

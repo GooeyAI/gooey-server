@@ -34,19 +34,23 @@ def document_uploader(
     accept_multiple_files=True,
 ) -> list[str] | str:
     st.write(label, className="gui-input")
-    documents = st.session_state.get(key) or ([] if accept_multiple_files else "")
-    has_custom_urls = not all(
-        map(is_user_uploaded_url, documents if accept_multiple_files else [documents])
-    )
+    documents = st.session_state.get(key) or []
+    if isinstance(documents, str):
+        documents = [documents]
+    has_custom_urls = not all(map(is_user_uploaded_url, documents))
     custom_key = "__custom_" + key
-    checkbox_key = "__checkbox_" + key
-    st.session_state.setdefault(checkbox_key, has_custom_urls)
-    if st.checkbox("Enter Custom URLs", key=checkbox_key):
+    if st.checkbox(
+        "Enter Custom URLs", key=f"__custom_checkbox_{key}", value=has_custom_urls
+    ):
         if not custom_key in st.session_state:
             st.session_state[custom_key] = "\n".join(documents)
-        fn = st.text_area if accept_multiple_files else st.text_input
-        kwargs = dict(height=150) if accept_multiple_files else {}
-        text_value = fn(
+        if accept_multiple_files:
+            widget = st.text_area
+            kwargs = dict(height=150)
+        else:
+            widget = st.text_input
+            kwargs = {}
+        text_value = widget(
             label,
             key=custom_key,
             label_visibility="collapsed",

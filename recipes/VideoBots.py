@@ -1,13 +1,11 @@
-import datetime
 import os
 import os.path
 import re
 import typing
 
-import jinja2
 from django.db.models import QuerySet
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import BotIntegration, Platform
@@ -15,9 +13,6 @@ from bots.models import Workflow
 from daras_ai.image_input import (
     truncate_text_words,
 )
-from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
-from daras_ai_v2.query_generator import generate_final_search_query
-from recipes.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
     run_google_translate,
     google_translate_language_selector,
@@ -27,6 +22,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
 )
+from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
@@ -40,10 +36,11 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_SYSTEM,
     model_max_tokens,
 )
-from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
+from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
 from daras_ai_v2.text_output_widget import text_output
@@ -56,6 +53,7 @@ from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
 )
+from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
@@ -247,9 +245,19 @@ class VideoBotsPage(BasePage):
         use_url_shortener: bool | None
 
         user_language: str | None
-        # internal_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
-        glossary_document_user_to_internal: str | None
-        glossary_document_internal_to_user: str | None
+        # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
+        input_glossary_document: str | None = Field(
+            title="Input Glossary",
+            description="""
+Translation Glossary for User Langauge -> LLM Language (English)  
+            """,
+        )
+        output_glossary_document: str | None = Field(
+            title="Output Glossary",
+            description="""
+Translation Glossary for LLM Language (English) -> User Langauge  
+            """,
+        )
 
         variables: dict[str, typing.Any] | None
 
@@ -363,32 +371,28 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             doc_search_settings(keyword_instructions_allowed=True)
             st.write("---")
         language_model_settings()
+
         st.write("---")
         google_translate_language_selector(
             """
-            ###### 🔠 User Language
+            ##### 🔠 User Language
             If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
-            """,
+            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            """,
             key="user_language",
         )
         st.markdown(
             """
-            ## 📖 Customize with Glossary
-            It is also possible to customize translations using a glossary. 
-            When translating user messages to English, each English term can correspond to multiple user language terms but a user language term cannot be translated into multiple English terms (i.e. the user language column should be unique).
-            When translating copilot responses back into the user language, multiple English terms can correspond to each user language term, but each English term can only correspond to one user language term (i.e. the English column should be unique).
-            We therefore provide two glossaries, one for translating user messages to English and one for translating copilot responses back into the user language respectively:
+            ###### 📖 Customize with Glossary
+            Provide a glossary to customize translation and improve accuracy of domain-specific terms.
             """
         )
-        st.session_state.setdefault("glossary_document_user_to_internal", None)
-        st.session_state.setdefault("glossary_document_user_to_internal", None)
         glossary_input(
-            "##### 📖 User Language to Copilot Glossary",
-            key="glossary_document_user_to_internal",
+            f"##### {self.RequestModel.__fields__['input_glossary_document'].field_info.title}\n{self.RequestModel.__fields__['input_glossary_document'].field_info.description or ''}",
+            key="input_glossary_document",
         )
         glossary_input(
-            "##### 📖 Copilot to User Language Glossary",
-            key="glossary_document_user_to_internal",
+            f"##### {self.RequestModel.__fields__['output_glossary_document'].field_info.title}\n{self.RequestModel.__fields__['output_glossary_document'].field_info.description or ''}",
+            key="output_glossary_document",
         )
         st.write("---")
 
@@ -630,7 +634,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 texts=[user_input],
                 source_language=request.user_language,
                 target_language="en",
-                glossary_url=request.glossary_document_user_to_internal,
+                glossary_url=request.input_glossary_document,
             )[0]
 
         # parse the bot script
@@ -801,7 +805,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 texts=output_text,
                 source_language="en",
                 target_language=request.user_language,
-                glossary_url=request.glossary_document_internal_to_user,
+                glossary_url=request.output_glossary_document,
             )
             state["raw_tts_text"] = [
                 "".join(snippet for snippet, _ in parse_refs(text, references))

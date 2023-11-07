@@ -1,23 +1,18 @@
-import gooey_ui as gui
 from daras_ai_v2.asr import google_translate_languages
+
+from daras_ai_v2.doc_search_settings_widgets import document_uploader
 
 
 def glossary_input(
-    label="##### Glossary",
-    key="glossary_document",
+    label: str = "##### Glossary",
+    key: str = "glossary_document",
 ):
-    from daras_ai_v2.doc_search_settings_widgets import document_uploader
-
-    glossary_url = document_uploader(
-        label=label + "\nUpload a google sheet, csv, or xlsx file.",
+    return document_uploader(
+        label=label,
         key=key,
         accept=[".csv", ".xlsx", ".xls", ".gsheet", ".ods", ".tsv"],
         accept_multiple_files=False,
     )
-    gui.caption(
-        f"If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing)."
-    )
-    return glossary_url
 
 
 def create_glossary(
