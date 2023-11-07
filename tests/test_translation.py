@@ -45,10 +45,10 @@ TRANSLATION_TESTS = [
 
 def test_run_google_translate(threadpool_subtest):
     for text, expected in TRANSLATION_TESTS:
-        threadpool_subtest(test_run_google_translate_one, text, expected)
+        threadpool_subtest(_test_run_google_translate_one, text, expected)
 
 
-def test_run_google_translate_one(
+def _test_run_google_translate_one(
     text: str, expected: str, glossary_url=None, target_lang="en"
 ):
     actual = run_google_translate([text], target_lang, glossary_url=glossary_url)[0]

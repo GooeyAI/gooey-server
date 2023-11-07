@@ -3,7 +3,7 @@ import pytest
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2.crypto import get_random_doc_id
 from glossary_resources.models import GlossaryResource
-from tests.test_translation import test_run_google_translate_one
+from tests.test_translation import _test_run_google_translate_one
 
 GLOSSARY = [
     {
@@ -77,12 +77,12 @@ def glossary_url():
 def test_run_google_translate_glossary(glossary_url, threadpool_subtest):
     for text, expected, expected_with_glossary in TRANSLATION_TESTS_GLOSSARY:
         threadpool_subtest(
-            test_run_google_translate_one,
+            _test_run_google_translate_one,
             text,
             expected,
         )
         threadpool_subtest(
-            test_run_google_translate_one,
+            _test_run_google_translate_one,
             text,
             expected_with_glossary,
             glossary_url=glossary_url,
