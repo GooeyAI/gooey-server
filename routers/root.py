@@ -40,7 +40,9 @@ app = APIRouter()
 
 DEFAULT_LOGIN_REDIRECT = "/explore/"
 DEFAULT_LOGOUT_REDIRECT = "/"
-MOBILE_UA_PATTERN = re.compile(r"(Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini)", re.MULTILINE)
+MOBILE_UA_PATTERN = re.compile(
+    r"(Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini)", re.MULTILINE
+)
 
 
 @app.get("/sitemap.xml/")
@@ -344,7 +346,8 @@ def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
 
 def render_on_mobile_only() -> str:
     # disable video autoplay on mobile
-    st.html("""
+    st.html(
+        """
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             document.querySelectorAll("video").forEach(function(video) {
@@ -352,7 +355,8 @@ def render_on_mobile_only() -> str:
             });
         });
     </script>
-    """)
+    """
+    )
 
 
 def is_mobile(request: Request) -> bool:
