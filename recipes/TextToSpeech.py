@@ -82,18 +82,12 @@ class TextToSpeechPage(BasePage):
 
     def before_render(self):
         super().before_render()
-        if (
-            st.session_state.get("tts_provider")
-            == TextToSpeechProviders.ELEVEN_LABS.name
-        ):
-            if elevenlabs_api_key := st.session_state.get("elevenlabs_api_key"):
-                self.request.session["state"] = dict(
-                    elevenlabs_api_key=elevenlabs_api_key
-                )
-            elif "elevenlabs_api_key" in self.request.session.get("state", {}):
-                st.session_state["elevenlabs_api_key"] = self.request.session["state"][
-                    "elevenlabs_api_key"
-                ]
+
+        state = st.session_state
+        if self._get_tts_provider(state) == TextToSpeechProviders.ELEVEN_LABS:
+            if state.get("__elevenlabs_use_custom_key") is None:
+                state["__elevenlabs_use_custom_key"] = bool(state.get("elevenlabs_voice_id"))
+            self.save_or_restore_elevenlabs_api_key(state)
 
     def render_description(self):
         st.write(
@@ -133,7 +127,7 @@ class TextToSpeechPage(BasePage):
         tts_provider = self._get_tts_provider(state)
         match tts_provider:
             case TextToSpeechProviders.ELEVEN_LABS:
-                return self._get_eleven_labs_price(state)
+                return self._get_elevenlabs_price(state)
             case _:
                 return super().get_raw_price(state)
 
@@ -149,7 +143,7 @@ class TextToSpeechPage(BasePage):
         else:
             st.div()
 
-    def _get_eleven_labs_price(self, state: dict):
+    def _get_elevenlabs_price(self, state: dict):
         _, is_user_provided_key = self._get_elevenlabs_api_key(state)
         if is_user_provided_key:
             return 0
@@ -272,7 +266,13 @@ class TextToSpeechPage(BasePage):
                 )
 
             case TextToSpeechProviders.ELEVEN_LABS:
-                xi_api_key, _ = self._get_elevenlabs_api_key(state)
+                xi_api_key, is_custom_key = self._get_elevenlabs_api_key(state)
+                assert (
+                    is_custom_key or self.is_current_user_paying() or self.is_current_user_admin()
+                ), """
+                    Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
+                    """
+
                 voice_model = self._get_elevenlabs_voice_model(state)
                 voice_id = self._get_elevenlabs_voice_id(state)
 
@@ -303,7 +303,7 @@ class TextToSpeechPage(BasePage):
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):
         default_voice_model = next(iter(ELEVEN_LABS_MODELS))
-        voice_model = state.get("elevenlabs_voice_model", default_voice_model)
+        voice_model = state.get("elevenlabs_model", default_voice_model)
         assert voice_model in ELEVEN_LABS_MODELS, f"Invalid model: {voice_model}"
         return voice_model
 
@@ -328,11 +328,6 @@ class TextToSpeechPage(BasePage):
         if state.get("elevenlabs_api_key"):
             return state["elevenlabs_api_key"], True
         else:
-            assert (
-                self.is_current_user_paying() or self.is_current_user_admin()
-            ), """
-                Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
-                """
             return settings.ELEVEN_LABS_API_KEY, False
 
     def related_workflows(self) -> list:
@@ -358,3 +353,24 @@ class TextToSpeechPage(BasePage):
             audio_url = state.get("audio_url")
             if audio_url:
                 st.audio(audio_url)
+
+    def save_or_restore_elevenlabs_api_key(self, state: dict):
+        # elevenlabs_api_key is in state, so save it to session
+        if (new_value := state.get("elevenlabs_api_key")) is not None:
+            self._save_to_cookie("elevenlabs_api_key", new_value)
+        elif state.get("__elevenlabs_use_custom_key") is True or state.get("elevenlabs_voice_id"):
+            state["elevenlabs_api_key"] = self._fetch_from_cookie("elevenlabs_api_key")
+
+    def _save_to_cookie(self, key: str, value: str, store_name: str = "state") -> None:
+        if value is None:
+            # delete key
+            self.request.session.setdefault(store_name, {})
+            self.request.session[store_name].pop(key, None)
+        elif self._fetch_from_cookie(key) != value:
+            # current value != new value, so update
+            self.request.session.setdefault(store_name, {})
+            self.request.session[store_name][key] = value
+
+    def _fetch_from_cookie(self, key: str, store_name: str = "state") -> str | None:
+        # returns None if value not found
+        return self.request.session.get(store_name, {}).get(key)

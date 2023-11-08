@@ -277,18 +277,7 @@ class VideoBotsPage(BasePage):
 
     def before_render(self):
         super().before_render()
-        if (
-            st.session_state.get("tts_provider")
-            == TextToSpeechProviders.ELEVEN_LABS.name
-        ):
-            if elevenlabs_api_key := st.session_state.get("elevenlabs_api_key"):
-                self.request.session["state"] = dict(
-                    elevenlabs_api_key=elevenlabs_api_key
-                )
-            elif "elevenlabs_api_key" in self.request.session.get("state", {}):
-                st.session_state["elevenlabs_api_key"] = self.request.session["state"][
-                    "elevenlabs_api_key"
-                ]
+        TextToSpeechPage(request=self.request).before_render()
 
     def related_workflows(self):
         from recipes.LipsyncTTS import LipsyncTTSPage
@@ -597,7 +586,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             case TextToSpeechProviders.ELEVEN_LABS.name:
                 return f"""
                     - *Base cost = {super().get_raw_price(st.session_state)} credits*
-                    - *Additional Eleven Labs cost ≈ 4 credits per 10 words of the output*
+                    - *Additional {TextToSpeechPage().additional_notes()}*
                 """
             case _:
                 return ""

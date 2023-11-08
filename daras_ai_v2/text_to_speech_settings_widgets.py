@@ -232,10 +232,6 @@ def text_to_speech_settings(page=None):
                 elevenlabs_use_custom_key = st.checkbox(
                     "Use custom API key + Voice ID",
                     key="__elevenlabs_use_custom_key",
-                    value=bool(
-                        st.session_state.get("elevenlabs_api_key")
-                        or st.session_state.get("elevenlabs_voice_id")
-                    ),
                 )
                 if elevenlabs_use_custom_key:
                     st.session_state["elevenlabs_voice_name"] = None
