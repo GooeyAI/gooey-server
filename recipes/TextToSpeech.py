@@ -136,12 +136,10 @@ class TextToSpeechPage(BasePage):
         # TODO: validate tts_provider before lookup?
         return TextToSpeechProviders[tts_provider]
 
-    def additional_notes(self):
+    def get_cost_note(self):
         tts_provider = st.session_state.get("tts_provider")
         if tts_provider == TextToSpeechProviders.ELEVEN_LABS.name:
-            return """
-                *Eleven Labs cost ≈ 4 credits per 10 words*
-            """
+            return "Eleven Labs ≈ 4 credits per 10 words"
         else:
             return ""
 

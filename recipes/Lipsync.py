@@ -126,10 +126,8 @@ class LipsyncPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Create high-quality, realistic Lipsync animations from any audio file. Input a sample face gif/video + audio and we will automatically generate a lipsync animation that matches your audio."
 
-    def additional_notes(self) -> str | None:
-        return f"""
-        *Cost ≈ {CREDITS_PER_MB} credits per MB*
-        """
+    def get_cost_note(self) -> str | None:
+        return f"{CREDITS_PER_MB} credits per MB"
 
     def get_raw_price(self, state: dict) -> float:
         total_bytes = 0

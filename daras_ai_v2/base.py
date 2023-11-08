@@ -481,8 +481,12 @@ class BasePage:
             ] += " d-flex justify-content-end align-items-center"
             col1.node.props["className"] += " d-flex flex-column justify-content-center"
             with col1:
+                cost_note = self.get_cost_note() or ""
+                if cost_note:
+                    cost_note = f"({cost_note.strip()})"
                 st.caption(
                     f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()})"
+                    f" {cost_note}"
                 )
                 additional_notes = self.additional_notes()
                 if additional_notes:
@@ -633,7 +637,7 @@ class BasePage:
             st.text_area("Notes", key=StateKeys.page_notes)
         submitted = self.render_submit_button()
         st.caption(
-            "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) &"
+            "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & "
             "[privacy policy](https://gooey.ai/privacy)._"
         )
         return submitted
@@ -1143,6 +1147,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             )
 
     def additional_notes(self) -> str | None:
+        pass
+
+    def get_cost_note(self) -> str | None:
         pass
 
     def is_current_user_admin(self) -> bool:
