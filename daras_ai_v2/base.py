@@ -148,9 +148,7 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
-    def get_page_title(self) -> str | None:
-        state = st.session_state
-
+    def get_page_title(self, state) -> str | None:
         return state.get(StateKeys.page_title) or truncate_text_words(
             state.get("input_prompt")
             or state.get("text_prompt")
@@ -160,6 +158,9 @@ class BasePage:
             or self.title,
             maxlen=60,
         )
+
+    def get_recipe_page_title(self, state) -> str | None:
+        return state.get(StateKeys.page_title) or self.title
 
     def render(self):
         with sentry_sdk.configure_scope() as scope:
@@ -198,12 +199,12 @@ class BasePage:
                     className="text-muted",
                     style={"background-color": "#A5FFEE"},
                 )
-            st.write(f"# {self.get_page_title()}")
+            st.write(f"# {self.get_page_title(st.session_state)}")
         else:
             with st.link(
                 to=self.app_url(), className="text-decoration-none", target="_blank"
             ):
-                st.write(f"# {self.get_page_title()}")
+                st.write(f"# {self.get_recipe_page_title(st.session_state)}")
 
         st.write(st.session_state.get(StateKeys.page_notes))
 
