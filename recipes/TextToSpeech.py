@@ -86,7 +86,9 @@ class TextToSpeechPage(BasePage):
         state = st.session_state
         if self._get_tts_provider(state) == TextToSpeechProviders.ELEVEN_LABS:
             if state.get("__elevenlabs_use_custom_key") is None:
-                state["__elevenlabs_use_custom_key"] = bool(state.get("elevenlabs_voice_id"))
+                state["__elevenlabs_use_custom_key"] = bool(
+                    state.get("elevenlabs_voice_id")
+                )
             self.save_or_restore_elevenlabs_api_key(state)
 
     def render_description(self):
@@ -268,7 +270,9 @@ class TextToSpeechPage(BasePage):
             case TextToSpeechProviders.ELEVEN_LABS:
                 xi_api_key, is_custom_key = self._get_elevenlabs_api_key(state)
                 assert (
-                    is_custom_key or self.is_current_user_paying() or self.is_current_user_admin()
+                    is_custom_key
+                    or self.is_current_user_paying()
+                    or self.is_current_user_admin()
                 ), """
                     Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
                     """
@@ -358,7 +362,9 @@ class TextToSpeechPage(BasePage):
         # elevenlabs_api_key is in state, so save it to session
         if (new_value := state.get("elevenlabs_api_key")) is not None:
             self._save_to_cookie("elevenlabs_api_key", new_value)
-        elif state.get("__elevenlabs_use_custom_key") is True or state.get("elevenlabs_voice_id"):
+        elif state.get("__elevenlabs_use_custom_key") is True or state.get(
+            "elevenlabs_voice_id"
+        ):
             state["elevenlabs_api_key"] = self._fetch_from_cookie("elevenlabs_api_key")
 
     def _save_to_cookie(self, key: str, value: str, store_name: str = "state") -> None:
