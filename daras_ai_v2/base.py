@@ -479,9 +479,7 @@ class BasePage:
             col2.node.props[
                 "className"
             ] += " d-flex justify-content-end align-items-center"
-            col1.node.props[
-                "className"
-            ] += " d-flex flex-column justify-content-center"
+            col1.node.props["className"] += " d-flex flex-column justify-content-center"
             with col1:
                 st.caption(
                     f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()})"
