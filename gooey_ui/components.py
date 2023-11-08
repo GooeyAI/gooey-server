@@ -236,6 +236,7 @@ def video(src: str, caption: str = None, autoplay: bool = False):
             "autoPlay": True,
             "loop": True,
             "muted": True,
+            "playsinline": True,
         }
 
     if not src:
