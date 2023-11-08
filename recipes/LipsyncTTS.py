@@ -177,10 +177,9 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             "Lipsync": LipsyncPage.get_cost_note(self),
             "TTS": TextToSpeechPage.get_cost_note(self),
         }
-        notes = "\n".join([
-            f"- *{k} cost: {v.strip()}*" if v else ""
-            for k, v in cost_notes.items()
-        ])
+        notes = "\n".join(
+            [f"- *{k} cost: {v.strip()}*" if v else "" for k, v in cost_notes.items()]
+        )
 
         notes += LipsyncPage.additional_notes(self) or ""
         notes += TextToSpeechPage.additional_notes(self) or ""
