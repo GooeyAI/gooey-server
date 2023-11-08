@@ -180,7 +180,7 @@ class BasePage:
             f'# <a style="text-decoration: none;" target="_top" href="{root_url}">{st.session_state.get(StateKeys.page_title)}</a>',
             unsafe_allow_html=True,
         )
-        st.write(st.session_state.get(StateKeys.page_notes))
+        st.write(st.session_state.get(StateKeys.page_notes), line_clamp=2)
 
         try:
             selected_tab = MenuTabs.paths_reverse[self.tab]
@@ -992,7 +992,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             notes
             and notes.strip() != self.preview_description(st.session_state).strip()
         ):
-            st.write(notes)
+            st.write(notes, line_clamp=2)
 
         self.render_example(doc)
 

@@ -454,7 +454,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         output_text = state.get("output_text")
         if output_text:
-            st.write(truncate_text_words(output_text[0], maxlen=200))
+            st.write(output_text[0], line_clamp=5)
 
     def render_output(self):
         with st.div(className="pb-3"):

@@ -62,22 +62,22 @@ def html(body: str, **props):
     return _node("html", body=body, **props)
 
 
-def write(*objs: typing.Any, unsafe_allow_html=False, **props):
+def write(*objs: typing.Any, line_clamp: int = None, unsafe_allow_html=False, **props):
     for obj in objs:
         markdown(
             obj if isinstance(obj, str) else repr(obj),
-            unsafe_allow_html=unsafe_allow_html,
+            line_clamp=line_clamp,
             **props,
         )
 
 
-def markdown(body: str, *, unsafe_allow_html=False, **props):
+def markdown(body: str, *, line_clamp: int = None, unsafe_allow_html=False, **props):
     if body is None:
         return _node("markdown", body="", **props)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
     )
-    return _node("markdown", body=dedent(body).strip(), **props)
+    return _node("markdown", body=dedent(body).strip(), lineClamp=line_clamp, **props)
 
 
 def _node(name: str, **props):
