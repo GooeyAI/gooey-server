@@ -485,11 +485,15 @@ class BasePage:
                 if cost_note:
                     cost_note = f"({cost_note.strip()})"
                 st.caption(
-                    f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()})"
-                    f" {cost_note}"
+                    f"""
+                    <p style="margin-bottom: 0;">
+                        Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a>
+                        {cost_note}
+                    </p>
+                    """,
+                    unsafe_allow_html=True,
                 )
-                additional_notes = self.additional_notes()
-                if additional_notes:
+                if additional_notes := self.additional_notes():
                     st.caption(additional_notes)
             with col2:
                 submitted = st.button(
