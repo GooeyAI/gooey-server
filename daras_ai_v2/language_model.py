@@ -387,8 +387,6 @@ def _run_chat_model(
         case LLMApis.openai:
             from openai import OpenAI
 
-            print([len(messages), max_tokens, num_outputs, messages])
-
             client = OpenAI()
             r = client.chat.completions.create(
                 model=engine,
