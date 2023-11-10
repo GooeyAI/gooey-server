@@ -17,10 +17,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "phone_number",
         "balance",
         "is_paying",
-        "is_anonymous",
-        "is_disabled",
         "created_at",
-        "upgraded_from_anonymous_at",
     ]
     search_fields = [
         "uid",
