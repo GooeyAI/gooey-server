@@ -91,7 +91,6 @@ class BasePage:
     slug_versions: list[str]
 
     sane_defaults: dict = {}
-    private_fields: list = []
 
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
@@ -148,16 +147,7 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
-    def before_render(self):
-        """
-        Side-effects to apply before doing the actual render.
-        This shouldn't actually render anything to the page.
-        """
-        pass
-
     def render(self):
-        self.before_render()
-
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(

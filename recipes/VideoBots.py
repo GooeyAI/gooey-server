@@ -275,10 +275,6 @@ class VideoBotsPage(BasePage):
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COPILOT_META_IMG
 
-    def before_render(self):
-        super().before_render()
-        TextToSpeechPage(request=self.request).before_render()
-
     def related_workflows(self):
         from recipes.LipsyncTTS import LipsyncTTSPage
         from recipes.CompareText2Img import CompareText2ImgPage

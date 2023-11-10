@@ -1,12 +1,13 @@
-import hashlib
 from enum import Enum
 
 import requests
-import gooey_ui as st
 from google.cloud import texttospeech
 
+import gooey_ui as st
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.redis_cache import redis_cache_decorator
+
+SESSION_ELEVENLABS_API_KEY = "__user__elevenlabs_api_key"
 
 UBERDUCK_VOICES = {
     "Aiden Botha": "b01cf18d-0f10-46dd-adc6-562b599fdae4",
@@ -137,7 +138,7 @@ BARK_ALLOWED_PROMPTS = {
 }
 
 
-def text_to_speech_settings(page=None):
+def text_to_speech_settings(page):
     st.write(
         """
         ##### 🗣️ Voice Settings
@@ -229,9 +230,14 @@ def text_to_speech_settings(page=None):
 
         case TextToSpeechProviders.ELEVEN_LABS.name:
             with col2:
+                if not st.session_state.get("elevenlabs_api_key"):
+                    st.session_state["elevenlabs_api_key"] = page.request.session.get(
+                        SESSION_ELEVENLABS_API_KEY
+                    )
+
                 elevenlabs_use_custom_key = st.checkbox(
                     "Use custom API key + Voice ID",
-                    key="__elevenlabs_use_custom_key",
+                    value=bool(st.session_state.get("elevenlabs_api_key")),
                 )
                 if elevenlabs_use_custom_key:
                     st.session_state["elevenlabs_voice_name"] = None
@@ -254,8 +260,8 @@ def text_to_speech_settings(page=None):
 
                     if elevenlabs_api_key:
                         try:
-                            elevenlabs_voices = get_cached_elevenlabs_voices(
-                                st.session_state, elevenlabs_api_key
+                            elevenlabs_voices = fetch_elevenlabs_voices(
+                                elevenlabs_api_key
                             )
                         except requests.exceptions.HTTPError as e:
                             st.error(
@@ -271,6 +277,8 @@ def text_to_speech_settings(page=None):
                         format_func=elevenlabs_voices.__getitem__,
                     )
                 else:
+                    st.session_state["elevenlabs_api_key"] = None
+                    st.session_state["elevenlabs_voice_id"] = None
                     if not (
                         page
                         and (
@@ -297,6 +305,10 @@ def text_to_speech_settings(page=None):
                         format_func=str,
                         options=ELEVEN_LABS_VOICES.keys(),
                     )
+
+                page.request.session[SESSION_ELEVENLABS_API_KEY] = st.session_state.get(
+                    "elevenlabs_api_key"
+                )
 
                 st.selectbox(
                     """
@@ -359,30 +371,6 @@ def _pretty_voice(voice) -> str:
     return f"{voice.name} ({voice.ssml_gender.name.capitalize()})"
 
 
-def get_cached_elevenlabs_voices(state, api_key) -> dict[str, str]:
-    api_key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:40]
-    state.setdefault("__elevenlabs_voices_cache", {})
-    if api_key_hash not in state["__elevenlabs_voices_cache"]:
-        state["__elevenlabs_voices_cache"] = {
-            api_key_hash: fetch_elevenlabs_voices(api_key)
-        }
-    return state["__elevenlabs_voices_cache"][api_key_hash]
-
-
-def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
-    r = requests.get(
-        "https://api.elevenlabs.io/v1/voices",
-        headers={"Accept": "application/json", "xi-api-key": api_key},
-    )
-    r.raise_for_status()
-    sorted_voices = sorted(
-        r.json()["voices"],
-        key=lambda v: (int(v["category"] == "premade"), v["name"]),
-    )
-    describe_voice = lambda v: ", ".join(v["labels"].values())
-    return {v["voice_id"]: f"{v['name']} - {describe_voice(v)}" for v in sorted_voices}
-
-
 _lang_code_sort = ["en-US", "en-IN", "en-GB", "en-AU"]
 
 
@@ -399,3 +387,28 @@ def _voice_sort_key(voice: texttospeech.Voice):
         # sort alphabetically
         voice.name,
     )
+
+
+_elevenlabs_category_order = {
+    "cloned": 1,
+    "generated": 2,
+    "premade": 3,
+}
+
+
+@st.cache_in_session_state
+def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
+    r = requests.get(
+        "https://api.elevenlabs.io/v1/voices",
+        headers={"Accept": "application/json", "xi-api-key": api_key},
+    )
+    r.raise_for_status()
+    print(r.json()["voices"])
+    sorted_voices = sorted(
+        r.json()["voices"],
+        key=lambda v: (_elevenlabs_category_order.get(v["category"], 0), v["name"]),
+    )
+    return {
+        v["voice_id"]: " - ".join([v["name"], *v["labels"].values()])
+        for v in sorted_voices
+    }

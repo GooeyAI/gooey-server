@@ -80,17 +80,6 @@ class TextToSpeechPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
 
-    def before_render(self):
-        super().before_render()
-
-        state = st.session_state
-        if self._get_tts_provider(state) == TextToSpeechProviders.ELEVEN_LABS:
-            if state.get("__elevenlabs_use_custom_key") is None:
-                state["__elevenlabs_use_custom_key"] = bool(
-                    state.get("elevenlabs_voice_id")
-                )
-            self.save_or_restore_elevenlabs_api_key(state)
-
     def render_description(self):
         st.write(
             """
@@ -357,26 +346,3 @@ class TextToSpeechPage(BasePage):
             audio_url = state.get("audio_url")
             if audio_url:
                 st.audio(audio_url)
-
-    def save_or_restore_elevenlabs_api_key(self, state: dict):
-        # elevenlabs_api_key is in state, so save it to session
-        if (new_value := state.get("elevenlabs_api_key")) is not None:
-            self._save_to_cookie("elevenlabs_api_key", new_value)
-        elif state.get("__elevenlabs_use_custom_key") is True or state.get(
-            "elevenlabs_voice_id"
-        ):
-            state["elevenlabs_api_key"] = self._fetch_from_cookie("elevenlabs_api_key")
-
-    def _save_to_cookie(self, key: str, value: str, store_name: str = "state") -> None:
-        if value is None:
-            # delete key
-            self.request.session.setdefault(store_name, {})
-            self.request.session[store_name].pop(key, None)
-        elif self._fetch_from_cookie(key) != value:
-            # current value != new value, so update
-            self.request.session.setdefault(store_name, {})
-            self.request.session[store_name][key] = value
-
-    def _fetch_from_cookie(self, key: str, store_name: str = "state") -> str | None:
-        # returns None if value not found
-        return self.request.session.get(store_name, {}).get(key)
