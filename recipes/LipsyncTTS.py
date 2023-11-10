@@ -47,6 +47,8 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         bark_history_prompt: str | None
 
         elevenlabs_voice_name: str | None
+        elevenlabs_api_key: str | None
+        elevenlabs_voice_id: str | None
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None

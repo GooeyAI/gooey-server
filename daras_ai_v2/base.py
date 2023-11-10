@@ -91,6 +91,7 @@ class BasePage:
     slug_versions: list[str]
 
     sane_defaults: dict = {}
+
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
 
@@ -154,7 +155,6 @@ class BasePage:
             )
 
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-
         if st.session_state.get(StateKeys.run_status):
             channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
             output = realtime_pull([channel])[0]
@@ -1149,6 +1149,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def is_current_user_paying(self) -> bool:
         return bool(self.request and self.request.user and self.request.user.is_paying)
+
+    def is_current_user_owner(self) -> bool:
+        return bool(
+            self.request and self.request.user and self.run_user == self.request.user
+        )
 
 
 def get_example_request_body(
