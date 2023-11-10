@@ -2,7 +2,6 @@ import datetime
 import io
 import typing
 
-from django.utils.timesince import timesince
 from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
@@ -162,6 +161,8 @@ To understand what each field represents, check out our [API docs](https://api.g
 
         with visible_col1:
             st.write("##### Inputs")
+        with hidden_col1:
+            st.write("##### Inputs")
 
         input_columns_old = st.session_state.pop("input_columns", {})
         input_columns_new = st.session_state.setdefault("input_columns", {})
@@ -184,6 +185,8 @@ To understand what each field represents, check out our [API docs](https://api.g
 
         with visible_col2:
             st.write("##### Outputs")
+        with hidden_col2:
+            st.write("##### Outputs")
 
         # only show the first output field by default, and hide others
         try:
@@ -198,11 +201,10 @@ To understand what each field represents, check out our [API docs](https://api.g
             "run_url": "Run URL",
         }
         hidden_out_fields = {
-            k: v for k, v in output_fields.items() if k not in visible_out_fields
-        } | {
+            "price": "Price",
             "run_time": "Run Time",
             "error_msg": "Error Msg",
-        }
+        } | {k: v for k, v in output_fields.items() if k not in visible_out_fields}
 
         output_columns_old = st.session_state.pop("output_columns", {})
         output_columns_new = st.session_state.setdefault("output_columns", {})
@@ -274,9 +276,14 @@ To understand what each field represents, check out our [API docs](https://api.g
                     )
                     result.get(disable_sync_subtasks=False)
                     sr.refresh_from_db()
+
+                    run_time = datetime.timedelta(
+                        seconds=int(sr.run_time.total_seconds())
+                    )
                     state = sr.to_dict()
-                    state["run_time"] = timesince(datetime.datetime.now() - sr.run_time)
                     state["run_url"] = sr.get_app_url()
+                    state["price"] = sr.price
+                    state["run_time"] = str(run_time)
                     state["error_msg"] = sr.error_msg
 
                     for field, col in request.output_columns.items():

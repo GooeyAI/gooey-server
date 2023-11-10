@@ -83,13 +83,14 @@ class ChyronPlantPage(BasePage):
         state["chyron_output"] = self.run_chyron(state)
 
     def run_midi_notes(self, state: dict):
-        import openai
+        from openai import OpenAI
 
         prompt = state.get("midi_notes_prompt", "").strip()
         prompt += "\nMIDI: " + state.get("midi_notes", "") + "\nEnglish:"
 
-        r = openai.Completion.create(
-            engine="text-davinci-002",
+        client = OpenAI()
+        r = client.completions.create(
+            model="text-davinci-002",
             max_tokens=250,
             prompt=prompt,
             stop=["English:", "MIDI:", "\n"],
@@ -97,20 +98,21 @@ class ChyronPlantPage(BasePage):
             n=1,
         )
         # choose the first completion that isn't empty
-        for choice in r["choices"]:
-            text = choice["text"].strip()
+        for choice in r.choices:
+            text = choice.text.strip()
             if text:
                 return text
         return ""
 
     def run_chyron(self, state: dict):
-        import openai
+        from openai import OpenAI
 
         prompt = state.get("chyron_prompt", "").strip()
         prompt += "\nUser: " + state.get("midi_translation", "").strip() + "\nChyron:"
 
-        r = openai.Completion.create(
-            engine="text-davinci-002",
+        client = OpenAI()
+        r = client.completions.create(
+            model="text-davinci-002",
             max_tokens=250,
             prompt=prompt,
             stop=["\nChyron:", "\nUser:"],
@@ -118,8 +120,8 @@ class ChyronPlantPage(BasePage):
             n=1,
         )
         # choose the first completion that isn't empty
-        for choice in r["choices"]:
-            text = choice["text"].strip()
+        for choice in r.choices:
+            text = choice.text.strip()
             if text:
                 return text
         return ""

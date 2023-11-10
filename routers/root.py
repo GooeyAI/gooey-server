@@ -72,6 +72,25 @@ async def favicon():
     return FileResponse("static/favicon.ico")
 
 
+@app.post("/handleError/")
+async def handle_error(request: Request):
+    context = {"request": request, "settings": settings}
+
+    def not_found():
+        st.html(templates.get_template("errors/404.html").render(**context))
+
+    def unknown_error():
+        st.html(templates.get_template("errors/unknown.html").render(**context))
+
+    body = await request.json()
+
+    match body["status"]:
+        case 404:
+            return st.runner(lambda: page_wrapper(request, not_found))
+        case _:
+            return st.runner(lambda: page_wrapper(request, unknown_error))
+
+
 @app.get("/login/")
 def login(request: Request):
     if request.user and not request.user.is_anonymous:
@@ -198,7 +217,7 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
     )
     ret |= {
         "meta": raw_build_meta_tags(
-            url=str(request.url),
+            url=get_og_url_path(request),
             title=explore.META_TITLE,
             description=explore.META_DESCRIPTION,
         ),
@@ -264,7 +283,7 @@ def st_page(
 
     ret |= {
         "meta": build_meta_tags(
-            url=str(request.url),
+            url=get_og_url_path(request),
             page=page,
             state=state,
             run_id=run_id,
@@ -278,6 +297,12 @@ def st_page(
         # ],
     }
     return ret
+
+
+def get_og_url_path(request) -> str:
+    return str(
+        (furl(settings.APP_BASE_URL) / request.url.path).add(request.query_params)
+    )
 
 
 def get_run_user(request, uid) -> AppUser | None:

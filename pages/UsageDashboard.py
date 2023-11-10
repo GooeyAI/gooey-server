@@ -44,6 +44,7 @@ def main():
         )
         timezone = pytz.timezone(timezone)
         now = datetime.datetime.now(timezone)
+        now = now.replace(hour=0, minute=0, second=0, microsecond=0)
     with col2:
         start_time = st.date_input(
             "Start Date", value=now - datetime.timedelta(days=30)
@@ -52,18 +53,25 @@ def main():
         end_time = st.date_input("End Date", value=now)
     time_selector = dict(created_at__gte=start_time, created_at__lte=end_time)
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
     with col1:
         exclude_anon = st.checkbox("Exclude Anonymous", value=True)
     with col2:
         exclude_team = st.checkbox("Exclude Team", value=True)
     with col3:
         exclude_disabled = st.checkbox("Exclude Banned", value=True)
+    with col4:
+        paying_filter = st.selectbox(
+            "Paying Status",
+            options=["All", "Free", "Paid"],
+        )
 
     app_users = get_filtered_app_users(
         exclude_anon=exclude_anon,
         exclude_disabled=exclude_disabled,
         exclude_team=exclude_team,
+        exclude_free=paying_filter == "Paid",
+        exclude_paying=paying_filter == "Free",
     )
 
     signups = app_users.filter(**time_selector).order_by("-created_at")
@@ -312,6 +320,8 @@ def get_filtered_app_users(
     exclude_anon: bool,
     exclude_disabled: bool,
     exclude_team: bool,
+    exclude_free: bool,
+    exclude_paying: bool,
 ) -> QuerySet[AppUser]:
     qs = AppUser.objects.all()
     if exclude_anon:
@@ -320,6 +330,10 @@ def get_filtered_app_users(
         qs = qs.exclude(is_disabled=True)
     if exclude_team:
         qs = qs.exclude(team_user_Q)
+    if exclude_free:
+        qs = qs.filter(is_paying=True)
+    if exclude_paying:
+        qs = qs.exclude(is_paying=True)
     return qs
 
 

@@ -1041,6 +1041,17 @@ aiohttp = "*"
 websockets = "*"
 
 [[package]]
+name = "distro"
+version = "1.8.0"
+description = "Distro - an OS platform information API"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "distro-1.8.0-py3-none-any.whl", hash = "sha256:99522ca3e365cac527b44bde033f64c6945d90eb9f769703caaec52b09bbd3ff"},
+    {file = "distro-1.8.0.tar.gz", hash = "sha256:02e111d1dc6a50abb8eed6bf31c3e48ed8b0830d1ea2a1b78c61765c2513fdd8"},
+]
+
+[[package]]
 name = "django"
 version = "4.2.5"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
@@ -1092,6 +1103,17 @@ phonenumberslite = {version = ">=7.0.2", optional = true, markers = "extra == \"
 [package.extras]
 phonenumbers = ["phonenumbers (>=7.0.2)"]
 phonenumberslite = ["phonenumberslite (>=7.0.2)"]
+
+[[package]]
+name = "et-xmlfile"
+version = "1.1.0"
+description = "An implementation of lxml.xmlfile for the standard library"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "et_xmlfile-1.1.0-py3-none-any.whl", hash = "sha256:a2ba85d1d6a74ef63837eed693bcb89c3f752169b0e3e7ae5b16ca5e1b3deada"},
+    {file = "et_xmlfile-1.1.0.tar.gz", hash = "sha256:8eb9e2bc2f8c97e37a2dc85a09ecdcdec9d8a396530a6d5a33b30b9a92da0c5c"},
+]
 
 [[package]]
 name = "exceptiongroup"
@@ -1667,19 +1689,23 @@ protobuf = ">=3.19.5,<3.20.0 || >3.20.0,<3.20.1 || >3.20.1,<4.21.0 || >4.21.0,<4
 
 [[package]]
 name = "google-cloud-translate"
-version = "2.0.4"
-description = "Google Cloud Translation API client library"
+version = "3.12.1"
+description = "Google Cloud Translate API client library"
 optional = false
-python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
+python-versions = ">=3.7"
 files = [
-    {file = "google-cloud-translate-2.0.4.tar.gz", hash = "sha256:4c80b1d737f922d6ac85e172836dceac46fa6482b156d45512e6782b7f4a87e2"},
-    {file = "google_cloud_translate-2.0.4-py2.py3-none-any.whl", hash = "sha256:65b37d49ecb841f34b63d2597d83e837803c926ab6cee24edef158a80efe3141"},
+    {file = "google-cloud-translate-3.12.1.tar.gz", hash = "sha256:661cb8879aa3c63a2f725a3ea68f90199bd354c95ca169cc2e83a5105987d29e"},
+    {file = "google_cloud_translate-3.12.1-py2.py3-none-any.whl", hash = "sha256:2a0f6aa398a64d7836d0f2880dfd023be0de05f8b688ac537825391014fc114a"},
 ]
 
 [package.dependencies]
-google-api-core = {version = ">=1.31.5,<2.0.dev0 || >2.3.0,<3.0.0dev", extras = ["grpc"]}
-google-cloud-core = ">=1.1.0,<3.0dev"
-protobuf = "<4.0.0dev"
+google-api-core = {version = ">=1.34.0,<2.0.dev0 || >=2.11.dev0,<3.0.0dev", extras = ["grpc"]}
+google-cloud-core = ">=1.4.4,<3.0.0dev"
+proto-plus = [
+    {version = ">=1.22.2,<2.0.0dev", markers = "python_version >= \"3.11\""},
+    {version = ">=1.22.0,<2.0.0dev", markers = "python_version < \"3.11\""},
+]
+protobuf = ">=3.19.5,<3.20.0 || >3.20.0,<3.20.1 || >3.20.1,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<5.0.0dev"
 
 [[package]]
 name = "google-crc32c"
@@ -3329,25 +3355,25 @@ signedtoken = ["cryptography (>=3.0.0)", "pyjwt (>=2.0.0,<3)"]
 
 [[package]]
 name = "openai"
-version = "0.27.10"
-description = "Python client library for the OpenAI API"
+version = "1.2.2"
+description = "Client library for the openai API"
 optional = false
 python-versions = ">=3.7.1"
 files = [
-    {file = "openai-0.27.10-py3-none-any.whl", hash = "sha256:beabd1757e3286fa166dde3b70ebb5ad8081af046876b47c14c41e203ed22a14"},
-    {file = "openai-0.27.10.tar.gz", hash = "sha256:60e09edf7100080283688748c6803b7b3b52d5a55d21890f3815292a0552d83b"},
+    {file = "openai-1.2.2-py3-none-any.whl", hash = "sha256:e9238e506b8ee8fc00af5b656de7907986317d7cfcf581964ff6e54a449be727"},
+    {file = "openai-1.2.2.tar.gz", hash = "sha256:cbeff4eaf6cdcdccb24c9190d9880a827c034b221ed996201c10d578850b3db8"},
 ]
 
 [package.dependencies]
-aiohttp = "*"
-requests = ">=2.20"
-tqdm = "*"
+anyio = ">=3.5.0,<4"
+distro = ">=1.7.0,<2"
+httpx = ">=0.23.0,<1"
+pydantic = ">=1.9.0,<3"
+tqdm = ">4"
+typing-extensions = ">=4.5,<5"
 
 [package.extras]
-datalib = ["numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)"]
-dev = ["black (>=21.6b0,<22.0)", "pytest (==6.*)", "pytest-asyncio", "pytest-mock"]
-embeddings = ["matplotlib", "numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)", "plotly", "scikit-learn (>=1.0.2)", "scipy", "tenacity (>=8.0.1)"]
-wandb = ["numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)", "wandb"]
+datalib = ["numpy (>=1)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)"]
 
 [[package]]
 name = "openapi-schema-pydantic"
@@ -3385,6 +3411,20 @@ numpy = [
     {version = ">=1.21.4", markers = "python_version >= \"3.10\" and platform_system == \"Darwin\" and python_version < \"3.11\""},
     {version = ">=1.21.2", markers = "platform_system != \"Darwin\" and python_version >= \"3.10\" and python_version < \"3.11\""},
 ]
+
+[[package]]
+name = "openpyxl"
+version = "3.1.2"
+description = "A Python library to read/write Excel 2010 xlsx/xlsm files"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "openpyxl-3.1.2-py2.py3-none-any.whl", hash = "sha256:f91456ead12ab3c6c2e9491cf33ba6d08357d802192379bb482f1033ade496f5"},
+    {file = "openpyxl-3.1.2.tar.gz", hash = "sha256:a6f5977418eff3b2d5500d54d9db50c8277a368436f4e4f8ddb1be3422870184"},
+]
+
+[package.dependencies]
+et-xmlfile = "*"
 
 [[package]]
 name = "orderedmultidict"
@@ -4588,18 +4628,22 @@ files = [
 
 [[package]]
 name = "replicate"
-version = "0.4.0"
+version = "0.15.8"
 description = "Python client for Replicate"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.8"
 files = [
-    {file = "replicate-0.4.0.tar.gz", hash = "sha256:8347121312608750d94c6826729c62d0717a4bda8c6f339e47326695442257d1"},
+    {file = "replicate-0.15.8-py3-none-any.whl", hash = "sha256:a5a42e1b2f8a091325ebb7fb14f2c000e79bf818ef1d085730a8247fe28a9067"},
+    {file = "replicate-0.15.8.tar.gz", hash = "sha256:a6ca2be3ed5cfe6c3e24602caa61210279b821a5f91ccf818e4c5165ab8db51a"},
 ]
 
 [package.dependencies]
+httpx = ">=0.21.0,<1"
 packaging = "*"
-pydantic = "*"
-requests = "*"
+pydantic = ">1"
+
+[package.extras]
+dev = ["mypy", "pylint", "pytest", "pytest-asyncio", "pytest-recording", "respx", "ruff (>=0.1.3)"]
 
 [[package]]
 name = "requests"
@@ -6152,4 +6196,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "7673424f9bbfbe9170278701d4963e6cf72df707df43d6f3b1c491354b02e5a5"
+content-hash = "14753f1302e71690146109f96bd407f41ad2cd99601d9dae54a6d25f5081e3ba"

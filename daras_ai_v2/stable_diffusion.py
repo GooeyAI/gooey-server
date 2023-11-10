@@ -50,7 +50,8 @@ class Text2ImgModels(Enum):
     analog_diffusion = "Analog Diffusion (wavymulder)"
     protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
     dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
-    dall_e = "Dall-E (OpenAI)"
+    dall_e = "DALL·E 2 (OpenAI)"
+    dall_e_3 = "DALL·E 3 (OpenAI)"
 
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
     deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
@@ -70,6 +71,8 @@ text2img_model_ids = {
     Text2ImgModels.openjourney_2: "prompthero/openjourney-v2",
     Text2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Text2ImgModels.protogen_5_3: "darkstorm2150/Protogen_v5.3_Official_Release",
+    Text2ImgModels.dall_e: "dall-e-2",
+    Text2ImgModels.dall_e_3: "dall-e-3",
 }
 
 
@@ -268,17 +271,29 @@ def text2img(
     _resolution_check(width, height, max_size=(1024, 1024))
 
     match selected_model:
+        case Text2ImgModels.dall_e_3.name:
+            from openai import OpenAI
+
+            client = OpenAI()
+            response = client.images.generate(
+                model=text2img_model_ids[Text2ImgModels[selected_model]],
+                n=num_outputs,
+                prompt=prompt,
+                response_format="b64_json",
+            )
+            out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case Text2ImgModels.dall_e.name:
-            import openai
+            from openai import OpenAI
 
             edge = _get_dalle_img_size(width, height)
-            response = openai.Image.create(
+            client = OpenAI()
+            response = client.images.generate(
                 n=num_outputs,
                 prompt=prompt,
                 size=f"{edge}x{edge}",
                 response_format="b64_json",
             )
-            out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
+            out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
             return call_sd_multi(
@@ -338,12 +353,13 @@ def img2img(
 
     match selected_model:
         case Img2ImgModels.dall_e.name:
-            import openai
+            from openai import OpenAI
 
             edge = _get_dalle_img_size(width, height)
             image = resize_img_pad(init_image_bytes, (edge, edge))
 
-            response = openai.Image.create_variation(
+            client = OpenAI()
+            response = client.images.create_variation(
                 image=image,
                 n=num_outputs,
                 size=f"{edge}x{edge}",
@@ -351,8 +367,8 @@ def img2img(
             )
 
             out_imgs = [
-                resize_img_fit(b64_img_decode(part["b64_json"]), (width, height))
-                for part in response["data"]
+                resize_img_fit(b64_img_decode(part.b64_json), (width, height))
+                for part in response.data
             ]
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
@@ -457,21 +473,22 @@ def inpainting(
 
     match selected_model:
         case InpaintingModels.dall_e.name:
-            import openai
+            from openai import OpenAI
 
             edge = _get_dalle_img_size(width, height)
             edit_image_bytes = resize_img_pad(edit_image_bytes, (edge, edge))
             mask_bytes = resize_img_pad(mask_bytes, (edge, edge))
             image = rgb_img_to_rgba(edit_image_bytes, mask_bytes)
 
-            response = openai.Image.create_edit(
+            client = OpenAI()
+            response = client.images.edit(
                 prompt=prompt,
                 image=image,
                 n=num_outputs,
                 size=f"{edge}x{edge}",
                 response_format="b64_json",
             )
-            out_imgs = [b64_img_decode(part["b64_json"]) for part in response["data"]]
+            out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
 
         case InpaintingModels.sd_2.name | InpaintingModels.runway_ml.name:
             out_imgs_urls = call_sd_multi(

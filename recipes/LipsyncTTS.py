@@ -153,7 +153,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         with col2:
             output_video = state.get("output_video")
             if output_video:
-                st.video(output_video, caption="Output Video")
+                st.video(output_video, caption="Output Video", autoplay=True)
             else:
                 st.div()
 

@@ -227,7 +227,18 @@ def image(
     ).mount()
 
 
-def video(src: str, caption: str = None):
+def video(src: str, caption: str = None, autoplay: bool = False):
+    autoplay_props = {}
+    if autoplay:
+        autoplay_props = {
+            "preload": "auto",
+            "controls": True,
+            "autoPlay": True,
+            "loop": True,
+            "muted": True,
+            "playsInline": True,
+        }
+
     if not src:
         return
     if isinstance(src, str):
@@ -237,7 +248,7 @@ def video(src: str, caption: str = None):
         src = f.url
     state.RenderTreeNode(
         name="video",
-        props=dict(src=src, caption=dedent(caption)),
+        props=dict(src=src, caption=dedent(caption), **autoplay_props),
     ).mount()
 
 

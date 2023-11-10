@@ -449,10 +449,19 @@ class BasePage:
         if self.run_user.display_name:
             html += f"<div>{self.run_user.display_name}</div>"
         html += "</div>"
-        st.markdown(
-            html,
-            unsafe_allow_html=True,
-        )
+
+        if self.is_current_user_admin():
+            linkto = lambda: st.link(
+                to=self.app_url(
+                    tab_name=MenuTabs.paths[MenuTabs.history],
+                    query_params={"uid": self.run_user.uid},
+                )
+            )
+        else:
+            linkto = st.dummy
+
+        with linkto():
+            st.html(html)
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -460,33 +469,40 @@ class BasePage:
         else:
             return "/account/"
 
+    def get_submit_container_props(self):
+        return dict(className="position-sticky bottom-0 bg-white")
+
     def render_submit_button(self, key="--submit-1"):
-        col1, col2 = st.columns([2, 1], responsive=False)
-        col2.node.props["className"] += " d-flex justify-content-end align-items-center"
-        with col1:
-            st.caption(
-                f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()}) \\\n"
-                f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ ",
-            )
-            additional_notes = self.additional_notes()
-            if additional_notes:
-                st.caption(additional_notes)
-        with col2:
-            submitted = st.button(
-                "🏃 Submit",
-                key=key,
-                type="primary",
-                # disabled=bool(st.session_state.get(StateKeys.run_status)),
-            )
-        if not submitted:
-            return False
-        try:
-            self.validate_form_v2()
-        except AssertionError as e:
-            st.error(e)
-            return False
-        else:
-            return True
+        with st.div(**self.get_submit_container_props()):
+            st.write("---")
+            col1, col2 = st.columns([2, 1], responsive=False)
+            col2.node.props[
+                "className"
+            ] += " d-flex justify-content-end align-items-center"
+            with col1:
+                st.caption(
+                    f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()}) \\\n"
+                    f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ ",
+                )
+                additional_notes = self.additional_notes()
+                if additional_notes:
+                    st.caption(additional_notes)
+            with col2:
+                submitted = st.button(
+                    "🏃 Submit",
+                    key=key,
+                    type="primary",
+                    # disabled=bool(st.session_state.get(StateKeys.run_status)),
+                )
+            if not submitted:
+                return False
+            try:
+                self.validate_form_v2()
+            except AssertionError as e:
+                st.error(e)
+                return False
+            else:
+                return True
 
     def _render_step_row(self):
         with st.expander("**ℹ️ Details**"):
@@ -889,6 +905,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             )
             raise RedirectException(str(redirect_url))
         uid = self.request.user.uid
+        if self.is_current_user_admin():
+            uid = self.request.query_params.get("uid", uid)
 
         before = gooey_get_query_params().get("updated_at__lt", None)
         if before:
@@ -927,7 +945,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         grid_layout(3, run_history, _render)
 
         next_url = (
-            furl(self._get_current_app_url()) / MenuTabs.paths[MenuTabs.history] / "/"
+            furl(self._get_current_app_url(), query_params=self.request.query_params)
+            / MenuTabs.paths[MenuTabs.history]
+            / "/"
         )
         next_url.query.params.set(
             "updated_at__lt", run_history[-1].to_dict()["updated_at"]
