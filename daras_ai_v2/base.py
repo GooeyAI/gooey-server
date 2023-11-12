@@ -486,15 +486,11 @@ class BasePage:
                     cost_note = f"({cost_note.strip()})"
                 st.caption(
                     f"""
-                    <p style="margin-bottom: 0;">
-                        Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a>
-                        {cost_note}
-                    </p>
+Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}  
+{self.additional_notes() or ""}
                     """,
                     unsafe_allow_html=True,
                 )
-                if additional_notes := self.additional_notes():
-                    st.caption(additional_notes)
             with col2:
                 submitted = st.button(
                     "🏃 Submit",
@@ -640,10 +636,11 @@ class BasePage:
             st.text_input("Title", key=StateKeys.page_title)
             st.text_area("Notes", key=StateKeys.page_notes)
         submitted = self.render_submit_button()
-        st.caption(
-            "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & "
-            "[privacy policy](https://gooey.ai/privacy)._"
-        )
+        with st.div(style={"textAlign": "right"}):
+            st.caption(
+                "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & "
+                "[privacy policy](https://gooey.ai/privacy)._"
+            )
         return submitted
 
     def _render_output_col(self, submitted: bool):
