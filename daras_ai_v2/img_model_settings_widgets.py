@@ -181,7 +181,7 @@ def controlnet_weight_setting(
     )
 
 
-def num_outputs_setting(selected_model: str = None):
+def num_outputs_setting(selected_models: str | list[str] = None):
     col1, col2 = st.columns(2, gap="medium")
     with col1:
         st.slider(
@@ -200,12 +200,35 @@ def num_outputs_setting(selected_model: str = None):
             """
         )
     with col2:
-        quality_setting(selected_model)
+        quality_setting(selected_models)
 
 
-def quality_setting(selected_model=None):
-    if selected_model in [InpaintingModels.dall_e.name]:
+def quality_setting(selected_models=None):
+    if not isinstance(selected_models, list):
+        selected_models = [selected_models]
+    if any(
+        [
+            selected_model in [InpaintingModels.dall_e.name]
+            for selected_model in selected_models
+        ]
+    ):
         return
+    if any(
+        [
+            selected_model in [Text2ImgModels.dall_e_3.name]
+            for selected_model in selected_models
+        ]
+    ):
+        st.selectbox(
+            """##### Quality""",
+            options=[
+                "standard, natural",
+                "hd, natural",
+                "standard, vivid",
+                "hd, vivid",
+            ],
+            key="dalle_3_quality",
+        )
     st.slider(
         label="""
         ##### Quality
