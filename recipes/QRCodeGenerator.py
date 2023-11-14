@@ -175,7 +175,7 @@ class QRCodeGeneratorPage(BasePage):
                     key=QrSources.qr_code_file.name,
                 )
 
-        if source != QrSources.qr_code_vcard:
+        if source != QrSources.qr_code_vcard.name:
             st.checkbox(
                 "🔗 Shorten URL",
                 key="use_url_shortener",
@@ -183,6 +183,16 @@ class QRCodeGeneratorPage(BasePage):
             st.caption(
                 'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
             )
+
+        if source != QrSources.qr_code_input_image.name:
+            st.write("---")
+            if st.checkbox("🖼️ Add Logo", key="add_logo"):
+                st.file_uploader(
+                    "Upload a logo image which will be placed in the center of the QR code",
+                    key="logo",
+                    accept=["image/*"],
+                )
+                st.checkbox("Remove background", key="remove_logo_background")
 
     def validate_form_v2(self):
         assert st.session_state.get("text_prompt"), "Please provide a prompt"
