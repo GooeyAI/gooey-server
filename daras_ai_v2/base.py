@@ -146,6 +146,15 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
+    def get_tab_url(self, tab: str) -> str:
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        return self.app_url(
+            example_id=example_id,
+            run_id=run_id,
+            uid=uid,
+            tab_name=MenuTabs.paths[tab],
+        )
+
     def render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
@@ -191,10 +200,7 @@ class BasePage:
         with st.nav_tabs():
             tab_names = self.get_tabs()
             for name in tab_names:
-                url = self.app_url(
-                    *extract_query_params(gooey_get_query_params()),
-                    tab_name=MenuTabs.paths[name],
-                )
+                url = self.get_tab_url(name)
                 with st.nav_item(url, active=name == selected_tab):
                     st.html(name)
         with st.nav_tab_content():
@@ -634,6 +640,19 @@ class BasePage:
         submitted = self.render_submit_button()
         return submitted
 
+    def get_run_state(
+        self,
+    ) -> typing.Literal["success", "error", "waiting", "recipe_root"]:
+        if st.session_state.get(StateKeys.run_status):
+            return "waiting"
+        elif st.session_state.get(StateKeys.error_msg):
+            return "error"
+        elif st.session_state.get(StateKeys.run_time):
+            return "success"
+        else:
+            # when user is at a recipe root, and not running anything
+            return "recipe_root"
+
     def _render_output_col(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
 
@@ -647,26 +666,39 @@ class BasePage:
 
         self._render_before_output()
 
-        run_status = st.session_state.get(StateKeys.run_status)
-        if run_status:
-            st.caption("Your changes are saved in the above URL. Save it for later!")
-            html_spinner(run_status)
-        else:
-            err_msg = st.session_state.get(StateKeys.error_msg)
-            run_time = st.session_state.get(StateKeys.run_time, 0)
-
-            # render errors
-            if err_msg is not None:
-                st.error(err_msg)
-            # render run time
-            elif run_time:
-                st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
+        run_state = self.get_run_state()
+        match run_state:
+            case "success":
+                self._render_success_output()
+            case "error":
+                self._render_error_output()
+            case "waiting":
+                self._render_waiting_output()
+            case "recipe_root":
+                pass
 
         # render outputs
         self.render_output()
 
-        if not run_status:
+        if run_state != "waiting":
             self._render_after_output()
+
+    def _render_success_output(self):
+        run_time = st.session_state.get(StateKeys.run_time, 0)
+        st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
+
+    def _render_error_output(self):
+        err_msg = st.session_state.get(StateKeys.error_msg)
+        st.error(err_msg)
+
+    def _render_waiting_output(self):
+        run_status = st.session_state.get(StateKeys.run_status)
+        st.caption("Your changes are saved in the above URL. Save it for later!")
+        html_spinner(run_status)
+        self.render_extra_waiting_output()
+
+    def render_extra_waiting_output(self):
+        pass
 
     def on_submit(self):
         example_id, run_id, uid = self.create_new_run()
@@ -1149,6 +1181,17 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def is_current_user_paying(self) -> bool:
         return bool(self.request and self.request.user and self.request.user.is_paying)
+
+    def is_current_user_owner(self) -> bool:
+        """
+        Did the current user create this run?
+        """
+        return bool(
+            self.request
+            and self.request.user
+            and self.run_user
+            and self.request.user.uid == self.run_user.uid
+        )
 
 
 def get_example_request_body(

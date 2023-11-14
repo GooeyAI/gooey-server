@@ -189,9 +189,9 @@ class SavedRun(models.Model):
 
         ret = self.state.copy()
         if self.updated_at:
-            ret[StateKeys.updated_at] = self.updated_at
+            ret[StateKeys.updated_at] = self.updated_at.isoformat()
         if self.created_at:
-            ret[StateKeys.created_at] = self.created_at
+            ret[StateKeys.created_at] = self.created_at.isoformat()
         if self.error_msg:
             ret[StateKeys.error_msg] = self.error_msg
         if self.run_time:

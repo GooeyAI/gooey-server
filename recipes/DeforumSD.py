@@ -1,5 +1,6 @@
 import typing
 import uuid
+from datetime import datetime, timedelta
 
 from django.db.models import TextChoices
 from pydantic import BaseModel
@@ -12,6 +13,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.safety_checker import safety_checker
+from daras_ai_v2.tabs_widget import MenuTabs
 
 
 class AnimationModels(TextChoices):
@@ -27,6 +29,7 @@ class _AnimationPrompt(TypedDict):
 AnimationPrompts = list[_AnimationPrompt]
 
 CREDITS_PER_FRAME = 1.5
+MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
 
 
 def input_prompt_to_animation_prompts(input_prompt: str):
@@ -416,6 +419,25 @@ Choose fps for the video.
         if output_video:
             st.write("Output Video")
             st.video(output_video, autoplay=True)
+
+    def render_extra_waiting_output(self):
+        if created_at := st.session_state.get("created_at"):
+            start_time = datetime.fromisoformat(created_at)
+            with st.countdown_timer(
+                end_time=start_time + timedelta(seconds=self.estimate_run_duration()),
+                delay_text="Sorry for the wait. Your run is taking longer than we expected.",
+            ):
+                if self.is_current_user_owner() and self.request.user.email:
+                    st.write(
+                        f"""We'll email **{self.request.user.email}** when your workflow is done."""
+                    )
+                st.write(
+                    f"""In the meantime, check out [🚀 Examples]({self.get_tab_url(MenuTabs.examples)}) for inspiration."""
+                )
+
+    def estimate_run_duration(self):
+        # in seconds
+        return st.session_state.get("max_frames", 100) * MODEL_ESTIMATED_TIME_PER_FRAME
 
     def render_example(self, state: dict):
         display = self.preview_input(state)
