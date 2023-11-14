@@ -160,7 +160,12 @@ class BasePage:
         )
 
     def get_recipe_page_title(self, state) -> str | None:
-        return state.get(StateKeys.page_title) or self.title
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        if not example_id and not run_id:
+            return state.get(StateKeys.page_title) or self.title
+        else:
+            recipe_doc_state = self.recipe_doc_sr().to_dict()
+            return recipe_doc_state.get(StateKeys.page_title) or self.title
 
     def render(self):
         with sentry_sdk.configure_scope() as scope:
@@ -186,7 +191,6 @@ class BasePage:
             self.render_report_form()
             return
 
-        st.session_state.setdefault(StateKeys.page_title, self.title)
         st.session_state.setdefault(
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
@@ -194,7 +198,7 @@ class BasePage:
         if example_id or run_id:
             with st.breadcrumbs(className="mt-5"):
                 st.breadcrumb_item(
-                    self.title.upper(),
+                    self.get_recipe_page_title(st.session_state).upper(),
                     link_to=self.app_url(),
                     className="text-muted",
                     style={"background-color": "#A5FFEE"},
