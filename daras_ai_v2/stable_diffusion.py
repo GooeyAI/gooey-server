@@ -77,17 +77,16 @@ text2img_model_ids = {
 
 
 class Img2ImgModels(Enum):
-    # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
-    instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
+    dream_shaper = "DreamShaper (Lykon)"
+    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
-    dream_shaper = "DreamShaper (Lykon)"
-    openjourney = "Open Journey (PromptHero)"
+    dall_e = "Dall-E (OpenAI)"
+    instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
     openjourney_2 = "Open Journey v2 beta (PromptHero)"
+    openjourney = "Open Journey (PromptHero)"
     analog_diffusion = "Analog Diffusion (wavymulder)"
     protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
-    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
-    dall_e = "Dall-E (OpenAI)"
 
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
