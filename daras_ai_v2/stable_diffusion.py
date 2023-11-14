@@ -268,18 +268,21 @@ def text2img(
     negative_prompt: str = None,
     scheduler: str = None,
 ):
-    _resolution_check(width, height, max_size=(1024, 1024))
+    if selected_model != Text2ImgModels.dall_e_3.name:
+        _resolution_check(width, height, max_size=(1024, 1024))
 
     match selected_model:
         case Text2ImgModels.dall_e_3.name:
             from openai import OpenAI
 
             client = OpenAI()
+            width, height = _get_dalle_3_img_size(width, height)
             response = client.images.generate(
                 model=text2img_model_ids[Text2ImgModels[selected_model]],
                 n=num_outputs,
                 prompt=prompt,
                 response_format="b64_json",
+                size=f"{width}x{height}",
             )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case Text2ImgModels.dall_e.name:
@@ -330,6 +333,15 @@ def _get_dalle_img_size(width: int, height: int) -> int:
     elif edge > 1024:
         edge = 1024
     return edge
+
+
+def _get_dalle_3_img_size(width: int, height: int) -> tuple[int, int]:
+    if height == width:
+        return 1024, 1024
+    elif width < height:
+        return 1024, 1792
+    else:
+        return 1792, 1024
 
 
 def img2img(
