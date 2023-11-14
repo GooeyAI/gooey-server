@@ -196,13 +196,20 @@ class BasePage:
         )
 
         if example_id or run_id:
-            with st.breadcrumbs(className="mt-5"):
+            with st.breadcrumbs(className="mt-5", divider="/"):
                 st.breadcrumb_item(
                     self.get_recipe_page_title(st.session_state).upper(),
                     link_to=self.app_url(),
                     className="text-muted",
-                    style={"background-color": "#A5FFEE"},
                 )
+                saved_run = self.get_sr_from_query_params(example_id, run_id, uid)
+                if saved_run.parent and saved_run.parent.example_id:
+                    st.breadcrumb_item(
+                        self.get_page_title(saved_run.parent.to_dict()),
+                        link_to=self.app_url(
+                            example_id=saved_run.parent.example_id,
+                        ),
+                    )
             st.write(f"# {self.get_page_title(st.session_state)}")
         else:
             with st.link(
