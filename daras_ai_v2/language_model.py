@@ -1,7 +1,6 @@
 import hashlib
 import io
 import re
-import threading
 import typing
 from enum import Enum
 from functools import wraps
@@ -9,7 +8,6 @@ from time import sleep
 
 import numpy as np
 import requests
-import tiktoken
 import typing_extensions
 from django.conf import settings
 from jinja2.lexer import whitespace_re
@@ -38,8 +36,8 @@ class LLMApis(Enum):
 
 
 class LargeLanguageModels(Enum):
-    gpt_4 = "GPT-4 (openai)"
     gpt_4_turbo = "GPT-4 Turbo (openai)"
+    gpt_4 = "GPT-4 (openai)"
     gpt_3_5_turbo = "ChatGPT (openai)"
     gpt_3_5_turbo_16k = "ChatGPT 16k (openai)"
 
@@ -71,7 +69,7 @@ class LargeLanguageModels(Enum):
         ]
 
 
-engine_names = {
+llm_model_names = {
     LargeLanguageModels.gpt_4: "gpt-4",
     LargeLanguageModels.gpt_4_turbo: "gpt-4-1106-preview",
     LargeLanguageModels.gpt_3_5_turbo: "gpt-3.5-turbo",
@@ -155,14 +153,17 @@ def calc_gpt_tokens(
 
 
 def get_openai_error_cls():
-    import openai.error
+    import openai
+
+    class ServiceUnavailableError(openai.APIStatusError):
+        status_code = 503
 
     return (
-        openai.error.Timeout,
-        openai.error.APIError,
-        openai.error.APIConnectionError,
-        openai.error.RateLimitError,
-        openai.error.ServiceUnavailableError,
+        openai.APITimeoutError,
+        openai.APIError,
+        openai.APIConnectionError,
+        openai.RateLimitError,
+        ServiceUnavailableError,
     )
 
 
@@ -250,10 +251,11 @@ def np_dumps(a: np.ndarray) -> bytes:
 def _openai_embedding_create(
     *, input: list[str], model: str = "text-embedding-ada-002"
 ) -> np.ndarray:
-    import openai
+    from openai import OpenAI
 
-    res = openai.Embedding.create(model=model, input=input)
-    ret = np.array([data["embedding"] for data in res["data"]])  # type: ignore
+    client = OpenAI()
+    res = client.embeddings.create(model=model, input=input)
+    ret = np.array([data.embedding for data in res.data])
 
     # see - https://community.openai.com/t/text-embedding-ada-002-embeddings-sometime-return-nan/279664/5
     if np.isnan(ret).any():
@@ -301,7 +303,7 @@ def run_language_model(
             is_chatml, messages = parse_chatml(prompt)  # type: ignore
         result = _run_chat_model(
             api=api,
-            engine=engine_names[model],
+            engine=llm_model_names[model],
             messages=messages or [],  # type: ignore
             max_tokens=max_tokens,
             num_outputs=num_outputs,
@@ -343,10 +345,11 @@ def _run_text_model(
 ) -> list[str]:
     match api:
         case LLMApis.openai:
-            import openai
+            from openai import OpenAI
 
-            r = openai.Completion.create(
-                engine=engine_names[model],
+            client = OpenAI()
+            r = client.completions.create(
+                model=llm_model_names[model],
                 prompt=prompt,
                 max_tokens=max_tokens,
                 stop=stop,
@@ -356,10 +359,10 @@ def _run_text_model(
                 frequency_penalty=0.1 if avoid_repetition else 0,
                 presence_penalty=0.25 if avoid_repetition else 0,
             )
-            return [choice["text"] for choice in r["choices"]]
+            return [choice.text for choice in r.choices]
         case LLMApis.vertex_ai:
             return _run_palm_text(
-                model_id=engine_names[model],
+                model_id=llm_model_names[model],
                 prompt=prompt,
                 max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
                 candidate_count=num_outputs,
@@ -382,9 +385,10 @@ def _run_chat_model(
 ) -> list[ConversationEntry]:
     match api:
         case LLMApis.openai:
-            import openai
+            from openai import OpenAI
 
-            r = openai.ChatCompletion.create(
+            client = OpenAI()
+            r = client.chat.completions.create(
                 model=engine,
                 messages=messages,
                 max_tokens=max_tokens,
@@ -394,7 +398,7 @@ def _run_chat_model(
                 frequency_penalty=0.1 if avoid_repetition else 0,
                 presence_penalty=0.25 if avoid_repetition else 0,
             )
-            return [choice["message"] for choice in r["choices"]]
+            return [choice.message.dict() for choice in r.choices]
         case LLMApis.vertex_ai:
             return _run_palm_chat(
                 model_id=engine,
