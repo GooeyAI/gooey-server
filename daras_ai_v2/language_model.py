@@ -1,16 +1,20 @@
 import hashlib
 import io
 import re
-import typing
 from enum import Enum
-from functools import wraps
-from time import sleep
 
 import numpy as np
 import requests
 import typing_extensions
+from aifail import (
+    openai_should_retry,
+    retry_if,
+    vertex_ai_should_retry,
+    try_all,
+)
 from django.conf import settings
 from jinja2.lexer import whitespace_re
+from loguru import logger
 
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.functional import map_parallel
@@ -38,12 +42,13 @@ class LLMApis(Enum):
 class LargeLanguageModels(Enum):
     gpt_4_turbo = "GPT-4 Turbo (openai)"
     gpt_4 = "GPT-4 (openai)"
+    gpt_4_32k = "GPT-4 32K (openai)"
     gpt_3_5_turbo = "ChatGPT (openai)"
     gpt_3_5_turbo_16k = "ChatGPT 16k (openai)"
 
     llama2_70b_chat = "Llama 2 (Meta AI)"
-    palm2_chat = "PaLM 2 Text (Google)"
 
+    palm2_chat = "PaLM 2 Text (Google)"
     palm2_text = "PaLM 2 Chat (Google)"
 
     text_davinci_003 = "GPT-3.5 Davinci-3 (openai)"
@@ -59,21 +64,34 @@ class LargeLanguageModels(Enum):
         return {cls.code_davinci_002}
 
     def is_chat_model(self) -> bool:
-        return self in [
-            LargeLanguageModels.gpt_4,
-            LargeLanguageModels.gpt_4_turbo,
-            LargeLanguageModels.gpt_3_5_turbo,
-            LargeLanguageModels.gpt_3_5_turbo_16k,
-            LargeLanguageModels.palm2_chat,
-            LargeLanguageModels.llama2_70b_chat,
-        ]
+        return self not in {
+            self.palm2_text,
+            self.text_davinci_003,
+            self.text_davinci_002,
+            self.text_curie_001,
+            self.text_babbage_001,
+            self.text_ada_001,
+            self.code_davinci_002,
+        }
 
+
+AZURE_OPENAI_MODEL_PREFIX = "openai-"
 
 llm_model_names = {
-    LargeLanguageModels.gpt_4: "gpt-4",
     LargeLanguageModels.gpt_4_turbo: "gpt-4-1106-preview",
-    LargeLanguageModels.gpt_3_5_turbo: "gpt-3.5-turbo",
-    LargeLanguageModels.gpt_3_5_turbo_16k: "gpt-3.5-turbo-16k",
+    LargeLanguageModels.gpt_4: (
+        "openai-gpt-4-prod-ca-1",
+        "gpt-4",
+    ),
+    LargeLanguageModels.gpt_4_32k: "openai-gpt-4-32k-prod-ca-1",
+    LargeLanguageModels.gpt_3_5_turbo: (
+        "openai-gpt-35-turbo-prod-ca-1",
+        "gpt-3.5-turbo",
+    ),
+    LargeLanguageModels.gpt_3_5_turbo_16k: (
+        "openai-gpt-35-turbo-16k-prod-ca-1",
+        "gpt-3.5-turbo-16k",
+    ),
     LargeLanguageModels.text_davinci_003: "text-davinci-003",
     LargeLanguageModels.text_davinci_002: "text-davinci-002",
     LargeLanguageModels.code_davinci_002: "code-davinci-002",
@@ -86,8 +104,9 @@ llm_model_names = {
 }
 
 llm_api = {
-    LargeLanguageModels.gpt_4: LLMApis.openai,
     LargeLanguageModels.gpt_4_turbo: LLMApis.openai,
+    LargeLanguageModels.gpt_4: LLMApis.openai,
+    LargeLanguageModels.gpt_4_32k: LLMApis.openai,
     LargeLanguageModels.gpt_3_5_turbo: LLMApis.openai,
     LargeLanguageModels.gpt_3_5_turbo_16k: LLMApis.openai,
     LargeLanguageModels.text_davinci_003: LLMApis.openai,
@@ -104,10 +123,11 @@ llm_api = {
 EMBEDDING_MODEL_MAX_TOKENS = 8191
 
 model_max_tokens = {
-    # https://platform.openai.com/docs/models/gpt-4
-    LargeLanguageModels.gpt_4: 8192,
     # https://help.openai.com/en/articles/8555510-gpt-4-turbo
     LargeLanguageModels.gpt_4_turbo: 128_000,
+    # https://platform.openai.com/docs/models/gpt-4
+    LargeLanguageModels.gpt_4: 8192,
+    LargeLanguageModels.gpt_4_32k: 32_768,
     # https://platform.openai.com/docs/models/gpt-3-5
     LargeLanguageModels.gpt_3_5_turbo: 4096,
     LargeLanguageModels.gpt_3_5_turbo_16k: 16_384,
@@ -123,6 +143,23 @@ model_max_tokens = {
     LargeLanguageModels.palm2_chat: 4096,
     # https://huggingface.co/docs/transformers/main/model_doc/llama2#transformers.LlamaConfig.max_position_embeddings
     LargeLanguageModels.llama2_70b_chat: 4096,
+}
+
+llm_price = {
+    LargeLanguageModels.gpt_4_turbo: 5,
+    LargeLanguageModels.gpt_4: 10,
+    LargeLanguageModels.gpt_4_32k: 20,
+    LargeLanguageModels.gpt_3_5_turbo: 1,
+    LargeLanguageModels.gpt_3_5_turbo_16k: 2,
+    LargeLanguageModels.text_davinci_003: 10,
+    LargeLanguageModels.text_davinci_002: 10,
+    LargeLanguageModels.code_davinci_002: 10,
+    LargeLanguageModels.text_curie_001: 5,
+    LargeLanguageModels.text_babbage_001: 2,
+    LargeLanguageModels.text_ada_001: 1,
+    LargeLanguageModels.palm2_text: 15,
+    LargeLanguageModels.palm2_chat: 10,
+    LargeLanguageModels.llama2_70b_chat: 5,
 }
 
 
@@ -152,59 +189,6 @@ def calc_gpt_tokens(
     return default_length_function(combined)
 
 
-def get_openai_error_cls():
-    import openai
-
-    class ServiceUnavailableError(openai.APIStatusError):
-        status_code = 503
-
-    return (
-        openai.APITimeoutError,
-        openai.APIError,
-        openai.APIConnectionError,
-        openai.RateLimitError,
-        ServiceUnavailableError,
-    )
-
-
-def get_vertex_ai_error_cls():
-    import google.api_core.exceptions
-
-    return (
-        google.api_core.exceptions.ServiceUnavailable,
-        google.api_core.exceptions.TooManyRequests,
-        google.api_core.exceptions.InternalServerError,
-        google.api_core.exceptions.GatewayTimeout,
-    )
-
-
-def do_retry(
-    max_retries: int = 10,
-    retry_delay: float = 6,
-    get_error_cls=lambda: get_openai_error_cls() + get_vertex_ai_error_cls(),
-) -> typing.Callable[
-    [typing.Callable[..., typing.Any]], typing.Callable[..., typing.Any]
-]:
-    def decorator(fn):
-        @wraps(fn)
-        def wrapper(*args, **kwargs):
-            n = 0
-            while True:
-                try:
-                    return fn(*args, **kwargs)
-                except get_error_cls() as e:
-                    if n < max_retries:
-                        n += 1
-                        print(f"({n}/5) captured error, retry in {retry_delay}s: {e!r}")
-                        sleep(retry_delay)
-                    else:
-                        raise
-
-        return wrapper
-
-    return decorator
-
-
 def openai_embedding_create(texts: list[str]) -> list[np.ndarray | None]:
     # replace newlines, which can negatively affect performance.
     texts = [whitespace_re.sub(" ", text) for text in texts]
@@ -219,7 +203,7 @@ def openai_embedding_create(texts: list[str]) -> list[np.ndarray | None]:
     misses = [i for i, c in enumerate(ret) if c is None]
     if misses:
         # create the embeddings in bulk
-        embeddings = _openai_embedding_create(input=[texts[i] for i in misses])
+        embeddings = _run_openai_embedding(input=[texts[i] for i in misses])
         for i, embedding in zip(misses, embeddings):
             # save the embedding to the cache
             text = texts[i]
@@ -247,14 +231,27 @@ def np_dumps(a: np.ndarray) -> bytes:
     return f.getvalue()
 
 
-@do_retry()
-def _openai_embedding_create(
-    *, input: list[str], model: str = "text-embedding-ada-002"
+@retry_if(openai_should_retry)
+def _run_openai_embedding(
+    *,
+    input: list[str],
+    model: str = (
+        "openai-text-embedding-ada-002-prod-ca-1",
+        "text-embedding-ada-002",
+    ),
 ) -> np.ndarray:
-    from openai import OpenAI
+    logger.info(f"{model=}, {len(input)=}")
 
-    client = OpenAI()
-    res = client.embeddings.create(model=model, input=input)
+    if isinstance(model, str):
+        model = [model]
+    res = try_all(
+        *[
+            lambda: _get_openai_client(model_str).embeddings.create(
+                model=model_str, input=input
+            )
+            for model_str in model
+        ],
+    )
     ret = np.array([data.embedding for data in res.data])
 
     # see - https://community.openai.com/t/text-embedding-ada-002-embeddings-sometime-return-nan/279664/5
@@ -276,7 +273,6 @@ class ConversationEntry(typing_extensions.TypedDict):
     content: str
 
 
-@do_retry()
 def run_language_model(
     *,
     model: str,
@@ -295,16 +291,19 @@ def run_language_model(
 
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
     api = llm_api[model]
+    model_name = llm_model_names[model]
     if model.is_chat_model():
         if messages:
             is_chatml = False
         else:
             # if input is chatml, convert it into json messages
             is_chatml, messages = parse_chatml(prompt)  # type: ignore
+        messages = messages or []
+        logger.info(f"{model_name=}, {len(messages)=}, {max_tokens=}, {temperature=}")
         result = _run_chat_model(
             api=api,
-            engine=llm_model_names[model],
-            messages=messages or [],  # type: ignore
+            model=model_name,
+            messages=messages,  # type: ignore
             max_tokens=max_tokens,
             num_outputs=num_outputs,
             temperature=temperature,
@@ -317,9 +316,10 @@ def run_language_model(
             for entry in result
         ]
     else:
+        logger.info(f"{model_name=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
         result = _run_text_model(
             api=api,
-            model=model,
+            model=model_name,
             prompt=prompt,
             max_tokens=max_tokens,
             num_outputs=num_outputs,
@@ -334,7 +334,7 @@ def run_language_model(
 def _run_text_model(
     *,
     api: LLMApis,
-    model: LargeLanguageModels,
+    model: str | tuple,
     prompt: str,
     max_tokens: int,
     num_outputs: int,
@@ -345,24 +345,19 @@ def _run_text_model(
 ) -> list[str]:
     match api:
         case LLMApis.openai:
-            from openai import OpenAI
-
-            client = OpenAI()
-            r = client.completions.create(
-                model=llm_model_names[model],
+            return _run_openai_text(
+                model=model,
                 prompt=prompt,
                 max_tokens=max_tokens,
-                stop=stop,
-                best_of=int(num_outputs * quality),
-                n=num_outputs,
+                num_outputs=num_outputs,
                 temperature=temperature,
-                frequency_penalty=0.1 if avoid_repetition else 0,
-                presence_penalty=0.25 if avoid_repetition else 0,
+                stop=stop,
+                avoid_repetition=avoid_repetition,
+                quality=quality,
             )
-            return [choice.text for choice in r.choices]
         case LLMApis.vertex_ai:
             return _run_palm_text(
-                model_id=llm_model_names[model],
+                model_id=model,
                 prompt=prompt,
                 max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
                 candidate_count=num_outputs,
@@ -379,29 +374,24 @@ def _run_chat_model(
     max_tokens: int,
     num_outputs: int,
     temperature: float,
-    engine: str = "gpt-3.5-turbo",
-    stop: list[str] | None = None,
-    avoid_repetition: bool = False,
+    model: str | tuple,
+    stop: list[str] | None,
+    avoid_repetition: bool,
 ) -> list[ConversationEntry]:
     match api:
         case LLMApis.openai:
-            from openai import OpenAI
-
-            client = OpenAI()
-            r = client.chat.completions.create(
-                model=engine,
-                messages=messages,
+            return _run_openai_chat(
+                model=model,
+                avoid_repetition=avoid_repetition,
                 max_tokens=max_tokens,
+                messages=messages,
+                num_outputs=num_outputs,
                 stop=stop,
-                n=num_outputs,
                 temperature=temperature,
-                frequency_penalty=0.1 if avoid_repetition else 0,
-                presence_penalty=0.25 if avoid_repetition else 0,
             )
-            return [choice.message.dict() for choice in r.choices]
         case LLMApis.vertex_ai:
             return _run_palm_chat(
-                model_id=engine,
+                model_id=model,
                 messages=messages,
                 max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
                 candidate_count=num_outputs,
@@ -409,7 +399,7 @@ def _run_chat_model(
             )
         case LLMApis.together:
             return _run_together_chat(
-                model=engine,
+                model=model,
                 messages=messages,
                 max_tokens=max_tokens,
                 num_outputs=num_outputs,
@@ -418,6 +408,86 @@ def _run_chat_model(
             )
         case _:
             raise ValueError(f"Unsupported chat api: {api}")
+
+
+@retry_if(openai_should_retry)
+def _run_openai_chat(
+    *,
+    model: str,
+    messages: list[ConversationEntry],
+    max_tokens: int,
+    num_outputs: int,
+    temperature: float,
+    stop: list[str] | None,
+    avoid_repetition: bool,
+) -> list[ConversationEntry]:
+    if avoid_repetition:
+        frequency_penalty = 0.1
+        presence_penalty = 0.25
+    else:
+        frequency_penalty = 0
+        presence_penalty = 0
+    if isinstance(model, str):
+        model = [model]
+    r = try_all(
+        *[
+            lambda: _get_openai_client(model_str).chat.completions.create(
+                model=model_str,
+                messages=messages,
+                max_tokens=max_tokens,
+                stop=stop,
+                n=num_outputs,
+                temperature=temperature,
+                frequency_penalty=frequency_penalty,
+                presence_penalty=presence_penalty,
+            )
+            for model_str in model
+        ],
+    )
+    return [choice.message.dict() for choice in r.choices]
+
+
+@retry_if(openai_should_retry)
+def _run_openai_text(
+    model: str,
+    prompt: str,
+    max_tokens: int,
+    num_outputs: int,
+    temperature: float,
+    stop: list[str] | None,
+    avoid_repetition: bool,
+    quality: float,
+):
+    r = _get_openai_client(model).completions.create(
+        model=model,
+        prompt=prompt,
+        max_tokens=max_tokens,
+        stop=stop,
+        best_of=int(num_outputs * quality),
+        n=num_outputs,
+        temperature=temperature,
+        frequency_penalty=0.1 if avoid_repetition else 0,
+        presence_penalty=0.25 if avoid_repetition else 0,
+    )
+    return [choice.text for choice in r.choices]
+
+
+def _get_openai_client(model: str):
+    import openai
+
+    if model.startswith(AZURE_OPENAI_MODEL_PREFIX):
+        client = openai.AzureOpenAI(
+            api_key=settings.AZURE_OPENAI_KEY,
+            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+            api_version="2023-10-01-preview",
+            max_retries=0,
+        )
+    else:
+        client = openai.OpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            max_retries=0,
+        )
+    return client
 
 
 def _run_together_chat(
@@ -472,6 +542,7 @@ def _run_together_chat(
     return ret
 
 
+@retry_if(vertex_ai_should_retry)
 def _run_palm_chat(
     *,
     model_id: str,
@@ -529,6 +600,7 @@ def _run_palm_chat(
     ]
 
 
+@retry_if(vertex_ai_should_retry)
 def _run_palm_text(
     *,
     model_id: str,
