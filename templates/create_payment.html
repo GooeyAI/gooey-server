@@ -4,12 +4,21 @@
 <section class="text-center">
     <div class="description Box-root">
         <h3>Pay with Paypal</h3>
+        <form id="payment-amount" onsubmit="submitAmount(); return false;">
+            <h5>Buy a one-time top up @ 100 Credits per dollar (minimum $10).</h5>
+            <label>$<input id="input-amount" type="number" required style="display: inline;" min="10" placeholder="10"></label>
+            <button class="streamlit-like-btn" id="show-payment-types" type="submit">Buy</button>
+        </form>
     </div>
-    <div style="margin: auto; width: fit-content;" id="paypal-button-container"></div>
+    <div style="margin: auto; width: fit-content; display: none;" id="paypal-button-container"></div>
     <p id="result-message"></p>
     <!-- Replace the "test" client-id value with your client-id -->
     <script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo"></script>
     <script>
+        function submitAmount() {
+            document.getElementById("paypal-button-container").style.display = "block";
+            document.getElementById("input-amount").disabled = true;
+        }
         window.paypal
             .Buttons({
                 async createOrder() {
@@ -22,12 +31,7 @@
                         // use the "body" param to optionally pass additional order information
                         // like product ids and quantities
                         body: JSON.stringify({
-                            cart: [
-                            {
-                                id: "YOUR_PRODUCT_ID",
-                                quantity: "YOUR_PRODUCT_QUANTITY",
-                            },
-                            ],
+                            price: document.getElementById("input-amount").value,
                         }),
                     });
                     const orderData = await response.json();

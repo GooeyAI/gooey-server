@@ -42,11 +42,11 @@ def generateAccessToken():
 
 # Create an order to start the transaction.
 # @see https://developer.paypal.com/docs/api/orders/v2/#orders_create
-def createOrder(cart, uid):
+def createOrder(payload, uid):
     # use the cart information passed from the front-end to calculate the purchase unit details
     print(
         "shopping cart information passed from the frontend createOrder() callback:",
-        cart,
+        payload,
     )
 
     accessToken = generateAccessToken()
@@ -57,7 +57,7 @@ def createOrder(cart, uid):
             {
                 "amount": {
                     "currency_code": "USD",
-                    "value": "0.01",
+                    "value": payload["price"],
                 },
                 "custom_id": uid + "," + str(100),
             },
@@ -106,12 +106,18 @@ def handleResponse(response):
     return (jsonResponse, response.status_code)
 
 
+async def request_body(request: Request):
+    return await request.body()
+
+
 @router.post("/__/paypal/orders/{uid}")
-def orders(req: Request, uid: str):
+def orders(req: Request, uid: str, _payload: bytes = Depends(request_body)):
     # use the cart information passed from the front-end to calculate the order amount detals
-    cart = None  # req.text()
-    print("shopping cart information passed from the frontend orders() callback:", cart)
-    jsonResponse, httpStatusCode = createOrder(cart, uid)
+    payload: dict = json.loads(_payload)
+    print(
+        "shopping cart information passed from the frontend orders() callback:", payload
+    )
+    jsonResponse, httpStatusCode = createOrder(payload, uid)
     return JSONResponse(jsonResponse, httpStatusCode)
 
 
@@ -126,10 +132,6 @@ def capture(req: Request, orderID: str):
 def create_payment(request: Request):
     context = {"request": request, "settings": settings}
     return templates.TemplateResponse("create_payment.html", context)
-
-
-async def request_body(request: Request):
-    return await request.body()
 
 
 @router.post("/__/paypal/webhook", status_code=200)
