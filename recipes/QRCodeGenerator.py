@@ -32,6 +32,8 @@ from daras_ai_v2.stable_diffusion import (
     ControlNetModels,
     Img2ImgModels,
     Schedulers,
+    inpainting,
+    InpaintingModels,
 )
 from daras_ai_v2.vcard import VCARD
 from recipes.EmailFaceInpainting import get_photo_for_email
@@ -184,15 +186,15 @@ class QRCodeGeneratorPage(BasePage):
                 'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
             )
 
-        if source != QrSources.qr_code_input_image.name:
-            st.write("---")
-            if st.checkbox("🖼️ Add Logo", key="add_logo"):
-                st.file_uploader(
-                    "Upload a logo image which will be placed in the center of the QR code",
-                    key="logo",
-                    accept=["image/*"],
-                )
-                st.checkbox("Remove background", key="remove_logo_background")
+        # if source != QrSources.qr_code_input_image.name:
+        #     st.write("---")
+        # if st.checkbox("🖼️ Add Logo", key="add_logo"):
+        #     st.file_uploader(
+        #         "Upload a logo image which will be placed in the center of the QR code",
+        #         key="logo",
+        #         accept=["image/*"],
+        #     )
+        #     st.checkbox("Remove background", key="remove_logo_background")
 
     def validate_form_v2(self):
         assert st.session_state.get("text_prompt"), "Please provide a prompt"
@@ -377,14 +379,15 @@ Here is the final output:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)
 
         yield "Generating QR Code..."
-        image, qr_code_data, did_shorten = generate_and_upload_qr_code(
-            request, self.request.user
-        )
+        (
+            image,
+            qr_code_data,
+            did_shorten,
+            did_crop_for_outpainting,
+        ) = generate_and_upload_qr_code(request, self.request.user)
         if did_shorten:
             state["shortened_url"] = qr_code_data
         state["cleaned_qr_code"] = image
-
-        state["raw_images"] = raw_images = []
 
         yield f"Running {Text2ImgModels[request.selected_model].value}..."
         state["output_images"] = controlnet(
@@ -400,6 +403,56 @@ Here is the final output:
             controlnet_conditioning_scale=request.controlnet_conditioning_scale,
             scheduler=request.scheduler,
         )
+        raw_images = []
+        if did_crop_for_outpainting:
+            yield "Detected resolution is far from square, outpainting for more scannable results..."
+            for i, img in enumerate(state["output_images"]):
+                img_cv2 = bytes_to_cv2_img(requests.get(img).content)
+                blacked_out = img_cv2.copy()
+                blacked_out[:, :, :] = 0
+                blacked_out, _ = reposition_object(
+                    orig_img=blacked_out,
+                    orig_mask=img_cv2,
+                    out_size=(request.output_width, request.output_height),
+                    out_obj_scale=1,
+                    out_pos_x=request.obj_pos_x,
+                    out_pos_y=request.obj_pos_y,
+                    color=255,
+                )
+                img_cv2, _ = reposition_object(
+                    orig_img=img_cv2,
+                    orig_mask=img_cv2,
+                    out_size=(request.output_width, request.output_height),
+                    out_obj_scale=1,
+                    out_pos_x=request.obj_pos_x,
+                    out_pos_y=request.obj_pos_y,
+                    color=255,
+                )
+                mask_bytes = cv2_img_to_bytes(blacked_out)
+                mask_url = upload_file_from_bytes("outpainting_mask.png", mask_bytes)
+
+                img_bytes = cv2_img_to_bytes(img_cv2)
+                img_url = upload_file_from_bytes("outpainting_image.png", img_bytes)
+
+                raw_images += [img, img_url, mask_url]
+
+                state["output_images"][i] = inpainting(
+                    selected_model=InpaintingModels.sd_2.name,
+                    prompt=request.text_prompt,
+                    num_outputs=1,
+                    edit_image=img_url,
+                    edit_image_bytes=img_bytes,
+                    mask=mask_url,
+                    mask_bytes=mask_bytes,
+                    num_inference_steps=request.quality,
+                    width=100,
+                    height=100,
+                    negative_prompt=request.negative_prompt,
+                    guidance_scale=request.guidance_scale,
+                    seed=request.seed,
+                )[0]
+
+        state["raw_images"] = raw_images
 
         # TODO: properly detect bad qr code
         # TODO: generate safe qr code instead
@@ -569,7 +622,7 @@ def is_url(url: str) -> bool:
 def generate_and_upload_qr_code(
     request: QRCodeGeneratorPage.RequestModel,
     user: AppUser,
-) -> tuple[str, str, bool]:
+) -> tuple[str, str, bool, bool]:
     if request.qr_code_vcard:
         vcf_str = request.qr_code_vcard.to_vcf_str()
         qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
@@ -600,18 +653,35 @@ def generate_and_upload_qr_code(
 
     img_cv2 = generate_qr_code(qr_code_data)
 
+    # if request.add_logo:
+    #     logo = request.logo
+    #     if request.remove_logo_background:
+    #         logo = cv2_img_to_bytes(
+    #             bytes_to_cv2_img(logo).remove_background().to_bytes()
+    #         )
+    #     logo = bytes_to_cv2_img(logo)
+    #     img_cv2 = img_cv2.add_logo(logo)
+    height = request.output_height or 512
+    width = request.output_width or 512
+    did_crop_for_outpainting = False
+    min_dim = min(height, width)
+    position: tuple[int, int] = (request.obj_pos_x, request.obj_pos_y)
+    if abs(height - width) > 0.3 * min_dim:
+        height = width = min_dim
+        did_crop_for_outpainting = True
+        position = (0.5, 0.5)
     img_cv2, _ = reposition_object(
         orig_img=img_cv2,
         orig_mask=img_cv2,
-        out_size=(request.output_width, request.output_height),
+        out_size=(width, height),
         out_obj_scale=request.obj_scale,
-        out_pos_x=request.obj_pos_x,
-        out_pos_y=request.obj_pos_y,
+        out_pos_x=position[0],
+        out_pos_y=position[1],
         color=255,
     )
 
     img_url = upload_file_from_bytes("cleaned_qr.png", cv2_img_to_bytes(img_cv2))
-    return img_url, qr_code_data, using_shortened_url
+    return img_url, qr_code_data, using_shortened_url, did_crop_for_outpainting
 
 
 def generate_qr_code(qr_code_data: str) -> np.ndarray:
