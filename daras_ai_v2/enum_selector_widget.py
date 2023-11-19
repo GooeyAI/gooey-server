@@ -18,7 +18,12 @@ def enum_multiselect(
         deprecated = enum_cls._deprecated()
     except AttributeError:
         deprecated = set()
-    enums = [e for e in enum_cls if not e in deprecated]
+    enums = []
+    value = st.session_state.get(key, [])
+    for e in enum_cls:
+        if e in deprecated and e.name not in value:
+            continue
+        enums.append(e)
 
     if checkboxes:
         if label:

@@ -91,6 +91,7 @@ class BasePage:
     slug_versions: list[str]
 
     sane_defaults: dict = {}
+
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
 
@@ -154,7 +155,6 @@ class BasePage:
             )
 
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-
         if st.session_state.get(StateKeys.run_status):
             channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
             output = realtime_pull([channel])[0]
@@ -479,14 +479,18 @@ class BasePage:
             col2.node.props[
                 "className"
             ] += " d-flex justify-content-end align-items-center"
+            col1.node.props["className"] += " d-flex flex-column justify-content-center"
             with col1:
+                cost_note = self.get_cost_note() or ""
+                if cost_note:
+                    cost_note = f"({cost_note.strip()})"
                 st.caption(
-                    f"Run cost = [{self.get_price_roundoff(st.session_state)} credits]({self.get_credits_click_url()}) \\\n"
-                    f"_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)._ ",
+                    f"""
+Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}  
+{self.additional_notes() or ""}
+                    """,
+                    unsafe_allow_html=True,
                 )
-                additional_notes = self.additional_notes()
-                if additional_notes:
-                    st.caption(additional_notes)
             with col2:
                 submitted = st.button(
                     "🏃 Submit",
@@ -632,6 +636,11 @@ class BasePage:
             st.text_input("Title", key=StateKeys.page_title)
             st.text_area("Notes", key=StateKeys.page_notes)
         submitted = self.render_submit_button()
+        with st.div(style={"textAlign": "right"}):
+            st.caption(
+                "_By submitting, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & "
+                "[privacy policy](https://gooey.ai/privacy)._"
+            )
         return submitted
 
     def _render_output_col(self, submitted: bool):
@@ -1141,6 +1150,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def additional_notes(self) -> str | None:
         pass
 
+    def get_cost_note(self) -> str | None:
+        pass
+
     def is_current_user_admin(self) -> bool:
         if not self.request or not self.request.user:
             return False
@@ -1149,6 +1161,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def is_current_user_paying(self) -> bool:
         return bool(self.request and self.request.user and self.request.user.is_paying)
+
+    def is_current_user_owner(self) -> bool:
+        return bool(
+            self.request and self.request.user and self.run_user == self.request.user
+        )
 
 
 def get_example_request_body(

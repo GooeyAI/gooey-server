@@ -82,19 +82,7 @@ class AsrPage(BasePage):
     def render_form_v2(self):
         document_uploader(
             "##### Audio Files",
-            accept=(
-                ".wav",
-                ".ogg",
-                ".mp3",
-                ".aac",
-                ".opus",
-                ".oga",
-                ".mp4",
-                ".webm",
-                ".amr",
-                ".aac",
-                ".m4a",
-            ),
+            accept=("audio/*", "video/*", "application/octet-stream"),
         )
         col1, col2 = st.columns(2, responsive=False)
         with col1:
@@ -169,10 +157,8 @@ class AsrPage(BasePage):
             # Save the raw ASR text for details view
             state["output_text"] = asr_output
 
-    def additional_notes(self) -> str | None:
-        return """
-*Cost ≈ 1 credit for 12.5 words ≈ 0.08 credits per word*
-              """
+    def get_cost_note(self) -> str | None:
+        return "1 credit for 12.5 words ≈ 0.08 per word"
 
     def get_raw_price(self, state: dict):
         texts = state.get("output_text", [])
