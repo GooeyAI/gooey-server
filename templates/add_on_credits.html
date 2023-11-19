@@ -4,6 +4,6 @@
         <!-- Add a hidden field with the lookup_key of your Price -->
         <input type="hidden" name="quantity" value="{{ amt * 100 }}"/>
         <input type="hidden" name="lookup_key" value="addon"/>
-        <button class="streamlit-like-btn" type="submit">Buy ${{ amt }}</button>
+        <button class="streamlit-like-btn stripe-checkout" type="submit">Buy ${{ amt }}</button>
     </form>
 {% endfor %}

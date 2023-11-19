@@ -59,7 +59,7 @@ def createOrder(payload, uid):
                     "currency_code": "USD",
                     "value": payload["price"],
                 },
-                "custom_id": uid + "," + str(100),
+                "custom_id": uid + "," + str(int(payload["price"]) * 100),
             },
         ],
     }
@@ -123,7 +123,6 @@ def orders(req: Request, uid: str, _payload: bytes = Depends(request_body)):
 
 @router.post("/__/paypal/orders/{orderID}/capture")
 def capture(req: Request, orderID: str):
-    print("orderiddd", orderID)
     jsonResponse, httpStatusCode = captureOrder(orderID)
     return JSONResponse(jsonResponse, httpStatusCode)
 
@@ -136,8 +135,6 @@ def create_payment(request: Request):
 
 @router.post("/__/paypal/webhook", status_code=200)
 def create_webhook(request: Request, _payload: bytes = Depends(request_body)):
-    print("initial payload", _payload)
-    print("request.headers", request.headers)
     # Verify
     accessToken = generateAccessToken()
     headers = {
@@ -146,7 +143,6 @@ def create_webhook(request: Request, _payload: bytes = Depends(request_body)):
     }
 
     payload: dict = json.loads(_payload)
-    print("payload", payload)
     data = {
         "transmission_id": request.headers["paypal-transmission-id"],
         "transmission_time": request.headers["paypal-transmission-time"],
@@ -156,7 +152,6 @@ def create_webhook(request: Request, _payload: bytes = Depends(request_body)):
         "webhook_id": settings.PAYPAL_WEBHOOK_ID,
         "webhook_event": payload,
     }
-    print("data", data)
 
     response = requests.post(
         f"{settings.PAYPAL_BASE}/v1/notifications/verify-webhook-signature",
@@ -165,7 +160,6 @@ def create_webhook(request: Request, _payload: bytes = Depends(request_body)):
     )
     response.raise_for_status()
     response = response.json()
-    print("response", response)
     if response["verification_status"] != "SUCCESS":
         capture_exception(Exception("PayPal webhook verification failed"))
         return JSONResponse({"status": "failure"})

@@ -57,17 +57,27 @@
             <div class="buy-credits-container">
                 <h2>Buy Credits</h2>
                 <div class="pb-2">
-                    Payments processed via Stripe.
-                    <a href="/paypal">Pay via PayPal or Venmo</a> instead.
-                    </div>
-                <div class="plans-container">
+                    Payments processed via 
+                    <input type="radio" id="stripe-checked" value="Stripe" onchange="stripeLayout()" name="payment-type" checked="checked"><label for="stripe">Stripe</label>
+                    <input type="radio" value="Paypal" onchange="paypalLayout()" name="payment-type"><label for="paypal">Paypal or Venmo</label>
+                </div>
+                <div id="stripe-plans" class="plans-container">
                     {% for lookup_key, subscription in available_subscriptions.items() %}
-                        <ul class="product">
+                        <ul class="product" id="{{ subscription['display']['name'] }}">
                             <li>
                                 <h4>{{ subscription["display"]["title"] }}</h4>
                                 <h5>{{ subscription["display"]["description"] |safe }}</h5>
                                 {% if lookup_key == "addon" %}
                                     {% include 'add_on_credits.html' %}
+                                        {% for amt in [10, 30, 50, 100, 300, 500] %}
+                                            <form class="d-inline" onsubmit="submitAmount({{ amt }}); return false;" method="POST">
+                                                <input type="hidden" name="quantity" value="{{ amt * 100 }}"/>
+                                                <input type="hidden" name="lookup_key" value="addon"/>
+                                                <button class="streamlit-like-btn paypal-checkout" type="submit" style="display: none;">Buy ${{ amt }}</button>
+                                            </form>
+                                        {% endfor %}
+                                        <div style="width: fit-content; display: none;" id="paypal-button-container"></div>
+                                        <p id="result-message"></p>
                                 {% else %}
                                     <form action="/__/stripe/create-checkout-session" method="POST">
                                         <!-- Add a hidden field with the lookup_key of your Price -->
@@ -99,4 +109,135 @@
             {% include 'add_on_credits.html' %}
         {% endif %}
     </div>
+    <script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater"></script>
+    <script>
+        window.onload = function () {
+            if (document.getElementById("stripe-checked").checked) {
+                stripeLayout();
+            } else {
+                paypalLayout();
+            }
+        }
+        function stripeLayout() {
+            for (let plan of document.getElementsByClassName("product")) {
+                plan.style.display = "block";
+            }
+            for (let planBtn of document.getElementsByClassName("paypal-checkout")) {
+                planBtn.style.display = "none";
+            }
+            for (let planBtn of document.getElementsByClassName("stripe-checkout")) {
+                planBtn.style.display = "inline-block";
+            }
+        }
+
+        function paypalLayout() {
+            for (let plan of document.getElementsByClassName("product")) {
+                if (plan.id === "Add-on") {
+                    plan.style.display = "block";
+                } else {
+                    plan.style.display = "none";
+                }
+            }
+            for (let planBtn of document.getElementsByClassName("paypal-checkout")) {
+                planBtn.style.display = "inline-block";
+            }
+            for (let planBtn of document.getElementsByClassName("stripe-checkout")) {
+                planBtn.style.display = "none";
+            }
+        }
+
+        let price = 0;
+        // Handle Paypal
+        function submitAmount(amt) {
+            document.getElementById("paypal-button-container").style.display = "block";
+            price = amt;
+        }
+        window.paypal
+            .Buttons({
+                async createOrder() {
+                try {
+                    const response = await fetch("/__/paypal/orders/{{ request.user.uid }}", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        // use the "body" param to optionally pass additional order information
+                        // like product ids and quantities
+                        body: JSON.stringify({
+                            price: price,
+                        }),
+                    });
+                    const orderData = await response.json();
+                    if (orderData.id) {
+                        return orderData.id;
+                    } else {
+                        const errorDetail = orderData?.details?.[0];
+                        const errorMessage = errorDetail
+                            ? `${errorDetail.issue} ${errorDetail.description} (${orderData.debug_id})`
+                            : JSON.stringify(orderData);
+                        
+                        throw new Error(errorMessage);
+                    }
+                } catch (error) {
+                    console.error(error);
+                    resultMessage(`Could not initiate PayPal Checkout...<br><br>${error}`);
+                }
+                },
+                async onApprove(data, actions) {
+                    try {
+                        const response = await fetch(`/__/paypal/orders/${data.orderID}/capture`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        });
+                        
+                        const orderData = await response.json();
+                        // Three cases to handle:
+                        //   (1) Recoverable INSTRUMENT_DECLINED -> call actions.restart()
+                        //   (2) Other non-recoverable errors -> Show a failure message
+                        //   (3) Successful transaction -> Show confirmation or thank you message
+                        
+                        const errorDetail = orderData?.details?.[0];
+                        
+                        if (errorDetail?.issue === "INSTRUMENT_DECLINED") {
+                        // (1) Recoverable INSTRUMENT_DECLINED -> call actions.restart()
+                        // recoverable state, per https://developer.paypal.com/docs/checkout/standard/customize/handle-funding-failures/
+                        return actions.restart();
+                        } else if (errorDetail) {
+                        // (2) Other non-recoverable errors -> Show a failure message
+                        throw new Error(`${errorDetail.description} (${orderData.debug_id})`);
+                        } else if (!orderData.purchase_units) {
+                        throw new Error(JSON.stringify(orderData));
+                        } else {
+                        // (3) Successful transaction -> Show confirmation or thank you message
+                        // Or go to another URL:  actions.redirect('thank_you.html');
+                        const transaction =
+                            orderData?.purchase_units?.[0]?.payments?.captures?.[0] ||
+                            orderData?.purchase_units?.[0]?.payments?.authorizations?.[0];
+                        resultMessage(
+                            `Transaction ${transaction.status}: ${transaction.id}<br><br>See console for all available details`,
+                        );
+                        console.log(
+                            "Capture result",
+                            orderData,
+                            JSON.stringify(orderData, null, 2),
+                        );
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        resultMessage(
+                        `Sorry, your transaction could not be processed...<br><br>${error}`,
+                        );
+                    }
+                },
+            })
+            .render("#paypal-button-container");
+            
+        // Example function to show a result to the user. Your site's UI library can be used instead.
+        function resultMessage(message) {
+        const container = document.querySelector("#result-message");
+        container.innerHTML = message;
+        }
+    </script>
 {% endblock content %}
