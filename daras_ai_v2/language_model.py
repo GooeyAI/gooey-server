@@ -78,7 +78,10 @@ class LargeLanguageModels(Enum):
 AZURE_OPENAI_MODEL_PREFIX = "openai-"
 
 llm_model_names = {
-    LargeLanguageModels.gpt_4_turbo: "gpt-4-1106-preview",
+    LargeLanguageModels.gpt_4_turbo: (
+        "openai-gpt-4-turbo-prod-ca-1",
+        "gpt-4-1106-preview",
+    ),
     LargeLanguageModels.gpt_4: (
         "openai-gpt-4-prod-ca-1",
         "gpt-4",
