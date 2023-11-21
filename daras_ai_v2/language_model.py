@@ -2,6 +2,7 @@ import hashlib
 import io
 import re
 from enum import Enum
+from functools import partial
 
 import numpy as np
 import requests
@@ -249,8 +250,10 @@ def _run_openai_embedding(
         model = [model]
     res = try_all(
         *[
-            lambda: _get_openai_client(model_str).embeddings.create(
-                model=model_str, input=input
+            partial(
+                _get_openai_client(model_str).embeddings.create,
+                model=model_str,
+                input=input,
             )
             for model_str in model
         ],
@@ -434,7 +437,8 @@ def _run_openai_chat(
         model = [model]
     r = try_all(
         *[
-            lambda: _get_openai_client(model_str).chat.completions.create(
+            partial(
+                _get_openai_client(model_str).chat.completions.create,
                 model=model_str,
                 messages=messages,
                 max_tokens=max_tokens,
