@@ -382,13 +382,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             """
             ##### 🔠 User Language
             If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
-            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            """,
+            """,
             key="user_language",
         )
         st.markdown(
             """
             ###### 📖 Customize with Glossary
             Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            
             """
         )
         glossary_input(

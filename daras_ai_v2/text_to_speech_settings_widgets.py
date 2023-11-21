@@ -76,41 +76,42 @@ ELEVEN_LABS_VOICES = {
 
 # Mapping from Model ID -> Title in UI
 ELEVEN_LABS_MODELS = {
-    "eleven_multilingual_v2": "Multilingual V2",
-    "eleven_monolingual_v1": "English V1 - Low latency English TTS",
+    "eleven_multilingual_v2": "Multilingual V2 - High quality speech in 29 languages",
+    "eleven_turbo_v2": "English V2 - Very low latency text-to-speech",
+    "eleven_monolingual_v1": "English V1 - Low latency text-to-speech",
 }
 
 ELEVEN_LABS_SUPPORTED_LANGS = [
     "English",
-    "Chinese",
-    "Spanish",
-    "Hindi",
-    "Portuguese",
-    "French",
-    "German",
     "Japanese",
-    "Arabic",
+    "Chinese",
+    "German",
+    "Hindi",
+    "French",
     "Korean",
-    "Indonesian",
+    "Portuguese",
     "Italian",
+    "Spanish",
+    "Indonesian",
     "Dutch",
     "Turkish",
+    "Filipino",
     "Polish",
     "Swedish",
-    "Filipino",
-    "Malay",
-    "Romanian",
-    "Ukrainian",
-    "Greek",
-    "Czech",
-    "Danish",
-    "Finnish",
     "Bulgarian",
+    "Romanian",
+    "Arabic",
+    "Czech",
+    "Greek",
+    "Finnish",
     "Croatian",
+    "Malay",
     "Slovak",
+    "Danish",
     "Tamil",
+    "Ukrainian",
+    "Russian",
 ]
-
 
 BARK_SUPPORTED_LANGS = [
     ("English", "en"),
@@ -184,7 +185,7 @@ def text_to_speech_settings(page):
             with col1:
                 st.slider(
                     """
-                    ###### Speaking rate 
+                    ###### Speaking rate
                     *`1.0` is the normal native speed of the speaker*
                     """,
                     min_value=0.3,
@@ -219,7 +220,7 @@ def text_to_speech_settings(page):
             with col1:
                 st.slider(
                     """
-                    ###### Speaking rate 
+                    ###### Speaking rate
                     *`1.0` is the normal native speed of the speaker*
                     """,
                     min_value=0.5,

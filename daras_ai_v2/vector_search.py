@@ -400,14 +400,13 @@ def get_embeds_for_doc(
             )
         ]
     # get doc embeds in batches
-    embeds = []
-    batch_size = 100
+    batch_size = 16  # azure openai limits
     texts = [m["title"] + " | " + m["snippet"] for m in metas]
-    for i in range(0, len(texts), batch_size):
-        # progress = int(i / len(texts) * 100)
-        # print(f"Getting document embeddings ({progress}%)...")
-        batch = texts[i : i + batch_size]
-        embeds.extend(openai_embedding_create(batch))
+    embeds = flatmap_parallel(
+        openai_embedding_create,
+        [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)],
+        max_workers=5,
+    )
     return list(zip(metas, embeds))
 
 
