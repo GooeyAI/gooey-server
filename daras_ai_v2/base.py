@@ -148,25 +148,6 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
-    def get_page_title(self, state) -> str | None:
-        return state.get(StateKeys.page_title) or truncate_text_words(
-            state.get("input_prompt")
-            or state.get("text_prompt")
-            or (state.get("animation_prompts") or [{}])[0].get("prompt")
-            or state.get("search_query")
-            or state.get("title")
-            or self.title,
-            maxlen=60,
-        )
-
-    def get_recipe_page_title(self, state) -> str | None:
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        if not example_id and not run_id:
-            return state.get(StateKeys.page_title) or self.title
-        else:
-            recipe_doc_state = self.recipe_doc_sr().to_dict()
-            return recipe_doc_state.get(StateKeys.page_title) or self.title
-
     def render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
@@ -195,28 +176,7 @@ class BasePage:
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
-        if example_id or run_id:
-            with st.breadcrumbs(className="mt-5", divider="/"):
-                st.breadcrumb_item(
-                    self.get_recipe_page_title(st.session_state).upper(),
-                    link_to=self.app_url(),
-                    className="text-muted",
-                )
-                saved_run = self.get_sr_from_query_params(example_id, run_id, uid)
-                if saved_run.parent and saved_run.parent.example_id:
-                    st.breadcrumb_item(
-                        self.get_page_title(saved_run.parent.to_dict()),
-                        link_to=self.app_url(
-                            example_id=saved_run.parent.example_id,
-                        ),
-                    )
-            st.write(f"# {self.get_page_title(st.session_state)}")
-        else:
-            with st.link(
-                to=self.app_url(), className="text-decoration-none", target="_blank"
-            ):
-                st.write(f"# {self.get_recipe_page_title(st.session_state)}")
-
+        self._render_page_title_with_breadcrumbs(example_id, run_id, uid)
         st.write(st.session_state.get(StateKeys.page_notes))
 
         try:
@@ -236,6 +196,63 @@ class BasePage:
                     st.html(name)
         with st.nav_tab_content():
             self.render_selected_tab(selected_tab)
+
+    def _render_page_title_with_breadcrumbs(
+        self, example_id: str, run_id: str, uid: str
+    ):
+        if example_id or run_id:
+            # the title on the saved root / the hardcoded title
+            recipe_title = (
+                self.recipe_doc_sr().to_dict().get(StateKeys.page_title) or self.title
+            )
+
+            # the user saved title for the current run
+            current_title = st.session_state.get(StateKeys.page_title)
+
+            # prefer the prompt as h1 title for runs, but not for examples
+            prompt_title = truncate_text_words(
+                self.preview_input(st.session_state) or "", maxlen=60
+            )
+            if run_id:
+                h1_title = prompt_title or current_title or recipe_title
+            else:
+                h1_title = current_title or prompt_title or recipe_title
+
+            # render recipe title if it doesn't clash with the h1 title
+            render_item1 = recipe_title and recipe_title != h1_title
+            # render current title if it doesn't clash with the h1 title & recipe title
+            render_item2 = (
+                current_title
+                and current_title != recipe_title
+                and current_title != h1_title
+            )
+            if render_item1 and render_item2:  # avoids empty space
+                with st.breadcrumbs(className="mt-5"):
+                    if render_item1:
+                        st.breadcrumb_item(
+                            recipe_title,
+                            link_to=self.app_url(),
+                            className="text-muted",
+                        )
+                    if render_item2:
+                        current_sr = self.get_sr_from_query_params(
+                            example_id, run_id, uid
+                        )
+                        st.breadcrumb_item(
+                            current_title,
+                            link_to=current_sr.parent.get_app_url()
+                            if current_sr.parent_id
+                            else None,
+                        )
+            st.write(f"# {h1_title}")
+        else:
+            with st.link(
+                to=self.app_url(), className="text-decoration-none", target="_blank"
+            ):
+                st.write(f"# {self.get_recipe_title(st.session_state)}")
+
+    def get_recipe_title(self, state: dict) -> str:
+        return state.get(StateKeys.page_title) or self.title or ""
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
@@ -863,7 +880,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                     dict(example_id=sr_to_save.example_id)
                 )
 
-            if current_sr.parent:
+            if current_sr.parent_id:
                 st.write(f"Parent: {current_sr.parent.get_app_url()}")
 
     def state_to_doc(self, state: dict):
@@ -1035,6 +1052,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             state.get("text_prompt")
             or state.get("input_prompt")
             or state.get("search_query")
+            or state.get("title")
         )
 
     def preview_description(self, state: dict) -> str:
