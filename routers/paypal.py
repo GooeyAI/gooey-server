@@ -59,7 +59,7 @@ def createOrder(payload, uid):
                     "currency_code": "USD",
                     "value": payload["price"],
                 },
-                "custom_id": uid + "," + str(int(payload["price"]) * 100),
+                "custom_id": uid,
             },
         ],
     }
@@ -164,7 +164,7 @@ def create_webhook(request: Request, _payload: bytes = Depends(request_body)):
         capture_exception(Exception("PayPal webhook verification failed"))
         return JSONResponse({"status": "failure"})
     try:
-        uid = payload["resource"]["custom_id"].split(",")[0]
+        uid = payload["resource"]["custom_id"]
     except KeyError:
         uid = None
     if not uid:
@@ -186,7 +186,9 @@ def create_webhook(request: Request, _payload: bytes = Depends(request_body)):
 
 def _handle_invoice_paid(uid: str, invoice_data):
     invoice_id = invoice_data["transmission_id"]
-    amount = int(invoice_data["webhook_event"]["resource"]["custom_id"].split(",")[1])
+    amount = int(
+        float(invoice_data["webhook_event"]["resource"]["amount"]["value"]) * 100
+    )
     user = AppUser.objects.get_or_create_from_uid(uid)[0]
     user.add_balance(amount, invoice_id)
     if not user.is_paying:
