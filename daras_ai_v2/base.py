@@ -172,6 +172,7 @@ class BasePage:
             self.render_report_form()
             return
 
+        st.session_state.setdefault(StateKeys.page_title, self.title)
         st.session_state.setdefault(
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
