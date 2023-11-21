@@ -11,6 +11,7 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
+from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.vector_search import (
@@ -65,7 +66,7 @@ For each output field in the Gooey.AI workflow, specify the column name that you
         st.session_state.setdefault("__run_urls", "\n".join(run_urls))
         run_urls = (
             st.text_area(
-                f"##### {self.RequestModel.__fields__['run_urls'].field_info.title}\n{self.RequestModel.__fields__['run_urls'].field_info.description or ''}",
+                f"##### {field_title_desc(self.RequestModel, 'run_urls')}",
                 key="__run_urls",
             )
             .strip()
@@ -74,7 +75,7 @@ For each output field in the Gooey.AI workflow, specify the column name that you
         st.session_state["run_urls"] = run_urls
 
         files = document_uploader(
-            f"##### {self.RequestModel.__fields__['documents'].field_info.title}\n{self.RequestModel.__fields__['documents'].field_info.description or ''}",
+            f"##### {field_title_desc(self.RequestModel, 'documents')}",
             accept=(".csv", ".xlsx", ".xls", ".json", ".tsv", ".xml"),
         )
 
