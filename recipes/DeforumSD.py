@@ -430,7 +430,7 @@ Choose fps for the video.
         else:
             animation_prompts = state.get("animation_prompts", [])
         display = "\n\n".join(
-            [f"[{fp['frame']}] {fp['prompt']}" for fp in animation_prompts]
+            [f"{fp['prompt']} [{fp['frame']}]" for fp in animation_prompts]
         )
         return display
 
