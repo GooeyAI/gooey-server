@@ -23,7 +23,7 @@ def generate_final_search_query(
     if not instructions:
         return ""
     model = LargeLanguageModels[request.selected_model]
-    max_tokens = model_max_tokens[model] // 8  # just a sane default
+    max_tokens = min(model_max_tokens[model] // 8, 1024)  # just a sane default
     return run_language_model(
         model=request.selected_model,
         prompt=instructions,

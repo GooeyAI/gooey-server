@@ -241,7 +241,7 @@ class CompareText2ImgPage(BasePage):
             match name:
                 case Text2ImgModels.deepfloyd_if.name:
                     total += 5
-                case Text2ImgModels.dall_e.name:
+                case Text2ImgModels.dall_e.name | Text2ImgModels.dall_e_3.name:
                     total += 15
                 case _:
                     total += 2

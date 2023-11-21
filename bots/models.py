@@ -170,6 +170,8 @@ class SavedRun(models.Model):
             ),
         ]
         indexes = [
+            models.Index(fields=["-created_at"]),
+            models.Index(fields=["-updated_at"]),
             models.Index(fields=["workflow"]),
             models.Index(fields=["workflow", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
@@ -519,7 +521,8 @@ class ConversationQuerySet(models.QuerySet):
                         convo.last_active_delta().total_seconds() / 3600
                     ),
                     "D1": convo.d1(),
-                    "D3": convo.d3(),
+                    "D7": convo.d7(),
+                    "D30": convo.d30(),
                 }
             except Message.DoesNotExist:
                 pass
@@ -659,11 +662,17 @@ class Conversation(models.Model):
     d1.short_description = "D1"
     d1.boolean = True
 
-    def d3(self):
-        return self.last_active_delta() > datetime.timedelta(days=3)
+    def d7(self):
+        return self.last_active_delta() > datetime.timedelta(days=7)
 
-    d3.short_description = "D3"
-    d3.boolean = True
+    d7.short_description = "D7"
+    d7.boolean = True
+
+    def d30(self):
+        return self.last_active_delta() > datetime.timedelta(days=30)
+
+    d30.short_description = "D30"
+    d30.boolean = True
 
 
 class MessageQuerySet(models.QuerySet):

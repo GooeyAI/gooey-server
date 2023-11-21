@@ -236,6 +236,7 @@ def video(src: str, caption: str = None, autoplay: bool = False):
             "autoPlay": True,
             "loop": True,
             "muted": True,
+            "playsInline": True,
         }
 
     if not src:
@@ -618,6 +619,33 @@ def text_input(
     return value or ""
 
 
+def password_input(
+    label: str,
+    value: str = "",
+    max_chars: str = None,
+    key: str = None,
+    help: str = None,
+    *,
+    placeholder: str = None,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    **props,
+) -> str:
+    value = _input_widget(
+        input_type="password",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        maxLength=max_chars,
+        placeholder=placeholder,
+        **props,
+    )
+    return value or ""
+
+
 def slider(
     label: str,
     min_value: float = None,
@@ -735,6 +763,22 @@ def _input_widget(
         },
     ).mount()
     return value
+
+
+def breadcrumbs(divider: str = "/", **props) -> state.NestingCtx:
+    style = props.pop("style", {}) | {"--bs-breadcrumb-divider": f"'{divider}'"}
+    with tag("nav", style=style, **props):
+        return tag("ol", className="breadcrumb mb-0")
+
+
+def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
+    className = "breadcrumb-item lead " + props.pop("className", "")
+    with tag("li", className=className, **props):
+        if link_to:
+            with tag("a", href=link_to):
+                html(inner_html)
+        else:
+            html(inner_html)
 
 
 def dedent(text: str | None) -> str | None:
