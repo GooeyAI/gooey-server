@@ -405,7 +405,7 @@ def button(
     key: str = None,
     help: str = None,
     *,
-    type: typing.Literal["primary", "secondary", "link"] = "secondary",
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
     disabled: bool = False,
     **props,
 ) -> bool:
@@ -413,6 +413,7 @@ def button(
     Example:
         st.button("Primary", key="test0", type="primary")
         st.button("Secondary", key="test1")
+        st.button("Tertiary", key="test3", type="link", type="tertiary")
         st.button("Link Button", key="test3", type="link")
     """
     if not key:
