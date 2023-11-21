@@ -86,6 +86,10 @@ asr_supported_languages = {
     AsrModels.azure: AZURE_SUPPORTED,
 }
 
+does_not_support_auto_detect = {
+    AsrModels.azure,
+}
+
 
 class AsrChunk(typing_extensions.TypedDict):
     timestamp: tuple[float, float]
@@ -160,7 +164,9 @@ def asr_language_selector(
         st.session_state[key] = forced_lang
         return forced_lang
 
-    options = [None, *asr_supported_languages.get(selected_model, [])]
+    options = ([] if selected_model in does_not_support_auto_detect else [None]) + [
+        *asr_supported_languages.get(selected_model, [])
+    ]
 
     # handle non-canonical language codes
     old_val = st.session_state.get(key)
@@ -555,19 +561,6 @@ def azure_asr(audio_url: str, language: str):
         },
         "locale": language or "en-US",
     }
-    if not language:
-        payload["properties"]["languageIdentification"] = {
-            "candidateLocales": [
-                "en-US",
-                "en-IN",
-                "hi-IN",
-                "te-IN",
-                "ta-IN",
-                "kn-IN",
-                "es-ES",
-                "de-DE",
-            ]
-        }
     r = requests.post(
         str(furl(settings.AZURE_SPEECH_ENDPOINT) / "speechtotext/v3.1/transcriptions"),
         headers={
