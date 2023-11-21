@@ -206,8 +206,10 @@ class BasePage:
                 self.recipe_doc_sr().to_dict().get(StateKeys.page_title) or self.title
             )
 
-            # the user saved title for the current run
+            # the user saved title for the current run (if its not the same as the recipe title)
             current_title = st.session_state.get(StateKeys.page_title)
+            if current_title == recipe_title:
+                current_title = ""
 
             # prefer the prompt as h1 title for runs, but not for examples
             prompt_title = truncate_text_words(
@@ -220,12 +222,8 @@ class BasePage:
 
             # render recipe title if it doesn't clash with the h1 title
             render_item1 = recipe_title and recipe_title != h1_title
-            # render current title if it doesn't clash with the h1 title & recipe title
-            render_item2 = (
-                current_title
-                and current_title != recipe_title
-                and current_title != h1_title
-            )
+            # render current title if it doesn't clash with the h1 title
+            render_item2 = current_title and current_title != h1_title
             if render_item1 or render_item2:  # avoids empty space
                 with st.breadcrumbs(className="mt-4"):
                     if render_item1:
