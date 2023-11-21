@@ -78,6 +78,34 @@ Use black - https://pypi.org/project/black
 
 **Recommended**: Black IDE integration Guide: [Pycharm](https://black.readthedocs.io/en/stable/integrations/editors.html#pycharm-intellij-idea)
 
+
+## Running test Whatsapp bot
+
+We use the following facebook app for testing - 
+```
+gooey.ai (dev)
+App ID: 228027632918921
+```
+
+1. start ngrok
+
+```
+ngrok http 8080
+```
+
+2. set env var `FB_WEBHOOK_TOKEN = asdf1234`
+
+
+3. Open [WhatsApp Configuration](https://developers.facebook.com/apps/228027632918921/whatsapp-business/wa-settings/?business_id=549319917267066), set the Callback URL and Verify Token
+<img width="500" alt="image" src="https://github.com/GooeyAI/gooey-server/assets/19492893/95bb3a87-ae4f-4f6b-a04e-583ee51b85de">
+
+4. Open [WhatsApp API Setup](https://developers.facebook.com/apps/228027632918921/whatsapp-business/wa-dev-console/?business_id=549319917267066), send yourself a message from the test number.
+<img width="500" alt="image" src="https://github.com/GooeyAI/gooey-server/assets/19492893/f9417723-77c0-4be5-9814-778662215d9c">
+
+5. Copy the temporary access token there and set env var `WHATSAPP_ACCESS_TOKEN = XXXX`
+
+
+
 ## Dangerous postgres commands
 
 ### backup & restore postgres db
