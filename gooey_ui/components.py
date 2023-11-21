@@ -405,10 +405,16 @@ def button(
     key: str = None,
     help: str = None,
     *,
-    type: typing.Literal["primary", "secondary"] = "secondary",
+    type: typing.Literal["primary", "secondary", "link"] = "secondary",
     disabled: bool = False,
     **props,
 ) -> bool:
+    """
+    Example:
+        st.button("Primary", key="test0", type="primary")
+        st.button("Secondary", key="test1")
+        st.button("Link Button", key="test3", type="link")
+    """
     if not key:
         key = md5_values("button", label, help, type, props)
     state.RenderTreeNode(
@@ -420,6 +426,7 @@ def button(
             label=dedent(label),
             help=help,
             disabled=disabled,
+            className="btn-" + type,
             **props,
         ),
     ).mount()
