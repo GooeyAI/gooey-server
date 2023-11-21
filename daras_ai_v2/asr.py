@@ -518,22 +518,7 @@ def _get_or_create_recognizer(
     return recognizer
 
 
-@redis_cache_decorator
-def azure_asr(
-    audio_url: str,
-    language: str = "en-US",
-    candidate_languages: list[str] = [
-        "es-ES",
-        "zh-CN",
-        "ru-RU",
-        "fr-FR",
-        "de-DE",
-        "te-IN",
-        "ar-SA",
-        "hi-IN",
-        "ko-KR",
-    ],
-):
+def azure_asr(audio_url: str, language: str):
     # transcription from audio url only supported via rest api or cli
     # Start by initializing a request
     payload = {
@@ -542,19 +527,26 @@ def azure_asr(
         ],
         "displayName": "Gooey Transcription",
         "model": None,
-        "locale": language or "en-US",
         "properties": {
             "wordLevelTimestampsEnabled": False,
-            "languageIdentification": {
-                "candidateLocales": candidate_languages
-                + [  # 2-10 locales and one of them must be the actual locale
-                    language or "en-US",
-                ]
-            },
         },
+        "locale": language or "en-US",
     }
+    if not language:
+        payload["properties"]["languageIdentification"] = {
+            "candidateLocales": [
+                "en-US",
+                "en-IN",
+                "hi-IN",
+                "te-IN",
+                "ta-IN",
+                "kn-IN",
+                "es-ES",
+                "de-DE",
+            ]
+        }
     r = requests.post(
-        f"https://{settings.AZURE_SPEECH_REGION}.api.cognitive.microsoft.com/speechtotext/v3.1/transcriptions",
+        str(furl(settings.AZURE_SPEECH_ENDPOINT) / "speechtotext/v3.1/transcriptions"),
         headers={
             "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
             "Content-Type": "application/json",
@@ -584,13 +576,14 @@ def azure_asr(
         r.raise_for_status()
         transcriptions = []
         for value in r.json()["values"]:
-            if value["kind"] == "Transcription":
-                r = requests.get(
-                    value["links"]["contentUrl"],
-                    headers={"Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY},
-                )
-                r.raise_for_status()
-                transcriptions += [r.json()["combinedRecognizedPhrases"][0]["display"]]
+            if value["kind"] != "Transcription":
+                continue
+            r = requests.get(
+                value["links"]["contentUrl"],
+                headers={"Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY},
+            )
+            r.raise_for_status()
+            transcriptions += [r.json()["combinedRecognizedPhrases"][0]["display"]]
         return "\n".join(transcriptions)
     assert False, "Max polls exceeded, Azure speech did not yield a response"
 
