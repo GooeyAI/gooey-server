@@ -581,7 +581,7 @@ def azure_asr(audio_url: str, language: str):
             },
         )
         if not r.ok or not r.json()["status"] == "Succeeded":
-            sleep(1)
+            sleep(5)
             continue
         r = requests.get(
             r.json()["links"]["files"],
