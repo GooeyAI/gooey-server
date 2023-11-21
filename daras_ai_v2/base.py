@@ -226,7 +226,7 @@ class BasePage:
                 and current_title != recipe_title
                 and current_title != h1_title
             )
-            if render_item1 and render_item2:  # avoids empty space
+            if render_item1 or render_item2:  # avoids empty space
                 with st.breadcrumbs(className="mt-5"):
                     if render_item1:
                         st.breadcrumb_item(
