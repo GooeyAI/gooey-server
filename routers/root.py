@@ -30,8 +30,10 @@ from daras_ai_v2.base import (
 )
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
+from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.query_params_util import extract_query_params
+from daras_ai_v2.secrets_widget import secrets_widget
 from daras_ai_v2.settings import templates
 from routers.api import request_form_files
 
@@ -223,6 +225,23 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
         ),
     }
     return ret
+
+
+@app.post("/api-keys/")
+def api_keys(request: Request, json_data=Depends(request_json)):
+    def render_fn():
+        st.write("---")
+        st.write("### 🔐 API keys", className="mt-2")
+        manage_api_keys(request.user)
+
+        st.write("### 🏛️ Non-Gooey API keys", className="mt-2")
+        secrets_widget(request.user)
+
+    json_data.setdefault("state", {})
+    return st.runner(
+        lambda: page_wrapper(request=request, render_fn=render_fn),
+        **json_data,
+    )
 
 
 @app.post("/")
