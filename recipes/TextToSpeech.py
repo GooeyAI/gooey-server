@@ -27,6 +27,7 @@ DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/da
 
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3621e11a-88d9-11ee-b549-02420a000167/Compare%20AI%20voice%20generators.png.png"
     workflow = Workflow.TEXT_TO_SPEECH
     slug_versions = [
         "TextToSpeech",

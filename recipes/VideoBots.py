@@ -149,6 +149,7 @@ def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
 
 class VideoBotsPage(BasePage):
     title = "Copilot for your Enterprise"  # "Create Interactive Video Bots"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8c014530-88d4-11ee-aac9-02420a00016b/Copilot.png.png"
     workflow = Workflow.VIDEO_BOTS
     slug_versions = ["video-bots", "bots", "copilot"]
 

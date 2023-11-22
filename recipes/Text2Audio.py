@@ -28,6 +28,7 @@ text2audio_model_ids = {
 
 class Text2AudioPage(BasePage):
     title = "Text guided audio generator"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a4481d58-88d9-11ee-aa86-02420a000165/Text%20guided%20audio%20generator.png.png"
     workflow = Workflow.TEXT_2_AUDIO
     slug_versions = ["text2audio"]
 

@@ -32,6 +32,7 @@ from daras_ai_v2.stable_diffusion import (
 
 class GoogleImageGenPage(BasePage):
     title = "Render Image Search Results with AI"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/eb23c078-88da-11ee-aa86-02420a000165/web%20search%20render.png.png"
     workflow = Workflow.GOOGLE_IMAGE_GEN
     slug_versions = ["GoogleImageGen", "render-images-with-ai"]
 

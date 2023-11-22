@@ -38,6 +38,7 @@ class CombineDocumentsChains(Enum):
 
 class DocSummaryPage(BasePage):
     title = "Summarize your Docs with GPT"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1f858a7a-88d8-11ee-a658-02420a000163/Summarize%20your%20docs%20with%20gpt.png.png"
     workflow = Workflow.DOC_SUMMARY
     slug_versions = ["doc-summary"]
 

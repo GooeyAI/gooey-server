@@ -158,6 +158,7 @@ DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.
 
 class DeforumSDPage(BasePage):
     title = "AI Animation Generator"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/media/users/kxmNIYAOJbfOURxHBKNCWeUSKiP2/dd88c110-88d6-11ee-9b4f-2b58bd50e819/animation.gif"
     workflow = Workflow.DEFORUM_SD
     slug_versions = ["DeforumSD", "animation-generator"]
 
