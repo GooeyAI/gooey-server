@@ -214,7 +214,7 @@ class BasePage:
             # prefer the prompt as h1 title for runs, but not for examples
             prompt_title = truncate_text_words(
                 self.preview_input(st.session_state) or "", maxlen=60
-            )
+            ).replace("\n", " ")
             if run_id:
                 h1_title = prompt_title or current_title or recipe_title
             else:
