@@ -30,7 +30,6 @@ from daras_ai_v2.base import (
 )
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
-from daras_ai_v2.footer_widget import footer
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
@@ -335,5 +334,5 @@ def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
     with st.div(id="main-content", className="container"):
         render_fn(**kwargs)
 
-    footer()
+    st.html(templates.get_template("footer.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))
