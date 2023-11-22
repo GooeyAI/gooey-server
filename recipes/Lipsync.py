@@ -20,6 +20,7 @@ DEFAULT_LIPSYNC_GIF = "https://storage.googleapis.com/dara-c1b52.appspot.com/dar
 
 class LipsyncPage(BasePage):
     title = "Lip Syncing"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f33e6332-88d8-11ee-89f9-02420a000169/Lipsync%20TTS.png.png"
     workflow = Workflow.LIPSYNC
     slug_versions = ["Lipsync"]
 

@@ -56,6 +56,7 @@ class Columns(IntegerChoices):
 
 class DocExtractPage(BasePage):
     title = "Youtube Transcripts + GPT extraction to Google Sheets"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.DOC_EXTRACT
     slug_versions = [
         "doc-extract",

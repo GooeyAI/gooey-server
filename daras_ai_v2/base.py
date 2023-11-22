@@ -81,6 +81,7 @@ class RecipeRunState(Enum):
 
 class StateKeys:
     page_title = "__title"
+    page_image = "__image"
     page_notes = "__notes"
 
     created_at = "created_at"
@@ -96,6 +97,7 @@ class StateKeys:
 
 class BasePage:
     title: str
+    image: str
     workflow: Workflow
     slug_versions: list[str]
 
@@ -190,6 +192,10 @@ class BasePage:
 
         st.session_state.setdefault(StateKeys.page_title, self.title)
         st.session_state.setdefault(
+            StateKeys.page_image,
+            self.image,
+        )
+        st.session_state.setdefault(
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
@@ -262,6 +268,9 @@ class BasePage:
 
     def get_recipe_title(self, state: dict) -> str:
         return state.get(StateKeys.page_title) or self.title or ""
+
+    def get_recipe_image(self, state: dict) -> str:
+        return state.get(StateKeys.page_image) or self.image or ""
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
@@ -918,8 +927,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             self._render_report_button()
 
     def _render_save_options(self):
-        if not self.is_current_user_admin():
-            return
+        # if not self.is_current_user_admin():
+        #     return
 
         parent_example_id, parent_run_id, parent_uid = extract_query_params(
             gooey_get_query_params()

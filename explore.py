@@ -19,6 +19,9 @@ def render():
         with gui.link(to=page.app_url()):
             gui.markdown(f"### {page.get_recipe_title(state)}")
 
+        gui.html(
+            f"<img width=300px style='border-radius: 5px;' src='{page.get_recipe_image(state)}'/>"
+        )
         preview = page.preview_description(state)
         if preview:
             gui.write(truncate_text_words(preview, 150))
