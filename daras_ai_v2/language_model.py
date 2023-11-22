@@ -318,7 +318,9 @@ def run_language_model(
         )
         return [
             # return messages back as either chatml or json messages
-            format_chatml_message(entry) if is_chatml else entry["content"].strip()
+            format_chatml_message(entry)
+            if is_chatml
+            else (entry.get("content") or "").strip()
             for entry in result
         ]
     else:
