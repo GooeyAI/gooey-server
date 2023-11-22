@@ -12,11 +12,33 @@ DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 
 
 def render():
-    def _render(page_cls):
+    def _render_non_featured(page_cls):
         page = page_cls()
         state = page.recipe_doc_sr().to_dict()
 
-        gui.image(page.get_recipe_image(state), "", "", style={"border-radius": 5})
+        col1, col2 = gui.columns([1, 2])
+        with col1:
+            gui.image(
+                page.get_recipe_image(state),
+                style={"border-radius": 5},
+            )
+
+        with col2:
+            with gui.link(to=page.app_url()):
+                gui.markdown(f"#### {page.get_recipe_title(state)}")
+            preview = page.preview_description(state)
+            if preview:
+                gui.write(truncate_text_words(preview, 150))
+            else:
+                page.render_description()
+
+    def _render_as_featured(page_cls):
+        page = page_cls()
+        state = page.recipe_doc_sr().to_dict()
+        gui.image(
+            page.get_recipe_image(state),
+            style={"border-radius": 5},
+        )
 
         with gui.link(to=page.app_url()):
             gui.markdown(f"#### {page.get_recipe_title(state)}")
@@ -31,7 +53,9 @@ def render():
         gui.write("---")
         if category != "Featured":
             section_heading(category)
-        grid_layout(3, pages, _render, separator=False)
+            grid_layout(2, pages, _render_non_featured, separator=False)
+        else:
+            grid_layout(3, pages, _render_as_featured, separator=False)
 
 
 def heading(
