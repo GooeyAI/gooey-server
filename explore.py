@@ -16,24 +16,21 @@ def render():
         page = page_cls()
         state = page.recipe_doc_sr().to_dict()
 
-        with gui.link(to=page.app_url()):
-            gui.markdown(f"### {page.get_recipe_title(state)}")
+        gui.image(page.get_recipe_image(state), "", "", style={"border-radius": 5})
 
-        gui.html(
-            f"<img width=300px style='border-radius: 5px;' src='{page.get_recipe_image(state)}'/>"
-        )
+        with gui.link(to=page.app_url()):
+            gui.markdown(f"#### {page.get_recipe_title(state)}")
         preview = page.preview_description(state)
         if preview:
             gui.write(truncate_text_words(preview, 150))
         else:
             page.render_description()
 
-        page.render_example(state)
-
     heading(title=TITLE, description=DESCRIPTION)
     for category, pages in all_home_pages_by_category.items():
         gui.write("---")
-        section_heading(category)
+        if category != "Featured":
+            section_heading(category)
         grid_layout(3, pages, _render, separator=False)
 
 
