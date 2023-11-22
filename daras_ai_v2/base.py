@@ -538,7 +538,7 @@ class BasePage:
                     cost_note = f"({cost_note.strip()})"
                 st.caption(
                     f"""
-Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}  
+Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}
 {self.additional_notes() or ""}
                     """,
                     unsafe_allow_html=True,
@@ -811,7 +811,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account 
+You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
 and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
             """
         else:
