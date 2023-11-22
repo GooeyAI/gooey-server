@@ -19,6 +19,7 @@ from daras_ai_v2.gdrive_downloader import (
     url_to_gdrive_file_id,
 )
 from daras_ai_v2 import settings
+from daras_ai_v2 import google_utils
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
@@ -268,9 +269,6 @@ def _translate_text(
     return result.strip()
 
 
-_session = None
-
-
 def _MinT_translate_one_text(
     text: str, source_language: str, target_language: str
 ) -> str:
@@ -285,22 +283,6 @@ def _MinT_translate_one_text(
     # e.g. {"model":"IndicTrans2_indec_en","sourcelanguage":"hi","targetlanguage":"en","translation":"hello","translationtime":0.8}
     tanslation = res.json()
     return tanslation.get("translation", text)
-
-
-def get_google_auth_session():
-    global _session
-
-    if _session is None:
-        import google.auth
-        from google.auth.transport.requests import AuthorizedSession
-
-        creds, project = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-        # takes care of refreshing the token and adding it to request headers
-        _session = AuthorizedSession(credentials=creds), project
-
-    return _session
 
 
 def run_asr(

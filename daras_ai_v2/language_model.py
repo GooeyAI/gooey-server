@@ -17,7 +17,7 @@ from django.conf import settings
 from jinja2.lexer import whitespace_re
 from loguru import logger
 
-from daras_ai_v2.asr import get_google_auth_session
+from daras_ai_v2.google_utils import get_google_auth_session
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
