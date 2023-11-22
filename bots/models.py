@@ -1,11 +1,13 @@
 import datetime
 import typing
+import uuid
 from multiprocessing.pool import ThreadPool
 
 import pytz
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils.text import Truncator
@@ -15,6 +17,8 @@ from phonenumber_field.modelfields import PhoneNumberField
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder
+from daras_ai_v2.secrets_utils import GCPSecret
+
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -38,6 +42,10 @@ class Platform(models.IntegerChoices):
             return f"https://static.facebook.com/images/whatsapp/www/favicon.png"
         else:
             return f"https://www.{self.name.lower()}.com/favicon.ico"
+
+
+class UserSecretProvider(models.IntegerChoices):
+    ELEVEN_LABS = (1, "Eleven Labs")
 
 
 class Workflow(models.IntegerChoices):
@@ -898,3 +906,86 @@ class FeedbackComment(models.Model):
     author = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
     comment = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class UserSecretQuerySet(models.QuerySet):
+    def create_secret(
+        self, user: AppUser, name: str, value: str, provider: UserSecretProvider
+    ):
+        secret_id = f"gooey-user-secret-{uuid.uuid4()}"
+        secret = GCPSecret.create(secret_id=secret_id, secret_value=value)
+        try:
+            return super().create(
+                user=user,
+                name=name,
+                provider=provider,
+                preview=UserSecret.get_preview(value),
+                gcp_secret_id=secret_id,
+            )
+        except Exception:
+            secret.delete()
+            raise
+
+
+class UserSecret(models.Model):
+    user = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.CASCADE,
+        related_name="secrets",
+    )
+    name = models.CharField(
+        max_length=256,
+        validators=[
+            RegexValidator(
+                regex=r"^[a-zA-Z0-9_-]+$",
+                message="Valid names can only contain alphanumeric characters, -, and _.",
+            ),
+        ],
+        help_text="Name of the secret key to refer this by",
+    )
+    provider = models.IntegerField(
+        choices=UserSecretProvider.choices,
+        help_text="The secret key provider where you can use this key",
+    )
+    preview = models.CharField(
+        max_length=10,
+        help_text="Preview for the secret key",
+    )
+    description = models.TextField(
+        blank=True,
+        default="",
+        help_text="More details about this key",
+    )
+    gcp_secret_id = models.CharField(
+        max_length=63,
+        help_text="Lookup Key in GCP Secret Manager",
+    )
+
+    objects = UserSecretQuerySet.as_manager()
+
+    class Meta:
+        unique_together = ["user", "name"]
+
+    @staticmethod
+    def get_preview(value: str):
+        if len(value) > 20:
+            return value[:4] + "..." + value[-3:]
+        else:
+            return value[:4] + "..."
+
+    @staticmethod
+    def get_default_name_from_provider(provider: UserSecretProvider):
+        return provider.label.lower().replace(" ", "_")
+
+    def update_value(self, value: str):
+        secret = GCPSecret(self.gcp_secret_id)
+        secret.update(secret_value=value)
+        self.preview = self.get_preview(value)
+        return self
+
+    def get_value(self):
+        return GCPSecret(self.gcp_secret_id).get()
+
+    def delete_secret(self):
+        self.delete()
+        GCPSecret(self.gcp_secret_id).delete()
