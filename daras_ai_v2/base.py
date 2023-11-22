@@ -245,7 +245,9 @@ class BasePage:
             st.write(f"# {h1_title}")
         else:
             with st.link(
-                to=self.app_url(), className="text-decoration-none", target="_blank"
+                to=self.app_url(),
+                className="text-decoration-none d-inline-block",
+                target="_blank",
             ):
                 st.write(f"# {self.get_recipe_title(st.session_state)}")
 
