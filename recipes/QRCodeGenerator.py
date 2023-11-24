@@ -476,7 +476,7 @@ def vcard_form(*, key: str) -> VCARD:
         st.text_area(
             """
             Website Links  
-            *([calend.ly](calend.ly) works great!)*
+            *([calend.ly](https://calend.ly) works great!)*
             """,
             placeholder="https://www.gooey.ai\nhttps://calend.ly/seanblagsvedt",
             key="__vcard_data__urls_text",
