@@ -437,7 +437,7 @@ def vcard_form(*, key: str) -> VCARD:
 
     if vcard.email and st.button(
         "<u>Import other contact info</u> from my email - magic!",
-        className="link-button",
+        type="link",
     ):
         imported_vcard = get_vcard_from_email(vcard.email)
         if not imported_vcard or not imported_vcard.format_name:
