@@ -474,8 +474,11 @@ def vcard_form(*, key: str) -> VCARD:
     st.session_state.setdefault("__vcard_data__urls_text", "\n".join(vcard.urls or []))
     vcard.urls = (
         st.text_area(
-            "Link(s)",
-            placeholder="https://www.gooey.ai\nhttps://farmer.chat",
+            """
+            Other Link(s)  
+            *([calend.ly](calend.ly) links work great!)*
+            """,
+            placeholder="https://www.gooey.ai\nhttps://calend.ly/seanblagsvedt",
             key="__vcard_data__urls_text",
         )
         .strip()
@@ -491,11 +494,6 @@ def vcard_form(*, key: str) -> VCARD:
     with st.expander("More Contact Fields"):
         vcard.gender = st.text_input(
             "Gender", key="__vcard_data__gender", placeholder="F"
-        )
-        vcard.calendar_url = st.text_input(
-            "Calendar Link ([calend.ly](calend.ly))",
-            key="__vcard_data__calendar_url",
-            placeholder="https://calendar.google.com/calendar/u/0/r",
         )
         vcard.note = st.text_area(
             "Notes",
