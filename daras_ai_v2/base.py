@@ -176,8 +176,12 @@ class BasePage:
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
-        self._render_page_title_with_breadcrumbs(example_id, run_id, uid)
-        st.write(st.session_state.get(StateKeys.page_notes))
+        with st.div(className="d-lg-flex d-md-block justify-content-between"):
+            with st.div():
+                self._render_page_title_with_breadcrumbs(example_id, run_id, uid)
+                st.write(st.session_state.get(StateKeys.page_notes))
+            with st.div():
+                self._render_save_menu()
 
         try:
             selected_tab = MenuTabs.paths_reverse[self.tab]
@@ -196,6 +200,66 @@ class BasePage:
                     st.html(name)
         with st.nav_tab_content():
             self.render_selected_tab(selected_tab)
+
+    def _render_save_menu(self):
+        if not self.is_current_user_owner():
+            return
+
+        with st.div(className="d-flex justify-content-end"):
+            save_button_space, cancel_button_space = st.tag("span"), st.tag("span")
+            with save_button_space:
+                save_button = st.button("💾 Save", className="mb-0")
+            with cancel_button_space:
+                cancel_button = st.button("❌ Cancel", className="mb-0")
+            if save_button or cancel_button:
+                st.session_state["__save_mode"] = not st.session_state.get(
+                    "__save_mode", False
+                )
+
+        is_save_mode = st.session_state.get("__save_mode")
+        if not is_save_mode:
+            cancel_button_space.empty()
+        else:
+            save_button_space.empty()
+            with st.div(className="d-flex justify-content-end"):
+                st.html(
+                    """
+                <style>
+                    .save-button-menu {
+                        position: absolute;
+                        z-index: 1;
+                        min-width: min(500px, 80vw);
+                    }
+                    .save-button-menu .gui-input { margin-bottom: 0; }
+                    .save-button-menu .gui-input label p { color: black; }
+                </style>
+                """
+                )
+                with st.div(className="bg-light border p-4 save-button-menu"):
+                    st.radio(
+                        "Publish to",
+                        options=[
+                            "Only me + people with a link",
+                            "Public",
+                        ],
+                    )
+                    st.radio(
+                        "",
+                        options=[
+                            "Anyone at my org (coming soon)",
+                        ],
+                        disabled=True,
+                        checked_by_default=False,
+                    )
+                    with st.div(className="mt-4"):
+                        st.text_input(
+                            "Title",
+                            key="published_run_title",
+                            value=st.session_state[StateKeys.page_title],
+                        )
+
+                    with st.div(className="mt-4 d-flex justify-content-center"):
+                        publish_button = st.button("🌻 Publish")
 
     def _render_page_title_with_breadcrumbs(
         self, example_id: str, run_id: str, uid: str
@@ -538,7 +602,7 @@ class BasePage:
                     cost_note = f"({cost_note.strip()})"
                 st.caption(
                     f"""
-Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}  
+Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}
 {self.additional_notes() or ""}
                     """,
                     unsafe_allow_html=True,
@@ -811,7 +875,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account 
+You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
 and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
             """
         else:
