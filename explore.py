@@ -50,9 +50,10 @@ def render():
         gui.write("---")
         if category != "Featured":
             section_heading(category)
-            grid_layout(2, pages, _render_non_featured, separator=False)
-        else:
+        if category == "Images" or category == "Featured":
             grid_layout(3, pages, _render_as_featured, separator=False)
+        else:
+            grid_layout(2, pages, _render_non_featured, separator=False)
 
 
 def heading(
