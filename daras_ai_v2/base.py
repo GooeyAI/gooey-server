@@ -278,7 +278,7 @@ class BasePage:
             # prefer the prompt as h1 title for runs, but not for examples
             prompt_title = truncate_text_words(
                 self.preview_input(st.session_state) or "", maxlen=60
-            )
+            ).replace("\n", " ")
             if run_id:
                 h1_title = prompt_title or current_title or recipe_title
             else:
@@ -308,10 +308,7 @@ class BasePage:
                         )
             st.write(f"# {h1_title}")
         else:
-            with st.link(
-                to=self.app_url(), className="text-decoration-none", target="_blank"
-            ):
-                st.write(f"# {self.get_recipe_title(st.session_state)}")
+            st.write(f"# {self.get_recipe_title(st.session_state)}")
 
     def get_recipe_title(self, state: dict) -> str:
         return state.get(StateKeys.page_title) or self.title or ""
