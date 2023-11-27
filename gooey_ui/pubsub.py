@@ -6,6 +6,7 @@ from time import time
 
 import redis
 from fastapi.encoders import jsonable_encoder
+from loguru import logger
 
 from daras_ai_v2 import settings
 
@@ -41,7 +42,7 @@ def realtime_push(channel: str, value: typing.Any = "ping"):
     msg = json.dumps(jsonable_encoder(value))
     r.set(channel, msg)
     r.publish(channel, json.dumps(time()))
-    print(f"publish {channel!r}")
+    logger.info(f"publish {channel=}")
 
 
 # def use_state(

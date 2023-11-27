@@ -78,18 +78,20 @@ def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, b
 class AppUser(models.Model):
     uid = models.CharField(max_length=255, unique=True)
 
-    display_name = models.TextField(default="", blank=True)
+    display_name = models.TextField("name", blank=True)
     email = models.EmailField(null=True, blank=True)
     phone_number = PhoneNumberField(null=True, blank=True)
-    balance = models.IntegerField()
+    balance = models.IntegerField("bal")
     is_anonymous = models.BooleanField()
     is_disabled = models.BooleanField(default=False)
     photo_url = CustomURLField(default="", blank=True)
 
     stripe_customer_id = models.CharField(max_length=255, default="", blank=True)
-    is_paying = models.BooleanField(default=False)
+    is_paying = models.BooleanField("paid", default=False)
 
-    created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
+    created_at = models.DateTimeField(
+        "created", editable=False, blank=True, default=timezone.now
+    )
     upgraded_from_anonymous_at = models.DateTimeField(null=True, blank=True)
 
     disable_safety_checker = models.BooleanField(default=False)
