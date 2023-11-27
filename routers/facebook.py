@@ -13,6 +13,10 @@ from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.bots import _on_msg, request_json
 
+from routers.api import bot_integration_to_api
+
+bot_integration_to_api(WhatsappBot)
+
 router = APIRouter()
 
 

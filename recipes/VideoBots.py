@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 import gooey_ui as st
 from bots.models import BotIntegration, Platform
 from bots.models import Workflow
+from daras_ai_v2.bots import broadcast_input
 from daras_ai.image_input import (
     truncate_text_words,
 )
@@ -1016,6 +1017,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                             bi.name = bot_name
                             bi.save()
                             st.experimental_rerun()
+                        st.write("---")
+                        broadcast_input(bi)
+                elif bi.platform == Platform.WHATSAPP:
+                    with st.expander("📨 WhatsApp Settings"):
+                        broadcast_input(bi)
             if not pressed:
                 continue
             if is_connected:

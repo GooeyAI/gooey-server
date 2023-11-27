@@ -15,6 +15,8 @@ WHATSAPP_AUTH_HEADER = {
 
 
 class WhatsappBot(BotInterface):
+    platform = Platform.WHATSAPP
+
     def __init__(self, message: dict, metadata: dict):
         self.input_message = message
         self.platform = Platform.WHATSAPP
@@ -94,6 +96,33 @@ class WhatsappBot(BotInterface):
             response_video=video,
             buttons=buttons,
         )
+
+    @classmethod
+    def broadcast(
+        cls,
+        *,
+        bi: BotIntegration,
+        text: str = "",
+        audio: str | None = None,
+        video: str | None = None,
+        buttons: list | None = None,
+    ):
+        from daras_ai_v2.bots import save_broadcast_message
+
+        ids = []
+        for convo in Conversation.objects.filter(bot_integration=bi):
+            id = send_wa_msg(
+                bot_number=bi.wa_phone_number_id,
+                user_number=convo.wa_phone_number,
+                response_text=text,
+                response_audio=audio,
+                response_video=video,
+                buttons=buttons,
+            )
+            save_broadcast_message(convo, text, id)
+            ids += [id]
+
+        return ", ".join(ids)
 
     def mark_read(self):
         wa_mark_read(self.bot_id, self.input_message["id"])

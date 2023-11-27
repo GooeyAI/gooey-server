@@ -59,6 +59,18 @@ class BotInterface:
     ) -> str | None:
         raise NotImplementedError
 
+    @classmethod
+    def broadcast(
+        cls,
+        *,
+        bi: BotIntegration,
+        text: str = "",
+        audio: str | None = None,
+        video: str | None = None,
+        buttons: list | None = None,
+    ):
+        raise NotImplementedError
+
     def mark_read(self):
         raise NotImplementedError
 
@@ -503,3 +515,48 @@ def _process_msg(
         ),
     ]
     return response_text, response_audio, response_video, msgs_to_save
+
+
+def save_broadcast_message(convo: Conversation, text: str, id: str | None = None):
+    message = Message(
+        conversation=convo,
+        role=CHATML_ROLE_ASSISTANT,
+        content=text,
+        display_content=text,
+        saved_run=None,
+    )
+    if id:
+        message.platform_msg_id = id
+    message.save()
+    return message
+
+
+def broadcast_input(bi: BotIntegration):
+    import gooey_ui as st
+    from routers.api import registered_broadcasts
+
+    platform = Platform(bi.platform).name.lower()
+
+    if platform not in registered_broadcasts:
+        st.write(f"Broadcasting is not supported for {platform}")
+        return
+
+    with st.div(
+        className="px-3 pt-3 d-flex gap-1",
+        style=dict(background="rgba(239, 239, 239, 0.6)"),
+    ):
+        with st.div(className="flex-grow-1"):
+            broadcast_message = st.text_area(
+                "",
+                key="slack_broadcast_message_" + str(bi.id),
+                placeholder="Broadcast Message",
+                style=dict(height="3.2rem"),
+            )
+        if st.button("Broadcast", style=dict(height="3.2rem")):
+            registered_broadcasts[platform].broadcast(
+                bi=bi,
+                text=broadcast_message,
+            )
+    st.caption(
+        f"Broadcast a message to all users of this integration using this bot account. Use the [API](https://api.gooey.ai/docs#operation/{platform}__broadcast) (with bot_id={bi.id}) for the full feature set: sending audio, videos, buttons, etc."
+    )

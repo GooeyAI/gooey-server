@@ -1,7 +1,6 @@
 import re
 import typing
 from string import Template
-from typing import TypedDict
 
 import requests
 from django.db import transaction
@@ -124,6 +123,50 @@ class SlackBot(BotInterface):
     def get_interactive_msg_info(self) -> tuple[str, str]:
         button_id = self._actions[0]["value"]
         return button_id, self._msg_ts
+
+    @classmethod
+    def broadcast(
+        cls,
+        *,
+        bi: BotIntegration,
+        text: str = "",
+        audio: str | None = None,
+        video: str | None = None,
+        buttons: list | None = None,
+    ):
+        if buttons is None:
+            buttons = []
+        res = requests.post(
+            str(bi.slack_channel_hook_url),
+            json={
+                "text": text,
+                "username": bi.name,
+                "icon_emoji": ":robot_face:",
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {"type": "mrkdwn", "text": text},
+                    },
+                ]
+                + create_file_block("Audio", bi.slack_access_token, audio)
+                + create_file_block("Video", bi.slack_access_token, video)
+                + create_button_block(buttons),
+            },
+        )
+        if res.ok:
+            # the message went through, so we'll save it under all main channel (not personal channel) conversations (since we broadcasted to the main channel)
+            from daras_ai_v2.bots import save_broadcast_message
+            from bots.models import Conversation
+
+            convos = Conversation.objects.filter(
+                bot_integration=bi, slack_channel_is_personal=False
+            )
+            for convo in convos:
+                save_broadcast_message(
+                    convo,
+                    text,
+                )
+        return res
 
     def send_msg(
         self,

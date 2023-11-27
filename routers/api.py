@@ -93,6 +93,54 @@ async def request_form_files(request: Request) -> FormData:
     return await request.form()
 
 
+from daras_ai_v2.bots import BotInterface
+from bots.models import BotIntegration
+
+
+class BotBroadcastRequestModel(BaseModel):
+    bot_id: str = Field(
+        description="Unique ID for the bot. You can find yours in the settings on the integration page."
+    )
+    message: str = Field(description="Message to broadcast to all users")
+    audio_url: str | None = Field(description="Audio URL to send to all users")
+    video_url: str | None = Field(description="Video URL to send to all users")
+    buttons: list[dict] | None = Field(description="Buttons to send to all users")
+
+
+registered_broadcasts: dict[str, typing.Type[BotInterface]] = {}
+
+
+def bot_integration_to_api(BotInterface: typing.Type[BotInterface]):
+    platform = BotInterface.platform.name.lower()
+    endpoint = f"/v2/bot/broadcast/{platform}"
+    registered_broadcasts[platform] = BotInterface
+
+    @app.post(
+        os.path.join(endpoint, ""),
+        operation_id=platform + "__broadcast",
+        name=platform + " Broadcast (v2 sync)",
+    )
+    @app.post(
+        endpoint,
+        include_in_schema=False,
+    )
+    def run_api_json(
+        request: Request,
+        bot_request: BotBroadcastRequestModel,
+        user: AppUser = Depends(api_auth_header),
+    ):
+        bi = BotIntegration.objects.get(
+            id=bot_request.bot_id, billing_account_uid=user.uid
+        )
+        return BotInterface.broadcast(
+            bi=bi,
+            text=bot_request.message,
+            audio=bot_request.audio_url,
+            video=bot_request.video_url,
+            buttons=bot_request.buttons,
+        )
+
+
 def script_to_api(page_cls: typing.Type[BasePage]):
     endpoint = page_cls().endpoint.rstrip("/")
     response_model = create_model(
