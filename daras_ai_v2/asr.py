@@ -49,7 +49,7 @@ DEEPGRAM_SUPPORTED = {"en", "en-US", "en-AU", "en-GB", "en-NZ", "en-IN", "es", "
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
-    whisper_large_v3 = "Whisper Large v3 (replicate)"
+    whisper_large_v3 = "Whisper Large v3 (openai)"
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
     whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     nemo_english = "Conformer English (ai4bharat.org)"
