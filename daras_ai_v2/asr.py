@@ -49,6 +49,7 @@ DEEPGRAM_SUPPORTED = {"en", "en-US", "en-AU", "en-GB", "en-NZ", "en-IN", "es", "
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
+    whisper_large_v3 = "Whisper Large v3 (replicate)"
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
     whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     nemo_english = "Conformer English (ai4bharat.org)"
@@ -66,6 +67,7 @@ class AsrModels(Enum):
 
 
 asr_model_ids = {
+    AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:37dfc0d6a7eb43ff84e230f74a24dab84e6bb7756c9b457dbdcceca3de7a4a04",
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
     AsrModels.whisper_hindi_large_v2: "vasista22/whisper-hindi-large-v2",
     AsrModels.whisper_telugu_large_v2: "vasista22/whisper-telugu-large-v2",
@@ -84,6 +86,7 @@ forced_asr_languages = {
 }
 
 asr_supported_languages = {
+    AsrModels.whisper_large_v3: WHISPER_SUPPORTED,
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
@@ -358,6 +361,39 @@ def run_asr(
 
     if selected_model == AsrModels.azure:
         return azure_asr(audio_url, language)
+    elif selected_model == AsrModels.whisper_large_v3:
+        import replicate
+        from tempfile import NamedTemporaryFile
+
+        with NamedTemporaryFile(suffix=".wav") as f:
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    audio_url,
+                    "-vn",
+                    "-ar",
+                    "16000",
+                    "-ac",
+                    "1",
+                    "-f",
+                    "wav",
+                    f.name,
+                ],
+                check=True,
+            )
+            config = {
+                "audio": open(f.name, "rb"),
+                "return_timestamps": output_format != AsrOutputFormat.text,
+            }
+            if language:
+                config["language"] = language
+            output = replicate.run(
+                asr_model_ids[AsrModels.whisper_large_v3],
+                input=config,
+            )
+            return output["text"] if output_format == AsrOutputFormat.text else output
     elif selected_model == AsrModels.deepgram:
         r = requests.post(
             "https://api.deepgram.com/v1/listen",
