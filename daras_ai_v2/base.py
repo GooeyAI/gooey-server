@@ -26,6 +26,7 @@ from starlette.requests import Request
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import SavedRun, Workflow
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -175,11 +176,7 @@ class BasePage:
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
-        root_url = self.app_url(example_id=example_id)
-        st.write(
-            f'# <a style="text-decoration: none;" target="_top" href="{root_url}">{st.session_state.get(StateKeys.page_title)}</a>',
-            unsafe_allow_html=True,
-        )
+        self._render_page_title_with_breadcrumbs(example_id, run_id, uid)
         st.write(st.session_state.get(StateKeys.page_notes))
 
         try:
@@ -199,6 +196,58 @@ class BasePage:
                     st.html(name)
         with st.nav_tab_content():
             self.render_selected_tab(selected_tab)
+
+    def _render_page_title_with_breadcrumbs(
+        self, example_id: str, run_id: str, uid: str
+    ):
+        if example_id or run_id:
+            # the title on the saved root / the hardcoded title
+            recipe_title = (
+                self.recipe_doc_sr().to_dict().get(StateKeys.page_title) or self.title
+            )
+
+            # the user saved title for the current run (if its not the same as the recipe title)
+            current_title = st.session_state.get(StateKeys.page_title)
+            if current_title == recipe_title:
+                current_title = ""
+
+            # prefer the prompt as h1 title for runs, but not for examples
+            prompt_title = truncate_text_words(
+                self.preview_input(st.session_state) or "", maxlen=60
+            ).replace("\n", " ")
+            if run_id:
+                h1_title = prompt_title or current_title or recipe_title
+            else:
+                h1_title = current_title or prompt_title or recipe_title
+
+            # render recipe title if it doesn't clash with the h1 title
+            render_item1 = recipe_title and recipe_title != h1_title
+            # render current title if it doesn't clash with the h1 title
+            render_item2 = current_title and current_title != h1_title
+            if render_item1 or render_item2:  # avoids empty space
+                with st.breadcrumbs(className="mt-4"):
+                    if render_item1:
+                        st.breadcrumb_item(
+                            recipe_title,
+                            link_to=self.app_url(),
+                            className="text-muted",
+                        )
+                    if render_item2:
+                        current_sr = self.get_sr_from_query_params(
+                            example_id, run_id, uid
+                        )
+                        st.breadcrumb_item(
+                            current_title,
+                            link_to=current_sr.parent.get_app_url()
+                            if current_sr.parent_id
+                            else None,
+                        )
+            st.write(f"# {h1_title}")
+        else:
+            st.write(f"# {self.get_recipe_title(st.session_state)}")
+
+    def get_recipe_title(self, state: dict) -> str:
+        return state.get(StateKeys.page_title) or self.title or ""
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
@@ -486,7 +535,7 @@ class BasePage:
                     cost_note = f"({cost_note.strip()})"
                 st.caption(
                     f"""
-Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}  
+Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}
 {self.additional_notes() or ""}
                     """,
                     unsafe_allow_html=True,
@@ -759,7 +808,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account 
+You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
 and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
             """
         else:
@@ -851,7 +900,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                     dict(example_id=sr_to_save.example_id)
                 )
 
-            if current_sr.parent:
+            if current_sr.parent_id:
                 st.write(f"Parent: {current_sr.parent.get_app_url()}")
 
     def state_to_doc(self, state: dict):
@@ -1027,6 +1076,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             state.get("text_prompt")
             or state.get("input_prompt")
             or state.get("search_query")
+            or state.get("title")
         )
 
     def preview_description(self, state: dict) -> str:
