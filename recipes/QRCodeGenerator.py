@@ -37,6 +37,7 @@ from daras_ai_v2.vcard import VCARD
 from recipes.EmailFaceInpainting import get_photo_for_email
 from recipes.SocialLookupEmail import get_profile_for_email
 from url_shortener.models import ShortenedURL
+from daras_ai_v2.enum_selector_widget import enum_multiselect
 
 ATTEMPTS = 1
 DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a679a410-9456-11ee-bd77-02420a0001ce/QR%20Code.jpg.png"
@@ -60,6 +61,12 @@ class QRCodeGeneratorPage(BasePage):
         obj_scale=0.65,
         obj_pos_x=0.5,
         obj_pos_y=0.5,
+        image_prompt_controlnet_models=[
+            ControlNetModels.sd_controlnet_canny.name,
+            ControlNetModels.sd_controlnet_depth.name,
+            ControlNetModels.sd_controlnet_tile.name,
+        ],
+        inspiration_strength=0.3,
     )
 
     def __init__(self, *args, **kwargs):
@@ -76,6 +83,11 @@ class QRCodeGeneratorPage(BasePage):
 
         text_prompt: str
         negative_prompt: str | None
+        image_prompt: str | None
+        image_prompt_controlnet_models: list[
+            typing.Literal[tuple(e.name for e in ControlNetModels)], ...
+        ] | None
+        inspiration_strength: float | None
 
         selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
         selected_controlnet_model: list[
@@ -131,6 +143,14 @@ class QRCodeGeneratorPage(BasePage):
             """,
             key="text_prompt",
             placeholder="Bright sunshine coming through the cracks of a wet, cave wall of big rocks",
+        )
+        st.file_uploader(
+            """
+            ### 🏞️ Reference Image [optional]
+            This image will be used as inspiration to blend with the QR Code.
+            """,
+            key="image_prompt",
+            accept=["image/*"],
         )
 
         qr_code_source_key = "__qr_code_source"
@@ -323,6 +343,30 @@ Here is the final output:
             color=255,
         )
 
+        if st.session_state.get("image_prompt"):
+            st.write("---")
+            st.write(
+                """
+                ##### 🎨 Inspiration
+                Use this to control how the image prompt should influence the output.
+                """,
+                className="gui-input",
+            )
+            st.slider(
+                "Inspiration Strength",
+                min_value=0.0,
+                max_value=1.0,
+                step=0.05,
+                key="inspiration_strength",
+            )
+            enum_multiselect(
+                ControlNetModels,
+                label="Control Net Models",
+                key="image_prompt_controlnet_models",
+                checkboxes=False,
+                allow_none=False,
+            )
+
     def render_output(self):
         state = st.session_state
         self._render_outputs(state)
@@ -379,11 +423,22 @@ Here is the final output:
         state["raw_images"] = raw_images = []
 
         yield f"Running {Text2ImgModels[request.selected_model].value}..."
+        if isinstance(request.selected_controlnet_model, str):
+            request.selected_controlnet_model = [request.selected_controlnet_model]
+        init_images = [image] * len(request.selected_controlnet_model)
+        if request.image_prompt:
+            init_images += [request.image_prompt] * len(
+                request.image_prompt_controlnet_models
+            )
+            request.selected_controlnet_model += request.image_prompt_controlnet_models
+            request.controlnet_conditioning_scale += [
+                request.inspiration_strength
+            ] * len(request.image_prompt_controlnet_models)
         state["output_images"] = controlnet(
             selected_model=request.selected_model,
             selected_controlnet_model=request.selected_controlnet_model,
             prompt=request.text_prompt,
-            init_image=image,
+            init_images=init_images,
             num_outputs=request.num_outputs,
             num_inference_steps=request.quality,
             negative_prompt=request.negative_prompt,
