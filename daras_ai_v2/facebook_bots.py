@@ -108,9 +108,11 @@ class WhatsappBot(BotInterface):
         buttons: list | None = None,
     ):
         from daras_ai_v2.bots import save_broadcast_message
+        from threading import Thread
 
         ids = []
-        for convo in Conversation.objects.filter(bot_integration=bi):
+        convos = Conversation.objects.filter(bot_integration=bi)
+        for convo in convos:
             id = send_wa_msg(
                 bot_number=bi.wa_phone_number_id,
                 user_number=convo.wa_phone_number,
@@ -119,8 +121,20 @@ class WhatsappBot(BotInterface):
                 response_video=video,
                 buttons=buttons,
             )
-            save_broadcast_message(convo, text, id)
             ids += [id]
+
+        # save the message in the background so we can return immediately from the api call
+        Thread(
+            target=lambda convos, text, ids: [
+                save_broadcast_message(convo, text, id)
+                for convo, id in zip(convos, ids)
+            ],
+            args=(
+                convos,
+                text,
+                ids,
+            ),
+        ).start()
 
         return ", ".join(ids)
 

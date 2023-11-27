@@ -157,15 +157,20 @@ class SlackBot(BotInterface):
             # the message went through, so we'll save it under all main channel (not personal channel) conversations (since we broadcasted to the main channel)
             from daras_ai_v2.bots import save_broadcast_message
             from bots.models import Conversation
+            from threading import Thread
 
-            convos = Conversation.objects.filter(
-                bot_integration=bi, slack_channel_is_personal=False
-            )
-            for convo in convos:
-                save_broadcast_message(
-                    convo,
+            # save the message in the background so we can return immediately from the api call
+            Thread(
+                target=lambda convos, text: [
+                    save_broadcast_message(convo, text) for convo in convos
+                ],
+                args=(
+                    Conversation.objects.filter(
+                        bot_integration=bi, slack_channel_is_personal=False
+                    ),
                     text,
-                )
+                ),
+            ).start()
         return res
 
     def send_msg(
