@@ -18,28 +18,25 @@ def render():
 
         col1, col2 = gui.columns([1, 2])
         with col1:
-            gui.image(
-                page.get_recipe_image(state),
-                style={"border-radius": 5},
-            )
+            render_image(page, state)
 
         with col2:
-            with gui.link(to=page.app_url()):
-                gui.markdown(f"#### {page.get_recipe_title(state)}")
-            preview = page.preview_description(state)
-            if preview:
-                gui.write(truncate_text_words(preview, 150))
-            else:
-                page.render_description()
+            render_description(page, state)
 
     def _render_as_featured(page_cls):
         page = page_cls()
         state = page.recipe_doc_sr().to_dict()
+        render_image(page, state)
+
+        render_description(page, state)
+
+    def render_image(page, state):
         gui.image(
             page.get_recipe_image(state),
             style={"border-radius": 5},
         )
 
+    def render_description(page, state):
         with gui.link(to=page.app_url()):
             gui.markdown(f"#### {page.get_recipe_title(state)}")
         preview = page.preview_description(state)

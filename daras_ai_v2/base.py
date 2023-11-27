@@ -175,10 +175,6 @@ class BasePage:
 
         st.session_state.setdefault(StateKeys.page_title, self.title)
         st.session_state.setdefault(
-            StateKeys.page_image,
-            self.image,
-        )
-        st.session_state.setdefault(
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
@@ -315,7 +311,7 @@ class BasePage:
             page = page_cls()
             state = page_cls().recipe_doc_sr().to_dict()
             preview_image = meta_preview_url(
-                page_cls().preview_image(state), page_cls().fallback_preivew_image()
+                page.get_recipe_image(state), page.fallback_preivew_image()
             )
 
             with st.link(to=page.app_url()):
@@ -867,8 +863,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             self._render_report_button()
 
     def _render_save_options(self):
-        # if not self.is_current_user_admin():
-        #     return
+        if not self.is_current_user_admin():
+            return
 
         parent_example_id, parent_run_id, parent_uid = extract_query_params(
             gooey_get_query_params()
