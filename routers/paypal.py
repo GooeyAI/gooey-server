@@ -42,7 +42,7 @@ def generateAccessToken():
 
 # Create an order to start the transaction.
 # @see https://developer.paypal.com/docs/api/orders/v2/#orders_create
-def createOrder(payload, uid):
+def createOrder(payload: dict, uid: str):
     # use the cart information passed from the front-end to calculate the purchase unit details
     print(
         "shopping cart information passed from the frontend createOrder() callback:",
@@ -82,7 +82,7 @@ def createOrder(payload, uid):
 
 # Capture payment for the created order to complete the transaction.
 # @see https://developer.paypal.com/docs/api/orders/v2/#orders_capture
-def captureOrder(orderID):
+def captureOrder(orderID: str):
     accessToken = generateAccessToken()
     url = f"{settings.PAYPAL_BASE}/v2/checkout/orders/{orderID}/capture"
 
@@ -101,7 +101,7 @@ def captureOrder(orderID):
     return handleResponse(response)
 
 
-def handleResponse(response):
+def handleResponse(response: requests.Response):
     jsonResponse = response.json()
     return (jsonResponse, response.status_code)
 
@@ -184,7 +184,7 @@ def create_webhook(request: Request, _payload: bytes = Depends(request_body)):
     return JSONResponse({"status": "success"})
 
 
-def _handle_invoice_paid(uid: str, invoice_data):
+def _handle_invoice_paid(uid: str, invoice_data: dict):
     invoice_id = invoice_data["transmission_id"]
     amount = int(
         float(invoice_data["webhook_event"]["resource"]["amount"]["value"]) * 100
