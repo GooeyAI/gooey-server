@@ -40,7 +40,8 @@ class CompareText2ImgPage(BasePage):
         "seed": 42,
         "sd_2_upscaling": False,
         "image_guidance_scale": 1.2,
-        "dalle_3_quality": "standard, vivid",
+        "dalle_3_quality": "standard",
+        "dalle_3_style": "vivid",
     }
 
     class RequestModel(BaseModel):
@@ -53,6 +54,7 @@ class CompareText2ImgPage(BasePage):
         num_outputs: int | None
         quality: int | None
         dalle_3_quality: str | None
+        dalle_3_style: str | None
 
         guidance_scale: float | None
         seed: int | None
@@ -181,6 +183,7 @@ class CompareText2ImgPage(BasePage):
                 num_outputs=request.num_outputs,
                 num_inference_steps=request.quality,
                 dalle_3_quality=request.dalle_3_quality,
+                dalle_3_style=request.dalle_3_style,
                 width=request.output_width,
                 height=request.output_height,
                 guidance_scale=request.guidance_scale,

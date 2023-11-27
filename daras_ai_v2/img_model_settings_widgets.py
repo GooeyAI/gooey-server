@@ -220,14 +220,20 @@ def quality_setting(selected_models=None):
         ]
     ):
         st.selectbox(
-            """##### Quality""",
+            """##### Dalle 3 Quality""",
             options=[
-                "standard, natural",
-                "hd, natural",
-                "standard, vivid",
-                "hd, vivid",
+                "standard",
+                "hd",
             ],
             key="dalle_3_quality",
+        )
+        st.selectbox(
+            """##### Dalle 3 Style""",
+            options=[
+                "natural",
+                "vivid",
+            ],
+            key="dalle_3_style",
         )
     st.slider(
         label="""

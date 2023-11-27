@@ -261,13 +261,14 @@ def text2img(
     prompt: str,
     num_outputs: int,
     num_inference_steps: int,
-    dalle_3_quality: str,
     width: int,
     height: int,
     seed: int = 42,
     guidance_scale: float = None,
     negative_prompt: str = None,
     scheduler: str = None,
+    dalle_3_quality: str | None = None,
+    dalle_3_style: str | None = None,
 ):
     if selected_model != Text2ImgModels.dall_e_3.name:
         _resolution_check(width, height, max_size=(1024, 1024))
@@ -278,14 +279,13 @@ def text2img(
 
             client = OpenAI()
             width, height = _get_dalle_3_img_size(width, height)
-            quality, style = dalle_3_quality.split(", ")
             response = client.images.generate(
                 model=text2img_model_ids[Text2ImgModels[selected_model]],
                 n=1,  # num_outputs, not supported yet
                 prompt=prompt,
                 response_format="b64_json",
-                quality=quality,
-                style=style,
+                quality=dalle_3_quality,
+                style=dalle_3_style,
                 size=f"{width}x{height}",
             )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
