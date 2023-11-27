@@ -30,7 +30,7 @@ from daras_ai_v2.base import (
 )
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
-from daras_ai_v2.meta_content import build_meta_tags
+from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from routers.api import request_form_files
@@ -70,6 +70,25 @@ async def get_sitemap():
 @app.get("/favicon.ico/")
 async def favicon():
     return FileResponse("static/favicon.ico")
+
+
+@app.post("/handleError/")
+async def handle_error(request: Request):
+    context = {"request": request, "settings": settings}
+
+    def not_found():
+        st.html(templates.get_template("errors/404.html").render(**context))
+
+    def unknown_error():
+        st.html(templates.get_template("errors/unknown.html").render(**context))
+
+    body = await request.json()
+
+    match body["status"]:
+        case 404:
+            return st.runner(lambda: page_wrapper(request, not_found))
+        case _:
+            return st.runner(lambda: page_wrapper(request, unknown_error))
 
 
 @app.get("/login/")
@@ -192,7 +211,18 @@ async def request_json(request: Request):
 def explore_page(request: Request, json_data: dict = Depends(request_json)):
     import explore
 
-    return st.runner(lambda: page_wrapper(request, explore.render), **json_data)
+    ret = st.runner(
+        lambda: page_wrapper(request=request, render_fn=explore.render),
+        **json_data,
+    )
+    ret |= {
+        "meta": raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title=explore.META_TITLE,
+            description=explore.META_DESCRIPTION,
+        ),
+    }
+    return ret
 
 
 @app.post("/")
@@ -253,7 +283,7 @@ def st_page(
 
     ret |= {
         "meta": build_meta_tags(
-            url=str(request.url),
+            url=get_og_url_path(request),
             page=page,
             state=state,
             run_id=run_id,
@@ -267,6 +297,12 @@ def st_page(
         # ],
     }
     return ret
+
+
+def get_og_url_path(request) -> str:
+    return str(
+        (furl(settings.APP_BASE_URL) / request.url.path).add(request.query_params)
+    )
 
 
 def get_run_user(request, uid) -> AppUser | None:

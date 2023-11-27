@@ -1,7 +1,5 @@
-import datetime
 import typing
 
-import jinja2
 from furl import furl
 from pydantic import BaseModel
 
@@ -16,7 +14,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
-    model_max_tokens,
+    llm_price,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -201,13 +199,10 @@ class DocSearchPage(BasePage):
 
     def get_raw_price(self, state: dict) -> float:
         name = state.get("selected_model")
-        match name:
-            case LargeLanguageModels.gpt_4.name:
-                return 60
-            case LargeLanguageModels.gpt_3_5_turbo_16k.name:
-                return 20
-            case _:
-                return 10
+        try:
+            return llm_price[LargeLanguageModels[name]] * 2
+        except KeyError:
+            return 10
 
 
 def render_documents(state, label="**Documents**", *, key="documents"):

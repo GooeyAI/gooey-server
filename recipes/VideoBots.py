@@ -1,13 +1,11 @@
-import datetime
 import os
 import os.path
 import re
 import typing
 
-import jinja2
 from django.db.models import QuerySet
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import BotIntegration, Platform
@@ -15,9 +13,6 @@ from bots.models import Workflow
 from daras_ai.image_input import (
     truncate_text_words,
 )
-from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
-from daras_ai_v2.query_generator import generate_final_search_query
-from recipes.GoogleGPT import SearchReference
 from daras_ai_v2.asr import (
     run_google_translate,
     google_translate_language_selector,
@@ -27,6 +22,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
 )
+from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
@@ -43,6 +39,8 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
+from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
 from daras_ai_v2.text_output_widget import text_output
@@ -55,6 +53,7 @@ from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
 )
+from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
@@ -206,6 +205,8 @@ class VideoBotsPage(BasePage):
         google_pitch: float | None
         bark_history_prompt: str | None
         elevenlabs_voice_name: str | None
+        elevenlabs_api_key: str | None
+        elevenlabs_voice_id: str | None
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
@@ -246,14 +247,25 @@ class VideoBotsPage(BasePage):
         use_url_shortener: bool | None
 
         user_language: str | None
+        # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
+        input_glossary_document: str | None = Field(
+            title="Input Glossary",
+            description="""
+Translation Glossary for User Langauge -> LLM Language (English)  
+            """,
+        )
+        output_glossary_document: str | None = Field(
+            title="Output Glossary",
+            description="""
+Translation Glossary for LLM Language (English) -> User Langauge  
+            """,
+        )
 
         variables: dict[str, typing.Any] | None
 
     class ResponseModel(BaseModel):
         final_prompt: str
-        raw_input_text: str | None
-        raw_output_text: list[str] | None
-        raw_tts_text: list[str] | None
+
         output_text: list[str]
 
         # tts
@@ -261,6 +273,11 @@ class VideoBotsPage(BasePage):
 
         # lipsync
         output_video: list[str]
+
+        # intermediate text
+        raw_input_text: str | None
+        raw_tts_text: list[str] | None
+        raw_output_text: list[str] | None
 
         # doc search
         references: list[SearchReference] | None
@@ -286,6 +303,9 @@ class VideoBotsPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Create customized chatbots from your own docs/PDF/webpages. Craft your own bot prompts using the creative GPT3, fast GPT 3.5-turbo or powerful GPT4 & optionally prevent hallucinations by constraining all answers to just your citations. Available as Facebook, Instagram, WhatsApp bots or via API. Add multi-lingual speech recognition and text-to-speech in 100+ languages and even video responses. Collect 👍🏾 👎🏽 feedback + see usage & retention graphs too! This is the workflow that powers https://Farmer.CHAT and it's yours to tweak."
         # return "Create an amazing, interactive AI videobot with just a GPT3 script + a video clip or photo. To host it on your own site or app, contact us at support@gooey.ai"
+
+    def get_submit_container_props(self):
+        return {}
 
     def render_description(self):
         st.write(
@@ -356,13 +376,29 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             doc_search_settings(keyword_instructions_allowed=True)
             st.write("---")
         language_model_settings()
+
         st.write("---")
         google_translate_language_selector(
             """
-            ###### 🔠 User Language
+            ##### 🔠 User Language
             If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
             """,
             key="user_language",
+        )
+        st.markdown(
+            """
+            ###### 📖 Customize with Glossary
+            Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            
+            """
+        )
+        glossary_input(
+            f"##### {self.RequestModel.__fields__['input_glossary_document'].field_info.title}\n{self.RequestModel.__fields__['input_glossary_document'].field_info.description or ''}",
+            key="input_glossary_document",
+        )
+        glossary_input(
+            f"##### {self.RequestModel.__fields__['output_glossary_document'].field_info.title}\n{self.RequestModel.__fields__['output_glossary_document'].field_info.description or ''}",
+            key="output_glossary_document",
         )
         st.write("---")
 
@@ -397,7 +433,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             lipsync_settings()
 
     def fields_to_save(self) -> [str]:
-        return super().fields_to_save() + ["landbot_url"]
+        fields = super().fields_to_save() + ["landbot_url"]
+        if "elevenlabs_api_key" in fields:
+            fields.remove("elevenlabs_api_key")
+        return fields
 
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
@@ -412,7 +451,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         output_video = state.get("output_video")
         if output_video:
-            st.video(output_video[0])
+            st.video(output_video[0], autoplay=True)
 
         output_text = state.get("output_text")
         if output_text:
@@ -439,7 +478,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                         for idx, text in enumerate(output_text):
                             st.write(text)
                             try:
-                                st.video(output_video[idx])
+                                st.video(output_video[idx], autoplay=True)
                             except IndexError:
                                 try:
                                     st.audio(output_audio[idx])
@@ -574,7 +613,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             case TextToSpeechProviders.ELEVEN_LABS.name:
                 return f"""
                     - *Base cost = {super().get_raw_price(st.session_state)} credits*
-                    - *Additional Eleven Labs cost ≈ 4 credits per 10 words of the output*
+                    - *Additional {TextToSpeechPage().additional_notes()}*
                 """
             case _:
                 return ""
@@ -604,6 +643,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 texts=[user_input],
                 source_language=request.user_language,
                 target_language="en",
+                glossary_url=request.input_glossary_document,
             )[0]
 
         # parse the bot script
@@ -665,7 +705,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
-                yield "Exctracting keywords..."
+                yield "Extracting keywords..."
                 state["final_keyword_query"] = generate_final_search_query(
                     request=request,
                     instructions=keyword_instructions,
@@ -774,6 +814,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 texts=output_text,
                 source_language="en",
                 target_language=request.user_language,
+                glossary_url=request.output_glossary_document,
             )
             state["raw_tts_text"] = [
                 "".join(snippet for snippet, _ in parse_refs(text, references))

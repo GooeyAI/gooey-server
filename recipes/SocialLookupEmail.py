@@ -1,15 +1,17 @@
 import re
 import typing
-import requests
 
+import requests
 from pydantic import BaseModel
+
 import gooey_ui as st
 from bots.models import Workflow
-
 from daras_ai.text_format import daras_ai_format_str
+from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.redis_cache import redis_cache_decorator
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/email%20ver%202.png"
@@ -70,6 +72,7 @@ class SocialLookupEmailPage(BasePage):
     def render_description(self):
         st.write(
             """
+            
     This recipe takes an email address and a sample email body. It attempts to pull the social profile of the email address and then personlize the email using AI.
 
     How It Works:
@@ -230,14 +233,11 @@ class SocialLookupEmailPage(BasePage):
         st.write(state.get("output_email_body", ""))
 
 
-@st.cache_data()
-def get_profile_for_email(email_address):
+@redis_cache_decorator
+def get_profile_for_email(email_address) -> dict | None:
     r = requests.post(
         "https://api.apollo.io/v1/people/match",
-        json={
-            "api_key": "BOlC1SGQWNuP3D70WA_-yw",
-            "email": email_address,
-        },
+        json={"api_key": settings.APOLLO_API_KEY, "email": email_address},
     )
     r.raise_for_status()
 

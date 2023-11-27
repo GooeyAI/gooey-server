@@ -47,6 +47,8 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         bark_history_prompt: str | None
 
         elevenlabs_voice_name: str | None
+        elevenlabs_api_key: str | None
+        elevenlabs_voice_id: str | None
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
@@ -151,7 +153,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         with col2:
             output_video = state.get("output_video")
             if output_video:
-                st.video(output_video, caption="Output Video")
+                st.video(output_video, caption="Output Video", autoplay=True)
             else:
                 st.div()
 
@@ -167,15 +169,20 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         else:
             return LipsyncPage.get_raw_price(self, state)
 
+    def get_cost_note(self):
+        return "Lipsync cost + TTS cost"
+
     def additional_notes(self):
-        lipsync_notes = LipsyncPage.additional_notes(self)
-        if tts_notes := TextToSpeechPage.additional_notes(self):
-            notes = f"""
-                - *Lipsync* {lipsync_notes.strip()}
-                - *TTS* {tts_notes.strip()}
-            """
-        else:
-            notes = lipsync_notes
+        cost_notes = {
+            "Lipsync": LipsyncPage.get_cost_note(self),
+            "TTS": TextToSpeechPage.get_cost_note(self),
+        }
+        notes = "\n".join(
+            [f"- *{k} cost: {v.strip()}*" if v else "" for k, v in cost_notes.items()]
+        )
+
+        notes += LipsyncPage.additional_notes(self) or ""
+        notes += TextToSpeechPage.additional_notes(self) or ""
 
         return notes
 

@@ -50,6 +50,7 @@ class DocSummaryPage(BasePage):
         "quality": 1.0,
         "avoid_repetition": True,
         "selected_model": LargeLanguageModels.text_davinci_003.name,
+        "chain_type": CombineDocumentsChains.map_reduce.name,
     }
 
     class RequestModel(BaseModel):

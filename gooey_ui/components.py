@@ -153,6 +153,32 @@ def tabs(labels: list[str]) -> list[state.NestingCtx]:
     return [state.NestingCtx(tab) for tab in parent.children]
 
 
+def controllable_tabs(
+    labels: list[str], key: str
+) -> tuple[list[state.NestingCtx], int]:
+    index = state.session_state.get(key, 0)
+    for i, label in enumerate(labels):
+        if button(
+            label,
+            key=f"tab-{i}",
+            type="primary",
+            className="replicate-nav",
+            style={
+                "background": "black" if i == index else "white",
+                "color": "white" if i == index else "black",
+            },
+        ):
+            state.session_state[key] = index = i
+            state.experimental_rerun()
+    ctxs = []
+    for i, label in enumerate(labels):
+        if i == index:
+            ctxs += [div(className="tab-content")]
+        else:
+            ctxs += [div(className="tab-content", style={"display": "none"})]
+    return ctxs, index
+
+
 def columns(
     spec,
     *,
@@ -201,7 +227,18 @@ def image(
     ).mount()
 
 
-def video(src: str, caption: str = None):
+def video(src: str, caption: str = None, autoplay: bool = False):
+    autoplay_props = {}
+    if autoplay:
+        autoplay_props = {
+            "preload": "auto",
+            "controls": True,
+            "autoPlay": True,
+            "loop": True,
+            "muted": True,
+            "playsInline": True,
+        }
+
     if not src:
         return
     if isinstance(src, str):
@@ -211,7 +248,7 @@ def video(src: str, caption: str = None):
         src = f.url
     state.RenderTreeNode(
         name="video",
-        props=dict(src=src, caption=dedent(caption)),
+        props=dict(src=src, caption=dedent(caption), **autoplay_props),
     ).mount()
 
 
@@ -368,10 +405,17 @@ def button(
     key: str = None,
     help: str = None,
     *,
-    type: typing.Literal["primary", "secondary"] = "secondary",
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
     disabled: bool = False,
     **props,
 ) -> bool:
+    """
+    Example:
+        st.button("Primary", key="test0", type="primary")
+        st.button("Secondary", key="test1")
+        st.button("Tertiary", key="test3", type="tertiary")
+        st.button("Link Button", key="test3", type="link")
+    """
     if not key:
         key = md5_values("button", label, help, type, props)
     state.RenderTreeNode(
@@ -383,6 +427,7 @@ def button(
             label=dedent(label),
             help=help,
             disabled=disabled,
+            className="btn-" + type,
             **props,
         ),
     ).mount()
@@ -582,6 +627,33 @@ def text_input(
     return value or ""
 
 
+def password_input(
+    label: str,
+    value: str = "",
+    max_chars: str = None,
+    key: str = None,
+    help: str = None,
+    *,
+    placeholder: str = None,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    **props,
+) -> str:
+    value = _input_widget(
+        input_type="password",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        maxLength=max_chars,
+        placeholder=placeholder,
+        **props,
+    )
+    return value or ""
+
+
 def slider(
     label: str,
     min_value: float = None,
@@ -701,7 +773,33 @@ def _input_widget(
     return value
 
 
+def breadcrumbs(divider: str = "/", **props) -> state.NestingCtx:
+    style = props.pop("style", {}) | {"--bs-breadcrumb-divider": f"'{divider}'"}
+    with tag("nav", style=style, **props):
+        return tag("ol", className="breadcrumb mb-0")
+
+
+def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
+    className = "breadcrumb-item lead " + props.pop("className", "")
+    with tag("li", className=className, **props):
+        if link_to:
+            with tag("a", href=link_to):
+                html(inner_html)
+        else:
+            html(inner_html)
+
+
 def dedent(text: str | None) -> str | None:
     if not text:
         return text
     return textwrap.dedent(text)
+
+
+def js(src: str, **kwargs):
+    state.RenderTreeNode(
+        name="script",
+        props=dict(
+            src=src,
+            args=kwargs,
+        ),
+    ).mount()

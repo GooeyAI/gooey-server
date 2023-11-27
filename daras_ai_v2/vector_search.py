@@ -1,4 +1,5 @@
 import codecs
+import csv
 import io
 import mimetypes
 import random
@@ -13,7 +14,6 @@ from furl import furl
 from googleapiclient.errors import HttpError
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
-from scipy.stats import rankdata
 
 import gooey_ui as gui
 from daras_ai.image_input import (
@@ -24,6 +24,9 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, run_asr, run_google_translate
+from daras_ai_v2.azure_doc_extract import (
+    table_arr_to_prompt_chunked,
+)
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )
@@ -43,7 +46,8 @@ from daras_ai_v2.search_ref import (
     SearchReference,
     remove_quotes,
 )
-from daras_ai_v2.text_splitter import text_splitter, puncts
+from daras_ai_v2.text_splitter import text_splitter, puncts, Document
+from files.models import FileMetadata
 
 
 class DocSearchRequest(BaseModel):
@@ -106,6 +110,8 @@ def get_top_k_references(
     sparse_weight = 1 - dense_weight
 
     if dense_weight:
+        from scipy.stats import rankdata
+
         # get dense scores above cutoff based on cosine similarity
         cutoff = 0.7
         custom_weights = np.array(
@@ -155,7 +161,7 @@ def get_top_k_references(
         reverse=True,
     )
 
-    references = [embeds[i][0] | {"score": rrf_scores[i]} for i in final_ranks]
+    references = [embeds[idx][0] | {"score": rrf_scores[idx]} for idx in final_ranks]
 
     # merge duplicate references
     uniques = {}
@@ -171,7 +177,7 @@ def get_top_k_references(
     return list(uniques.values())
 
 
-bm25_split_re = re.compile(rf"[{puncts}\s]")
+bm25_split_re = re.compile(rf"[{puncts},|\s]")
 
 
 def bm25_tokenizer(text: str) -> list[str]:
@@ -238,10 +244,14 @@ class DocMetadata(typing.NamedTuple):
     etag: str | None
     mime_type: str | None
 
+    @classmethod
+    def from_file_metadata(cls, meta: FileMetadata):
+        return cls(meta.name, meta.etag, meta.mime_type)
+
 
 def doc_url_to_metadata(f_url: str) -> DocMetadata:
     """
-    Fetches the google drive metadata for a document url
+    Fetches the metadata for a document url
 
     Args:
         f_url: document url
@@ -249,6 +259,10 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
     Returns:
         document metadata
     """
+    return DocMetadata.from_file_metadata(doc_url_to_file_metadata(f_url))
+
+
+def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
     f = furl(f_url.strip("/"))
     if is_gdrive_url(f):
         # extract filename from google drive metadata
@@ -265,6 +279,7 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
         name = meta["name"]
         etag = meta.get("md5Checksum") or meta.get("modifiedTime")
         mime_type = meta["mimeType"]
+        total_bytes = int(meta.get("size") or 0)
     else:
         try:
             r = requests.head(
@@ -275,17 +290,19 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
             r.raise_for_status()
         except requests.RequestException as e:
             print(f"ignore error while downloading {f_url}: {e}")
+            name = None
             mime_type = None
             etag = None
-            name = None
+            total_bytes = 0
         else:
-            mime_type = get_mimetype_from_response(r)
-            etag = r.headers.get("etag", r.headers.get("last-modified"))
             name = (
                 r.headers.get("content-disposition", "")
                 .split("filename=")[-1]
                 .strip('"')
             )
+            etag = r.headers.get("etag", r.headers.get("last-modified"))
+            mime_type = get_mimetype_from_response(r)
+            total_bytes = int(r.headers.get("content-length") or 0)
     # extract filename from url as a fallback
     if not name:
         if is_user_uploaded_url(str(f)):
@@ -295,7 +312,9 @@ def doc_url_to_metadata(f_url: str) -> DocMetadata:
     # guess mimetype from name as a fallback
     if not mime_type:
         mime_type = mimetypes.guess_type(name)[0]
-    return DocMetadata(name, etag, mime_type)
+    return FileMetadata(
+        name=name, etag=etag, mime_type=mime_type, total_bytes=total_bytes
+    )
 
 
 @redis_cache_decorator
@@ -332,7 +351,6 @@ def get_embeds_for_doc(
     )
     chunk_size = int(max_context_words * 2)
     chunk_overlap = int(max_context_words * 2 / scroll_jump)
-    metas: list[SearchReference]
     if isinstance(pages, pd.DataFrame):
         metas = []
         # treat each row as a separate document
@@ -355,8 +373,9 @@ def get_embeds_for_doc(
                     "title": doc_meta.name,
                     "url": f_url,
                     **row,  # preserve extra csv rows
-                    "score": -1,
                     "snippet": doc.text,
+                    **doc.kwargs,
+                    "score": -1,
                 }
                 for doc in splits
             ]
@@ -364,12 +383,16 @@ def get_embeds_for_doc(
         # split the text into chunks
         metas = [
             {
-                "title": doc_meta.name
-                + (f", page {doc.end + 1}" if len(pages) > 1 else ""),
-                "url": furl(f_url)
-                .set(fragment_args={"page": doc.end + 1} if len(pages) > 1 else {})
-                .url,
+                "title": (
+                    doc_meta.name + (f", page {doc.end + 1}" if len(pages) > 1 else "")
+                ),
+                "url": (
+                    furl(f_url)
+                    .set(fragment_args={"page": doc.end + 1} if len(pages) > 1 else {})
+                    .url
+                ),
                 "snippet": doc.text,
+                **doc.kwargs,
                 "score": -1,
             }
             for doc in text_splitter(
@@ -377,21 +400,22 @@ def get_embeds_for_doc(
             )
         ]
     # get doc embeds in batches
-    embeds = []
-    batch_size = 100
+    batch_size = 16  # azure openai limits
     texts = [m["title"] + " | " + m["snippet"] for m in metas]
-    for i in range(0, len(texts), batch_size):
-        # progress = int(i / len(texts) * 100)
-        # print(f"Getting document embeddings ({progress}%)...")
-        batch = texts[i : i + batch_size]
-        embeds.extend(openai_embedding_create(batch))
+    embeds = flatmap_parallel(
+        openai_embedding_create,
+        [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)],
+        max_workers=5,
+    )
     return list(zip(metas, embeds))
 
 
 sections_re = re.compile(r"(\s*[\r\n\f\v]|^)(\w+)\=", re.MULTILINE)
 
 
-def split_sections(sections: str, *, chunk_overlap: int, chunk_size: int):
+def split_sections(
+    sections: str, *, chunk_overlap: int, chunk_size: int
+) -> typing.Iterable[Document]:
     split = sections_re.split(sections)
     header = ""
     for i in range(2, len(split), 3):
@@ -400,19 +424,18 @@ def split_sections(sections: str, *, chunk_overlap: int, chunk_size: int):
         if not content:
             continue
         match role:
-            case "content":
+            case "content" | "table":
                 for doc in text_splitter(
                     content, chunk_size=chunk_size, chunk_overlap=chunk_overlap
                 ):
                     doc.text = header + doc.text
                     yield doc
-            case "table":
-                for doc in text_splitter(
-                    content, chunk_size=chunk_size, chunk_overlap=chunk_overlap
-                ):
-                    doc.text = header + doc.text
-                    yield doc
-                    break  # truncate tables that are too large. TODO: extract table headers
+
+            case "csv":
+                reader = csv.reader(io.StringIO(content))
+                for prompt in table_arr_to_prompt_chunked(reader, chunk_size=1024):
+                    yield Document(prompt, (0, 0))
+
             case _:
                 header += f"{role}={content}\n"
 

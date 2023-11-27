@@ -8,7 +8,11 @@ from pydantic import BaseModel
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
+from daras_ai_v2.language_model import (
+    run_language_model,
+    LargeLanguageModels,
+    llm_price,
+)
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import prompt_vars_widget, render_prompt_vars
@@ -131,27 +135,10 @@ class CompareLLMPage(BasePage):
         selected_models = state.get("selected_models", [])
         total = 0
         for name in selected_models:
-            match name:
-                case LargeLanguageModels.gpt_4.name:
-                    total += 10
-                case LargeLanguageModels.gpt_3_5_turbo_16k.name:
-                    total += 2
-                case LargeLanguageModels.gpt_3_5_turbo.name:
-                    total += 1
-                case LargeLanguageModels.text_davinci_003.name | LargeLanguageModels.code_davinci_002.name:
-                    total += 10
-                case LargeLanguageModels.text_curie_001.name:
-                    total += 5
-                case LargeLanguageModels.text_babbage_001.name:
-                    total += 2
-                case LargeLanguageModels.text_ada_001.name:
-                    total += 1
-                case LargeLanguageModels.palm2_text.name:
-                    total += 15
-                case LargeLanguageModels.palm2_chat.name:
-                    total += 10
-                case LargeLanguageModels.llama2_70b_chat.name:
-                    total += 5
+            try:
+                total += llm_price[LargeLanguageModels[name]]
+            except KeyError:
+                total += 5
         return total * state.get("num_outputs", 1)
 
     def related_workflows(self) -> list:

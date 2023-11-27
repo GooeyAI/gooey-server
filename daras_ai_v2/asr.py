@@ -7,26 +7,39 @@ from enum import Enum
 import langcodes
 import requests
 import typing_extensions
+from django.db.models import F
 from furl import furl
 
 import gooey_ui as st
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
+from daras_ai_v2.gdrive_downloader import (
+    is_gdrive_url,
+    gdrive_download,
+    gdrive_metadata,
+    url_to_gdrive_file_id,
+)
 from daras_ai_v2 import settings
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.gpu_server import (
-    GpuEndpoints,
-    call_celery_task,
-)
+from daras_ai_v2.gpu_server import call_celery_task
+from daras_ai_v2.redis_cache import redis_cache_decorator
+from time import sleep
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
 
 TRANSLITERATION_SUPPORTED = {"ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"}
 
-# below list was found experimentally since the supported languages list by google is actually wrong:
+# below CHIRP list was found experimentally since the supported languages list by google is actually wrong:
 CHIRP_SUPPORTED = {"af-ZA", "sq-AL", "am-ET", "ar-EG", "hy-AM", "as-IN", "ast-ES", "az-AZ", "eu-ES", "be-BY", "bs-BA", "bg-BG", "my-MM", "ca-ES", "ceb-PH", "ckb-IQ", "zh-Hans-CN", "yue-Hant-HK", "hr-HR", "cs-CZ", "da-DK", "nl-NL", "en-AU", "en-IN", "en-GB", "en-US", "et-EE", "fil-PH", "fi-FI", "fr-CA", "fr-FR", "gl-ES", "ka-GE", "de-DE", "el-GR", "gu-IN", "ha-NG", "iw-IL", "hi-IN", "hu-HU", "is-IS", "id-ID", "it-IT", "ja-JP", "jv-ID", "kea-CV", "kam-KE", "kn-IN", "kk-KZ", "km-KH", "ko-KR", "ky-KG", "lo-LA", "lv-LV", "ln-CD", "lt-LT", "luo-KE", "lb-LU", "mk-MK", "ms-MY", "ml-IN", "mt-MT", "mi-NZ", "mr-IN", "mn-MN", "ne-NP", "ny-MW", "oc-FR", "ps-AF", "fa-IR", "pl-PL", "pt-BR", "pa-Guru-IN", "ro-RO", "ru-RU", "nso-ZA", "sr-RS", "sn-ZW", "sd-IN", "si-LK", "sk-SK", "sl-SI", "so-SO", "es-ES", "es-US", "su-ID", "sw", "sv-SE", "tg-TJ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-PK", "uz-UZ", "vi-VN", "cy-GB", "wo-SN", "yo-NG", "zu-ZA"}  # fmt: skip
 
 WHISPER_SUPPORTED = {"af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de", "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no", "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"}  # fmt: skip
+
+# See page 14 of https://scontent-sea1-1.xx.fbcdn.net/v/t39.2365-6/369747868_602316515432698_2401716319310287708_n.pdf?_nc_cat=106&ccb=1-7&_nc_sid=3c67a6&_nc_ohc=_5cpNOcftdYAX8rCrVo&_nc_ht=scontent-sea1-1.xx&oh=00_AfDVkx7XubifELxmB_Un-yEYMJavBHFzPnvTbTlalbd_1Q&oe=65141B39
+# For now, below are listed the languages that support ASR. Note that Seamless only accepts ISO 639-3 codes.
+SEAMLESS_SUPPORTED = {"afr", "amh", "arb", "ary", "arz", "asm", "ast", "azj", "bel", "ben", "bos", "bul", "cat", "ceb", "ces", "ckb", "cmn", "cym", "dan", "deu", "ell", "eng", "est", "eus", "fin", "fra", "gaz", "gle", "glg", "guj", "heb", "hin", "hrv", "hun", "hye", "ibo", "ind", "isl", "ita", "jav", "jpn", "kam", "kan", "kat", "kaz", "kea", "khk", "khm", "kir", "kor", "lao", "lit", "ltz", "lug", "luo", "lvs", "mai", "mal", "mar", "mkd", "mlt", "mni", "mya",  "nld", "nno", "nob", "npi", "nya", "oci", "ory", "pan", "pbt", "pes", "pol", "por", "ron", "rus", "slk", "slv", "sna", "snd", "som", "spa", "srp", "swe", "swh", "tam", "tel", "tgk", "tgl", "tha", "tur", "ukr", "urd", "uzn", "vie", "xho", "yor", "yue", "zlm", "zul"}  # fmt: skip
+
+AZURE_SUPPORTED = {"af-ZA", "am-ET", "ar-AE", "ar-BH", "ar-DZ", "ar-EG", "ar-IL", "ar-IQ", "ar-JO", "ar-KW", "ar-LB", "ar-LY", "ar-MA", "ar-OM", "ar-PS", "ar-QA", "ar-SA", "ar-SY", "ar-TN", "ar-YE", "az-AZ", "bg-BG", "bn-IN", "bs-BA", "ca-ES", "cs-CZ", "cy-GB", "da-DK", "de-AT", "de-CH", "de-DE", "el-GR", "en-AU", "en-CA", "en-GB", "en-GH", "en-HK", "en-IE", "en-IN", "en-KE", "en-NG", "en-NZ", "en-PH", "en-SG", "en-TZ", "en-US", "en-ZA", "es-AR", "es-BO", "es-CL", "es-CO", "es-CR", "es-CU", "es-DO", "es-EC", "es-ES", "es-GQ", "es-GT", "es-HN", "es-MX", "es-NI", "es-PA", "es-PE", "es-PR", "es-PY", "es-SV", "es-US", "es-UY", "es-VE", "et-EE", "eu-ES", "fa-IR", "fi-FI", "fil-PH", "fr-BE", "fr-CA", "fr-CH", "fr-FR", "ga-IE", "gl-ES", "gu-IN", "he-IL", "hi-IN", "hr-HR", "hu-HU", "hy-AM", "id-ID", "is-IS", "it-CH", "it-IT", "ja-JP", "jv-ID", "ka-GE", "kk-KZ", "km-KH", "kn-IN", "ko-KR", "lo-LA", "lt-LT", "lv-LV", "mk-MK", "ml-IN", "mn-MN", "mr-IN", "ms-MY", "mt-MT", "my-MM", "nb-NO", "ne-NP", "nl-BE", "nl-NL", "pa-IN", "pl-PL", "ps-AF", "pt-BR", "pt-PT", "ro-RO", "ru-RU", "si-LK", "sk-SK", "sl-SI", "so-SO", "sq-AL", "sr-RS", "sv-SE", "sw-KE", "sw-TZ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-IN", "uz-UZ", "vi-VN", "wuu-CN", "yue-CN", "zh-CN", "zh-CN-shandong", "zh-CN-sichuan", "zh-HK", "zh-TW", "zu-ZA"}  # fmt: skip
+MAX_POLLS = 100
 
 
 class AsrModels(Enum):
@@ -38,6 +51,8 @@ class AsrModels(Enum):
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
     usm = "Chirp / USM (Google)"
     deepgram = "Deepgram"
+    azure = "Azure Speech"
+    seamless_m4t = "Seamless M4T (Facebook Research)"
 
 
 asr_model_ids = {
@@ -47,6 +62,7 @@ asr_model_ids = {
     AsrModels.vakyansh_bhojpuri: "Harveenchadha/vakyansh-wav2vec2-bhojpuri-bhom-60",
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
+    AsrModels.seamless_m4t: "facebook/hf-seamless-m4t-large",
 }
 
 forced_asr_languages = {
@@ -61,6 +77,8 @@ asr_supported_languages = {
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: WHISPER_SUPPORTED,
+    AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
+    AsrModels.azure: AZURE_SUPPORTED,
 }
 
 
@@ -105,7 +123,7 @@ def google_translate_language_selector(
     )
 
 
-@st.cache_data()
+@redis_cache_decorator
 def google_translate_languages() -> dict[str, str]:
     """
     Get list of supported languages for Google Translate.
@@ -161,7 +179,8 @@ def asr_language_selector(
 def run_google_translate(
     texts: list[str],
     target_language: str,
-    source_language: str = None,
+    source_language: str | None = None,
+    glossary_url: str | None = None,
 ) -> list[str]:
     """
     Translate text using the Google Translate API.
@@ -169,6 +188,7 @@ def run_google_translate(
         texts (list[str]): Text to be translated.
         target_language (str): Language code to translate to.
         source_language (str): Language code to translate from.
+        glossary_url (str): URL of glossary file.
     Returns:
         list[str]: Translated text.
     """
@@ -183,18 +203,26 @@ def run_google_translate(
         language_codes = [detection["language"] for detection in detections]
 
     return map_parallel(
-        lambda text, source: _translate_text(text, source, target_language),
+        lambda text, source: _translate_text(
+            text, source, target_language, glossary_url
+        ),
         texts,
         language_codes,
     )
 
 
-def _translate_text(text: str, source_language: str, target_language: str):
+def _translate_text(
+    text: str,
+    source_language: str,
+    target_language: str,
+    glossary_url: str | None,
+) -> str:
     is_romanized = source_language.endswith("-Latn")
     source_language = source_language.replace("-Latn", "")
     enable_transliteration = (
         is_romanized and source_language in TRANSLITERATION_SUPPORTED
     )
+
     # prevent incorrect API calls
     if source_language == target_language or not text:
         return text
@@ -202,29 +230,42 @@ def _translate_text(text: str, source_language: str, target_language: str):
     if source_language == "wo-SN" or target_language == "wo-SN":
         return _MinT_translate_one_text(text, source_language, target_language)
 
+    config = {
+        "source_language_code": source_language,
+        "target_language_code": target_language,
+        "contents": text,
+        "mime_type": "text/plain",
+        "transliteration_config": {"enable_transliteration": enable_transliteration},
+    }
+
+    # glossary does not work with transliteration
+    if glossary_url and not enable_transliteration:
+        from glossary_resources.models import GlossaryResource
+
+        gr = GlossaryResource.objects.get_or_create_from_url(glossary_url)[0]
+        GlossaryResource.objects.filter(pk=gr.pk).update(
+            usage_count=F("usage_count") + 1
+        )
+        location = gr.location
+        config["glossary_config"] = {
+            "glossary": gr.get_glossary_path(),
+            "ignoreCase": True,
+        }
+    else:
+        location = "global"
+
     authed_session, project = get_google_auth_session()
     res = authed_session.post(
-        f"https://translation.googleapis.com/v3/projects/{project}/locations/global:translateText",
-        json.dumps(
-            {
-                "source_language_code": source_language,
-                "target_language_code": target_language,
-                "contents": text,
-                "mime_type": "text/plain",
-                "transliteration_config": {
-                    "enable_transliteration": enable_transliteration
-                },
-            }
-        ),
-        headers={
-            "Content-Type": "application/json",
-        },
+        f"https://translation.googleapis.com/v3/projects/{project}/locations/{location}:translateText",
+        json=config,
     )
     res.raise_for_status()
     data = res.json()
-    result = data["translations"][0]
-
-    return result["translatedText"].strip()
+    try:
+        result = data["glossaryTranslations"][0]["translatedText"]
+    except (KeyError, IndexError):
+        result = data["translations"][0]["translatedText"]
+    return result.strip()
 
 
 _session = None
@@ -287,11 +328,24 @@ def run_asr(
     is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
     if is_youtube_url:
         audio_url, size = download_youtube_to_wav(audio_url)
+    elif is_gdrive_url(furl(audio_url)):
+        meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
+        anybytes, ext = gdrive_download(
+            furl(audio_url), meta.get("mimeType", "audio/wav")
+        )
+        wavbytes, size = audio_bytes_to_wav(anybytes)
+        audio_url = upload_file_from_bytes(
+            filename=meta.get("name", "gdrive_audio"),
+            data=wavbytes,
+            content_type=meta.get("mimeType", "audio/wav"),
+        )
     else:
         audio_url, size = audio_url_to_wav(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
 
-    if selected_model == AsrModels.deepgram:
+    if selected_model == AsrModels.azure:
+        return azure_asr(audio_url, language)
+    elif selected_model == AsrModels.deepgram:
         r = requests.post(
             "https://api.deepgram.com/v1/listen",
             headers={
@@ -326,10 +380,20 @@ def run_asr(
         return "\n".join(
             f"Speaker {chunk['speaker']}: {chunk['text']}" for chunk in chunks
         )
-
+    elif selected_model == AsrModels.seamless_m4t:
+        data = call_celery_task(
+            "seamless",
+            pipeline=dict(
+                model_id=asr_model_ids[AsrModels.seamless_m4t],
+            ),
+            inputs=dict(
+                audio=audio_url,
+                task="ASR",
+                src_lang=language,
+            ),
+        )
     elif selected_model == AsrModels.usm:
-        # note: only us-central1 and a few other regions support chirp recognizers (so global can't be used)
-        location = "us-central1"
+        location = settings.GCP_REGION
 
         # Create a client
         options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
@@ -361,7 +425,7 @@ def run_asr(
             audio_channel_count=1,
         )
         audio = cloud_speech.BatchRecognizeFileMetadata()
-        audio.uri = "gs://" + "/".join(furl(audio_url).path.segments)
+        audio.uri = gs_url_to_uri(audio_url)
         # Specify that results should be inlined in the response (only possible for 1 audio file)
         output_config = cloud_speech.RecognitionOutputConfig()
         output_config.inline_response_config = cloud_speech.InlineOutputConfig()
@@ -472,6 +536,76 @@ def _get_or_create_recognizer(
     return recognizer
 
 
+def azure_asr(audio_url: str, language: str):
+    # transcription from audio url only supported via rest api or cli
+    # Start by initializing a request
+    payload = {
+        "contentUrls": [
+            audio_url,
+        ],
+        "displayName": "Gooey Transcription",
+        "model": None,
+        "properties": {
+            "wordLevelTimestampsEnabled": False,
+        },
+        "locale": language or "en-US",
+    }
+    if not language:
+        payload["properties"]["languageIdentification"] = {
+            "candidateLocales": [
+                "en-US",
+                "en-IN",
+                "hi-IN",
+                "te-IN",
+                "ta-IN",
+                "kn-IN",
+                "es-ES",
+                "de-DE",
+            ]
+        }
+    r = requests.post(
+        str(furl(settings.AZURE_SPEECH_ENDPOINT) / "speechtotext/v3.1/transcriptions"),
+        headers={
+            "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
+            "Content-Type": "application/json",
+        },
+        json=payload,
+    )
+    r.raise_for_status()
+    uri = r.json()["self"]
+
+    # poll for results
+    for _ in range(MAX_POLLS):
+        r = requests.get(
+            uri,
+            headers={
+                "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
+            },
+        )
+        if not r.ok or not r.json()["status"] == "Succeeded":
+            sleep(1)
+            continue
+        r = requests.get(
+            r.json()["links"]["files"],
+            headers={
+                "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
+            },
+        )
+        r.raise_for_status()
+        transcriptions = []
+        for value in r.json()["values"]:
+            if value["kind"] != "Transcription":
+                continue
+            r = requests.get(
+                value["links"]["contentUrl"],
+                headers={"Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY},
+            )
+            r.raise_for_status()
+            transcriptions += [r.json()["combinedRecognizedPhrases"][0]["display"]]
+        return "\n".join(transcriptions)
+    assert False, "Max polls exceeded, Azure speech did not yield a response"
+
+
 # 16kHz, 16-bit, mono
 FFMPEG_WAV_ARGS = ["-vn", "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000"]
 
@@ -531,9 +665,22 @@ def audio_bytes_to_wav(audio_bytes: bytes) -> tuple[bytes | None, int]:
 
         with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
             # convert audio to single channel wav
-            args = ["ffmpeg", "-y", "-i", infile.name, *FFMPEG_WAV_ARGS, outfile.name]
+            args = [
+                "ffmpeg",
+                "-y",
+                "-i",
+                infile.name,
+                *FFMPEG_WAV_ARGS,
+                outfile.name,
+            ]
             print("\t$ " + " ".join(args))
-            subprocess.check_call(args)
+            try:
+                subprocess.check_output(args, stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as e:
+                ffmpeg_output_error = ValueError(e.output, e)
+                raise ValueError(
+                    "Invalid audio file. Could not convert audio to wav format. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
+                ) from ffmpeg_output_error
             return outfile.read(), os.path.getsize(outfile.name)
 
 
@@ -548,7 +695,13 @@ def check_wav_audio_format(filename: str) -> bool:
         filename,
     ]
     print("\t$ " + " ".join(args))
-    data = json.loads(subprocess.check_output(args))
+    try:
+        data = json.loads(subprocess.check_output(args, stderr=subprocess.STDOUT))
+    except subprocess.CalledProcessError as e:
+        ffmpeg_output_error = ValueError(e.output, e)
+        raise ValueError(
+            "Invalid audio file. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
+        ) from ffmpeg_output_error
     return (
         len(data["streams"]) == 1
         and data["streams"][0]["codec_name"] == "pcm_s16le"

@@ -83,7 +83,9 @@ class WhatsappBot(BotInterface):
         should_translate: bool = False,
     ) -> str | None:
         if should_translate and self.language and self.language != "en":
-            text = run_google_translate([text], self.language)[0]
+            text = run_google_translate(
+                [text], self.language, glossary_url=self.output_glossary
+            )[0]
         return send_wa_msg(
             bot_number=self.bot_id,
             user_number=self.user_id,
@@ -340,7 +342,9 @@ class FacebookBot(BotInterface):
         should_translate: bool = False,
     ) -> str | None:
         if should_translate and self.language and self.language != "en":
-            text = run_google_translate([text], self.language)[0]
+            text = run_google_translate(
+                [text], self.language, glossary_url=self.output_glossary
+            )[0]
         return send_fb_msg(
             access_token=self._access_token,
             bot_id=self.bot_id,

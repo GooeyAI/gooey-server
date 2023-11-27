@@ -1,3 +1,4 @@
+import datetime
 import io
 import typing
 
@@ -17,8 +18,6 @@ from daras_ai_v2.vector_search import (
     download_content_bytes,
 )
 from recipes.DocSearch import render_documents
-
-CACHED_COLUMNS = "__cached_columns"
 
 
 class BulkRunnerPage(BasePage):
@@ -43,8 +42,18 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
             """,
         )
 
-        input_columns: dict[str, str]
-        output_columns: dict[str, str]
+        input_columns: dict[str, str] = Field(
+            title="Input Column Mappings",
+            description="""
+For each input field in the Gooey.AI workflow, specify the column in your input data that corresponds to it.
+            """,
+        )
+        output_columns: dict[str, str] = Field(
+            title="Output Column Mappings",
+            description="""
+For each output field in the Gooey.AI workflow, specify the column name that you'd like to use for it in the output data.
+            """,
+        )
 
     class ResponseModel(BaseModel):
         output_documents: list[str]
@@ -76,20 +85,6 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
             accept=(".csv", ".xlsx", ".xls", ".json", ".tsv", ".xml"),
         )
 
-        if files:
-            dfs = map_parallel(_read_df, files)
-            st.session_state[CACHED_COLUMNS] = list(
-                {
-                    col: None
-                    for df in dfs
-                    for col in df.columns
-                    if not col.startswith("Unnamed:")
-                }
-            )
-        else:
-            dfs = []
-            st.session_state.pop(CACHED_COLUMNS, None)
-
         required_input_fields = {}
         optional_input_fields = {}
         output_fields = {}
@@ -117,7 +112,7 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
                 else:
                     input_fields = optional_input_fields
                 field_props = schema["properties"][field]
-                title = field_props["title"]
+                title = field_props.get("title", field.replace("_", " ").capitalize())
                 keys = None
                 if is_arr(field_props):
                     try:
@@ -146,33 +141,14 @@ You can add multiple URLs runs from the same recipe (e.g. two versions of your c
                 for field, model_field in page_cls.ResponseModel.__fields__.items()
             }
 
-        columns = st.session_state.get(CACHED_COLUMNS, [])
-        if not columns:
-            return
-
         st.write(
             """
 ##### Input Data Preview
-Here's how we've parsed your data.          
+Here's what you uploaded:          
             """
         )
-
-        for df in dfs:
-            st.text_area(
-                "",
-                value=df.to_string(
-                    max_cols=10, max_rows=10, max_colwidth=40, show_dimensions=True
-                ),
-                label_visibility="collapsed",
-                disabled=True,
-                style={
-                    "white-space": "pre",
-                    "overflow": "scroll",
-                    "font-family": "monospace",
-                    "font-size": "0.9rem",
-                },
-                height=250,
-            )
+        for file in files:
+            st.data_table(file)
 
         if not (required_input_fields or optional_input_fields):
             return
@@ -186,45 +162,73 @@ To understand what each field represents, check out our [API docs](https://api.g
             """
         )
 
-        col1, col2 = st.columns(2)
+        visible_col1, visible_col2 = st.columns(2)
+        with st.expander("🤲 Show All Columns"):
+            hidden_col1, hidden_col2 = st.columns(2)
 
-        with col1:
+        with visible_col1:
+            st.write("##### Inputs")
+        with hidden_col1:
             st.write("##### Inputs")
 
-            input_columns_old = st.session_state.pop("input_columns", {})
-            input_columns_new = st.session_state.setdefault("input_columns", {})
+        input_columns_old = st.session_state.pop("input_columns", {})
+        input_columns_new = st.session_state.setdefault("input_columns", {})
 
-            column_options = [None, *columns]
-            for fields in (required_input_fields, optional_input_fields):
-                for field, title in fields.items():
+        column_options = [None, *get_columns(files)]
+        for fields, div in (
+            (required_input_fields, visible_col1),
+            (optional_input_fields, hidden_col1),
+        ):
+            for field, title in fields.items():
+                with div:
                     col = st.selectbox(
                         label="`" + title + "`",
                         options=column_options,
                         key="--input-mapping:" + field,
                         default_value=input_columns_old.get(field),
                     )
-                    if col:
-                        input_columns_new[field] = col
-                st.write("---")
+                if col:
+                    input_columns_new[field] = col
 
-        with col2:
+        with visible_col2:
+            st.write("##### Outputs")
+        with hidden_col2:
             st.write("##### Outputs")
 
-            output_columns_old = st.session_state.pop("output_columns", {})
-            output_columns_new = st.session_state.setdefault("output_columns", {})
+        # only show the first output field by default, and hide others
+        try:
+            first_out_field = next(
+                field for field in output_fields if "output" in field
+            )
+        except StopIteration:
+            first_out_field = next(iter(output_fields))
 
-            prev_fields = st.session_state.get("--prev-output-fields")
-            fields = {**output_fields, "error_msg": "Error Msg", "run_url": "Run URL"}
-            did_change = prev_fields is not None and prev_fields != fields
-            st.session_state["--prev-output-fields"] = fields
+        visible_out_fields = {
+            first_out_field: output_fields[first_out_field],
+            "run_url": "Run URL",
+        }
+        hidden_out_fields = {
+            "price": "Price",
+            "run_time": "Run Time",
+            "error_msg": "Error Msg",
+        } | {k: v for k, v in output_fields.items() if k not in visible_out_fields}
+
+        output_columns_old = st.session_state.pop("output_columns", {})
+        output_columns_new = st.session_state.setdefault("output_columns", {})
+
+        for fields, div, checked in (
+            (visible_out_fields, visible_col2, True),
+            (hidden_out_fields, hidden_col2, False),
+        ):
             for field, title in fields.items():
-                col = st.text_input(
-                    label="`" + title + "`",
-                    key="--output-mapping:" + field,
-                    value=output_columns_old.get(field, title if did_change else None),
-                )
+                with div:
+                    col = st.checkbox(
+                        label="`" + title + "`",
+                        key="--output-mapping:" + field,
+                        value=bool(output_columns_old.get(field, checked)),
+                    )
                 if col:
-                    output_columns_new[field] = col
+                    output_columns_new[field] = title
 
     def render_example(self, state: dict):
         render_documents(state)
@@ -279,8 +283,14 @@ To understand what each field represents, check out our [API docs](https://api.g
                     )
                     result.get(disable_sync_subtasks=False)
                     sr.refresh_from_db()
+
+                    run_time = datetime.timedelta(
+                        seconds=int(sr.run_time.total_seconds())
+                    )
                     state = sr.to_dict()
                     state["run_url"] = sr.get_app_url()
+                    state["price"] = sr.price
+                    state["run_time"] = str(run_time)
                     state["error_msg"] = sr.error_msg
 
                     for field, col in request.output_columns.items():
@@ -413,8 +423,8 @@ def slice_request_df(df, request):
         while df_ix + arr_len < len(df):
             if (
                 not arr_cols
-                or array_df.iloc[df_ix + arr_len].isnull().all()
-                or not non_array_df.iloc[df_ix + arr_len].isnull().all()
+                or not all(array_df.iloc[df_ix + arr_len])
+                or any(non_array_df.iloc[df_ix + arr_len])
             ):
                 break
             arr_len += 1
@@ -430,6 +440,19 @@ def is_arr(field_props: dict) -> bool:
             if props["type"] == "array":
                 return True
     return False
+
+
+@st.cache_in_session_state
+def get_columns(files: list[str]) -> list[str]:
+    dfs = map_parallel(_read_df, files)
+    return list(
+        {
+            col: None
+            for df in dfs
+            for col in df.columns
+            if not col.startswith("Unnamed:")
+        }
+    )
 
 
 def _read_df(f_url: str) -> "pd.DataFrame":

@@ -1,9 +1,13 @@
 from enum import Enum
 
-import gooey_ui as st
+import requests
 from google.cloud import texttospeech
 
+import gooey_ui as st
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.redis_cache import redis_cache_decorator
+
+SESSION_ELEVENLABS_API_KEY = "__user__elevenlabs_api_key"
 
 UBERDUCK_VOICES = {
     "Aiden Botha": "b01cf18d-0f10-46dd-adc6-562b599fdae4",
@@ -22,7 +26,7 @@ UBERDUCK_VOICES = {
 
 class TextToSpeechProviders(Enum):
     GOOGLE_TTS = "Google Cloud Text-to-Speech"
-    ELEVEN_LABS = "Eleven Labs (Premium)"
+    ELEVEN_LABS = "Eleven Labs"
     UBERDUCK = "uberduck.ai"
     BARK = "Bark (suno-ai)"
 
@@ -72,41 +76,42 @@ ELEVEN_LABS_VOICES = {
 
 # Mapping from Model ID -> Title in UI
 ELEVEN_LABS_MODELS = {
-    "eleven_multilingual_v2": "Multilingual V2",
-    "eleven_monolingual_v1": "English V1 - Low latency English TTS",
+    "eleven_multilingual_v2": "Multilingual V2 - High quality speech in 29 languages",
+    "eleven_turbo_v2": "English V2 - Very low latency text-to-speech",
+    "eleven_monolingual_v1": "English V1 - Low latency text-to-speech",
 }
 
 ELEVEN_LABS_SUPPORTED_LANGS = [
     "English",
-    "Chinese",
-    "Spanish",
-    "Hindi",
-    "Portuguese",
-    "French",
-    "German",
     "Japanese",
-    "Arabic",
+    "Chinese",
+    "German",
+    "Hindi",
+    "French",
     "Korean",
-    "Indonesian",
+    "Portuguese",
     "Italian",
+    "Spanish",
+    "Indonesian",
     "Dutch",
     "Turkish",
+    "Filipino",
     "Polish",
     "Swedish",
-    "Filipino",
-    "Malay",
-    "Romanian",
-    "Ukrainian",
-    "Greek",
-    "Czech",
-    "Danish",
-    "Finnish",
     "Bulgarian",
+    "Romanian",
+    "Arabic",
+    "Czech",
+    "Greek",
+    "Finnish",
     "Croatian",
+    "Malay",
     "Slovak",
+    "Danish",
     "Tamil",
+    "Ukrainian",
+    "Russian",
 ]
-
 
 BARK_SUPPORTED_LANGS = [
     ("English", "en"),
@@ -134,7 +139,7 @@ BARK_ALLOWED_PROMPTS = {
 }
 
 
-def text_to_speech_settings(page=None):
+def text_to_speech_settings(page):
     st.write(
         """
         ##### 🗣️ Voice Settings
@@ -180,7 +185,7 @@ def text_to_speech_settings(page=None):
             with col1:
                 st.slider(
                     """
-                    ###### Speaking rate 
+                    ###### Speaking rate
                     *`1.0` is the normal native speed of the speaker*
                     """,
                     min_value=0.3,
@@ -215,7 +220,7 @@ def text_to_speech_settings(page=None):
             with col1:
                 st.slider(
                     """
-                    ###### Speaking rate 
+                    ###### Speaking rate
                     *`1.0` is the normal native speed of the speaker*
                     """,
                     min_value=0.5,
@@ -226,25 +231,86 @@ def text_to_speech_settings(page=None):
 
         case TextToSpeechProviders.ELEVEN_LABS.name:
             with col2:
-                if not (
-                    page
-                    and (page.is_current_user_paying() or page.is_current_user_admin())
-                ):
-                    st.caption(
-                        """
-                        Note: Please purchase Gooey.AI credits to use ElevenLabs voices
-                        <a href="/account">here</a>.
-                        """
+                if not st.session_state.get("elevenlabs_api_key"):
+                    st.session_state["elevenlabs_api_key"] = page.request.session.get(
+                        SESSION_ELEVENLABS_API_KEY
                     )
 
-                st.selectbox(
-                    """
-                    ###### Voice name (ElevenLabs)
-                    """,
-                    key="elevenlabs_voice_name",
-                    format_func=str,
-                    options=ELEVEN_LABS_VOICES.keys(),
+                elevenlabs_use_custom_key = st.checkbox(
+                    "Use custom API key + Voice ID",
+                    value=bool(st.session_state.get("elevenlabs_api_key")),
                 )
+                if elevenlabs_use_custom_key:
+                    st.session_state["elevenlabs_voice_name"] = None
+                    elevenlabs_api_key = st.text_input(
+                        """
+                        ###### Your ElevenLabs API key
+                        *Read <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">this</a>
+                        to know how to obtain an API key from
+                        ElevenLabs.*
+                        """,
+                        key="elevenlabs_api_key",
+                    )
+
+                    selected_voice_id = st.session_state.get("elevenlabs_voice_id")
+                    elevenlabs_voices = (
+                        {selected_voice_id: selected_voice_id}
+                        if selected_voice_id
+                        else {}
+                    )
+
+                    if elevenlabs_api_key:
+                        try:
+                            elevenlabs_voices = fetch_elevenlabs_voices(
+                                elevenlabs_api_key
+                            )
+                        except requests.exceptions.HTTPError as e:
+                            st.error(
+                                f"Invalid ElevenLabs API key. Failed to fetch voices: {e}"
+                            )
+
+                    st.selectbox(
+                        """
+                        ###### Voice ID (ElevenLabs)
+                        """,
+                        key="elevenlabs_voice_id",
+                        options=elevenlabs_voices.keys(),
+                        format_func=elevenlabs_voices.__getitem__,
+                    )
+                else:
+                    st.session_state["elevenlabs_api_key"] = None
+                    st.session_state["elevenlabs_voice_id"] = None
+                    if not (
+                        page
+                        and (
+                            page.is_current_user_paying()
+                            or page.is_current_user_admin()
+                        )
+                    ):
+                        st.caption(
+                            """
+                            Note: Please purchase Gooey.AI credits to use ElevenLabs voices
+                            <a href="/account">here</a>.<br/>
+                            Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
+                            """
+                        )
+
+                    st.session_state.update(
+                        elevenlabs_api_key=None, elevenlabs_voice_id=None
+                    )
+                    st.selectbox(
+                        """
+                        ###### Voice Name (ElevenLabs)
+                        """,
+                        key="elevenlabs_voice_name",
+                        format_func=str,
+                        options=ELEVEN_LABS_VOICES.keys(),
+                    )
+
+                page.request.session[SESSION_ELEVENLABS_API_KEY] = st.session_state.get(
+                    "elevenlabs_api_key"
+                )
+
                 st.selectbox(
                     """
                     ###### Voice Model
@@ -293,8 +359,8 @@ def text_to_speech_settings(page=None):
                 )
 
 
-@st.cache_data()
-def google_tts_voices() -> dict[texttospeech.Voice, str]:
+@redis_cache_decorator
+def google_tts_voices() -> dict[str, str]:
     voices: list[texttospeech.Voice] = (
         texttospeech.TextToSpeechClient().list_voices().voices
     )
@@ -322,3 +388,28 @@ def _voice_sort_key(voice: texttospeech.Voice):
         # sort alphabetically
         voice.name,
     )
+
+
+_elevenlabs_category_order = {
+    "cloned": 1,
+    "generated": 2,
+    "premade": 3,
+}
+
+
+@st.cache_in_session_state
+def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
+    r = requests.get(
+        "https://api.elevenlabs.io/v1/voices",
+        headers={"Accept": "application/json", "xi-api-key": api_key},
+    )
+    r.raise_for_status()
+    print(r.json()["voices"])
+    sorted_voices = sorted(
+        r.json()["voices"],
+        key=lambda v: (_elevenlabs_category_order.get(v["category"], 0), v["name"]),
+    )
+    return {
+        v["voice_id"]: " - ".join([v["name"], *v["labels"].values()])
+        for v in sorted_voices
+    }

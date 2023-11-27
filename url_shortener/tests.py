@@ -44,7 +44,7 @@ def test_url_shortener_create_atomic(transactional_db):
 
 
 def test_url_shortener_clicks_decrement_atomic(transactional_db):
-    surl = ShortenedURL.objects.create(url=TEST_URL)
+    surl = ShortenedURL.objects.create(url=TEST_URL, enable_analytics=False)
     short_url = surl.shortened_url()
 
     def make_clicks(_):

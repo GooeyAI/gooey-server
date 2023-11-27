@@ -15,6 +15,7 @@ from daras_ai_v2.asr import (
     forced_asr_languages,
     asr_language_selector,
 )
+from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
@@ -39,6 +40,7 @@ class AsrPage(BasePage):
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
         google_translate_target: str | None
+        glossary_document: str | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
 
     class ResponseModel(BaseModel):
@@ -80,7 +82,7 @@ class AsrPage(BasePage):
     def render_form_v2(self):
         document_uploader(
             "##### Audio Files",
-            accept=(".wav", ".ogg", ".mp3", ".aac", ".opus", ".oga", ".mp4", ".webm"),
+            accept=("audio/*", "video/*", "application/octet-stream"),
         )
         col1, col2 = st.columns(2, responsive=False)
         with col1:
@@ -95,6 +97,7 @@ class AsrPage(BasePage):
 
     def render_settings(self):
         google_translate_language_selector()
+        glossary_input()
         st.write("---")
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
@@ -148,15 +151,14 @@ class AsrPage(BasePage):
                 source_language=forced_asr_languages.get(
                     selected_model, request.language
                 ),
+                glossary_url=request.glossary_document,
             )
         else:
             # Save the raw ASR text for details view
             state["output_text"] = asr_output
 
-    def additional_notes(self) -> str | None:
-        return """
-*Cost ≈ 1 credit for 12.5 words ≈ 0.08 credits per word*
-              """
+    def get_cost_note(self) -> str | None:
+        return "1 credit for 12.5 words ≈ 0.08 per word"
 
     def get_raw_price(self, state: dict):
         texts = state.get("output_text", [])

@@ -35,44 +35,47 @@ from recipes.asr import AsrPage
 from recipes.embeddings_page import EmbeddingsPage
 
 # note: the ordering here matters!
+all_home_pages_by_category = {
+    "Featured": [
+        VideoBotsPage,
+        DeforumSDPage,
+        QRCodeGeneratorPage,
+    ],
+    "Marketing & SEO": [
+        RelatedQnAPage,
+        SEOSummaryPage,
+        GoogleGPTPage,
+        SocialLookupEmailPage,
+    ],
+    "LLMs, RAG, & Synthetic Data": [
+        BulkRunnerPage,
+        DocExtractPage,
+        CompareLLMPage,
+        DocSearchPage,
+        SmartGPTPage,
+        DocSummaryPage,
+    ],
+    "Videos, Lipsync, & Speech": [
+        LipsyncPage,
+        LipsyncTTSPage,
+        TextToSpeechPage,
+        AsrPage,
+        Text2AudioPage,
+    ],
+    "Images": [
+        Img2ImgPage,
+        CompareText2ImgPage,
+        ObjectInpaintingPage,
+        FaceInpaintingPage,
+        EmailFaceInpaintingPage,
+        GoogleImageGenPage,
+        ImageSegmentationPage,
+        CompareUpscalerPage,
+    ],
+}
+
 all_home_pages = [
-    # top ones
-    VideoBotsPage,
-    DeforumSDPage,
-    QRCodeGeneratorPage,
-    # SEO tools
-    GoogleGPTPage,
-    SEOSummaryPage,
-    RelatedQnAPage,
-    # Image Tools
-    ObjectInpaintingPage,
-    CompareText2ImgPage,
-    Img2ImgPage,
-    # More Image
-    FaceInpaintingPage,
-    EmailFaceInpaintingPage,
-    GoogleImageGenPage,
-    # LipSync fun
-    TextToSpeechPage,
-    LipsyncPage,
-    LipsyncTTSPage,
-    # Text
-    CompareLLMPage,
-    DocSearchPage,
-    SmartGPTPage,
-    # Speech & Music
-    AsrPage,
-    # VideoPlayList,
-    Text2AudioPage,
-    # Other
-    DocSummaryPage,
-    RelatedQnADocPage,
-    SocialLookupEmailPage,
-    # More
-    ImageSegmentationPage,
-    CompareUpscalerPage,
-    DocExtractPage,
-    BulkRunnerPage,
+    page for page_group in all_home_pages_by_category.values() for page in page_group
 ]
 
 # exposed as API
@@ -80,6 +83,7 @@ all_api_pages = all_home_pages.copy() + [
     ChyronPlantPage,
     LetterWriterPage,
     EmbeddingsPage,
+    RelatedQnADocPage,
 ]
 
 # pytest suite

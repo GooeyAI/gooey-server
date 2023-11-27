@@ -229,11 +229,11 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
             """
             )
 
+    def get_cost_note(self) -> str | None:
+        return f"{CREDITS_PER_FRAME} / frame"
+
     def additional_notes(self) -> str | None:
-        return f"""
-*Cost ≈ {CREDITS_PER_FRAME} credits per frame* \\
-*Process Run Time ≈ 5 seconds per frame*
-        """
+        return "Render Time ≈ 3s / frame"
 
     def get_raw_price(self, state: dict) -> float:
         max_frames = state.get("max_frames", 100) or 0
@@ -415,13 +415,13 @@ Choose fps for the video.
         output_video = st.session_state.get("output_video")
         if output_video:
             st.write("Output Video")
-            st.video(output_video)
+            st.video(output_video, autoplay=True)
 
     def render_example(self, state: dict):
         display = self.preview_input(state)
         st.markdown("```lua\n" + display + "\n```")
 
-        st.video(state.get("output_video"))
+        st.video(state.get("output_video"), autoplay=True)
 
     def preview_input(self, state: dict) -> str:
         input_prompt = state.get("input_prompt")
@@ -430,7 +430,7 @@ Choose fps for the video.
         else:
             animation_prompts = state.get("animation_prompts", [])
         display = "\n\n".join(
-            [f"[{fp['frame']}] {fp['prompt']}" for fp in animation_prompts]
+            [f"{fp['prompt']} [{fp['frame']}]" for fp in animation_prompts]
         )
         return display
 

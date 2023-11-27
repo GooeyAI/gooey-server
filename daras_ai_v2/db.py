@@ -1,5 +1,3 @@
-from google.cloud import firestore
-
 FIREBASE_SESSION_COOKIE = "firebase_session"
 ANONYMOUS_USER_COOKIE = "anonymous_user"
 
@@ -14,13 +12,15 @@ _client = None
 
 
 def get_client():
+    from google.cloud import firestore
+
     global _client
     if _client is None:
         _client = firestore.Client()
     return _client
 
 
-def get_doc_field(doc_ref: firestore.DocumentReference, field: str, default=None):
+def get_doc_field(doc_ref: "firestore.DocumentReference", field: str, default=None):
     snapshot = doc_ref.get([field])
     if not snapshot.exists:
         return default
@@ -30,13 +30,13 @@ def get_doc_field(doc_ref: firestore.DocumentReference, field: str, default=None
         return default
 
 
-def get_user_doc_ref(uid: str) -> firestore.DocumentReference:
+def get_user_doc_ref(uid: str) -> "firestore.DocumentReference":
     return get_doc_ref(collection_id=USERS_COLLECTION, document_id=uid)
 
 
 def get_or_create_doc(
-    doc_ref: firestore.DocumentReference,
-) -> firestore.DocumentSnapshot:
+    doc_ref: "firestore.DocumentReference",
+) -> "firestore.DocumentSnapshot":
     doc = doc_ref.get()
     if not doc.exists:
         doc_ref.create({})
@@ -50,7 +50,7 @@ def get_doc_ref(
     collection_id=DEFAULT_COLLECTION,
     sub_collection_id: str = None,
     sub_document_id: str = None,
-) -> firestore.DocumentReference:
+) -> "firestore.DocumentReference":
     db_collection = get_client().collection(collection_id)
     doc_ref = db_collection.document(document_id)
     if sub_collection_id:

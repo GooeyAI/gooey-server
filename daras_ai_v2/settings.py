@@ -52,7 +52,9 @@ INSTALLED_APPS = [
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
     "app_users",
+    "files",
     "url_shortener",
+    "glossary_resources",
 ]
 
 MIDDLEWARE = [
@@ -210,8 +212,12 @@ if not firebase_admin._apps:
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
+GCP_PROJECT = config("GCP_PROJECT", default="dara-c1b52")
+GCP_REGION = config("GCP_REGION", default="us-central1")
+
 GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
-# GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID")
+GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
+
 UBERDUCK_KEY = config("UBERDUCK_KEY", None)
 UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 
@@ -255,6 +261,7 @@ DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
 
 SEON_API_KEY = config("SEON_API_KEY", None)
+APOLLO_API_KEY = config("APOLLO_API_KEY", None)
 
 FB_APP_ID = config("FB_APP_ID", "")
 FB_APP_SECRET = config("FB_APP_SECRET", "")
@@ -285,6 +292,12 @@ AZURE_FORM_RECOGNIZER_KEY = config("AZURE_FORM_RECOGNIZER_KEY", "")
 
 AZURE_IMAGE_MODERATION_ENDPOINT = config("AZURE_IMAGE_MODERATION_ENDPOINT", "")
 AZURE_IMAGE_MODERATION_KEY = config("AZURE_IMAGE_MODERATION_KEY", "")
+
+AZURE_SPEECH_ENDPOINT = config("AZURE_SPEECH_ENDPOINT", "")
+AZURE_SPEECH_KEY = config("AZURE_SPEECH_KEY", "")
+
+AZURE_OPENAI_ENDPOINT = config("AZURE_OPENAI_ENDPOINT", "")
+AZURE_OPENAI_KEY = config("AZURE_OPENAI_KEY", "")
 
 DEEPGRAM_API_KEY = config("DEEPGRAM_API_KEY", "")
 

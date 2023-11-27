@@ -17,10 +17,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "phone_number",
         "balance",
         "is_paying",
-        "is_anonymous",
-        "is_disabled",
         "created_at",
-        "upgraded_from_anonymous_at",
     ]
     search_fields = [
         "uid",
@@ -39,10 +36,20 @@ class AppUserAdmin(admin.ModelAdmin):
     readonly_fields = [
         "created_at",
         "upgraded_from_anonymous_at",
+        "user_runs",
         "view_transactions",
         "open_in_firebase",
         "open_in_stripe",
     ]
+
+    @admin.display(description="User Runs")
+    def user_runs(self, user: models.AppUser):
+        return list_related_html_url(
+            SavedRun.objects.filter(uid=user.uid),
+            query_param="uid",
+            instance_id=user.uid,
+            show_add=False,
+        )
 
     def open_in_firebase(self, user: models.AppUser):
         path = f"users/{user.uid}"
