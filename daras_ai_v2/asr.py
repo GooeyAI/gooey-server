@@ -164,9 +164,9 @@ def asr_language_selector(
         st.session_state[key] = forced_lang
         return forced_lang
 
-    options = ([] if selected_model in does_not_support_auto_detect else [None]) + [
-        *asr_supported_languages.get(selected_model, [])
-    ]
+    options = list(asr_supported_languages.get(selected_model, []))
+    if selected_model not in does_not_support_auto_detect:
+        options.insert(0, None)
 
     # handle non-canonical language codes
     old_val = st.session_state.get(key)
