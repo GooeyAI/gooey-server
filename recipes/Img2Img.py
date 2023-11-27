@@ -171,7 +171,7 @@ class Img2ImgPage(BasePage):
                 selected_controlnet_model=request.selected_controlnet_model,
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
-                init_image=init_image,
+                init_images=init_image,
                 num_inference_steps=request.quality,
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
