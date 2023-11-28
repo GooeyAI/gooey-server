@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
@@ -25,6 +27,20 @@ CHATML_ROLE_ASSISSTANT = "assistant"
 
 
 EPOCH = datetime.datetime.utcfromtimestamp(0)
+
+
+class PublishedRunVisibility(models.IntegerChoices):
+    UNLISTED = 1
+    PUBLIC = 2
+
+    def help_text(self):
+        match self:
+            case PublishedRunVisibility.UNLISTED:
+                return "Only me + people with a link"
+            case PublishedRunVisibility.PUBLIC:
+                return "Public"
+            case _:
+                return self.label
 
 
 class Platform(models.IntegerChoices):
@@ -130,6 +146,13 @@ class SavedRun(models.Model):
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
 
+    created_by = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="examples_created",
+    )
+
     state = models.JSONField(default=dict, blank=True, encoder=PostgresJSONEncoder)
 
     error_msg = models.TextField(default="", blank=True)
@@ -140,6 +163,11 @@ class SavedRun(models.Model):
 
     hidden = models.BooleanField(default=False)
     is_flagged = models.BooleanField(default=False)
+    visibility = models.IntegerField(
+        choices=PublishedRunVisibility.choices,
+        default=PublishedRunVisibility.UNLISTED,
+    )
+    is_approved_example = models.BooleanField(default=False)
 
     price = models.IntegerField(default=0)
     transaction = models.ForeignKey(
@@ -264,6 +292,14 @@ class SavedRun(models.Model):
                 ),
             )
         return result, page.run_doc_sr(run_id, uid)
+
+    def get_creator(self) -> AppUser | None:
+        if self.created_by:
+            return self.created_by
+        elif self.uid:
+            return AppUser.objects.filter(uid=self.uid).first()
+        else:
+            return None
 
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):

@@ -25,7 +25,7 @@ from starlette.requests import Request
 
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
-from bots.models import SavedRun, Workflow
+from bots.models import SavedRun, PublishedRunVisibility, Workflow
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -56,6 +56,7 @@ from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
 from gooey_ui import realtime_clear_subs
 from gooey_ui.pubsub import realtime_pull
+from gooey_ui.components.modal import Modal
 
 DEFAULT_META_IMG = (
     # Small
@@ -181,7 +182,7 @@ class BasePage:
                 self._render_page_title_with_breadcrumbs(example_id, run_id, uid)
                 st.write(st.session_state.get(StateKeys.page_notes))
             with st.div():
-                self._render_save_menu()
+                self._render_publish_menu()
 
         try:
             selected_tab = MenuTabs.paths_reverse[self.tab]
@@ -201,47 +202,81 @@ class BasePage:
         with st.nav_tab_content():
             self.render_selected_tab(selected_tab)
 
-    def _render_save_menu(self):
-        if not self.is_current_user_owner():
+    def _render_publish_menu(self):
+        if not self.request or not self.request.user:
             return
 
-        with st.div(className="d-flex justify-content-end"):
-            save_button_space, cancel_button_space = st.tag("span"), st.tag("span")
-            with save_button_space:
-                save_button = st.button("💾 Save", className="mb-0")
-            with cancel_button_space:
-                cancel_button = st.button("❌ Cancel", className="mb-0")
-            if save_button or cancel_button:
-                st.session_state["__save_mode"] = not st.session_state.get(
-                    "__save_mode", False
-                )
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        current_run = self.get_sr_from_query_params(example_id, run_id, uid)
 
-        is_save_mode = st.session_state.get("__save_mode")
-        if not is_save_mode:
-            cancel_button_space.empty()
-        else:
-            save_button_space.empty()
+        if current_run.get_creator() != self.request.user:
+            return
+
+        published_run = self.example_doc_sr(example_id) if example_id else None
+        is_update_mode = bool(
+            published_run
+            and (
+                published_run.get_creator() == self.request.user
+                or self.is_current_user_admin()
+            )
+        )
+
+        with st.div():
             with st.div(className="d-flex justify-content-end"):
+                # if published_run and is_update_mode and current_run != published_run:
+                #     st.caption("Unpublished changes")
                 st.html(
                     """
                 <style>
-                    .save-button-menu {
-                        position: absolute;
-                        z-index: 1;
-                        min-width: min(500px, 80vw);
-                    }
-                    .save-button-menu .gui-input { margin-bottom: 0; }
                     .save-button-menu .gui-input label p { color: black; }
+                    .visibility-radio .gui-input {
+                        margin-bottom: 0;
+                    }
+                    .published-options-menu {
+                        z-index: 1;
+                    }
                 </style>
                 """
                 )
-                with st.div(className="bg-light border p-4 save-button-menu"):
-                    st.radio(
+
+                save_text = "📝 Update" if is_update_mode else "💾 Save"
+                save_button = st.button(
+                    save_text,
+                    className="mb-0",
+                    type="primary",
+                )
+                publish_modal = Modal("", key="publish-modal")
+                if save_button:
+                    publish_modal.open()
+
+                published_run_options_button = (
+                    st.button("⋮", className="mb-0", type="secondary")
+                    if is_update_mode
+                    else None
+                )
+                if published_run_options_button:
+                    st.session_state[
+                        "__published_run_options"
+                    ] = not st.session_state.get(
+                        "__published_run_options",
+                        False,
+                    )
+
+            show_published_run_options = st.session_state.get("__published_run_options")
+            if show_published_run_options:
+                # with st.div(className="d-flex justify-content-end"):
+                with st.div(
+                    className="bg-white border p-4 published-options-menu w-100"
+                ):
+                    st.button("Delete")
+
+        if publish_modal.is_open():
+            with publish_modal.container(style={"min-width": "min(500px, 100vw)"}):
+                with st.div(className="visibility-radio"):
+                    published_run_visibility = st.radio(
                         "Publish to",
-                        options=[
-                            "Only me + people with a link",
-                            "Public",
-                        ],
+                        options=PublishedRunVisibility.values,
+                        format_func=lambda x: PublishedRunVisibility(x).help_text(),
                     )
                     st.radio(
                         "",
@@ -251,15 +286,51 @@ class BasePage:
                         disabled=True,
                         checked_by_default=False,
                     )
-                    with st.div(className="mt-4"):
-                        st.text_input(
-                            "Title",
-                            key="published_run_title",
-                            value=st.session_state[StateKeys.page_title],
-                        )
 
-                    with st.div(className="mt-4 d-flex justify-content-center"):
-                        publish_button = st.button("🌻 Publish")
+                with st.div(className="mt-4"):
+                    recipe_title = (
+                        self.recipe_doc_sr().to_dict().get(StateKeys.page_title)
+                        or self.title
+                    )
+                    default_title = (
+                        published_run.page_title
+                        if is_update_mode
+                        else st.session_state[StateKeys.page_title]
+                    )
+                    if default_title == recipe_title:
+                        default_title = ""
+                    published_run_title = st.text_input(
+                        "Title",
+                        key="published_run_title",
+                        value=default_title,
+                    )
+                    published_run_notes = st.text_area(
+                        "Notes",
+                        value=published_run.page_notes
+                        if is_update_mode
+                        else st.session_state[StateKeys.page_notes].strip(),
+                    )
+
+                with st.div(className="mt-4 d-flex justify-content-center"):
+                    publish_button = st.button("🌻 Publish", type="primary")
+
+            if publish_button:
+                doc = current_run.to_dict()
+                doc[StateKeys.page_title] = published_run_title
+                doc[StateKeys.page_notes] = published_run_notes
+                if not is_update_mode:
+                    published_run = self.example_doc_sr(
+                        get_random_doc_id(), create=True
+                    )
+                    published_run.created_by = self.request.user
+                published_run.set(doc)
+                if current_run != published_run:
+                    published_run.parent = current_run
+                published_run.visibility = published_run_visibility
+                published_run.save()
+                raise QueryParamsRedirectException(
+                    query_params=dict(example_id=published_run.example_id),
+                )
 
     def _render_page_title_with_breadcrumbs(
         self, example_id: str, run_id: str, uid: str
@@ -1014,6 +1085,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         example_runs = SavedRun.objects.filter(
             workflow=self.workflow,
             hidden=False,
+            is_approved_example=True,
+            visibility=PublishedRunVisibility.PUBLIC,
             example_id__isnull=False,
         )[:50]
 
