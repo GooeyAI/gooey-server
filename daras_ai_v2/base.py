@@ -705,7 +705,7 @@ class BasePage:
             if isinstance(created_at, datetime.datetime):
                 start_time = created_at
             else:
-                start_time = datetime.fromisoformat(created_at)
+                start_time = datetime.datetime.fromisoformat(created_at)
             with st.countdown_timer(
                 end_time=start_time + datetime.timedelta(seconds=estimated_run_time),
                 delay_text="Sorry for the wait. Your run is taking longer than we expected.",
