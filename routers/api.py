@@ -110,7 +110,13 @@ class BotBroadcastRequestModel(BaseModel):
 registered_broadcasts: dict[str, typing.Type[BotInterface]] = {}
 
 
-def bot_integration_to_api(BotInterface: typing.Type[BotInterface]):
+def bot_integration_to_api(
+    BotInterface: typing.Type[BotInterface],
+    responseModel: typing.Type[BotBroadcastRequestModel] = BotBroadcastRequestModel,
+    getConvoFilterKwargs: typing.Callable[
+        [BotBroadcastRequestModel], dict
+    ] = lambda x: {},
+):
     platform = BotInterface.platform.name.lower()
     endpoint = f"/v2/bot/broadcast/{platform}"
     registered_broadcasts[platform] = BotInterface
@@ -126,18 +132,20 @@ def bot_integration_to_api(BotInterface: typing.Type[BotInterface]):
     )
     def run_api_json(
         request: Request,
-        bot_request: BotBroadcastRequestModel,
+        bot_request: responseModel,
         user: AppUser = Depends(api_auth_header),
     ):
         bi = BotIntegration.objects.get(
             id=bot_request.bot_id, billing_account_uid=user.uid
         )
+        convo_filter_kwargs = getConvoFilterKwargs(bot_request)
         return BotInterface.broadcast(
             bi=bi,
             text=bot_request.message,
             audio=bot_request.audio_url,
             video=bot_request.video_url,
             buttons=bot_request.buttons,
+            convo_filter_kwargs=convo_filter_kwargs,
         )
 
 

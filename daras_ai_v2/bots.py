@@ -68,6 +68,7 @@ class BotInterface:
         audio: str | None = None,
         video: str | None = None,
         buttons: list | None = None,
+        convo_filter_kwargs: dict | None = None,
     ):
         raise NotImplementedError
 

@@ -106,12 +106,15 @@ class WhatsappBot(BotInterface):
         audio: str | None = None,
         video: str | None = None,
         buttons: list | None = None,
+        convo_filter_kwargs: dict | None = None,
     ):
         from daras_ai_v2.bots import save_broadcast_message
         from threading import Thread
 
         ids = []
-        convos = Conversation.objects.filter(bot_integration=bi)
+        convos = Conversation.objects.filter(
+            bot_integration=bi, **(convo_filter_kwargs or {})
+        )
         for convo in convos:
             id = send_wa_msg(
                 bot_number=bi.wa_phone_number_id,
