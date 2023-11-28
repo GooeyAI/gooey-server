@@ -417,10 +417,17 @@ def button(
     key: str = None,
     help: str = None,
     *,
-    type: typing.Literal["primary", "secondary"] = "secondary",
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
     disabled: bool = False,
     **props,
 ) -> bool:
+    """
+    Example:
+        st.button("Primary", key="test0", type="primary")
+        st.button("Secondary", key="test1")
+        st.button("Tertiary", key="test3", type="tertiary")
+        st.button("Link Button", key="test3", type="link")
+    """
     if not key:
         key = md5_values("button", label, help, type, props)
     state.RenderTreeNode(
@@ -432,6 +439,7 @@ def button(
             label=dedent(label),
             help=help,
             disabled=disabled,
+            className="btn-" + type,
             **props,
         ),
     ).mount()
@@ -631,6 +639,33 @@ def text_input(
     return value or ""
 
 
+def password_input(
+    label: str,
+    value: str = "",
+    max_chars: str = None,
+    key: str = None,
+    help: str = None,
+    *,
+    placeholder: str = None,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    **props,
+) -> str:
+    value = _input_widget(
+        input_type="password",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        maxLength=max_chars,
+        placeholder=placeholder,
+        **props,
+    )
+    return value or ""
+
+
 def slider(
     label: str,
     min_value: float = None,
@@ -748,6 +783,22 @@ def _input_widget(
         },
     ).mount()
     return value
+
+
+def breadcrumbs(divider: str = "/", **props) -> state.NestingCtx:
+    style = props.pop("style", {}) | {"--bs-breadcrumb-divider": f"'{divider}'"}
+    with tag("nav", style=style, **props):
+        return tag("ol", className="breadcrumb mb-0")
+
+
+def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
+    className = "breadcrumb-item lead " + props.pop("className", "")
+    with tag("li", className=className, **props):
+        if link_to:
+            with tag("a", href=link_to):
+                html(inner_html)
+        else:
+            html(inner_html)
 
 
 def dedent(text: str | None) -> str | None:

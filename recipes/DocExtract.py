@@ -4,8 +4,10 @@ import threading
 import typing
 
 import requests
+from aifail import retry_if
 from django.db.models import IntegerChoices
 from furl import furl
+from googleapiclient.errors import HttpError
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -20,7 +22,6 @@ from daras_ai_v2.asr import (
     run_google_translate,
     audio_url_to_wav,
 )
-from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.azure_doc_extract import azure_doc_extract_pages
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
@@ -31,6 +32,7 @@ from daras_ai_v2.functional import (
     flatapply_parallel,
 )
 from daras_ai_v2.gdrive_downloader import is_gdrive_url, gdrive_download
+from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -431,6 +433,13 @@ def process_source(
         update_cell(spreadsheet_id, row, Columns.summary.value, summary)
 
 
+def google_api_should_retry(e: Exception) -> bool:
+    return isinstance(e, HttpError) and (
+        e.resp.status in (408, 429) or e.resp.status > 500
+    )
+
+
+@retry_if(google_api_should_retry)
 def update_cell(spreadsheet_id: str, row: int, col: int, value: str):
     get_spreadsheet_service().values().update(
         spreadsheetId=spreadsheet_id,

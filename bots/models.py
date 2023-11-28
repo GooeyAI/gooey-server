@@ -170,6 +170,8 @@ class SavedRun(models.Model):
             ),
         ]
         indexes = [
+            models.Index(fields=["-created_at"]),
+            models.Index(fields=["-updated_at"]),
             models.Index(fields=["workflow"]),
             models.Index(fields=["workflow", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "run_id", "uid"]),

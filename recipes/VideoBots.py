@@ -205,6 +205,8 @@ class VideoBotsPage(BasePage):
         google_pitch: float | None
         bark_history_prompt: str | None
         elevenlabs_voice_name: str | None
+        elevenlabs_api_key: str | None
+        elevenlabs_voice_id: str | None
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
@@ -380,13 +382,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             """
             ##### 🔠 User Language
             If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
-            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            """,
+            """,
             key="user_language",
         )
         st.markdown(
             """
             ###### 📖 Customize with Glossary
             Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            
             """
         )
         glossary_input(
@@ -430,7 +433,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             lipsync_settings()
 
     def fields_to_save(self) -> [str]:
-        return super().fields_to_save() + ["landbot_url"]
+        fields = super().fields_to_save() + ["landbot_url"]
+        if "elevenlabs_api_key" in fields:
+            fields.remove("elevenlabs_api_key")
+        return fields
 
     def render_example(self, state: dict):
         input_prompt = state.get("input_prompt")
@@ -607,7 +613,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             case TextToSpeechProviders.ELEVEN_LABS.name:
                 return f"""
                     - *Base cost = {super().get_raw_price(st.session_state)} credits*
-                    - *Additional Eleven Labs cost ≈ 4 credits per 10 words of the output*
+                    - *Additional {TextToSpeechPage().additional_notes()}*
                 """
             case _:
                 return ""
