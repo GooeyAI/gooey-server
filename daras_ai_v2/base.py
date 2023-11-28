@@ -14,6 +14,7 @@ import math
 import requests
 import sentry_sdk
 from django.utils import timezone
+from enum import Enum
 from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
@@ -68,6 +69,13 @@ gooey_rng = Random()
 
 
 SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
+
+
+class RecipeRunState(Enum):
+	idle = 1
+	running = 2
+	completed = 3
+	failed = 4
 
 
 class StateKeys:
@@ -642,16 +650,16 @@ class BasePage:
 
     def get_run_state(
         self,
-    ) -> typing.Literal["success", "error", "waiting", "recipe_root"]:
+    ) -> RecipeRunState:
         if st.session_state.get(StateKeys.run_status):
-            return "waiting"
+            return RecipeRunState.running
         elif st.session_state.get(StateKeys.error_msg):
-            return "error"
+            return RecipeRunState.failed
         elif st.session_state.get(StateKeys.run_time):
-            return "success"
+            return RecipeRunState.completed
         else:
             # when user is at a recipe root, and not running anything
-            return "recipe_root"
+            return RecipeRunState.idle
 
     def _render_output_col(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
@@ -668,13 +676,13 @@ class BasePage:
 
         run_state = self.get_run_state()
         match run_state:
-            case "success":
-                self._render_success_output()
-            case "error":
-                self._render_error_output()
-            case "waiting":
-                self._render_waiting_output()
-            case "recipe_root":
+            case RecipeRunState.completed:
+                self._render_completed_output()
+            case RecipeRunState.failed:
+                self._render_failed_output()
+            case RecipeRunState.running:
+                self._render_running_output()
+            case RecipeRunState.idle:
                 pass
 
         # render outputs
@@ -683,15 +691,15 @@ class BasePage:
         if run_state != "waiting":
             self._render_after_output()
 
-    def _render_success_output(self):
+    def _render_completed_output(self):
         run_time = st.session_state.get(StateKeys.run_time, 0)
         st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
 
-    def _render_error_output(self):
+    def _render_failed_output(self):
         err_msg = st.session_state.get(StateKeys.error_msg)
         st.error(err_msg)
 
-    def _render_waiting_output(self):
+    def _render_running_output(self):
         run_status = st.session_state.get(StateKeys.run_status)
         st.caption("Your changes are saved in the above URL. Save it for later!")
         html_spinner(run_status)
