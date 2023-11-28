@@ -2,6 +2,7 @@ import base64
 import math
 import textwrap
 import typing
+from dataclasses import asdict, dataclass
 
 import numpy as np
 
@@ -395,6 +396,50 @@ def selectbox(
                 {"value": option, "label": str(format_func(option))}
                 for option in options
             ],
+        ),
+    ).mount()
+    return value
+
+
+@dataclass
+class Option:
+    label: str
+    value: typing.Any = None
+    isDisabled: bool = False
+
+    def __post_init__(self):
+        if self.value is None:
+            self.value = self.label
+
+
+def rich_selectbox(
+    label: str,
+    options: typing.Sequence[Option],
+    key: str | None = None,
+    help: str | None = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    default_value: T | None = None,
+) -> T | None:
+    if label_visibility != "visible":
+        label = None
+    options = list(options)
+    if not key:
+        key = md5_values("rich_select", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if key not in state.session_state or value not in options:
+        value = default_value or options[0]
+    state.session_state.setdefault(key, value)
+    state.RenderTreeNode(
+        name="select",
+        props=dict(
+            name=key,
+            label=dedent(label),
+            help=help,
+            isDisabled=disabled,
+            defaultValue=value,
+            options=[asdict(option) for option in options],
         ),
     ).mount()
     return value
