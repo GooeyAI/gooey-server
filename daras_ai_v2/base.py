@@ -706,9 +706,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
         return submitted
 
-    def get_run_state(
-        self,
-    ) -> RecipeRunState:
+    def get_run_state(self) -> RecipeRunState:
         if st.session_state.get(StateKeys.run_status):
             return RecipeRunState.running
         elif st.session_state.get(StateKeys.error_msg):
