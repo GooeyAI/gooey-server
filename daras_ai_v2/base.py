@@ -239,6 +239,16 @@ class BasePage:
                 """
                 )
 
+                published_run_options_button = (
+                    st.button("⋮", className="mb-0", type="secondary")
+                    if is_update_mode
+                    else None
+                )
+                if published_run_options_button:
+                    st.session_state[
+                        "__published_run_options"
+                    ] = not st.session_state.get("__published_run_options", False)
+
                 save_text = "📝 Update" if is_update_mode else "💾 Save"
                 save_button = st.button(
                     save_text,
@@ -248,19 +258,6 @@ class BasePage:
                 publish_modal = Modal("", key="publish-modal")
                 if save_button:
                     publish_modal.open()
-
-                published_run_options_button = (
-                    st.button("⋮", className="mb-0", type="secondary")
-                    if is_update_mode
-                    else None
-                )
-                if published_run_options_button:
-                    st.session_state[
-                        "__published_run_options"
-                    ] = not st.session_state.get(
-                        "__published_run_options",
-                        False,
-                    )
 
             show_published_run_options = st.session_state.get("__published_run_options")
             if show_published_run_options:
@@ -290,7 +287,7 @@ class BasePage:
                     st.radio(
                         "",
                         options=[
-                            "Anyone at my org (coming soon)",
+                            '<span class="text-muted">Anyone at my org (coming soon)</span>',
                         ],
                         disabled=True,
                         checked_by_default=False,
