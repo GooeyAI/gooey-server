@@ -459,6 +459,10 @@ class BasePage:
             raise HTTPException(status_code=404)
 
     @classmethod
+    def get_total_runs(cls) -> int:
+        return SavedRun.objects.filter(workflow=cls.workflow).count()
+
+    @classmethod
     def recipe_doc_sr(cls) -> SavedRun:
         return SavedRun.objects.get_or_create(
             workflow=cls.workflow,
