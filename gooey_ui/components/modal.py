@@ -57,7 +57,7 @@ class Modal:
         }}
         .modal-container {{
             overflow-y: scroll;
-            padding: 3rem;
+            padding: 1.5rem;
             margin: auto;
             background: white;
             z-index: 3000;
@@ -74,10 +74,11 @@ class Modal:
 
         with container:
             with st.div(className="d-flex justify-content-between align-items-center"):
-                st.markdown(f"## {self.title or ''}")
+                st.markdown(f"### {self.title or ''}")
 
                 close_ = st.button(
                     "&#10006;",
+                    type="tertiary",
                     key=f"{self.key}-close",
                     style={"padding": "0.375rem 0.75rem"},
                 )
