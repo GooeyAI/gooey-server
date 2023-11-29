@@ -273,8 +273,10 @@ class BasePage:
         if publish_modal.is_open():
             with publish_modal.container(style={"min-width": "min(500px, 100vw)"}):
                 with st.div(className="visibility-radio"):
+                    st.write("### Publish to")
                     published_run_visibility = st.radio(
-                        "Publish to",
+                        "",
+                        key="published_run_visibility",
                         options=PublishedRunVisibility.values,
                         format_func=lambda x: PublishedRunVisibility(x).help_text(),
                     )
@@ -295,10 +297,8 @@ class BasePage:
                     default_title = (
                         published_run.page_title
                         if is_update_mode
-                        else st.session_state[StateKeys.page_title]
+                        else f"{self.request.user.display_name}'s {recipe_title}"
                     )
-                    if default_title == recipe_title:
-                        default_title = ""
                     published_run_title = st.text_input(
                         "Title",
                         key="published_run_title",
