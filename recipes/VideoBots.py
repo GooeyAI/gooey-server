@@ -432,15 +432,16 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
     def on_send(self, new_input: str, new_input_images: list[str]):
         prev_input = st.session_state.get("raw_input_text") or ""
+        prev_input_images = st.session_state.pop("input_images", None)
         prev_output = (st.session_state.get("raw_output_text") or [""])[0]
 
-        if prev_input and prev_output:
+        if (prev_input or prev_input_images) and prev_output:
             # append previous input to the history
             st.session_state["messsages"] = st.session_state.get("messages", []) + [
                 format_chat_entry(
                     role=CHATML_ROLE_USER,
                     content=prev_input,
-                    images=(st.session_state.pop("input_images", None)),
+                    images=prev_input_images,
                 ),
                 format_chat_entry(
                     role=CHATML_ROLE_ASSISTANT,
