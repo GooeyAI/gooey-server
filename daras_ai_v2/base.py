@@ -274,6 +274,13 @@ class BasePage:
             with publish_modal.container(style={"min-width": "min(500px, 100vw)"}):
                 with st.div(className="visibility-radio"):
                     st.write("### Publish to")
+                    convert_state_type(
+                        st.session_state, "published_run_visibility", int
+                    )
+                    if is_update_mode:
+                        st.session_state.setdefault(
+                            "published_run_visibility", published_run.visibility
+                        )
                     published_run_visibility = st.radio(
                         "",
                         key="published_run_visibility",
@@ -1415,3 +1422,8 @@ class QueryParamsRedirectException(RedirectException):
         query_params = {k: v for k, v in query_params.items() if v is not None}
         url = "?" + urllib.parse.urlencode(query_params)
         super().__init__(url, status_code)
+
+
+def convert_state_type(state, key, fn):
+    if key in state:
+        state[key] = fn(state[key])
