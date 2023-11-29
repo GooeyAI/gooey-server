@@ -21,6 +21,7 @@ from bots.models import (
     Feedback,
     Conversation,
     BotIntegration,
+    MessageAttachment,
 )
 from app_users.models import AppUser
 from bots.tasks import create_personal_channels_for_all_members
@@ -360,6 +361,12 @@ class FeedbackInline(admin.TabularInline):
     readonly_fields = ["created_at"]
 
 
+class MessageAttachmentInline(admin.TabularInline):
+    model = MessageAttachment
+    extra = 0
+    readonly_fields = ["url", "metadata", "created_at"]
+
+
 class AnalysisResultFilter(admin.SimpleListFilter):
     title = "analysis_result"
     parameter_name = "analysis_result"
@@ -419,7 +426,7 @@ class MessageAdmin(admin.ModelAdmin):
     ordering = ["created_at"]
     actions = [export_to_csv, export_to_excel]
 
-    inlines = [FeedbackInline]
+    inlines = [MessageAttachmentInline, FeedbackInline]
 
     formfield_overrides = {
         django.db.models.JSONField: {"widget": JSONEditorWidget},

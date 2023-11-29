@@ -3,6 +3,7 @@ import traceback
 import typing
 from urllib.parse import parse_qs
 
+from django.db import transaction
 from fastapi import HTTPException, Request
 from furl import furl
 from sentry_sdk import capture_exception
@@ -17,10 +18,12 @@ from bots.models import (
     SavedRun,
     ConvoState,
     Workflow,
+    MessageAttachment,
 )
 from daras_ai_v2.asr import AsrModels, run_google_translate
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
+from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
 
 
@@ -66,6 +69,9 @@ class BotInterface:
         raise NotImplementedError
 
     def get_input_audio(self) -> str | None:
+        raise NotImplementedError
+
+    def get_input_images(self) -> list[str] | None:
         raise NotImplementedError
 
     def nice_filename(self, mime_type: str) -> str:
@@ -159,6 +165,7 @@ def _mock_api_output(input_text):
 @db_middleware
 def _on_msg(bot: BotInterface):
     speech_run = None
+    input_images = None
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
@@ -194,6 +201,13 @@ def _on_msg(bot: BotInterface):
                     return
                 # send confirmation of asr
                 bot.send_msg(text=AUDIO_ASR_CONFIRMATION.format(input_text))
+        case "image":
+            input_images = bot.get_input_images()
+            if not input_images:
+                raise HTTPException(
+                    status_code=400, detail="No image found in request."
+                )
+            input_text = (bot.get_input_text() or "").strip()
         case "text":
             input_text = (bot.get_input_text() or "").strip()
             if not input_text:
@@ -221,6 +235,7 @@ def _on_msg(bot: BotInterface):
         _process_and_send_msg(
             billing_account_user=billing_account_user,
             bot=bot,
+            input_images=input_images,
             input_text=input_text,
             speech_run=speech_run,
         )
@@ -258,6 +273,7 @@ def _process_and_send_msg(
     *,
     billing_account_user: AppUser,
     bot: BotInterface,
+    input_images: list[str] | None,
     input_text: str,
     speech_run: str | None,
 ):
@@ -267,7 +283,13 @@ def _process_and_send_msg(
         #     bot, input_text
         # )
         # make API call to gooey bots to get the response
-        response_text, response_audio, response_video, msgs_to_save = _process_msg(
+        (
+            response_text,
+            response_audio,
+            response_video,
+            user_msg,
+            assistant_msg,
+        ) = _process_msg(
             page_cls=bot.page_cls,
             api_user=billing_account_user,
             query_params=bot.query_params,
@@ -275,6 +297,7 @@ def _process_and_send_msg(
             input_text=input_text,
             user_language=bot.language,
             speech_run=speech_run,
+            input_images=input_images,
         )
     except HTTPException as e:
         traceback.print_exc()
@@ -285,24 +308,35 @@ def _process_and_send_msg(
     # this really shouldn't happen, but just in case it does, we should have a nice message
     response_text = response_text or DEFAULT_RESPONSE
     # send the response to the user
-    print(bot.show_feedback_buttons)
     msg_id = bot.send_msg(
         text=response_text,
         audio=response_audio,
         video=response_video,
         buttons=_feedback_start_buttons() if bot.show_feedback_buttons else None,
     )
-    if not msgs_to_save:
+    if not (user_msg and assistant_msg):
         return
-    # save the message id for the sent message
-    if msg_id:
-        msgs_to_save[-1].platform_msg_id = msg_id
     # save the message id for the received message
     if bot.recieved_msg_id:
-        msgs_to_save[0].platform_msg_id = bot.recieved_msg_id
-    # save the messages
-    for msg in msgs_to_save:
-        msg.save()
+        user_msg.platform_msg_id = bot.recieved_msg_id
+    # save the message id for the sent message
+    if msg_id:
+        assistant_msg.platform_msg_id = msg_id
+
+    # get the attachments
+    attachments = []
+    for img in input_images or []:
+        metadata = doc_url_to_file_metadata(img)
+        attachments.append(
+            MessageAttachment(message=user_msg, url=img, metadata=metadata)
+        )
+    # save the messages & attachments
+    with transaction.atomic():
+        user_msg.save()
+        assistant_msg.save()
+        for attachment in attachments:
+            attachment.metadata.save()
+            attachment.save()
 
 
 def _handle_interactive_msg(bot: BotInterface):
@@ -438,18 +472,15 @@ def _process_msg(
     api_user: AppUser,
     query_params: dict,
     convo: Conversation,
+    input_images: list[str] | None,
     input_text: str,
     user_language: str,
     speech_run: str | None,
-) -> tuple[str, str | None, str | None, list[Message]]:
+) -> tuple[str, str | None, str | None, Message, Message]:
     from routers.api import call_api
 
     # get latest messages for context (upto 100)
-    saved_msgs = list(
-        reversed(
-            convo.messages.order_by("-created_at").values("role", "content")[:100],
-        ),
-    )
+    saved_msgs = convo.messages.all().as_llm_context()
 
     # # mock testing
     # result = _mock_api_output(input_text)
@@ -460,6 +491,7 @@ def _process_msg(
         user=api_user,
         request_body={
             "input_prompt": input_text,
+            "input_images": input_images,
             "messages": saved_msgs,
             "user_language": user_language,
         },
@@ -480,26 +512,24 @@ def _process_msg(
     raw_output_text = result["output"]["raw_output_text"][0]
     response_text = result["output"]["output_text"][0]
     # save new messages for future context
-    msgs_to_save = [
-        Message(
-            conversation=convo,
-            role=CHATML_ROLE_USER,
-            content=raw_input_text,
-            display_content=input_text,
-            saved_run=SavedRun.objects.get_or_create(
-                workflow=Workflow.ASR, **furl(speech_run).query.params
-            )[0]
-            if speech_run
-            else None,
-        ),
-        Message(
-            conversation=convo,
-            role=CHATML_ROLE_ASSISTANT,
-            content=raw_output_text,
-            display_content=output_text,
-            saved_run=SavedRun.objects.get_or_create(
-                workflow=Workflow.VIDEO_BOTS, **furl(result.get("url", "")).query.params
-            )[0],
-        ),
-    ]
-    return response_text, response_audio, response_video, msgs_to_save
+    user_msg = Message(
+        conversation=convo,
+        role=CHATML_ROLE_USER,
+        content=raw_input_text,
+        display_content=input_text,
+        saved_run=SavedRun.objects.get_or_create(
+            workflow=Workflow.ASR, **furl(speech_run).query.params
+        )[0]
+        if speech_run
+        else None,
+    )
+    assistant_msg = Message(
+        conversation=convo,
+        role=CHATML_ROLE_ASSISTANT,
+        content=raw_output_text,
+        display_content=output_text,
+        saved_run=SavedRun.objects.get_or_create(
+            workflow=Workflow.VIDEO_BOTS, **furl(result.get("url", "")).query.params
+        )[0],
+    )
+    return response_text, response_audio, response_video, user_msg, assistant_msg

@@ -17,11 +17,16 @@ from daras_ai_v2.asr import (
     run_google_translate,
     google_translate_language_selector,
 )
+from daras_ai_v2.azure_doc_extract import (
+    azure_form_recognizer,
+    azure_form_recognizer_models,
+)
 from daras_ai_v2.base import BasePage, MenuTabs, StateKeys
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
 )
+from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -35,6 +40,9 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
     CHATML_ROLE_SYSTEM,
     model_max_tokens,
+    get_entry_images,
+    get_entry_text,
+    format_chat_entry,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -71,80 +79,6 @@ BOT_SCRIPT_RE = re.compile(
 )
 
 SAFETY_BUFFER = 100
-
-
-def show_landbot_widget():
-    landbot_url = st.session_state.get("landbot_url")
-    if not landbot_url:
-        st.html("", **{"data-landbot-config-url": ""})
-        return
-
-    f = furl(landbot_url)
-    config_path = os.path.join(f.host, *f.path.segments[:2])
-    config_url = f"https://storage.googleapis.com/{config_path}/index.json"
-
-    st.html(
-        # language=HTML
-        """
-<script>
-function updateLandbotWidget() {
-    if (window.myLandbot) {
-        try {
-            window.myLandbot.destroy();
-        } catch (e) {}
-    }
-    const configUrl = document.querySelector("[data-landbot-config-url]")?.getAttribute("data-landbot-config-url");
-    if (configUrl) {
-        window.myLandbot = new Landbot.Livechat({ configUrl });
-    }
-}
-if (typeof Landbot === "undefined") {
-    const script = document.createElement("script");
-    script.src = "https://cdn.landbot.io/landbot-3/landbot-3.0.0.js";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-        window.waitUntilHydrated.then(updateLandbotWidget);
-        window.addEventListener("hydrated", updateLandbotWidget);
-    };
-    document.body.appendChild(script);
-}
-</script>
-        """,
-        **{"data-landbot-config-url": config_url},
-    )
-
-
-def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
-    # run regex to find scripted messages in script text
-    script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
-    # extract system message from script
-    system_message = bot_script
-    if script_matches:
-        system_message = system_message[: script_matches[0].start()]
-    system_message = system_message.strip()
-    # extract pre-scripted messages from script
-    scripted_msgs: list[ConversationEntry] = []
-    for idx in range(len(script_matches)):
-        match = script_matches[idx]
-        try:
-            next_match = script_matches[idx + 1]
-        except IndexError:
-            next_match_start = None
-        else:
-            next_match_start = next_match.start()
-        if (len(script_matches) - idx) % 2 == 0:
-            role = CHATML_ROLE_USER
-        else:
-            role = CHATML_ROLE_ASSISTANT
-        scripted_msgs.append(
-            {
-                "role": role,
-                "display_name": match.group(1).strip(),
-                "content": bot_script[match.end() : next_match_start].strip(),
-            }
-        )
-    return system_message, scripted_msgs
 
 
 class VideoBotsPage(BasePage):
@@ -192,8 +126,13 @@ class VideoBotsPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_prompt: str
         bot_script: str | None
+
+        input_prompt: str
+        input_images: list[str] | None
+
+        # conversation history/context
+        messages: list[ConversationEntry] | None
 
         # tts settings
         tts_provider: typing.Literal[
@@ -216,6 +155,11 @@ class VideoBotsPage(BasePage):
         selected_model: typing.Literal[
             tuple(e.name for e in LargeLanguageModels)
         ] | None
+        document_model: str | None = Field(
+            title="🩻 Photo / Document Intelligence",
+            description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
+            "(via [Azure](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/use-sdk-rest-api?view=doc-intel-3.1.0&tabs=linux&pivots=programming-language-rest-api))",
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -228,9 +172,6 @@ class VideoBotsPage(BasePage):
         face_padding_bottom: int | None
         face_padding_left: int | None
         face_padding_right: int | None
-
-        # conversation history/context
-        messages: list[ConversationEntry] | None
 
         # doc search
         task_instructions: str | None
@@ -265,7 +206,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         variables: dict[str, typing.Any] | None
 
     class ResponseModel(BaseModel):
-        final_prompt: str
+        final_prompt: str | list[ConversationEntry]
 
         output_text: list[str]
 
@@ -376,7 +317,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.write("---")
             doc_search_settings(keyword_instructions_allowed=True)
             st.write("---")
-        language_model_settings()
+
+        language_model_settings(show_document_model=True)
 
         st.write("---")
         google_translate_language_selector(
@@ -394,11 +336,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             """
         )
         glossary_input(
-            f"##### {self.RequestModel.__fields__['input_glossary_document'].field_info.title}\n{self.RequestModel.__fields__['input_glossary_document'].field_info.description or ''}",
+            f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
             key="input_glossary_document",
         )
         glossary_input(
-            f"##### {self.RequestModel.__fields__['output_glossary_document'].field_info.title}\n{self.RequestModel.__fields__['output_glossary_document'].field_info.description or ''}",
+            f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
             key="output_glossary_document",
         )
         st.write("---")
@@ -459,81 +401,24 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.write(truncate_text_words(output_text[0], maxlen=200))
 
     def render_output(self):
+        # chat window
         with st.div(className="pb-3"):
-            with st.div(
-                className="pb-1",
-                style=dict(
-                    maxHeight="80vh",
-                    overflowY="scroll",
-                    display="flex",
-                    flexDirection="column-reverse",
-                    border="1px solid #c9c9c9",
-                ),
-            ):
-                with msg_container_widget(CHATML_ROLE_ASSISTANT):
-                    output_text = st.session_state.get("output_text", [])
-                    output_video = st.session_state.get("output_video", [])
-                    output_audio = st.session_state.get("output_audio", [])
-                    if output_text:
-                        st.write(f"**Assistant**")
-                        for idx, text in enumerate(output_text):
-                            st.write(text)
-                            try:
-                                st.video(output_video[idx], autoplay=True)
-                            except IndexError:
-                                try:
-                                    st.audio(output_audio[idx])
-                                except IndexError:
-                                    pass
+            chat_list_view()
+            pressed_send, new_input, new_input_images = chat_input_view()
 
-                input_prompt = st.session_state.get("input_prompt")
-                if input_prompt:
-                    with msg_container_widget(CHATML_ROLE_USER):
-                        st.write(f"**User** \\\n{input_prompt}")
+        if pressed_send:
+            self.on_send(new_input, new_input_images)
 
-                for entry in reversed(st.session_state.get("messages", [])):
-                    with msg_container_widget(entry["role"]):
-                        display_name = entry.get("display_name") or entry["role"]
-                        display_name = display_name.capitalize()
-                        st.write(f'**{display_name}** \\\n{entry["content"]}')
-
-            with st.div(
-                className="px-3 pt-3 d-flex gap-1",
-                style=dict(background="rgba(239, 239, 239, 0.6)"),
-            ):
-                with st.div(className="flex-grow-1"):
-                    new_input = st.text_area(
-                        "", placeholder="Send a message", height=50
-                    )
-
-                if st.button("✈ Send", style=dict(height="3.2rem")):
-                    messsages = st.session_state.get("messages", [])
-                    raw_input_text = st.session_state.get("raw_input_text") or ""
-                    raw_output_text = (st.session_state.get("raw_output_text") or [""])[
-                        0
-                    ]
-                    if raw_input_text and raw_output_text:
-                        messsages += [
-                            {
-                                "role": CHATML_ROLE_USER,
-                                "content": raw_input_text,
-                            },
-                            {
-                                "role": CHATML_ROLE_ASSISTANT,
-                                "content": raw_output_text,
-                            },
-                        ]
-                    st.session_state["messages"] = messsages
-                    st.session_state["input_prompt"] = new_input
-                    self.on_submit()
-
+        # clear chat inputs
         if st.button("🗑️ Clear"):
             st.session_state["messages"] = []
             st.session_state["input_prompt"] = ""
+            st.session_state["input_images"] = None
             st.session_state["raw_input_text"] = ""
             self.clear_outputs()
             st.experimental_rerun()
 
+        # render sources
         references = st.session_state.get("references", [])
         if not references:
             return
@@ -545,6 +430,31 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     value=ref["snippet"],
                     label_visibility="collapsed",
                 )
+
+    def on_send(self, new_input: str, new_input_images: list[str]):
+        prev_input = st.session_state.get("raw_input_text") or ""
+        prev_input_images = st.session_state.pop("input_images", None)
+        prev_output = (st.session_state.get("raw_output_text") or [""])[0]
+
+        if (prev_input or prev_input_images) and prev_output:
+            # append previous input to the history
+            st.session_state["messsages"] = st.session_state.get("messages", []) + [
+                format_chat_entry(
+                    role=CHATML_ROLE_USER,
+                    content=prev_input,
+                    images=prev_input_images,
+                ),
+                format_chat_entry(
+                    role=CHATML_ROLE_ASSISTANT,
+                    content=prev_output,
+                ),
+            ]
+
+        # add new input to the state
+        st.session_state["input_prompt"] = new_input
+        st.session_state["input_images"] = new_input_images or None
+
+        self.on_submit()
 
     def render_steps(self):
         if st.session_state.get("tts_provider"):
@@ -569,11 +479,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
-            text_output(
-                "**Final Prompt**",
-                value=final_prompt,
-                height=300,
-            )
+            if isinstance(final_prompt, str):
+                text_output("**Final Prompt**", value=final_prompt, height=300)
+            else:
+                st.json(final_prompt)
 
         for idx, text in enumerate(st.session_state.get("raw_output_text", [])):
             st.text_area(
@@ -630,22 +539,38 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 """
 
         user_input = request.input_prompt.strip()
-        if not user_input:
+        if not (user_input or request.input_images):
             return
         model = LargeLanguageModels[request.selected_model]
         is_chat_model = model.is_chat_model()
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
+        ocr_texts = []
+        if request.input_images:
+            yield "Running Azure Form Recognizer..."
+            for img in request.input_images:
+                ocr_text = (
+                    azure_form_recognizer(
+                        img, model_id=request.document_model or "prebuilt-read"
+                    )
+                    .get("content", "")
+                    .strip()
+                )
+                if not ocr_text:
+                    continue
+                ocr_texts.append(ocr_text)
+
         # translate input text
-        if request.user_language and request.user_language != "en":
-            yield f"Translating input to english..."
-            user_input = run_google_translate(
-                texts=[user_input],
-                source_language=request.user_language,
-                target_language="en",
-                glossary_url=request.input_glossary_document,
-            )[0]
+        yield f"Translating input to english..."
+        user_input, *ocr_texts = run_google_translate(
+            texts=[user_input, *ocr_texts],
+            target_language="en",
+            glossary_url=request.input_glossary_document,
+        )
+
+        for text in ocr_texts:
+            user_input = f"Image: {text!r}\n{user_input}"
 
         # parse the bot script
         system_message, scripted_msgs = parse_script(bot_script)
@@ -687,7 +612,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             query_msgs = query_msgs[clip_idx:]
 
             chat_history = "\n".join(
-                f'{msg["role"]}: """{msg["content"]}"""' for msg in query_msgs
+                f'{entry["role"]}: """{get_entry_text(entry)}"""'
+                for entry in query_msgs
             )
 
             query_instructions = (request.query_instructions or "").strip()
@@ -701,7 +627,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             else:
                 query_msgs.reverse()
                 state["final_search_query"] = "\n---\n".join(
-                    msg["content"] for msg in query_msgs
+                    get_entry_text(entry) for entry in query_msgs
                 )
 
             keyword_instructions = (request.keyword_instructions or "").strip()
@@ -766,9 +692,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 }
             )
 
-        # final prompt to display
-        prompt = "\n".join(format_chatml_message(entry) for entry in prompt_messages)
-        state["final_prompt"] = prompt
+        state["final_prompt"] = prompt_messages
 
         # ensure input script is not too big
         max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(
@@ -792,6 +716,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 avoid_repetition=request.avoid_repetition,
             )
         else:
+            prompt = "\n".join(
+                format_chatml_message(entry) for entry in prompt_messages
+            )
             output_text = run_language_model(
                 model=request.selected_model,
                 prompt=prompt,
@@ -1022,6 +949,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             if is_connected:
                 bi.saved_run = None
             else:
+                # set bot language from state
+                bi.user_language = (
+                    st.session_state.get("user_language") or bi.user_language
+                )
                 bi.saved_run = current_sr
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg
@@ -1031,6 +962,181 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.experimental_rerun()
 
         st.write("---")
+
+
+def show_landbot_widget():
+    landbot_url = st.session_state.get("landbot_url")
+    if not landbot_url:
+        st.html("", **{"data-landbot-config-url": ""})
+        return
+
+    f = furl(landbot_url)
+    config_path = os.path.join(f.host, *f.path.segments[:2])
+    config_url = f"https://storage.googleapis.com/{config_path}/index.json"
+
+    st.html(
+        # language=HTML
+        """
+<script>
+function updateLandbotWidget() {
+    if (window.myLandbot) {
+        try {
+            window.myLandbot.destroy();
+        } catch (e) {}
+    }
+    const configUrl = document.querySelector("[data-landbot-config-url]")?.getAttribute("data-landbot-config-url");
+    if (configUrl) {
+        window.myLandbot = new Landbot.Livechat({ configUrl });
+    }
+}
+if (typeof Landbot === "undefined") {
+    const script = document.createElement("script");
+    script.src = "https://cdn.landbot.io/landbot-3/landbot-3.0.0.js";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+        window.waitUntilHydrated.then(updateLandbotWidget);
+        window.addEventListener("hydrated", updateLandbotWidget);
+    };
+    document.body.appendChild(script);
+}
+</script>
+        """,
+        **{"data-landbot-config-url": config_url},
+    )
+
+
+def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
+    # run regex to find scripted messages in script text
+    script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
+    # extract system message from script
+    system_message = bot_script
+    if script_matches:
+        system_message = system_message[: script_matches[0].start()]
+    system_message = system_message.strip()
+    # extract pre-scripted messages from script
+    scripted_msgs: list[ConversationEntry] = []
+    for idx in range(len(script_matches)):
+        match = script_matches[idx]
+        try:
+            next_match = script_matches[idx + 1]
+        except IndexError:
+            next_match_start = None
+        else:
+            next_match_start = next_match.start()
+        if (len(script_matches) - idx) % 2 == 0:
+            role = CHATML_ROLE_USER
+        else:
+            role = CHATML_ROLE_ASSISTANT
+        scripted_msgs.append(
+            {
+                "role": role,
+                "display_name": match.group(1).strip(),
+                "content": bot_script[match.end() : next_match_start].strip(),
+            }
+        )
+    return system_message, scripted_msgs
+
+
+def chat_list_view():
+    # render a reversed list view
+    with st.div(
+        className="pb-1",
+        style=dict(
+            maxHeight="80vh",
+            overflowY="scroll",
+            display="flex",
+            flexDirection="column-reverse",
+            border="1px solid #c9c9c9",
+        ),
+    ):
+        with st.div(className="px-3"):
+            show_raw_msgs = st.checkbox("_Show Raw Output_")
+        # render the last output
+        with msg_container_widget(CHATML_ROLE_ASSISTANT):
+            if show_raw_msgs:
+                output_text = st.session_state.get("raw_output_text", [])
+            else:
+                output_text = st.session_state.get("output_text", [])
+            output_video = st.session_state.get("output_video", [])
+            output_audio = st.session_state.get("output_audio", [])
+            if output_text:
+                st.write(f"**Assistant**")
+                for idx, text in enumerate(output_text):
+                    st.write(text)
+                    try:
+                        st.video(output_video[idx], autoplay=True)
+                    except IndexError:
+                        try:
+                            st.audio(output_audio[idx])
+                        except IndexError:
+                            pass
+        messages = st.session_state.get("messages", []).copy()
+        # add last input to history if present
+        if show_raw_msgs:
+            input_prompt = st.session_state.get("raw_input_text")
+        else:
+            input_prompt = st.session_state.get("input_prompt")
+        input_images = st.session_state.get("input_images")
+        if input_prompt or input_images:
+            messages += [
+                format_chat_entry(
+                    role=CHATML_ROLE_USER, content=input_prompt, images=input_images
+                ),
+            ]
+        # render history
+        for entry in reversed(messages):
+            with msg_container_widget(entry["role"]):
+                display_name = entry.get("display_name") or entry["role"]
+                display_name = display_name.capitalize()
+                images = get_entry_images(entry)
+                text = get_entry_text(entry)
+                if text or images:
+                    st.write(f"**{display_name}**  \n{text}")
+                if images:
+                    for im in images:
+                        st.image(im, style={"maxHeight": "200px"})
+
+
+def chat_input_view() -> tuple[bool, str, list[str]]:
+    with st.div(
+        className="px-3 pt-3 d-flex gap-1",
+        style=dict(background="rgba(239, 239, 239, 0.6)"),
+    ):
+        show_uploader_key = "--show-file-uploader"
+        show_uploader = st.session_state.setdefault(show_uploader_key, False)
+        if st.button(
+            "📎",
+            style=dict(height="3.2rem", backgroundColor="white"),
+        ):
+            show_uploader = not show_uploader
+            st.session_state[show_uploader_key] = show_uploader
+
+        with st.div(className="flex-grow-1"):
+            new_input = st.text_area("", placeholder="Send a message", height=50)
+
+        pressed_send = st.button("✈ Send", style=dict(height="3.2rem"))
+
+    if show_uploader:
+        new_input_images = st.file_uploader(
+            "",
+            accept_multiple_files=True,
+        )
+    else:
+        new_input_images = None
+
+    return pressed_send, new_input, new_input_images
+
+
+def msg_container_widget(role: str):
+    return st.div(
+        className="px-3 py-1 pt-2",
+        style=dict(
+            background="rgba(239, 239, 239, 0.6)"
+            if role == CHATML_ROLE_USER
+            else "#fff",
+        ),
+    )
 
 
 def convo_window_clipper(
@@ -1048,14 +1154,3 @@ def convo_window_clipper(
         ):
             return i + step
     return 0
-
-
-def msg_container_widget(role: str):
-    return st.div(
-        className="px-3 py-1 pt-2",
-        style=dict(
-            background="rgba(239, 239, 239, 0.6)"
-            if role == CHATML_ROLE_USER
-            else "#fff",
-        ),
-    )
