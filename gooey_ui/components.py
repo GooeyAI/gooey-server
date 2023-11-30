@@ -2,6 +2,7 @@ import base64
 import math
 import textwrap
 import typing
+from datetime import datetime, timezone
 
 import numpy as np
 
@@ -30,6 +31,17 @@ set_page_config = dummy
 form = dummy
 plotly_chart = dummy
 dataframe = dummy
+
+
+def countdown_timer(
+    end_time: datetime,
+    delay_text: str,
+) -> state.NestingCtx:
+    return _node(
+        "countdown-timer",
+        endTime=end_time.astimezone(timezone.utc).isoformat(),
+        delayText=delay_text,
+    )
 
 
 def nav_tabs():
