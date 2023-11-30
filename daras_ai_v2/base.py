@@ -195,10 +195,12 @@ class BasePage:
                     self.render_author(self.run_user)
                 elif author := current_run.get_creator():
                     self.render_author(author)
+
             with st.div(className="d-flex align-items-center"):
                 if (
                     self.request
                     and self.request.user
+                    and not self.request.user.is_anonymous
                     and current_run.get_creator() == self.request.user
                 ):
                     if published_run and published_run != current_run:
@@ -287,7 +289,7 @@ class BasePage:
                 if run_actions_button:
                     run_actions_modal.open()
 
-                save_text = "📝 Update" if is_update_mode else "💾 Save"
+                save_text = "📝 Update" if is_update_mode else "📝 Save"
                 save_button = st.button(
                     save_text,
                     className="mb-0",
@@ -371,7 +373,10 @@ class BasePage:
             doc[StateKeys.page_title] = published_run_title
             doc[StateKeys.page_notes] = published_run_notes
             if not is_update_mode:
-                published_run = self.example_doc_sr(get_random_doc_id(), create=True)
+                published_run = self.create_published_run(
+                    example_id=get_random_doc_id(),
+                    created_by=self.request.user,
+                )
                 published_run.created_by = self.request.user
             published_run.set(doc)
             if current_run != published_run:
@@ -460,55 +465,6 @@ class BasePage:
                         text,
                         link_to=link,
                     )
-
-    def _render_page_title_with_breadcrumbs(
-        self, example_id: str, run_id: str, uid: str
-    ):
-        if example_id or run_id:
-            # the title on the saved root / the hardcoded title
-            recipe_title = (
-                self.recipe_doc_sr().to_dict().get(StateKeys.page_title) or self.title
-            )
-
-            # the user saved title for the current run (if its not the same as the recipe title)
-            current_title = st.session_state.get(StateKeys.page_title)
-            if current_title == recipe_title:
-                current_title = ""
-
-            # prefer the prompt as h1 title for runs, but not for examples
-            prompt_title = truncate_text_words(
-                self.preview_input(st.session_state) or "", maxlen=60
-            ).replace("\n", " ")
-            if run_id:
-                h1_title = prompt_title or current_title or recipe_title
-            else:
-                h1_title = current_title or prompt_title or recipe_title
-
-            # render recipe title if it doesn't clash with the h1 title
-            render_item1 = recipe_title and recipe_title != h1_title
-            # render current title if it doesn't clash with the h1 title
-            render_item2 = current_title and current_title != h1_title
-            if render_item1 or render_item2:  # avoids empty space
-                with st.breadcrumbs(className="mt-4"):
-                    if render_item1:
-                        st.breadcrumb_item(
-                            recipe_title,
-                            link_to=self.app_url(),
-                            className="text-muted",
-                        )
-                    if render_item2:
-                        current_sr = self.get_sr_from_query_params(
-                            example_id, run_id, uid
-                        )
-                        st.breadcrumb_item(
-                            current_title,
-                            link_to=current_sr.parent.get_app_url()
-                            if current_sr.parent_id
-                            else None,
-                        )
-            st.write(f"# {h1_title}")
-        else:
-            st.write(f"# {self.get_recipe_title(st.session_state)}")
 
     def get_recipe_title(self, state: dict) -> str:
         return state.get(StateKeys.page_title) or self.title or ""
@@ -731,6 +687,16 @@ class BasePage:
             return SavedRun.objects.get_or_create(**config)[0]
         else:
             return SavedRun.objects.get(**config)
+
+    @classmethod
+    def create_published_run(cls, example_id: str, created_by: AppUser):
+        published_run = SavedRun(
+            workflow=cls.workflow,
+            example_id=example_id,
+            created_by=created_by,
+        )
+        published_run.save()
+        return published_run
 
     def render_description(self):
         pass
