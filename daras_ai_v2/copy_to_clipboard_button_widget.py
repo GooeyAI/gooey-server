@@ -1,3 +1,4 @@
+import typing
 import gooey_ui as gui
 
 # language="html"
@@ -20,16 +21,18 @@ def copy_to_clipboard_button(
     *,
     value: str,
     style: str = "",
+    className: str = "",
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "primary",
 ):
     return gui.html(
         # language="html"
         f"""
-<button 
+<button
     type="button"
-    class="btn btn-theme"
+    class="btn btn-theme btn-{type} {className}"
     onClick="copyToClipboard(this);"
-    style="{style}" 
-    data-clipboard-text={value!r}> 
+    style="{style}"
+    data-clipboard-text={value!r}>
     {label}
 </button>
         """,
