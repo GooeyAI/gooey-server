@@ -468,6 +468,7 @@ class BasePage:
         tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
         if self.request.user:
             tabs.extend([MenuTabs.history])
+            tabs.extend([MenuTabs.published])
         return tabs
 
     def render_selected_tab(self, selected_tab: str):
@@ -499,6 +500,9 @@ class BasePage:
 
             case MenuTabs.run_as_api:
                 self.run_as_api_tab()
+
+            case MenuTabs.published:
+                self._published_tab()
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
@@ -1152,6 +1156,40 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )[:50]
 
         grid_layout(3, example_runs, _render)
+
+    def _published_tab(self):
+        if not self.request.user or self.request.user.is_anonymous:
+            redirect_url = furl(
+                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
+            )
+            raise RedirectException(str(redirect_url))
+
+        published_runs = SavedRun.objects.filter(
+            workflow=self.workflow,
+            hidden=False,
+            example_id__isnull=False,
+            created_by=self.request.user,
+        )[:50]
+        if not published_runs:
+            st.write("No published runs yet")
+            return
+
+        allow_delete = self.is_current_user_admin()
+
+        def _render(sr: SavedRun):
+            url = str(
+                furl(
+                    self.app_url(), query_params={EXAMPLE_ID_QUERY_PARAM: sr.example_id}
+                )
+            )
+            self._render_doc_example(
+                allow_delete=allow_delete,
+                doc=sr.to_dict(),
+                url=url,
+                query_params=dict(example_id=sr.example_id),
+            )
+
+        grid_layout(3, published_runs, _render)
 
     def _history_tab(self):
         assert self.request, "request must be set to render history tab"
