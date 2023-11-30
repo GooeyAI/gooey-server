@@ -180,23 +180,29 @@ class BasePage:
         title, breadcrumbs = self._get_title_and_breadcrumbs(
             example_id=example_id, run_id=run_id, uid=uid
         )
-        with st.div(className="d-lg-flex d-md-block justify-content-between"):
-            with st.div():
-                if breadcrumbs:
-                    self._render_breadcrumbs(breadcrumbs)
-                else:
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        current_run = self.get_sr_from_query_params(example_id, run_id, uid)
+        published_run = self.example_doc_sr(example_id) if example_id else None
+        with st.div(className="d-lg-flex d-md-block justify-content-between mt-4"):
+            with st.div(className="d-lg-flex d-md-block align-items-center"):
+                if not breadcrumbs and not self.run_user:
                     self._render_title(title)
+
+                if breadcrumbs:
+                    with st.tag("span", className="me-3"):
+                        self._render_breadcrumbs(breadcrumbs)
+                if self.run_user:
+                    self.render_author(self.run_user)
+                elif author := current_run.get_creator():
+                    self.render_author(author)
             with st.div(className="d-flex align-items-center"):
-                example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-                current_run = self.get_sr_from_query_params(example_id, run_id, uid)
-                published_run = self.example_doc_sr(example_id) if example_id else None
-                if published_run and published_run != current_run:
-                    self._render_unpublished_changes_indicator()
                 if (
                     self.request
                     and self.request.user
                     and current_run.get_creator() == self.request.user
                 ):
+                    if published_run and published_run != current_run:
+                        self._render_unpublished_changes_indicator()
                     self._render_run_action_buttons(
                         current_run=current_run,
                         published_run=published_run,
@@ -205,9 +211,9 @@ class BasePage:
                     self._render_social_buttons()
 
         with st.div():
-            if breadcrumbs:
-                # title is rendered here only if breadcrumbs were rendered above
-                st.write(f"# {title}")
+            if breadcrumbs or self.run_user:
+                # only render title here if the above row was not empty
+                self._render_title(title)
             st.write(st.session_state.get(StateKeys.page_notes, ""))
 
         try:
@@ -440,7 +446,7 @@ class BasePage:
         render_item1 = items and items[0]
         render_item2 = items[1:] and items[1]
         if render_item1 or render_item2:  # avoids empty space
-            with st.breadcrumbs(className="mt-4"):
+            with st.breadcrumbs():
                 if render_item1:
                     text, link = render_item1
                     st.breadcrumb_item(
@@ -741,27 +747,25 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
-    def render_author(self):
-        if not self.run_user or (
-            not self.run_user.photo_url and not self.run_user.display_name
-        ):
+    def render_author(self, user: AppUser):
+        if not user or (not user.photo_url and not user.display_name):
             return
 
-        html = "<div style='display:flex; align-items:center; padding-bottom:16px'>"
-        if self.run_user.photo_url:
+        html = "<div style='display:flex; align-items:center;'>"
+        if user.photo_url:
             html += f"""
-                <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{self.run_user.photo_url}">
+                <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{user.photo_url}">
                 <div style="width:8px;"></div>
             """
-        if self.run_user.display_name:
-            html += f"<div>{self.run_user.display_name}</div>"
+        if user.display_name:
+            html += f"<div>{user.display_name}</div>"
         html += "</div>"
 
         if self.is_current_user_admin():
             linkto = lambda: st.link(
                 to=self.app_url(
                     tab_name=MenuTabs.paths[MenuTabs.history],
-                    query_params={"uid": self.run_user.uid},
+                    query_params={"uid": user.uid},
                 )
             )
         else:
@@ -920,7 +924,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         st.session_state["is_flagged"] = is_flagged
 
     def _render_input_col(self):
-        self.render_author()
         self.render_form_v2()
         with st.expander("⚙️ Settings"):
             self.render_settings()
