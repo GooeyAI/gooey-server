@@ -204,7 +204,11 @@ class BasePage:
                     and not self.request.user.is_anonymous
                     and current_run.get_creator() == self.request.user
                 ):
-                    if published_run and published_run != current_run:
+                    if (
+                        published_run
+                        and published_run != current_run
+                        and published_run.get_creator() == self.request.user
+                    ):
                         self._render_unpublished_changes_indicator()
                     self._render_published_run_buttons(
                         current_run=current_run,
