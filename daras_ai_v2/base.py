@@ -205,7 +205,7 @@ class BasePage:
                 ):
                     if published_run and published_run != current_run:
                         self._render_unpublished_changes_indicator()
-                    self._render_run_action_buttons(
+                    self._render_published_run_buttons(
                         current_run=current_run,
                         published_run=published_run,
                     )
@@ -250,7 +250,7 @@ class BasePage:
             className="mb-0",
         )
 
-    def _render_run_action_buttons(
+    def _render_published_run_buttons(
         self,
         *,
         current_run: SavedRun,
