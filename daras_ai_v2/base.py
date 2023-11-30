@@ -177,12 +177,13 @@ class BasePage:
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
-        title, breadcrumbs = self._get_title_and_breadcrumbs(
-            example_id=example_id, run_id=run_id, uid=uid
-        )
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         current_run = self.get_sr_from_query_params(example_id, run_id, uid)
         published_run = self.example_doc_sr(example_id) if example_id else None
+        title, breadcrumbs = self._get_title_and_breadcrumbs(
+            current_run=current_run,
+            published_run=published_run,
+        )
         with st.div(className="d-lg-flex d-md-block justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-md-block align-items-center"):
                 if not breadcrumbs and not self.run_user:
@@ -355,14 +356,12 @@ class BasePage:
             )
             published_run_title = st.text_input(
                 "Title",
-                key="published_run_title",
+                key=StateKeys.page_title,
                 value=default_title,
             )
             published_run_notes = st.text_area(
                 "Notes",
-                value=published_run.page_notes
-                if is_update_mode
-                else st.session_state[StateKeys.page_notes].strip(),
+                key=StateKeys.page_notes,
             )
 
         with st.div(className="mt-4 d-flex justify-content-center"):
@@ -398,54 +397,37 @@ class BasePage:
 
     def _get_title_and_breadcrumbs(
         self,
-        example_id: str,
-        run_id: str,
-        uid: str,
+        current_run: SavedRun,
+        published_run: SavedRun | None,
     ) -> tuple[str, list[tuple[str, str | None]]]:
-        if example_id or run_id:
+        if not current_run.run_id and not current_run.example_id:
+            # when run_id/example_id is not set, the run is the root example
+            return self.get_recipe_title(st.session_state), []
+        else:
             # the title on the saved root / the hardcoded title
             recipe_title = (
                 self.recipe_doc_sr().to_dict().get(StateKeys.page_title) or self.title
             )
-
-            # the user saved title for the current run (if its not the same as the recipe title)
-            current_title = st.session_state.get(StateKeys.page_title, "")
-            if current_title == recipe_title:
-                current_title = ""
-
-            # prefer the prompt as h1 title for runs, but not for examples
+            published_run_title = (
+                published_run and published_run.page_title or recipe_title
+            )
             prompt_title = truncate_text_words(
-                self.preview_input(st.session_state) or "", maxlen=60
+                self.preview_input(current_run.to_dict()) or "",
+                maxlen=60,
             ).replace("\n", " ")
-            if run_id:
-                h1_title = prompt_title or current_title or recipe_title
+
+            recipe_breadcrumb = (recipe_title, self.app_url())
+            if current_run == published_run:
+                return published_run_title, [recipe_breadcrumb]
             else:
-                h1_title = current_title or prompt_title or recipe_title
-
-            # render recipe title if it doesn't clash with the h1 title
-            render_item1 = recipe_title != h1_title and recipe_title
-            # render current title if it doesn't clash with the h1 title
-            render_item2 = current_title != h1_title and current_title
-
-            breadcrumbs = []
-            if render_item1:
-                breadcrumbs.append((recipe_title, self.app_url()))
-            if render_item2:
-                current_sr = self.get_sr_from_query_params_dict(
-                    gooey_get_query_params()
-                )
-                breadcrumbs.append(
-                    (
-                        current_title,
-                        current_sr.parent.get_app_url()
-                        if current_sr.parent_id
-                        else None,
-                    )
-                )
-
-            return h1_title, breadcrumbs
-        else:
-            return self.get_recipe_title(st.session_state), []
+                h1_title = prompt_title or f"Run: {published_run_title}"
+                if not published_run:
+                    return h1_title, [recipe_breadcrumb]
+                else:
+                    return h1_title, [
+                        recipe_breadcrumb,
+                        (published_run_title, published_run.get_app_url()),
+                    ]
 
     def _render_breadcrumbs(self, items: list[tuple[str, str | None]]):
         render_item1 = items and items[0]
@@ -894,9 +876,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         with st.expander("⚙️ Settings"):
             self.render_settings()
             st.write("---")
-            st.write("##### 🖌️ Personalize")
-            st.text_input("Title", key=StateKeys.page_title)
-            st.text_area("Notes", key=StateKeys.page_notes)
         submitted = self.render_submit_button()
         with st.div(style={"textAlign": "right"}):
             st.caption(
