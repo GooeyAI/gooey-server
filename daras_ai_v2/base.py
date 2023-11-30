@@ -189,6 +189,9 @@ class BasePage:
             with st.div(className="d-flex align-items-center"):
                 example_id, run_id, uid = extract_query_params(gooey_get_query_params())
                 current_run = self.get_sr_from_query_params(example_id, run_id, uid)
+                published_run = self.example_doc_sr(example_id) if example_id else None
+                if published_run and published_run != current_run:
+                    self._render_unpublished_changes_indicator()
                 if (
                     self.request
                     and self.request.user
@@ -196,9 +199,7 @@ class BasePage:
                 ):
                     self._render_run_action_buttons(
                         current_run=current_run,
-                        published_run=self.example_doc_sr(example_id)
-                        if example_id
-                        else None,
+                        published_run=published_run,
                     )
                 else:
                     self._render_social_buttons()
@@ -229,6 +230,9 @@ class BasePage:
 
     def _render_title(self, title: str):
         st.write(f"# {title}")
+
+    def _render_unpublished_changes_indicator(self):
+        st.html('<span class="text-muted me-3">Unpublished changes</span>')
 
     def _render_social_buttons(self):
         copy_to_clipboard_button(
