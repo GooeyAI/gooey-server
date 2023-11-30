@@ -177,11 +177,16 @@ class BasePage:
             StateKeys.page_notes, self.preview_description(st.session_state)
         )
 
+        title, breadcrumbs = self._get_title_and_breadcrumbs(
+            example_id=example_id, run_id=run_id, uid=uid
+        )
         with st.div(className="d-lg-flex d-md-block justify-content-between"):
             with st.div():
-                self._render_page_title_with_breadcrumbs(example_id, run_id, uid)
-                st.write(st.session_state.get(StateKeys.page_notes))
-            with st.div():
+                if breadcrumbs:
+                    self._render_breadcrumbs(breadcrumbs)
+                else:
+                    self._render_title(title)
+            with st.div(className="d-flex align-items-center"):
                 example_id, run_id, uid = extract_query_params(gooey_get_query_params())
                 current_run = self.get_sr_from_query_params(example_id, run_id, uid)
                 if (
@@ -197,6 +202,12 @@ class BasePage:
                     )
                 else:
                     self._render_social_buttons()
+
+        with st.div():
+            if breadcrumbs:
+                # title is rendered here only if breadcrumbs were rendered above
+                st.write(f"# {title}")
+            st.write(st.session_state.get(StateKeys.page_notes, ""))
 
         try:
             selected_tab = MenuTabs.paths_reverse[self.tab]
@@ -215,6 +226,9 @@ class BasePage:
                     st.html(name)
         with st.nav_tab_content():
             self.render_selected_tab(selected_tab)
+
+    def _render_title(self, title: str):
+        st.write(f"# {title}")
 
     def _render_social_buttons(self):
         copy_to_clipboard_button(
@@ -366,6 +380,76 @@ class BasePage:
                 type="secondary",
                 className="w-100",
             )
+
+    def _get_title_and_breadcrumbs(
+        self,
+        example_id: str,
+        run_id: str,
+        uid: str,
+    ) -> tuple[str, list[tuple[str, str | None]]]:
+        if example_id or run_id:
+            # the title on the saved root / the hardcoded title
+            recipe_title = (
+                self.recipe_doc_sr().to_dict().get(StateKeys.page_title) or self.title
+            )
+
+            # the user saved title for the current run (if its not the same as the recipe title)
+            current_title = st.session_state.get(StateKeys.page_title, "")
+            if current_title == recipe_title:
+                current_title = ""
+
+            # prefer the prompt as h1 title for runs, but not for examples
+            prompt_title = truncate_text_words(
+                self.preview_input(st.session_state) or "", maxlen=60
+            ).replace("\n", " ")
+            if run_id:
+                h1_title = prompt_title or current_title or recipe_title
+            else:
+                h1_title = current_title or prompt_title or recipe_title
+
+            # render recipe title if it doesn't clash with the h1 title
+            render_item1 = recipe_title != h1_title and recipe_title
+            # render current title if it doesn't clash with the h1 title
+            render_item2 = current_title != h1_title and current_title
+
+            breadcrumbs = []
+            if render_item1:
+                breadcrumbs.append((recipe_title, self.app_url()))
+            if render_item2:
+                current_sr = self.get_sr_from_query_params_dict(
+                    gooey_get_query_params()
+                )
+                breadcrumbs.append(
+                    (
+                        current_title,
+                        current_sr.parent.get_app_url()
+                        if current_sr.parent_id
+                        else None,
+                    )
+                )
+
+            return h1_title, breadcrumbs
+        else:
+            return self.get_recipe_title(st.session_state), []
+
+    def _render_breadcrumbs(self, items: list[tuple[str, str | None]]):
+        render_item1 = items and items[0]
+        render_item2 = items[1:] and items[1]
+        if render_item1 or render_item2:  # avoids empty space
+            with st.breadcrumbs(className="mt-4"):
+                if render_item1:
+                    text, link = render_item1
+                    st.breadcrumb_item(
+                        text,
+                        link_to=link,
+                        className="text-muted",
+                    )
+                if render_item2:
+                    text, link = render_item2
+                    st.breadcrumb_item(
+                        text,
+                        link_to=link,
+                    )
 
     def _render_page_title_with_breadcrumbs(
         self, example_id: str, run_id: str, uid: str
