@@ -22,16 +22,14 @@ def render():
             render_image(page, state)
 
         with col2:
-            render_description(page, state)
-            render_run_count(total_runs)
+            render_description(page, state, total_runs)
 
     def _render_as_featured(page_cls):
         page = page_cls()
         state = page.recipe_doc_sr().to_dict()
         total_runs = page.get_total_runs()
         render_image(page, state)
-        render_description(page, state)
-        render_run_count(total_runs)
+        render_description(page, state, total_runs)
 
     def render_image(page, state):
         gui.image(
@@ -39,7 +37,7 @@ def render():
             style={"border-radius": 5},
         )
 
-    def render_description(page, state):
+    def render_description(page, state, total_runs):
         with gui.link(to=page.app_url()):
             gui.markdown(f"#### {page.get_recipe_title(state)}")
         preview = page.preview_description(state)
@@ -50,8 +48,6 @@ def render():
                 )
         else:
             page.render_description()
-
-    def render_run_count(total_runs):
         with gui.tag(
             "p",
             style={
