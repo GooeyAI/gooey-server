@@ -25,6 +25,7 @@ from bots.models import (
 )
 from app_users.models import AppUser
 from bots.tasks import create_personal_channels_for_all_members
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.base import BasePage
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
@@ -253,7 +254,7 @@ class SavedRunAdmin(admin.ModelAdmin):
 
     @admin.display(description="Input")
     def preview_input(self, saved_run: SavedRun):
-        return BasePage.preview_input(saved_run.state)
+        return truncate_text_words(BasePage.preview_input(saved_run.state), 100)
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):
