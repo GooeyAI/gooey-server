@@ -25,6 +25,7 @@ from bots.models import (
 )
 from app_users.models import AppUser
 from bots.tasks import create_personal_channels_for_all_members
+from daras_ai_v2.base import BasePage
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
@@ -215,6 +216,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "run_time",
         "updated_at",
         "price",
+        "preview_input",
     ]
     list_filter = ["workflow"]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
@@ -248,6 +250,10 @@ class SavedRunAdmin(admin.ModelAdmin):
         return list_related_html_url(saved_run.botintegrations)
 
     view_bots.short_description = "View Bots"
+
+    @admin.display(description="Input")
+    def preview_input(self, saved_run: SavedRun):
+        return BasePage.preview_input(saved_run.state)
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):

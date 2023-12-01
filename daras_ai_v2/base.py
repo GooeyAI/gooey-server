@@ -1131,7 +1131,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def render_steps(self):
         raise NotImplementedError
 
-    def preview_input(self, state: dict) -> str | None:
+    @classmethod
+    def preview_input(cls, state: dict) -> str | None:
         return (
             state.get("text_prompt")
             or state.get("input_prompt")
