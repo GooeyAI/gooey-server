@@ -22,6 +22,7 @@ from daras_ai_v2.asr import AsrModels, run_google_translate
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from gooeysite.bg_db_conn import db_middleware
+from celeryapp.celeryconfig import app
 
 
 async def request_json(request: Request):
@@ -530,6 +531,18 @@ def save_broadcast_message(convo: Conversation, text: str, id: str | None = None
         message.platform_msg_id = id
     message.save()
     return message
+
+
+@app.task
+def save_broadcast_messages(
+    convos: list[Conversation],
+    text: str,
+    ids: typing.Sequence[str | None] | None = None,
+) -> "celery.result.AsyncResult":
+    if ids == None:
+        ids = [None] * len(convos)
+    for convo, id in zip(convos, ids):
+        save_broadcast_message(convo, text, id)
 
 
 def broadcast_input(bi: BotIntegration):

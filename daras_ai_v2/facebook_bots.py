@@ -108,8 +108,7 @@ class WhatsappBot(BotInterface):
         buttons: list | None = None,
         convo_filter_kwargs: dict | None = None,
     ):
-        from daras_ai_v2.bots import save_broadcast_message
-        from threading import Thread
+        from daras_ai_v2.bots import save_broadcast_messages
 
         ids = []
         convos = Conversation.objects.filter(
@@ -127,17 +126,11 @@ class WhatsappBot(BotInterface):
             ids += [id]
 
         # save the message in the background so we can return immediately from the api call
-        Thread(
-            target=lambda convos, text, ids: [
-                save_broadcast_message(convo, text, id)
-                for convo, id in zip(convos, ids)
-            ],
-            args=(
-                convos,
-                text,
-                ids,
-            ),
-        ).start()
+        save_broadcast_messages.delay(
+            convos,
+            text,
+            ids,
+        )
 
         return ", ".join(ids)
 
