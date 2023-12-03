@@ -40,8 +40,8 @@ class CompareText2ImgPage(BasePage):
         "seed": 42,
         "sd_2_upscaling": False,
         "image_guidance_scale": 1.2,
-        "dalle_3_quality": "standard",
-        "dalle_3_style": "vivid",
+        "dall_e_3_quality": "standard",
+        "dall_e_3_style": "vivid",
     }
 
     class RequestModel(BaseModel):
@@ -53,8 +53,8 @@ class CompareText2ImgPage(BasePage):
 
         num_outputs: int | None
         quality: int | None
-        dalle_3_quality: str | None
-        dalle_3_style: str | None
+        dall_e_3_quality: str | None
+        dall_e_3_style: str | None
 
         guidance_scale: float | None
         seed: int | None
@@ -182,8 +182,8 @@ class CompareText2ImgPage(BasePage):
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
                 num_inference_steps=request.quality,
-                dalle_3_quality=request.dalle_3_quality,
-                dalle_3_style=request.dalle_3_style,
+                dall_e_3_quality=request.dall_e_3_quality,
+                dall_e_3_style=request.dall_e_3_style,
                 width=request.output_width,
                 height=request.output_height,
                 guidance_scale=request.guidance_scale,

@@ -225,7 +225,7 @@ def quality_setting(selected_models=None):
                 "standard",
                 "hd",
             ],
-            key="dalle_3_quality",
+            key="dall_e_3_quality",
         )
         st.selectbox(
             """##### Dalle 3 Style""",
@@ -233,7 +233,7 @@ def quality_setting(selected_models=None):
                 "natural",
                 "vivid",
             ],
-            key="dalle_3_style",
+            key="dall_e_3_style",
         )
     st.slider(
         label="""
