@@ -418,9 +418,7 @@ def button(
     """
     if not key:
         key = md5_values("button", label, help, type, props)
-    className = "btn-" + type
-    if "className" in props:
-        className += " " + props.pop("className")
+    props["className"] = props.get("className", "") + " btn-" + type
     state.RenderTreeNode(
         name="gui-button",
         props=dict(
@@ -430,7 +428,6 @@ def button(
             label=dedent(label),
             help=help,
             disabled=disabled,
-            className=className,
             **props,
         ),
     ).mount()
