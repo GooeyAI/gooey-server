@@ -1,6 +1,7 @@
 import hashlib
 import io
 import re
+import typing
 from enum import Enum
 from functools import partial
 
@@ -16,6 +17,7 @@ from aifail import (
 from django.conf import settings
 from jinja2.lexer import whitespace_re
 from loguru import logger
+from openai.types.chat import ChatCompletionContentPartParam
 
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.functional import map_parallel
@@ -41,6 +43,7 @@ class LLMApis(Enum):
 
 
 class LargeLanguageModels(Enum):
+    gpt_4_vision = "GPT-4 Vision (openai)"
     gpt_4_turbo = "GPT-4 Turbo (openai)"
     gpt_4 = "GPT-4 (openai)"
     gpt_4_32k = "GPT-4 32K (openai)"
@@ -64,6 +67,11 @@ class LargeLanguageModels(Enum):
     def _deprecated(cls):
         return {cls.code_davinci_002}
 
+    def is_vision_model(self) -> bool:
+        return self in {
+            self.gpt_4_vision,
+        }
+
     def is_chat_model(self) -> bool:
         return self not in {
             self.palm2_text,
@@ -79,6 +87,7 @@ class LargeLanguageModels(Enum):
 AZURE_OPENAI_MODEL_PREFIX = "openai-"
 
 llm_model_names = {
+    LargeLanguageModels.gpt_4_vision: "gpt-4-vision-preview",
     LargeLanguageModels.gpt_4_turbo: (
         "openai-gpt-4-turbo-prod-ca-1",
         "gpt-4-1106-preview",
@@ -108,6 +117,7 @@ llm_model_names = {
 }
 
 llm_api = {
+    LargeLanguageModels.gpt_4_vision: LLMApis.openai,
     LargeLanguageModels.gpt_4_turbo: LLMApis.openai,
     LargeLanguageModels.gpt_4: LLMApis.openai,
     LargeLanguageModels.gpt_4_32k: LLMApis.openai,
@@ -127,6 +137,8 @@ llm_api = {
 EMBEDDING_MODEL_MAX_TOKENS = 8191
 
 model_max_tokens = {
+    # https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
+    LargeLanguageModels.gpt_4_vision: 128_000,
     # https://help.openai.com/en/articles/8555510-gpt-4-turbo
     LargeLanguageModels.gpt_4_turbo: 128_000,
     # https://platform.openai.com/docs/models/gpt-4
@@ -150,6 +162,7 @@ model_max_tokens = {
 }
 
 llm_price = {
+    LargeLanguageModels.gpt_4_vision: 6,
     LargeLanguageModels.gpt_4_turbo: 5,
     LargeLanguageModels.gpt_4: 10,
     LargeLanguageModels.gpt_4_32k: 20,
@@ -274,9 +287,27 @@ def _run_openai_embedding(
 
 
 class ConversationEntry(typing_extensions.TypedDict):
-    role: str
+    role: typing.Literal["user", "system", "assistant"]
+    content: str | list[ChatCompletionContentPartParam]
     display_name: typing_extensions.NotRequired[str]
-    content: str
+
+
+def get_entry_images(entry: ConversationEntry) -> list[str]:
+    contents = entry.get("content") or ""
+    if isinstance(contents, str):
+        return []
+    return list(
+        filter(None, (part.get("image_url", {}).get("url") for part in contents)),
+    )
+
+
+def get_entry_text(entry: ConversationEntry) -> str:
+    contents = entry.get("content") or ""
+    if isinstance(contents, str):
+        return contents
+    return "\n".join(
+        filter(None, (part.get("text") for part in contents)),
+    )
 
 
 def run_language_model(
@@ -306,6 +337,11 @@ def run_language_model(
             is_chatml, messages = parse_chatml(prompt)  # type: ignore
         messages = messages or []
         logger.info(f"{model_name=}, {len(messages)=}, {max_tokens=}, {temperature=}")
+        if not model.is_vision_model():
+            messages = [
+                format_chat_entry(role=entry["role"], content=get_entry_text(entry))
+                for entry in messages
+            ]
         result = _run_chat_model(
             api=api,
             model=model_name,
@@ -429,6 +465,8 @@ def _run_openai_chat(
     stop: list[str] | None,
     avoid_repetition: bool,
 ) -> list[ConversationEntry]:
+    from openai._types import NOT_GIVEN
+
     if avoid_repetition:
         frequency_penalty = 0.1
         presence_penalty = 0.25
@@ -444,7 +482,7 @@ def _run_openai_chat(
                 model=model_str,
                 messages=messages,
                 max_tokens=max_tokens,
-                stop=stop,
+                stop=stop or NOT_GIVEN,
                 n=num_outputs,
                 temperature=temperature,
                 frequency_penalty=frequency_penalty,
@@ -648,7 +686,7 @@ def _run_palm_text(
 
 def format_chatml_message(entry: ConversationEntry) -> str:
     msg = CHATML_START_TOKEN + entry.get("role", "")
-    content = entry.get("content").strip()
+    content = get_entry_text(entry).strip()
     if content:
         msg += "\n" + content + CHATML_END_TOKEN
     return msg
@@ -740,3 +778,15 @@ def build_llama_prompt(messages: list[ConversationEntry]):
     ret += f"{B_INST} {messages[-1].get('content').strip()} {E_INST}"
 
     return ret
+
+
+def format_chat_entry(
+    *, role: str, content: str, images: list[str] = None
+) -> ConversationEntry:
+    if images:
+        content = [
+            {"type": "image_url", "image_url": {"url": url}} for url in images
+        ] + [
+            {"type": "text", "text": content},
+        ]
+    return {"role": role, "content": content}

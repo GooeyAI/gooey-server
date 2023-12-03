@@ -26,12 +26,6 @@ class WhatsappBot(BotInterface):
 
         self.input_type = message["type"]
 
-        # if the message has a caption, treat it as text
-        caption = self._get_caption()
-        if caption:
-            self.input_type = "text"
-            self.input_message["text"] = {"body": caption}
-
         bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
@@ -43,10 +37,11 @@ class WhatsappBot(BotInterface):
         try:
             return self.input_message["text"]["body"]
         except KeyError:
-            return None
-
-    def _get_caption(self):
-        return self.input_message.get(self.input_type, {}).get("caption")
+            pass
+        try:
+            return self.input_message[self.input_type]["caption"]
+        except KeyError:
+            pass
 
     def get_input_audio(self) -> str | None:
         try:
@@ -56,13 +51,27 @@ class WhatsappBot(BotInterface):
                 media_id = self.input_message["video"]["id"]
             except KeyError:
                 return None
-        return self._download_wa_media(media_id)
-
-    def _download_wa_media(self, media_id: str) -> str:
         # download file from whatsapp
         data, mime_type = retrieve_wa_media_by_id(media_id)
         data, _ = audio_bytes_to_wav(data)
         mime_type = "audio/wav"
+        # upload file to firebase
+        return upload_file_from_bytes(
+            filename=self.nice_filename(mime_type),
+            data=data,
+            content_type=mime_type,
+        )
+
+    def get_input_images(self) -> list[str] | None:
+        try:
+            media_id = self.input_message["image"]["id"]
+        except KeyError:
+            return None
+        return [self._download_wa_media(media_id)]
+
+    def _download_wa_media(self, media_id: str) -> str:
+        # download file from whatsapp
+        data, mime_type = retrieve_wa_media_by_id(media_id)
         # upload file to firebase
         return upload_file_from_bytes(
             filename=self.nice_filename(mime_type),

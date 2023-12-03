@@ -21,9 +21,12 @@ from bots.models import (
     Feedback,
     Conversation,
     BotIntegration,
+    MessageAttachment,
 )
 from app_users.models import AppUser
 from bots.tasks import create_personal_channels_for_all_members
+from daras_ai.image_input import truncate_text_words
+from daras_ai_v2.base import BasePage
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
@@ -214,6 +217,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "run_time",
         "updated_at",
         "price",
+        "preview_input",
     ]
     list_filter = ["workflow"]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
@@ -247,6 +251,10 @@ class SavedRunAdmin(admin.ModelAdmin):
         return list_related_html_url(saved_run.botintegrations)
 
     view_bots.short_description = "View Bots"
+
+    @admin.display(description="Input")
+    def preview_input(self, saved_run: SavedRun):
+        return truncate_text_words(BasePage.preview_input(saved_run.state), 100)
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):
@@ -360,6 +368,12 @@ class FeedbackInline(admin.TabularInline):
     readonly_fields = ["created_at"]
 
 
+class MessageAttachmentInline(admin.TabularInline):
+    model = MessageAttachment
+    extra = 0
+    readonly_fields = ["url", "metadata", "created_at"]
+
+
 class AnalysisResultFilter(admin.SimpleListFilter):
     title = "analysis_result"
     parameter_name = "analysis_result"
@@ -419,7 +433,7 @@ class MessageAdmin(admin.ModelAdmin):
     ordering = ["created_at"]
     actions = [export_to_csv, export_to_excel]
 
-    inlines = [FeedbackInline]
+    inlines = [MessageAttachmentInline, FeedbackInline]
 
     formfield_overrides = {
         django.db.models.JSONField: {"widget": JSONEditorWidget},

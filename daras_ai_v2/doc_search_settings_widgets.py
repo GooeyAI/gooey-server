@@ -2,7 +2,6 @@ import os
 import typing
 
 import gooey_ui as st
-
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, google_translate_language_selector
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -80,7 +79,8 @@ def document_uploader(
 
 
 def doc_search_settings(
-    asr_allowed: bool = True, keyword_instructions_allowed: bool = False
+    asr_allowed: bool = False,
+    keyword_instructions_allowed: bool = False,
 ):
     from daras_ai_v2.vector_search import DocSearchRequest
 
@@ -93,6 +93,24 @@ def doc_search_settings(
             key="citation_style",
             use_selectbox=True,
             allow_none=True,
+        )
+
+    st.text_area(
+        """
+###### 👁‍🗨 Summarization Instructions
+Prompt to transform the conversation history into a vector search query.  
+These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.                
+        """,
+        key="query_instructions",
+        height=300,
+    )
+    if keyword_instructions_allowed:
+        st.text_area(
+            """
+###### 🔑 Keyword Extraction                 
+        """,
+            key="keyword_instructions",
+            height=300,
         )
 
     dense_weight_ = DocSearchRequest.__fields__["dense_weight"]
@@ -135,33 +153,15 @@ Your knowledge base documents are split into overlapping snippets. This settings
         max_value=50,
     )
 
-    st.text_area(
-        """
-###### 👁‍🗨 Summarization Instructions
-Prompt to transform the conversation history into a vector search query.  
-These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.                
-        """,
-        key="query_instructions",
-        height=300,
-    )
-    if keyword_instructions_allowed:
-        st.text_area(
-            """
-###### 🔑 Keyword Extraction                 
-        """,
-            key="keyword_instructions",
-            height=300,
-        )
-
     if not asr_allowed:
         return
 
     st.write("---")
     st.write(
         """
-             ##### 🎤 Knowledge Base Speech Recognition
-             <font color="grey">If your knowledge base documents contain audio or video files, we'll transcribe and optionally translate them to English, given we've found most vectorDBs and LLMs perform best in English (even if their final answers are translated into another language). 
-             """
+        ##### 🎤 Knowledge Base Speech Recognition
+        <font color="grey">If your knowledge base documents contain audio or video files, we'll transcribe and optionally translate them to English, given we've found most vectorDBs and LLMs perform best in English (even if their final answers are translated into another language). 
+        """
     )
 
     enum_selector(

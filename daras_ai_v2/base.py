@@ -14,6 +14,7 @@ import math
 import requests
 import sentry_sdk
 from django.utils import timezone
+from enum import Enum
 from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
@@ -69,6 +70,13 @@ gooey_rng = Random()
 
 
 SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
+
+
+class RecipeRunState(Enum):
+    idle = 1
+    running = 2
+    completed = 3
+    failed = 4
 
 
 class StateKeys:
@@ -148,6 +156,15 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
+    def get_tab_url(self, tab: str) -> str:
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        return self.app_url(
+            example_id=example_id,
+            run_id=run_id,
+            uid=uid,
+            tab_name=MenuTabs.paths[tab],
+        )
+
     def render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
@@ -188,10 +205,7 @@ class BasePage:
         with st.nav_tabs():
             tab_names = self.get_tabs()
             for name in tab_names:
-                url = self.app_url(
-                    *extract_query_params(gooey_get_query_params()),
-                    tab_name=MenuTabs.paths[name],
-                )
+                url = self.get_tab_url(name)
                 with st.nav_item(url, active=name == selected_tab):
                     st.html(name)
         with st.nav_tab_content():
@@ -214,7 +228,7 @@ class BasePage:
             # prefer the prompt as h1 title for runs, but not for examples
             prompt_title = truncate_text_words(
                 self.preview_input(st.session_state) or "", maxlen=60
-            )
+            ).replace("\n", " ")
             if run_id:
                 h1_title = prompt_title or current_title or recipe_title
             else:
@@ -244,10 +258,7 @@ class BasePage:
                         )
             st.write(f"# {h1_title}")
         else:
-            with st.link(
-                to=self.app_url(), className="text-decoration-none", target="_blank"
-            ):
-                st.write(f"# {self.get_recipe_title(st.session_state)}")
+            st.write(f"# {self.get_recipe_title(st.session_state)}")
 
     def get_recipe_title(self, state: dict) -> str:
         return state.get(StateKeys.page_title) or self.title or ""
@@ -538,7 +549,7 @@ class BasePage:
                     cost_note = f"({cost_note.strip()})"
                 st.caption(
                     f"""
-Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}  
+Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}
 {self.additional_notes() or ""}
                     """,
                     unsafe_allow_html=True,
@@ -695,6 +706,17 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
         return submitted
 
+    def get_run_state(self) -> RecipeRunState:
+        if st.session_state.get(StateKeys.run_status):
+            return RecipeRunState.running
+        elif st.session_state.get(StateKeys.error_msg):
+            return RecipeRunState.failed
+        elif st.session_state.get(StateKeys.run_time):
+            return RecipeRunState.completed
+        else:
+            # when user is at a recipe root, and not running anything
+            return RecipeRunState.idle
+
     def _render_output_col(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
 
@@ -708,26 +730,61 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
         self._render_before_output()
 
-        run_status = st.session_state.get(StateKeys.run_status)
-        if run_status:
-            st.caption("Your changes are saved in the above URL. Save it for later!")
-            html_spinner(run_status)
-        else:
-            err_msg = st.session_state.get(StateKeys.error_msg)
-            run_time = st.session_state.get(StateKeys.run_time, 0)
-
-            # render errors
-            if err_msg is not None:
-                st.error(err_msg)
-            # render run time
-            elif run_time:
-                st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
+        run_state = self.get_run_state()
+        match run_state:
+            case RecipeRunState.completed:
+                self._render_completed_output()
+            case RecipeRunState.failed:
+                self._render_failed_output()
+            case RecipeRunState.running:
+                self._render_running_output()
+            case RecipeRunState.idle:
+                pass
 
         # render outputs
         self.render_output()
 
-        if not run_status:
+        if run_state != "waiting":
             self._render_after_output()
+
+    def _render_completed_output(self):
+        run_time = st.session_state.get(StateKeys.run_time, 0)
+        st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
+
+    def _render_failed_output(self):
+        err_msg = st.session_state.get(StateKeys.error_msg)
+        st.error(err_msg)
+
+    def _render_running_output(self):
+        run_status = st.session_state.get(StateKeys.run_status)
+        st.caption("Your changes are saved in the above URL. Save it for later!")
+        html_spinner(run_status)
+        self.render_extra_waiting_output()
+
+    def render_extra_waiting_output(self):
+        estimated_run_time = self.estimate_run_duration()
+        if not estimated_run_time:
+            return
+        if created_at := st.session_state.get("created_at"):
+            if isinstance(created_at, datetime.datetime):
+                start_time = created_at
+            else:
+                start_time = datetime.datetime.fromisoformat(created_at)
+            with st.countdown_timer(
+                end_time=start_time + datetime.timedelta(seconds=estimated_run_time),
+                delay_text="Sorry for the wait. Your run is taking longer than we expected.",
+            ):
+                if self.is_current_user_owner() and self.request.user.email:
+                    st.write(
+                        f"""We'll email **{self.request.user.email}** when your workflow is done."""
+                    )
+                st.write(
+                    f"""In the meantime, check out [🚀 Examples]({self.get_tab_url(MenuTabs.examples)})
+                      for inspiration."""
+                )
+
+    def estimate_run_duration(self) -> int | None:
+        pass
 
     def on_submit(self):
         example_id, run_id, uid = self.create_new_run()
@@ -811,7 +868,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
-You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account 
+You’ll receive {settings.LOGIN_USER_FREE_CREDITS} Credits when you sign up via your phone #, Google, Apple or GitHub account
 and can <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
             """
         else:
@@ -1074,7 +1131,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def render_steps(self):
         raise NotImplementedError
 
-    def preview_input(self, state: dict) -> str | None:
+    @classmethod
+    def preview_input(cls, state: dict) -> str | None:
         return (
             state.get("text_prompt")
             or state.get("input_prompt")
