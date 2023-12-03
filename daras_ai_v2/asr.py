@@ -61,7 +61,7 @@ class AsrModels(Enum):
 
     def supports_auto_detect(self) -> bool:
         return self not in {
-            seld.azure,
+            self.azure,
         }
 
 
