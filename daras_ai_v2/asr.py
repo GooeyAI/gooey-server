@@ -59,6 +59,11 @@ class AsrModels(Enum):
     azure = "Azure Speech"
     seamless_m4t = "Seamless M4T (Facebook Research)"
 
+    def supports_auto_detect(self) -> bool:
+        return self not in {
+            seld.azure,
+        }
+
 
 asr_model_ids = {
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
@@ -84,10 +89,6 @@ asr_supported_languages = {
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
     AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
-}
-
-does_not_support_auto_detect = {
-    AsrModels.azure,
 }
 
 
@@ -165,7 +166,7 @@ def asr_language_selector(
         return forced_lang
 
     options = list(asr_supported_languages.get(selected_model, []))
-    if selected_model not in does_not_support_auto_detect:
+    if selected_model and selected_model.supports_auto_detect():
         options.insert(0, None)
 
     # handle non-canonical language codes
