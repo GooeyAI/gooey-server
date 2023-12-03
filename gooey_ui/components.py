@@ -576,7 +576,7 @@ def horizontal_radio(
         return None
     options = list(options)
     if not key:
-        key = md5_values("radio", label, options, help, label_visibility)
+        key = md5_values("horizontal_radio", label, options, help, label_visibility)
     value = state.session_state.get(key)
     if key not in state.session_state or value not in options:
         value = options[0]
