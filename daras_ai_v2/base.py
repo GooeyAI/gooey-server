@@ -347,6 +347,7 @@ class BasePage:
                             current_run=current_run,
                             published_run=published_run,
                             is_update_mode=is_update_mode,
+                            modal=publish_modal,
                         )
 
                 if run_actions_modal.is_open():
@@ -359,6 +360,7 @@ class BasePage:
         self,
         *,
         current_run: SavedRun,
+        modal: Modal,
         published_run: PublishedRun | None,
         is_update_mode: bool = False,
     ):
@@ -429,6 +431,9 @@ class BasePage:
                     title=published_run_title.strip(),
                     notes=published_run_notes.strip(),
                 )
+            modal.close()
+            st.experimental_rerun()
+
             raise QueryParamsRedirectException(
                 query_params=dict(example_id=published_run.published_run_id),
             )
@@ -582,6 +587,7 @@ class BasePage:
                 with col1:
                     self._render_help()
                 with col2:
+                    self._render_versions()
                     self._render_save_options()
 
                 self.render_related_workflows()
@@ -599,6 +605,35 @@ class BasePage:
 
             case MenuTabs.published:
                 self._published_tab()
+                render_js_dynamic_dates()
+
+    def _render_versions(self):
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        published_run = self.get_published_run_from_query_params(
+            example_id, run_id, uid
+        )
+
+        if published_run:
+            st.write("## Versions")
+            col1, col2, col3 = st.columns([1, 3, 2], responsive=False)
+            versions = published_run.versions.all()
+            for i, version in reverse_enumerate(len(versions) - 1, versions):
+                url = self.app_url(
+                    example_id=published_run.published_run_id,
+                    run_id=version.saved_run.run_id,
+                    uid=version.saved_run.uid,
+                )
+                with col1:
+                    st.write(f"{i}")
+                with col2:
+                    with st.link(to=url):
+                        st.write(version.title)
+                with col3:
+                    if isinstance(version.created_at, datetime.datetime):
+                        timestamp = version.created_at
+                    else:
+                        timestamp = datetime.datetime.fromisoformat(version.created_at)
+                    st.write(format_timestamp(timestamp))
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
@@ -1257,18 +1292,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                     "Note: To approve a run as an example, it must be published publicly first."
                 )
 
-            if published_run:
-                st.write("#### Versions")
-                versions = published_run.versions.all()
-                for i, version in reverse_enumerate(len(versions) - 1, versions):
-                    url = self.app_url(
-                        example_id=published_run.published_run_id,
-                        run_id=version.saved_run.run_id,
-                        uid=version.saved_run.uid,
-                    )
-                    with st.link(to=url):
-                        st.write(f"{i}: {version.title}")
-
     def state_to_doc(self, state: dict):
         ret = {
             field_name: deepcopy(state[field_name])
@@ -1658,3 +1681,11 @@ def convert_state_type(state, key, fn):
 
 def reverse_enumerate(start, iterator):
     return zip(range(start, -1, -1), iterator)
+
+
+def format_timestamp(timestamp: datetime.datetime):
+    current_year = datetime.datetime.now().year
+    if timestamp.year == current_year:
+        return timestamp.strftime("%a, %d %b, %I:%M %p")
+    else:
+        return timestamp.strftime("%a, %d %b %Y, %I:%M %p")
