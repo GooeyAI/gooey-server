@@ -782,7 +782,7 @@ def breadcrumbs(divider: str = "/", **props) -> state.NestingCtx:
 
 
 def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
-    className = "breadcrumb-item lead " + props.pop("className", "")
+    className = "breadcrumb-item " + props.pop("className", "")
     with tag("li", className=className, **props):
         if link_to:
             with tag("a", href=link_to):

@@ -182,20 +182,21 @@ class BasePage:
             current_run=current_run,
             published_run=published_run,
         )
-        with st.div(className="d-lg-flex d-md-block justify-content-between mt-4"):
-            with st.div(className="d-lg-flex d-md-block align-items-center"):
+        with st.div(className="d-flex justify-content-between mt-4"):
+            with st.div(className="d-md-flex d-block align-items-center"):
                 if not breadcrumbs and not self.run_user:
                     self._render_title(title)
 
                 if breadcrumbs:
-                    with st.tag("span", className="me-3"):
+                    with st.tag("div", className="me-3 mb-1 mb-md-0 py-2 py-md-0"):
                         self._render_breadcrumbs(breadcrumbs)
 
                 author = self.run_user or current_run.get_creator()
                 if not is_root_example:
                     self.render_author(author)
 
-            with st.div(className="d-flex align-items-center"):
+            with st.div(className="d-flex align-items-start"):
+                self._render_social_buttons()
                 if (
                     self.request
                     and self.request.user
@@ -212,8 +213,6 @@ class BasePage:
                         current_run=current_run,
                         published_run=published_run,
                     )
-                else:
-                    self._render_social_buttons()
 
         with st.div():
             if breadcrumbs or self.run_user:
@@ -250,9 +249,9 @@ class BasePage:
 
     def _render_social_buttons(self):
         copy_to_clipboard_button(
-            "🔗 Copy URL",
+            '<i class="fa-regular fa-link"></i>',
             value=self._get_current_app_url(),
-            type="secondary",
+            type="tertiary",
             className="mb-0",
         )
 
@@ -295,11 +294,13 @@ class BasePage:
                 if run_actions_button:
                     run_actions_modal.open()
 
-                save_text = "📝 Update" if is_update_mode else "📝 Save"
+                save_icon = '<i class="fa-regular fa-floppy-disk"></i>'
+                # save_text = f"{save_icon} Update" if is_update_mode else f"{save_icon} Save"
+                save_text = save_icon
                 save_button = st.button(
                     save_text,
                     className="mb-0",
-                    type="secondary",
+                    type="tertiary",
                 )
                 publish_modal = Modal("", key="publish-modal")
                 if save_button:
@@ -453,6 +454,25 @@ class BasePage:
                     ]
 
     def _render_breadcrumbs(self, items: list[tuple[str, str | None]]):
+        st.html(
+            """
+            <style>
+            @media (min-width: 768px) {
+                .breadcrumb-item {
+                    font-size: 1.25rem !important;
+                }
+            }
+
+            @media (max-width: 768px) {
+                .breadcrumb-item {
+                    font-size: 1rem !important;
+                    padding-top: 6px;
+                }
+            }
+            </style>
+            """
+        )
+
         render_item1 = items and items[0]
         render_item2 = items[1:] and items[1]
         if render_item1 or render_item2:  # avoids empty space
@@ -764,9 +784,28 @@ class BasePage:
 
         html = "<div style='display:flex; align-items:center;'>"
         if user.photo_url:
+            st.html(
+                """
+                <style>
+                .author-image {
+                    width: 26px;
+                    height: 26px;
+                    margin-right: 6px;
+                    border-radius: 50%;
+                    pointer-events: none;
+                }
+
+                @media (min-width: 768px) {
+                    .author-image {
+                        width: 38px;
+                        height: 38px;
+                    }
+                }
+                </style>
+            """
+            )
             html += f"""
-                <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{user.photo_url}">
-                <div style="width:8px;"></div>
+                <img class="author-image" src="{user.photo_url}">
             """
         if user.display_name:
             html += f"<div>{user.display_name}</div>"
