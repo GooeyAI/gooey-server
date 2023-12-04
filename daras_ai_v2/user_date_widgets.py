@@ -29,7 +29,7 @@ async function render_js_dynamic_dates() {
         let yearToShow = "";
         if (date.getFullYear() != new Date().getFullYear()) {
             yearToShow = " " + date.getFullYear().toString();
-        } 
+        }
         elem.children[0].innerHTML = `
                 ${date.toLocaleDateString("en-IN", dateOptions)}${yearToShow},
                 ${date.toLocaleTimeString("en-IN", timeOptions).toUpperCase()}
@@ -39,5 +39,16 @@ async function render_js_dynamic_dates() {
 window.waitUntilHydrated.then(render_js_dynamic_dates);
 window.addEventListener("hydrated", render_js_dynamic_dates);
 </script>
+        """,
+    )
+
+
+def re_render_js_dynamic_dates():
+    gui.html(
+        # language=HTML
+        """
+        <script>
+        render_js_dynamic_dates();
+        </script>
         """,
     )

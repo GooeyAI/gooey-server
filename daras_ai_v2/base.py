@@ -53,7 +53,11 @@ from daras_ai_v2.query_params_util import (
 )
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.tabs_widget import MenuTabs
-from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
+from daras_ai_v2.user_date_widgets import (
+    render_js_dynamic_dates,
+    re_render_js_dynamic_dates,
+    js_dynamic_date,
+)
 from gooey_ui import realtime_clear_subs
 from gooey_ui.pubsub import realtime_pull
 from gooey_ui.components.modal import Modal
@@ -467,6 +471,10 @@ class BasePage:
             published_run.delete()
             raise QueryParamsRedirectException(query_params={})
 
+        with st.div(className="mt-3"):
+            st.write("#### Version History")
+            self._render_versions()
+
     def _get_title_and_breadcrumbs(
         self,
         current_run: SavedRun,
@@ -583,10 +591,10 @@ class BasePage:
                 with col1:
                     self._render_help()
                 with col2:
-                    self._render_versions()
                     self._render_save_options()
 
                 self.render_related_workflows()
+                render_js_dynamic_dates()
 
             case MenuTabs.examples:
                 self._examples_tab()
@@ -610,18 +618,17 @@ class BasePage:
         )
 
         if published_run:
-            st.write("## Versions")
-            col1, col2, col3 = st.columns([1, 3, 2], responsive=False)
             versions = published_run.versions.all()
-            for i, version in reverse_enumerate(len(versions) - 1, versions):
-                url = self.app_url(
-                    example_id=published_run.published_run_id,
-                    run_id=version.saved_run.run_id,
-                    uid=version.saved_run.uid,
-                )
+            for i, version in reverse_enumerate(len(versions), versions):
+                col1, col2, col3 = st.columns([1, 4, 4], responsive=False)
                 with col1:
                     st.write(f"{i}")
                 with col2:
+                    url = self.app_url(
+                        example_id=published_run.published_run_id,
+                        run_id=version.saved_run.run_id,
+                        uid=version.saved_run.uid,
+                    )
                     with st.link(to=url):
                         st.write(version.title)
                 with col3:
@@ -629,7 +636,8 @@ class BasePage:
                         timestamp = version.created_at
                     else:
                         timestamp = datetime.datetime.fromisoformat(version.created_at)
-                    st.write(format_timestamp(timestamp))
+                    js_dynamic_date(timestamp)
+                    re_render_js_dynamic_dates()
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
@@ -1688,11 +1696,3 @@ def convert_state_type(state, key, fn):
 
 def reverse_enumerate(start, iterator):
     return zip(range(start, -1, -1), iterator)
-
-
-def format_timestamp(timestamp: datetime.datetime):
-    current_year = datetime.datetime.now().year
-    if timestamp.year == current_year:
-        return timestamp.strftime("%a, %d %b, %I:%M %p")
-    else:
-        return timestamp.strftime("%a, %d %b %Y, %I:%M %p")
