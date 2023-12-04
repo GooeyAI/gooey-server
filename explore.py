@@ -36,6 +36,7 @@ def render():
     def render_image(page, state):
         gui.image(
             page.get_recipe_image(state),
+            href=page.app_url(),
             style={"border-radius": 5},
         )
 

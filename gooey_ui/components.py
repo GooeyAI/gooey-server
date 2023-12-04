@@ -214,6 +214,7 @@ def image(
     src: str | np.ndarray,
     caption: str = None,
     alt: str = None,
+    href: str = None,
     **props,
 ):
     if isinstance(src, np.ndarray):
@@ -234,6 +235,7 @@ def image(
             src=src,
             caption=dedent(caption),
             alt=alt or caption,
+            href=href,
             **props,
         ),
     ).mount()
