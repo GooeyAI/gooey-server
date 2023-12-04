@@ -181,7 +181,7 @@ def controlnet_weight_setting(
     )
 
 
-def num_outputs_setting(selected_model: str = None):
+def num_outputs_setting(selected_models: str | list[str] = None):
     col1, col2 = st.columns(2, gap="medium")
     with col1:
         st.slider(
@@ -200,12 +200,41 @@ def num_outputs_setting(selected_model: str = None):
             """
         )
     with col2:
-        quality_setting(selected_model)
+        quality_setting(selected_models)
 
 
-def quality_setting(selected_model=None):
-    if selected_model in [InpaintingModels.dall_e.name]:
+def quality_setting(selected_models=None):
+    if not isinstance(selected_models, list):
+        selected_models = [selected_models]
+    if any(
+        [
+            selected_model in [InpaintingModels.dall_e.name]
+            for selected_model in selected_models
+        ]
+    ):
         return
+    if any(
+        [
+            selected_model in [Text2ImgModels.dall_e_3.name]
+            for selected_model in selected_models
+        ]
+    ):
+        st.selectbox(
+            """##### Dalle 3 Quality""",
+            options=[
+                "standard",
+                "hd",
+            ],
+            key="dall_e_3_quality",
+        )
+        st.selectbox(
+            """##### Dalle 3 Style""",
+            options=[
+                "natural",
+                "vivid",
+            ],
+            key="dall_e_3_style",
+        )
     st.slider(
         label="""
         ##### Quality
@@ -223,7 +252,10 @@ def quality_setting(selected_model=None):
     )
 
 
-RESOLUTIONS = {
+RESOLUTIONS: dict[int, dict[str, str]] = {
+    256: {
+        "256, 256": "square",
+    },
     512: {
         "512, 512": "square",
         "576, 448": "A4",
@@ -247,6 +279,7 @@ RESOLUTIONS = {
         "1536, 512": "smartphone",
         "1792, 512": "cinema",
         "2048, 512": "panorama",
+        "1792, 1024": "wide",
     },
 }
 LANDSCAPE = "Landscape"
@@ -281,12 +314,19 @@ def output_resolution_setting():
         st.session_state.get("selected_model", st.session_state.get("selected_models"))
         or ""
     )
+    allowed_shapes = RESOLUTIONS[st.session_state["__pixels"]].values()
     if not isinstance(selected_models, list):
         selected_models = [selected_models]
     if "jack_qiao" in selected_models or "sd_1_4" in selected_models:
         pixel_options = [512]
     elif selected_models == ["deepfloyd_if"]:
         pixel_options = [1024]
+    elif selected_models == ["dall_e"]:
+        pixel_options = [256, 512, 1024]
+        allowed_shapes = ["square"]
+    elif selected_models == ["dall_e_3"]:
+        pixel_options = [1024]
+        allowed_shapes = ["square", "wide"]
     else:
         pixel_options = [512, 768]
 
@@ -298,11 +338,16 @@ def output_resolution_setting():
             options=pixel_options,
         )
     with col2:
+        res_options = [
+            key
+            for key, val in RESOLUTIONS[pixels or pixel_options[0]].items()
+            if val in allowed_shapes
+        ]
         res = st.selectbox(
             "##### Resolution",
             key="__res",
             format_func=lambda r: f"{r.split(', ')[0]} x {r.split(', ')[1]} ({RESOLUTIONS[pixels][r]})",
-            options=list(RESOLUTIONS[pixels].keys()),
+            options=res_options,
         )
         res = tuple(map(int, res.split(", ")))
 

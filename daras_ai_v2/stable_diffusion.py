@@ -270,25 +270,32 @@ def text2img(
     guidance_scale: float = None,
     negative_prompt: str = None,
     scheduler: str = None,
+    dall_e_3_quality: str | None = None,
+    dall_e_3_style: str | None = None,
 ):
-    _resolution_check(width, height, max_size=(1024, 1024))
+    if selected_model != Text2ImgModels.dall_e_3.name:
+        _resolution_check(width, height, max_size=(1024, 1024))
 
     match selected_model:
         case Text2ImgModels.dall_e_3.name:
             from openai import OpenAI
 
             client = OpenAI()
+            width, height = _get_dall_e_3_img_size(width, height)
             response = client.images.generate(
                 model=text2img_model_ids[Text2ImgModels[selected_model]],
-                n=num_outputs,
+                n=1,  # num_outputs, not supported yet
                 prompt=prompt,
                 response_format="b64_json",
+                quality=dall_e_3_quality,
+                style=dall_e_3_style,
+                size=f"{width}x{height}",
             )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case Text2ImgModels.dall_e.name:
             from openai import OpenAI
 
-            edge = _get_dalle_img_size(width, height)
+            edge = _get_dall_e_img_size(width, height)
             client = OpenAI()
             response = client.images.generate(
                 n=num_outputs,
@@ -324,7 +331,7 @@ def text2img(
     ]
 
 
-def _get_dalle_img_size(width: int, height: int) -> int:
+def _get_dall_e_img_size(width: int, height: int) -> int:
     edge = max(width, height)
     if edge < 512:
         edge = 256
@@ -333,6 +340,15 @@ def _get_dalle_img_size(width: int, height: int) -> int:
     elif edge > 1024:
         edge = 1024
     return edge
+
+
+def _get_dall_e_3_img_size(width: int, height: int) -> tuple[int, int]:
+    if height == width:
+        return 1024, 1024
+    elif width < height:
+        return 1024, 1792
+    else:
+        return 1792, 1024
 
 
 def img2img(
@@ -358,7 +374,7 @@ def img2img(
         case Img2ImgModels.dall_e.name:
             from openai import OpenAI
 
-            edge = _get_dalle_img_size(width, height)
+            edge = _get_dall_e_img_size(width, height)
             image = resize_img_pad(init_image_bytes, (edge, edge))
 
             client = OpenAI()
@@ -478,7 +494,7 @@ def inpainting(
         case InpaintingModels.dall_e.name:
             from openai import OpenAI
 
-            edge = _get_dalle_img_size(width, height)
+            edge = _get_dall_e_img_size(width, height)
             edit_image_bytes = resize_img_pad(edit_image_bytes, (edge, edge))
             mask_bytes = resize_img_pad(mask_bytes, (edge, edge))
             image = rgb_img_to_rgba(edit_image_bytes, mask_bytes)
