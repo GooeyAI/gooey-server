@@ -183,19 +183,19 @@ class BasePage:
             published_run=published_run,
         )
         with st.div(className="d-flex justify-content-between mt-4"):
-            with st.div(className="d-md-flex d-block align-items-center"):
+            with st.div(className="d-lg-flex d-block align-items-center"):
                 if not breadcrumbs and not self.run_user:
                     self._render_title(title)
 
                 if breadcrumbs:
-                    with st.tag("div", className="me-3 mb-1 mb-md-0 py-2 py-md-0"):
+                    with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
                         self._render_breadcrumbs(breadcrumbs)
 
                 author = self.run_user or current_run.get_creator()
                 if not is_root_example:
                     self.render_author(author)
 
-            with st.div(className="d-flex align-items-start"):
+            with st.div(className="d-flex align-items-center"):
                 is_current_user_creator = (
                     self.request
                     and self.request.user
@@ -213,13 +213,31 @@ class BasePage:
                 if is_current_user_creator and has_unpublished_changes:
                     self._render_unpublished_changes_indicator()
 
-                self._render_social_buttons()
+                with st.div(className="d-flex align-items-center right-action-icons"):
+                    st.html(
+                        """
+                    <style>
+                    @media (min-width: 768px) {
+                        .right-action-icons .btn {
+                            padding: 6px;
+                        }
+                    }
 
-                if is_current_user_creator:
-                    self._render_published_run_buttons(
-                        current_run=current_run,
-                        published_run=published_run,
+                    .right-action-icons .btn {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                    }
+                    </style>
+                    """
                     )
+
+                    self._render_social_buttons()
+
+                    if is_current_user_creator:
+                        self._render_published_run_buttons(
+                            current_run=current_run,
+                            published_run=published_run,
+                        )
 
         with st.div():
             if breadcrumbs or self.run_user:
@@ -255,7 +273,8 @@ class BasePage:
         with st.div(
             className="d-none d-lg-flex h-100 align-items-center text-muted me-3"
         ):
-            st.html("Unpublished changes")
+            with st.tag("span", className="d-inline-block"):
+                st.html("Unpublished changes")
 
     def _render_social_buttons(self):
         copy_to_clipboard_button(
@@ -471,15 +490,15 @@ class BasePage:
         st.html(
             """
             <style>
-            @media (min-width: 768px) {
+            @media (min-width: 1024px) {
                 .breadcrumb-item {
                     font-size: 1.25rem !important;
                 }
             }
 
-            @media (max-width: 768px) {
+            @media (max-width: 1024px) {
                 .breadcrumb-item {
-                    font-size: 1rem !important;
+                    font-size: 0.85rem !important;
                     padding-top: 6px;
                 }
             }
@@ -809,7 +828,7 @@ class BasePage:
                     pointer-events: none;
                 }
 
-                @media (min-width: 768px) {
+                @media (min-width: 1024px) {
                     .author-image {
                         width: 38px;
                         height: 38px;
