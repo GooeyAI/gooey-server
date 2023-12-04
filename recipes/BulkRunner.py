@@ -117,12 +117,12 @@ For each output field in the Gooey.AI workflow, specify the column name that you
                     except KeyError:
                         try:
                             keys = {k: k for k in sr.state[field][0].keys()}
-                        except (KeyError, IndexError, AttributeError):
+                        except (KeyError, IndexError, AttributeError, TypeError):
                             pass
                 elif field_props.get("type") == "object":
                     try:
                         keys = {k: k for k in sr.state[field].keys()}
-                    except (KeyError, AttributeError):
+                    except (KeyError, AttributeError, TypeError):
                         pass
                 if keys:
                     for k, ktitle in keys.items():
