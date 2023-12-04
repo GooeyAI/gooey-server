@@ -327,7 +327,7 @@ class BasePage:
                     if is_update_mode
                     else None
                 )
-                run_actions_modal = Modal("Actions", key="published-run-options-modal")
+                run_actions_modal = Modal("Options", key="published-run-options-modal")
                 if run_actions_button:
                     run_actions_modal.open()
 
