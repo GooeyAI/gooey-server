@@ -1,5 +1,6 @@
 import typing
 import uuid
+from datetime import datetime, timedelta
 
 from django.db.models import TextChoices
 from pydantic import BaseModel
@@ -12,6 +13,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.safety_checker import safety_checker
+from daras_ai_v2.tabs_widget import MenuTabs
 
 
 class AnimationModels(TextChoices):
@@ -27,6 +29,7 @@ class _AnimationPrompt(TypedDict):
 AnimationPrompts = list[_AnimationPrompt]
 
 CREDITS_PER_FRAME = 1.5
+MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
 
 
 def input_prompt_to_animation_prompts(input_prompt: str):
@@ -77,7 +80,7 @@ def animation_prompts_editor(
     st.write("#### 👩‍💻 Animation Prompts")
     st.caption(
         """
-        Describe the scenes or series of images that you want to generate into an animation. You can add as many prompts as you like. Mention the keyframe number for each prompt i.e. the transition point from the first prompt to the next. 
+        Describe the scenes or series of images that you want to generate into an animation. You can add as many prompts as you like. Mention the keyframe number for each prompt i.e. the transition point from the first prompt to the next.
         View the ‘Details’ drop down menu to get started.
         """
     )
@@ -144,7 +147,7 @@ def animation_prompts_editor(
     )
     st.caption(
         """
-        Pro-tip: To avoid abrupt endings on your animation, ensure that the last keyframe prompt is set for a higher number of keyframes/time than the previous transition rate. There should be an ample number of frames between the last frame and the total frame count of the animation. 
+        Pro-tip: To avoid abrupt endings on your animation, ensure that the last keyframe prompt is set for a higher number of keyframes/time than the previous transition rate. There should be an ample number of frames between the last frame and the total frame count of the animation.
         """
     )
 
@@ -226,7 +229,7 @@ class DeforumSDPage(BasePage):
             )
             st.caption(
                 """
-Pro-tip: The more frames you add, the longer it will take to render the animation. Test your prompts before adding more frames. 
+Pro-tip: The more frames you add, the longer it will take to render the animation. Test your prompts before adding more frames.
             """
             )
 
@@ -271,14 +274,14 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
         st.text_input(
             """
 ###### Zoom
-How should the camera zoom in or out? This setting scales the canvas size, multiplicatively. 
-1 is static, with numbers greater than 1 moving forward (or zooming in) and numbers less than 1 moving backwards (or zooming out). 
+How should the camera zoom in or out? This setting scales the canvas size, multiplicatively.
+1 is static, with numbers greater than 1 moving forward (or zooming in) and numbers less than 1 moving backwards (or zooming out).
             """,
             key="zoom",
         )
         st.caption(
             """
-            With 0 as the starting keyframe, the input of 0: (1.004) can be used to zoom in moderately, starting at frame 0 and continuing until the end. 
+            With 0 as the starting keyframe, the input of 0: (1.004) can be used to zoom in moderately, starting at frame 0 and continuing until the end.
             """
         )
         st.text_input(
@@ -319,7 +322,7 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
             )
         st.slider(
             """
-###### FPS (Frames per second) 
+###### FPS (Frames per second)
 Choose fps for the video.
             """,
             min_value=10,
@@ -359,13 +362,13 @@ Choose fps for the video.
     def render_description(self):
         st.markdown(
             f"""
-            - Every Submit will require approximately 3-5 minutes to render.  
+            - Every Submit will require approximately 3-5 minutes to render.
 
-            - Animation is complex: Please watch the video and review our decks to help you. 
+            - Animation is complex: Please watch the video and review our decks to help you.
 
-            - Test your image prompts BEFORE adding lots of frames e.g. Tweak key frame images with just 10 frames between them AND then increase the FPS or frame count between them once you like the outputs. This will save you time and credits. 
+            - Test your image prompts BEFORE adding lots of frames e.g. Tweak key frame images with just 10 frames between them AND then increase the FPS or frame count between them once you like the outputs. This will save you time and credits.
 
-            - No lost work! All your animations or previously generated versions are in the History tab. If they don't appear here, it likely means they aren't done rendering yet. 
+            - No lost work! All your animations or previously generated versions are in the History tab. If they don't appear here, it likely means they aren't done rendering yet.
 
             """
         )
@@ -380,23 +383,23 @@ Choose fps for the video.
             Here’s a comprehensive style guide to assist you with different stylized animation prompts:
 
             [StableDiffusion CheatSheet](https://supagruen.github.io/StableDiffusion-CheatSheet/)
-            
+
             """
         )
         st.write("---")
         st.markdown(
             """
-            Animation Length: You can indicate how long you want your animation to be by increasing or decreasing your frame count. 
+            Animation Length: You can indicate how long you want your animation to be by increasing or decreasing your frame count.
 
-            FPS: Every Animation is set at 12 frames per second by default. You can change this default frame rate/ frames per second (FPS) on the Settings menu. 
+            FPS: Every Animation is set at 12 frames per second by default. You can change this default frame rate/ frames per second (FPS) on the Settings menu.
 
-            Prompts: Within your sequence you can input multiple text Prompts for your visuals. Each prompt can be defined for a specific keyframe number. 
+            Prompts: Within your sequence you can input multiple text Prompts for your visuals. Each prompt can be defined for a specific keyframe number.
 
-            ##### What are keyframes? 
+            ##### What are keyframes?
 
             Keyframes define the transition points from one prompt to the next, or the start and end points of a prompted action set in between the total frame count or sequence. These keyframes or markers are necessary to establish smooth transitions or jump cuts, whatever you prefer.
 
-            Use the Camera Settings to generate animations with depth and other 3D parameters.  
+            Use the Camera Settings to generate animations with depth and other 3D parameters.
             """
         )
         st.markdown(
@@ -417,6 +420,10 @@ Choose fps for the video.
         if output_video:
             st.write("Output Video")
             st.video(output_video, autoplay=True)
+
+    def estimate_run_duration(self):
+        # in seconds
+        return st.session_state.get("max_frames", 100) * MODEL_ESTIMATED_TIME_PER_FRAME
 
     def render_example(self, state: dict):
         display = self.preview_input(state)

@@ -121,7 +121,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         return call_api(
             page_cls=page_cls,
             user=user,
-            request_body=page_request.dict(),
+            request_body=page_request.dict(exclude_unset=True),
             query_params=dict(request.query_params),
         )
 
@@ -175,7 +175,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         ret = call_api(
             page_cls=page_cls,
             user=user,
-            request_body=page_request.dict(),
+            request_body=page_request.dict(exclude_unset=True),
             query_params=dict(request.query_params),
             run_async=True,
         )
@@ -332,14 +332,11 @@ def submit_api_call(
     state = self.get_sr_from_query_params_dict(query_params).to_dict()
     if state is None:
         raise HTTPException(status_code=404)
-
     # set sane defaults
     for k, v in self.sane_defaults.items():
         state.setdefault(k, v)
-
-    # remove None values & insert request data
-    request_dict = {k: v for k, v in request_body.items() if v is not None}
-    state.update(request_dict)
+    # insert request data
+    state.update(request_body)
 
     # set streamlit session state
     st.set_session_state(state)
