@@ -17,7 +17,7 @@ def render():
         state = page.recipe_doc_sr().to_dict()
 
         with gui.link(to=page.app_url()):
-            gui.markdown(f"### {page.get_recipe_title(state)}")
+            gui.markdown(f"### {page.get_recipe_title()}")
 
         preview = page.preview_description(state)
         if preview:

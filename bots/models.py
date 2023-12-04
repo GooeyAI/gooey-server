@@ -17,6 +17,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder
+from daras_ai_v2.crypto import get_random_doc_id
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -146,13 +147,6 @@ class SavedRun(models.Model):
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
 
-    created_by = models.ForeignKey(
-        "app_users.AppUser",
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="examples_created",
-    )
-
     state = models.JSONField(default=dict, blank=True, encoder=PostgresJSONEncoder)
 
     error_msg = models.TextField(default="", blank=True)
@@ -163,11 +157,6 @@ class SavedRun(models.Model):
 
     hidden = models.BooleanField(default=False)
     is_flagged = models.BooleanField(default=False)
-    visibility = models.IntegerField(
-        choices=PublishedRunVisibility.choices,
-        default=PublishedRunVisibility.UNLISTED,
-    )
-    is_approved_example = models.BooleanField(default=False)
 
     price = models.IntegerField(default=0)
     transaction = models.ForeignKey(
@@ -294,9 +283,7 @@ class SavedRun(models.Model):
         return result, page.run_doc_sr(run_id, uid)
 
     def get_creator(self) -> AppUser | None:
-        if self.created_by:
-            return self.created_by
-        elif self.uid:
+        if self.uid:
             return AppUser.objects.filter(uid=self.uid).first()
         else:
             return None
@@ -934,3 +921,128 @@ class FeedbackComment(models.Model):
     author = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
     comment = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PublishedRun(models.Model):
+    published_run_id = models.CharField(
+        max_length=128,
+        blank=True,
+    )
+
+    saved_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.PROTECT,
+        related_name="published_runs",
+        null=True,
+    )
+    workflow = models.IntegerField(
+        choices=Workflow.choices,
+    )
+    title = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    visibility = models.IntegerField(
+        choices=PublishedRunVisibility.choices,
+        default=PublishedRunVisibility.UNLISTED,
+    )
+    is_approved_example = models.BooleanField(default=False)
+
+    created_by = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        null=True,
+        related_name="published_runs",
+    )
+    last_edited_by = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        null=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        unique_together = [
+            ["workflow", "published_run_id"],
+        ]
+
+    def get_app_url(self):
+        return Workflow(self.workflow).get_app_url(
+            example_id=self.published_run_id, run_id="", uid=""
+        )
+
+    def add_version(
+        self,
+        *,
+        user: AppUser,
+        saved_run: SavedRun,
+        visibility: PublishedRunVisibility,
+        title: str,
+        notes: str,
+    ):
+        assert saved_run.workflow == self.workflow
+
+        with transaction.atomic():
+            version = PublishedRunVersion(
+                published_run=self,
+                version_id=get_random_doc_id(),
+                saved_run=saved_run,
+                changed_by=user,
+                title=title,
+                notes=notes,
+                visibility=visibility,
+            )
+            version.save()
+            self.update_fields_to_latest_version()
+
+    def is_editor(self, user: AppUser):
+        return self.created_by == user
+
+    def is_root_example(self):
+        return not self.published_run_id
+
+    def update_fields_to_latest_version(self):
+        latest_version = self.versions.latest()
+        self.saved_run = latest_version.saved_run
+        self.last_edited_by = latest_version.changed_by
+        self.title = latest_version.title
+        self.notes = latest_version.notes
+        self.visibility = latest_version.visibility
+
+        self.save()
+
+
+class PublishedRunVersion(models.Model):
+    version_id = models.CharField(max_length=128, unique=True)
+
+    published_run = models.ForeignKey(
+        PublishedRun,
+        on_delete=models.CASCADE,
+        related_name="versions",
+    )
+    saved_run = models.ForeignKey(
+        SavedRun,
+        on_delete=models.PROTECT,
+        related_name="published_run_versions",
+    )
+    changed_by = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        null=True,
+    )
+    title = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    visibility = models.IntegerField(
+        choices=PublishedRunVisibility.choices,
+        default=PublishedRunVisibility.UNLISTED,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        get_latest_by = "created_at"
+        indexes = [
+            models.Index(fields=["published_run", "-created_at"]),
+            models.Index(fields=["version_id"]),
+        ]
