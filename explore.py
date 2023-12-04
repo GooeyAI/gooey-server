@@ -19,7 +19,8 @@ def render():
 
         col1, col2 = gui.columns([1, 2])
         with col1:
-            render_image(page, state)
+            with gui.link(to=page.app_url()):
+                render_image(page, state)
 
         with col2:
             # render_description(page, state, total_runs)
@@ -29,15 +30,15 @@ def render():
         page = page_cls()
         state = page.recipe_doc_sr().to_dict()
         # total_runs = page.get_total_runs()
-        render_image(page, state)
+        with gui.link(to=page.app_url()):
+            render_image(page, state)
         # render_description(page, state, total_runs)
         render_description(page, state)
 
     def render_image(page, state):
         gui.image(
             page.get_recipe_image(state),
-            href=page.app_url(),
-            style={"border-radius": 5},
+            style={"border-radius": 5, "pointer-events": "none"},
         )
 
     def render_description(page, state):
