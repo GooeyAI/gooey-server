@@ -353,7 +353,7 @@ class BasePage:
                     with run_actions_modal.container(
                         style={"min-width": "min(300px, 100vw)"}
                     ):
-                        self._render_run_actions_modal()
+                        self._render_run_actions_modal(published_run=published_run)
 
     def _render_publish_modal(
         self,
@@ -433,14 +433,38 @@ class BasePage:
                 query_params=dict(example_id=published_run.published_run_id),
             )
 
-    def _render_run_actions_modal(self):
+    def _render_run_actions_modal(
+        self,
+        *,
+        published_run: PublishedRun,
+    ):
         with st.div(className="mt-4"):
-            copy_to_clipboard_button(
-                "🔗 Copy URL",
-                value=self._get_current_app_url(),
-                type="secondary",
-                className="w-100",
+            duplicate_icon = '<i class="fa-regular fa-copy"></i>'
+            duplicate_button = st.button(
+                f"{duplicate_icon} Duplicate", type="secondary", className="w-100"
             )
+            delete_icon = '<i class="fa-regular fa-trash"></i>'
+            delete_button = st.button(
+                f"{delete_icon} Delete", type="secondary", className="w-100 text-danger"
+            )
+
+        if duplicate_button:
+            duplicate_pr = self.duplicate_published_run(
+                published_run,
+                title=f"{published_run.title} (Copy)",
+                notes=published_run.notes,
+                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+            )
+            raise QueryParamsRedirectException(
+                query_params=dict(example_id=duplicate_pr.published_run_id),
+            )
+
+        if delete_button:
+            if not published_run.published_run_id:
+                st.error("Cannot delete root example")
+                return
+            published_run.delete()
+            raise QueryParamsRedirectException(query_params={})
 
     def _get_title_and_breadcrumbs(
         self,
@@ -771,29 +795,36 @@ class BasePage:
         notes: str,
         visibility: PublishedRunVisibility,
     ):
-        published_run = PublishedRun(
+        return PublishedRun.create_published_run(
             workflow=cls.workflow,
             published_run_id=published_run_id,
-            created_by=user,
-            last_edited_by=user,
-            title=title,
-        )
-        published_run.save()
-        published_run.add_version(
-            user=user,
             saved_run=saved_run,
+            user=user,
             title=title,
-            visibility=visibility,
             notes=notes,
+            visibility=visibility,
         )
-        published_run.save()
-        return published_run
 
     @classmethod
     def get_published_run(cls, *, published_run_id: str):
         return PublishedRun.objects.get(
             workflow=cls.workflow,
             published_run_id=published_run_id,
+        )
+
+    def duplicate_published_run(
+        self,
+        published_run: PublishedRun,
+        *,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        return published_run.duplicate(
+            user=self.request.user,
+            title=title,
+            notes=notes,
+            visibility=visibility,
         )
 
     def render_description(self):

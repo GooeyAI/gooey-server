@@ -967,6 +967,54 @@ class PublishedRun(models.Model):
             ["workflow", "published_run_id"],
         ]
 
+    @classmethod
+    def create_published_run(
+        cls,
+        *,
+        workflow: Workflow,
+        published_run_id: str,
+        saved_run: SavedRun,
+        user: AppUser,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        with transaction.atomic():
+            published_run = PublishedRun(
+                workflow=workflow,
+                published_run_id=published_run_id,
+                created_by=user,
+                last_edited_by=user,
+                title=title,
+            )
+            published_run.save()
+            published_run.add_version(
+                user=user,
+                saved_run=saved_run,
+                title=title,
+                visibility=visibility,
+                notes=notes,
+            )
+            return published_run
+
+    def duplicate(
+        self,
+        *,
+        user: AppUser,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ) -> PublishedRun:
+        return PublishedRun.create_published_run(
+            workflow=Workflow(self.workflow),
+            published_run_id=get_random_doc_id(),
+            saved_run=self.saved_run,
+            user=user,
+            title=title,
+            notes=notes,
+            visibility=visibility,
+        )
+
     def get_app_url(self):
         return Workflow(self.workflow).get_app_url(
             example_id=self.published_run_id, run_id="", uid=""
