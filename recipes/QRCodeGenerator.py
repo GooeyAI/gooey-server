@@ -44,9 +44,9 @@ DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.co
 
 class QrSources(Enum):
     qr_code_data = "🔗 URL or Text"
-    qr_code_vcard = "👩‍🦰 Contact Info"
+    qr_code_vcard = "📇 Contact Card"
     qr_code_file = "📄 Upload File"
-    qr_code_input_image = "📷 Existing QR Code"
+    qr_code_input_image = "🏁 Existing QR Code"
 
 
 class QRCodeGeneratorPage(BasePage):
@@ -104,6 +104,8 @@ class QRCodeGeneratorPage(BasePage):
         cleaned_qr_code: str
 
     def preview_image(self, state: dict) -> str | None:
+        if len(state.get("output_images") or []) > 0:
+            return state["output_images"][0]
         return DEFAULT_QR_CODE_META_IMG
 
     def related_workflows(self) -> list:
@@ -136,7 +138,7 @@ class QRCodeGeneratorPage(BasePage):
                 if st.session_state.get(key):
                     st.session_state[qr_code_source_key] = key
                     break
-        source = st.radio(
+        source = st.horizontal_radio(
             "",
             options=QrSources._member_names_,
             key=qr_code_source_key,
@@ -436,7 +438,7 @@ def vcard_form(*, key: str) -> VCARD:
     )
 
     if vcard.email and st.button(
-        "<u>Import other contact info</u> from my email - magic!",
+        "Import other contact info from my email - magic!",
         type="link",
     ):
         imported_vcard = get_vcard_from_email(vcard.email)
