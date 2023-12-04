@@ -431,12 +431,8 @@ class BasePage:
                     title=published_run_title.strip(),
                     notes=published_run_notes.strip(),
                 )
-            modal.close()
-            st.experimental_rerun()
 
-            raise QueryParamsRedirectException(
-                query_params=dict(example_id=published_run.published_run_id),
-            )
+            force_redirect(published_run.get_app_url())
 
     def _render_run_actions_modal(
         self,
@@ -1672,6 +1668,17 @@ class QueryParamsRedirectException(RedirectException):
         query_params = {k: v for k, v in query_params.items() if v is not None}
         url = "?" + urllib.parse.urlencode(query_params)
         super().__init__(url, status_code)
+
+
+def force_redirect(url: str):
+    # note: assumes sanitized URLs
+    st.html(
+        f"""
+    <script>
+    window.location = '{url}';
+    </script>
+    """
+    )
 
 
 def convert_state_type(state, key, fn):
