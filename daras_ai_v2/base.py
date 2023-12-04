@@ -620,7 +620,7 @@ class BasePage:
         if published_run:
             versions = published_run.versions.all()
             for i, version in reverse_enumerate(len(versions), versions):
-                col1, col2, col3 = st.columns([1, 4, 4], responsive=False)
+                col1, col2, col3 = st.columns([1, 4, 3], responsive=False)
                 with col1:
                     st.write(f"{i}")
                 with col2:
@@ -636,7 +636,9 @@ class BasePage:
                         timestamp = version.created_at
                     else:
                         timestamp = datetime.datetime.fromisoformat(version.created_at)
-                    js_dynamic_date(timestamp)
+                    js_dynamic_date(
+                        timestamp, date_options={"day": "numeric", "month": "short"}
+                    )
                     re_render_js_dynamic_dates()
 
     def render_related_workflows(self):
