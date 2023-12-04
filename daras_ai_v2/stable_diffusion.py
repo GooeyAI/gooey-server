@@ -42,20 +42,22 @@ inpaint_model_ids = {
 
 class Text2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
+    dream_shaper = "DreamShaper (Lykon)"
+    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
-    dream_shaper = "DreamShaper (Lykon)"
-    openjourney = "Open Journey (PromptHero)"
-    openjourney_2 = "Open Journey v2 beta (PromptHero)"
-    analog_diffusion = "Analog Diffusion (wavymulder)"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
-    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
+
     dall_e = "DALL·E 2 (OpenAI)"
     dall_e_3 = "DALL·E 3 (OpenAI)"
 
+    openjourney_2 = "Open Journey v2 beta (PromptHero) 🐢"
+    openjourney = "Open Journey (PromptHero) 🐢"
+    analog_diffusion = "Analog Diffusion (wavymulder) 🐢"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150) 🐢"
+
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
-    deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
+    deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
 
     @classmethod
     def _deprecated(cls):
@@ -81,12 +83,14 @@ class Img2ImgModels(Enum):
     dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
+
     dall_e = "Dall-E (OpenAI)"
+
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
-    openjourney_2 = "Open Journey v2 beta (PromptHero)"
-    openjourney = "Open Journey (PromptHero)"
-    analog_diffusion = "Analog Diffusion (wavymulder)"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
+    openjourney_2 = "Open Journey v2 beta (PromptHero) 🐢"
+    openjourney = "Open Journey (PromptHero) 🐢"
+    analog_diffusion = "Analog Diffusion (wavymulder) 🐢"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150) 🐢"
 
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
