@@ -358,7 +358,10 @@ class BasePage:
                     with run_actions_modal.container(
                         style={"min-width": "min(300px, 100vw)"}
                     ):
-                        self._render_run_actions_modal(published_run=published_run)
+                        self._render_run_actions_modal(
+                            published_run=published_run,
+                            modal=run_actions_modal,
+                        )
 
     def _render_publish_modal(
         self,
@@ -442,6 +445,7 @@ class BasePage:
         self,
         *,
         published_run: PublishedRun,
+        modal: Modal,
     ):
         with st.div(className="mt-4"):
             duplicate_icon = '<i class="fa-regular fa-copy"></i>'
@@ -464,16 +468,54 @@ class BasePage:
                 query_params=dict(example_id=duplicate_pr.published_run_id),
             )
 
+        confirm_delete_modal = Modal("Confirm Delete", key="confirm-delete-modal")
         if delete_button:
             if not published_run.published_run_id:
                 st.error("Cannot delete root example")
                 return
-            published_run.delete()
-            raise QueryParamsRedirectException(query_params={})
+            confirm_delete_modal.open()
 
         with st.div(className="mt-3"):
             st.write("#### Version History")
             self._render_versions()
+
+        if confirm_delete_modal.is_open():
+            modal.empty()
+            with confirm_delete_modal.container():
+                self._render_confirm_delete_modal(
+                    published_run=published_run,
+                    modal=confirm_delete_modal,
+                )
+
+    def _render_confirm_delete_modal(
+        self,
+        *,
+        published_run: PublishedRun,
+        modal: Modal,
+    ):
+        st.write(
+            "Are you sure you want to delete this published run? "
+            f"<em>({published_run.title})</em>"
+        )
+        st.caption("This will also delete all the associated versions.")
+        with st.div(className="d-flex"):
+            confirm_button = st.button(
+                '<span class="text-danger">Confirm</span>',
+                type="secondary",
+                className="w-100",
+            )
+            cancel_button = st.button(
+                "Cancel",
+                type="secondary",
+                className="w-100",
+            )
+
+        if confirm_button:
+            published_run.delete()
+            raise QueryParamsRedirectException(query_params={})
+
+        if cancel_button:
+            modal.close()
 
     def _get_title_and_breadcrumbs(
         self,

@@ -17,6 +17,8 @@ class Modal:
         self.max_width = str(max_width) + "px"
         self.key = key
 
+        self._container = None
+
     def is_open(self):
         return st.session_state.get(f"{self.key}-opened", False)
 
@@ -28,6 +30,10 @@ class Modal:
         st.session_state[f"{self.key}-opened"] = False
         if rerun_condition:
             rerun()
+
+    def empty(self):
+        if self._container:
+            self._container.empty()
 
     @contextmanager
     def container(self, **props):
@@ -70,9 +76,9 @@ class Modal:
         with st.div(className="blur-background"):
             with st.div(className="modal-parent"):
                 container_class = "modal-container " + props.pop("className", "")
-                container = st.div(className=container_class, **props)
+                self._container = st.div(className=container_class, **props)
 
-        with container:
+        with self._container:
             with st.div(className="d-flex justify-content-between align-items-center"):
                 st.markdown(f"### {self.title or ''}")
 
@@ -84,4 +90,4 @@ class Modal:
                 )
                 if close_:
                     self.close()
-            yield container
+            yield self._container
