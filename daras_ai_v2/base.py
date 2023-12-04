@@ -196,19 +196,26 @@ class BasePage:
                     self.render_author(author)
 
             with st.div(className="d-flex align-items-start"):
-                self._render_social_buttons()
-                if (
+                is_current_user_creator = (
                     self.request
                     and self.request.user
                     and not self.request.user.is_anonymous
                     and current_run.get_creator() == self.request.user
-                ):
-                    if (
-                        published_run
-                        and published_run.saved_run != current_run
-                        and published_run.is_editor(self.request.user)
-                    ):
-                        self._render_unpublished_changes_indicator()
+                )
+                has_unpublished_changes = (
+                    published_run
+                    and published_run.saved_run != current_run
+                    and self.request
+                    and self.request.user
+                    and published_run.is_editor(self.request.user)
+                )
+
+                if is_current_user_creator and has_unpublished_changes:
+                    self._render_unpublished_changes_indicator()
+
+                self._render_social_buttons()
+
+                if is_current_user_creator:
                     self._render_published_run_buttons(
                         current_run=current_run,
                         published_run=published_run,
@@ -245,7 +252,10 @@ class BasePage:
         st.write(f"# {title}")
 
     def _render_unpublished_changes_indicator(self):
-        st.html('<span class="text-muted me-3">Unpublished changes</span>')
+        with st.div(
+            className="d-none d-lg-flex h-100 align-items-center text-muted me-3"
+        ):
+            st.html("Unpublished changes")
 
     def _render_social_buttons(self):
         copy_to_clipboard_button(
@@ -286,7 +296,11 @@ class BasePage:
                 )
 
                 run_actions_button = (
-                    st.button("⋮", className="mb-0", type="secondary")
+                    st.button(
+                        '<i class="fa-regular fa-ellipsis"></i>',
+                        className="mb-0",
+                        type="tertiary",
+                    )
                     if is_update_mode
                     else None
                 )
