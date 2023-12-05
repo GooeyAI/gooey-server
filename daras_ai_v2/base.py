@@ -295,7 +295,7 @@ class BasePage:
             f'<i class="fa-regular fa-link"></i>{button_text}',
             value=self._get_current_app_url(),
             type="secondary",
-            className="mb-0",
+            className="mb-0 ms-lg-2",
         )
 
     def _render_published_run_buttons(
@@ -345,7 +345,7 @@ class BasePage:
                 save_text = "Update" if is_update_mode else "Save"
                 save_button = st.button(
                     f'{save_icon}<span class="d-none d-lg-inline"> {save_text}</span>',
-                    className="mb-0 px-lg-4",
+                    className="mb-0 ms-lg-2 px-lg-4",
                     type="primary",
                 )
                 publish_modal = Modal("", key="publish-modal")
