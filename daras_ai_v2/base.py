@@ -6,6 +6,7 @@ import urllib
 import urllib.parse
 import uuid
 from copy import deepcopy
+from itertools import pairwise
 from random import Random
 from time import sleep
 from types import SimpleNamespace
@@ -25,7 +26,13 @@ from starlette.requests import Request
 
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
-from bots.models import SavedRun, PublishedRun, PublishedRunVisibility, Workflow
+from bots.models import (
+    SavedRun,
+    PublishedRun,
+    PublishedRunVersion,
+    PublishedRunVisibility,
+    Workflow,
+)
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -197,7 +204,10 @@ class BasePage:
 
                 author = self.run_user or current_run.get_creator()
                 if not is_root_example:
-                    self.render_author(author)
+                    self.render_author(
+                        author,
+                        show_as_link=self.is_current_user_admin(),
+                    )
 
             with st.div(className="d-flex align-items-center"):
                 is_current_user_creator = (
@@ -431,15 +441,40 @@ class BasePage:
                     visibility=PublishedRunVisibility(published_run_visibility),
                 )
             else:
-                published_run.add_version(
-                    user=self.request.user,
+                updates = dict(
                     saved_run=current_run,
-                    visibility=PublishedRunVisibility(published_run_visibility),
                     title=published_run_title.strip(),
                     notes=published_run_notes.strip(),
+                    visibility=PublishedRunVisibility(published_run_visibility),
                 )
+                if self._has_published_run_changed(
+                    published_run=published_run, **updates
+                ):
+                    published_run.add_version(
+                        user=self.request.user,
+                        **updates,
+                    )
+                else:
+                    st.error("No changes to publish")
+                    return
 
             force_redirect(published_run.get_app_url())
+
+    def _has_published_run_changed(
+        self,
+        *,
+        published_run: PublishedRun,
+        saved_run: SavedRun,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        return (
+            published_run.title != title
+            or published_run.notes != notes
+            or published_run.visibility != visibility
+            or published_run.saved_run != saved_run
+        )
 
     def _render_run_actions_modal(
         self,
@@ -475,9 +510,9 @@ class BasePage:
                 return
             confirm_delete_modal.open()
 
-        with st.div(className="mt-3"):
-            st.write("#### Version History")
-            self._render_versions()
+        with st.div(className="mt-4"):
+            st.write("#### Version History", className="mb-4")
+            self._render_version_history()
 
         if confirm_delete_modal.is_open():
             modal.empty()
@@ -653,7 +688,7 @@ class BasePage:
                 self._published_tab()
                 render_js_dynamic_dates()
 
-    def _render_versions(self):
+    def _render_version_history(self):
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         published_run = self.get_published_run_from_query_params(
             example_id, run_id, uid
@@ -661,27 +696,66 @@ class BasePage:
 
         if published_run:
             versions = published_run.versions.all()
-            for i, version in reverse_enumerate(len(versions), versions):
-                col1, col2, col3 = st.columns([1, 4, 3], responsive=False)
-                with col1:
-                    st.write(f"{i}")
-                with col2:
-                    url = self.app_url(
-                        example_id=published_run.published_run_id,
-                        run_id=version.saved_run.run_id,
-                        uid=version.saved_run.uid,
-                    )
-                    with st.link(to=url):
-                        st.write(version.title)
-                with col3:
-                    if isinstance(version.created_at, datetime.datetime):
-                        timestamp = version.created_at
-                    else:
-                        timestamp = datetime.datetime.fromisoformat(version.created_at)
-                    js_dynamic_date(
-                        timestamp, date_options={"day": "numeric", "month": "short"}
-                    )
-                    re_render_js_dynamic_dates()
+            first_version = versions[0]
+            for version, older_version in pairwise(versions):
+                first_version = older_version
+                self._render_version_row(version, older_version)
+            self._render_version_row(first_version, None)
+            re_render_js_dynamic_dates()
+
+    def _render_version_row(
+        self,
+        version: PublishedRunVersion,
+        older_version: PublishedRunVersion | None,
+    ):
+        st.html(
+            """
+            <style>
+            .disable-p-margin p {
+                margin-bottom: 0;
+            }
+            </style>
+            """
+        )
+        url = self.app_url(
+            example_id=version.published_run.published_run_id,
+            run_id=version.saved_run.run_id,
+            uid=version.saved_run.uid,
+        )
+        with st.link(to=url, className="text-decoration-none"):
+            with st.div(
+                className="d-flex mb-4 disable-p-margin",
+                style={"min-width": "min(100vw, 500px)"},
+            ):
+                col1 = st.div(className="me-4")
+                col2 = st.div()
+        with col1:
+            with st.div(className="fs-5 mt-1"):
+                st.html('<i class="fa-regular fa-clock"></i>')
+        with col2:
+            is_first_version = not older_version
+            with st.div(className="fs-5 d-flex align-items-center"):
+                js_dynamic_date(
+                    version.created_at,
+                    container=self._render_version_history_date,
+                    date_options={"month": "short", "day": "numeric"},
+                )
+                if is_first_version:
+                    with st.tag("span", className="badge bg-secondary px-3 ms-2"):
+                        st.write("FIRST VERSION")
+            with st.div(className="text-muted"):
+                if older_version and older_version.title != version.title:
+                    st.write(f"Renamed: {version.title}")
+                elif not older_version:
+                    st.write(version.title)
+            with st.div(className="mt-1", style={"font-size": "0.85rem"}):
+                self.render_author(
+                    version.changed_by, image_size="18px", responsive=False
+                )
+
+    def _render_version_history_date(self, text, **props):
+        with st.tag("span", **props):
+            st.html(text)
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
@@ -925,40 +999,56 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
-    def render_author(self, user: AppUser):
+    def render_author(
+        self,
+        user: AppUser,
+        *,
+        image_size: str = "30px",
+        responsive: bool = True,
+        show_as_link: bool = False,
+    ):
         if not user or (not user.photo_url and not user.display_name):
             return
+
+        responsive_image_size = (
+            f"calc({image_size} * 0.67)" if responsive else image_size
+        )
+
+        # new class name so that different ones don't conflict
+        class_name = f"author-image-{image_size}"
+        if responsive:
+            class_name += "-responsive"
 
         html = "<div style='display:flex; align-items:center;'>"
         if user.photo_url:
             st.html(
-                """
+                f"""
                 <style>
-                .author-image {
-                    width: 26px;
-                    height: 26px;
+                .{class_name} {{
+                    width: {responsive_image_size};
+                    height: {responsive_image_size};
                     margin-right: 6px;
                     border-radius: 50%;
                     pointer-events: none;
-                }
+                }}
 
-                @media (min-width: 1024px) {
-                    .author-image {
-                        width: 38px;
-                        height: 38px;
-                    }
-                }
+                @media (min-width: 1024px) {{
+                    .{class_name} {{
+                        width: {image_size};
+                        height: {image_size};
+                    }}
+                }}
                 </style>
             """
             )
             html += f"""
-                <img class="author-image" src="{user.photo_url}">
+                <img class="{class_name}" src="{user.photo_url}">
             """
         if user.display_name:
-            html += f"<div>{user.display_name}</div>"
+            html += f"<span>{user.display_name}</span>"
         html += "</div>"
 
-        if self.is_current_user_admin():
+        if show_as_link:
             linkto = lambda: st.link(
                 to=self.app_url(
                     tab_name=MenuTabs.paths[MenuTabs.history],

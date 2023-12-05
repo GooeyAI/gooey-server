@@ -1,6 +1,6 @@
 import datetime
 import json
-from typing import Any
+from typing import Any, Callable
 
 import gooey_ui as gui
 
@@ -8,6 +8,7 @@ import gooey_ui as gui
 def js_dynamic_date(
     dt: datetime.datetime,
     *,
+    container: Callable = gui.caption,
     date_options: dict[str, Any] | None = None,
     time_options: dict[str, Any] | None = None,
 ):
@@ -17,7 +18,7 @@ def js_dynamic_date(
         attrs["data-id-date-options"] = json.dumps(date_options)
     if time_options:
         attrs["data-id-time-options"] = json.dumps(time_options)
-    gui.caption("Loading...", **attrs)
+    container("Loading...", **attrs)
 
 
 def render_js_dynamic_dates():
