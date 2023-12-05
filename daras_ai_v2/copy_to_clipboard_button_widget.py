@@ -6,10 +6,10 @@ copy_to_clipboard_scripts = """
 <script>
 function copyToClipboard(button) {
     navigator.clipboard.writeText(button.getAttribute("data-clipboard-text"));
-    const original = button.textContent;
+    const original = button.innerHTML;
     button.textContent = "✅ Copied";
     setTimeout(() => {
-        button.textContent = original;
+        button.innerHTML = original;
     }, 2000);
 }
 </script>
