@@ -16,6 +16,7 @@ from bots.models import (
     FeedbackComment,
     CHATML_ROLE_ASSISSTANT,
     SavedRun,
+    PublishedRun,
     Message,
     Platform,
     Feedback,
@@ -94,13 +95,14 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "updated_at",
         "billing_account_uid",
         "saved_run",
+        "published_run",
         "analysis_run",
     ]
     list_filter = ["platform"]
 
     form = BotIntegrationAdminForm
 
-    autocomplete_fields = ["saved_run", "analysis_run"]
+    autocomplete_fields = ["saved_run", "published_run", "analysis_run"]
 
     readonly_fields = [
         "fb_page_access_token",
@@ -120,6 +122,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                 "fields": [
                     "name",
                     "saved_run",
+                    "published_run",
                     "billing_account_uid",
                     "user_language",
                 ],
@@ -204,6 +207,38 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         )
         html = mark_safe(html)
         return html
+
+
+@admin.register(PublishedRun)
+class PublishedRunAdmin(admin.ModelAdmin):
+    list_display = [
+        "__str__",
+        "published_run_id",
+        "view_user",
+        "view_saved_run",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = ["workflow"]
+    search_fields = ["workflow", "published_run_id"]
+
+    readonly_fields = [
+        "open_in_gooey",
+        "created_at",
+        "updated_at",
+    ]
+
+    def view_user(self, published_run: PublishedRun):
+        if published_run.created_by is None:
+            return None
+        return change_obj_url(published_run.created_by)
+
+    view_user.short_description = "View User"
+
+    def view_saved_run(self, published_run: PublishedRun):
+        return change_obj_url(published_run.saved_run)
+
+    view_saved_run.short_description = "View Saved Run"
 
 
 @admin.register(SavedRun)

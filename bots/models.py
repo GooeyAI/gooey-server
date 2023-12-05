@@ -299,7 +299,7 @@ class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
     def reset_fb_pages_for_user(
         self, uid: str, fb_pages: list[dict]
-    ) -> list["BotIntegration"]:
+    ) -> list[BotIntegration]:
         saved = []
         for fb_page in fb_pages:
             fb_page_id = fb_page["id"]
@@ -347,6 +347,15 @@ class BotIntegration(models.Model):
     )
     saved_run = models.ForeignKey(
         "bots.SavedRun",
+        on_delete=models.SET_NULL,
+        related_name="botintegrations",
+        null=True,
+        default=None,
+        blank=True,
+        help_text="The saved run that the bot is based on",
+    )
+    published_run = models.ForeignKey(
+        "bots.PublishedRun",
         on_delete=models.SET_NULL,
         related_name="botintegrations",
         null=True,
@@ -493,6 +502,14 @@ class BotIntegration(models.Model):
             return f"{self.name} ({platform_name})"
         else:
             return self.name or platform_name
+
+    def get_active_saved_run(self) -> SavedRun | None:
+        if self.published_run:
+            return self.published_run.saved_run
+        elif self.saved_run:
+            return self.saved_run
+        else:
+            return None
 
     def get_display_name(self):
         return (
@@ -1000,6 +1017,13 @@ class PublishedRun(models.Model):
         unique_together = [
             ["workflow", "published_run_id"],
         ]
+
+    def __str__(self):
+        return self.get_app_url()
+
+    @admin.display(description="Open in Gooey")
+    def open_in_gooey(self):
+        return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
 
     @classmethod
     def create_published_run(
