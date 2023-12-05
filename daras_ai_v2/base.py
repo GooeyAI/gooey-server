@@ -84,9 +84,6 @@ SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
 
 
 class StateKeys:
-    page_title = "__title"
-    page_notes = "__notes"
-
     created_at = "created_at"
     updated_at = "updated_at"
 
@@ -689,10 +686,7 @@ class BasePage:
                 render_js_dynamic_dates()
 
     def _render_version_history(self):
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        published_run = self.get_published_run_from_query_params(
-            example_id, run_id, uid
-        )
+        published_run = self.get_current_published_run()
 
         if published_run:
             versions = published_run.versions.all()
@@ -887,6 +881,10 @@ class BasePage:
     def get_sr_from_query_params_dict(self, query_params) -> SavedRun:
         example_id, run_id, uid = extract_query_params(query_params)
         return self.get_sr_from_query_params(example_id, run_id, uid)
+
+    def get_current_published_run(self) -> PublishedRun | None:
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        return self.get_published_run_from_query_params(example_id, run_id, uid)
 
     @classmethod
     def get_sr_from_query_params(

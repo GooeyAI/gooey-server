@@ -217,10 +217,6 @@ class SavedRun(models.Model):
             ret[StateKeys.run_time] = self.run_time.total_seconds()
         if self.run_status:
             ret[StateKeys.run_status] = self.run_status
-        if self.page_title:
-            ret[StateKeys.page_title] = self.page_title
-        if self.page_notes:
-            ret[StateKeys.page_notes] = self.page_notes
         if self.hidden:
             ret[StateKeys.hidden] = self.hidden
         if self.is_flagged:
@@ -251,9 +247,6 @@ class SavedRun(models.Model):
             seconds=state.pop(StateKeys.run_time, None) or 0
         )
         self.run_status = state.pop(StateKeys.run_status, None) or ""
-        self.page_title = state.pop(StateKeys.page_title, None) or ""
-        self.page_notes = state.pop(StateKeys.page_notes, None) or ""
-        # self.hidden = state.pop(StateKeys.hidden, False)
         self.is_flagged = state.pop("is_flagged", False)
         self.state = state
 
