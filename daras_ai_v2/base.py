@@ -84,6 +84,8 @@ SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
 
 
 class StateKeys:
+    page_image = "__image"
+
     created_at = "created_at"
     updated_at = "updated_at"
 
