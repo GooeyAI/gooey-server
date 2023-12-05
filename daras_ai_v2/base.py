@@ -417,6 +417,10 @@ class BasePage:
                 key="published_run_title",
                 value=default_title,
             )
+            st.session_state.setdefault(
+                "published_run_notes",
+                published_run and published_run.notes or "",
+            )
             published_run_notes = st.text_area(
                 "Notes",
                 key="published_run_notes",
