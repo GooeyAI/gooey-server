@@ -2,6 +2,7 @@ import base64
 import math
 import textwrap
 import typing
+from datetime import datetime, timezone
 
 import numpy as np
 
@@ -30,6 +31,17 @@ set_page_config = dummy
 form = dummy
 plotly_chart = dummy
 dataframe = dummy
+
+
+def countdown_timer(
+    end_time: datetime,
+    delay_text: str,
+) -> state.NestingCtx:
+    return _node(
+        "countdown-timer",
+        endTime=end_time.astimezone(timezone.utc).isoformat(),
+        delayText=delay_text,
+    )
 
 
 def nav_tabs():
@@ -202,6 +214,7 @@ def image(
     src: str | np.ndarray,
     caption: str = None,
     alt: str = None,
+    href: str = None,
     **props,
 ):
     if isinstance(src, np.ndarray):
@@ -222,6 +235,7 @@ def image(
             src=src,
             caption=dedent(caption),
             alt=alt or caption,
+            href=href,
             **props,
         ),
     ).mount()
@@ -561,6 +575,77 @@ def table(df: "pd.DataFrame"):
             ),
         ],
     ).mount()
+
+
+def horizontal_radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+) -> T | None:
+    if not options:
+        return None
+    options = list(options)
+    if not key:
+        key = md5_values("horizontal_radio", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if key not in state.session_state or value not in options:
+        value = options[0]
+    state.session_state.setdefault(key, value)
+    if label_visibility != "visible":
+        label = None
+    markdown(label)
+    for option in options:
+        if button(
+            format_func(option),
+            key=f"tab-{key}-{option}",
+            type="primary",
+            className="replicate-nav " + ("active" if value == option else ""),
+            disabled=disabled,
+        ):
+            state.session_state[key] = value = option
+            state.experimental_rerun()
+    return value
+
+
+def horizontal_radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    checked_by_default: bool = True,
+    label_visibility: LabelVisibility = "visible",
+) -> T | None:
+    if not options:
+        return None
+    options = list(options)
+    if not key:
+        key = md5_values("horizontal_radio", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if (key not in state.session_state or value not in options) and checked_by_default:
+        value = options[0]
+    state.session_state.setdefault(key, value)
+    if label_visibility != "visible":
+        label = None
+    markdown(label)
+    for option in options:
+        if button(
+            format_func(option),
+            key=f"tab-{key}-{option}",
+            type="primary",
+            className="replicate-nav " + ("active" if value == option else ""),
+            disabled=disabled,
+        ):
+            state.session_state[key] = value = option
+            state.experimental_rerun()
+    return value
 
 
 def radio(

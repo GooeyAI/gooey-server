@@ -16,7 +16,8 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
-from bots.custom_fields import PostgresJSONEncoder
+from bots.custom_fields import PostgresJSONEncoder, CustomURLField
+from daras_ai_v2.language_model import format_chat_entry
 from daras_ai_v2.crypto import get_random_doc_id
 
 if typing.TYPE_CHECKING:
@@ -717,6 +718,17 @@ class MessageQuerySet(models.QuerySet):
         df = pd.DataFrame.from_records(rows)
         return df
 
+    def as_llm_context(self, limit: int = 100) -> list["ConversationEntry"]:
+        msgs = self.order_by("-created_at").prefetch_related("attachments")[:limit]
+        entries = [None] * len(msgs)
+        for i, msg in enumerate(reversed(msgs)):
+            entries[i] = format_chat_entry(
+                role=msg.role,
+                content=msg.content,
+                images=msg.attachments.values_list("url", flat=True),
+            )
+        return entries
+
 
 class Message(models.Model):
     conversation = models.ForeignKey(
@@ -797,6 +809,32 @@ class Message(models.Model):
 
     def local_lang(self):
         return Truncator(self.display_content).words(30)
+
+
+class MessageAttachment(models.Model):
+    message = models.ForeignKey(
+        "bots.Message",
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    url = CustomURLField()
+    metadata = models.ForeignKey(
+        "files.FileMetadata",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        default=None,
+        related_name="message_attachments",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        if self.metadata_id:
+            return f"{self.metadata.name} ({self.url})"
+        return self.url
 
 
 class FeedbackQuerySet(models.QuerySet):
@@ -890,7 +928,10 @@ class Feedback(models.Model):
     objects = FeedbackQuerySet.as_manager()
 
     class Meta:
-        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["-created_at"]),
+        ]
+        ordering = ["-created_at"]
         get_latest_by = "created_at"
 
     def __str__(self):

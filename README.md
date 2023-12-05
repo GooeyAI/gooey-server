@@ -166,3 +166,4 @@ echo $PWD/fixture.json
 createdb -T template0 $PGDATABASE
 pg_dump $SOURCE_DATABASE | psql -q $PGDATABASE
 ```
+

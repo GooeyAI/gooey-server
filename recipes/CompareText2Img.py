@@ -28,6 +28,7 @@ from daras_ai_v2.stable_diffusion import (
 
 class CompareText2ImgPage(BasePage):
     title = "Compare AI Image Generators"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d127484e-88d9-11ee-b549-02420a000167/Compare%20AI%20Image%20generators.png.png"
     workflow = Workflow.COMPARE_TEXT2IMG
     slug_versions = [
         "CompareText2Img",
@@ -40,6 +41,8 @@ class CompareText2ImgPage(BasePage):
         "seed": 42,
         "sd_2_upscaling": False,
         "image_guidance_scale": 1.2,
+        "dall_e_3_quality": "standard",
+        "dall_e_3_style": "vivid",
     }
 
     class RequestModel(BaseModel):
@@ -51,6 +54,8 @@ class CompareText2ImgPage(BasePage):
 
         num_outputs: int | None
         quality: int | None
+        dall_e_3_quality: str | None
+        dall_e_3_style: str | None
 
         guidance_scale: float | None
         seed: int | None
@@ -152,7 +157,7 @@ class CompareText2ImgPage(BasePage):
 
         negative_prompt_setting()
         output_resolution_setting()
-        num_outputs_setting()
+        num_outputs_setting(st.session_state.get("selected_models", []))
         sd_2_upscaling_setting()
         col1, col2 = st.columns(2)
         with col1:
@@ -178,6 +183,8 @@ class CompareText2ImgPage(BasePage):
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
                 num_inference_steps=request.quality,
+                dall_e_3_quality=request.dall_e_3_quality,
+                dall_e_3_style=request.dall_e_3_style,
                 width=request.output_width,
                 height=request.output_height,
                 guidance_scale=request.guidance_scale,

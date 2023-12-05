@@ -634,6 +634,9 @@ class BasePage:
     def get_recipe_title(self) -> str:
         return self.get_root_published_run().title or self.title or ""
 
+    def get_recipe_image(self, state: dict) -> str:
+        return state.get(StateKeys.page_image) or self.image or ""
+
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
             msg = (
@@ -904,6 +907,10 @@ class BasePage:
             return sr
         except (SavedRun.DoesNotExist, PublishedRun.DoesNotExist):
             raise HTTPException(status_code=404)
+
+    @classmethod
+    def get_total_runs(cls) -> int:
+        return SavedRun.objects.filter(workflow=cls.workflow).count()
 
     @classmethod
     def get_published_run_from_query_params(

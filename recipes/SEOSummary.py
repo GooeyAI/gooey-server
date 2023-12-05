@@ -56,6 +56,7 @@ sanitizer = Sanitizer(
 
 class SEOSummaryPage(BasePage):
     title = "Create a perfect SEO-optimized Title & Paragraph"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85f38b42-88d6-11ee-ad97-02420a00016c/Create%20SEO%20optimized%20content%20option%202.png.png"
     workflow = Workflow.SEO_SUMMARY
     slug_versions = ["SEOSummary", "seo-paragraph-generator"]
 

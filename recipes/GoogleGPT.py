@@ -42,6 +42,7 @@ DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot
 
 class GoogleGPTPage(BasePage):
     title = "Web Search + GPT3"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1de97d80-88d7-11ee-ad97-02420a00016c/Websearch%20GPT.png.png"
     workflow = Workflow.GOOGLE_GPT
     slug_versions = ["google-gpt"]
 

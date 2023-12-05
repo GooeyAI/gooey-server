@@ -41,6 +41,11 @@ SEAMLESS_SUPPORTED = {"afr", "amh", "arb", "ary", "arz", "asm", "ast", "azj", "b
 AZURE_SUPPORTED = {"af-ZA", "am-ET", "ar-AE", "ar-BH", "ar-DZ", "ar-EG", "ar-IL", "ar-IQ", "ar-JO", "ar-KW", "ar-LB", "ar-LY", "ar-MA", "ar-OM", "ar-PS", "ar-QA", "ar-SA", "ar-SY", "ar-TN", "ar-YE", "az-AZ", "bg-BG", "bn-IN", "bs-BA", "ca-ES", "cs-CZ", "cy-GB", "da-DK", "de-AT", "de-CH", "de-DE", "el-GR", "en-AU", "en-CA", "en-GB", "en-GH", "en-HK", "en-IE", "en-IN", "en-KE", "en-NG", "en-NZ", "en-PH", "en-SG", "en-TZ", "en-US", "en-ZA", "es-AR", "es-BO", "es-CL", "es-CO", "es-CR", "es-CU", "es-DO", "es-EC", "es-ES", "es-GQ", "es-GT", "es-HN", "es-MX", "es-NI", "es-PA", "es-PE", "es-PR", "es-PY", "es-SV", "es-US", "es-UY", "es-VE", "et-EE", "eu-ES", "fa-IR", "fi-FI", "fil-PH", "fr-BE", "fr-CA", "fr-CH", "fr-FR", "ga-IE", "gl-ES", "gu-IN", "he-IL", "hi-IN", "hr-HR", "hu-HU", "hy-AM", "id-ID", "is-IS", "it-CH", "it-IT", "ja-JP", "jv-ID", "ka-GE", "kk-KZ", "km-KH", "kn-IN", "ko-KR", "lo-LA", "lt-LT", "lv-LV", "mk-MK", "ml-IN", "mn-MN", "mr-IN", "ms-MY", "mt-MT", "my-MM", "nb-NO", "ne-NP", "nl-BE", "nl-NL", "pa-IN", "pl-PL", "ps-AF", "pt-BR", "pt-PT", "ro-RO", "ru-RU", "si-LK", "sk-SK", "sl-SI", "so-SO", "sq-AL", "sr-RS", "sv-SE", "sw-KE", "sw-TZ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-IN", "uz-UZ", "vi-VN", "wuu-CN", "yue-CN", "zh-CN", "zh-CN-shandong", "zh-CN-sichuan", "zh-HK", "zh-TW", "zu-ZA"}  # fmt: skip
 MAX_POLLS = 100
 
+# https://deepgram.com/product/languages for the "general" model:
+# DEEPGRAM_SUPPORTED = {"nl","en","en-AU","en-US","en-GB","en-NZ","en-IN","fr","fr-CA","de","hi","hi-Latn","id","it","ja","ko","cmn-Hans-CN","cmn-Hant-TW","no","pl","pt","pt-PT","pt-BR","ru","es","es-419","sv","tr","uk"}  # fmt: skip
+# but we only have the Nova tier so these are our languages (https://developers.deepgram.com/docs/models-languages-overview):
+DEEPGRAM_SUPPORTED = {"en", "en-US", "en-AU", "en-GB", "en-NZ", "en-IN", "es", "es-419"}  # fmt: skip
+
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
@@ -53,6 +58,11 @@ class AsrModels(Enum):
     deepgram = "Deepgram"
     azure = "Azure Speech"
     seamless_m4t = "Seamless M4T (Facebook Research)"
+
+    def supports_auto_detect(self) -> bool:
+        return self not in {
+            self.azure,
+        }
 
 
 asr_model_ids = {
@@ -76,7 +86,7 @@ forced_asr_languages = {
 asr_supported_languages = {
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
-    AsrModels.deepgram: WHISPER_SUPPORTED,
+    AsrModels.deepgram: DEEPGRAM_SUPPORTED,
     AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
 }
@@ -155,7 +165,9 @@ def asr_language_selector(
         st.session_state[key] = forced_lang
         return forced_lang
 
-    options = [None, *asr_supported_languages.get(selected_model, [])]
+    options = list(asr_supported_languages.get(selected_model, []))
+    if selected_model and selected_model.supports_auto_detect():
+        options.insert(0, None)
 
     # handle non-canonical language codes
     old_val = st.session_state.get(key)
@@ -550,19 +562,6 @@ def azure_asr(audio_url: str, language: str):
         },
         "locale": language or "en-US",
     }
-    if not language:
-        payload["properties"]["languageIdentification"] = {
-            "candidateLocales": [
-                "en-US",
-                "en-IN",
-                "hi-IN",
-                "te-IN",
-                "ta-IN",
-                "kn-IN",
-                "es-ES",
-                "de-DE",
-            ]
-        }
     r = requests.post(
         str(furl(settings.AZURE_SPEECH_ENDPOINT) / "speechtotext/v3.1/transcriptions"),
         headers={
@@ -583,7 +582,7 @@ def azure_asr(audio_url: str, language: str):
             },
         )
         if not r.ok or not r.json()["status"] == "Succeeded":
-            sleep(1)
+            sleep(5)
             continue
         r = requests.get(
             r.json()["links"]["files"],
