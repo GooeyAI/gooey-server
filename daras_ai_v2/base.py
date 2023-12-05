@@ -227,31 +227,26 @@ class BasePage:
                 if is_current_user_creator and has_unpublished_changes:
                     self._render_unpublished_changes_indicator()
 
-                with st.div(className="d-flex align-items-center right-action-icons"):
+                with st.div(className="d-flex align-items-start right-action-icons"):
                     st.html(
                         """
                     <style>
-                    @media (min-width: 768px) {
-                        .right-action-icons .btn {
-                            padding: 6px;
-                        }
-                    }
-
                     .right-action-icons .btn {
-                        padding-left: 6px;
-                        padding-right: 6px;
+                        padding: 6px;
                     }
                     </style>
                     """
                     )
-
-                    self._render_social_buttons()
 
                     if is_current_user_creator:
                         self._render_published_run_buttons(
                             current_run=current_run,
                             published_run=published_run,
                         )
+
+                    self._render_social_buttons(
+                        show_button_text=not is_current_user_creator
+                    )
 
         with st.div():
             if breadcrumbs or self.run_user:
@@ -285,16 +280,22 @@ class BasePage:
 
     def _render_unpublished_changes_indicator(self):
         with st.div(
-            className="d-none d-lg-flex h-100 align-items-center text-muted me-3"
+            className="d-none d-lg-flex h-100 align-items-center text-muted ms-2"
         ):
             with st.tag("span", className="d-inline-block"):
                 st.html("Unpublished changes")
 
-    def _render_social_buttons(self):
+    def _render_social_buttons(self, show_button_text: bool = False):
+        button_text = (
+            '<span class="d-none d-lg-inline"> Copy Link</span>'
+            if show_button_text
+            else ""
+        )
+
         copy_to_clipboard_button(
-            '<i class="fa-regular fa-link"></i>',
+            f'<i class="fa-regular fa-link"></i>{button_text}',
             value=self._get_current_app_url(),
-            type="tertiary",
+            type="secondary",
             className="mb-0",
         )
 
@@ -331,7 +332,7 @@ class BasePage:
                 run_actions_button = (
                     st.button(
                         '<i class="fa-regular fa-ellipsis"></i>',
-                        className="mb-0",
+                        className="mb-0 ms-lg-2",
                         type="tertiary",
                     )
                     if is_update_mode
@@ -342,12 +343,11 @@ class BasePage:
                     run_actions_modal.open()
 
                 save_icon = '<i class="fa-regular fa-floppy-disk"></i>'
-                # save_text = f"{save_icon} Update" if is_update_mode else f"{save_icon} Save"
-                save_text = save_icon
+                save_text = "Update" if is_update_mode else "Save"
                 save_button = st.button(
-                    save_text,
-                    className="mb-0",
-                    type="tertiary",
+                    f'{save_icon}<span class="d-none d-lg-inline"> {save_text}</span>',
+                    className="mb-0 px-lg-4",
+                    type="primary",
                 )
                 publish_modal = Modal("", key="publish-modal")
                 if save_button:
