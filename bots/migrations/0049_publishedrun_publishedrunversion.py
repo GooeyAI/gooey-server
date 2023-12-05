@@ -31,7 +31,7 @@ def create_published_run_from_example(
         title=saved_run.page_title,
         notes=saved_run.page_notes,
         visibility=PublishedRunVisibility.PUBLIC,
-        is_approved_example=True,
+        is_approved_example=not saved_run.hidden,
     )
     set_field_attribute(published_run, "created_at", auto_now_add=False)
     set_field_attribute(published_run, "updated_at", auto_now=False)
