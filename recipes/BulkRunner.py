@@ -20,6 +20,8 @@ from daras_ai_v2.vector_search import (
 )
 from recipes.DocSearch import render_documents
 
+DEFAULT_BULK_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d80fd4d8-93fa-11ee-bc13-02420a0001cc/Bulk%20Runner.jpg.png"
+
 
 class BulkRunnerPage(BasePage):
     title = "Bulk Runner"
@@ -60,6 +62,9 @@ For each output field in the Gooey.AI workflow, specify the column name that you
 
     class ResponseModel(BaseModel):
         output_documents: list[str]
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_BULK_META_IMG
 
     def render_form_v2(self):
         from daras_ai_v2.all_pages import page_slug_map, normalize_slug

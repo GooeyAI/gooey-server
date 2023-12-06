@@ -9,7 +9,7 @@ from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.loom_video_widget import youtube_video
 
-DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/lipsync_meta_img.gif"
+DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/13b4d352-9456-11ee-8edd-02420a0001c7/Lipsync%20TTS.jpg.png"
 
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):

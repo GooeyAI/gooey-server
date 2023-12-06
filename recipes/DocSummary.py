@@ -27,7 +27,7 @@ from recipes.DocSearch import (
 )
 from recipes.GoogleGPT import render_output_with_refs, GoogleGPTPage
 
-DEFAULT_DOC_SUMMARY_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/db70c56e-585a-11ee-990b-02420a00018f/doc%20summary.png.png"
+DEFAULT_DOC_SUMMARY_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f35796d2-93fe-11ee-b86c-02420a0001c7/Summarize%20with%20GPT.jpg.png"
 
 
 class CombineDocumentsChains(Enum):

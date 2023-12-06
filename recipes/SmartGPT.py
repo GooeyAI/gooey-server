@@ -17,7 +17,7 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.pt import PromptTree
 
-DEFAULT_SMARTGPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/e02d1582-538a-11ee-9d7b-02420a000194/smartgpt%201.png.png"
+DEFAULT_SMARTGPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3d71b434-9457-11ee-8edd-02420a0001c7/Smart%20GPT.jpg.png"
 
 
 class SmartGPTPage(BasePage):
