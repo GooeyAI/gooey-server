@@ -22,7 +22,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
 )
 
-DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/cropped_tts_compare_meta_img.gif"
+DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
 
 
 class TextToSpeechPage(BasePage):

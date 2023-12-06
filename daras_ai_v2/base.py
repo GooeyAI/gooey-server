@@ -60,7 +60,7 @@ from gooey_ui.pubsub import realtime_pull
 
 DEFAULT_META_IMG = (
     # Small
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/optimized%20hp%20gif.gif"
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/b0f328d0-93f7-11ee-bd89-02420a0001cc/Main.jpg.png"
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     # Big
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"

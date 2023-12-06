@@ -33,7 +33,7 @@ from daras_ai_v2.vector_search import (
     render_sources_widget,
 )
 
-DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
+DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bcc7aa58-93fe-11ee-a083-02420a0001c8/Search%20your%20docs.jpg.png"
 
 
 class DocSearchPage(BasePage):
