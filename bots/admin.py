@@ -254,7 +254,7 @@ class SavedRunAdmin(admin.ModelAdmin):
 
     @admin.display(description="Input")
     def preview_input(self, saved_run: SavedRun):
-        return truncate_text_words(BasePage.preview_input(saved_run.state), 100)
+        return truncate_text_words(BasePage.preview_input(saved_run.state) or "", 100)
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):

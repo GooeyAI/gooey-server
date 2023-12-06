@@ -1,3 +1,4 @@
+import json
 import os
 import os.path
 import re
@@ -19,14 +20,15 @@ from daras_ai_v2.asr import (
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
-    azure_form_recognizer_models,
 )
 from daras_ai_v2.base import BasePage, MenuTabs, StateKeys
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
 )
+from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -72,13 +74,26 @@ BOT_SCRIPT_RE = re.compile(
     # start of line
     r"^"
     # name of bot / user
-    r"([\w\ \t]+)"
+    r"([\w\ \t]{3,30})"
     # colon
     r"\:\ ",
     flags=re.M,
 )
 
 SAFETY_BUFFER = 100
+
+
+def exec_tool_call(call: dict):
+    tool_name = call["function"]["name"]
+    tool = LLMTools[tool_name]
+    yield f"🛠 {tool.label}..."
+    kwargs = json.loads(call["function"]["arguments"])
+    return tool.fn(**kwargs)
+
+
+class ReplyButton(typing.TypedDict):
+    id: str
+    title: str
 
 
 class VideoBotsPage(BasePage):
@@ -205,6 +220,11 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
         variables: dict[str, typing.Any] | None
 
+        tools: list[LLMTools] | None = Field(
+            title="🛠️ Tools",
+            description="Give your copilot superpowers by giving it access to tools. Powered by [Function calling](https://platform.openai.com/docs/guides/function-calling).",
+        )
+
     class ResponseModel(BaseModel):
         final_prompt: str | list[ConversationEntry]
 
@@ -225,6 +245,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
         references: list[SearchReference] | None
         final_search_query: str | None
         final_keyword_query: str | None
+
+        # function calls
+        output_documents: list[str] | None
+        reply_buttons: list[ReplyButton] | None
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COPILOT_META_IMG
@@ -374,6 +398,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 key="input_face",
             )
             lipsync_settings()
+
+        st.write("---")
+        enum_multiselect(
+            enum_cls=LLMTools,
+            label="##### " + field_title_desc(self.RequestModel, "tools"),
+            key="tools",
+        )
 
     def fields_to_save(self) -> [str]:
         fields = super().fields_to_save() + ["landbot_url"]
@@ -714,6 +745,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 num_outputs=request.num_outputs,
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
+                tools=request.tools,
             )
         else:
             prompt = "\n".join(
@@ -729,6 +761,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 avoid_repetition=request.avoid_repetition,
                 stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
             )
+        if request.tools:
+            output_text, tool_call_choices = output_text
+            state["output_documents"] = output_documents = []
+            for tool_calls in tool_call_choices:
+                for call in tool_calls:
+                    result = yield from exec_tool_call(call)
+                    output_documents.append(result)
+
         # save model response
         state["raw_output_text"] = [
             "".join(snippet for snippet, _ in parse_refs(text, references))
@@ -1071,6 +1111,10 @@ def chat_list_view():
                             st.audio(output_audio[idx])
                         except IndexError:
                             pass
+            output_documents = st.session_state.get("output_documents", [])
+            if output_documents:
+                for doc in output_documents:
+                    st.write(doc)
         messages = st.session_state.get("messages", []).copy()
         # add last input to history if present
         if show_raw_msgs:
