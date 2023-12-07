@@ -592,15 +592,25 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 ocr_texts.append(ocr_text)
 
         # translate input text
-        yield f"Translating input to english..."
-        user_input, *ocr_texts = run_google_translate(
-            texts=[user_input, *ocr_texts],
-            target_language="en",
-            glossary_url=request.input_glossary_document,
-        )
+        if request.user_language and request.user_language != "en":
+            yield f"Translating Input to English..."
+            user_input = run_google_translate(
+                texts=[user_input],
+                source_language=request.user_language,
+                target_language="en",
+                glossary_url=request.input_glossary_document,
+            )[0]
 
-        for text in ocr_texts:
-            user_input = f"Image: {text!r}\n{user_input}"
+        if ocr_texts:
+            yield f"Translating Images to English..."
+            ocr_texts = run_google_translate(
+                texts=ocr_texts,
+                source_language="auto",
+                target_language="en",
+                glossary_url=request.input_glossary_document,
+            )
+            for text in ocr_texts:
+                user_input = f"Image: {text!r}\n{user_input}"
 
         # parse the bot script
         # system_message, scripted_msgs = parse_script(bot_script)
