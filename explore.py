@@ -46,7 +46,7 @@ def render():
             gui.markdown(f"#### {page.get_recipe_title(state)}")
         preview = page.preview_description(state)
         if preview:
-            with gui.tag("p", style={"margin-bottom": "2px"}):
+            with gui.tag("p", style={"margin-bottom": "25px"}):
                 gui.html(
                     truncate_text_words(preview, 150),
                 )
