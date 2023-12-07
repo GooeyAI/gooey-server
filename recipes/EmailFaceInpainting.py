@@ -20,7 +20,7 @@ twitter_handle_regex = r"(@)?[A-Za-z0-9_]{1,15}"
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
     title = "AI Generated Photo from Email Profile Lookup"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2affefa6-88da-11ee-aa86-02420a000165/AI%20generated%20photo%20with%20email%20profile%20lookup.png.png"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ec0df5aa-9521-11ee-93d3-02420a0001e5/Email%20Profile%20Lookup.png.png"
     workflow = Workflow.EMAIL_FACE_INPAINTING
     slug_versions = ["EmailFaceInpainting", "ai-image-from-email-lookup"]
 
