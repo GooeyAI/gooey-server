@@ -149,6 +149,11 @@ echo $PWD/fixture.json
 ```
 
 ```bash
+# copy fixture.json from server to local
+rsync -P -a <username>@captain.us-1.gooey.ai:/home/<username>/fixture.json .
+```
+
+```bash
 # reset the database
 ./manage.py reset_db -c
 # create the database

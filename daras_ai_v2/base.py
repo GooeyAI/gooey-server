@@ -1068,6 +1068,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 url=url,
                 query_params=dict(run_id=sr.run_id, uid=uid),
             )
+            if sr.run_status:
+                html_spinner(sr.run_status)
+            elif sr.error_msg:
+                st.error(sr.error_msg)
 
         grid_layout(3, run_history, _render)
 
