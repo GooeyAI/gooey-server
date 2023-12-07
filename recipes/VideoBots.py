@@ -1,7 +1,6 @@
 import json
 import os
 import os.path
-import re
 import typing
 
 from django.db.models import QuerySet
@@ -70,15 +69,15 @@ from url_shortener.models import ShortenedURL
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c8b24b0c-538a-11ee-a1a3-02420a00018d/meta%20tags1%201.png.png"
 
-BOT_SCRIPT_RE = re.compile(
-    # start of line
-    r"^"
-    # name of bot / user
-    r"([\w\ \t]{3,30})"
-    # colon
-    r"\:\ ",
-    flags=re.M,
-)
+# BOT_SCRIPT_RE = re.compile(
+#     # start of line
+#     r"^"
+#     # name of bot / user
+#     r"([\w\ \t]{3,30})"
+#     # colon
+#     r"\:\ ",
+#     flags=re.M,
+# )
 
 SAFETY_BUFFER = 100
 
@@ -297,7 +296,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         st.text_area(
             """
             ##### 📝 Prompt
-            High-level system instructions to the copilot + optional example conversations between the bot and the user.
+            High-level system instructions.
             """,
             key="bot_script",
             height=300,
@@ -604,7 +603,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             user_input = f"Image: {text!r}\n{user_input}"
 
         # parse the bot script
-        system_message, scripted_msgs = parse_script(bot_script)
+        # system_message, scripted_msgs = parse_script(bot_script)
+        system_message = bot_script.strip()
+        scripted_msgs = []
 
         # consturct the system prompt
         if system_message:
@@ -614,21 +615,20 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         else:
             system_prompt = None
 
-        # get user/bot display names
-        try:
-            bot_display_name = scripted_msgs[-1]["display_name"]
-        except IndexError:
-            bot_display_name = CHATML_ROLE_ASSISTANT
-        try:
-            user_display_name = scripted_msgs[-2]["display_name"]
-        except IndexError:
-            user_display_name = CHATML_ROLE_USER
+        # # get user/bot display names
+        # try:
+        #     bot_display_name = scripted_msgs[-1]["display_name"]
+        # except IndexError:
+        #     bot_display_name = CHATML_ROLE_ASSISTANT
+        # try:
+        #     user_display_name = scripted_msgs[-2]["display_name"]
+        # except IndexError:
+        #     user_display_name = CHATML_ROLE_USER
 
         # construct user prompt
         state["raw_input_text"] = user_input
         user_prompt = {
             "role": CHATML_ROLE_USER,
-            "display_name": user_display_name,
             "content": user_input,
         }
 
@@ -718,7 +718,6 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             prompt_messages.append(
                 {
                     "role": CHATML_ROLE_ASSISTANT,
-                    "display_name": bot_display_name,
                     "content": "",
                 }
             )
@@ -1046,36 +1045,36 @@ if (typeof Landbot === "undefined") {
     )
 
 
-def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
-    # run regex to find scripted messages in script text
-    script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
-    # extract system message from script
-    system_message = bot_script
-    if script_matches:
-        system_message = system_message[: script_matches[0].start()]
-    system_message = system_message.strip()
-    # extract pre-scripted messages from script
-    scripted_msgs: list[ConversationEntry] = []
-    for idx in range(len(script_matches)):
-        match = script_matches[idx]
-        try:
-            next_match = script_matches[idx + 1]
-        except IndexError:
-            next_match_start = None
-        else:
-            next_match_start = next_match.start()
-        if (len(script_matches) - idx) % 2 == 0:
-            role = CHATML_ROLE_USER
-        else:
-            role = CHATML_ROLE_ASSISTANT
-        scripted_msgs.append(
-            {
-                "role": role,
-                "display_name": match.group(1).strip(),
-                "content": bot_script[match.end() : next_match_start].strip(),
-            }
-        )
-    return system_message, scripted_msgs
+# def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
+#     # run regex to find scripted messages in script text
+#     script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
+#     # extract system message from script
+#     system_message = bot_script
+#     if script_matches:
+#         system_message = system_message[: script_matches[0].start()]
+#     system_message = system_message.strip()
+#     # extract pre-scripted messages from script
+#     scripted_msgs: list[ConversationEntry] = []
+#     for idx in range(len(script_matches)):
+#         match = script_matches[idx]
+#         try:
+#             next_match = script_matches[idx + 1]
+#         except IndexError:
+#             next_match_start = None
+#         else:
+#             next_match_start = next_match.start()
+#         if (len(script_matches) - idx) % 2 == 0:
+#             role = CHATML_ROLE_USER
+#         else:
+#             role = CHATML_ROLE_ASSISTANT
+#         scripted_msgs.append(
+#             {
+#                 "role": role,
+#                 "display_name": match.group(1).strip(),
+#                 "content": bot_script[match.end() : next_match_start].strip(),
+#             }
+#         )
+#     return system_message, scripted_msgs
 
 
 def chat_list_view():
@@ -1131,12 +1130,10 @@ def chat_list_view():
         # render history
         for entry in reversed(messages):
             with msg_container_widget(entry["role"]):
-                display_name = entry.get("display_name") or entry["role"]
-                display_name = display_name.capitalize()
                 images = get_entry_images(entry)
                 text = get_entry_text(entry)
                 if text or images:
-                    st.write(f"**{display_name}**  \n{text}")
+                    st.write(f"**{entry['role'].capitalize()}**  \n{text}")
                 if images:
                     for im in images:
                         st.image(im, style={"maxHeight": "200px"})
