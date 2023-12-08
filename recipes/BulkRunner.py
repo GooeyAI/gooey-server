@@ -387,7 +387,9 @@ def build_requests_for_df(df, request, df_ix, arr_len):
             else:
                 request_body[field] = df.at[df_ix, col]
         # for validation
-        request_body = page_cls.RequestModel.parse_obj(request_body).dict()
+        request_body = page_cls.RequestModel.parse_obj(request_body).dict(
+            exclude_unset=True
+        )
 
         yield url_ix, f, request_body, page_cls
 
