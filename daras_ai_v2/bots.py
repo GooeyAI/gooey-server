@@ -83,7 +83,9 @@ class BotInterface:
         if bi.published_run:
             self.page_cls = Workflow(bi.published_run.workflow).page_cls
             self.query_params = self.page_cls.clean_query_params(
-                example_id=bi.published_run.example_id,
+                example_id=bi.published_run.published_run_id,
+                run_id="",
+                uid="",
             )
             saved_run = bi.published_run.saved_run
             self.input_glossary = saved_run.state.get("input_glossary_document")
