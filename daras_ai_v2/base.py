@@ -184,9 +184,7 @@ class BasePage:
 
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         current_run = self.get_sr_from_query_params(example_id, run_id, uid)
-        published_run = self.get_published_run_from_query_params(
-            example_id, run_id, uid
-        )
+        published_run = self.get_current_published_run()
         is_root_example = published_run and published_run.is_root_example()
         title, breadcrumbs = self._get_title_and_breadcrumbs(
             current_run=current_run,
@@ -893,7 +891,16 @@ class BasePage:
 
     def get_current_published_run(self) -> PublishedRun | None:
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        return self.get_published_run_from_query_params(example_id, run_id, uid)
+        if run_id:
+            current_run = self.get_sr_from_query_params(example_id, run_id, uid)
+            if current_run.parent_version:
+                return current_run.parent_version.published_run
+            else:
+                return None
+        elif example_id:
+            return self.get_published_run_from_query_params(example_id, "", "")
+        else:
+            return self.get_root_published_run()
 
     @classmethod
     def get_sr_from_query_params(
@@ -942,12 +949,18 @@ class BasePage:
 
     @classmethod
     def run_doc_sr(
-        cls, run_id: str, uid: str, create: bool = False, parent: SavedRun = None
+        cls,
+        run_id: str,
+        uid: str,
+        create: bool = False,
+        parent: SavedRun | None = None,
+        parent_version: PublishedRunVersion | None = None,
     ) -> SavedRun:
         config = dict(workflow=cls.workflow, uid=uid, run_id=run_id)
         if create:
             return SavedRun.objects.get_or_create(
-                **config, defaults=dict(parent=parent)
+                **config,
+                defaults=dict(parent=parent, parent_version=parent_version),
             )[0]
         else:
             return SavedRun.objects.get(**config)
@@ -1279,7 +1292,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         else:
             self.call_runner_task(example_id, run_id, uid)
         raise QueryParamsRedirectException(
-            self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
+            self.clean_query_params(example_id=None, run_id=run_id, uid=uid)
         )
 
     def should_submit_after_login(self) -> bool:
@@ -1315,12 +1328,18 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         parent = self.get_sr_from_query_params(
             parent_example_id, parent_run_id, parent_uid
         )
+        published_run = self.get_current_published_run()
+        parent_version = published_run and published_run.versions.latest()
 
-        self.run_doc_sr(run_id, uid, create=True, parent=parent).set(
-            self.state_to_doc(st.session_state)
-        )
+        self.run_doc_sr(
+            run_id,
+            uid,
+            create=True,
+            parent=parent,
+            parent_version=parent_version,
+        ).set(self.state_to_doc(st.session_state))
 
-        return parent_example_id, run_id, uid
+        return None, run_id, uid
 
     def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
         from celeryapp.tasks import gui_runner
@@ -1405,9 +1424,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         current_sr = self.get_sr_from_query_params(example_id, run_id, uid)
-        published_run = self.get_published_run_from_query_params(
-            example_id, run_id, uid
-        )
+        published_run = self.get_current_published_run()
 
         with st.expander("🛠️ Admin Options"):
             if st.button("⭐️ Save Workflow"):
@@ -1614,7 +1631,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def render_steps(self):
         raise NotImplementedError
 
-    def preview_input(self, state: dict) -> str | None:
+    @classmethod
+    def preview_input(cls, state: dict) -> str | None:
         return (
             state.get("text_prompt")
             or state.get("input_prompt")
