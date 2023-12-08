@@ -1,4 +1,5 @@
 import enum
+import typing
 from typing import TypeVar, Type
 
 import gooey_ui as st
@@ -35,7 +36,7 @@ def enum_multiselect(
             if inner_key not in st.session_state:
                 st.session_state[inner_key] = e.name in selected
 
-            st.checkbox(e.value, key=inner_key)
+            st.checkbox(_format_func(enum_cls)(e.name), key=inner_key)
 
             if st.session_state.get(inner_key):
                 selected.add(e.name)
@@ -49,7 +50,7 @@ def enum_multiselect(
     else:
         return st.multiselect(
             options=[e.name for e in enums],
-            format_func=lambda k: enum_cls[k].value,
+            format_func=_format_func(enum_cls),
             label=label,
             key=key,
             allow_none=allow_none,
@@ -82,8 +83,19 @@ def enum_selector(
     return widget(
         **kwargs,
         options=options,
-        format_func=lambda k: getattr(enum_cls[k], "label", enum_cls[k].value)
-        if k
-        else "———",
+        format_func=_format_func(enum_cls),
         label=label,
     )
+
+
+def _format_func(enum_cls: E) -> typing.Callable[[str], str]:
+    def _format(k):
+        if not k:
+            return "———"
+        e = enum_cls[k]
+        try:
+            return e.label
+        except AttributeError:
+            return e.value
+
+    return _format

@@ -1,6 +1,6 @@
+import json
 import os
 import os.path
-import re
 import typing
 
 from django.db.models import QuerySet
@@ -19,14 +19,15 @@ from daras_ai_v2.asr import (
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
-    azure_form_recognizer_models,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
 )
+from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -68,17 +69,30 @@ from url_shortener.models import ShortenedURL
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c8b24b0c-538a-11ee-a1a3-02420a00018d/meta%20tags1%201.png.png"
 
-BOT_SCRIPT_RE = re.compile(
-    # start of line
-    r"^"
-    # name of bot / user
-    r"([\w\ \t]+)"
-    # colon
-    r"\:\ ",
-    flags=re.M,
-)
+# BOT_SCRIPT_RE = re.compile(
+#     # start of line
+#     r"^"
+#     # name of bot / user
+#     r"([\w\ \t]{3,30})"
+#     # colon
+#     r"\:\ ",
+#     flags=re.M,
+# )
 
 SAFETY_BUFFER = 100
+
+
+def exec_tool_call(call: dict):
+    tool_name = call["function"]["name"]
+    tool = LLMTools[tool_name]
+    yield f"🛠 {tool.label}..."
+    kwargs = json.loads(call["function"]["arguments"])
+    return tool.fn(**kwargs)
+
+
+class ReplyButton(typing.TypedDict):
+    id: str
+    title: str
 
 
 class VideoBotsPage(BasePage):
@@ -205,6 +219,11 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
         variables: dict[str, typing.Any] | None
 
+        tools: list[LLMTools] | None = Field(
+            title="🛠️ Tools",
+            description="Give your copilot superpowers by giving it access to tools. Powered by [Function calling](https://platform.openai.com/docs/guides/function-calling).",
+        )
+
     class ResponseModel(BaseModel):
         final_prompt: str | list[ConversationEntry]
 
@@ -225,6 +244,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
         references: list[SearchReference] | None
         final_search_query: str | None
         final_keyword_query: str | None
+
+        # function calls
+        output_documents: list[str] | None
+        reply_buttons: list[ReplyButton] | None
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COPILOT_META_IMG
@@ -273,7 +296,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         st.text_area(
             """
             ##### 📝 Prompt
-            High-level system instructions to the copilot + optional example conversations between the bot and the user.
+            High-level system instructions.
             """,
             key="bot_script",
             height=300,
@@ -374,6 +397,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 key="input_face",
             )
             lipsync_settings()
+
+        st.write("---")
+        enum_multiselect(
+            enum_cls=LLMTools,
+            label="##### " + field_title_desc(self.RequestModel, "tools"),
+            key="tools",
+        )
 
     def fields_to_save(self) -> [str]:
         fields = super().fields_to_save() + ["landbot_url"]
@@ -562,18 +592,30 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 ocr_texts.append(ocr_text)
 
         # translate input text
-        yield f"Translating input to english..."
-        user_input, *ocr_texts = run_google_translate(
-            texts=[user_input, *ocr_texts],
-            target_language="en",
-            glossary_url=request.input_glossary_document,
-        )
+        if request.user_language and request.user_language != "en":
+            yield f"Translating Input to English..."
+            user_input = run_google_translate(
+                texts=[user_input],
+                source_language=request.user_language,
+                target_language="en",
+                glossary_url=request.input_glossary_document,
+            )[0]
 
-        for text in ocr_texts:
-            user_input = f"Image: {text!r}\n{user_input}"
+        if ocr_texts:
+            yield f"Translating Images to English..."
+            ocr_texts = run_google_translate(
+                texts=ocr_texts,
+                source_language="auto",
+                target_language="en",
+                glossary_url=request.input_glossary_document,
+            )
+            for text in ocr_texts:
+                user_input = f"Image: {text!r}\n{user_input}"
 
         # parse the bot script
-        system_message, scripted_msgs = parse_script(bot_script)
+        # system_message, scripted_msgs = parse_script(bot_script)
+        system_message = bot_script.strip()
+        scripted_msgs = []
 
         # consturct the system prompt
         if system_message:
@@ -583,21 +625,20 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         else:
             system_prompt = None
 
-        # get user/bot display names
-        try:
-            bot_display_name = scripted_msgs[-1]["display_name"]
-        except IndexError:
-            bot_display_name = CHATML_ROLE_ASSISTANT
-        try:
-            user_display_name = scripted_msgs[-2]["display_name"]
-        except IndexError:
-            user_display_name = CHATML_ROLE_USER
+        # # get user/bot display names
+        # try:
+        #     bot_display_name = scripted_msgs[-1]["display_name"]
+        # except IndexError:
+        #     bot_display_name = CHATML_ROLE_ASSISTANT
+        # try:
+        #     user_display_name = scripted_msgs[-2]["display_name"]
+        # except IndexError:
+        #     user_display_name = CHATML_ROLE_USER
 
         # construct user prompt
         state["raw_input_text"] = user_input
         user_prompt = {
             "role": CHATML_ROLE_USER,
-            "display_name": user_display_name,
             "content": user_input,
         }
 
@@ -687,7 +728,6 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             prompt_messages.append(
                 {
                     "role": CHATML_ROLE_ASSISTANT,
-                    "display_name": bot_display_name,
                     "content": "",
                 }
             )
@@ -714,6 +754,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 num_outputs=request.num_outputs,
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
+                tools=request.tools,
             )
         else:
             prompt = "\n".join(
@@ -729,6 +770,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 avoid_repetition=request.avoid_repetition,
                 stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
             )
+        if request.tools:
+            output_text, tool_call_choices = output_text
+            state["output_documents"] = output_documents = []
+            for tool_calls in tool_call_choices:
+                for call in tool_calls:
+                    result = yield from exec_tool_call(call)
+                    output_documents.append(result)
+
         # save model response
         state["raw_output_text"] = [
             "".join(snippet for snippet, _ in parse_refs(text, references))
@@ -1005,36 +1054,36 @@ if (typeof Landbot === "undefined") {
     )
 
 
-def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
-    # run regex to find scripted messages in script text
-    script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
-    # extract system message from script
-    system_message = bot_script
-    if script_matches:
-        system_message = system_message[: script_matches[0].start()]
-    system_message = system_message.strip()
-    # extract pre-scripted messages from script
-    scripted_msgs: list[ConversationEntry] = []
-    for idx in range(len(script_matches)):
-        match = script_matches[idx]
-        try:
-            next_match = script_matches[idx + 1]
-        except IndexError:
-            next_match_start = None
-        else:
-            next_match_start = next_match.start()
-        if (len(script_matches) - idx) % 2 == 0:
-            role = CHATML_ROLE_USER
-        else:
-            role = CHATML_ROLE_ASSISTANT
-        scripted_msgs.append(
-            {
-                "role": role,
-                "display_name": match.group(1).strip(),
-                "content": bot_script[match.end() : next_match_start].strip(),
-            }
-        )
-    return system_message, scripted_msgs
+# def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
+#     # run regex to find scripted messages in script text
+#     script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
+#     # extract system message from script
+#     system_message = bot_script
+#     if script_matches:
+#         system_message = system_message[: script_matches[0].start()]
+#     system_message = system_message.strip()
+#     # extract pre-scripted messages from script
+#     scripted_msgs: list[ConversationEntry] = []
+#     for idx in range(len(script_matches)):
+#         match = script_matches[idx]
+#         try:
+#             next_match = script_matches[idx + 1]
+#         except IndexError:
+#             next_match_start = None
+#         else:
+#             next_match_start = next_match.start()
+#         if (len(script_matches) - idx) % 2 == 0:
+#             role = CHATML_ROLE_USER
+#         else:
+#             role = CHATML_ROLE_ASSISTANT
+#         scripted_msgs.append(
+#             {
+#                 "role": role,
+#                 "display_name": match.group(1).strip(),
+#                 "content": bot_script[match.end() : next_match_start].strip(),
+#             }
+#         )
+#     return system_message, scripted_msgs
 
 
 def chat_list_view():
@@ -1070,6 +1119,10 @@ def chat_list_view():
                             st.audio(output_audio[idx])
                         except IndexError:
                             pass
+            output_documents = st.session_state.get("output_documents", [])
+            if output_documents:
+                for doc in output_documents:
+                    st.write(doc)
         messages = st.session_state.get("messages", []).copy()
         # add last input to history if present
         if show_raw_msgs:
@@ -1086,12 +1139,10 @@ def chat_list_view():
         # render history
         for entry in reversed(messages):
             with msg_container_widget(entry["role"]):
-                display_name = entry.get("display_name") or entry["role"]
-                display_name = display_name.capitalize()
                 images = get_entry_images(entry)
                 text = get_entry_text(entry)
                 if text or images:
-                    st.write(f"**{display_name}**  \n{text}")
+                    st.write(f"**{entry['role'].capitalize()}**  \n{text}")
                 if images:
                     for im in images:
                         st.image(im, style={"maxHeight": "200px"})

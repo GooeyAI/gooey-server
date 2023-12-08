@@ -314,9 +314,10 @@ def output_resolution_setting():
         st.session_state.get("selected_model", st.session_state.get("selected_models"))
         or ""
     )
-    allowed_shapes = RESOLUTIONS[st.session_state["__pixels"]].values()
     if not isinstance(selected_models, list):
         selected_models = [selected_models]
+
+    allowed_shapes = None
     if "jack_qiao" in selected_models or "sd_1_4" in selected_models:
         pixel_options = [512]
     elif selected_models == ["deepfloyd_if"]:
@@ -339,9 +340,9 @@ def output_resolution_setting():
         )
     with col2:
         res_options = [
-            key
-            for key, val in RESOLUTIONS[pixels or pixel_options[0]].items()
-            if val in allowed_shapes
+            res
+            for res, shape in RESOLUTIONS[pixels or pixel_options[0]].items()
+            if not allowed_shapes or shape in allowed_shapes
         ]
         res = st.selectbox(
             "##### Resolution",

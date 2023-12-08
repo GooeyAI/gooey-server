@@ -236,19 +236,20 @@ def _translate_text(
     )
 
     # prevent incorrect API calls
-    if source_language == target_language or not text:
+    if not text or source_language == target_language or source_language == "und":
         return text
 
     if source_language == "wo-SN" or target_language == "wo-SN":
         return _MinT_translate_one_text(text, source_language, target_language)
 
     config = {
-        "source_language_code": source_language,
         "target_language_code": target_language,
         "contents": text,
         "mime_type": "text/plain",
         "transliteration_config": {"enable_transliteration": enable_transliteration},
     }
+    if source_language != "auto":
+        config["source_language_code"] = source_language
 
     # glossary does not work with transliteration
     if glossary_url and not enable_transliteration:

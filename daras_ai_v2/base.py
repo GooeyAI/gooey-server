@@ -1575,6 +1575,11 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if updated_at and isinstance(updated_at, datetime.datetime):
             js_dynamic_date(updated_at)
 
+        if saved_run.run_status:
+            html_spinner(saved_run.run_status)
+        elif saved_run.error_msg:
+            st.error(saved_run.error_msg)
+
         return self.render_example(saved_run.to_dict())
 
     def _render_example_preview(
