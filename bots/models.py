@@ -140,6 +140,13 @@ class SavedRun(models.Model):
         blank=True,
         related_name="children",
     )
+    parent_version = models.ForeignKey(
+        "bots.PublishedRunVersion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="children_runs",
+    )
 
     workflow = models.IntegerField(
         choices=Workflow.choices, default=Workflow.VIDEO_BOTS
@@ -1013,6 +1020,8 @@ class PublishedRun(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        get_latest_by = "updated_at"
+
         ordering = ["-updated_at"]
         unique_together = [
             ["workflow", "published_run_id"],
@@ -1152,3 +1161,6 @@ class PublishedRunVersion(models.Model):
             models.Index(fields=["published_run", "-created_at"]),
             models.Index(fields=["version_id"]),
         ]
+
+    def __str__(self):
+        return f"{self.published_run} - {self.version_id}"
