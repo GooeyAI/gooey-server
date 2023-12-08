@@ -17,6 +17,7 @@ from bots.models import (
     CHATML_ROLE_ASSISSTANT,
     SavedRun,
     PublishedRun,
+    PublishedRunVersion,
     Message,
     Platform,
     Feedback,
@@ -256,6 +257,7 @@ class SavedRunAdmin(admin.ModelAdmin):
     ]
     list_filter = ["workflow"]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
+    autocomplete_fields = ["parent_version"]
 
     readonly_fields = [
         "open_in_gooey",
@@ -289,7 +291,12 @@ class SavedRunAdmin(admin.ModelAdmin):
 
     @admin.display(description="Input")
     def preview_input(self, saved_run: SavedRun):
-        return truncate_text_words(BasePage.preview_input(saved_run.state), 100)
+        return truncate_text_words(BasePage.preview_input(saved_run.state) or "", 100)
+
+
+@admin.register(PublishedRunVersion)
+class PublishedRunVersionAdmin(admin.ModelAdmin):
+    search_fields = ["id", "version_id", "published_run__published_run_id"]
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):
