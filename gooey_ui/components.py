@@ -523,8 +523,33 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     ).mount()
 
 
-def data_table(file_url: str):
-    return _node("data-table", fileUrl=file_url)
+def data_table(file_url: str, colorCode: bool = False):
+    return _node("data-table", fileUrl=file_url, colorCode=colorCode)
+
+
+def bar_chart(
+    columns=["1st bar", "2nd bar", "3rd bar", "4th bar"],
+    values=[1552, 1400, 1319, 613],
+    colors=[(75, 192, 192), (255, 205, 86), (255, 159, 64), (255, 99, 132)],
+    label: str = "total count/value",
+):
+    return _node(
+        "bar-chart",
+        data={
+            "labels": columns,
+            "datasets": [
+                {
+                    "label": label,
+                    "data": values,
+                    "backgroundColor": [
+                        f"rgba({r}, {g}, {b}, 0.2)" for (r, g, b) in colors
+                    ],
+                    "borderColor": [f"rgba({r}, {g}, {b})" for (r, g, b) in colors],
+                    "borderWidth": 1,
+                },
+            ],
+        },
+    )
 
 
 def table(df: "pd.DataFrame"):

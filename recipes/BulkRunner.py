@@ -57,8 +57,16 @@ For each output field in the Gooey.AI workflow, specify the column name that you
             """,
         )
 
+        analysis_run_url: str = Field(
+            title="Analysis Run URL",
+            description="""
+            Paste in a Gooey.AI workflow links for an llm run. Should accept an ai_answer and golden_answer input and output json with a score and rationale.
+            """,
+        )
+
     class ResponseModel(BaseModel):
         output_documents: list[str]
+        analysis_tables: list[str]
 
     def render_form_v2(self):
         from daras_ai_v2.all_pages import page_slug_map, normalize_slug
@@ -206,24 +214,30 @@ To understand what each field represents, check out our [API docs](https://api.g
             "price": "Price",
             "run_time": "Run Time",
             "error_msg": "Error Msg",
+            "title": "Title",
         } | {k: v for k, v in output_fields.items() if k not in visible_out_fields}
 
         output_columns_old = st.session_state.pop("output_columns", {})
         output_columns_new = st.session_state.setdefault("output_columns", {})
 
-        for fields, div, checked in (
-            (visible_out_fields, visible_col2, True),
-            (hidden_out_fields, hidden_col2, False),
+        for fields, div in (
+            (visible_out_fields, visible_col2),
+            (hidden_out_fields, hidden_col2),
         ):
             for field, title in fields.items():
                 with div:
                     col = st.checkbox(
                         label="`" + title + "`",
                         key="--output-mapping:" + field,
-                        value=bool(output_columns_old.get(field, checked)),
+                        value=bool(
+                            output_columns_old.get(field, field in output_columns_old)
+                        ),
                     )
                 if col:
                     output_columns_new[field] = title
+
+    def render_settings(self):
+        st.text_input("""##### Analysis Run URL""", key="analysis_run_url")
 
     def render_example(self, state: dict):
         render_documents(state)
@@ -233,6 +247,17 @@ To understand what each field represents, check out our [API docs](https://api.g
         for file in files:
             st.write(file)
             st.data_table(file)
+        analysis_files = st.session_state.get("analysis_tables", [])
+        for file in analysis_files:
+            st.write(file)
+            st.data_table(file, colorCode=True)
+            df = _read_df(file)
+            df.sort_values(by=["Average Score"], inplace=True, ascending=False)
+            st.bar_chart(
+                columns=list(df["Title"]),
+                values=list(df["Average Score"]),
+                label="Average Score",
+            )
 
     def run_v2(
         self,
@@ -243,10 +268,14 @@ To understand what each field represents, check out our [API docs](https://api.g
 
         response.output_documents = []
 
+        response.analysis_tables = []
+
         for doc_ix, doc in enumerate(request.documents):
             df = _read_df(doc)
             in_recs = df.to_dict(orient="records")
             out_recs = []
+
+            analysis_scores = {}
 
             f = upload_file_from_bytes(
                 filename=f"bulk-runner-{doc_ix}-0-0.csv",
@@ -287,6 +316,11 @@ To understand what each field represents, check out our [API docs](https://api.g
                     state["price"] = sr.price
                     state["run_time"] = str(run_time)
                     state["error_msg"] = sr.error_msg
+                    state["title"] = sr.page_title.strip() or (
+                        "Untitled " + str(sr.workflow)
+                    )
+
+                    analysis_scores[state["title"]] = [0, 0]
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
@@ -317,6 +351,68 @@ To understand what each field represents, check out our [API docs](https://api.g
                         else:
                             out_recs[rec_ix][col] = str(out_val)
 
+                        if request.analysis_run_url:
+                            if field in [
+                                "run_url",
+                                "price",
+                                "run_time",
+                                "error_msg",
+                                "title",
+                            ]:
+                                continue
+                            from recipes.CompareLLM import CompareLLMPage
+                            import json
+
+                            f = furl(request.analysis_run_url)
+                            example_id, run_id, uid = extract_query_params(
+                                f.query.params
+                            )
+                            try:
+                                sr = CompareLLMPage.get_sr_from_query_params(
+                                    example_id, run_id, uid
+                                )
+                            except HTTPException as e:
+                                raise ValueError(
+                                    "Invalid analysis run url. Should be an llm run with golden_answer and ai_answer variables."
+                                ) from e
+
+                            if isinstance(out_val, list):
+                                scores = []
+                                rationales = []
+                                for arr_ix, item in enumerate(out_val):
+                                    result, sr = sr.submit_api_call(
+                                        current_user=self.request.user,
+                                        request_body=dict(
+                                            variables=dict(
+                                                ai_answer=out_val[arr_ix],
+                                                golden_answer=df["golden_answer"].iloc[
+                                                    df_ix + arr_ix
+                                                ],
+                                            )
+                                        ),
+                                    )
+                                    result.get(disable_sync_subtasks=False)
+                                    sr.refresh_from_db()
+
+                                    run_time = datetime.timedelta(
+                                        seconds=int(sr.run_time.total_seconds())
+                                    )
+                                    output = sr.to_dict().get("output_text", {})
+                                    output = output.get(next(iter(output)), [{}])[0]
+                                    output = json.loads(output)
+                                    score = output.get("score", pd.NaT)
+                                    scores += [score]
+                                    rationales += [
+                                        output.get("rationale", "No rationale given")
+                                    ]
+                                    analysis_scores[state["title"]][0] += float(score)
+                                    analysis_scores[state["title"]][1] += 1
+                                for i, (score, rationale) in enumerate(
+                                    zip(scores, rationales)
+                                ):
+                                    out_recs[rec_ix + i][f"{col} score"] = score
+                                    out_recs[rec_ix + i][f"{col} rationale"] = rationale
+
                     out_df = pd.DataFrame.from_records(out_recs)
                     f = upload_file_from_bytes(
                         filename=f"bulk-runner-{doc_ix}-{url_ix}-{df_ix}.csv",
@@ -324,6 +420,23 @@ To understand what each field represents, check out our [API docs](https://api.g
                         content_type="text/csv",
                     )
                     response.output_documents[doc_ix] = f
+
+            if request.analysis_run_url:
+                df_analysis = pd.DataFrame(
+                    {
+                        "Title": [k for k in analysis_scores.keys()],
+                        "Average Score": [
+                            v[0] / v[1] for v in analysis_scores.values()
+                        ],
+                        "Number of Samples": [v[1] for v in analysis_scores.values()],
+                    }
+                )
+                f = upload_file_from_bytes(
+                    filename=f"bulk-runner-analysis-{doc_ix}.csv",
+                    data=df_analysis.to_csv(index=False).encode(),
+                    content_type="text/csv",
+                )
+                response.analysis_tables.append(f)
 
     def preview_description(self, state: dict) -> str:
         return """
