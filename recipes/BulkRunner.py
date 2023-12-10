@@ -317,7 +317,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                     state["run_time"] = str(run_time)
                     state["error_msg"] = sr.error_msg
                     state["title"] = sr.page_title.strip() or (
-                        "Untitled " + str(sr.workflow)
+                        "Untitled " + str(Workflow(sr.workflow).name)
                     )
 
                     analysis_scores[state["title"]] = [0, 0]
