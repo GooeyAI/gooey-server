@@ -19,6 +19,11 @@ from daras_ai_v2.vector_search import (
     download_content_bytes,
 )
 from recipes.DocSearch import render_documents
+import matplotlib
+import matplotlib.pyplot as plt
+
+# default backend is not compatible with celery, so we need to change it to Agg
+matplotlib.use("Agg")
 
 
 class BulkRunnerPage(BasePage):
@@ -67,6 +72,7 @@ For each output field in the Gooey.AI workflow, specify the column name that you
     class ResponseModel(BaseModel):
         output_documents: list[str]
         analysis_tables: list[str]
+        analysis_plots: list[str]
 
     def render_form_v2(self):
         from daras_ai_v2.all_pages import page_slug_map, normalize_slug
@@ -268,6 +274,11 @@ To understand what each field represents, check out our [API docs](https://api.g
                 colors=colors,
             )
 
+    def preview_image(self, state: dict) -> str | None:
+        if len(state.get("analysis_plots", [])) > 0:
+            return state["analysis_plots"][0]
+        return self.image
+
     def run_v2(
         self,
         request: "BulkRunnerPage.RequestModel",
@@ -278,6 +289,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         response.output_documents = []
 
         response.analysis_tables = []
+        response.analysis_plots = []
 
         for doc_ix, doc in enumerate(request.documents):
             df = _read_df(doc)
@@ -456,6 +468,26 @@ To understand what each field represents, check out our [API docs](https://api.g
                     content_type="text/csv",
                 )
                 response.analysis_tables.append(f)
+
+                df_analysis.plot.bar(x="Title", y="Average Score")
+                df_analysis.sort_values(by=["Average Score"], inplace=True)
+                plt.title("Average Score")
+                plt.legend().remove()
+                plt.xticks(rotation=0)
+                plt.gca().get_children()[0].set_color((216 / 255, 230 / 255, 206 / 255))
+                plt.gca().get_children()[len(df_analysis.index) - 1].set_color(
+                    (235 / 255, 199 / 255, 198 / 255)
+                )
+                with io.BytesIO() as buffer:  # use buffer memory
+                    plt.savefig(buffer, format="png")
+                    buffer.seek(0)
+                    image = buffer.getvalue()
+                f = upload_file_from_bytes(
+                    filename="bulk-runner-analysis.png",
+                    data=image,
+                    content_type="image/png",
+                )
+                response.analysis_plots.append(f)
 
     def preview_description(self, state: dict) -> str:
         return """
