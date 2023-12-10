@@ -43,7 +43,7 @@ RUN pip install --no-cache-dir -U poetry pip && poetry install --no-cache --only
 # install nltk stopwords
 RUN poetry run python -c 'import nltk; nltk.download("stopwords")'
 # install playwright
-RUN poetry run playwright install
+RUN poetry run playwright install-deps && poetry run playwright install
 
 # copy the code into the container
 COPY . .
