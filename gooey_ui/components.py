@@ -523,8 +523,19 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     ).mount()
 
 
-def data_table(file_url: str, colorCode: bool = False):
-    return _node("data-table", fileUrl=file_url, colorCode=colorCode)
+def data_table(
+    file_url: str,
+    colorCodeMin: tuple[int, int, int] = (255, 255, 255),
+    colorCodeMax: tuple[int, int, int] = (255, 255, 255),
+    colorColumns: list[str] = [],
+):
+    return _node(
+        "data-table",
+        fileUrl=file_url,
+        colorCodeMin=f"rgb({colorCodeMin[0]}, {colorCodeMin[1]}, {colorCodeMin[2]})",
+        colorCodeMax=f"rgb({colorCodeMax[0]}, {colorCodeMax[1]}, {colorCodeMax[2]})",
+        colorColumns=colorColumns,
+    )
 
 
 def bar_chart(

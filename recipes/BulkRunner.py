@@ -250,13 +250,22 @@ To understand what each field represents, check out our [API docs](https://api.g
         analysis_files = st.session_state.get("analysis_tables", [])
         for file in analysis_files:
             st.write(file)
-            st.data_table(file, colorCode=True)
             df = _read_df(file)
             df.sort_values(by=["Average Score"], inplace=True, ascending=False)
+            colors: list[tuple[int, int, int]] = [(0, 0, 0)] * len(df.index)
+            colors[0] = (216, 230, 206)
+            colors[-1] = (235, 199, 198)
+            st.data_table(
+                file,
+                colorCodeMax=colors[0],
+                colorCodeMin=colors[-1],
+                colorColumns=["Average Score"],
+            )
             st.bar_chart(
                 columns=list(df["Title"]),
                 values=list(df["Average Score"]),
                 label="Average Score",
+                colors=colors,
             )
 
     def run_v2(
@@ -320,7 +329,12 @@ To understand what each field represents, check out our [API docs](https://api.g
                         "Untitled " + str(Workflow(sr.workflow).name)
                     )
 
-                    analysis_scores[state["title"]] = [0, 0]
+                    analysis_scores[state["title"]] = [
+                        0,
+                        0,
+                        state["price"],
+                        state["run_time"],
+                    ]
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
@@ -405,8 +419,11 @@ To understand what each field represents, check out our [API docs](https://api.g
                                     rationales += [
                                         output.get("rationale", "No rationale given")
                                     ]
-                                    analysis_scores[state["title"]][0] += float(score)
-                                    analysis_scores[state["title"]][1] += 1
+                                    if score:
+                                        analysis_scores[state["title"]][0] += float(
+                                            score
+                                        )
+                                        analysis_scores[state["title"]][1] += 1
                                 for i, (score, rationale) in enumerate(
                                     zip(scores, rationales)
                                 ):
@@ -429,6 +446,8 @@ To understand what each field represents, check out our [API docs](https://api.g
                             v[0] / v[1] for v in analysis_scores.values()
                         ],
                         "Number of Samples": [v[1] for v in analysis_scores.values()],
+                        "Price": [v[2] for v in analysis_scores.values()],
+                        "Run Time": [v[3] for v in analysis_scores.values()],
                     }
                 )
                 f = upload_file_from_bytes(
