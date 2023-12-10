@@ -172,13 +172,23 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
     )
 
     total_runs = (
-        counts_df.sum(numeric_only=True)
+        counts_df.drop(columns=["display_name", "email"])
+        .sum()
         .rename("Total Runs")
         .to_frame()
         .reset_index(names=["label"])
-        .sort_values("Total Runs", ascending=False)
         .reset_index(drop=True)
     )
+
+    total_runs["Unique Users"] = (
+        counts_df.drop(columns=["display_name", "email"])
+        .astype(bool)
+        .sum(numeric_only=True)
+        .rename("Unique Users")
+        .to_frame()
+        .reset_index(drop=True)
+    )
+    total_runs.sort_values("Total Runs", ascending=False, inplace=True)
 
     col1, col2 = st.columns(2)
 
