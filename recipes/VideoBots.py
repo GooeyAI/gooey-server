@@ -602,12 +602,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             )[0]
 
         if ocr_texts:
-            yield f"Translating Images to English..."
+            yield f"Translating Image Text to English..."
             ocr_texts = run_google_translate(
                 texts=ocr_texts,
                 source_language="auto",
                 target_language="en",
-                glossary_url=request.input_glossary_document,
             )
             for text in ocr_texts:
                 user_input = f"Image: {text!r}\n{user_input}"
