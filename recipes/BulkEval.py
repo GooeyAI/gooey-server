@@ -95,7 +95,7 @@ def _render_results(results: list[AggFunctionResult]):
         counts = [d.get("count", 1) for d in g]
         fig.add_trace(
             go.Table(
-                header=dict(values=["Metric", "Value", "Count"]),
+                header=dict(values=["Metric", k.capitalize(), "Count"]),
                 cells=dict(
                     values=[columns, values, counts],
                     fill_color=["aliceblue", colors, "aliceblue"],
