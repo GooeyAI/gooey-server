@@ -3,6 +3,7 @@ import typing
 
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
+from recipes.BulkEval import BulkEvalPage
 from recipes.BulkRunner import BulkRunnerPage
 from recipes.ChyronPlant import ChyronPlantPage
 from recipes.CompareLLM import CompareLLMPage
@@ -49,6 +50,7 @@ all_home_pages_by_category = {
     ],
     "LLMs, RAG, & Synthetic Data": [
         BulkRunnerPage,
+        BulkEvalPage,
         DocExtractPage,
         CompareLLMPage,
         DocSearchPage,

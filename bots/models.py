@@ -72,6 +72,7 @@ class Workflow(models.IntegerChoices):
     RELATED_QNA_MAKER_DOC = (28, "Related QnA Maker Doc")
     EMBEDDINGS = (29, "Embeddings")
     BULK_RUNNER = (30, "Bulk Runner")
+    BULK_EVAL = (31, "Bulk Evaluator")
 
     @property
     def short_slug(self):
