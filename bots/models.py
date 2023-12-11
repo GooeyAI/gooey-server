@@ -982,6 +982,7 @@ class FeedbackComment(models.Model):
 
 
 class PublishedRun(models.Model):
+    # published_run_id was earlier SavedRun.example_id
     published_run_id = models.CharField(
         max_length=128,
         blank=True,
@@ -1025,6 +1026,13 @@ class PublishedRun(models.Model):
         ordering = ["-updated_at"]
         unique_together = [
             ["workflow", "published_run_id"],
+        ]
+
+        indexes = [
+            models.Index(fields=["workflow"]),
+            models.Index(fields=["workflow", "created_by"]),
+            models.Index(fields=["workflow", "published_run_id"]),
+            models.Index(fields=["workflow", "visibility", "is_approved_example"]),
         ]
 
     def __str__(self):
