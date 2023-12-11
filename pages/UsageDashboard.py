@@ -171,41 +171,29 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
         """
     )
 
-    total_runs = (
-        counts_df.sum(numeric_only=True)
-        .rename("Total Runs")
-        .to_frame()
-        .reset_index(names=["label"])
-        .sort_values("Total Runs", ascending=False)
-        .reset_index(drop=True)
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.write(total_runs)
-
-    with col2:
-        st.plotly_chart(
-            px.pie(
-                total_runs.iloc[2:],
-                values="Total Runs",
-                names="label",
-            ),
-            use_container_width=True,
+    if st.checkbox("Show Uniques"):
+        calc = "Unique Users"
+        total_runs = (
+            counts_df.drop(columns=["display_name", "email"])
+            .astype(bool)
+            .sum(numeric_only=True)
+            .rename(calc)
+            .to_frame()
+            .reset_index(names=["label"])
+            .sort_values(calc, ascending=False)
+            .reset_index(drop=True)
+        )
+    else:
+        calc = "Total Runs"
+        total_runs = (
+            counts_df.sum(numeric_only=True)
+            .rename(calc)
+            .to_frame()
+            .reset_index(names=["label"])
+            .sort_values(calc, ascending=False)
+            .reset_index(drop=True)
         )
 
-    total_runs = (
-        counts_df.drop(columns=["display_name", "email"])
-        .astype(bool)
-        .sum(numeric_only=True)
-        .rename("Unique Users")
-        .to_frame()
-        .reset_index(names=["label"])
-        .sort_values("Unique Users", ascending=False)
-        .reset_index(drop=True)
-    )
-
     col1, col2 = st.columns(2)
 
     with col1:
@@ -215,7 +203,7 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
         st.plotly_chart(
             px.pie(
                 total_runs.iloc[2:],
-                values="Unique Users",
+                values=calc,
                 names="label",
             ),
             use_container_width=True,
