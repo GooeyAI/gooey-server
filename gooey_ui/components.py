@@ -560,6 +560,12 @@ def bar_chart(
                 },
             ],
         },
+        options={
+            "scales": {
+                "y": {"ticks": {"format": {"style": "percent"}}},
+                "x": {"ticks": {"font": {"size": 16, "weight": "bold"}}},
+            }
+        },
     )
 
 

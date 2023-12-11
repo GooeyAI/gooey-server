@@ -250,29 +250,51 @@ To understand what each field represents, check out our [API docs](https://api.g
 
     def render_output(self):
         files = st.session_state.get("output_documents", [])
-        for file in files:
-            st.write(file)
-            st.data_table(file)
         analysis_files = st.session_state.get("analysis_tables", [])
-        for file in analysis_files:
-            st.write(file)
-            df = _read_df(file)
-            df.sort_values(by=["Average Score"], inplace=True, ascending=False)
-            colors: list[tuple[int, int, int]] = [(0, 0, 0)] * len(df.index)
-            colors[0] = (216, 230, 206)
-            colors[-1] = (235, 199, 198)
-            st.data_table(
-                file,
-                colorCodeMax=colors[0],
-                colorCodeMin=colors[-1],
-                colorColumns=["Average Score"],
+        if len(analysis_files) != len(files):
+            analysis_files = analysis_files[: len(files)]
+            analysis_files += [None] * (len(files) - len(analysis_files))
+        for i, (file, analysis_file) in enumerate(zip(files, analysis_files)):
+            prefix = f"{i + 1}." if len(files) > 1 else ""
+            st.html(
+                f"""
+                <div style="display: flex; align-items: baseline; justify-content: space-between; transform: translateY(30%)">
+                <h4>{prefix}Results</h4>
+                <a class="btn btn-theme btn-tertiary" href={file}><i class="fa fa-link"></i> CSV</a>
+                </div>
+                """
             )
-            st.bar_chart(
-                columns=list(df["Title"]),
-                values=list(df["Average Score"]),
-                label="Average Score",
-                colors=colors,
-            )
+            st.data_table(file)
+
+            if analysis_file:
+                st.html(
+                    f"""
+                    <div style="display: flex; align-items: baseline; justify-content: space-between; transform: translateY(40%)">
+                    <h4>{prefix}Summary</h4>
+                    <a class="btn btn-theme btn-tertiary" href={analysis_file}><i class="fa fa-link"></i> CSV</a>
+                    </div>
+                    """
+                )
+
+                df = _read_df(analysis_file)
+                df.sort_values(by=["Average Score"], inplace=True, ascending=False)
+                colors: list[tuple[int, int, int]] = [(0, 0, 0)] * len(df.index)
+                colors[0] = (216, 230, 206)
+                colors[-1] = (235, 199, 198)
+                st.bar_chart(
+                    columns=list(df["Title"]),
+                    values=list(df["Average Score"]),
+                    label="Average Score",
+                    colors=colors,
+                )
+                st.write("<br>")
+                st.data_table(
+                    analysis_file,
+                    colorCodeMax=colors[0],
+                    colorCodeMin=colors[-1],
+                    colorColumns=["Average Score"],
+                )
+                st.write("<br>")
 
     def preview_image(self, state: dict) -> str | None:
         if len(state.get("analysis_plots", [])) > 0:
