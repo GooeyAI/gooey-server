@@ -366,6 +366,7 @@ class BasePage:
                         style={"min-width": "min(300px, 100vw)"}
                     ):
                         self._render_run_actions_modal(
+                            current_run=current_run,
                             published_run=published_run,
                             modal=run_actions_modal,
                         )
@@ -480,14 +481,28 @@ class BasePage:
     def _render_run_actions_modal(
         self,
         *,
+        current_run: SavedRun,
         published_run: PublishedRun,
         modal: Modal,
     ):
+        assert published_run is not None
+
+        is_latest_version = published_run.saved_run == current_run
+
         with st.div(className="mt-4"):
-            duplicate_icon = '<i class="fa-regular fa-copy"></i>'
-            duplicate_button = st.button(
-                f"{duplicate_icon} Duplicate", type="secondary", className="w-100"
-            )
+            duplicate_button = None
+            save_as_new_button = None
+            duplicate_icon = save_as_new_icon = '<i class="fa-regular fa-copy"></i>'
+            if is_latest_version:
+                duplicate_button = st.button(
+                    f"{duplicate_icon} Duplicate", type="secondary", className="w-100"
+                )
+            else:
+                save_as_new_button = st.button(
+                    f"{save_as_new_icon} Save as New",
+                    type="secondary",
+                    className="w-100",
+                )
             delete_icon = '<i class="fa-regular fa-trash"></i>'
             delete_button = st.button(
                 f"{delete_icon} Delete", type="secondary", className="w-100 text-danger"
@@ -502,6 +517,19 @@ class BasePage:
             )
             raise QueryParamsRedirectException(
                 query_params=dict(example_id=duplicate_pr.published_run_id),
+            )
+
+        if save_as_new_button:
+            new_pr = self.create_published_run(
+                published_run_id=get_random_doc_id(),
+                saved_run=current_run,
+                user=self.request.user,
+                title=f"{published_run.title} (Copy)",
+                notes=published_run.notes,
+                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+            )
+            raise QueryParamsRedirectException(
+                query_params=dict(example_id=new_pr.published_run_id)
             )
 
         confirm_delete_modal = Modal("Confirm Delete", key="confirm-delete-modal")
