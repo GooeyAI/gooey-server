@@ -502,7 +502,10 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
         except LookupError:
             pass
         else:
-            f_bytes = codec.decode(f_bytes)[0].encode()
+            try:
+                f_bytes = codec.decode(f_bytes)[0].encode()
+            except UnicodeDecodeError:
+                pass
     ext = guess_ext_from_response(r)
     return f_bytes, ext
 
