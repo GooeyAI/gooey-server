@@ -328,7 +328,7 @@ class BasePage:
             )
 
             with st.link(to=page.app_url()):
-                st.markdown(
+                st.html(
                     # language=html
                     f"""
 <div class="w-100 mb-2" style="height:150px; background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
@@ -1177,7 +1177,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
         st.markdown(
-            f'📖 To learn more, take a look at our <a href="{api_docs_url}" target="_blank">complete API</a>'
+            f'📖 To learn more, take a look at our <a href="{api_docs_url}" target="_blank">complete API</a>',
+            unsafe_allow_html=True,
         )
 
         st.write("#### 📤 Example Request")
