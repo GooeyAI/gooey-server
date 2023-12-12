@@ -155,4 +155,4 @@ def render_qna_outputs(state, height, show_count=None):
             {"output_text": output_text, "references": references}, height
         )
         render_sources_widget(references)
-        st.write("<br>")
+        st.html("<br>")
