@@ -10,7 +10,7 @@ class MenuTabs:
     run_as_api = "🚀 API"
     history = "📖 History"
     integrations = "🔌 Integrations"
-    published = "📁 Published"
+    saved = "📁 Saved"
 
     paths = {
         run: "",
@@ -18,7 +18,7 @@ class MenuTabs:
         run_as_api: "api",
         history: "history",
         integrations: "integrations",
-        published: "published",
+        saved: "saved",
     }
     paths_reverse = {v: k for k, v in paths.items()}
 

@@ -358,7 +358,6 @@ class BasePage:
                             current_run=current_run,
                             published_run=published_run,
                             is_update_mode=is_update_mode,
-                            modal=publish_modal,
                         )
 
                 if run_actions_modal.is_open():
@@ -375,7 +374,6 @@ class BasePage:
         self,
         *,
         current_run: SavedRun,
-        modal: Modal,
         published_run: PublishedRun | None,
         is_update_mode: bool = False,
     ):
@@ -426,7 +424,10 @@ class BasePage:
             )
 
         with st.div(className="mt-4 d-flex justify-content-center"):
-            publish_button = st.button("🌻 Publish", type="primary")
+            save_icon = '<i class="fa-regular fa-floppy-disk"></i>'
+            publish_button = st.button(
+                f"{save_icon} Save", className="px-4", type="primary"
+            )
 
         if publish_button:
             recipe_title = self.get_root_published_run().title or self.title
@@ -682,7 +683,7 @@ class BasePage:
         tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
         if self.request.user:
             tabs.extend([MenuTabs.history])
-            tabs.extend([MenuTabs.published])
+            tabs.extend([MenuTabs.saved])
         return tabs
 
     def render_selected_tab(self, selected_tab: str):
@@ -716,8 +717,8 @@ class BasePage:
             case MenuTabs.run_as_api:
                 self.run_as_api_tab()
 
-            case MenuTabs.published:
-                self._published_tab()
+            case MenuTabs.saved:
+                self._saved_tab()
                 render_js_dynamic_dates()
 
     def _render_version_history(self):
@@ -1524,7 +1525,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         grid_layout(3, example_runs, _render)
 
-    def _published_tab(self):
+    def _saved_tab(self):
         if not self.request.user or self.request.user.is_anonymous:
             redirect_url = furl(
                 "/login", query_params={"next": furl(self.request.url).set(origin=None)}
