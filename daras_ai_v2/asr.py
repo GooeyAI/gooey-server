@@ -3,6 +3,7 @@ import os.path
 import subprocess
 import tempfile
 from enum import Enum
+from time import sleep
 
 import langcodes
 import requests
@@ -12,17 +13,16 @@ from furl import furl
 
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
+from daras_ai_v2 import settings
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gdrive_downloader import (
     is_gdrive_url,
     gdrive_download,
     gdrive_metadata,
     url_to_gdrive_file_id,
 )
-from daras_ai_v2 import settings
-from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
-from time import sleep
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -363,37 +363,17 @@ def run_asr(
         return azure_asr(audio_url, language)
     elif selected_model == AsrModels.whisper_large_v3:
         import replicate
-        from tempfile import NamedTemporaryFile
 
-        with NamedTemporaryFile(suffix=".wav") as f:
-            subprocess.run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    audio_url,
-                    "-vn",
-                    "-ar",
-                    "16000",
-                    "-ac",
-                    "1",
-                    "-f",
-                    "wav",
-                    f.name,
-                ],
-                check=True,
-            )
-            config = {
-                "audio": open(f.name, "rb"),
-                "return_timestamps": output_format != AsrOutputFormat.text,
-            }
-            if language:
-                config["language"] = language
-            output = replicate.run(
-                asr_model_ids[AsrModels.whisper_large_v3],
-                input=config,
-            )
-            return output["text"] if output_format == AsrOutputFormat.text else output
+        config = {
+            "audio": audio_url,
+            "return_timestamps": output_format != AsrOutputFormat.text,
+        }
+        if language:
+            config["language"] = language
+        data = replicate.run(
+            asr_model_ids[AsrModels.whisper_large_v3],
+            input=config,
+        )
     elif selected_model == AsrModels.deepgram:
         r = requests.post(
             "https://api.deepgram.com/v1/listen",
