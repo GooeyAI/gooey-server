@@ -22,10 +22,11 @@ from recipes.DocSearch import render_documents
 
 
 class BulkRunnerPage(BasePage):
-    title = "Bulk Runner & Evaluator"
+    title = "Bulk Runner"
     image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/87f35df4-88d7-11ee-aac9-02420a00016b/Bulk%20Runner.png.png"
     workflow = Workflow.BULK_RUNNER
     slug_versions = ["bulk-runner", "bulk"]
+    price = 1
 
     class RequestModel(BaseModel):
         documents: list[str] = Field(
@@ -244,7 +245,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         response.output_documents = []
 
         for doc_ix, doc in enumerate(request.documents):
-            df = _read_df(doc)
+            df = read_df_any(doc)
             in_recs = df.to_dict(orient="records")
             out_recs = []
 
@@ -290,7 +291,10 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
-                            col = f"({url_ix + 1}) {col}"
+                            if sr.page_title:
+                                col = f"({sr.page_title}) {col}"
+                            else:
+                                col = f"({url_ix + 1}) {col}"
                         out_val = state.get(field)
                         if isinstance(out_val, list):
                             for arr_ix, item in enumerate(out_val):
@@ -441,7 +445,7 @@ def is_arr(field_props: dict) -> bool:
 
 @st.cache_in_session_state
 def get_columns(files: list[str]) -> list[str]:
-    dfs = map_parallel(_read_df, files)
+    dfs = map_parallel(read_df_any, files)
     return list(
         {
             col: None
@@ -452,7 +456,7 @@ def get_columns(files: list[str]) -> list[str]:
     )
 
 
-def _read_df(f_url: str) -> "pd.DataFrame":
+def read_df_any(f_url: str) -> "pd.DataFrame":
     import pandas as pd
 
     doc_meta = doc_url_to_metadata(f_url)

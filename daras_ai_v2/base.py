@@ -84,8 +84,6 @@ SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
 
 
 class StateKeys:
-    page_image = "__image"
-
     created_at = "created_at"
     updated_at = "updated_at"
 
@@ -99,6 +97,7 @@ class StateKeys:
 
 class BasePage:
     title: str
+    image: str | None = None
     workflow: Workflow
     slug_versions: list[str]
 
@@ -668,7 +667,7 @@ class BasePage:
         return self.get_root_published_run().title or self.title or ""
 
     def get_recipe_image(self, state: dict) -> str:
-        return state.get(StateKeys.page_image) or self.image or ""
+        return self.image or ""
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
