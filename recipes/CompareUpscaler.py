@@ -9,7 +9,7 @@ from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.face_restoration import UpscalerModels, run_upscaler_model
 from daras_ai_v2.stable_diffusion import SD_IMG_MAX_SIZE
 
-DEFAULT_COMPARE_UPSCALER_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/COMPARE%20IMAGE%20UPSCALERS.jpg"
+DEFAULT_COMPARE_UPSCALER_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2e8ee512-93fe-11ee-a083-02420a0001c8/Image%20upscaler.jpg.png"
 
 
 class CompareUpscalerPage(BasePage):

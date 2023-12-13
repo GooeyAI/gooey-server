@@ -37,12 +37,12 @@ from recipes.DocSearch import (
     EmptySearchResults,
 )
 
-DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
+DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85ed60a2-9405-11ee-9747-02420a0001ce/Web%20search%20GPT.jpg.png"
 
 
 class GoogleGPTPage(BasePage):
     title = "Web Search + GPT3"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1de97d80-88d7-11ee-ad97-02420a00016c/Websearch%20GPT.png.png"
+    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/28649544-9406-11ee-bba3-02420a0001cc/Websearch%20GPT%20option%202.png.png"
     workflow = Workflow.GOOGLE_GPT
     slug_versions = ["google-gpt"]
 

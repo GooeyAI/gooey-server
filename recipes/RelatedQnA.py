@@ -16,7 +16,7 @@ from recipes.DocSearch import render_doc_search_step, EmptySearchResults
 from recipes.GoogleGPT import GoogleGPTPage
 from recipes.RelatedQnADoc import render_qna_outputs
 
-DEFAULT_SEO_CONTENT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9b415768-5393-11ee-a837-02420a000190/RQnA%20SEO%20content%201.png.png"
+DEFAULT_SEO_CONTENT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/cbd2c94e-9456-11ee-a95e-02420a0001cc/People%20also%20ask.jpg.png"
 
 
 class RelatedGoogleGPTResponse(GoogleGPTPage.ResponseModel):
