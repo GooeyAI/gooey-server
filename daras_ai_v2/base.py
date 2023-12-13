@@ -664,7 +664,7 @@ class BasePage:
                     )
 
     def get_recipe_title(self) -> str:
-        return self.get_root_published_run().title or self.title or ""
+        return self.get_or_create_root_published_run().title or self.title or ""
 
     def get_recipe_image(self, state: dict) -> str:
         return self.image or ""
@@ -972,8 +972,32 @@ class BasePage:
         return cls.get_published_run(published_run_id="")
 
     @classmethod
-    def recipe_doc_sr(cls) -> SavedRun:
-        return cls.get_root_published_run().saved_run
+    def get_or_create_root_published_run(cls) -> PublishedRun:
+        try:
+            return cls.get_root_published_run()
+        except PublishedRun.DoesNotExist:
+            saved_run = cls.run_doc_sr(
+                run_id="",
+                uid="",
+                create=True,
+                parent=None,
+                parent_version=None,
+            )
+            return cls.create_published_run(
+                published_run_id="",
+                saved_run=saved_run,
+                user=None,
+                title=cls.title,
+                notes=cls().preview_description(state=saved_run.to_dict()),
+                visibility=PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
+            )
+
+    @classmethod
+    def recipe_doc_sr(cls, create: bool = False) -> SavedRun:
+        if create:
+            return cls.get_or_create_root_published_run().saved_run
+        else:
+            return cls.get_root_published_run().saved_run
 
     @classmethod
     def run_doc_sr(

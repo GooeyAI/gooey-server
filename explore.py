@@ -14,7 +14,7 @@ DESCRIPTION = "DISCOVER YOUR FIELD’S FAVORITE AI WORKFLOWS"
 def render():
     def _render_non_featured(page_cls):
         page = page_cls()
-        state = page.recipe_doc_sr().to_dict()
+        state = page.recipe_doc_sr(create=True).to_dict()
         # total_runs = page.get_total_runs()
 
         col1, col2 = gui.columns([1, 2])
@@ -27,7 +27,7 @@ def render():
 
     def _render_as_featured(page_cls):
         page = page_cls()
-        state = page.recipe_doc_sr().to_dict()
+        state = page.recipe_doc_sr(create=True).to_dict()
         # total_runs = page.get_total_runs()
         render_image(page, state)
         # render_description(page, state, total_runs)
