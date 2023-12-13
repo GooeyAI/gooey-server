@@ -36,7 +36,7 @@ from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
 KEYWORDS_SEP = re.compile(r"[\n,]")
 
 STOP_SEQ = "$" * 10
-SEO_SUMMARY_DEFAULT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/seo.png"
+SEO_SUMMARY_DEFAULT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/13d3ab1e-9457-11ee-98a6-02420a0001c9/SEO.jpg.png"
 
 BANNED_HOSTS = [
     # youtube generally returns garbage

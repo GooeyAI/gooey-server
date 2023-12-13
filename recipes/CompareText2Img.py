@@ -25,6 +25,8 @@ from daras_ai_v2.stable_diffusion import (
     Schedulers,
 )
 
+DEFAULT_COMPARE_TEXT2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ae7b2940-93fc-11ee-8edc-02420a0001cc/Compare%20image%20generators.jpg.png"
+
 
 class CompareText2ImgPage(BasePage):
     title = "Compare AI Image Generators"
@@ -73,6 +75,9 @@ class CompareText2ImgPage(BasePage):
         output_images: dict[
             typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
         ]
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_COMPARE_TEXT2IMG_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.FaceInpainting import FaceInpaintingPage

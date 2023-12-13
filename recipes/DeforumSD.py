@@ -15,6 +15,8 @@ from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.tabs_widget import MenuTabs
 
+DEFAULT_DEFORUMSD_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7dc25196-93fe-11ee-9e3a-02420a0001ce/AI%20Animation%20generator.jpg.png"
+
 
 class AnimationModels(TextChoices):
     protogen_2_2 = ("Protogen_V2.2.ckpt", "Protogen V2.2 (darkstorm2150)")
@@ -198,6 +200,9 @@ class DeforumSDPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_video: str
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_DEFORUMSD_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage

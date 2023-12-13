@@ -29,6 +29,8 @@ from daras_ai_v2.stable_diffusion import (
     instruct_pix2pix,
 )
 
+DEFAULT_GOOGLE_IMG_GEN_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/dcd82b68-9400-11ee-9e3a-02420a0001ce/Search%20result%20photo.jpg.png"
+
 
 class GoogleImageGenPage(BasePage):
     title = "Render Image Search Results with AI"
@@ -73,6 +75,9 @@ class GoogleImageGenPage(BasePage):
 
         image_urls: list[str]
         selected_image: str | None
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_GOOGLE_IMG_GEN_META_IMG
 
     def related_workflows(self):
         from recipes.ObjectInpainting import ObjectInpaintingPage

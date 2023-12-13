@@ -60,7 +60,7 @@ from gooey_ui.pubsub import realtime_pull
 
 DEFAULT_META_IMG = (
     # Small
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/optimized%20hp%20gif.gif"
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/b0f328d0-93f7-11ee-bd89-02420a0001cc/Main.jpg.png"
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     # Big
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
@@ -81,7 +81,6 @@ class RecipeRunState(Enum):
 
 class StateKeys:
     page_title = "__title"
-    page_image = "__image"
     page_notes = "__notes"
 
     created_at = "created_at"
@@ -97,7 +96,7 @@ class StateKeys:
 
 class BasePage:
     title: str
-    image: str
+    image: str = None
     workflow: Workflow
     slug_versions: list[str]
 
@@ -266,7 +265,7 @@ class BasePage:
         return state.get(StateKeys.page_title) or self.title or ""
 
     def get_recipe_image(self, state: dict) -> str:
-        return state.get(StateKeys.page_image) or self.image or ""
+        return self.image or ""
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:

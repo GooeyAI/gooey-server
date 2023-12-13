@@ -39,7 +39,7 @@ from recipes.SocialLookupEmail import get_profile_for_email
 from url_shortener.models import ShortenedURL
 
 ATTEMPTS = 1
-DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f09c8cfa-5393-11ee-a837-02420a000190/ai%20art%20qr%20codes1%201.png.png"
+DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a679a410-9456-11ee-bd77-02420a0001ce/QR%20Code.jpg.png"
 
 
 class QrSources(Enum):
