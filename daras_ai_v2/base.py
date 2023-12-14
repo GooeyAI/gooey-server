@@ -1633,12 +1633,12 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
         with st.link(to=saved_run.get_app_url(), className="text-decoration-none"):
-            with st.tag("span", className="badge bg-secondary px-4 py-2 mb-2 lead"):
+            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
                 if is_latest_version:
                     st.html(
-                        PublishedRunVisibility(published_run.visibility)
-                        .help_text()
-                        .upper()
+                        PublishedRunVisibility(
+                            published_run.visibility
+                        ).get_badge_html()
                     )
 
             st.write(f"#### {title}")
@@ -1661,9 +1661,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
         with st.link(to=published_run.get_app_url(), className="text-decoration-none"):
-            with st.tag("span", className="badge bg-secondary px-4 py-2 mb-2"):
+            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
                 st.html(
-                    PublishedRunVisibility(published_run.visibility).help_text().upper()
+                    PublishedRunVisibility(published_run.visibility).get_badge_html()
                 )
 
             st.write(f"#### {title}")

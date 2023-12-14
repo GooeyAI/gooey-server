@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
+from textwrap import dedent
 
 import pytz
 from django.conf import settings
@@ -43,6 +44,33 @@ class PublishedRunVisibility(models.IntegerChoices):
                 return "Public"
             case _:
                 return self.label
+
+    def get_badge_html(self):
+        badge_container_class = (
+            "text-sm bg-light border border-dark rounded-pill px-2 py-1"
+        )
+
+        match self:
+            case PublishedRunVisibility.UNLISTED:
+                return dedent(
+                    f"""\
+                <span class="{badge_container_class}">
+                    <i class="fa-regular fa-lock"></i>
+                    Private
+                </span>
+                """
+                )
+            case PublishedRunVisibility.PUBLIC:
+                return dedent(
+                    f"""\
+                <span class="{badge_container_class}">
+                    <i class="fa-regular fa-globe"></i>
+                    Public
+                </span>
+                """
+                )
+            case _:
+                raise NotImplementedError(self)
 
 
 class Platform(models.IntegerChoices):
