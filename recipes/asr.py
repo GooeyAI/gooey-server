@@ -94,7 +94,10 @@ class AsrPage(BasePage):
                 use_selectbox=True,
             )
         with col2:
-            asr_language_selector(AsrModels[selected_model])
+            translation_enabled = bool(st.session_state.get("google_translate_target"))
+            asr_language_selector(
+                AsrModels[selected_model], only_allow_translatable=translation_enabled
+            )
 
     def render_settings(self):
         google_translate_language_selector()

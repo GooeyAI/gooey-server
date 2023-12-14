@@ -47,6 +47,49 @@ MAX_POLLS = 100
 DEEPGRAM_SUPPORTED = {"en", "en-US", "en-AU", "en-GB", "en-NZ", "en-IN", "es", "es-419"}  # fmt: skip
 
 
+class ConsistentLanguageCode(str):
+    """
+    To see if language codes are compatible, we need to convert them to a consistent format internally.
+    However we also need to preserve the original language code to use in the API call to models.
+
+    This class makes equivalent languages equal to each other while preserving their actual value.
+    """
+
+    # Examples:
+    #   True: ConsistentLanguageCode("en") == "en"
+    #   False: ConsistentLanguageCode("eng") == "en"
+    #   True: ConsistentLanguageCode("en") == ConsistentLanguageCode("eng")
+    #   False: ConsistentLanguageCode("eng") == ConsistentLanguageCode("da")
+    #   False: bool(ConsistentLanguageCode(None))
+    #   False: ConsistentLanguageCode("en") == "en-US"
+    #   True: ConsistentLanguageCode("en") == ConsistentLanguageCode("en-US")
+
+    _2LetterISOCode: str | None = None
+
+    def __new__(cls, value: str | None):
+        if not value:
+            return value
+        if isinstance(value, cls):  # avoid potential infinite recursion
+            return value
+        obj = super().__new__(cls, value)
+        obj._2LetterISOCode = langcodes.Language.get(value).language
+        return obj
+
+    def __eq__(self, other):
+        if not isinstance(other, str):
+            return NotImplemented
+        if not isinstance(other, ConsistentLanguageCode):
+            return str(self) == other
+        return self._2LetterISOCode == other._2LetterISOCode
+
+    def __hash__(self):
+        return hash(self._2LetterISOCode)
+
+
+def convert_to_consistent_language_codes(langs) -> list[ConsistentLanguageCode]:
+    return [ConsistentLanguageCode(lang) for lang in langs]
+
+
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
     whisper_large_v3 = "Whisper Large v3 (openai)"
@@ -86,12 +129,12 @@ forced_asr_languages = {
 }
 
 asr_supported_languages = {
-    AsrModels.whisper_large_v3: WHISPER_SUPPORTED,
-    AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
-    AsrModels.usm: CHIRP_SUPPORTED,
-    AsrModels.deepgram: DEEPGRAM_SUPPORTED,
-    AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
-    AsrModels.azure: AZURE_SUPPORTED,
+    AsrModels.whisper_large_v3: convert_to_consistent_language_codes(WHISPER_SUPPORTED),
+    AsrModels.whisper_large_v2: convert_to_consistent_language_codes(WHISPER_SUPPORTED),
+    AsrModels.usm: convert_to_consistent_language_codes(CHIRP_SUPPORTED),
+    AsrModels.deepgram: convert_to_consistent_language_codes(DEEPGRAM_SUPPORTED),
+    AsrModels.seamless_m4t: convert_to_consistent_language_codes(SEAMLESS_SUPPORTED),
+    AsrModels.azure: convert_to_consistent_language_codes(AZURE_SUPPORTED),
 }
 
 
@@ -137,7 +180,7 @@ def google_translate_language_selector(
 
 
 @redis_cache_decorator
-def google_translate_languages() -> dict[str, str]:
+def google_translate_languages() -> dict[ConsistentLanguageCode, str]:
     """
     Get list of supported languages for Google Translate.
     :return: Dictionary of language codes and display names.
@@ -151,9 +194,30 @@ def google_translate_languages() -> dict[str, str]:
         parent=parent, display_language_code="en"
     )
     return {
-        lang.language_code: lang.display_name
+        ConsistentLanguageCode(lang.language_code): lang.display_name
         for lang in supported_languages.languages
         if lang.support_target
+    }
+
+
+@redis_cache_decorator
+def google_translate_input_languages() -> dict[ConsistentLanguageCode, str]:
+    """
+    Get list of supported languages for Google Translate.
+    :return: Dictionary of language codes and display names.
+    """
+    from google.cloud import translate
+
+    _, project = get_google_auth_session()
+    parent = f"projects/{project}/locations/global"
+    client = translate.TranslationServiceClient()
+    supported_languages = client.get_supported_languages(
+        parent=parent, display_language_code="en"
+    )
+    return {
+        ConsistentLanguageCode(lang.language_code): lang.display_name
+        for lang in supported_languages.languages
+        if lang.support_source
     }
 
 
@@ -161,6 +225,7 @@ def asr_language_selector(
     selected_model: AsrModels,
     label="##### Spoken Language",
     key="language",
+    only_allow_translatable=False,
 ):
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
@@ -169,17 +234,18 @@ def asr_language_selector(
         return forced_lang
 
     options = list(asr_supported_languages.get(selected_model, []))
+    if only_allow_translatable:
+        translatable = google_translate_input_languages()
+        options = [lang for lang in options if lang in translatable]
     if selected_model and selected_model.supports_auto_detect():
         options.insert(0, None)
 
     # handle non-canonical language codes
-    old_val = st.session_state.get(key)
-    if old_val and old_val not in options:
-        lobj = langcodes.Language.get(old_val)
-        for opt in options:
-            if opt and langcodes.Language.get(opt).language == lobj.language:
-                st.session_state[key] = opt
-                break
+    old_val = ConsistentLanguageCode(st.session_state.get(key))
+    if old_val and str(old_val) not in options and old_val in options:
+        new_val = options.pop(options.index(old_val))
+        st.session_state[key] = new_val
+        options.insert(0, new_val)
 
     return st.selectbox(
         label=label,
