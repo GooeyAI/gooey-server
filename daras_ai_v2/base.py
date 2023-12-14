@@ -209,7 +209,6 @@ class BasePage:
                 is_current_user_creator = (
                     self.request
                     and self.request.user
-                    and not self.request.user.is_anonymous
                     and current_run.get_creator() == self.request.user
                 )
                 has_unpublished_changes = (
@@ -347,7 +346,18 @@ class BasePage:
                 )
                 publish_modal = Modal("", key="publish-modal")
                 if save_button:
-                    publish_modal.open()
+                    if self.request.user.is_anonymous:
+                        redirect_url = furl(
+                            "/login",
+                            query_params={
+                                "next": furl(self.request.url).set(origin=None)
+                            },
+                        )
+                        # TODO: investigate why RedirectException does not work here
+                        force_redirect(redirect_url)
+                        return
+                    else:
+                        publish_modal.open()
 
                 if publish_modal.is_open():
                     with publish_modal.container(
