@@ -413,7 +413,7 @@ def _stream_outputs(
                 streamed_text_lengths[i],
                 streamed_text_counts[i],
             ):
-                streamed_text_lengths[i] = breaking_index + 1
+                streamed_text_lengths[i] = breaking_index
                 streamed_text_counts[i] += 1
                 outputs[i] = updated_text[: breaking_index + 1]
                 yield outputs

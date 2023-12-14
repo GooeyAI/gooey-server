@@ -434,6 +434,7 @@ def _process_msg(
             print(f"msg: {msg}")
             return VideoBotsPage.get_run_state(msg) == RecipeRunState.completed
 
+        state = {}
         streamed_text_length = 0
         for state in realtime_subscribe(
             channel,
@@ -448,12 +449,12 @@ def _process_msg(
                 state["output_text"][0] = state["output_text"][0][streamed_text_length:]
                 streamed_text_length += len(state["output_text"][0])
 
-                if (
-                    state["output_text"][0]
-                    or state["output_audio"]
-                    or state["output_video"]
-                ):
+                if state["output_text"][0]:
                     yield page_cls.ResponseModel.parse_obj(state)
+
+        if state and (state.get("output_audio") or state.get("output_video")):
+            # the last state -- this includes audio / video if any
+            yield page_cls.ResponseModel.parse_obj(state)
 
     return messages_iterator(), url
 
