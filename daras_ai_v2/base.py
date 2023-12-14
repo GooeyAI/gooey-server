@@ -96,11 +96,12 @@ class StateKeys:
 
 class BasePage:
     title: str
-    image: str = None
     workflow: Workflow
     slug_versions: list[str]
 
     sane_defaults: dict = {}
+
+    explore_image: str = None
 
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
@@ -264,8 +265,8 @@ class BasePage:
     def get_recipe_title(self, state: dict) -> str:
         return state.get(StateKeys.page_title) or self.title or ""
 
-    def get_recipe_image(self, state: dict) -> str:
-        return self.image or ""
+    def get_explore_image(self, state: dict) -> str:
+        return self.explore_image or ""
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
@@ -324,7 +325,7 @@ class BasePage:
             page = page_cls()
             state = page_cls().recipe_doc_sr().to_dict()
             preview_image = meta_preview_url(
-                page.get_recipe_image(state), page.fallback_preivew_image()
+                page.get_explore_image(state), page.fallback_preivew_image()
             )
 
             with st.link(to=page.app_url()):

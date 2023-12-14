@@ -30,7 +30,7 @@ DEFAULT_ASR_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/da
 
 class AsrPage(BasePage):
     title = "Speech Recognition & Translation"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fb7e5f6-88d9-11ee-aa86-02420a000165/Speech.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fb7e5f6-88d9-11ee-aa86-02420a000165/Speech.png.png"
     workflow = Workflow.ASR
     slug_versions = ["asr", "speech"]
 

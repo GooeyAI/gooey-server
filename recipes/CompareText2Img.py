@@ -30,7 +30,7 @@ DEFAULT_COMPARE_TEXT2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.a
 
 class CompareText2ImgPage(BasePage):
     title = "Compare AI Image Generators"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d127484e-88d9-11ee-b549-02420a000167/Compare%20AI%20Image%20generators.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d127484e-88d9-11ee-b549-02420a000167/Compare%20AI%20Image%20generators.png.png"
     workflow = Workflow.COMPARE_TEXT2IMG
     slug_versions = [
         "CompareText2Img",

@@ -34,7 +34,7 @@ DEFAULT_GOOGLE_IMG_GEN_META_IMG = "https://storage.googleapis.com/dara-c1b52.app
 
 class GoogleImageGenPage(BasePage):
     title = "Render Image Search Results with AI"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/eb23c078-88da-11ee-aa86-02420a000165/web%20search%20render.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/eb23c078-88da-11ee-aa86-02420a000165/web%20search%20render.png.png"
     workflow = Workflow.GOOGLE_IMAGE_GEN
     slug_versions = ["GoogleImageGen", "render-images-with-ai"]
 

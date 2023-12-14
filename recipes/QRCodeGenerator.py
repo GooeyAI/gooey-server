@@ -51,7 +51,7 @@ class QrSources(Enum):
 
 class QRCodeGeneratorPage(BasePage):
     title = "AI Art QR Code"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/03d6538e-88d5-11ee-ad97-02420a00016c/W.I.2.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/03d6538e-88d5-11ee-ad97-02420a00016c/W.I.2.png.png"
     workflow = Workflow.QR_CODE
     slug_versions = ["art-qr-code", "qr", "qr-code"]
 

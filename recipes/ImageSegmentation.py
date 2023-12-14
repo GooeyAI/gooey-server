@@ -33,7 +33,7 @@ DEFAULT_IMG_SEGMENTATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.a
 
 class ImageSegmentationPage(BasePage):
     title = "AI Background Changer"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/06fc595e-88db-11ee-b428-02420a000168/AI%20Background%20Remover.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/06fc595e-88db-11ee-b428-02420a000168/AI%20Background%20Remover.png.png"
     workflow = Workflow.IMAGE_SEGMENTATION
     slug_versions = ["ImageSegmentation", "remove-image-background-with-ai"]
 

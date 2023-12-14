@@ -29,7 +29,7 @@ DEFAULT_OBJECT_INPAINTING_META_IMG = "https://storage.googleapis.com/dara-c1b52.
 
 class ObjectInpaintingPage(BasePage):
     title = "Generate Product Photo Backgrounds"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f07b731e-88d9-11ee-a658-02420a000163/W.I.3.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f07b731e-88d9-11ee-a658-02420a000163/W.I.3.png.png"
     workflow = Workflow.OBJECT_INPAINTING
     slug_versions = ["ObjectInpainting", "product-photo-background-generator"]
 

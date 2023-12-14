@@ -24,7 +24,7 @@ DEFAULT_IMG2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.co
 
 class Img2ImgPage(BasePage):
     title = "Edit An Image with AI prompt"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bcc9351a-88d9-11ee-bf6c-02420a000166/Edit%20an%20image%20with%20AI%201.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bcc9351a-88d9-11ee-bf6c-02420a000166/Edit%20an%20image%20with%20AI%201.png.png"
     workflow = Workflow.IMG_2_IMG
     slug_versions = ["Img2Img", "ai-photo-editor"]
 

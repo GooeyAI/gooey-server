@@ -126,9 +126,29 @@ def _render_results(results: list[AggFunctionResult]):
 
 
 class BulkEvalPage(BasePage):
-    title = "Bulk Evaluator"
+    title = "Evaluator"
     workflow = Workflow.BULK_EVAL
     slug_versions = ["bulk-eval", "eval"]
+
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aad314f0-9a97-11ee-8318-02420a0001c7/W.I.9.png.png"
+
+    def preview_image(self, state: dict) -> str | None:
+        return "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9631fb74-9a97-11ee-971f-02420a0001c4/evaluator.png.png"
+
+    def render_description(self):
+        st.write(
+            """
+Summarize and score every row of any CSV, google sheet or excel with GPT4 (or any LLM you choose).  Then average every score in any column to generate automated evaluations.
+            """
+        )
+
+    def related_workflows(self) -> list:
+        from recipes.BulkRunner import BulkRunnerPage
+        from recipes.VideoBots import VideoBotsPage
+        from recipes.asr import AsrPage
+        from recipes.DocSearch import DocSearchPage
+
+        return [BulkRunnerPage, VideoBotsPage, AsrPage, DocSearchPage]
 
     class RequestModel(LLMSettingsMixin, BaseModel):
         documents: list[str] = Field(

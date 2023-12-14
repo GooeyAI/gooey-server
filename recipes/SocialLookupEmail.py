@@ -19,7 +19,7 @@ DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG = "https://storage.googleapis.com/dara-c1b5
 
 class SocialLookupEmailPage(BasePage):
     title = "Profile Lookup + GPT3 for AI-Personalized Emails"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fbd475a-88d7-11ee-aac9-02420a00016b/personalized%20email.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fbd475a-88d7-11ee-aac9-02420a00016b/personalized%20email.png.png"
     workflow = Workflow.SOCIAL_LOOKUP_EMAIL
     slug_versions = ["SocialLookupEmail", "email-writer-with-profile-lookup"]
 

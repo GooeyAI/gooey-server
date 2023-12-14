@@ -1,8 +1,11 @@
+import typing
+
 import gooey_ui as gui
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.all_pages import all_home_pages_by_category
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.grid_layout_widget import grid_layout
-
+from daras_ai_v2.meta_preview_url import meta_preview_url
 
 META_TITLE = "Explore AI workflows"
 META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
@@ -25,7 +28,7 @@ def render():
             # render_description(page, state, total_runs)
             render_description(page, state)
 
-    def _render_as_featured(page_cls):
+    def _render_as_featured(page_cls: typing.Type[BasePage]):
         page = page_cls()
         state = page.recipe_doc_sr().to_dict()
         # total_runs = page.get_total_runs()
@@ -33,9 +36,9 @@ def render():
         # render_description(page, state, total_runs)
         render_description(page, state)
 
-    def render_image(page, state):
+    def render_image(page: BasePage, state: dict):
         gui.image(
-            page.get_recipe_image(state),
+            meta_preview_url(page.get_explore_image(state), page.preview_image(state)),
             href=page.app_url(),
             style={"border-radius": 5},
         )
