@@ -29,3 +29,4 @@ class Cost(models.Model):
     quantity = models.IntegerField(default=1)
     calculation_notes = models.TextField(default="", blank=True)
     cost = models.FloatField(default=0.0)
+    input = models.
