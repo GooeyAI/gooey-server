@@ -1623,6 +1623,26 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             )
 
     def _render_run_preview(self, saved_run: SavedRun):
+        published_run: PublishedRun | None = (
+            saved_run.parent_version.published_run if saved_run.parent_version else None
+        )
+        is_latest_version = published_run and published_run.saved_run == saved_run
+        title, _ = self._get_title_and_breadcrumbs(
+            current_run=saved_run,
+            published_run=published_run,
+        )
+
+        with st.link(to=saved_run.get_app_url(), className="text-decoration-none"):
+            with st.tag("span", className="badge bg-secondary px-4 py-2 mb-2 lead"):
+                if is_latest_version:
+                    st.html(
+                        PublishedRunVisibility(published_run.visibility)
+                        .help_text()
+                        .upper()
+                    )
+
+            st.write(f"#### {title}")
+
         updated_at = saved_run.updated_at
         if updated_at and isinstance(updated_at, datetime.datetime):
             js_dynamic_date(updated_at)
