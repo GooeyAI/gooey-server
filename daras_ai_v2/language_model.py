@@ -4,6 +4,7 @@ import re
 import typing
 from enum import Enum
 from functools import partial
+from typing import Iterator
 
 import numpy as np
 import requests
@@ -18,6 +19,7 @@ from django.conf import settings
 from jinja2.lexer import whitespace_re
 from loguru import logger
 from openai.types.chat import ChatCompletionContentPartParam
+from openai.types.chat.chat_completion_chunk import ChoiceDelta
 
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.functional import map_parallel
@@ -288,7 +290,7 @@ def _run_openai_embedding(
 
 
 class ConversationEntry(typing_extensions.TypedDict):
-    role: typing.Literal["user", "system", "assistant"]
+    role: typing.Literal["user", "system", "assistant", "tool"]
     content: str | list[ChatCompletionContentPartParam]
     display_name: typing_extensions.NotRequired[str]
 
@@ -323,15 +325,16 @@ def run_language_model(
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
     tools: list[LLMTools] | None = None,
-) -> list[str] | tuple[list[str], list[list[dict]]]:
+    stream: bool = False,
+) -> Iterator[list[str]] | list[str] | tuple[list[str], list[list[dict]]]:
     assert bool(prompt) != bool(
         messages
     ), "Pleave provide exactly one of { prompt, messages }"
 
-    model: LargeLanguageModels = LargeLanguageModels[str(model)]
-    api = llm_api[model]
-    model_name = llm_model_names[model]
-    if model.is_chat_model():
+    llm = LargeLanguageModels[model]
+    api = llm_api[llm]
+    model_name = llm_model_names[llm]
+    if llm.is_chat_model():
         if messages:
             is_chatml = False
         else:
@@ -339,12 +342,12 @@ def run_language_model(
             is_chatml, messages = parse_chatml(prompt)  # type: ignore
         messages = messages or []
         logger.info(f"{model_name=}, {len(messages)=}, {max_tokens=}, {temperature=}")
-        if not model.is_vision_model():
+        if not llm.is_vision_model():
             messages = [
                 format_chat_entry(role=entry["role"], content=get_entry_text(entry))
                 for entry in messages
             ]
-        result = _run_chat_model(
+        chat_result = _run_chat_model(
             api=api,
             model=model_name,
             messages=messages,  # type: ignore
@@ -354,21 +357,34 @@ def run_language_model(
             stop=stop,
             avoid_repetition=avoid_repetition,
             tools=tools,
+            stream=stream,
         )
-        output_text = [
-            # return messages back as either chatml or json messages
-            format_chatml_message(entry)
-            if is_chatml
-            else (entry.get("content") or "").strip()
-            for entry in result
-        ]
-        if tools:
-            return output_text, [(entry.get("tool_calls") or []) for entry in result]
+        if stream:
+            chat_result_iterator = stream_chat_result(
+                chat_result,
+                num_outputs=num_outputs,
+                is_chatml=is_chatml,
+            )
+            return _stream_outputs(num_outputs, chat_result_iterator)
         else:
-            return output_text
+            entries = next(chat_result)
+            output_text = [
+                # return messages back as either chatml or json messages
+                format_chatml_message(entry)
+                if is_chatml
+                else (entry.get("content") or "").strip()
+                for entry in entries
+            ]
+            if tools:
+                tools_output = [(entry.get("tool_calls") or []) for entry in entries]
+                return output_text, tools_output
+            else:
+                return output_text
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
+        if stream:
+            raise ValueError("Only OpenAI chat models support streaming")
         logger.info(f"{model_name=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
         result = _run_text_model(
             api=api,
@@ -382,6 +398,75 @@ def run_language_model(
             quality=quality,
         )
         return [msg.strip() for msg in result]
+
+
+def _stream_outputs(
+    num_outputs: int, result: typing.Iterator[list[str]]
+) -> Iterator[list[str]]:
+    outputs: list[str] = ["" for _ in range(num_outputs)]
+    streamed_text_lengths: list[int] = [0 for _ in range(num_outputs)]
+    streamed_text_counts: list[int] = [0 for _ in range(num_outputs)]
+    for updated_texts in result:
+        for i, updated_text in enumerate(updated_texts):
+            if breaking_index := _get_breaking_index(
+                updated_text,
+                streamed_text_lengths[i],
+                streamed_text_counts[i],
+            ):
+                streamed_text_lengths[i] = breaking_index + 1
+                streamed_text_counts[i] += 1
+                outputs[i] = updated_text[: breaking_index + 1]
+                yield outputs
+
+    yield updated_texts
+
+
+def _get_breaking_index(text: str, streamed_length: int, streamed_count: int):
+    match streamed_count:
+        case 0:
+            if len(text) < 100:
+                return None
+            newline_rindex = text.rfind("\n", 100)
+            newline_index = text.find("\n", 100)
+            period_rindex = text.rfind(". ", 100)
+            period_index = text.find(". ", 100)
+            if newline_index != -1 and newline_rindex != newline_index:
+                return newline_rindex
+            elif period_index != -1 and period_rindex != period_index:
+                return period_rindex + 1
+            else:
+                return None
+        case 1:
+            if len(text) < streamed_length + 100:
+                return None
+            if text[streamed_length + 100 :].count("\n") >= 3:
+                return text.rfind("\n")
+            elif text[streamed_length + 100 :].count(". ") >= 5:
+                return text.rfind(". ") + 1
+            else:
+                return None
+        case _:
+            return None
+
+
+def stream_chat_result(
+    chat_result: Iterator[list[ConversationEntry]],
+    is_chatml: bool,
+    num_outputs: int,
+) -> Iterator[list[str]]:
+    entries: list[ConversationEntry] = [
+        {"role": "assistant", "content": ""} for _ in range(num_outputs)
+    ]
+    for partial_entries in chat_result:
+        for i, part in enumerate(partial_entries):
+            entries[i]["role"] = part["role"]
+            entries[i]["content"] += part.get("content", "")  # type: ignore
+        yield [
+            format_chatml_message(entry)
+            if is_chatml
+            else str(entry.get("content") or "")
+            for entry in entries
+        ]
 
 
 def _run_text_model(
@@ -430,11 +515,12 @@ def _run_chat_model(
     model: str | tuple,
     stop: list[str] | None,
     avoid_repetition: bool,
+    stream: bool,
     tools: list[LLMTools] | None = None,
-) -> list[ConversationEntry]:
+) -> Iterator[list[ConversationEntry]]:
     match api:
         case LLMApis.openai:
-            return _run_openai_chat(
+            result = _run_openai_chat(
                 model=model,
                 avoid_repetition=avoid_repetition,
                 max_tokens=max_tokens,
@@ -443,11 +529,15 @@ def _run_chat_model(
                 stop=stop,
                 temperature=temperature,
                 tools=tools,
+                stream=stream,
             )
+            yield from result
         case LLMApis.vertex_ai:
             if tools:
                 raise ValueError("Only OpenAI chat models support Tools")
-            return _run_palm_chat(
+            if stream:
+                raise ValueError("Only OpenAI chat models support streaming")
+            yield _run_palm_chat(
                 model_id=model,
                 messages=messages,
                 max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
@@ -457,7 +547,9 @@ def _run_chat_model(
         case LLMApis.together:
             if tools:
                 raise ValueError("Only OpenAI chat models support Tools")
-            return _run_together_chat(
+            if stream:
+                raise ValueError("Only OpenAI chat models support streaming")
+            yield _run_together_chat(
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
@@ -472,7 +564,7 @@ def _run_chat_model(
 @retry_if(openai_should_retry)
 def _run_openai_chat(
     *,
-    model: str,
+    model: str | list[str],
     messages: list[ConversationEntry],
     max_tokens: int,
     num_outputs: int,
@@ -480,7 +572,8 @@ def _run_openai_chat(
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTools] | None = None,
-) -> list[ConversationEntry]:
+    stream: bool,
+) -> Iterator[list[ConversationEntry]]:
     from openai._types import NOT_GIVEN
 
     if avoid_repetition:
@@ -491,24 +584,35 @@ def _run_openai_chat(
         presence_penalty = 0
     if isinstance(model, str):
         model = [model]
-    r = try_all(
-        *[
-            partial(
-                _get_openai_client(model_str).chat.completions.create,
-                model=model_str,
-                messages=messages,
-                max_tokens=max_tokens,
-                stop=stop or NOT_GIVEN,
-                n=num_outputs,
-                temperature=temperature,
-                frequency_penalty=frequency_penalty,
-                presence_penalty=presence_penalty,
-                tools=[tool.spec for tool in tools] if tools else NOT_GIVEN,
-            )
-            for model_str in model
-        ],
-    )
-    return [choice.message.dict() for choice in r.choices]
+    partials = [
+        partial(
+            _get_openai_client(model_str).chat.completions.create,
+            model=model_str,
+            messages=messages,
+            max_tokens=max_tokens,
+            stop=stop or NOT_GIVEN,
+            n=num_outputs,
+            temperature=temperature,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
+            tools=[tool.spec for tool in tools] if tools else NOT_GIVEN,
+            stream=stream,
+        )
+        for model_str in model
+    ]
+    if stream:
+        # NOTE: retries not supported for streaming yet
+        stream_fn = partials[0]
+        for chunk in stream_fn():
+            outputs: list[ConversationEntry] = [
+                {"role": "assistant", "content": ""} for _ in range(num_outputs)
+            ]
+            for choice in chunk.choices:
+                outputs[choice.index] = choice_delta_to_entry(choice.delta)
+            yield outputs
+    else:
+        r = try_all(*partials)
+        yield [choice.message.dict() for choice in r.choices]
 
 
 @retry_if(openai_should_retry)
@@ -536,7 +640,7 @@ def _run_openai_text(
     return [choice.text for choice in r.choices]
 
 
-def _get_openai_client(model: str):
+def _get_openai_client(model: str) -> "openai.OpenAI | openai.AzureOpenAI":
     import openai
 
     if model.startswith(AZURE_OPENAI_MODEL_PREFIX):
@@ -702,11 +806,19 @@ def _run_palm_text(
 
 
 def format_chatml_message(entry: ConversationEntry) -> str:
-    msg = CHATML_START_TOKEN + entry.get("role", "")
+    msg = CHATML_START_TOKEN + (entry.get("role") or "")
     content = get_entry_text(entry).strip()
     if content:
         msg += "\n" + content + CHATML_END_TOKEN
     return msg
+
+
+def choice_delta_to_entry(
+    delta: ChoiceDelta,
+    *,
+    default_role: str = "assistant",
+) -> ConversationEntry:
+    return {"role": delta.role or default_role, "content": delta.content or ""}
 
 
 chatml_re = re.compile(

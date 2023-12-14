@@ -45,6 +45,27 @@ def realtime_push(channel: str, value: typing.Any = "ping"):
     logger.info(f"publish {channel=}")
 
 
+def realtime_subscribe(
+    channel: str,
+    unsubscribe_condition: typing.Callable[..., bool],
+) -> typing.Iterator[typing.Any]:
+    channel = f"gooey-gui/state/{channel}"
+    pubsub = r.pubsub()
+    pubsub.subscribe(channel)
+    logger.info(f"subscribe {channel=}")
+    while True:
+        message = pubsub.get_message(timeout=10)
+        logger.info(f"realtime_subscribe: received {message=}")
+        if message and message["type"] == "message":
+            state = json.loads(r.get(channel))
+            logger.info(f"realtime_subscribe: received {state=}")
+            yield state
+            if unsubscribe_condition(state):
+                break
+    logger.info(f"unsubscribe {channel=}")
+    pubsub.unsubscribe(channel)
+
+
 # def use_state(
 #     value: T = None, *, key: str = None
 # ) -> tuple[T, typing.Callable[[T], None]]:

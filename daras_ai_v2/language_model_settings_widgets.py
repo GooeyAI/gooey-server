@@ -29,6 +29,8 @@ def language_model_settings(show_selector=True, show_document_model=False):
                 else "———",
             )
 
+    st.checkbox("Stream output", key="stream_llm_output")
+
     st.checkbox("Avoid Repetition", key="avoid_repetition")
 
     col1, col2 = st.columns(2)
@@ -75,8 +77,8 @@ Generate multiple responses and choose the best one.
         st.slider(
             label="""
             ###### Creativity (aka Sampling Temperature)
-    
-            Higher values allow the LLM to take more risks. Try values larger than 1 for more creative applications or 0 to ensure that LLM gives the same answer when given the same user input. 
+
+            Higher values allow the LLM to take more risks. Try values larger than 1 for more creative applications or 0 to ensure that LLM gives the same answer when given the same user input.
             """,
             key="sampling_temperature",
             min_value=0.0,

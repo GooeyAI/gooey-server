@@ -44,6 +44,8 @@ from daras_ai_v2.language_model import (
     get_entry_images,
     get_entry_text,
     format_chat_entry,
+    LLMApis,
+    llm_api,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -179,6 +181,7 @@ class VideoBotsPage(BasePage):
         quality: float | None
         max_tokens: int | None
         sampling_temperature: float | None
+        stream_llm_output: bool | None
 
         # lipsync
         input_face: str | None
@@ -207,13 +210,13 @@ class VideoBotsPage(BasePage):
         input_glossary_document: str | None = Field(
             title="Input Glossary",
             description="""
-Translation Glossary for User Langauge -> LLM Language (English)  
+Translation Glossary for User Langauge -> LLM Language (English)
             """,
         )
         output_glossary_document: str | None = Field(
             title="Output Glossary",
             description="""
-Translation Glossary for LLM Language (English) -> User Langauge  
+Translation Glossary for LLM Language (English) -> User Langauge
             """,
         )
 
@@ -275,20 +278,20 @@ Translation Glossary for LLM Language (English) -> User Langauge
     def render_description(self):
         st.write(
             """
-Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how. 
+Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how.
 
-This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot’s face and  voice settings. 
- 
-We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page. 
+This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot’s face and  voice settings.
+
+We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page.
 
 How It Works:
-1. Appends the user's question to the bottom of your dialog script. 
+1. Appends the user's question to the bottom of your dialog script.
 2. Sends the appended script to OpenAI’s GPT3 asking it to respond to the question in the style of your character
 3. Synthesizes your character's response as audio using your voice settings (using Google Text-To-Speech or Uberduck)
 4. Lip syncs the face video clip to the voice clip
 5. Shows the resulting video to the user
 
-PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers. 
+PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers.
         """
         )
 
@@ -355,7 +358,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             """
             ###### 📖 Customize with Glossary
             Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            
+            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
             """
         )
         glossary_input(
@@ -391,8 +394,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.file_uploader(
                 """
                 #### 👩‍🦰 Input Face
-                Upload a video/image that contains faces to use  
-                *Recommended - mp4 / mov / png / jpg / gif* 
+                Upload a video/image that contains faces to use
+                *Recommended - mp4 / mov / png / jpg / gif*
                 """,
                 key="input_face",
             )
@@ -744,7 +747,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         yield f"Running {model.value}..."
         if is_chat_model:
-            output_text = run_language_model(
+            output_texts = run_language_model(
                 model=request.selected_model,
                 messages=[
                     {"role": s["role"], "content": s["content"]}
@@ -755,12 +758,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
                 tools=request.tools,
+                stream=request.stream_llm_output,
             )
         else:
             prompt = "\n".join(
                 format_chatml_message(entry) for entry in prompt_messages
             )
-            output_text = run_language_model(
+            output_texts = run_language_model(
                 model=request.selected_model,
                 prompt=prompt,
                 max_tokens=max_allowed_tokens,
@@ -770,41 +774,50 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 avoid_repetition=request.avoid_repetition,
                 stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
             )
-        if request.tools:
-            output_text, tool_call_choices = output_text
-            state["output_documents"] = output_documents = []
-            for tool_calls in tool_call_choices:
-                for call in tool_calls:
-                    result = yield from exec_tool_call(call)
-                    output_documents.append(result)
 
-        # save model response
-        state["raw_output_text"] = [
-            "".join(snippet for snippet, _ in parse_refs(text, references))
-            for text in output_text
-        ]
+        if isinstance(output_texts, list):
+            output_texts = iter([output_texts])
 
-        # translate response text
-        if request.user_language and request.user_language != "en":
-            yield f"Translating response to {request.user_language}..."
-            output_text = run_google_translate(
-                texts=output_text,
-                source_language="en",
-                target_language=request.user_language,
-                glossary_url=request.output_glossary_document,
-            )
-            state["raw_tts_text"] = [
+        for output_text in output_texts:
+            if request.tools:
+                output_text, tool_call_choices = output_text
+                state["output_documents"] = output_documents = []
+                for tool_calls in tool_call_choices:
+                    for call in tool_calls:
+                        result = yield from exec_tool_call(call)
+                        output_documents.append(result)
+
+            # save model response
+            state["raw_output_text"] = [
                 "".join(snippet for snippet, _ in parse_refs(text, references))
                 for text in output_text
             ]
 
-        if references:
-            citation_style = (
-                request.citation_style and CitationStyles[request.citation_style]
-            ) or None
-            apply_response_template(output_text, references, citation_style)
+            # translate response text
+            if request.user_language and request.user_language != "en":
+                yield f"Translating response to {request.user_language}..."
+                output_text = run_google_translate(
+                    texts=output_text,
+                    source_language="en",
+                    target_language=request.user_language,
+                    glossary_url=request.output_glossary_document,
+                )
+                state["raw_tts_text"] = [
+                    "".join(snippet for snippet, _ in parse_refs(text, references))
+                    for text in output_text
+                ]
 
-        state["output_text"] = output_text
+            if references:
+                citation_style = (
+                    request.citation_style and CitationStyles[request.citation_style]
+                ) or None
+                apply_response_template(output_text, references, citation_style)
+
+            state["output_text"] = output_text
+            if request.stream_llm_output:
+                yield f"Streaming output text..."
+            else:
+                yield None
 
         state["output_audio"] = []
         state["output_video"] = []
@@ -868,7 +881,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             with col2:
                 st.write(
                     """
-                    
+
                     #### Part 2:
                     [Interactive Chatbots for your Content - Part 2: Make your Chatbot - How to use Gooey.AI Workflows ](https://youtu.be/h817RolPjq4)
                     """
@@ -877,7 +890,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     """
                     <div style="position: relative; padding-bottom: 56.25%; height: 0;">
                             <iframe src="https://www.youtube.com/embed/h817RolPjq4" title="YouTube video player" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                    </iframe>                    
+                    </iframe>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -897,7 +910,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         st.markdown(
             # language=html
             f"""
-            <h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>       
+            <h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>
 
             Your can connect your FB Messenger account and Slack Workspace here directly.<br>
             If you ping us at support@gooey.ai, we'll add your other accounts too!
@@ -906,26 +919,26 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             <div style='height: 50px'>
                 <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
                 <img height="20" src="https://www.instagram.com/favicon.ico">️
-                &nbsp; 
+                &nbsp;
                 Add Your Instagram Page
                 </a>
             </div>
             -->
             <div style='height: 50px'>
                 <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
-                <img height="20" src="https://www.facebook.com/favicon.ico">️             
-                &nbsp; 
+                <img height="20" src="https://www.facebook.com/favicon.ico">️
+                &nbsp;
                 Add Your Facebook Page
                 </a>
             </div>
             <div style='height: 50px'>
                 <a target="_blank" class="streamlit-like-btn" href="{slack_connect_url}">
-                <img height="20" src="https://www.slack.com/favicon.ico">             
-                &nbsp; 
+                <img height="20" src="https://www.slack.com/favicon.ico">
+                &nbsp;
                 Add Your Slack Workspace
                 </a>
                 <a target="_blank" href="https://docs.google.com/document/d/1EuBaC4TGHTFSOgKYM1eOlisjvPAwLji9dExKwbt2ocA/edit?usp=sharing" class="streamlit-like-btn" aria-label="docs">
-                <img height="20" width="0" src="https://www.slack.com/favicon.ico">   <!-- for vertical alignment -->          
+                <img height="20" width="0" src="https://www.slack.com/favicon.ico">   <!-- for vertical alignment -->
                 ℹ️
                 </a>
             </div>

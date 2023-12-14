@@ -45,6 +45,7 @@ class CompareLLMPage(BasePage):
         quality: float | None
         max_tokens: int | None
         sampling_temperature: float | None
+        stream_llm_output: bool | None
 
         variables: dict[str, typing.Any] | None
 
@@ -63,7 +64,7 @@ class CompareLLMPage(BasePage):
         st.text_area(
             """
             #### 👩‍💻 Prompt
-            *Supports [ChatML](https://github.com/openai/openai-python/blob/main/chatml.md) & [Jinja](https://jinja.palletsprojects.com/templates/)* 
+            *Supports [ChatML](https://github.com/openai/openai-python/blob/main/chatml.md) & [Jinja](https://jinja.palletsprojects.com/templates/)*
             """,
             key="input_prompt",
             help="What a fine day..",
@@ -96,7 +97,7 @@ class CompareLLMPage(BasePage):
         for selected_model in request.selected_models:
             yield f"Running {LargeLanguageModels[selected_model].value}..."
 
-            output_text[selected_model] = run_language_model(
+            result = run_language_model(
                 model=selected_model,
                 quality=request.quality,
                 num_outputs=request.num_outputs,
@@ -104,7 +105,14 @@ class CompareLLMPage(BasePage):
                 prompt=prompt,
                 max_tokens=request.max_tokens,
                 avoid_repetition=request.avoid_repetition,
+                stream=request.stream_llm_output,
             )
+            if request.stream_llm_output:
+                for outputs in result:
+                    output_text[selected_model] = outputs
+                    yield None
+            else:
+                output_text[selected_model] = result
 
     def render_output(self):
         self._render_outputs(st.session_state, 450)

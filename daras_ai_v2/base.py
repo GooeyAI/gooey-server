@@ -715,12 +715,13 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
         return submitted
 
-    def get_run_state(self) -> RecipeRunState:
-        if st.session_state.get(StateKeys.run_status):
+    @classmethod
+    def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
+        if state.get(StateKeys.run_status):
             return RecipeRunState.running
-        elif st.session_state.get(StateKeys.error_msg):
+        elif state.get(StateKeys.error_msg):
             return RecipeRunState.failed
-        elif st.session_state.get(StateKeys.run_time):
+        elif state.get(StateKeys.run_time):
             return RecipeRunState.completed
         else:
             # when user is at a recipe root, and not running anything
@@ -739,7 +740,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
         self._render_before_output()
 
-        run_state = self.get_run_state()
+        run_state = self.get_run_state(st.session_state)
         match run_state:
             case RecipeRunState.completed:
                 self._render_completed_output()

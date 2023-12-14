@@ -20,10 +20,11 @@ from bots.models import (
     MessageAttachment,
 )
 from daras_ai_v2.asr import AsrModels, run_google_translate
-from daras_ai_v2.base import BasePage
+from daras_ai_v2.base import BasePage, RecipeRunState
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
+from gooey_ui.pubsub import realtime_subscribe
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 
 
@@ -306,7 +307,7 @@ def _process_and_send_msg(
         #     bot, input_text
         # )
         # make API call to gooey bots to get the response
-        response, url = _process_msg(
+        responses, url = _process_msg(
             page_cls=bot.page_cls,
             api_user=billing_account_user,
             query_params=bot.query_params,
@@ -323,25 +324,26 @@ def _process_and_send_msg(
         bot.send_msg(text=ERROR_MSG.format(e))
         return
 
-    # send the response to the user
-    msg_id = bot.send_msg_or_default(
-        text=response.output_text and response.output_text[0],
-        audio=response.output_audio and response.output_audio[0],
-        video=response.output_video and response.output_video[0],
-        documents=response.output_documents or [],
-        buttons=_feedback_start_buttons() if bot.show_feedback_buttons else None,
-    )
+    for response in responses:
+        # send the response to the user
+        msg_id = bot.send_msg_or_default(
+            text=response.output_text and response.output_text[0],
+            audio=response.output_audio and response.output_audio[0],
+            video=response.output_video and response.output_video[0],
+            documents=response.output_documents or [],
+            buttons=_feedback_start_buttons() if bot.show_feedback_buttons else None,
+        )
 
-    # save msgs to db
-    _save_msgs(
-        bot=bot,
-        input_images=input_images,
-        input_text=input_text,
-        speech_run=speech_run,
-        platform_msg_id=msg_id,
-        response=response,
-        url=url,
-    )
+        # save msgs to db
+        _save_msgs(
+            bot=bot,
+            input_images=input_images,
+            input_text=input_text,
+            speech_run=speech_run,
+            platform_msg_id=msg_id,
+            response=response,
+            url=url,
+        )
 
 
 def _save_msgs(
@@ -401,7 +403,7 @@ def _process_msg(
     input_text: str,
     user_language: str,
     speech_run: str | None,
-) -> tuple[VideoBotsPage.ResponseModel, str]:
+) -> tuple[typing.Iterator[VideoBotsPage.ResponseModel], str]:
     from routers.api import call_api
 
     # get latest messages for context (upto 100)
@@ -421,11 +423,39 @@ def _process_msg(
             "user_language": user_language,
         },
         query_params=query_params,
+        run_async=True,
     )
-    # parse result
-    response = page_cls.ResponseModel.parse_obj(result["output"])
-    url = result.get("url", "")
-    return response, url
+
+    url = result["web_url"]
+    channel = f"gooey-outputs/video-bots/{api_user.uid}/{result['run_id']}"
+
+    def messages_iterator():
+        def unsubscribe_condition(msg):
+            print(f"msg: {msg}")
+            return VideoBotsPage.get_run_state(msg) == RecipeRunState.completed
+
+        streamed_text_length = 0
+        for state in realtime_subscribe(
+            channel,
+            unsubscribe_condition=unsubscribe_condition,
+        ):
+            # parse result
+            if state and len(state.get("output_text", [])) > 0:
+                state.setdefault("final_prompt", "")
+                state.setdefault("output_audio", [])
+                state.setdefault("output_video", [])
+
+                state["output_text"][0] = state["output_text"][0][streamed_text_length:]
+                streamed_text_length += len(state["output_text"][0])
+
+                if (
+                    state["output_text"][0]
+                    or state["output_audio"]
+                    or state["output_video"]
+                ):
+                    yield page_cls.ResponseModel.parse_obj(state)
+
+    return messages_iterator(), url
 
 
 def _handle_interactive_msg(bot: BotInterface):
