@@ -761,7 +761,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_failed_output(self):
         err_msg = st.session_state.get(StateKeys.error_msg)
-        st.error(err_msg)
+        st.error(err_msg, unsafe_allow_html=True)
 
     def _render_running_output(self):
         run_status = st.session_state.get(StateKeys.run_status)
@@ -1070,7 +1070,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             if sr.run_status:
                 html_spinner(sr.run_status)
             elif sr.error_msg:
-                st.error(sr.error_msg)
+                st.error(sr.error_msg, unsafe_allow_html=True)
 
         grid_layout(3, run_history, _render)
 
