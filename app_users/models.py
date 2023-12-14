@@ -225,6 +225,7 @@ class AppUserTransaction(models.Model):
     amount = models.IntegerField()
     end_balance = models.IntegerField()
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
+    dollar_amt = models.DecimalField(default=decimal(0.0), blank=True)
 
     class Meta:
         verbose_name = "Transaction"

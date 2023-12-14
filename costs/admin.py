@@ -1,11 +1,11 @@
 from django.contrib import admin
-from cost import models
+from costs import models
 
 # Register your models here.
 
 
-@admin.register(models.Cost)
-class CostAdmin(admin.ModelAdmin):
+@admin.register(models.UsageCost)
+class CostsAdmin(admin.ModelAdmin):
     list_display = [
         "run_id",
         "provider",

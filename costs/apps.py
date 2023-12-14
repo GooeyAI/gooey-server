@@ -1,7 +1,7 @@
 from django.apps import AppConfig
 
 
-class CostConfig(AppConfig):
+class CostsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "cost"
-    verbose_name = "Cost"
+    name = "costs"
+    verbose_name = "Costs"
