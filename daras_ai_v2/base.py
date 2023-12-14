@@ -692,6 +692,7 @@ class BasePage:
         tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
         if self.request.user:
             tabs.extend([MenuTabs.history])
+        if self.request.user and not self.request.user.is_anonymous:
             tabs.extend([MenuTabs.saved])
         return tabs
 
