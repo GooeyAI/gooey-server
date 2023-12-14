@@ -1575,10 +1575,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             return
 
         def _render(pr: PublishedRun):
-            self._render_example_preview(
-                published_run=pr,
-                allow_hide=False,
-            )
+            self._render_published_run_preview(published_run=pr)
 
         grid_layout(3, published_runs, _render)
 
@@ -1636,6 +1633,34 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.error(saved_run.error_msg)
 
         return self.render_example(saved_run.to_dict())
+
+    def _render_published_run_preview(self, published_run: PublishedRun):
+        title, _ = self._get_title_and_breadcrumbs(
+            current_run=published_run.saved_run,
+            published_run=published_run,
+        )
+
+        with st.link(to=published_run.get_app_url(), className="text-decoration-none"):
+            with st.tag("span", className="badge bg-secondary px-4 py-2 mb-2"):
+                st.html(
+                    PublishedRunVisibility(published_run.visibility).help_text().upper()
+                )
+
+            st.write(f"#### {title}")
+
+        with st.div(className="d-flex align-items-center justify-content-between"):
+            with st.div():
+                updated_at = published_run.updated_at
+                if updated_at and isinstance(updated_at, datetime.datetime):
+                    js_dynamic_date(updated_at)
+
+            if published_run.visibility == PublishedRunVisibility.PUBLIC:
+                run_icon = '<i class="fa-regular fa-person-running"></i>'
+                run_count = format_number_with_suffix(published_run.get_run_count())
+                st.caption(f"{run_icon} {run_count} runs")
+
+        doc = published_run.saved_run.to_dict()
+        self.render_example(doc)
 
     def _render_example_preview(
         self,
