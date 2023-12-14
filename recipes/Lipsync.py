@@ -15,12 +15,12 @@ from daras_ai_v2.loom_video_widget import youtube_video
 
 CREDITS_PER_MB = 2
 
-DEFAULT_LIPSYNC_GIF = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/91acbbde-5857-11ee-920a-02420a000194/lipsync%20audio.png.png"
+DEFAULT_LIPSYNC_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7fc4d302-9402-11ee-98dc-02420a0001ca/Lip%20Sync.jpg.png"
 
 
 class LipsyncPage(BasePage):
     title = "Lip Syncing"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f33e6332-88d8-11ee-89f9-02420a000169/Lipsync%20TTS.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f33e6332-88d8-11ee-89f9-02420a000169/Lipsync%20TTS.png.png"
     workflow = Workflow.LIPSYNC
     slug_versions = ["Lipsync"]
 
@@ -37,7 +37,7 @@ class LipsyncPage(BasePage):
         output_video: str
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_LIPSYNC_GIF
+        return DEFAULT_LIPSYNC_META_IMG
 
     def render_form_v2(self) -> bool:
         st.file_uploader(
