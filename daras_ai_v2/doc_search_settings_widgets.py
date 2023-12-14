@@ -98,8 +98,8 @@ def doc_search_settings(
     st.text_area(
         """
 ###### 👁‍🗨 Summarization Instructions
-Prompt to transform the conversation history into a vector search query.  
-These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.                
+Prompt to transform the conversation history into a vector search query.
+These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.
         """,
         key="query_instructions",
         height=300,
@@ -107,7 +107,7 @@ These instructions run before the workflow performs a search of the knowledge ba
     if keyword_instructions_allowed:
         st.text_area(
             """
-###### 🔑 Keyword Extraction                 
+###### 🔑 Keyword Extraction
         """,
             key="keyword_instructions",
             height=300,
@@ -135,7 +135,7 @@ The maximum number of document search citations.
         label="""
 ###### Max Snippet Words
 
-After a document search, relevant snippets of your documents are returned as results. This setting adjusts the maximum number of words in each snippet. A high snippet size allows the LLM to access more information from your document results, at the cost of being verbose and potentially exhausting input tokens (which can cause a failure of the copilot to respond). Default: 300 
+After a document search, relevant snippets of your documents are returned as results. This setting adjusts the maximum number of words in each snippet. A high snippet size allows the LLM to access more information from your document results, at the cost of being verbose and potentially exhausting input tokens (which can cause a failure of the copilot to respond). Default: 300
 """,
         key="max_context_words",
         min_value=10,
@@ -160,8 +160,9 @@ Your knowledge base documents are split into overlapping snippets. This settings
     st.write(
         """
         ##### 🎤 Knowledge Base Speech Recognition
-        <font color="grey">If your knowledge base documents contain audio or video files, we'll transcribe and optionally translate them to English, given we've found most vectorDBs and LLMs perform best in English (even if their final answers are translated into another language). 
-        """
+        <font color="grey">If your knowledge base documents contain audio or video files, we'll transcribe and optionally translate them to English, given we've found most vectorDBs and LLMs perform best in English (even if their final answers are translated into another language).</font>
+        """,
+        unsafe_allow_html=True,
     )
 
     enum_selector(

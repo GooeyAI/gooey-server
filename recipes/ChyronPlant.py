@@ -10,7 +10,7 @@ from daras_ai_v2.base import (
 
 class ChyronPlantPage(BasePage):
     title = "Chyron Plant Bot"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.CHYRON_PLANT
     slug_versions = ["ChyronPlant"]
 

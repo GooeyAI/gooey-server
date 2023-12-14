@@ -1,4 +1,5 @@
 import base64
+import html as html_lib
 import math
 import textwrap
 import typing
@@ -82,9 +83,11 @@ def write(*objs: typing.Any, unsafe_allow_html=False, **props):
         )
 
 
-def markdown(body: str, *, unsafe_allow_html=False, **props):
+def markdown(body: str | None, *, unsafe_allow_html=False, **props):
     if body is None:
         return _node("markdown", body="", **props)
+    if not unsafe_allow_html:
+        body = html_lib.escape(body)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
     )
