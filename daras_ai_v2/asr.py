@@ -243,9 +243,8 @@ def asr_language_selector(
     # handle non-canonical language codes
     old_val = ConsistentLanguageCode(st.session_state.get(key))
     if old_val and str(old_val) not in options and old_val in options:
-        new_val = options.pop(options.index(old_val))
-        st.session_state[key] = new_val
-        options.insert(0, new_val)
+        st.session_state[key] = options.pop(options.index(old_val))
+        options.insert(0, st.session_state[key])
 
     return st.selectbox(
         label=label,
