@@ -290,6 +290,9 @@ class SavedRun(models.Model):
         else:
             return None
 
+    def get_run_count(self) -> int:
+        return self.children.count()
+
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):
         return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
@@ -1135,6 +1138,17 @@ class PublishedRun(models.Model):
         self.visibility = latest_version.visibility
 
         self.save()
+
+    def get_run_count(self):
+        annotated_versions = self.versions.annotate(
+            children_runs_count=models.Count("children_runs")
+        )
+        return (
+            annotated_versions.aggregate(run_count=models.Sum("children_runs_count"))[
+                "run_count"
+            ]
+            or 0
+        )
 
 
 class PublishedRunVersion(models.Model):
