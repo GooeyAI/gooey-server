@@ -125,8 +125,8 @@ class WhatsappBot(BotInterface):
         )
         for convo in convos:
             id = send_wa_msg(
-                bot_number=bi.wa_phone_number_id,
-                user_number=convo.wa_phone_number,
+                bot_number=str(bi.wa_phone_number_id),
+                user_number=str(convo.wa_phone_number),
                 response_text=text,
                 response_audio=audio,
                 response_video=video,
