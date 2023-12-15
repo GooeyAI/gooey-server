@@ -131,9 +131,9 @@ class WhatsappBot(BotInterface):
             id = send_wa_msg(
                 bot_number=str(bi.wa_phone_number_id),
                 user_number=str(convo.wa_phone_number),
-                response_text=text,
-                response_audio=audio,
-                response_video=video,
+                text=text,
+                audio=audio,
+                video=video,
                 buttons=buttons,
             )
             ids += [id]

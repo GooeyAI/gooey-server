@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 import gooey_ui as st
 from bots.models import BotIntegration, Platform
 from bots.models import Workflow
-from daras_ai_v2.bots import broadcast_input
 from daras_ai.image_input import (
     truncate_text_words,
 )
@@ -893,6 +892,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
     def messenger_bot_integration(self):
         from routers.facebook import ig_connect_url, fb_connect_url
         from routers.slack import slack_connect_url
+        from daras_ai_v2.bots import broadcast_input
 
         st.markdown(
             # language=html
@@ -994,10 +994,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                             bi.save()
                             st.experimental_rerun()
                         st.write("---")
-                        broadcast_input(bi)
+                        broadcast_input(bi, key=f"slack_broadcast_{bi.id}")
                 elif bi.platform == Platform.WHATSAPP:
                     with st.expander("📨 WhatsApp Settings"):
-                        broadcast_input(bi)
+                        broadcast_input(bi, key=f"whatsapp_broadcast_{bi.id}")
             if not pressed:
                 continue
             if is_connected:
