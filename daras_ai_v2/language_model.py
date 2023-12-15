@@ -1,5 +1,6 @@
 import hashlib
 import io
+import json
 import re
 import typing
 from enum import Enum
@@ -21,6 +22,7 @@ from openai.types.chat import ChatCompletionContentPartParam
 
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
@@ -313,15 +315,17 @@ def get_entry_text(entry: ConversationEntry) -> str:
 def run_language_model(
     *,
     model: str,
-    prompt: str | None = None,
-    messages: list[ConversationEntry] | None = None,
-    max_tokens: int = 512,  # Default value version 1.0
-    quality: float = 1.0,  # Default value version 1.0
-    num_outputs: int = 1,  # Default value version 1.0
-    temperature: float = 0.7,  # Default value version 1.0
-    stop: list[str] | None = None,
+    prompt: str = None,
+    messages: list[ConversationEntry] = None,
+    max_tokens: int = 512,
+    quality: float = 1.0,
+    num_outputs: int = 1,
+    temperature: float = 0.7,
+    stop: list[str] = None,
     avoid_repetition: bool = False,
-) -> list[str]:
+    tools: list[LLMTools] = None,
+    response_format_type: typing.Literal["text", "json_object"] = None,
+) -> list[str] | tuple[list[str], list[list[dict]]] | list[dict]:
     assert bool(prompt) != bool(
         messages
     ), "Pleave provide exactly one of { prompt, messages }"
@@ -351,15 +355,26 @@ def run_language_model(
             temperature=temperature,
             stop=stop,
             avoid_repetition=avoid_repetition,
+            tools=tools,
+            response_format_type=response_format_type,
         )
-        return [
-            # return messages back as either chatml or json messages
-            format_chatml_message(entry)
-            if is_chatml
-            else (entry.get("content") or "").strip()
-            for entry in result
-        ]
+        if response_format_type == "json_object":
+            out_content = [json.loads(entry["content"]) for entry in result]
+        else:
+            out_content = [
+                # return messages back as either chatml or json messages
+                format_chatml_message(entry)
+                if is_chatml
+                else (entry.get("content") or "").strip()
+                for entry in result
+            ]
+        if tools:
+            return out_content, [(entry.get("tool_calls") or []) for entry in result]
+        else:
+            return out_content
     else:
+        if tools:
+            raise ValueError("Only OpenAI chat models support Tools")
         logger.info(f"{model_name=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
         result = _run_text_model(
             api=api,
@@ -421,6 +436,8 @@ def _run_chat_model(
     model: str | tuple,
     stop: list[str] | None,
     avoid_repetition: bool,
+    tools: list[LLMTools] | None,
+    response_format_type: typing.Literal["text", "json_object"],
 ) -> list[ConversationEntry]:
     match api:
         case LLMApis.openai:
@@ -432,8 +449,12 @@ def _run_chat_model(
                 num_outputs=num_outputs,
                 stop=stop,
                 temperature=temperature,
+                tools=tools,
+                response_format_type=response_format_type,
             )
         case LLMApis.vertex_ai:
+            if tools:
+                raise ValueError("Only OpenAI chat models support Tools")
             return _run_palm_chat(
                 model_id=model,
                 messages=messages,
@@ -442,6 +463,8 @@ def _run_chat_model(
                 temperature=temperature,
             )
         case LLMApis.together:
+            if tools:
+                raise ValueError("Only OpenAI chat models support Tools")
             return _run_together_chat(
                 model=model,
                 messages=messages,
@@ -464,6 +487,8 @@ def _run_openai_chat(
     temperature: float,
     stop: list[str] | None,
     avoid_repetition: bool,
+    tools: list[LLMTools] | None,
+    response_format_type: typing.Literal["text", "json_object"],
 ) -> list[ConversationEntry]:
     from openai._types import NOT_GIVEN
 
@@ -487,6 +512,10 @@ def _run_openai_chat(
                 temperature=temperature,
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty,
+                tools=[tool.spec for tool in tools] if tools else NOT_GIVEN,
+                response_format={"type": response_format_type}
+                if response_format_type
+                else NOT_GIVEN,
             )
             for model_str in model
         ],

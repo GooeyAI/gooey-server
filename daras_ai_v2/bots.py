@@ -10,7 +10,6 @@ from sentry_sdk import capture_exception
 
 from app_users.models import AppUser
 from bots.models import (
-    BotIntegration,
     Platform,
     Message,
     Conversation,
@@ -19,6 +18,7 @@ from bots.models import (
     ConvoState,
     Workflow,
     MessageAttachment,
+    BotIntegration,
 )
 from daras_ai_v2.asr import AsrModels, run_google_translate
 from daras_ai_v2.base import BasePage
@@ -26,6 +26,41 @@ from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
 from celeryapp.celeryconfig import app
+from recipes.VideoBots import VideoBotsPage, ReplyButton
+
+PAGE_NOT_CONNECTED_ERROR = (
+    "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
+    "Please go to the Integrations Tab and connect this page."
+)
+RESET_KEYWORD = "reset"
+RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
+
+DEFAULT_RESPONSE = (
+    "🤔🤖 Well that was Unexpected! I seem to be lost. Could you please try again?."
+)
+
+INVALID_INPUT_FORMAT = (
+    "⚠️ Sorry! I don't understand {} messsages. Please try with text or audio."
+)
+
+AUDIO_ASR_CONFIRMATION = """
+🎧 I heard: “{}”
+Working on your answer…
+""".strip()
+
+ERROR_MSG = """
+`{0!r}`
+
+⚠️ Sorry, I ran into an error while processing your request. Please try again, or type "Reset" to start over.
+""".strip()
+
+FEEDBACK_THUMBS_UP_MSG = "🎉 What did you like about my response?"
+FEEDBACK_THUMBS_DOWN_MSG = "🤔 What was the issue with the response? How could it be improved? Please send me an voice note or text me."
+FEEDBACK_CONFIRMED_MSG = (
+    "🙏 Thanks! Your feedback helps us make {bot_name} better. How else can I help you?"
+)
+
+TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
 
 
 async def request_json(request: Request):
@@ -52,13 +87,36 @@ class BotInterface:
     input_glossary: str | None = None
     output_glossary: str | None = None
 
+    def send_msg_or_default(
+        self,
+        *,
+        text: str | None = None,
+        audio: str = None,
+        video: str = None,
+        buttons: list[ReplyButton] = None,
+        documents: list[str] = None,
+        should_translate: bool = False,
+        default: str = DEFAULT_RESPONSE,
+    ):
+        if not (text or audio or video or documents):
+            text = default
+        return self.send_msg(
+            text=text,
+            audio=audio,
+            video=video,
+            buttons=buttons,
+            documents=documents,
+            should_translate=should_translate,
+        )
+
     def send_msg(
         self,
         *,
         text: str | None = None,
         audio: str = None,
         video: str = None,
-        buttons: list = None,
+        buttons: list[ReplyButton] = None,
+        documents: list[str] = None,
         should_translate: bool = False,
     ) -> str | None:
         raise NotImplementedError
@@ -113,41 +171,6 @@ class BotInterface:
 
     def get_interactive_msg_info(self) -> tuple[str, str]:
         raise NotImplementedError("This bot does not support interactive messages.")
-
-
-PAGE_NOT_CONNECTED_ERROR = (
-    "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
-    "Please go to the Integrations Tab and connect this page."
-)
-RESET_KEYWORD = "reset"
-RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
-
-DEFAULT_RESPONSE = (
-    "🤔🤖 Well that was Unexpected! I seem to be lost. Could you please try again?."
-)
-
-INVALID_INPUT_FORMAT = (
-    "⚠️ Sorry! I don't understand {} messsages. Please try with text or audio."
-)
-
-AUDIO_ASR_CONFIRMATION = """
-🎧 I heard: “{}”
-Working on your answer…
-""".strip()
-
-ERROR_MSG = """
-`{0!r}`
-
-⚠️ Sorry, I ran into an error while processing your request. Please try again, or type "Reset" to start over.
-""".strip()
-
-FEEDBACK_THUMBS_UP_MSG = "🎉 What did you like about my response?"
-FEEDBACK_THUMBS_DOWN_MSG = "🤔 What was the issue with the response? How could it be improved? Please send me an voice note or text me."
-FEEDBACK_CONFIRMED_MSG = (
-    "🙏 Thanks! Your feedback helps us make {bot_name} better. How else can I help you?"
-)
-
-TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
 
 
 def _echo(bot, input_text):
@@ -297,13 +320,7 @@ def _process_and_send_msg(
         #     bot, input_text
         # )
         # make API call to gooey bots to get the response
-        (
-            response_text,
-            response_audio,
-            response_video,
-            user_msg,
-            assistant_msg,
-        ) = _process_msg(
+        response, url = _process_msg(
             page_cls=bot.page_cls,
             api_user=billing_account_user,
             query_params=bot.query_params,
@@ -319,38 +336,110 @@ def _process_and_send_msg(
         # send error msg as repsonse
         bot.send_msg(text=ERROR_MSG.format(e))
         return
-    # this really shouldn't happen, but just in case it does, we should have a nice message
-    response_text = response_text or DEFAULT_RESPONSE
+
     # send the response to the user
-    msg_id = bot.send_msg(
-        text=response_text,
-        audio=response_audio,
-        video=response_video,
+    msg_id = bot.send_msg_or_default(
+        text=response.output_text and response.output_text[0],
+        audio=response.output_audio and response.output_audio[0],
+        video=response.output_video and response.output_video[0],
+        documents=response.output_documents or [],
         buttons=_feedback_start_buttons() if bot.show_feedback_buttons else None,
     )
-    if not (user_msg and assistant_msg):
-        return
-    # save the message id for the received message
-    if bot.recieved_msg_id:
-        user_msg.platform_msg_id = bot.recieved_msg_id
-    # save the message id for the sent message
-    if msg_id:
-        assistant_msg.platform_msg_id = msg_id
 
-    # get the attachments
+    # save msgs to db
+    _save_msgs(
+        bot=bot,
+        input_images=input_images,
+        input_text=input_text,
+        speech_run=speech_run,
+        platform_msg_id=msg_id,
+        response=response,
+        url=url,
+    )
+
+
+def _save_msgs(
+    bot: BotInterface,
+    input_images: list[str] | None,
+    input_text: str,
+    speech_run: str | None,
+    platform_msg_id: str | None,
+    response: VideoBotsPage.ResponseModel,
+    url: str,
+):
+    # create messages for future context
+    user_msg = Message(
+        platform_msg_id=bot.recieved_msg_id,
+        conversation=bot.convo,
+        role=CHATML_ROLE_USER,
+        content=response.raw_input_text,
+        display_content=input_text,
+        saved_run=SavedRun.objects.get_or_create(
+            workflow=Workflow.ASR, **furl(speech_run).query.params
+        )[0]
+        if speech_run
+        else None,
+    )
     attachments = []
     for img in input_images or []:
         metadata = doc_url_to_file_metadata(img)
         attachments.append(
             MessageAttachment(message=user_msg, url=img, metadata=metadata)
         )
+    assistant_msg = Message(
+        platform_msg_id=platform_msg_id,
+        conversation=bot.convo,
+        role=CHATML_ROLE_ASSISTANT,
+        content=response.raw_output_text and response.raw_output_text[0],
+        display_content=response.output_text and response.output_text[0],
+        saved_run=SavedRun.objects.get_or_create(
+            workflow=Workflow.VIDEO_BOTS, **furl(url).query.params
+        )[0],
+    )
     # save the messages & attachments
     with transaction.atomic():
         user_msg.save()
-        assistant_msg.save()
         for attachment in attachments:
             attachment.metadata.save()
             attachment.save()
+        assistant_msg.save()
+
+
+def _process_msg(
+    *,
+    page_cls,
+    api_user: AppUser,
+    query_params: dict,
+    convo: Conversation,
+    input_images: list[str] | None,
+    input_text: str,
+    user_language: str,
+    speech_run: str | None,
+) -> tuple[VideoBotsPage.ResponseModel, str]:
+    from routers.api import call_api
+
+    # get latest messages for context (upto 100)
+    saved_msgs = convo.messages.all().as_llm_context()
+
+    # # mock testing
+    # result = _mock_api_output(input_text)
+
+    # call the api with provided input
+    result = call_api(
+        page_cls=page_cls,
+        user=api_user,
+        request_body={
+            "input_prompt": input_text,
+            "input_images": input_images,
+            "messages": saved_msgs,
+            "user_language": user_language,
+        },
+        query_params=query_params,
+    )
+    # parse result
+    response = page_cls.ResponseModel.parse_obj(result["output"])
+    url = result.get("url", "")
+    return response, url
 
 
 def _handle_interactive_msg(bot: BotInterface):
@@ -452,31 +541,22 @@ class ButtonIds:
     feedback_thumbs_down = "FEEDBACK_THUMBS_DOWN"
 
 
-def _feedback_post_click_buttons():
+def _feedback_post_click_buttons() -> list[ReplyButton]:
     """
     Buttons to show after the user has clicked on a feedback button
     """
     return [
-        {
-            "type": "reply",
-            "reply": {"id": ButtonIds.action_skip, "title": "🔀 Skip"},
-        },
+        {"id": ButtonIds.action_skip, "title": "🔀 Skip"},
     ]
 
 
-def _feedback_start_buttons():
+def _feedback_start_buttons() -> list[ReplyButton]:
     """
     Buttons to show for collecting feedback after the bot has sent a response
     """
     return [
-        {
-            "type": "reply",
-            "reply": {"id": ButtonIds.feedback_thumbs_up, "title": "👍🏾"},
-        },
-        {
-            "type": "reply",
-            "reply": {"id": ButtonIds.feedback_thumbs_down, "title": "👎🏽"},
-        },
+        {"id": ButtonIds.feedback_thumbs_up, "title": "👍🏾"},
+        {"id": ButtonIds.feedback_thumbs_down, "title": "👎🏽"},
     ]
 
 
@@ -575,7 +655,7 @@ def save_broadcast_messages(
         save_broadcast_message(convo, text, id)
 
 
-def broadcast_input(bi: BotIntegration):
+def broadcast_input(bi: BotIntegration, key="broadcast_message"):
     import gooey_ui as st
     from routers.api import registered_broadcasts
 
@@ -596,7 +676,7 @@ def broadcast_input(bi: BotIntegration):
                 placeholder="Broadcast Message",
                 style=dict(height="3.2rem"),
             )
-        if st.button("Broadcast", style=dict(height="3.2rem")):
+        if st.button("Broadcast", style=dict(height="3.2rem"), key=key):
             registered_broadcasts[platform].broadcast(
                 bi=bi,
                 text=broadcast_message,

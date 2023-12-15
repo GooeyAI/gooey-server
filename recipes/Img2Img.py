@@ -19,9 +19,12 @@ from daras_ai_v2.stable_diffusion import (
 )
 from daras_ai_v2.safety_checker import safety_checker
 
+DEFAULT_IMG2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/cc2804ea-9401-11ee-940a-02420a0001c7/Edit%20an%20image.jpg.png"
+
 
 class Img2ImgPage(BasePage):
     title = "Edit An Image with AI prompt"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bcc9351a-88d9-11ee-bf6c-02420a000166/Edit%20an%20image%20with%20AI%201.png.png"
     workflow = Workflow.IMG_2_IMG
     slug_versions = ["Img2Img", "ai-photo-editor"]
 
@@ -66,6 +69,9 @@ class Img2ImgPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_images: list[str]
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_IMG2IMG_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.QRCodeGenerator import QRCodeGeneratorPage

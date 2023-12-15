@@ -14,6 +14,7 @@ from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
 from daras_ai_v2.bots import BotInterface
 from daras_ai_v2.functional import fetch_parallel
 from daras_ai_v2.text_splitter import text_splitter
+from recipes.VideoBots import ReplyButton
 
 SLACK_CONFIRMATION_MSG = """
 Hi there! 👋
@@ -175,15 +176,15 @@ class SlackBot(BotInterface):
         text: str | None = None,
         audio: str | None = None,
         video: str | None = None,
-        buttons: list | None = None,
+        buttons: list[ReplyButton] = None,
+        documents: list[str] = None,
         should_translate: bool = False,
     ) -> str | None:
-        if not text:
-            return None
-        if should_translate and self.language and self.language != "en":
+        if text and should_translate and self.language and self.language != "en":
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
+        text = text or "\u200b"  # handle empty text with zero-width space
 
         if self._read_rcpt_ts and self._read_rcpt_ts != self._msg_ts:
             delete_msg(
@@ -542,7 +543,7 @@ def chat_post_message(
     audio: str | None = None,
     video: str | None = None,
     username: str = "Video Bot",
-    buttons: list | None = None,
+    buttons: list[ReplyButton] = None,
 ) -> str | None:
     if buttons is None:
         buttons = []
@@ -603,7 +604,7 @@ def create_file_block(
     ]
 
 
-def create_button_block(buttons: list[dict]) -> list[dict]:
+def create_button_block(buttons: list[ReplyButton]) -> list[dict]:
     if not buttons:
         return []
     return [
@@ -612,9 +613,9 @@ def create_button_block(buttons: list[dict]) -> list[dict]:
             "elements": [
                 {
                     "type": "button",
-                    "text": {"type": "plain_text", "text": button["reply"]["title"]},
-                    "value": button["reply"]["id"],
-                    "action_id": "button_" + button["reply"]["id"],
+                    "text": {"type": "plain_text", "text": button["title"]},
+                    "value": button["id"],
+                    "action_id": "button_" + button["id"],
                 }
                 for button in buttons
             ],

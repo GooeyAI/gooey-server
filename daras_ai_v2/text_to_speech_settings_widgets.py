@@ -289,8 +289,7 @@ def text_to_speech_settings(page):
                     ):
                         st.caption(
                             """
-                            Note: Please purchase Gooey.AI credits to use ElevenLabs voices
-                            <a href="/account">here</a>.<br/>
+                            Note: Please purchase Gooey.AI credits to use ElevenLabs voices [here](/account).
                             Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
                             """
                         )
