@@ -274,6 +274,11 @@ def run_google_translate(
     """
     from google.cloud import translate_v2 as translate
 
+    # convert to BCP-47 format (google handles consistent language codes but sometimes gets confused by a mix of iso2 and iso3 which we have)
+    if source_language:
+        source_language = langcodes.Language.get(source_language).to_tag()
+    target_language = langcodes.Language.get(target_language).to_tag()
+
     # if the language supports transliteration, we should check if the script is Latin
     if source_language and source_language not in TRANSLITERATION_SUPPORTED:
         language_codes = [source_language] * len(texts)
