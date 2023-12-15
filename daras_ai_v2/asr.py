@@ -65,6 +65,7 @@ class ConsistentLanguageCode(str):
     #   True: ConsistentLanguageCode("en") == ConsistentLanguageCode("en-US")
 
     _2LetterISOCode: str | None = None
+    match: str = None  # type: ignore
 
     def __new__(cls, value: str | None):
         if not value:
@@ -80,6 +81,7 @@ class ConsistentLanguageCode(str):
             return NotImplemented
         if not isinstance(other, ConsistentLanguageCode):
             return str(self) == other
+        self.match = other
         return self._2LetterISOCode == other._2LetterISOCode
 
     def __hash__(self):
@@ -409,8 +411,8 @@ def run_asr(
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding
 
-    selected_model = AsrModels[selected_model]
-    output_format = AsrOutputFormat[output_format]
+    selected_model: AsrModels = AsrModels[selected_model]
+    output_format: AsrOutputFormat = AsrOutputFormat[output_format]
     is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
     if is_youtube_url:
         audio_url, size = download_youtube_to_wav(audio_url)
@@ -428,6 +430,17 @@ def run_asr(
     else:
         audio_url, size = audio_url_to_wav(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
+
+    # in case of api calls, check supported languages and convert to correct format as necessary
+    supported_languages = asr_supported_languages.get(selected_model, [])
+    if language and language not in supported_languages:
+        language = ConsistentLanguageCode(language)
+        if language in supported_languages:
+            language = language.match
+        else:
+            raise ValueError(
+                f"Unsupported language for {selected_model.value}: {language}"
+            )
 
     if selected_model == AsrModels.azure:
         return azure_asr(audio_url, language)
