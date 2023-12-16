@@ -1035,12 +1035,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         st.write("---")
 
 
-# state logic does not allow overwriting some inputs, so we need to shuffle the keys
-shuffling_keys = {}
-
-
 def general_integration_settings(bi: BotIntegration):
     import random
+
+    # state logic does not allow overwriting some inputs, so we need to shuffle the keys
+    st.session_state["__shuffling_keys"] = shuffling_keys = st.session_state.get(
+        "__shuffling_keys", {}
+    )
 
     user_language_key = shuffling_keys.get(
         "user_language_" + str(bi.id), "user_language_" + str(bi.id)
@@ -1088,6 +1089,7 @@ def general_integration_settings(bi: BotIntegration):
         shuffling_keys["analysis_run_url_" + str(bi.id)] = (
             "analysis_run_url_" + str(bi.id) + str(random.random())
         )
+        st.session_state["__shuffling_keys"] = shuffling_keys
         st.experimental_rerun()
     if st.button("Update", key=f"btn_update_{bi.id}"):
         bi.user_language = user_language
