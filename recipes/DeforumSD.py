@@ -325,15 +325,30 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
                 """,
                 key="rotation_3d_x",
             )
-        st.slider(
+
+        st.radio(
             """
 ###### FPS (Frames per second)
 Choose fps for the video.
             """,
-            min_value=10,
-            max_value=60,
-            step=1,
+            options=[2, 10, 24],
+            format_func=lambda x: {
+                "2": "Draft: 2 FPS",
+                "10": "Stop-motion: 10 FPS",
+                "24": "Film: 24 FPS",
+            }[str(x)],
             key="fps",
+            custom={
+                "label": "Custom",
+                "input": lambda label, key: st.number_input(
+                    label=label,
+                    min_value=1,
+                    max_value=60,
+                    step=1,
+                    key=key,
+                    style={"margin-top": "-28px"},
+                ),
+            },
         )
 
     #         st.selectbox(
