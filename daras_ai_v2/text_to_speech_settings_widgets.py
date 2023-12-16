@@ -356,7 +356,7 @@ def text_to_speech_settings(page):
                         """,
                         min_value=0,
                         max_value=1.0,
-                        step=0.0,
+                        step=0.05,
                         key="elevenlabs_style",
                         value=0.0,
                     )
