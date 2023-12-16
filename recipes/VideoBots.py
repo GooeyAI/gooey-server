@@ -347,25 +347,38 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         google_translate_language_selector(
             """
             ##### 🔠 User Language
-            If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
+            If provided, the copilot will translate user messages to English and the copilot's response back to the selected language. This setting only applies to this web ui. Integration specific languages have to be set on the integration tab.
             """,
             key="user_language",
         )
-        st.markdown(
+        st.session_state.setdefault(
+            "__enable_glossary",
+            st.session_state.get("input_glossary_document")
+            or st.session_state.get("output_glossary_document"),
+        )
+        if st.checkbox(
             """
-            ###### 📖 Customize with Glossary
-            Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            
-            """
-        )
-        glossary_input(
-            f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
-            key="input_glossary_document",
-        )
-        glossary_input(
-            f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
-            key="output_glossary_document",
-        )
+            📖 Customize with Glossary
+            """,
+            key="__enable_glossary",
+        ):
+            st.markdown(
+                """
+                Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+                If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            
+                """
+            )
+            glossary_input(
+                f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
+                key="input_glossary_document",
+            )
+            glossary_input(
+                f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
+                key="output_glossary_document",
+            )
+        else:
+            st.session_state["input_glossary_document"] = None
+            st.session_state["output_glossary_document"] = None
         st.write("---")
 
         if not "__enable_audio" in st.session_state:
@@ -962,6 +975,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             with col3:
                 if bi.platform == Platform.SLACK:
                     with st.expander("📨 Slack Settings"):
+                        general_integration_settings(bi)
+                        st.write("---")
+                        st.markdown("#### Slack Specific Settings")
                         read_receipt_key = "slack_read_receipt_" + str(bi.id)
                         st.session_state.setdefault(
                             read_receipt_key, bi.slack_read_receipt_msg
@@ -978,7 +994,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                             key=bot_name_key,
                             placeholder=bi.name,
                         )
-                        if st.button("Reset to Default"):
+                        if st.button(
+                            "Reset to Default", key=f"slack_btn_reset_{bi.id}"
+                        ):
                             bi.name = st.session_state.get(
                                 StateKeys.page_title, bi.name
                             )
@@ -987,11 +1005,16 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                             ).default
                             bi.save()
                             st.experimental_rerun()
-                        if st.button("Update"):
+                        if st.button("Update", key=f"slack_btn_update_{bi.id}"):
                             bi.slack_read_receipt_msg = read_msg
                             bi.name = bot_name
                             bi.save()
                             st.experimental_rerun()
+                else:
+                    with st.expander(
+                        f"📨 {Platform(bi.platform).name.capitalize()} Settings"
+                    ):
+                        general_integration_settings(bi)
             if not pressed:
                 continue
             if is_connected:
@@ -1010,6 +1033,76 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.experimental_rerun()
 
         st.write("---")
+
+
+# state logic does not allow overwriting some inputs, so we need to shuffle the keys
+shuffling_keys = {}
+
+
+def general_integration_settings(bi: BotIntegration):
+    import random
+
+    user_language_key = shuffling_keys.get(
+        "user_language_" + str(bi.id), "user_language_" + str(bi.id)
+    )
+    st.session_state.setdefault(user_language_key, bi.user_language)
+    google_translate_language_selector(
+        "🔠 User Language",
+        key=user_language_key,
+    )
+    user_language: str = st.session_state.get(user_language_key, "")
+
+    show_feedback_key = shuffling_keys.get(
+        "show_feedback_" + str(bi.id), "show_feedback_" + str(bi.id)
+    )
+    st.session_state.setdefault(show_feedback_key, bi.show_feedback_buttons)
+    show_feedback = st.checkbox(
+        "👍🏾 👎🏽 Show Feedback Buttons",
+        key=show_feedback_key,
+    )
+
+    analysis_key = shuffling_keys.get(
+        "analysis_run_url_" + str(bi.id), "analysis_run_url_" + str(bi.id)
+    )
+    analysis_run_url = bi.analysis_run.get_app_url() if bi.analysis_run else ""
+    st.session_state.setdefault(analysis_key, analysis_run_url)
+    analysis_run = st.text_input(
+        "Analysis Run URL (leave blank to disable)",
+        key=analysis_key,
+        placeholder=analysis_run_url,
+    )
+
+    if st.button("Reset to Default", key=f"btn_reset_{bi.id}"):
+        bi.user_language = BotIntegration._meta.get_field("user_language").default
+        bi.show_feedback_buttons = BotIntegration._meta.get_field(
+            "show_feedback_buttons"
+        ).default
+        bi.analysis_run = None
+        bi.save()
+        shuffling_keys["user_language_" + str(bi.id)] = (
+            "user_language_" + str(bi.id) + str(random.random())
+        )
+        shuffling_keys["show_feedback_" + str(bi.id)] = (
+            "show_feedback_" + str(bi.id) + str(random.random())
+        )
+        shuffling_keys["analysis_run_url_" + str(bi.id)] = (
+            "analysis_run_url_" + str(bi.id) + str(random.random())
+        )
+        st.experimental_rerun()
+    if st.button("Update", key=f"btn_update_{bi.id}"):
+        bi.user_language = user_language
+        bi.show_feedback_buttons = show_feedback
+        try:
+            bi.analysis_run = (
+                VideoBotsPage.get_sr_from_run_url(analysis_run)
+                if analysis_run
+                else None
+            )
+        except Exception:
+            st.error("Invalid Analysis Run URL")
+            return
+        bi.save()
+        st.experimental_rerun()
 
 
 def show_landbot_widget():

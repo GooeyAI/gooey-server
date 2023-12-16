@@ -459,6 +459,11 @@ class BasePage:
             raise HTTPException(status_code=404)
 
     @classmethod
+    def get_sr_from_run_url(cls, run_url: str) -> SavedRun:
+        example_id, run_id, uid = extract_query_params(furl(run_url).query.params)
+        return cls.get_sr_from_query_params(example_id, run_id, uid)
+
+    @classmethod
     def get_total_runs(cls) -> int:
         return SavedRun.objects.filter(workflow=cls.workflow).count()
 
