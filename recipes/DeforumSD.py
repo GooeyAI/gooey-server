@@ -329,7 +329,6 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
         st.radio(
             """
 ###### FPS (Frames per second)
-Choose fps for the video.
             """,
             options=[2, 10, 24],
             format_func=lambda x: {
