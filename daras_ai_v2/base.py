@@ -263,7 +263,7 @@ class BasePage:
             st.write(f"# {self.get_recipe_title(st.session_state)}")
 
     def get_recipe_title(self, state: dict) -> str:
-        return state.get(StateKeys.page_title) or self.title or ""
+        return state.get(StateKeys.page_title) or self.title or self.workflow.label
 
     def get_explore_image(self, state: dict) -> str:
         return self.explore_image or ""

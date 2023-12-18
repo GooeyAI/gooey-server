@@ -526,8 +526,13 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     ).mount()
 
 
-def data_table(file_url: str):
-    return _node("data-table", fileUrl=file_url)
+def data_table(file_url_or_cells: str | list):
+    if isinstance(file_url_or_cells, str):
+        file_url = file_url_or_cells
+        return _node("data-table", fileUrl=file_url)
+    else:
+        cells = file_url_or_cells
+        return _node("data-table-raw", cells=cells)
 
 
 def table(df: "pd.DataFrame"):
