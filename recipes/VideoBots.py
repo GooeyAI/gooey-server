@@ -972,6 +972,15 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     "🔌💔️ Disconnect" if is_connected else "🖇️ Connect",
                     key=f"btn_connect_{bi.id}",
                 )
+                if bi.platform == Platform.WHATSAPP and is_connected:
+                    with st.link(to=f"https://wa.me/{bi.wa_phone_number}?text=Hi"):
+                        st.html(
+                            "📱 Test",
+                            style={
+                                "display": "inline-block",
+                            },
+                            className="btn btn-theme btn-secondary",
+                        )
             with col3:
                 if is_connected:
                     if bi.platform == Platform.SLACK:
