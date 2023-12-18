@@ -347,7 +347,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         google_translate_language_selector(
             """
             ##### 🔠 User Language
-            If provided, the copilot will translate user messages to English and the copilot's response back to the selected language. This setting only applies to this web ui. Integration specific languages have to be set on the integration tab.
+            If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
             """,
             key="user_language",
         )
@@ -973,48 +973,42 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     key=f"btn_connect_{bi.id}",
                 )
             with col3:
-                if bi.platform == Platform.SLACK:
-                    with st.expander("📨 Slack Settings"):
-                        general_integration_settings(bi)
-                        st.write("---")
-                        st.markdown("#### Slack Specific Settings")
-                        read_receipt_key = "slack_read_receipt_" + str(bi.id)
-                        st.session_state.setdefault(
-                            read_receipt_key, bi.slack_read_receipt_msg
-                        )
-                        read_msg = st.text_input(
-                            "Read Receipt (leave blank to disable)",
-                            key=read_receipt_key,
-                            placeholder=bi.slack_read_receipt_msg,
-                        )
-                        bot_name_key = "slack_bot_name_" + str(bi.id)
-                        st.session_state.setdefault(bot_name_key, bi.name)
-                        bot_name = st.text_input(
-                            "Channel Specific Bot Name (to be displayed in Slack)",
-                            key=bot_name_key,
-                            placeholder=bi.name,
-                        )
-                        if st.button(
-                            "Reset to Default", key=f"slack_btn_reset_{bi.id}"
-                        ):
-                            bi.name = st.session_state.get(
-                                StateKeys.page_title, bi.name
+                if is_connected:
+                    if bi.platform == Platform.SLACK:
+                        with st.expander("📨 Slack Settings"):
+                            slack_settings = [
+                                {
+                                    "field": "slack_read_receipt_msg",
+                                    "value": bi.slack_read_receipt_msg,
+                                    "input": lambda key, placeholder: st.text_input(
+                                        "###### Read Receipt (leave blank to disable)",
+                                        key=key,
+                                        placeholder=placeholder,
+                                    ),
+                                    "caption": "This message is sent immediately after recieving a user message and replaced with the copilot's response once it's ready.",
+                                },
+                                {
+                                    "field": "name",
+                                    "value": bi.name,
+                                    "input": lambda key, placeholder: st.text_input(
+                                        "###### Channel Specific Bot Name (to be displayed in Slack)",
+                                        key=key,
+                                        placeholder=placeholder,
+                                    ),
+                                    "default": st.session_state.get(
+                                        StateKeys.page_title, bi.name
+                                    ),
+                                    "caption": "This is the name the bot will post as in this specific channel.",
+                                },
+                            ]
+                            general_integration_settings(
+                                bi, extra_settings=slack_settings
                             )
-                            bi.slack_read_receipt_msg = BotIntegration._meta.get_field(
-                                "slack_read_receipt_msg"
-                            ).default
-                            bi.save()
-                            st.experimental_rerun()
-                        if st.button("Update", key=f"slack_btn_update_{bi.id}"):
-                            bi.slack_read_receipt_msg = read_msg
-                            bi.name = bot_name
-                            bi.save()
-                            st.experimental_rerun()
-                else:
-                    with st.expander(
-                        f"📨 {Platform(bi.platform).name.capitalize()} Settings"
-                    ):
-                        general_integration_settings(bi)
+                    else:
+                        with st.expander(
+                            f"📨 {Platform(bi.platform).name.capitalize()} Settings"
+                        ):
+                            general_integration_settings(bi)
             if not pressed:
                 continue
             if is_connected:
@@ -1035,75 +1029,85 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         st.write("---")
 
 
-def general_integration_settings(bi: BotIntegration):
+def general_integration_settings(bi: BotIntegration, extra_settings: list = []):
     import random
 
     # state logic does not allow overwriting some inputs, so we need to shuffle the keys
-    st.session_state["__shuffling_keys"] = shuffling_keys = st.session_state.get(
-        "__shuffling_keys", {}
-    )
+    shuffling_keys = st.session_state.get("__shuffling_keys", {})
 
-    user_language_key = shuffling_keys.get(
-        "user_language_" + str(bi.id), "user_language_" + str(bi.id)
-    )
-    st.session_state.setdefault(user_language_key, bi.user_language)
-    google_translate_language_selector(
-        "🔠 User Language",
-        key=user_language_key,
-    )
-    user_language: str = st.session_state.get(user_language_key, "")
+    settings = extra_settings + [
+        {
+            "field": "user_language",
+            "value": bi.user_language,
+            "input": lambda key, _: google_translate_language_selector(
+                "###### 🔠 Language",
+                key=key,
+            ),
+            "caption": "Set a default language for the copilot's responses and to better understand incoming audio messages.",
+        },
+        {
+            "field": "show_feedback_buttons",
+            "value": bi.show_feedback_buttons,
+            "input": lambda key, _: st.checkbox(
+                "###### 👍🏾 👎🏽 Show Feedback Buttons",
+                key=key,
+            ),
+            "caption": "Users can rate and provide feedback on every copilot response if enabled.",
+        },
+        {
+            "field": "analysis_run",
+            "value": bi.analysis_run.get_app_url() if bi.analysis_run else "",
+            "input": lambda key, placeholder: st.text_input(
+                "###### 🧠 Analysis Run URL",
+                key=key,
+                placeholder=placeholder,
+            ),
+            "default": None,
+            "parse_input": lambda x: (
+                VideoBotsPage.get_sr_from_run_url(x) if x else None
+            ),
+            "caption": "Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow url. Leave blank to disable. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).",
+        },
+    ]
 
-    show_feedback_key = shuffling_keys.get(
-        "show_feedback_" + str(bi.id), "show_feedback_" + str(bi.id)
-    )
-    st.session_state.setdefault(show_feedback_key, bi.show_feedback_buttons)
-    show_feedback = st.checkbox(
-        "👍🏾 👎🏽 Show Feedback Buttons",
-        key=show_feedback_key,
-    )
+    for input in settings:
+        field = input["field"]
+        input["key"] = field + "_" + str(bi.id)
+        key = shuffling_keys.get(input["key"], input["key"])
+        value = input["value"]
 
-    analysis_key = shuffling_keys.get(
-        "analysis_run_url_" + str(bi.id), "analysis_run_url_" + str(bi.id)
-    )
-    analysis_run_url = bi.analysis_run.get_app_url() if bi.analysis_run else ""
-    st.session_state.setdefault(analysis_key, analysis_run_url)
-    analysis_run = st.text_input(
-        "Analysis Run URL (leave blank to disable)",
-        key=analysis_key,
-        placeholder=analysis_run_url,
-    )
+        st.session_state.setdefault(key, value)
+        input["input"](key, value)
+        input["value"] = st.session_state.get(key, "")
+        if "caption" in input:
+            st.caption(input["caption"])
 
-    if st.button("Reset to Default", key=f"btn_reset_{bi.id}"):
-        bi.user_language = BotIntegration._meta.get_field("user_language").default
-        bi.show_feedback_buttons = BotIntegration._meta.get_field(
-            "show_feedback_buttons"
-        ).default
-        bi.analysis_run = None
-        bi.save()
-        shuffling_keys["user_language_" + str(bi.id)] = (
-            "user_language_" + str(bi.id) + str(random.random())
-        )
-        shuffling_keys["show_feedback_" + str(bi.id)] = (
-            "show_feedback_" + str(bi.id) + str(random.random())
-        )
-        shuffling_keys["analysis_run_url_" + str(bi.id)] = (
-            "analysis_run_url_" + str(bi.id) + str(random.random())
-        )
-        st.session_state["__shuffling_keys"] = shuffling_keys
-        st.experimental_rerun()
     if st.button("Update", key=f"btn_update_{bi.id}"):
-        bi.user_language = user_language
-        bi.show_feedback_buttons = show_feedback
-        try:
-            bi.analysis_run = (
-                VideoBotsPage.get_sr_from_run_url(analysis_run)
-                if analysis_run
-                else None
-            )
-        except Exception:
-            st.error("Invalid Analysis Run URL")
-            return
+        for input in settings:
+            field = input["field"]
+            value = input["value"]
+            if "parse_input" in input:
+                try:
+                    value = input["parse_input"](value)
+                except Exception:
+                    field_name = BotIntegration._meta.get_field(field).verbose_name
+                    st.error(f"Invalid {field_name}")
+                    return
+            bi.__setattr__(field, value)
         bi.save()
+        st.experimental_rerun()
+    if st.button("Reset to Default", key=f"btn_reset_{bi.id}", type="tertiary"):
+        for input in settings:
+            field = input["field"]
+            default = (
+                input["default"]
+                if "default" in input
+                else BotIntegration._meta.get_field(field).default
+            )
+            setattr(bi, field, default)
+            shuffling_keys[input["key"]] = input["key"] + str(random.random())
+        bi.save()
+        st.session_state["__shuffling_keys"] = shuffling_keys
         st.experimental_rerun()
 
 
