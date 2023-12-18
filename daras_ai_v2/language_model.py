@@ -1,5 +1,6 @@
 import hashlib
 import io
+import json
 import re
 import typing
 from enum import Enum
@@ -316,20 +317,26 @@ def get_entry_text(entry: ConversationEntry) -> str:
 def run_language_model(
     *,
     model: str,
-    prompt: str | None = None,
-    messages: list[ConversationEntry] | None = None,
-    max_tokens: int = 512,  # Default value version 1.0
-    quality: float = 1.0,  # Default value version 1.0
-    num_outputs: int = 1,  # Default value version 1.0
-    temperature: float = 0.7,  # Default value version 1.0
-    stop: list[str] | None = None,
+    prompt: str = None,
+    messages: list[ConversationEntry] = None,
+    max_tokens: int = 512,
+    quality: float = 1.0,
+    num_outputs: int = 1,
+    temperature: float = 0.7,
+    stop: list[str] = None,
     avoid_repetition: bool = False,
     tools: list[LLMTools] | None = None,
+    response_format_type: typing.Literal["text", "json_object"] = "text",
     stream: bool = False,
 ) -> Iterator[list[str]] | list[str] | tuple[list[str], list[list[dict]]]:
     assert bool(prompt) != bool(
         messages
     ), "Pleave provide exactly one of { prompt, messages }"
+    if stream:
+        assert (
+            response_format_type == "text"
+        ), "Only text output is supported with streaming"
+        assert not tools, "Tools are not yet supported with streaming"
 
     llm = LargeLanguageModels[model]
     api = llm_api[llm]
@@ -358,7 +365,9 @@ def run_language_model(
             avoid_repetition=avoid_repetition,
             tools=tools,
             stream=stream,
+            response_format_type=response_format_type,
         )
+
         if stream:
             chat_result_iterator = stream_chat_result(
                 chat_result,
@@ -366,20 +375,25 @@ def run_language_model(
                 is_chatml=is_chatml,
             )
             return _stream_outputs(num_outputs, chat_result_iterator)
+
+        entries = next(chat_result)
+
+        if response_format_type == "json_object":
+            out_content = [json.loads(entry["content"]) for entry in entries]
         else:
-            entries = next(chat_result)
-            output_text = [
+            out_content = [
                 # return messages back as either chatml or json messages
                 format_chatml_message(entry)
                 if is_chatml
                 else (entry.get("content") or "").strip()
                 for entry in entries
             ]
-            if tools:
-                tools_output = [(entry.get("tool_calls") or []) for entry in entries]
-                return output_text, tools_output
-            else:
-                return output_text
+
+        if tools:
+            return out_content, [(entry.get("tool_calls") or []) for entry in entries]
+        else:
+            return out_content
+
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
@@ -516,7 +530,8 @@ def _run_chat_model(
     stop: list[str] | None,
     avoid_repetition: bool,
     stream: bool,
-    tools: list[LLMTools] | None = None,
+    tools: list[LLMTools] | None,
+    response_format_type: typing.Literal["text", "json_object"],
 ) -> Iterator[list[ConversationEntry]]:
     match api:
         case LLMApis.openai:
@@ -530,6 +545,7 @@ def _run_chat_model(
                 temperature=temperature,
                 tools=tools,
                 stream=stream,
+                response_format_type=response_format_type,
             )
             yield from result
         case LLMApis.vertex_ai:
@@ -571,8 +587,9 @@ def _run_openai_chat(
     temperature: float,
     stop: list[str] | None,
     avoid_repetition: bool,
-    tools: list[LLMTools] | None = None,
     stream: bool,
+    tools: list[LLMTools] | None,
+    response_format_type: typing.Literal["text", "json_object"],
 ) -> Iterator[list[ConversationEntry]]:
     from openai._types import NOT_GIVEN
 
@@ -584,6 +601,7 @@ def _run_openai_chat(
         presence_penalty = 0
     if isinstance(model, str):
         model = [model]
+
     partials = [
         partial(
             _get_openai_client(model_str).chat.completions.create,
@@ -597,9 +615,13 @@ def _run_openai_chat(
             presence_penalty=presence_penalty,
             tools=[tool.spec for tool in tools] if tools else NOT_GIVEN,
             stream=stream,
+            response_format={"type": response_format_type}
+            if response_format_type
+            else NOT_GIVEN,
         )
         for model_str in model
     ]
+
     if stream:
         # NOTE: retries not supported for streaming yet
         stream_fn = partials[0]

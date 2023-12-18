@@ -17,10 +17,12 @@ from recipes.FaceInpainting import FaceInpaintingPage
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 twitter_handle_regex = r"(@)?[A-Za-z0-9_]{1,15}"
 
+DEFAULT_EMAIL_FACE_INPAINTING_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6937427a-9522-11ee-b6d3-02420a0001ea/Email%20photo.jpg.png"
+
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
     title = "AI Generated Photo from Email Profile Lookup"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2affefa6-88da-11ee-aa86-02420a000165/AI%20generated%20photo%20with%20email%20profile%20lookup.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ec0df5aa-9521-11ee-93d3-02420a0001e5/Email%20Profile%20Lookup.png.png"
     workflow = Workflow.EMAIL_FACE_INPAINTING
     slug_versions = ["EmailFaceInpainting", "ai-image-from-email-lookup"]
 
@@ -84,6 +86,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         diffusion_images: list[str]
         output_images: list[str]
         email_sent: bool = False
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_EMAIL_FACE_INPAINTING_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Find an email's public photo and then draw the face into an AI generated scene using your own prompt + the latest Stable Diffusion or DallE image generator."

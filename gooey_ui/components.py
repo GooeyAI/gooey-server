@@ -1,4 +1,5 @@
 import base64
+import html as html_lib
 import math
 import textwrap
 import typing
@@ -29,7 +30,6 @@ def dummy(*args, **kwargs):
 spinner = dummy
 set_page_config = dummy
 form = dummy
-plotly_chart = dummy
 dataframe = dummy
 
 
@@ -83,9 +83,11 @@ def write(*objs: typing.Any, unsafe_allow_html=False, **props):
         )
 
 
-def markdown(body: str, *, unsafe_allow_html=False, **props):
+def markdown(body: str | None, *, unsafe_allow_html=False, **props):
     if body is None:
         return _node("markdown", body="", **props)
+    if not unsafe_allow_html:
+        body = html_lib.escape(body)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
     )
@@ -287,13 +289,14 @@ def text_area(
     **props,
 ) -> str:
     style = props.setdefault("style", {})
-    if key:
-        assert not value, "only one of value or key can be provided"
-    else:
+    # if key:
+    #     assert not value, "only one of value or key can be provided"
+    # else:
+    if not key:
         key = md5_values(
             "textarea", label, height, help, value, placeholder, label_visibility
         )
-    value = str(state.session_state.setdefault(key, value))
+    value = str(state.session_state.setdefault(key, value) or "")
     if label_visibility != "visible":
         label = None
     if disabled:
@@ -836,6 +839,21 @@ def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
                 html(inner_html)
         else:
             html(inner_html)
+
+
+def plotly_chart(figure_or_data, **kwargs):
+    data = (
+        figure_or_data.to_plotly_json()
+        if hasattr(figure_or_data, "to_plotly_json")
+        else figure_or_data
+    )
+    state.RenderTreeNode(
+        name="plotly-chart",
+        props=dict(
+            chart=data,
+            args=kwargs,
+        ),
+    ).mount()
 
 
 def dedent(text: str | None) -> str | None:

@@ -495,13 +495,17 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
         return b"", ""
     f_bytes = r.content
     # if it's a known encoding, standardize to utf-8
-    if r.encoding:
+    encoding = r.apparent_encoding or r.encoding
+    if encoding:
         try:
-            codec = codecs.lookup(r.encoding)
+            codec = codecs.lookup(encoding)
         except LookupError:
             pass
         else:
-            f_bytes = codec.decode(f_bytes)[0].encode()
+            try:
+                f_bytes = codec.decode(f_bytes)[0].encode()
+            except UnicodeDecodeError:
+                pass
     ext = guess_ext_from_response(r)
     return f_bytes, ext
 

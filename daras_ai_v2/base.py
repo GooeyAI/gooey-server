@@ -60,7 +60,7 @@ from gooey_ui.pubsub import realtime_pull
 
 DEFAULT_META_IMG = (
     # Small
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/optimized%20hp%20gif.gif"
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/b0f328d0-93f7-11ee-bd89-02420a0001cc/Main.jpg.png"
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     # Big
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
@@ -81,7 +81,6 @@ class RecipeRunState(Enum):
 
 class StateKeys:
     page_title = "__title"
-    page_image = "__image"
     page_notes = "__notes"
 
     created_at = "created_at"
@@ -97,11 +96,12 @@ class StateKeys:
 
 class BasePage:
     title: str
-    image: str
     workflow: Workflow
     slug_versions: list[str]
 
     sane_defaults: dict = {}
+
+    explore_image: str = None
 
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
@@ -265,8 +265,8 @@ class BasePage:
     def get_recipe_title(self, state: dict) -> str:
         return state.get(StateKeys.page_title) or self.title or ""
 
-    def get_recipe_image(self, state: dict) -> str:
-        return state.get(StateKeys.page_image) or self.image or ""
+    def get_explore_image(self, state: dict) -> str:
+        return self.explore_image or ""
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
@@ -325,11 +325,11 @@ class BasePage:
             page = page_cls()
             state = page_cls().recipe_doc_sr().to_dict()
             preview_image = meta_preview_url(
-                page.get_recipe_image(state), page.fallback_preivew_image()
+                page.get_explore_image(state), page.fallback_preivew_image()
             )
 
             with st.link(to=page.app_url()):
-                st.markdown(
+                st.html(
                     # language=html
                     f"""
 <div class="w-100 mb-2" style="height:150px; background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
@@ -763,7 +763,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_failed_output(self):
         err_msg = st.session_state.get(StateKeys.error_msg)
-        st.error(err_msg)
+        st.error(err_msg, unsafe_allow_html=True)
 
     def _render_running_output(self):
         run_status = st.session_state.get(StateKeys.run_status)
@@ -1072,7 +1072,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             if sr.run_status:
                 html_spinner(sr.run_status)
             elif sr.error_msg:
-                st.error(sr.error_msg)
+                st.error(sr.error_msg, unsafe_allow_html=True)
 
         grid_layout(3, run_history, _render)
 
@@ -1179,7 +1179,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
         st.markdown(
-            f'📖 To learn more, take a look at our <a href="{api_docs_url}" target="_blank">complete API</a>'
+            f'📖 To learn more, take a look at our <a href="{api_docs_url}" target="_blank">complete API</a>',
+            unsafe_allow_html=True,
         )
 
         st.write("#### 📤 Example Request")

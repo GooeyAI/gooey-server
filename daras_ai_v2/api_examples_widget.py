@@ -93,19 +93,20 @@ done
             """
 1. Generate an api key [below👇](#api-keys)
 
-2. Install [curl](https://everything.curl.dev/get) & add the `GOOEY_API_KEY` to your environment variables.  
-Never store the api key [in your code](https://12factor.net/config).          
+2. Install [curl](https://everything.curl.dev/get) & add the `GOOEY_API_KEY` to your environment variables.
+Never store the api key [in your code](https://12factor.net/config).
 ```bash
 export GOOEY_API_KEY=sk-xxxx
 ```
 
-3. Run the following `curl` command in your terminal.  
+3. Run the following `curl` command in your terminal.
 If you encounter any issues, write to us at support@gooey.ai and make sure to include the full curl command and the error message.
 ```bash
 %s
 ```
             """
-            % curl_code.strip()
+            % curl_code.strip(),
+            unsafe_allow_html=True,
         )
 
     with python:
@@ -157,8 +158,8 @@ assert response.ok, response.content
             )
         if as_async:
             py_code += r"""
-from time import sleep            
-            
+from time import sleep
+
 status_url = response.headers["Location"]
 while True:
     response = requests.get(status_url, headers={"Authorization": "%(auth_keyword)s " + os.environ["GOOEY_API_KEY"]})
@@ -188,20 +189,21 @@ print(response.status_code, result)
             rf"""
 1. Generate an api key [below👇](#api-keys)
 
-2. Install [requests](https://requests.readthedocs.io/en/latest/) & add the `GOOEY_API_KEY` to your environment variables.  
-Never store the api key [in your code](https://12factor.net/config).          
+2. Install [requests](https://requests.readthedocs.io/en/latest/) & add the `GOOEY_API_KEY` to your environment variables.
+Never store the api key [in your code](https://12factor.net/config).
 ```bash
 $ python3 -m pip install requests
 $ export GOOEY_API_KEY=sk-xxxx
 ```
-    
-3. Use this sample code to call the API.    
+
+3. Use this sample code to call the API.
 If you encounter any issues, write to us at support@gooey.ai and make sure to include the full code snippet and the error message.
 ```python
 %s
 ```
             """
-            % py_code
+            % py_code,
+            unsafe_allow_html=True,
         )
 
     with js:
@@ -276,7 +278,7 @@ async function gooeyAPI() {
     if (!response.ok) {
         throw new Error(response.status);
     }
-    
+
     const result = await response.json();
     if (result.status === "completed") {
         console.log(response.status, result);
@@ -302,18 +304,19 @@ async function gooeyAPI() {
             r"""
 1. Generate an api key [below👇](#api-keys)
 
-2. Install [node-fetch](https://www.npmjs.com/package/node-fetch) & add the `GOOEY_API_KEY` to your environment variables.  
-Never store the api key [in your code](https://12factor.net/config) and don't use direcly in the browser.          
+2. Install [node-fetch](https://www.npmjs.com/package/node-fetch) & add the `GOOEY_API_KEY` to your environment variables.
+Never store the api key [in your code](https://12factor.net/config) and don't use direcly in the browser.
 ```bash
 $ npm install node-fetch
 $ export GOOEY_API_KEY=sk-xxxx
 ```
 
-3. Use this sample code to call the API.    
+3. Use this sample code to call the API.
 If you encounter any issues, write to us at support@gooey.ai and make sure to include the full code snippet and the error message.
 ```js
 %s
 ```
             """
-            % js_code
+            % js_code,
+            unsafe_allow_html=True,
         )
