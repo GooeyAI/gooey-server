@@ -1092,6 +1092,7 @@ def general_integration_settings(bi: BotIntegration, extra_settings: list = []):
         if "caption" in input:
             st.caption(input["caption"])
 
+    errors = []
     if st.button("Update", key=f"btn_update_{bi.id}"):
         for input in settings:
             field = input["field"]
@@ -1099,13 +1100,13 @@ def general_integration_settings(bi: BotIntegration, extra_settings: list = []):
             if "parse_input" in input:
                 try:
                     value = input["parse_input"](value)
+                    bi.__setattr__(field, value)
                 except Exception:
                     field_name = BotIntegration._meta.get_field(field).verbose_name
-                    st.error(f"Invalid {field_name}")
-                    return
-            bi.__setattr__(field, value)
-        bi.save()
-        st.experimental_rerun()
+                    errors.append(f"Invalid {field_name}")
+        if not errors:
+            bi.save()
+            st.experimental_rerun()
     if st.button("Reset to Default", key=f"btn_reset_{bi.id}", type="tertiary"):
         for input in settings:
             field = input["field"]
@@ -1119,6 +1120,9 @@ def general_integration_settings(bi: BotIntegration, extra_settings: list = []):
         bi.save()
         st.session_state["__shuffling_keys"] = shuffling_keys
         st.experimental_rerun()
+
+    for error in errors:
+        st.error(error)
 
 
 def show_landbot_widget():
