@@ -356,18 +356,17 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.session_state.get("input_glossary_document")
             or st.session_state.get("output_glossary_document"),
         )
+        glossary_caption = """
+            Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            
+            """
         if st.checkbox(
             """
             📖 Customize with Glossary
             """,
             key="__enable_glossary",
         ):
-            st.markdown(
-                """
-                Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-                If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            
-                """
-            )
+            st.markdown(glossary_caption)
             glossary_input(
                 f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
                 key="input_glossary_document",
@@ -377,6 +376,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 key="output_glossary_document",
             )
         else:
+            st.markdown(glossary_caption)
             st.session_state["input_glossary_document"] = None
             st.session_state["output_glossary_document"] = None
         st.write("---")

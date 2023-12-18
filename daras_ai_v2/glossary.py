@@ -7,12 +7,45 @@ def glossary_input(
     label: str = "##### Glossary",
     key: str = "glossary_document",
 ):
-    return document_uploader(
+    import gooey_ui as st
+
+    old_document: str = st.session_state.get(key, "")
+
+    document: str = document_uploader(
         label=label,
         key=key,
         accept=[".csv", ".xlsx", ".xls", ".gsheet", ".ods", ".tsv"],
         accept_multiple_files=False,
-    )
+    )  # type: ignore
+
+    # Validate glossary: must have at least 2 columns, top row must be language codes or "description" or "pos"
+    # Since this can be slow, only do it if the document has changed
+    if document.strip() and document != old_document:
+        import langcodes
+        from daras_ai_v2.vector_search import (
+            download_content_bytes,
+            bytes_to_df,
+            doc_url_to_metadata,
+        )
+
+        metadata = doc_url_to_metadata(document)
+        f_bytes, ext = download_content_bytes(f_url=document, mime_type=metadata.name)
+        df = bytes_to_df(f_name=metadata.name, f_bytes=f_bytes, ext=ext)
+
+        if len(df.columns) < 2:
+            st.error(
+                f"Invalid glossary: must have at least 2 columns, but has {len(df.columns)}."
+            )
+        for col in df.columns:
+            if col not in ["description", "pos"]:
+                try:
+                    lang = langcodes.Language.get(col).language
+                except langcodes.LanguageTagError:
+                    st.error(
+                        f'Invalid glossary: column header "{col}" is not a valid language code.'
+                    )
+
+    return document
 
 
 def create_glossary(
