@@ -782,6 +782,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         else:
             output_texts = llm_output
 
+        is_first_output = True
         for output in output_texts:
             is_done = True
             if request.stream_llm_output:
@@ -832,14 +833,17 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     output_text,
                     references,
                     citation_style,
-                    add_footnotes=is_done,
+                    add_prefix=is_first_output,
+                    add_suffix=is_done,
                 )
 
             state["output_text"] = output_text
             if request.stream_llm_output:
-                yield f"Streaming output text..."
+                yield "Streaming output text...", {"__is_output_text_complete": is_done}
             else:
                 yield None
+
+            is_first_output = False
 
         state["output_audio"] = []
         state["output_video"] = []
@@ -859,6 +863,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             lip_state["input_audio"] = audio_url
             yield from LipsyncPage().run(lip_state)
             state["output_video"].append(lip_state["output_video"])
+
+    @classmethod
+    def is_output_text_complete(cls, state: dict) -> bool:
+        if "__is_output_text_complete" in state:
+            return state["__is_output_text_complete"]
+        else:
+            return bool(state.get("output_text"))
 
     def get_tabs(self):
         tabs = super().get_tabs()

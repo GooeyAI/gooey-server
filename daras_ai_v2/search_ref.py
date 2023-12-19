@@ -61,7 +61,8 @@ def apply_response_template(
     output_text: list[str],
     references: list[SearchReference],
     citation_style: CitationStyles | None = CitationStyles.number,
-    add_footnotes: bool = True,
+    add_suffix: bool = True,
+    add_prefix: bool = True,
 ):
     for i, text in enumerate(output_text):
         formatted = ""
@@ -141,7 +142,7 @@ def apply_response_template(
                 formatted += " " + cites + " "
             all_refs.update(ref_map)
 
-        if add_footnotes:
+        if add_suffix:
             match citation_style:
                 case CitationStyles.number_markdown:
                     formatted += "\n\n"
@@ -199,9 +200,12 @@ def apply_response_template(
             except KeyError:
                 pass
             else:
-                if not add_footnotes:
-                    # if not adding footnotes, remove the part
-                    # after output_text in the template
+                if not add_prefix:
+                    # if not adding prefix, remove the part before output_text in the template
+                    if match := re.search(r"\{\{\s*output_text\s*\}\}", template):
+                        template = template[match.start() :]
+                if not add_suffix:
+                    # if not adding suffix, remove the part after output_text in the template
                     if match := re.search(r"\{\{\s*output_text\s*\}\}", template):
                         template = template[: match.end()]
                 formatted = jinja2.Template(template).render(

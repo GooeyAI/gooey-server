@@ -53,17 +53,19 @@ def realtime_subscribe(
     pubsub = r.pubsub()
     pubsub.subscribe(channel)
     logger.info(f"subscribe {channel=}")
-    while True:
-        message = pubsub.get_message(timeout=10)
-        if message and message["type"] == "message":
-            state = json.loads(r.get(channel))
-            logger.info(f"realtime_subscribe: received message")
-            yield state
-            if unsubscribe_condition(state):
-                break
-    logger.info(f"unsubscribe {channel=}")
-    pubsub.unsubscribe(channel)
-    pubsub.close()
+    try:
+        while True:
+            message = pubsub.get_message(timeout=10)
+            if message and message["type"] == "message":
+                state = json.loads(r.get(channel))
+                logger.info(f"realtime_subscribe: received message")
+                yield state
+                if unsubscribe_condition(state):
+                    break
+    finally:
+        logger.info(f"unsubscribe {channel=}")
+        pubsub.unsubscribe(channel)
+        pubsub.close()
 
 
 # def use_state(

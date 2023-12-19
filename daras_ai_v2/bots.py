@@ -66,6 +66,7 @@ TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
 class VideoBotsResponseChunk(typing.TypedDict):
     response: VideoBotsPage.ResponseModel
     full_output_text: str
+    is_streaming_text_done: bool
 
 
 async def request_json(request: Request):
@@ -103,7 +104,7 @@ class BotInterface:
         should_translate: bool = False,
         default: str = DEFAULT_RESPONSE,
     ):
-        if not (text or audio or video or documents):
+        if not (text or audio or video or documents or buttons):
             text = default
         return self.send_msg(
             text=text,
@@ -329,12 +330,16 @@ def _process_and_send_msg(
         bot.send_msg(text=ERROR_MSG.format(e))
         return
 
-    response_chunk, first_msg_id = None, None
+    response_chunk, last_text_msg_id = None, None
     for response_chunk in responses:
         response = response_chunk["response"]
 
-        # add feedback buttons to the first message
-        if bot.show_feedback_buttons and not first_msg_id:
+        # add feedback buttons to the last message
+        if (
+            bot.show_feedback_buttons
+            and not last_text_msg_id
+            and response_chunk["is_streaming_text_done"]
+        ):
             buttons = _feedback_start_buttons()
         else:
             buttons = []
@@ -348,8 +353,8 @@ def _process_and_send_msg(
             buttons=buttons,
         )
 
-        if not first_msg_id:
-            first_msg_id = msg_id
+        if not last_text_msg_id and response_chunk["is_streaming_text_done"]:
+            last_text_msg_id = msg_id
 
     if response_chunk:
         response = response_chunk["response"]
@@ -361,7 +366,7 @@ def _process_and_send_msg(
             input_images=input_images,
             input_text=input_text,
             speech_run=speech_run,
-            platform_msg_id=first_msg_id,
+            platform_msg_id=last_text_msg_id,
             response=response,
             url=url,
         )
@@ -457,6 +462,7 @@ def _process_msg(
         state = {}
         full_output_text = ""
         streamed_text_length = 0
+        streamed_last_output_text = False
         for state in realtime_subscribe(
             channel,
             unsubscribe_condition=unsubscribe_condition,
@@ -471,17 +477,29 @@ def _process_msg(
                 state["output_text"][0] = full_output_text[streamed_text_length:]
                 streamed_text_length += len(state["output_text"][0])
 
+                is_output_text_complete = VideoBotsPage.is_output_text_complete(state)
                 if state["output_text"][0]:
                     yield VideoBotsResponseChunk(
                         response=page_cls.ResponseModel.parse_obj(state),
                         full_output_text=full_output_text,
+                        is_streaming_text_done=is_output_text_complete,
                     )
+                elif is_output_text_complete and not streamed_last_output_text:
+                    yield VideoBotsResponseChunk(
+                        response=page_cls.ResponseModel.parse_obj(state),
+                        full_output_text=full_output_text,
+                        is_streaming_text_done=is_output_text_complete,
+                    )
+
+                if not streamed_last_output_text:
+                    streamed_last_output_text = is_output_text_complete
 
         if state and (state.get("output_audio") or state.get("output_video")):
             # the last state -- this includes audio / video if any
             yield VideoBotsResponseChunk(
                 response=page_cls.ResponseModel.parse_obj(state),
                 full_output_text=full_output_text,
+                is_streaming_text_done=VideoBotsPage.is_output_text_complete(state),
             )
 
     return messages_iterator(), url
