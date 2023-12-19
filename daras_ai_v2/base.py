@@ -1383,6 +1383,32 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         run_status = st.session_state.get(StateKeys.run_status)
         st.caption("Your changes are saved in the above URL. Save it for later!")
         html_spinner(run_status)
+        self.render_extra_waiting_output()
+
+    def render_extra_waiting_output(self):
+        estimated_run_time = self.estimate_run_duration()
+        if not estimated_run_time:
+            return
+        if created_at := st.session_state.get("created_at"):
+            if isinstance(created_at, datetime.datetime):
+                start_time = created_at
+            else:
+                start_time = datetime.datetime.fromisoformat(created_at)
+            with st.countdown_timer(
+                end_time=start_time + datetime.timedelta(seconds=estimated_run_time),
+                delay_text="Sorry for the wait. Your run is taking longer than we expected.",
+            ):
+                if self.is_current_user_owner() and self.request.user.email:
+                    st.write(
+                        f"""We'll email **{self.request.user.email}** when your workflow is done."""
+                    )
+                st.write(
+                    f"""In the meantime, check out [🚀 Examples]({self.get_tab_url(MenuTabs.examples)})
+                      for inspiration."""
+                )
+
+    def estimate_run_duration(self) -> int | None:
+        pass
 
     def on_submit(self):
         example_id, run_id, uid = self.create_new_run()
