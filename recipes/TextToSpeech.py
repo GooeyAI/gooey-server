@@ -71,6 +71,8 @@ class TextToSpeechPage(BasePage):
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
+        elevenlabs_style: float | None
+        elevenlabs_speaker_boost: bool | None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -268,6 +270,14 @@ class TextToSpeechPage(BasePage):
 
                 stability = state.get("elevenlabs_stability", 0.5)
                 similarity_boost = state.get("elevenlabs_similarity_boost", 0.75)
+                voice_settings = dict(
+                    stability=stability, similarity_boost=similarity_boost
+                )
+                if voice_model == "eleven_multilingual_v2":
+                    voice_settings["style"] = state.get("elevenlabs_style", 0.0)
+                    voice_settings["speaker_boost"] = state.get(
+                        "elevenlabs_speaker_boost", True
+                    )
 
                 response = requests.post(
                     f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
@@ -278,10 +288,7 @@ class TextToSpeechPage(BasePage):
                     json={
                         "text": text,
                         "model_id": voice_model,
-                        "voice_settings": {
-                            "stability": stability,
-                            "similarity_boost": similarity_boost,
-                        },
+                        "voice_settings": voice_settings,
                     },
                 )
                 response.raise_for_status()
