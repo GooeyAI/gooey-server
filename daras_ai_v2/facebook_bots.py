@@ -86,18 +86,20 @@ class WhatsappBot(BotInterface):
     def send_msg(
         self,
         *,
-        text: str = None,
-        audio: str = None,
-        video: str = None,
-        buttons: list[ReplyButton] = None,
-        documents: list[str] = None,
+        text: str | None = None,
+        audio: str | None = None,
+        video: str | None = None,
+        buttons: list[ReplyButton] | None = None,
+        documents: list[str] | None = None,
         should_translate: bool = False,
     ) -> str | None:
         if text and should_translate and self.language and self.language != "en":
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
-        text = text or "\u200b"  # handle empty text with zero-width space
+        if not text:
+            # handle empty text with zero-width space (required with buttons)
+            text = "\u200b" if buttons else ""
         return send_wa_msg(
             bot_number=self.bot_id,
             user_number=self.user_id,
@@ -117,10 +119,10 @@ def send_wa_msg(
     bot_number: str,
     user_number: str,
     text: str,
-    audio: str = None,
-    video: str = None,
-    documents: list[str] = None,
-    buttons: list[ReplyButton] = None,
+    audio: str | None = None,
+    video: str | None = None,
+    documents: list[str] | None = None,
+    buttons: list[ReplyButton] | None = None,
 ) -> str | None:
     # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
 
@@ -146,50 +148,35 @@ def send_wa_msg(
             ],
         )
 
-    if video:
-        if buttons:
-            messages = [
-                # interactive text msg + video in header
-                _build_msg_buttons(
-                    buttons,
-                    {
-                        "body": {
-                            "text": text,
-                        },
-                        "header": {
-                            "type": "video",
-                            "video": {"link": video},
-                        },
-                    },
-                ),
-            ]
-        else:
-            messages = [
-                # simple video msg + text caption
+    messages = []
+    if video and buttons:
+        messages.append(
+            # interactive text msg + video in header
+            _build_msg_buttons(
+                buttons,
                 {
-                    "type": "video",
-                    "video": {
-                        "link": video,
-                        "caption": text,
+                    "body": {
+                        "text": text,
+                    },
+                    "header": {
+                        "type": "video",
+                        "video": {"link": video},
                     },
                 },
-            ]
-    elif audio:
-        if buttons:
-            # audio can't be sent as an interaction, so send text and audio separately
-            messages = [
+            ),
+        )
+    else:
+        if audio:
+            messages.append(
                 # simple audio msg
                 {
                     "type": "audio",
                     "audio": {"link": audio},
                 },
-            ]
-            send_wa_msgs_raw(
-                bot_number=bot_number,
-                user_number=user_number,
-                messages=messages,
             )
-            messages = [
+
+        if buttons:
+            messages.append(
                 # interactive text msg
                 _build_msg_buttons(
                     buttons,
@@ -199,10 +186,9 @@ def send_wa_msg(
                         },
                     },
                 )
-            ]
-        else:
-            # audio doesn't support captions, so send text and audio separately
-            messages = [
+            )
+        elif text:
+            messages.append(
                 # simple text msg
                 {
                     "type": "text",
@@ -210,38 +196,8 @@ def send_wa_msg(
                         "body": text,
                         "preview_url": True,
                     },
-                },
-                # simple audio msg
-                {
-                    "type": "audio",
-                    "audio": {"link": audio},
-                },
-            ]
-    else:
-        # text message
-        if buttons:
-            messages = [
-                # interactive text msg
-                _build_msg_buttons(
-                    buttons,
-                    {
-                        "body": {
-                            "text": text,
-                        }
-                    },
-                ),
-            ]
-        else:
-            messages = [
-                # simple text msg
-                {
-                    "type": "text",
-                    "text": {
-                        "body": text,
-                        "preview_url": True,
-                    },
-                },
-            ]
+                }
+            )
 
     if documents:
         messages += [
