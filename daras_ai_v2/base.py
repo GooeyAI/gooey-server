@@ -455,7 +455,11 @@ class BasePage:
 
         if publish_button:
             recipe_title = self.get_root_published_run().title or self.title
-            if published_run_title.strip() == recipe_title.strip():
+            is_root_published_run = is_update_mode and published_run.is_root_example()
+            if (
+                not is_root_published_run
+                and published_run_title.strip() == recipe_title.strip()
+            ):
                 st.error("Title can't be the same as the recipe title")
                 return
             if not is_update_mode:
