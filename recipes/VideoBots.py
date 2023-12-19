@@ -746,7 +746,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         yield f"Running {model.value}..."
         if is_chat_model:
-            output_texts = run_language_model(
+            llm_output = run_language_model(
                 model=request.selected_model,
                 messages=[
                     {"role": s["role"], "content": s["content"]}
@@ -763,7 +763,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             prompt = "\n".join(
                 format_chatml_message(entry) for entry in prompt_messages
             )
-            output_texts = run_language_model(
+            llm_output = run_language_model(
                 model=request.selected_model,
                 prompt=prompt,
                 max_tokens=max_allowed_tokens,
@@ -774,29 +774,45 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
             )
 
-        if isinstance(output_texts, list):
-            output_texts = iter([output_texts])
+        output_texts: typing.Iterator[
+            tuple[list[str], bool] | list[str] | tuple[list[str], list[list[dict]]]
+        ]
+        if isinstance(llm_output, list) or isinstance(llm_output, tuple):
+            output_texts = iter([llm_output])
+        else:
+            output_texts = llm_output
 
-        for output_text in output_texts:
-            if request.tools:
-                output_text, tool_call_choices = output_text
+        for output in output_texts:
+            is_done = True
+            if request.stream_llm_output:
+                # tuple[list[str], bool]
+                assert isinstance(output, tuple)
+                raw_output_text, is_done = output
+            elif request.tools:
+                # tuple[list[str], list[list[dict]]]
+                assert isinstance(output, tuple)
+                raw_output_text, tool_call_choices = output
                 state["output_documents"] = output_documents = []
                 for tool_calls in tool_call_choices:
                     for call in tool_calls:
                         result = yield from exec_tool_call(call)
                         output_documents.append(result)
+            else:
+                # list[str]
+                assert isinstance(output, list)
+                raw_output_text = output
 
             # save model response
             state["raw_output_text"] = [
                 "".join(snippet for snippet, _ in parse_refs(text, references))
-                for text in output_text
+                for text in raw_output_text
             ]
 
             # translate response text
             if request.user_language and request.user_language != "en":
                 yield f"Translating response to {request.user_language}..."
                 output_text = run_google_translate(
-                    texts=output_text,
+                    texts=raw_output_text,
                     source_language="en",
                     target_language=request.user_language,
                     glossary_url=request.output_glossary_document,
@@ -805,12 +821,19 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     "".join(snippet for snippet, _ in parse_refs(text, references))
                     for text in output_text
                 ]
+            else:
+                output_text = raw_output_text
 
             if references:
                 citation_style = (
                     request.citation_style and CitationStyles[request.citation_style]
                 ) or None
-                apply_response_template(output_text, references, citation_style)
+                apply_response_template(
+                    output_text,
+                    references,
+                    citation_style,
+                    add_footnotes=is_done,
+                )
 
             state["output_text"] = output_text
             if request.stream_llm_output:

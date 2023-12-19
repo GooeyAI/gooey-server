@@ -61,6 +61,7 @@ def apply_response_template(
     output_text: list[str],
     references: list[SearchReference],
     citation_style: CitationStyles | None = CitationStyles.number,
+    add_footnotes: bool = True,
 ):
     for i, text in enumerate(output_text):
         formatted = ""
@@ -135,59 +136,62 @@ def apply_response_template(
                     cites = ""
                 case _:
                     raise ValueError(f"Unknown citation style: {citation_style}")
-            formatted += snippet + " " + cites + " "
+            formatted += snippet
+            if cites:
+                formatted += " " + cites + " "
             all_refs.update(ref_map)
 
-        match citation_style:
-            case CitationStyles.number_markdown:
-                formatted += "\n\n"
-                formatted += "\n".join(
-                    f"[{ref_num}] {ref_to_markdown(ref)}"
-                    for ref_num, ref in sorted(all_refs.items())
-                )
-            case CitationStyles.number_html:
-                formatted += "<br><br>"
-                formatted += "<br>".join(
-                    f"[{ref_num}] {ref_to_html(ref)}"
-                    for ref_num, ref in sorted(all_refs.items())
-                )
-            case CitationStyles.number_slack_mrkdwn:
-                formatted += "\n\n"
-                formatted += "\n".join(
-                    f"[{ref_num}] {ref_to_slack_mrkdwn(ref)}"
-                    for ref_num, ref in sorted(all_refs.items())
-                )
-            case CitationStyles.number_plaintext:
-                formatted += "\n\n"
-                formatted += "\n".join(
-                    f'{ref_num}. {ref["title"]} {ref["url"]}'
-                    for ref_num, ref in sorted(all_refs.items())
-                )
+        if add_footnotes:
+            match citation_style:
+                case CitationStyles.number_markdown:
+                    formatted += "\n\n"
+                    formatted += "\n".join(
+                        f"[{ref_num}] {ref_to_markdown(ref)}"
+                        for ref_num, ref in sorted(all_refs.items())
+                    )
+                case CitationStyles.number_html:
+                    formatted += "<br><br>"
+                    formatted += "<br>".join(
+                        f"[{ref_num}] {ref_to_html(ref)}"
+                        for ref_num, ref in sorted(all_refs.items())
+                    )
+                case CitationStyles.number_slack_mrkdwn:
+                    formatted += "\n\n"
+                    formatted += "\n".join(
+                        f"[{ref_num}] {ref_to_slack_mrkdwn(ref)}"
+                        for ref_num, ref in sorted(all_refs.items())
+                    )
+                case CitationStyles.number_plaintext:
+                    formatted += "\n\n"
+                    formatted += "\n".join(
+                        f'{ref_num}. {ref["title"]} {ref["url"]}'
+                        for ref_num, ref in sorted(all_refs.items())
+                    )
 
-            case CitationStyles.symbol_markdown:
-                formatted += "\n\n"
-                formatted += "\n".join(
-                    f"{generate_footnote_symbol(ref_num - 1)} {ref_to_markdown(ref)}"
-                    for ref_num, ref in sorted(all_refs.items())
-                )
-            case CitationStyles.symbol_html:
-                formatted += "<br><br>"
-                formatted += "<br>".join(
-                    f"{generate_footnote_symbol(ref_num - 1)} {ref_to_html(ref)}"
-                    for ref_num, ref in sorted(all_refs.items())
-                )
-            case CitationStyles.symbol_slack_mrkdwn:
-                formatted += "\n\n"
-                formatted += "\n".join(
-                    f"{generate_footnote_symbol(ref_num - 1)} {ref_to_slack_mrkdwn(ref)}"
-                    for ref_num, ref in sorted(all_refs.items())
-                )
-            case CitationStyles.symbol_plaintext:
-                formatted += "\n\n"
-                formatted += "\n".join(
-                    f'{generate_footnote_symbol(ref_num - 1)}. {ref["title"]} {ref["url"]}'
-                    for ref_num, ref in sorted(all_refs.items())
-                )
+                case CitationStyles.symbol_markdown:
+                    formatted += "\n\n"
+                    formatted += "\n".join(
+                        f"{generate_footnote_symbol(ref_num - 1)} {ref_to_markdown(ref)}"
+                        for ref_num, ref in sorted(all_refs.items())
+                    )
+                case CitationStyles.symbol_html:
+                    formatted += "<br><br>"
+                    formatted += "<br>".join(
+                        f"{generate_footnote_symbol(ref_num - 1)} {ref_to_html(ref)}"
+                        for ref_num, ref in sorted(all_refs.items())
+                    )
+                case CitationStyles.symbol_slack_mrkdwn:
+                    formatted += "\n\n"
+                    formatted += "\n".join(
+                        f"{generate_footnote_symbol(ref_num - 1)} {ref_to_slack_mrkdwn(ref)}"
+                        for ref_num, ref in sorted(all_refs.items())
+                    )
+                case CitationStyles.symbol_plaintext:
+                    formatted += "\n\n"
+                    formatted += "\n".join(
+                        f'{generate_footnote_symbol(ref_num - 1)}. {ref["title"]} {ref["url"]}'
+                        for ref_num, ref in sorted(all_refs.items())
+                    )
 
         for ref_num, ref in all_refs.items():
             try:
@@ -195,11 +199,17 @@ def apply_response_template(
             except KeyError:
                 pass
             else:
+                if not add_footnotes:
+                    # if not adding footnotes, remove the part
+                    # after output_text in the template
+                    if match := re.search(r"\{\{\s*output_text\s*\}\}", template):
+                        template = template[: match.end()]
                 formatted = jinja2.Template(template).render(
                     **ref,
                     output_text=formatted,
                     ref_num=ref_num,
                 )
+            print(f"{ref_num=}, {ref=}, {formatted=}")
         output_text[i] = formatted
 
 

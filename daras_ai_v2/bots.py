@@ -63,6 +63,11 @@ FEEDBACK_CONFIRMED_MSG = (
 TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
 
 
+class VideoBotsResponseChunk(typing.TypedDict):
+    response: VideoBotsPage.ResponseModel
+    full_output_text: str
+
+
 async def request_json(request: Request):
     return await request.json()
 
@@ -324,23 +329,39 @@ def _process_and_send_msg(
         bot.send_msg(text=ERROR_MSG.format(e))
         return
 
-    for response in responses:
+    response_chunk, first_msg_id = None, None
+    for response_chunk in responses:
+        response = response_chunk["response"]
+
+        # add feedback buttons to the first message
+        if bot.show_feedback_buttons and not first_msg_id:
+            buttons = _feedback_start_buttons()
+        else:
+            buttons = []
+
         # send the response to the user
         msg_id = bot.send_msg_or_default(
-            text=response.output_text and response.output_text[0],
-            audio=response.output_audio and response.output_audio[0],
-            video=response.output_video and response.output_video[0],
+            text=response.output_text and response.output_text[0] or "",
+            audio=response.output_audio and response.output_audio[0] or "",
+            video=response.output_video and response.output_video[0] or "",
             documents=response.output_documents or [],
-            buttons=_feedback_start_buttons() if bot.show_feedback_buttons else None,
+            buttons=buttons,
         )
 
+        if not first_msg_id:
+            first_msg_id = msg_id
+
+    if response_chunk:
+        response = response_chunk["response"]
+
         # save msgs to db
+        response.output_text[0] = response_chunk["full_output_text"]
         _save_msgs(
             bot=bot,
             input_images=input_images,
             input_text=input_text,
             speech_run=speech_run,
-            platform_msg_id=msg_id,
+            platform_msg_id=first_msg_id,
             response=response,
             url=url,
         )
@@ -403,7 +424,7 @@ def _process_msg(
     input_text: str,
     user_language: str,
     speech_run: str | None,
-) -> tuple[typing.Iterator[VideoBotsPage.ResponseModel], str]:
+) -> tuple[typing.Iterator[VideoBotsResponseChunk], str]:
     from routers.api import call_api
 
     # get latest messages for context (upto 100)
@@ -431,10 +452,10 @@ def _process_msg(
 
     def messages_iterator():
         def unsubscribe_condition(msg):
-            print(f"msg: {msg}")
             return VideoBotsPage.get_run_state(msg) == RecipeRunState.completed
 
         state = {}
+        full_output_text = ""
         streamed_text_length = 0
         for state in realtime_subscribe(
             channel,
@@ -446,15 +467,22 @@ def _process_msg(
                 state.setdefault("output_audio", [])
                 state.setdefault("output_video", [])
 
-                state["output_text"][0] = state["output_text"][0][streamed_text_length:]
+                full_output_text = state["output_text"][0]
+                state["output_text"][0] = full_output_text[streamed_text_length:]
                 streamed_text_length += len(state["output_text"][0])
 
                 if state["output_text"][0]:
-                    yield page_cls.ResponseModel.parse_obj(state)
+                    yield VideoBotsResponseChunk(
+                        response=page_cls.ResponseModel.parse_obj(state),
+                        full_output_text=full_output_text,
+                    )
 
         if state and (state.get("output_audio") or state.get("output_video")):
             # the last state -- this includes audio / video if any
-            yield page_cls.ResponseModel.parse_obj(state)
+            yield VideoBotsResponseChunk(
+                response=page_cls.ResponseModel.parse_obj(state),
+                full_output_text=full_output_text,
+            )
 
     return messages_iterator(), url
 

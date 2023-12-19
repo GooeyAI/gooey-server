@@ -328,7 +328,7 @@ def run_language_model(
     tools: list[LLMTools] | None = None,
     response_format_type: typing.Literal["text", "json_object"] = "text",
     stream: bool = False,
-) -> Iterator[list[str]] | list[str] | tuple[list[str], list[list[dict]]]:
+) -> Iterator[tuple[list[str], bool]] | list[str] | tuple[list[str], list[list[dict]]]:
     assert bool(prompt) != bool(
         messages
     ), "Pleave provide exactly one of { prompt, messages }"
@@ -347,6 +347,7 @@ def run_language_model(
         else:
             # if input is chatml, convert it into json messages
             is_chatml, messages = parse_chatml(prompt)  # type: ignore
+
         messages = messages or []
         logger.info(f"{model_name=}, {len(messages)=}, {max_tokens=}, {temperature=}")
         if not llm.is_vision_model():
@@ -416,7 +417,11 @@ def run_language_model(
 
 def _stream_outputs(
     num_outputs: int, result: typing.Iterator[list[str]]
-) -> Iterator[list[str]]:
+) -> Iterator[tuple[list[str], bool]]:
+    """
+    Returns an iterator of (outputs, is_done) where is_done
+    is only True on the final iteration.
+    """
     outputs: list[str] = ["" for _ in range(num_outputs)]
     streamed_text_lengths: list[int] = [0 for _ in range(num_outputs)]
     streamed_text_counts: list[int] = [0 for _ in range(num_outputs)]
@@ -430,9 +435,9 @@ def _stream_outputs(
                 streamed_text_lengths[i] = breaking_index
                 streamed_text_counts[i] += 1
                 outputs[i] = updated_text[: breaking_index + 1]
-                yield outputs
+                yield outputs, False
 
-    yield updated_texts
+    yield updated_texts, True
 
 
 def _get_breaking_index(text: str, streamed_length: int, streamed_count: int):

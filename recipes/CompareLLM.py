@@ -108,7 +108,8 @@ class CompareLLMPage(BasePage):
                 stream=request.stream_llm_output,
             )
             if request.stream_llm_output:
-                for outputs in result:
+                assert isinstance(result, typing.Iterator)
+                for outputs, _is_done in result:
                     output_text[selected_model] = outputs
                     yield None
             else:
