@@ -1377,25 +1377,8 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_running_output(self):
         run_status = st.session_state.get(StateKeys.run_status)
-        if run_status:
-            st.caption("Your changes are saved in the above URL. Save it for later!")
-            html_spinner(run_status)
-        else:
-            err_msg = st.session_state.get(StateKeys.error_msg)
-            run_time = st.session_state.get(StateKeys.run_time, 0)
-
-            # render errors
-            if err_msg is not None:
-                st.error(err_msg, unsafe_allow_html=True)
-            # render run time
-            elif run_time:
-                st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
-
-        # render outputs
-        self.render_output()
-
-        if not run_status:
-            self._render_after_output()
+        st.caption("Your changes are saved in the above URL. Save it for later!")
+        html_spinner(run_status)
 
     def on_submit(self):
         example_id, run_id, uid = self.create_new_run()
