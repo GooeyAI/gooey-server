@@ -1591,7 +1591,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             workflow=self.workflow,
             visibility=PublishedRunVisibility.PUBLIC,
             is_approved_example=True,
-        )[:50]
+        ).exclude(published_run_id="")[:50]
 
         grid_layout(3, example_runs, _render)
 

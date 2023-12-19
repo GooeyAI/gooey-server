@@ -1034,6 +1034,14 @@ class PublishedRun(models.Model):
             models.Index(fields=["workflow", "created_by"]),
             models.Index(fields=["workflow", "published_run_id"]),
             models.Index(fields=["workflow", "visibility", "is_approved_example"]),
+            models.Index(
+                fields=[
+                    "workflow",
+                    "visibility",
+                    "is_approved_example",
+                    "published_run_id",
+                ]
+            ),
         ]
 
     def __str__(self):
