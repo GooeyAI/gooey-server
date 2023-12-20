@@ -380,8 +380,6 @@ def run_asr(
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding
 
-    return "మిరుపు పంటలో రసం పిల్చే పురుగులను అరికట్టడానికి ఎటువంటి కషాయాలు వాడాలి"
-
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
     is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
