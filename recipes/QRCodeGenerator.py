@@ -66,7 +66,7 @@ class QRCodeGeneratorPage(BasePage):
             ControlNetModels.sd_controlnet_depth.name,
             ControlNetModels.sd_controlnet_tile.name,
         ],
-        inspiration_strength=0.3,
+        image_prompt_strength=0.3,
     )
 
     def __init__(self, *args, **kwargs):
@@ -87,7 +87,7 @@ class QRCodeGeneratorPage(BasePage):
         image_prompt_controlnet_models: list[
             typing.Literal[tuple(e.name for e in ControlNetModels)], ...
         ] | None
-        inspiration_strength: float | None
+        image_prompt_strength: float | None
 
         selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
         selected_controlnet_model: list[
@@ -357,7 +357,7 @@ Here is the final output:
                 min_value=0.0,
                 max_value=1.0,
                 step=0.05,
-                key="inspiration_strength",
+                key="image_prompt_strength",
             )
             enum_multiselect(
                 ControlNetModels,
@@ -432,7 +432,7 @@ Here is the final output:
             )
             request.selected_controlnet_model += request.image_prompt_controlnet_models
             request.controlnet_conditioning_scale += [
-                request.inspiration_strength
+                request.image_prompt_strength
             ] * len(request.image_prompt_controlnet_models)
         state["output_images"] = controlnet(
             selected_model=request.selected_model,
