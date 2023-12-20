@@ -67,6 +67,9 @@ class QRCodeGeneratorPage(BasePage):
             ControlNetModels.sd_controlnet_tile.name,
         ],
         image_prompt_strength=0.3,
+        image_prompt_scale=1.0,
+        image_prompt_pos_x=0.5,
+        image_prompt_pos_y=0.5,
     )
 
     def __init__(self, *args, **kwargs):
@@ -88,6 +91,9 @@ class QRCodeGeneratorPage(BasePage):
             typing.Literal[tuple(e.name for e in ControlNetModels)], ...
         ] | None
         image_prompt_strength: float | None
+        image_prompt_scale: float | None
+        image_prompt_pos_x: float | None
+        image_prompt_pos_y: float | None
 
         selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
         selected_controlnet_model: list[
@@ -366,6 +372,55 @@ Here is the final output:
                 checkboxes=False,
                 allow_none=False,
             )
+            st.write(
+                """
+                ##### ⌖ Positioning
+                Use this to control where the reference image is placed, and how big it should be.
+                """,
+                className="gui-input",
+            )
+            col1, _ = st.columns(2)
+            with col1:
+                image_prompt_scale = st.slider(
+                    "Scale",
+                    min_value=0.1,
+                    max_value=1.0,
+                    step=0.05,
+                    key="image_prompt_scale",
+                )
+            col1, col2 = st.columns(2, responsive=False)
+            with col1:
+                image_prompt_pos_x = st.slider(
+                    "Position X",
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.05,
+                    key="image_prompt_pos_x",
+                )
+            with col2:
+                image_prompt_pos_y = st.slider(
+                    "Position Y",
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.05,
+                    key="image_prompt_pos_y",
+                )
+
+            img_cv2 = mask_cv2 = bytes_to_cv2_img(
+                requests.get(st.session_state["image_prompt"]).content,
+            )
+            repositioning_preview_widget(
+                img_cv2=img_cv2,
+                mask_cv2=mask_cv2,
+                obj_scale=image_prompt_scale,
+                pos_x=image_prompt_pos_x,
+                pos_y=image_prompt_pos_y,
+                out_size=(
+                    st.session_state["output_width"],
+                    st.session_state["output_height"],
+                ),
+                color=255,
+            )
 
     def render_output(self):
         state = st.session_state
@@ -427,6 +482,28 @@ Here is the final output:
             request.selected_controlnet_model = [request.selected_controlnet_model]
         init_images = [image] * len(request.selected_controlnet_model)
         if request.image_prompt:
+            if (
+                request.image_prompt_scale != 1.0
+                or request.image_prompt_pos_x != 0.5
+                or request.image_prompt_pos_y != 0.5
+            ):
+                # we only need to reposition if the user moved/scaled the image
+                image_prompt = bytes_to_cv2_img(
+                    requests.get(request.image_prompt).content
+                )
+                repositioned_image_prompt, _ = reposition_object(
+                    orig_img=image_prompt,
+                    orig_mask=image_prompt,
+                    out_size=(request.output_width, request.output_height),
+                    out_obj_scale=request.image_prompt_scale,
+                    out_pos_x=request.image_prompt_pos_x,
+                    out_pos_y=request.image_prompt_pos_y,
+                    color=255,
+                )
+                request.image_prompt = upload_file_from_bytes(
+                    "repositioned_image_prompt.png",
+                    cv2_img_to_bytes(repositioned_image_prompt),
+                )
             init_images += [request.image_prompt] * len(
                 request.image_prompt_controlnet_models
             )
