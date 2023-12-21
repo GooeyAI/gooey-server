@@ -3,11 +3,45 @@ from daras_ai_v2.asr import google_translate_languages
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 
 
+def validate_glossary_document(
+    *,
+    document: str,
+):
+    """
+    Throws for the most common errors in a glossary document.
+    I.e. the glossary must have at least 2 columns, top row must be language codes or "description" or "pos"
+    """
+    import langcodes
+    from daras_ai_v2.vector_search import (
+        download_content_bytes,
+        bytes_to_df,
+        doc_url_to_metadata,
+    )
+
+    metadata = doc_url_to_metadata(document)
+    f_bytes, ext = download_content_bytes(f_url=document, mime_type=metadata.name)
+    df = bytes_to_df(f_name=metadata.name, f_bytes=f_bytes, ext=ext)
+
+    if len(df.columns) < 2:
+        raise ValueError(
+            f"Invalid glossary: must have at least 2 columns, but has {len(df.columns)}."
+        )
+    for col in df.columns:
+        if col not in ["description", "pos"]:
+            try:
+                langcodes.Language.get(col).language
+            except langcodes.LanguageTagError:
+                raise ValueError(
+                    f'Invalid glossary: column header "{col}" is not a valid language code.'
+                )
+
+
 def glossary_input(
     label: str = "##### Glossary",
     key: str = "glossary_document",
 ):
     import gooey_ui as st
+    from daras_ai_v2.base import StateKeys
 
     old_document: str = st.session_state.get(key, "")
 
@@ -18,32 +52,39 @@ def glossary_input(
         accept_multiple_files=False,
     )  # type: ignore
 
-    # Validate glossary: must have at least 2 columns, top row must be language codes or "description" or "pos"
-    # Since this can be slow, only do it if the document has changed
-    if document.strip() and document != old_document:
-        import langcodes
-        from daras_ai_v2.vector_search import (
-            download_content_bytes,
-            bytes_to_df,
-            doc_url_to_metadata,
-        )
+    if not document.strip():
+        return document
 
-        metadata = doc_url_to_metadata(document)
-        f_bytes, ext = download_content_bytes(f_url=document, mime_type=metadata.name)
-        df = bytes_to_df(f_name=metadata.name, f_bytes=f_bytes, ext=ext)
+    # Validate glossary -- since this can be slow, only do it if the document has changed
+    inline_error_msgs = st.session_state.get(StateKeys.inline_error_msgs, {})
+    if document.strip() != old_document.strip():
+        # new document, we need to re-validate
+        if key in inline_error_msgs:
+            del inline_error_msgs[key]
+        try:
+            validate_glossary_document(document=document)
+        except Exception as e:
+            inline_error_msgs[key] = str(e)
+        st.session_state[StateKeys.inline_error_msgs] = inline_error_msgs
 
-        if len(df.columns) < 2:
-            st.error(
-                f"Invalid glossary: must have at least 2 columns, but has {len(df.columns)}."
-            )
-        for col in df.columns:
-            if col not in ["description", "pos"]:
-                try:
-                    lang = langcodes.Language.get(col).language
-                except langcodes.LanguageTagError:
-                    st.error(
-                        f'Invalid glossary: column header "{col}" is not a valid language code.'
-                    )
+    if key in inline_error_msgs:
+        # even if the document hasn't changed, there could still be errors from a previous time the run was validated, so we always need to check the error session dict
+        st.error(inline_error_msgs[key])
+    else:
+        st.success("Glossary is valid.")
+
+    # in addition to checking when the user uploads a new document, we also give them the option to force a reload in case they changed the file in place
+    if st.button(
+        "Re-validate glossary", key=f"revalidate_{key}", style={"display": "block"}
+    ):
+        if key in inline_error_msgs:
+            del inline_error_msgs[key]
+        try:
+            validate_glossary_document(document=document)
+        except Exception as e:
+            inline_error_msgs[key] = str(e)
+        st.session_state[StateKeys.inline_error_msgs] = inline_error_msgs
+        st.experimental_rerun()
 
     return document
 

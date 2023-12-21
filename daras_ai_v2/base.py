@@ -87,6 +87,7 @@ class StateKeys:
     updated_at = "updated_at"
 
     error_msg = "__error_msg"
+    inline_error_msgs = "__inline_error_msgs"
     run_time = "__run_time"
     run_status = "__run_status"
     pressed_randomize = "__randomize"
@@ -579,8 +580,19 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
                 return False
             try:
                 self.validate_form_v2()
+                inline_errors = "\n  \n".join(
+                    [
+                        str(v)
+                        for v in st.session_state.get(
+                            StateKeys.inline_error_msgs, {}
+                        ).values()
+                    ]
+                )
+                assert (
+                    not inline_errors
+                ), f"There are inline errors. Please fix them before submitting:\n  \n{inline_errors}"
             except AssertionError as e:
-                st.error(e)
+                st.error(str(e))
                 return False
             else:
                 return True
