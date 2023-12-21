@@ -1040,11 +1040,6 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
 
 def general_integration_settings(bi: BotIntegration, extra_settings: list = []):
-    import random
-
-    # state logic does not allow overwriting some inputs, so we need to shuffle the keys
-    shuffling_keys = st.session_state.get("__shuffling_keys", {})
-
     settings = extra_settings + [
         {
             "field": "user_language",
@@ -1082,8 +1077,7 @@ def general_integration_settings(bi: BotIntegration, extra_settings: list = []):
 
     for input in settings:
         field = input["field"]
-        input["key"] = field + "_" + str(bi.id)
-        key = shuffling_keys.get(input["key"], input["key"])
+        key = input["key"] = "botintegration_" + field + "_" + str(bi.id)
         value = input["value"]
 
         st.session_state.setdefault(key, value)
@@ -1100,10 +1094,10 @@ def general_integration_settings(bi: BotIntegration, extra_settings: list = []):
             if "parse_input" in input:
                 try:
                     value = input["parse_input"](value)
-                    bi.__setattr__(field, value)
                 except Exception:
                     field_name = BotIntegration._meta.get_field(field).verbose_name
                     errors.append(f"Invalid {field_name}")
+            bi.__setattr__(field, value)
         if not errors:
             bi.save()
             st.experimental_rerun()
@@ -1116,9 +1110,8 @@ def general_integration_settings(bi: BotIntegration, extra_settings: list = []):
                 else BotIntegration._meta.get_field(field).default
             )
             setattr(bi, field, default)
-            shuffling_keys[input["key"]] = input["key"] + str(random.random())
+            st.session_state[input["key"]] = default
         bi.save()
-        st.session_state["__shuffling_keys"] = shuffling_keys
         st.experimental_rerun()
 
     for error in errors:
