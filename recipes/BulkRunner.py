@@ -34,15 +34,15 @@ class BulkRunnerPage(BasePage):
         documents: list[str] = Field(
             title="Input Data Spreadsheet",
             description="""
-Upload or link to a CSV or google sheet that contains your sample input data.  
-For example, for Copilot, this would sample questions or for Art QR Code, would would be pairs of image descriptions and URLs.   
+Upload or link to a CSV or google sheet that contains your sample input data.
+For example, for Copilot, this would sample questions or for Art QR Code, would would be pairs of image descriptions and URLs.
 Remember to includes header names in your CSV too.
             """,
         )
         run_urls: list[str] = Field(
             title="Gooey Workflows",
             description="""
-Provide one or more Gooey.AI workflow runs.   
+Provide one or more Gooey.AI workflow runs.
 You can add multiple runs from the same recipe (e.g. two versions of your copilot) and we'll run the inputs over both of them.
             """,
         )
@@ -142,7 +142,7 @@ List of URLs to the evaluation runs that you requested.
 
         st.write(
             """
-###### **Preview**: Here's what you uploaded          
+###### **Preview**: Here's what you uploaded
             """
         )
         for file in files:
@@ -155,8 +155,8 @@ List of URLs to the evaluation runs that you requested.
             st.write(
                 """
 ###### **Columns**
-Please select which CSV column corresponds to your workflow's input fields.  
-For the outputs, select the fields that should be included in the output CSV.  
+Please select which CSV column corresponds to your workflow's input fields.
+For the outputs, select the fields that should be included in the output CSV.
 To understand what each field represents, check out our [API docs](https://api.gooey.ai/docs).
                 """,
             )
@@ -358,7 +358,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         response.eval_runs = []
         for url in request.eval_urls:
             page_cls, sr = url_to_sr(url)
-            yield f"Running {page_cls().get_recipe_title(sr.state)}..."
+            yield f"Running {page_cls().get_recipe_title()}..."
             request_body = page_cls.RequestModel(
                 documents=response.output_documents
             ).dict(exclude_unset=True)
@@ -371,30 +371,30 @@ To understand what each field represents, check out our [API docs](https://api.g
 
     def preview_description(self, state: dict) -> str:
         return """
-Which AI model actually works best for your needs? 
-Upload your own data and evaluate any Gooey.AI workflow, LLM or AI model against any other. 
-Great for large data sets, AI model evaluation, task automation, parallel processing and automated testing. 
-To get started, paste in a Gooey.AI workflow, upload a CSV of your test data (with header names!), check the mapping of headers to workflow inputs and tap Submit. 
-More tips in the Details below.        
+Which AI model actually works best for your needs?
+Upload your own data and evaluate any Gooey.AI workflow, LLM or AI model against any other.
+Great for large data sets, AI model evaluation, task automation, parallel processing and automated testing.
+To get started, paste in a Gooey.AI workflow, upload a CSV of your test data (with header names!), check the mapping of headers to workflow inputs and tap Submit.
+More tips in the Details below.
         """
 
     def render_description(self):
         st.write(
             """
-Building complex AI workflows like copilot) and then evaluating each iteration is complex. 
-Workflows are affected by the particular LLM used (GPT4 vs PalM2), their vector DB knowledge sets (e.g. your google docs), how synthetic data creation happened (e.g. how you transformed your video transcript or PDF into structured data), which translation or speech engine you used and your LLM prompts. Every change can affect the quality of your outputs. 
+Building complex AI workflows like copilot) and then evaluating each iteration is complex.
+Workflows are affected by the particular LLM used (GPT4 vs PalM2), their vector DB knowledge sets (e.g. your google docs), how synthetic data creation happened (e.g. how you transformed your video transcript or PDF into structured data), which translation or speech engine you used and your LLM prompts. Every change can affect the quality of your outputs.
 
 1. This bulk tool enables you to do two incredible things:
-2. Upload your own set of inputs (e.g. typical questions to your bot) to any gooey workflow (e.g. /copilot) and run them in bulk to generate outputs or answers. 
-3. Compare the results of competing workflows to determine which one generates better outputs. 
+2. Upload your own set of inputs (e.g. typical questions to your bot) to any gooey workflow (e.g. /copilot) and run them in bulk to generate outputs or answers.
+3. Compare the results of competing workflows to determine which one generates better outputs.
 
 To get started:
 1. Enter the Gooey.AI Workflow URLs that you'd like to run in bulk
 2. Enter a csv of sample inputs to run in bulk
-3. Ensure that the mapping between your inputs and API parameters of the Gooey.AI workflow are correctly mapped. 
-4. Tap Submit. 
+3. Ensure that the mapping between your inputs and API parameters of the Gooey.AI workflow are correctly mapped.
+4. Tap Submit.
 5. Wait for results
-6. Make a change to your Gooey Workflow, copy its URL and repeat Step 1 (or just add the link to see the results of both workflows together)            
+6. Make a change to your Gooey Workflow, copy its URL and repeat Step 1 (or just add the link to see the results of both workflows together)
         """
         )
 
@@ -419,9 +419,7 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
         with scol1:
             with st.div(className="pt-1"):
                 options = {
-                    page_cls.workflow: page_cls().get_recipe_title(
-                        page_cls.recipe_doc_sr().state
-                    )
+                    page_cls.workflow: page_cls().get_recipe_title()
                     for page_cls in all_home_pages
                 }
                 last_workflow_key = "__last_run_url_workflow"
