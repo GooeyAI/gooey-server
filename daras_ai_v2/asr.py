@@ -157,6 +157,34 @@ def google_translate_languages() -> dict[str, str]:
     }
 
 
+@redis_cache_decorator
+def google_translate_input_languages() -> dict[str, str]:
+    """
+    Get list of supported languages for Google Translate.
+    :return: Dictionary of language codes and display names.
+    """
+    from google.cloud import translate
+
+    _, project = get_google_auth_session()
+    parent = f"projects/{project}/locations/global"
+    client = translate.TranslationServiceClient()
+    supported_languages = client.get_supported_languages(
+        parent=parent, display_language_code="en"
+    )
+    return {
+        lang.language_code: lang.display_name
+        for lang in supported_languages.languages
+        if lang.support_source
+    }
+
+
+def get_language_in_collection(langcode: str, languages):
+    for lang in languages:
+        if langcodes.get(lang).language == langcodes.get(langcode).language:
+            return langcode
+    return None
+
+
 def asr_language_selector(
     selected_model: AsrModels,
     label="##### Spoken Language",
@@ -208,6 +236,19 @@ def run_google_translate(
         list[str]: Translated text.
     """
     from google.cloud import translate_v2 as translate
+
+    # convert to BCP-47 format (google handles consistent language codes but sometimes gets confused by a mix of iso2 and iso3 which we have)
+    if source_language:
+        source_language = langcodes.Language.get(source_language).to_tag()
+        source_language = get_language_in_collection(
+            source_language, google_translate_input_languages().keys()
+        )  # this will default to autodetect if language is not found as supported
+    target_language = langcodes.Language.get(target_language).to_tag()
+    target_language: str | None = get_language_in_collection(
+        target_language, google_translate_languages().keys()
+    )
+    if not target_language:
+        raise ValueError(f"Unsupported target language: {target_language!r}")
 
     # if the language supports transliteration, we should check if the script is Latin
     if source_language and source_language not in TRANSLITERATION_SUPPORTED:
