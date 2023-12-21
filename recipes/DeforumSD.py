@@ -326,7 +326,7 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
                 key="rotation_3d_x",
             )
 
-        st.radio(
+        st.custom_radio(
             """
 ###### FPS (Frames per second)
             """,

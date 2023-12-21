@@ -623,7 +623,7 @@ def radio(
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
-    custom: dict | None = None,
+    validate_value: bool = True,
 ) -> T | None:
     if not options:
         return None
@@ -631,7 +631,7 @@ def radio(
     if not key:
         key = md5_values("radio", label, options, help, label_visibility)
     value = state.session_state.get(key)
-    if key not in state.session_state or (value not in options and not custom):
+    if key not in state.session_state or (value not in options and validate_value):
         value = options[0]
     state.session_state.setdefault(key, value)
     if label_visibility != "visible":
@@ -650,26 +650,52 @@ def radio(
                 disabled=disabled,
             ),
         ).mount()
-    if custom:
-        with div(
-            className="d-flex", style={"gap": "1ch", "flex-direction": "row-reverse"}
-        ):
-            with div(className="flex-grow-1"):
-                state.session_state.setdefault(f"custom-{key}", value)
-                val = custom["input"](label="", key=f"custom-{key}")
-            with div():
-                state.RenderTreeNode(
-                    name="input",
-                    props=dict(
-                        type="radio",
-                        name=key,
-                        label=dedent(str(custom["label"])),
-                        value=val,
-                        defaultChecked=value not in options,
-                        help=help,
-                        disabled=disabled,
-                    ),
-                ).mount()
+    return value
+
+
+def custom_radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    custom: dict,
+) -> T | None:
+    if not key:
+        key = md5_values("custom_radio", label, options, help, label_visibility)
+    value = radio(
+        label=label,
+        options=options,
+        format_func=format_func,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        validate_value=False,
+    )
+    is_custom = value not in options
+    with div(className="d-flex", style={"gap": "1ch", "flex-direction": "row-reverse"}):
+        with div(className="flex-grow-1"):
+            state.session_state.setdefault(f"custom-{key}", value)
+            val = custom["input"](label="", key=f"custom-{key}")
+        with div():
+            state.RenderTreeNode(
+                name="input",
+                props=dict(
+                    type="radio",
+                    name=key,
+                    label=dedent(str(custom["label"])),
+                    value=val,
+                    defaultChecked=is_custom,
+                    help=help,
+                    disabled=disabled,
+                ),
+            ).mount()
+    if type(options[0])(value) not in options:
+        value = state.session_state[key] = state.session_state[f"custom-{key}"]
     return value
 
 
