@@ -693,7 +693,11 @@ class BasePage:
                     )
 
     def get_recipe_title(self) -> str:
-        return self.get_or_create_root_published_run().title or self.title or self.workflow.label
+        return (
+            self.get_or_create_root_published_run().title
+            or self.title
+            or self.workflow.label
+        )
 
     def get_explore_image(self, state: dict) -> str:
         return self.explore_image or ""
