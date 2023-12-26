@@ -7,7 +7,7 @@ from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
-from bots.models import Workflow, SavedRun
+from bots.models import Workflow, PublishedRun, PublishedRunVisibility, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
@@ -358,7 +358,8 @@ To understand what each field represents, check out our [API docs](https://api.g
         response.eval_runs = []
         for url in request.eval_urls:
             page_cls, sr = url_to_sr(url)
-            yield f"Running {page_cls().get_recipe_title()}..."
+            published_run = url_to_published_run(url)
+            yield f"Running {page_cls.get_title(run=published_run or sr)}..."
             request_body = page_cls.RequestModel(
                 documents=response.output_documents
             ).dict(exclude_unset=True)
@@ -419,7 +420,7 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
         with scol1:
             with st.div(className="pt-1"):
                 options = {
-                    page_cls.workflow: page_cls().get_recipe_title()
+                    page_cls.workflow: page_cls.get_recipe_title()
                     for page_cls in all_home_pages
                 }
                 last_workflow_key = "__last_run_url_workflow"
@@ -436,22 +437,17 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
                 # use this to set default for next time
                 st.session_state[last_workflow_key] = workflow
         with scol2:
+            page_cls = Workflow(d["workflow"]).page_cls
             options = {
-                SavedRun.objects.get(
-                    workflow=d["workflow"],
-                    example_id__isnull=True,
-                    run_id__isnull=True,
-                    uid__isnull=True,
-                ).get_app_url(): "Default"
+                page_cls.get_root_published_run().get_app_url(): "Default",
             } | {
-                sr.get_app_url(): sr.page_title
-                for sr in SavedRun.objects.filter(
+                # approved examples
+                pub_run.get_app_url(): page_cls.get_title(run=pub_run)
+                for pub_run in PublishedRun.objects.filter(
                     workflow=d["workflow"],
-                    example_id__isnull=False,
-                    run_id__isnull=True,
-                    uid__isnull=True,
-                    hidden=False,
-                ).exclude(page_title="")
+                    is_approved_example=True,
+                    visibility=PublishedRunVisibility.PUBLIC,
+                ).exclude(published_run_id="")
             }
             with st.div(className="pt-1"):
                 url = st.selectbox(
@@ -495,16 +491,14 @@ def render_eval_url_inputs(key: str, del_key: str, d: dict):
             from recipes.BulkEval import BulkEvalPage
 
             options = {
-                BulkEvalPage().recipe_doc_sr().get_app_url(): "Default",
+                BulkEvalPage.get_root_published_run().get_app_url(): "Default",
             } | {
-                sr.get_app_url(): sr.page_title
-                for sr in SavedRun.objects.filter(
+                run.get_app_url(): BulkEvalPage.get_title(run=run)
+                for run in PublishedRun.objects.filter(
                     workflow=Workflow.BULK_EVAL,
-                    example_id__isnull=False,
-                    run_id__isnull=True,
-                    uid__isnull=True,
-                    hidden=False,
-                ).exclude(page_title="")
+                    is_approved_example=True,
+                    visibility=PublishedRunVisibility.PUBLIC,
+                )
             }
             with st.div(className="pt-1"):
                 url = st.selectbox(
@@ -562,13 +556,14 @@ def _prefill_workflow(d: dict, key: str):
     elif not d.get("workflow") and d.get("url"):
         try:
             page_cls, sr = url_to_sr(d.get("url"))
-        except:
+        except Exception:
             return
-        if (sr.example_id and sr.page_title and not sr.hidden) or not (
-            sr.example_id or sr.run_id or sr.uid
-        ):
-            d["workflow"] = sr.workflow
-            d["url"] = sr.get_app_url()
+        else:
+            if (sr.example_id and sr.page_title and not sr.hidden) or not (
+                sr.example_id or sr.run_id or sr.uid
+            ):
+                d["workflow"] = sr.workflow
+                d["url"] = sr.get_app_url()
 
 
 def url_to_sr(url: str) -> tuple[typing.Type[BasePage], SavedRun]:
@@ -580,6 +575,19 @@ def url_to_sr(url: str) -> tuple[typing.Type[BasePage], SavedRun]:
     example_id, run_id, uid = extract_query_params(f.query.params)
     sr = page_cls.get_sr_from_query_params(example_id, run_id, uid)
     return page_cls, sr
+
+
+def url_to_published_run(url: str) -> PublishedRun | None:
+    from daras_ai_v2.all_pages import page_slug_map, normalize_slug
+
+    f = furl(url)
+    slug = f.path.segments[0]
+    page_cls = page_slug_map[normalize_slug(slug)]
+    example_id, run_id, uid = extract_query_params(f.query.params)
+    published_run = page_cls.get_published_run_from_query_params(
+        example_id, run_id, uid
+    )
+    return published_run
 
 
 def build_requests_for_df(df, request, df_ix, arr_len):

@@ -610,8 +610,28 @@ class BasePage:
         if cancel_button:
             modal.close()
 
+    @classmethod
+    def get_title(cls, run: PublishedRun | SavedRun):
+        if isinstance(run, PublishedRun):
+            title, _ = cls._get_title_and_breadcrumbs(
+                current_run=run.saved_run,
+                published_run=run,
+            )
+        elif isinstance(run, SavedRun):
+            published_run = (
+                run and run.parent_version and run.parent_version.pubilshed_run or None
+            )
+            title, _ = cls._get_title_and_breadcrumbs(
+                current_run=run,
+                published_run=published_run,
+            )
+        else:
+            raise TypeError(f"Invalid type: {type(run)}")
+        return title
+
+    @classmethod
     def _get_title_and_breadcrumbs(
-        self,
+        cls,
         current_run: SavedRun,
         published_run: PublishedRun | None,
     ) -> tuple[str, list[tuple[str, str | None]]]:
@@ -621,16 +641,16 @@ class BasePage:
             and current_run == published_run.saved_run
         ):
             # when published_run.published_run_id is blank, the run is the root example
-            return self.get_recipe_title(), []
+            return cls.get_recipe_title(), []
         else:
             # the title on the saved root / the hardcoded title
-            recipe_title = self.get_root_published_run().title or self.title
+            recipe_title = cls.get_root_published_run().title or cls.title
             prompt_title = truncate_text_words(
-                self.preview_input(current_run.to_dict()) or "",
+                cls.preview_input(current_run.to_dict()) or "",
                 maxlen=60,
             ).replace("\n", " ")
 
-            recipe_breadcrumb = (recipe_title, self.app_url())
+            recipe_breadcrumb = (recipe_title, cls.app_url())
             if published_run and current_run == published_run.saved_run:
                 # recipe root
                 return published_run.title or prompt_title or recipe_title, [
@@ -692,11 +712,12 @@ class BasePage:
                         link_to=link,
                     )
 
-    def get_recipe_title(self) -> str:
+    @classmethod
+    def get_recipe_title(cls) -> str:
         return (
-            self.get_or_create_root_published_run().title
-            or self.title
-            or self.workflow.label
+            cls.get_or_create_root_published_run().title
+            or cls.title
+            or cls.workflow.label
         )
 
     def get_explore_image(self, state: dict) -> str:

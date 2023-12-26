@@ -36,7 +36,7 @@ from recipes.asr import AsrPage
 from recipes.embeddings_page import EmbeddingsPage
 
 # note: the ordering here matters!
-all_home_pages_by_category = {
+all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
     "Featured": [
         VideoBotsPage,
         DeforumSDPage,
@@ -76,7 +76,7 @@ all_home_pages_by_category = {
     ],
 }
 
-all_home_pages = [
+all_home_pages: list[typing.Type[BasePage]] = [
     page for page_group in all_home_pages_by_category.values() for page in page_group
 ]
 
