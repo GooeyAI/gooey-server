@@ -555,15 +555,19 @@ def _prefill_workflow(d: dict, key: str):
         d.pop("workflow", None)
     elif not d.get("workflow") and d.get("url"):
         try:
-            page_cls, sr = url_to_sr(d.get("url"))
+            published_run = url_to_published_run(str(d["url"]))
         except Exception:
             return
         else:
-            if (sr.example_id and sr.page_title and not sr.hidden) or not (
-                sr.example_id or sr.run_id or sr.uid
+            if (
+                published_run
+                and published_run.visibility == PublishedRunVisibility.PUBLIC
+                and (
+                    published_run.is_approved_example or published_run.is_root_example()
+                )
             ):
-                d["workflow"] = sr.workflow
-                d["url"] = sr.get_app_url()
+                d["workflow"] = published_run.workflow
+                d["url"] = published_run.get_app_url()
 
 
 def url_to_sr(url: str) -> tuple[typing.Type[BasePage], SavedRun]:
