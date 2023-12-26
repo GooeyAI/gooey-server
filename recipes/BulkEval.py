@@ -1,8 +1,8 @@
 import itertools
 import typing
-import uuid
 from itertools import zip_longest
 
+import typing_extensions
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
@@ -19,7 +19,7 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.prompt_vars import render_prompt_vars
-from recipes.BulkRunner import read_df_any
+from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
 
 NROWS_CACHE_KEY = "__nrows"
@@ -58,8 +58,8 @@ class EvalPrompt(typing.TypedDict):
     prompt: str
 
 
-class AggFunction(typing.TypedDict):
-    column: str
+class AggFunction(typing_extensions.TypedDict):
+    column: typing_extensions.NotRequired[str]
     function: typing.Literal[tuple(AggFunctionsList)]
 
 
@@ -73,62 +73,85 @@ class AggFunctionResult(typing.TypedDict):
 def _render_results(results: list[AggFunctionResult]):
     import plotly.graph_objects as go
     from plotly.colors import sample_colorscale
-    from plotly.subplots import make_subplots
 
     for k, g in itertools.groupby(results, key=lambda d: d["function"]):
-        st.write("---\n##### " + k.capitalize())
+        st.write("---\n###### **Aggregate**: " + k.capitalize())
 
         g = list(g)
+
         columns = [d["column"] for d in g]
         values = [round(d["value"], 2) for d in g]
-        norm_values = [(v - min(values)) / (max(values) - min(values)) for v in values]
+
+        norm_values = [
+            (v - min(values)) / ((max(values) - min(values)) or 1) for v in values
+        ]
         colors = sample_colorscale("RdYlGn", norm_values, colortype="tuple")
         colors = [f"rgba{(r * 255, g * 255, b * 255, 0.5)}" for r, g, b in colors]
 
-        fig = make_subplots(
-            rows=2,
-            shared_xaxes=True,
-            specs=[[{"type": "table"}], [{"type": "bar"}]],
-            vertical_spacing=0.03,
-            row_heights=[0.3, 0.7],
+        st.data_table(
+            [
+                ["Metric", k.capitalize(), "Count"],
+            ]
+            + [
+                [
+                    columns[i],
+                    dict(
+                        kind="number",
+                        readonly=True,
+                        displayData=str(values[i]),
+                        data=values[i],
+                        themeOverride=dict(bgCell=colors[i]),
+                    ),
+                    g[i].get("count", 1),
+                ]
+                for i in range(len(g))
+            ]
         )
-        counts = [d.get("count", 1) for d in g]
-        fig.add_trace(
-            go.Table(
-                header=dict(values=["Metric", k.capitalize(), "Count"]),
-                cells=dict(
-                    values=[columns, values, counts],
-                    fill_color=["aliceblue", colors, "aliceblue"],
+
+        fig = go.Figure(
+            data=[
+                go.Bar(
+                    name=k,
+                    x=columns,
+                    y=values,
+                    marker=dict(color=colors),
+                    text=values,
+                    texttemplate="<b>%{text}</b>",
+                    insidetextanchor="middle",
+                    insidetextfont=dict(size=24),
                 ),
+            ],
+            layout=dict(
+                margin=dict(l=0, r=0, t=24, b=0),
             ),
-            row=1,
-            col=1,
-        )
-        fig.add_trace(
-            go.Bar(
-                name=k,
-                x=columns,
-                y=values,
-                marker=dict(color=colors),
-                text=values,
-                texttemplate="<b>%{text}</b>",
-                insidetextanchor="middle",
-                insidetextfont=dict(size=24),
-            ),
-            row=2,
-            col=1,
-        )
-        fig.update_layout(
-            margin=dict(l=0, r=0, t=24, b=0),
-            # autosize=True,
         )
         st.plotly_chart(fig)
 
 
 class BulkEvalPage(BasePage):
-    title = "Bulk Evaluator"
+    title = "Evaluator"
     workflow = Workflow.BULK_EVAL
     slug_versions = ["bulk-eval", "eval"]
+
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aad314f0-9a97-11ee-8318-02420a0001c7/W.I.9.png.png"
+
+    def preview_image(self, state: dict) -> str | None:
+        return "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9631fb74-9a97-11ee-971f-02420a0001c4/evaluator.png.png"
+
+    def render_description(self):
+        st.write(
+            """
+Summarize and score every row of any CSV, google sheet or excel with GPT4 (or any LLM you choose).  Then average every score in any column to generate automated evaluations.
+            """
+        )
+
+    def related_workflows(self) -> list:
+        from recipes.BulkRunner import BulkRunnerPage
+        from recipes.VideoBots import VideoBotsPage
+        from recipes.asr import AsrPage
+        from recipes.DocSearch import DocSearchPage
+
+        return [BulkRunnerPage, VideoBotsPage, AsrPage, DocSearchPage]
 
     class RequestModel(LLMSettingsMixin, BaseModel):
         documents: list[str] = Field(
@@ -140,7 +163,7 @@ Remember to includes header names in your CSV too.
             """,
         )
 
-        eval_prompts: list[EvalPrompt] = Field(
+        eval_prompts: list[EvalPrompt] | None = Field(
             title="Evaluation Prompts",
             description="""
 Specify custom LLM prompts to calculate metrics that evaluate each row of the input data. The output should be a JSON object mapping the metric names to values.  
@@ -151,7 +174,7 @@ _The `columns` dictionary can be used to reference the spreadsheet columns._
         agg_functions: list[AggFunction] | None = Field(
             title="Aggregations",
             description="""
-Aggregate using one or more operations over the specified columns. Uses [pandas](https://pandas.pydata.org/pandas-docs/stable/reference/groupby.html#dataframegroupby-computations-descriptive-stats).
+Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/pandas-docs/stable/reference/groupby.html#dataframegroupby-computations-descriptive-stats).
             """,
         )
 
@@ -179,10 +202,8 @@ Here's what you uploaded:
         st.write("---")
 
         def render_inputs(key: str, del_key: str, d: EvalPrompt):
-            col1, col2 = st.columns([1, 8], responsive=False)
+            col1, col2 = st.columns([8, 1], responsive=False)
             with col1:
-                st.button("❌️", key=del_key, type="tertiary")
-            with col2:
                 d["name"] = st.text_input(
                     label="",
                     label_visibility="collapsed",
@@ -198,6 +219,8 @@ Here's what you uploaded:
                     value=d.get("prompt"),
                     height=500,
                 ).strip()
+            with col2:
+                del_button(del_key)
 
         st.write("##### " + field_title_desc(self.RequestModel, "eval_prompts"))
         list_view_editor(
@@ -206,33 +229,34 @@ Here's what you uploaded:
             render_inputs=render_inputs,
         )
 
-        def render_inputs(key: str, del_key: str, d: AggFunction):
-            col1, col2, col3 = st.columns([1, 5, 3], responsive=False)
+        def render_agg_inputs(key: str, del_key: str, d: AggFunction):
+            col1, col3 = st.columns([8, 1], responsive=False)
             with col1:
-                st.button("❌️", key=del_key, type="tertiary")
-            with col2:
-                d["column"] = st.text_input(
-                    "",
-                    label_visibility="collapsed",
-                    placeholder="Column Name",
-                    key=key + ":column",
-                    value=d.get("column"),
-                ).strip()
+                #     d["column"] = st.text_input(
+                #         "",
+                #         label_visibility="collapsed",
+                #         placeholder="Column Name",
+                #         key=key + ":column",
+                #         value=d.get("column"),
+                #     ).strip()
+                # with col2:
+                with st.div(className="pt-1"):
+                    d["function"] = st.selectbox(
+                        "",
+                        label_visibility="collapsed",
+                        key=key + ":func",
+                        options=AggFunctionsList,
+                        default_value=d.get("function"),
+                    )
             with col3:
-                d["function"] = st.selectbox(
-                    "",
-                    label_visibility="collapsed",
-                    key=key + ":func",
-                    options=AggFunctionsList,
-                    default_value=d.get("function"),
-                )
+                del_button(del_key)
 
         st.html("<br>")
         st.write("##### " + field_title_desc(self.RequestModel, "agg_functions"))
         list_view_editor(
             add_btn_label="➕ Add an Aggregation",
             key="agg_functions",
-            render_inputs=render_inputs,
+            render_inputs=render_agg_inputs,
         )
 
     def render_settings(self):
@@ -305,7 +329,7 @@ Here's what you uploaded:
 
                 out_df = pd.DataFrame.from_records(out_recs)
                 f = upload_file_from_bytes(
-                    filename=f"bulk-runner-{doc_ix}-{df_ix}.csv",
+                    filename=f"evaluator-{doc_ix}-{df_ix}.csv",
                     data=out_df.to_csv(index=False).encode(),
                     content_type="text/csv",
                 )
@@ -313,17 +337,22 @@ Here's what you uploaded:
 
             if out_df is None:
                 continue
-            for agg_ix, agg in enumerate(request.agg_functions):
-                col_values = out_df[agg["column"]].dropna()
-                agg_value = col_values.agg(agg["function"])
-                response.aggregations[doc_ix].append(
-                    {
-                        "column": agg["column"],
-                        "function": agg["function"],
-                        "count": len(col_values),
-                        "value": agg_value,
-                    }
-                )
+            for agg in request.agg_functions:
+                if agg.get("column"):
+                    cols = [agg["column"]]
+                else:
+                    cols = out_df.select_dtypes(include=["float", "int"]).columns
+                for col in cols:
+                    col_values = out_df[col].dropna()
+                    agg_value = col_values.agg(agg["function"])
+                    response.aggregations[doc_ix].append(
+                        {
+                            "column": col,
+                            "function": agg["function"],
+                            "count": len(col_values),
+                            "value": agg_value,
+                        }
+                    )
 
     def fields_to_save(self) -> [str]:
         return super().fields_to_save() + [NROWS_CACHE_KEY]
@@ -344,30 +373,3 @@ Here's what you uploaded:
 def get_nrows(files: list[str]) -> int:
     dfs = map_parallel(read_df_any, files)
     return sum((len(df) for df in dfs), 0)
-
-
-def list_view_editor(
-    *,
-    add_btn_label: str,
-    key: str,
-    render_labels: typing.Callable = None,
-    render_inputs: typing.Callable[[str, str, dict], None],
-):
-    old_lst = st.session_state.setdefault(key, [])
-    add_key = f"--{key}:add"
-    if st.session_state.get(add_key):
-        old_lst.append({})
-    label_placeholder = st.div()
-    new_lst = []
-    for d in old_lst:
-        entry_key = d.setdefault("__key__", f"--{key}:{uuid.uuid1()}")
-        del_key = entry_key + ":del"
-        if st.session_state.pop(del_key, None):
-            continue
-        render_inputs(entry_key, del_key, d)
-        new_lst.append(d)
-    if new_lst and render_labels:
-        with label_placeholder:
-            render_labels()
-    st.session_state[key] = new_lst
-    st.button(add_btn_label, key=add_key)

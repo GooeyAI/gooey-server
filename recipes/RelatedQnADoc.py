@@ -24,7 +24,7 @@ class RelatedDocSearchResponse(DocSearchPage.ResponseModel):
 
 class RelatedQnADocPage(BasePage):
     title = '"People Also Ask" Answers from a Doc'
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.RELATED_QNA_MAKER_DOC
     slug_versions = ["related-qna-maker-doc"]
 
@@ -155,4 +155,4 @@ def render_qna_outputs(state, height, show_count=None):
             {"output_text": output_text, "references": references}, height
         )
         render_sources_widget(references)
-        st.write("<br>")
+        st.html("<br>")

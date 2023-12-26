@@ -6,6 +6,7 @@ import urllib
 import urllib.parse
 import uuid
 from copy import deepcopy
+from enum import Enum
 from itertools import pairwise
 from random import Random
 from time import sleep
@@ -71,7 +72,7 @@ from gooey_ui.components.modal import Modal
 
 DEFAULT_META_IMG = (
     # Small
-    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/optimized%20hp%20gif.gif"
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/b0f328d0-93f7-11ee-bd89-02420a0001cc/Main.jpg.png"
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
     # Big
     # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
@@ -81,6 +82,13 @@ gooey_rng = Random()
 
 
 SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
+
+
+class RecipeRunState(Enum):
+    idle = 1
+    running = 2
+    completed = 3
+    failed = 4
 
 
 class StateKeys:
@@ -97,11 +105,12 @@ class StateKeys:
 
 class BasePage:
     title: str
-    image: str | None = None
     workflow: Workflow
     slug_versions: list[str]
 
     sane_defaults: dict = {}
+
+    explore_image: str = None
 
     RequestModel: typing.Type[BaseModel]
     ResponseModel: typing.Type[BaseModel]
@@ -157,6 +166,15 @@ class BasePage:
     @property
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
+
+    def get_tab_url(self, tab: str) -> str:
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        return self.app_url(
+            example_id=example_id,
+            run_id=run_id,
+            uid=uid,
+            tab_name=MenuTabs.paths[tab],
+        )
 
     def render(self):
         with sentry_sdk.configure_scope() as scope:
@@ -261,10 +279,7 @@ class BasePage:
         with st.nav_tabs():
             tab_names = self.get_tabs()
             for name in tab_names:
-                url = self.app_url(
-                    *extract_query_params(gooey_get_query_params()),
-                    tab_name=MenuTabs.paths[name],
-                )
+                url = self.get_tab_url(name)
                 with st.nav_item(url, active=name == selected_tab):
                     st.html(name)
         with st.nav_tab_content():
@@ -440,7 +455,11 @@ class BasePage:
 
         if publish_button:
             recipe_title = self.get_root_published_run().title or self.title
-            if published_run_title.strip() == recipe_title.strip():
+            is_root_published_run = is_update_mode and published_run.is_root_example()
+            if (
+                not is_root_published_run
+                and published_run_title.strip() == recipe_title.strip()
+            ):
                 st.error("Title can't be the same as the recipe title")
                 return
             if not is_update_mode:
@@ -569,7 +588,7 @@ class BasePage:
     ):
         st.write(
             "Are you sure you want to delete this published run? "
-            f"<em>({published_run.title})</em>"
+            f"_({published_run.title})_"
         )
         st.caption("This will also delete all the associated versions.")
         with st.div(className="d-flex"):
@@ -674,10 +693,14 @@ class BasePage:
                     )
 
     def get_recipe_title(self) -> str:
-        return self.get_or_create_root_published_run().title or self.title or ""
+        return (
+            self.get_or_create_root_published_run().title
+            or self.title
+            or self.workflow.label
+        )
 
-    def get_recipe_image(self, state: dict) -> str:
-        return self.image or ""
+    def get_explore_image(self, state: dict) -> str:
+        return self.explore_image or ""
 
     def _user_disabled_check(self):
         if self.run_user and self.run_user.is_disabled:
@@ -692,6 +715,7 @@ class BasePage:
         tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
         if self.request.user:
             tabs.extend([MenuTabs.history])
+        if self.request.user and not self.request.user.is_anonymous:
             tabs.extend([MenuTabs.saved])
         return tabs
 
@@ -809,11 +833,11 @@ class BasePage:
             root_run = page.get_root_published_run()
             state = root_run.saved_run.to_dict()
             preview_image = meta_preview_url(
-                page_cls().preview_image(state), page_cls().fallback_preivew_image()
+                page.get_explore_image(state), page.fallback_preivew_image()
             )
 
             with st.link(to=page.app_url()):
-                st.markdown(
+                st.html(
                     # language=html
                     f"""
 <div class="w-100 mb-2" style="height:150px; background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
@@ -961,6 +985,7 @@ class BasePage:
 
     @classmethod
     def get_total_runs(cls) -> int:
+        # TODO: fix to also handle published run case
         return SavedRun.objects.filter(workflow=cls.workflow).count()
 
     @classmethod
@@ -1310,6 +1335,17 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
         return submitted
 
+    def get_run_state(self) -> RecipeRunState:
+        if st.session_state.get(StateKeys.run_status):
+            return RecipeRunState.running
+        elif st.session_state.get(StateKeys.error_msg):
+            return RecipeRunState.failed
+        elif st.session_state.get(StateKeys.run_time):
+            return RecipeRunState.completed
+        else:
+            # when user is at a recipe root, and not running anything
+            return RecipeRunState.idle
+
     def _render_output_col(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
 
@@ -1323,26 +1359,61 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
         self._render_before_output()
 
-        run_status = st.session_state.get(StateKeys.run_status)
-        if run_status:
-            st.caption("Your changes are saved in the above URL. Save it for later!")
-            html_spinner(run_status)
-        else:
-            err_msg = st.session_state.get(StateKeys.error_msg)
-            run_time = st.session_state.get(StateKeys.run_time, 0)
-
-            # render errors
-            if err_msg is not None:
-                st.error(err_msg)
-            # render run time
-            elif run_time:
-                st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
+        run_state = self.get_run_state()
+        match run_state:
+            case RecipeRunState.completed:
+                self._render_completed_output()
+            case RecipeRunState.failed:
+                self._render_failed_output()
+            case RecipeRunState.running:
+                self._render_running_output()
+            case RecipeRunState.idle:
+                pass
 
         # render outputs
         self.render_output()
 
-        if not run_status:
+        if run_state != "waiting":
             self._render_after_output()
+
+    def _render_completed_output(self):
+        run_time = st.session_state.get(StateKeys.run_time, 0)
+        st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
+
+    def _render_failed_output(self):
+        err_msg = st.session_state.get(StateKeys.error_msg)
+        st.error(err_msg, unsafe_allow_html=True)
+
+    def _render_running_output(self):
+        run_status = st.session_state.get(StateKeys.run_status)
+        st.caption("Your changes are saved in the above URL. Save it for later!")
+        html_spinner(run_status)
+        self.render_extra_waiting_output()
+
+    def render_extra_waiting_output(self):
+        estimated_run_time = self.estimate_run_duration()
+        if not estimated_run_time:
+            return
+        if created_at := st.session_state.get("created_at"):
+            if isinstance(created_at, datetime.datetime):
+                start_time = created_at
+            else:
+                start_time = datetime.datetime.fromisoformat(created_at)
+            with st.countdown_timer(
+                end_time=start_time + datetime.timedelta(seconds=estimated_run_time),
+                delay_text="Sorry for the wait. Your run is taking longer than we expected.",
+            ):
+                if self.is_current_user_owner() and self.request.user.email:
+                    st.write(
+                        f"""We'll email **{self.request.user.email}** when your workflow is done."""
+                    )
+                st.write(
+                    f"""In the meantime, check out [🚀 Examples]({self.get_tab_url(MenuTabs.examples)})
+                      for inspiration."""
+                )
+
+    def estimate_run_duration(self) -> int | None:
+        pass
 
     def on_submit(self):
         example_id, run_id, uid = self.create_new_run()
@@ -1555,7 +1626,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             workflow=self.workflow,
             visibility=PublishedRunVisibility.PUBLIC,
             is_approved_example=True,
-        )[:50]
+        ).exclude(published_run_id="")[:50]
 
         grid_layout(3, example_runs, _render, column_props=dict(className="mb-0 pb-0"))
 
@@ -1650,7 +1721,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if saved_run.run_status:
             html_spinner(saved_run.run_status)
         elif saved_run.error_msg:
-            st.error(saved_run.error_msg)
+            st.error(saved_run.error_msg, unsafe_allow_html=True)
 
         return self.render_example(saved_run.to_dict())
 
@@ -1777,7 +1848,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
         st.markdown(
-            f'📖 To learn more, take a look at our <a href="{api_docs_url}" target="_blank">complete API</a>'
+            f'📖 To learn more, take a look at our <a href="{api_docs_url}" target="_blank">complete API</a>',
+            unsafe_allow_html=True,
         )
 
         st.write("#### 📤 Example Request")

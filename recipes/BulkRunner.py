@@ -1,13 +1,13 @@
 import datetime
 import io
 import typing
+import uuid
 
-from fastapi import HTTPException
 from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
-from bots.models import Workflow
+from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
@@ -20,10 +20,12 @@ from daras_ai_v2.vector_search import (
 )
 from recipes.DocSearch import render_documents
 
+DEFAULT_BULK_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d80fd4d8-93fa-11ee-bc13-02420a0001cc/Bulk%20Runner.jpg.png"
+
 
 class BulkRunnerPage(BasePage):
     title = "Bulk Runner"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/87f35df4-88d7-11ee-aac9-02420a00016b/Bulk%20Runner.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/87f35df4-88d7-11ee-aac9-02420a00016b/Bulk%20Runner.png.png"
     workflow = Workflow.BULK_RUNNER
     slug_versions = ["bulk-runner", "bulk"]
     price = 1
@@ -32,16 +34,16 @@ class BulkRunnerPage(BasePage):
         documents: list[str] = Field(
             title="Input Data Spreadsheet",
             description="""
-Upload or link to a CSV or google sheet that contains your sample input data. 
-For example, for Copilot, this would sample questions or for Art QR Code, would would be pairs of image descriptions and URLs. 
+Upload or link to a CSV or google sheet that contains your sample input data.
+For example, for Copilot, this would sample questions or for Art QR Code, would would be pairs of image descriptions and URLs.
 Remember to includes header names in your CSV too.
             """,
         )
         run_urls: list[str] = Field(
-            title="Gooey Workflow URL(s)",
+            title="Gooey Workflows",
             description="""
-Paste in one or more Gooey.AI workflow links (on separate lines). 
-You can add multiple URLs runs from the same recipe (e.g. two versions of your copilot) and we'll run the inputs over both of them.
+Provide one or more Gooey.AI workflow runs.
+You can add multiple runs from the same recipe (e.g. two versions of your copilot) and we'll run the inputs over both of them.
             """,
         )
 
@@ -58,26 +60,37 @@ For each output field in the Gooey.AI workflow, specify the column name that you
             """,
         )
 
+        eval_urls: list[str] | None = Field(
+            title="Evaluation Workflows",
+            description="""
+_(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the results of your runs.
+            """,
+        )
+
     class ResponseModel(BaseModel):
         output_documents: list[str]
 
-    def render_form_v2(self):
-        from daras_ai_v2.all_pages import page_slug_map, normalize_slug
-
-        run_urls = st.session_state.get("run_urls", "")
-        st.session_state.setdefault("__run_urls", "\n".join(run_urls))
-        run_urls = (
-            st.text_area(
-                f"##### {field_title_desc(self.RequestModel, 'run_urls')}",
-                key="__run_urls",
-            )
-            .strip()
-            .splitlines()
+        eval_runs: list[str] | None = Field(
+            title="Evaluation Run URLs",
+            description="""
+List of URLs to the evaluation runs that you requested.
+            """,
         )
-        st.session_state["run_urls"] = run_urls
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_BULK_META_IMG
+
+    def render_form_v2(self):
+        st.write(f"##### {field_title_desc(self.RequestModel, 'run_urls')}")
+        run_urls = list_view_editor(
+            add_btn_label="➕ Add a Workflow",
+            key="run_urls",
+            render_inputs=render_run_url_inputs,
+            flatten_dict_key="url",
+        )
 
         files = document_uploader(
-            f"##### {field_title_desc(self.RequestModel, 'documents')}",
+            f"---\n##### {field_title_desc(self.RequestModel, 'documents')}",
             accept=(".csv", ".xlsx", ".xls", ".json", ".tsv", ".xml"),
         )
 
@@ -86,19 +99,9 @@ For each output field in the Gooey.AI workflow, specify the column name that you
         output_fields = {}
 
         for url in run_urls:
-            f = furl(url)
-            slug = f.path.segments[0]
             try:
-                page_cls = page_slug_map[normalize_slug(slug)]
-            except KeyError as e:
-                st.error(repr(e))
-                continue
-
-            example_id, run_id, uid = extract_query_params(f.query.params)
-            try:
-                sr = page_cls.get_sr_from_query_params(example_id, run_id, uid)
-            except HTTPException as e:
-                st.error(repr(e))
+                page_cls, sr = url_to_sr(url)
+            except:
                 continue
 
             schema = page_cls.RequestModel.schema(ref_template="{model}")
@@ -139,8 +142,7 @@ For each output field in the Gooey.AI workflow, specify the column name that you
 
         st.write(
             """
-##### Input Data Preview
-Here's what you uploaded:          
+###### **Preview**: Here's what you uploaded
             """
         )
         for file in files:
@@ -149,14 +151,15 @@ Here's what you uploaded:
         if not (required_input_fields or optional_input_fields):
             return
 
-        st.write(
-            """
----
+        with st.div(className="pt-3"):
+            st.write(
+                """
+###### **Columns**
 Please select which CSV column corresponds to your workflow's input fields.
-For the outputs, please fill in what the column name should be that corresponds to each output too.
+For the outputs, select the fields that should be included in the output CSV.
 To understand what each field represents, check out our [API docs](https://api.gooey.ai/docs).
-            """
-        )
+                """,
+            )
 
         visible_col1, visible_col2 = st.columns(2)
         with st.expander("🤲 Show All Columns"):
@@ -226,14 +229,34 @@ To understand what each field represents, check out our [API docs](https://api.g
                 if col:
                     output_columns_new[field] = title
 
+        st.write("---")
+        st.write(f"##### {field_title_desc(self.RequestModel, 'eval_urls')}")
+        list_view_editor(
+            add_btn_label="➕ Add an Eval",
+            key="eval_urls",
+            render_inputs=render_eval_url_inputs,
+            flatten_dict_key="url",
+        )
+
     def render_example(self, state: dict):
         render_documents(state)
 
     def render_output(self):
-        files = st.session_state.get("output_documents", [])
-        for file in files:
-            st.write(file)
-            st.data_table(file)
+        eval_runs = st.session_state.get("eval_runs")
+
+        if eval_runs:
+            _backup = st.session_state
+            for url in eval_runs:
+                page_cls, sr = url_to_sr(url)
+                st.set_session_state(sr.state)
+                page_cls().render_output()
+                st.write("---")
+            st.set_session_state(_backup)
+        else:
+            files = st.session_state.get("output_documents", [])
+            for file in files:
+                st.write(file)
+                st.data_table(file)
 
     def run_v2(
         self,
@@ -329,34 +352,234 @@ To understand what each field represents, check out our [API docs](https://api.g
                     )
                     response.output_documents[doc_ix] = f
 
+        if not request.eval_urls:
+            return
+
+        response.eval_runs = []
+        for url in request.eval_urls:
+            page_cls, sr = url_to_sr(url)
+            yield f"Running {page_cls().get_recipe_title()}..."
+            request_body = page_cls.RequestModel(
+                documents=response.output_documents
+            ).dict(exclude_unset=True)
+            result, sr = sr.submit_api_call(
+                current_user=self.request.user, request_body=request_body
+            )
+            result.get(disable_sync_subtasks=False)
+            sr.refresh_from_db()
+            response.eval_runs.append(sr.get_app_url())
+
     def preview_description(self, state: dict) -> str:
         return """
-Which AI model actually works best for your needs? 
-Upload your own data and evaluate any Gooey.AI workflow, LLM or AI model against any other. 
-Great for large data sets, AI model evaluation, task automation, parallel processing and automated testing. 
-To get started, paste in a Gooey.AI workflow, upload a CSV of your test data (with header names!), check the mapping of headers to workflow inputs and tap Submit. 
-More tips in the Details below.        
+Which AI model actually works best for your needs?
+Upload your own data and evaluate any Gooey.AI workflow, LLM or AI model against any other.
+Great for large data sets, AI model evaluation, task automation, parallel processing and automated testing.
+To get started, paste in a Gooey.AI workflow, upload a CSV of your test data (with header names!), check the mapping of headers to workflow inputs and tap Submit.
+More tips in the Details below.
         """
 
     def render_description(self):
         st.write(
             """
-Building complex AI workflows like copilot) and then evaluating each iteration is complex. 
-Workflows are affected by the particular LLM used (GPT4 vs PalM2), their vector DB knowledge sets (e.g. your google docs), how synthetic data creation happened (e.g. how you transformed your video transcript or PDF into structured data), which translation or speech engine you used and your LLM prompts. Every change can affect the quality of your outputs. 
+Building complex AI workflows like copilot) and then evaluating each iteration is complex.
+Workflows are affected by the particular LLM used (GPT4 vs PalM2), their vector DB knowledge sets (e.g. your google docs), how synthetic data creation happened (e.g. how you transformed your video transcript or PDF into structured data), which translation or speech engine you used and your LLM prompts. Every change can affect the quality of your outputs.
 
 1. This bulk tool enables you to do two incredible things:
-2. Upload your own set of inputs (e.g. typical questions to your bot) to any gooey workflow (e.g. /copilot) and run them in bulk to generate outputs or answers. 
-3. Compare the results of competing workflows to determine which one generates better outputs. 
+2. Upload your own set of inputs (e.g. typical questions to your bot) to any gooey workflow (e.g. /copilot) and run them in bulk to generate outputs or answers.
+3. Compare the results of competing workflows to determine which one generates better outputs.
 
 To get started:
 1. Enter the Gooey.AI Workflow URLs that you'd like to run in bulk
 2. Enter a csv of sample inputs to run in bulk
-3. Ensure that the mapping between your inputs and API parameters of the Gooey.AI workflow are correctly mapped. 
-4. Tap Submit. 
+3. Ensure that the mapping between your inputs and API parameters of the Gooey.AI workflow are correctly mapped.
+4. Tap Submit.
 5. Wait for results
-6. Make a change to your Gooey Workflow, copy its URL and repeat Step 1 (or just add the link to see the results of both workflows together)            
+6. Make a change to your Gooey Workflow, copy its URL and repeat Step 1 (or just add the link to see the results of both workflows together)
         """
         )
+
+
+def render_run_url_inputs(key: str, del_key: str, d: dict):
+    from daras_ai_v2.all_pages import all_home_pages
+
+    _prefill_workflow(d, key)
+
+    col1, col2, col3 = st.columns([10, 1, 1], responsive=False)
+    if not d.get("workflow") and d.get("url"):
+        with col1:
+            url = st.text_input(
+                "",
+                key=key + ":url",
+                value=d.get("url"),
+                placeholder="https://gooey.ai/.../?run_id=...",
+            )
+    else:
+        with col1:
+            scol1, scol2, scol3 = st.columns([5, 6, 1], responsive=False)
+        with scol1:
+            with st.div(className="pt-1"):
+                options = {
+                    page_cls.workflow: page_cls().get_recipe_title()
+                    for page_cls in all_home_pages
+                }
+                last_workflow_key = "__last_run_url_workflow"
+                workflow = st.selectbox(
+                    "",
+                    key=key + ":workflow",
+                    default_value=(
+                        d.get("workflow") or st.session_state.get(last_workflow_key)
+                    ),
+                    options=options,
+                    format_func=lambda x: options[x],
+                )
+                d["workflow"] = workflow
+                # use this to set default for next time
+                st.session_state[last_workflow_key] = workflow
+        with scol2:
+            options = {
+                SavedRun.objects.get(
+                    workflow=d["workflow"],
+                    example_id__isnull=True,
+                    run_id__isnull=True,
+                    uid__isnull=True,
+                ).get_app_url(): "Default"
+            } | {
+                sr.get_app_url(): sr.page_title
+                for sr in SavedRun.objects.filter(
+                    workflow=d["workflow"],
+                    example_id__isnull=False,
+                    run_id__isnull=True,
+                    uid__isnull=True,
+                    hidden=False,
+                ).exclude(page_title="")
+            }
+            with st.div(className="pt-1"):
+                url = st.selectbox(
+                    "",
+                    key=key + ":url",
+                    options=options,
+                    default_value=d.get("url"),
+                    format_func=lambda x: options[x],
+                )
+        with scol3:
+            edit_button(key + ":editmode")
+    with col2:
+        url_button(url)
+    with col3:
+        del_button(del_key)
+
+    try:
+        url_to_sr(url)
+    except Exception as e:
+        st.error(repr(e))
+    d["url"] = url
+
+
+def render_eval_url_inputs(key: str, del_key: str, d: dict):
+    _prefill_workflow(d, key)
+
+    col1, col2, col3 = st.columns([10, 1, 1], responsive=False)
+    if not d.get("workflow") and d.get("url"):
+        with col1:
+            url = st.text_input(
+                "",
+                key=key + ":url",
+                value=d.get("url"),
+                placeholder="https://gooey.ai/.../?run_id=...",
+            )
+    else:
+        d["workflow"] = Workflow.BULK_EVAL
+        with col1:
+            scol1, scol2 = st.columns([11, 1], responsive=False)
+        with scol1:
+            from recipes.BulkEval import BulkEvalPage
+
+            options = {
+                BulkEvalPage().recipe_doc_sr().get_app_url(): "Default",
+            } | {
+                sr.get_app_url(): sr.page_title
+                for sr in SavedRun.objects.filter(
+                    workflow=Workflow.BULK_EVAL,
+                    example_id__isnull=False,
+                    run_id__isnull=True,
+                    uid__isnull=True,
+                    hidden=False,
+                ).exclude(page_title="")
+            }
+            with st.div(className="pt-1"):
+                url = st.selectbox(
+                    "",
+                    key=key + ":url",
+                    options=options,
+                    default_value=d.get("url"),
+                    format_func=lambda x: options[x],
+                )
+        with scol2:
+            edit_button(key + ":editmode")
+    with col2:
+        url_button(url)
+    with col3:
+        del_button(del_key)
+
+    try:
+        url_to_sr(url)
+    except Exception as e:
+        st.error(repr(e))
+    d["url"] = url
+
+
+def url_button(url):
+    st.html(
+        f"""
+<a href='{url}' target='_blank'>
+    <button type="button" class="btn btn-theme btn-tertiary">
+        <i class="fa-regular fa-external-link-square"></i>
+    </button>
+</a>
+        """
+    )
+
+
+def edit_button(key: str):
+    st.button(
+        '<i class="fa-regular fa-pencil text-warning"></i>',
+        key=key,
+        type="tertiary",
+    )
+
+
+def del_button(key: str):
+    st.button(
+        '<i class="fa-regular fa-trash text-danger"></i>',
+        key=key,
+        type="tertiary",
+    )
+
+
+def _prefill_workflow(d: dict, key: str):
+    if st.session_state.get(key + ":editmode"):
+        d.pop("workflow", None)
+    elif not d.get("workflow") and d.get("url"):
+        try:
+            page_cls, sr = url_to_sr(d.get("url"))
+        except:
+            return
+        if (sr.example_id and sr.page_title and not sr.hidden) or not (
+            sr.example_id or sr.run_id or sr.uid
+        ):
+            d["workflow"] = sr.workflow
+            d["url"] = sr.get_app_url()
+
+
+def url_to_sr(url: str) -> tuple[typing.Type[BasePage], SavedRun]:
+    from daras_ai_v2.all_pages import page_slug_map, normalize_slug
+
+    f = furl(url)
+    slug = f.path.segments[0]
+    page_cls = page_slug_map[normalize_slug(slug)]
+    example_id, run_id, uid = extract_query_params(f.query.params)
+    sr = page_cls.get_sr_from_query_params(example_id, run_id, uid)
+    return page_cls, sr
 
 
 def build_requests_for_df(df, request, df_ix, arr_len):
@@ -478,3 +701,48 @@ def read_df_any(f_url: str) -> "pd.DataFrame":
             raise ValueError(f"Unsupported file type: {f_url}")
 
     return df.dropna(how="all", axis=1).dropna(how="all", axis=0).fillna("")
+
+
+def list_view_editor(
+    *,
+    add_btn_label: str,
+    key: str,
+    render_labels: typing.Callable = None,
+    render_inputs: typing.Callable[[str, str, dict], None],
+    flatten_dict_key: str = None,
+):
+    if flatten_dict_key:
+        list_key = f"--list-view:{key}"
+        st.session_state.setdefault(
+            list_key,
+            [{flatten_dict_key: val} for val in st.session_state.get(key, [])],
+        )
+        new_lst = list_view_editor(
+            add_btn_label=add_btn_label,
+            key=list_key,
+            render_labels=render_labels,
+            render_inputs=render_inputs,
+        )
+        ret = [d[flatten_dict_key] for d in new_lst]
+        st.session_state[key] = ret
+        return ret
+
+    old_lst = st.session_state.setdefault(key, [])
+    add_key = f"--{key}:add"
+    if st.session_state.get(add_key):
+        old_lst.append({})
+    label_placeholder = st.div()
+    new_lst = []
+    for d in old_lst:
+        entry_key = d.setdefault("__key__", f"--{key}:{uuid.uuid1()}")
+        del_key = entry_key + ":del"
+        if st.session_state.pop(del_key, None):
+            continue
+        render_inputs(entry_key, del_key, d)
+        new_lst.append(d)
+    if new_lst and render_labels:
+        with label_placeholder:
+            render_labels()
+    st.session_state[key] = new_lst
+    st.button(add_btn_label, key=add_key)
+    return new_lst

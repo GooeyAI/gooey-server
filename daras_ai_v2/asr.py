@@ -3,6 +3,7 @@ import os.path
 import subprocess
 import tempfile
 from enum import Enum
+from time import sleep
 
 import langcodes
 import requests
@@ -12,17 +13,16 @@ from furl import furl
 
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
+from daras_ai_v2 import settings
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gdrive_downloader import (
     is_gdrive_url,
     gdrive_download,
     gdrive_metadata,
     url_to_gdrive_file_id,
 )
-from daras_ai_v2 import settings
-from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
-from time import sleep
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -49,6 +49,7 @@ DEEPGRAM_SUPPORTED = {"en", "en-US", "en-AU", "en-GB", "en-NZ", "en-IN", "es", "
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
+    whisper_large_v3 = "Whisper Large v3 (openai)"
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
     whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     nemo_english = "Conformer English (ai4bharat.org)"
@@ -66,6 +67,7 @@ class AsrModels(Enum):
 
 
 asr_model_ids = {
+    AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:37dfc0d6a7eb43ff84e230f74a24dab84e6bb7756c9b457dbdcceca3de7a4a04",
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
     AsrModels.whisper_hindi_large_v2: "vasista22/whisper-hindi-large-v2",
     AsrModels.whisper_telugu_large_v2: "vasista22/whisper-telugu-large-v2",
@@ -84,6 +86,7 @@ forced_asr_languages = {
 }
 
 asr_supported_languages = {
+    AsrModels.whisper_large_v3: WHISPER_SUPPORTED,
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
@@ -154,6 +157,34 @@ def google_translate_languages() -> dict[str, str]:
     }
 
 
+@redis_cache_decorator
+def google_translate_input_languages() -> dict[str, str]:
+    """
+    Get list of supported languages for Google Translate.
+    :return: Dictionary of language codes and display names.
+    """
+    from google.cloud import translate
+
+    _, project = get_google_auth_session()
+    parent = f"projects/{project}/locations/global"
+    client = translate.TranslationServiceClient()
+    supported_languages = client.get_supported_languages(
+        parent=parent, display_language_code="en"
+    )
+    return {
+        lang.language_code: lang.display_name
+        for lang in supported_languages.languages
+        if lang.support_source
+    }
+
+
+def get_language_in_collection(langcode: str, languages):
+    for lang in languages:
+        if langcodes.get(lang).language == langcodes.get(langcode).language:
+            return langcode
+    return None
+
+
 def asr_language_selector(
     selected_model: AsrModels,
     label="##### Spoken Language",
@@ -205,6 +236,19 @@ def run_google_translate(
         list[str]: Translated text.
     """
     from google.cloud import translate_v2 as translate
+
+    # convert to BCP-47 format (google handles consistent language codes but sometimes gets confused by a mix of iso2 and iso3 which we have)
+    if source_language:
+        source_language = langcodes.Language.get(source_language).to_tag()
+        source_language = get_language_in_collection(
+            source_language, google_translate_input_languages().keys()
+        )  # this will default to autodetect if language is not found as supported
+    target_language = langcodes.Language.get(target_language).to_tag()
+    target_language: str | None = get_language_in_collection(
+        target_language, google_translate_languages().keys()
+    )
+    if not target_language:
+        raise ValueError(f"Unsupported target language: {target_language!r}")
 
     # if the language supports transliteration, we should check if the script is Latin
     if source_language and source_language not in TRANSLITERATION_SUPPORTED:
@@ -358,6 +402,19 @@ def run_asr(
 
     if selected_model == AsrModels.azure:
         return azure_asr(audio_url, language)
+    elif selected_model == AsrModels.whisper_large_v3:
+        import replicate
+
+        config = {
+            "audio": audio_url,
+            "return_timestamps": output_format != AsrOutputFormat.text,
+        }
+        if language:
+            config["language"] = language
+        data = replicate.run(
+            asr_model_ids[AsrModels.whisper_large_v3],
+            input=config,
+        )
     elif selected_model == AsrModels.deepgram:
         r = requests.post(
             "https://api.deepgram.com/v1/listen",

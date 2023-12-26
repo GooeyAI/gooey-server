@@ -1,4 +1,5 @@
 import base64
+import html as html_lib
 import math
 import textwrap
 import typing
@@ -82,9 +83,11 @@ def write(*objs: typing.Any, unsafe_allow_html=False, **props):
         )
 
 
-def markdown(body: str, *, unsafe_allow_html=False, **props):
+def markdown(body: str | None, *, unsafe_allow_html=False, **props):
     if body is None:
         return _node("markdown", body="", **props)
+    if not unsafe_allow_html:
+        body = html_lib.escape(body)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
     )
@@ -524,8 +527,13 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     ).mount()
 
 
-def data_table(file_url: str):
-    return _node("data-table", fileUrl=file_url)
+def data_table(file_url_or_cells: str | list):
+    if isinstance(file_url_or_cells, str):
+        file_url = file_url_or_cells
+        return _node("data-table", fileUrl=file_url)
+    else:
+        cells = file_url_or_cells
+        return _node("data-table-raw", cells=cells)
 
 
 def table(df: "pd.DataFrame"):

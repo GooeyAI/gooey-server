@@ -222,7 +222,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
     ]
     list_filter = ["workflow"]
     search_fields = ["workflow", "published_run_id"]
-
+    autocomplete_fields = ["saved_run", "created_by", "last_edited_by"]
     readonly_fields = [
         "open_in_gooey",
         "created_at",
@@ -297,6 +297,7 @@ class SavedRunAdmin(admin.ModelAdmin):
 @admin.register(PublishedRunVersion)
 class PublishedRunVersionAdmin(admin.ModelAdmin):
     search_fields = ["id", "version_id", "published_run__published_run_id"]
+    autocomplete_fields = ["published_run", "saved_run", "changed_by"]
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):

@@ -17,12 +17,12 @@ from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import prompt_vars_widget, render_prompt_vars
 
-DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/compare%20llm%20under%201%20mg%20gif.gif"
+DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5e4f4c58-93fc-11ee-a39e-02420a0001ce/LLMs.jpg.png"
 
 
 class CompareLLMPage(BasePage):
     title = "Large Language Models: GPT-3"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ae42015e-88d7-11ee-aac9-02420a00016b/Compare%20LLMs.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ae42015e-88d7-11ee-aac9-02420a00016b/Compare%20LLMs.png.png"
     workflow = Workflow.COMPARE_LLM
     slug_versions = ["CompareLLM", "llm", "compare-large-language-models"]
 

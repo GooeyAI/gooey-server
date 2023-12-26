@@ -40,7 +40,7 @@ from daras_ai_v2.settings import service_account_key_path
 from daras_ai_v2.vector_search import doc_url_to_metadata
 from recipes.DocSearch import render_documents
 
-DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6c8f6876-538c-11ee-bea7-02420a000195/youtube%20bot%201.png.png"
+DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
 
 
 class Columns(IntegerChoices):
@@ -56,7 +56,7 @@ class Columns(IntegerChoices):
 
 class DocExtractPage(BasePage):
     title = "Youtube Transcripts + GPT extraction to Google Sheets"
-    image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.DOC_EXTRACT
     slug_versions = [
         "doc-extract",
