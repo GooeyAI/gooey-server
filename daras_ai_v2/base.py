@@ -1039,7 +1039,7 @@ class BasePage:
                 parent=None,
                 parent_version=None,
             )
-            return cls.create_published_run(
+            published_run = cls.create_published_run(
                 published_run_id="",
                 saved_run=saved_run,
                 user=None,
@@ -1047,6 +1047,9 @@ class BasePage:
                 notes=cls().preview_description(state=saved_run.to_dict()),
                 visibility=PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
             )
+            published_run.is_approved_example = True
+            published_run.save()
+            return published_run
 
     @classmethod
     def recipe_doc_sr(cls, create: bool = False) -> SavedRun:
