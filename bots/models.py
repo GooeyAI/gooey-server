@@ -152,7 +152,6 @@ class SavedRun(models.Model):
     workflow = models.IntegerField(
         choices=Workflow.choices, default=Workflow.VIDEO_BOTS
     )
-    example_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
 
@@ -161,8 +160,6 @@ class SavedRun(models.Model):
     error_msg = models.TextField(default="", blank=True)
     run_time = models.DurationField(default=datetime.timedelta, blank=True)
     run_status = models.TextField(default="", blank=True)
-    page_title = models.TextField(default="", blank=True)
-    page_notes = models.TextField(default="", blank=True)
 
     hidden = models.BooleanField(default=False)
     is_flagged = models.BooleanField(default=False)
@@ -179,6 +176,12 @@ class SavedRun(models.Model):
 
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    example_id = models.CharField(
+        max_length=128, default=None, null=True, blank=True, help_text="(Deprecated)"
+    )
+    page_title = models.TextField(default="", blank=True, help_text="(Deprecated)")
+    page_notes = models.TextField(default="", blank=True, help_text="(Deprecated)")
 
     objects = SavedRunQuerySet.as_manager()
 
