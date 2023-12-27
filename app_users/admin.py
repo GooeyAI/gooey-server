@@ -131,6 +131,7 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         "created_at",
         "end_balance",
         "type",
+        "dollar_amt",
     ]
     readonly_fields = ["created_at"]
     list_filter = ["created_at", IsStripeFilter]

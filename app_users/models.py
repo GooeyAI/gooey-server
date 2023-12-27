@@ -137,13 +137,14 @@ class AppUser(models.Model):
         user: AppUser = AppUser.objects.select_for_update().get(pk=self.pk)
         user.balance += amount
         user.save(update_fields=["balance"])
-
+        dollar_amt = amount / 100
         return AppUserTransaction.objects.create(
             user=self,
             invoice_id=invoice_id,
             amount=amount,
             end_balance=user.balance,
             type=type,
+            dollar_amt=dollar_amt,
         )
 
     def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
@@ -231,6 +232,7 @@ class AppUserTransaction(models.Model):
     end_balance = models.IntegerField()
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
     type = models.CharField(max_length=255, default="Stripe")
+    dollar_amt = models.DecimalField(max_digits=6, decimal_places=2, default=0.0)
 
     class Meta:
         verbose_name = "Transaction"
