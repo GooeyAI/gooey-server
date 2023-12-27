@@ -30,7 +30,7 @@ def generateAccessToken():
         (settings.PAYPAL_CLIENT_ID + ":" + settings.PAYPAL_SECRET).encode("utf-8")
     ).decode("utf-8")
     response = requests.post(
-        f"{settings.PAYPAL_BASE}/v1/oauth2/token",
+        str(furl(settings.PAYPAL_BASE) / "v1/oauth2/token"),
         data="grant_type=client_credentials",
         headers={"Authorization": f"Basic {auth}"},
     )
@@ -45,7 +45,7 @@ def createOrder(payload: dict, uid: str):
     # use the cart information passed from the front-end to calculate the purchase unit details
 
     accessToken = generateAccessToken()
-    url = f"{settings.PAYPAL_BASE}/v2/checkout/orders"
+    url = str(furl(settings.PAYPAL_BASE) / "v2/checkout/orders")
     payload = {
         "intent": "CAPTURE",
         "purchase_units": [
@@ -72,14 +72,15 @@ def createOrder(payload: dict, uid: str):
         },
         json=payload,
     )
-    return handleResponse(response)
+    response.raise_for_status()
+    return response.json(), response.status_code
 
 
 # Capture payment for the created order to complete the transaction.
 # @see https://developer.paypal.com/docs/api/orders/v2/#orders_capture
 def captureOrder(orderID: str):
     accessToken = generateAccessToken()
-    url = f"{settings.PAYPAL_BASE}/v2/checkout/orders/{orderID}/capture"
+    url = str(furl(settings.PAYPAL_BASE) / f"v2/checkout/orders/{orderID}/capture")
 
     response = requests.post(
         url,
@@ -93,12 +94,7 @@ def captureOrder(orderID: str):
             # "PayPal-Mock-Response": '{"mock_application_codes": "INTERNAL_SERVER_ERROR"}'
         },
     )
-    return handleResponse(response)
-
-
-def handleResponse(response: requests.Response):
-    jsonResponse = response.json()
-    return (jsonResponse, response.status_code)
+    return response.json(), response.status_code
 
 
 async def request_body(request: Request):
@@ -146,7 +142,7 @@ def create_webhook(request: Request, _payload: bytes = Depends(request_body)):
     }
 
     response = requests.post(
-        f"{settings.PAYPAL_BASE}/v1/notifications/verify-webhook-signature",
+        str(furl(settings.PAYPAL_BASE) / "v1/notifications/verify-webhook-signature"),
         headers=headers,
         json=data,
     )
