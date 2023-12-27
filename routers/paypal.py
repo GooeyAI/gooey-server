@@ -5,9 +5,8 @@ import requests
 import requests
 from fastapi import APIRouter, Depends
 from fastapi.requests import Request
-from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse
 from furl import furl
-from starlette.datastructures import FormData
 from sentry_sdk import capture_exception
 import json
 
@@ -44,10 +43,6 @@ def generateAccessToken():
 # @see https://developer.paypal.com/docs/api/orders/v2/#orders_create
 def createOrder(payload: dict, uid: str):
     # use the cart information passed from the front-end to calculate the purchase unit details
-    print(
-        "shopping cart information passed from the frontend createOrder() callback:",
-        payload,
-    )
 
     accessToken = generateAccessToken()
     url = f"{settings.PAYPAL_BASE}/v2/checkout/orders"
@@ -114,9 +109,6 @@ async def request_body(request: Request):
 def orders(req: Request, uid: str, _payload: bytes = Depends(request_body)):
     # use the cart information passed from the front-end to calculate the order amount detals
     payload: dict = json.loads(_payload)
-    print(
-        "shopping cart information passed from the frontend orders() callback:", payload
-    )
     jsonResponse, httpStatusCode = createOrder(payload, uid)
     return JSONResponse(jsonResponse, httpStatusCode)
 

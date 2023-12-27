@@ -119,12 +119,12 @@ class AppUser(models.Model):
         """
         # if an invoice entry exists
         try:
-            if len(invoice_id) > 17:
+            if "-" in invoice_id and "_" not in invoice_id:
                 type = "Paypal"
             else:
                 type = "Stripe"
-            # avoid updating twice for same invoice
-            return AppUserTransaction.objects.get(invoice_id=invoice_id)
+                # avoid updating twice for same invoice
+                return AppUserTransaction.objects.get(invoice_id=invoice_id)
         except AppUserTransaction.DoesNotExist:
             type = "SavedRun"
             pass
