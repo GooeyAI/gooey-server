@@ -1029,27 +1029,22 @@ class BasePage:
 
     @classmethod
     def get_or_create_root_published_run(cls) -> PublishedRun:
-        try:
-            return cls.get_root_published_run()
-        except PublishedRun.DoesNotExist:
-            saved_run = cls.run_doc_sr(
-                run_id="",
-                uid="",
-                create=True,
-                parent=None,
-                parent_version=None,
-            )
-            published_run = cls.create_published_run(
-                published_run_id="",
-                saved_run=saved_run,
-                user=None,
-                title=cls.title,
-                notes=cls().preview_description(state=saved_run.to_dict()),
-                visibility=PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
-            )
-            published_run.is_approved_example = True
-            published_run.save()
-            return published_run
+        published_run, _ = PublishedRun.objects.get_or_create(
+            workflow=cls.workflow,
+            published_run_id="",
+            defaults={
+                "saved_run": lambda: cls.run_doc_sr(
+                    run_id="", uid="", create=True, parent=None, parent_version=None
+                ),
+                "created_by": None,
+                "last_edited_by": None,
+                "title": cls.title,
+                "notes": cls().preview_description(state=cls.sane_defaults),
+                "visibility": PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
+                "is_approved_example": True,
+            },
+        )
+        return published_run
 
     @classmethod
     def recipe_doc_sr(cls, create: bool = False) -> SavedRun:
