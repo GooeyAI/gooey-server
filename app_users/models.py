@@ -117,12 +117,16 @@ class AppUser(models.Model):
         When credits are deducted due to a run -- invoice_id is of the
         form "gooey_in_{uuid}"
         """
-
         # if an invoice entry exists
         try:
+            if len(invoice_id) > 17:
+                type = "Paypal"
+            else:
+                type = "Stripe"
             # avoid updating twice for same invoice
             return AppUserTransaction.objects.get(invoice_id=invoice_id)
         except AppUserTransaction.DoesNotExist:
+            type = "SavedRun"
             pass
 
         # select_for_update() is very important here
@@ -139,6 +143,7 @@ class AppUser(models.Model):
             invoice_id=invoice_id,
             amount=amount,
             end_balance=user.balance,
+            type=type,
         )
 
     def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
@@ -225,6 +230,7 @@ class AppUserTransaction(models.Model):
     amount = models.IntegerField()
     end_balance = models.IntegerField()
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
+    type = models.CharField(max_length=255, default="Stripe")
 
     class Meta:
         verbose_name = "Transaction"

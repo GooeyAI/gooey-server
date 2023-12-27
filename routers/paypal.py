@@ -3,10 +3,11 @@ from urllib.parse import quote_plus
 import base64
 import requests
 import requests
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.requests import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from furl import furl
+from starlette.datastructures import FormData
 from sentry_sdk import capture_exception
 import json
 
@@ -30,7 +31,7 @@ def generateAccessToken():
         (settings.PAYPAL_CLIENT_ID + ":" + settings.PAYPAL_SECRET).encode("utf-8")
     ).decode("utf-8")
     response = requests.post(
-        furl(settings.PAYPAL_BASE).add(path="/v1/oauth2/token").url,
+        f"{settings.PAYPAL_BASE}/v1/oauth2/token",
         data="grant_type=client_credentials",
         headers={"Authorization": f"Basic {auth}"},
     )
@@ -49,7 +50,7 @@ def createOrder(payload: dict, uid: str):
     )
 
     accessToken = generateAccessToken()
-    url = furl(settings.PAYPAL_BASE).add(path="/v2/checkout/orders").url
+    url = f"{settings.PAYPAL_BASE}/v2/checkout/orders"
     payload = {
         "intent": "CAPTURE",
         "purchase_units": [
@@ -76,7 +77,6 @@ def createOrder(payload: dict, uid: str):
         },
         json=payload,
     )
-    response.raise_for_status()
     return handleResponse(response)
 
 
@@ -98,8 +98,12 @@ def captureOrder(orderID: str):
             # "PayPal-Mock-Response": '{"mock_application_codes": "INTERNAL_SERVER_ERROR"}'
         },
     )
-    response.raise_for_status()
-    return (response.json(), response.status_code)
+    return handleResponse(response)
+
+
+def handleResponse(response: requests.Response):
+    jsonResponse = response.json()
+    return (jsonResponse, response.status_code)
 
 
 async def request_body(request: Request):
@@ -107,7 +111,7 @@ async def request_body(request: Request):
 
 
 @router.post("/__/paypal/orders/{uid}")
-def orders(req: Request, uid: str, _payload: bytes):
+def orders(req: Request, uid: str, _payload: bytes = Depends(request_body)):
     # use the cart information passed from the front-end to calculate the order amount detals
     payload: dict = json.loads(_payload)
     print(
@@ -130,7 +134,7 @@ def create_payment(request: Request):
 
 
 @router.post("/__/paypal/webhook", status_code=200)
-def create_webhook(request: Request, _payload: bytes):
+def create_webhook(request: Request, _payload: bytes = Depends(request_body)):
     # Verify
     accessToken = generateAccessToken()
     headers = {
@@ -150,9 +154,7 @@ def create_webhook(request: Request, _payload: bytes):
     }
 
     response = requests.post(
-        furl(settings.PAYPAL_BASE)
-        .add(path="/v1/notifications/verify-webhook-signature")
-        .url,
+        f"{settings.PAYPAL_BASE}/v1/notifications/verify-webhook-signature",
         headers=headers,
         json=data,
     )
