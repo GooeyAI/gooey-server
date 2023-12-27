@@ -22,11 +22,12 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
 )
 
-DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/cropped_tts_compare_meta_img.gif"
+DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
 
 
 class TextToSpeechPage(BasePage):
     title = "Compare AI Voice Generators"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3621e11a-88d9-11ee-b549-02420a000167/Compare%20AI%20voice%20generators.png.png"
     workflow = Workflow.TEXT_TO_SPEECH
     slug_versions = [
         "TextToSpeech",
@@ -70,6 +71,8 @@ class TextToSpeechPage(BasePage):
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
+        elevenlabs_style: float | None
+        elevenlabs_speaker_boost: bool | None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -267,6 +270,14 @@ class TextToSpeechPage(BasePage):
 
                 stability = state.get("elevenlabs_stability", 0.5)
                 similarity_boost = state.get("elevenlabs_similarity_boost", 0.75)
+                voice_settings = dict(
+                    stability=stability, similarity_boost=similarity_boost
+                )
+                if voice_model == "eleven_multilingual_v2":
+                    voice_settings["style"] = state.get("elevenlabs_style", 0.0)
+                    voice_settings["speaker_boost"] = state.get(
+                        "elevenlabs_speaker_boost", True
+                    )
 
                 response = requests.post(
                     f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
@@ -277,10 +288,7 @@ class TextToSpeechPage(BasePage):
                     json={
                         "text": text,
                         "model_id": voice_model,
-                        "voice_settings": {
-                            "stability": stability,
-                            "similarity_boost": similarity_boost,
-                        },
+                        "voice_settings": voice_settings,
                     },
                 )
                 response.raise_for_status()

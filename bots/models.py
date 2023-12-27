@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
@@ -14,7 +16,9 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
-from bots.custom_fields import PostgresJSONEncoder
+from bots.custom_fields import PostgresJSONEncoder, CustomURLField
+from daras_ai_v2.language_model import format_chat_entry
+from daras_ai_v2.crypto import get_random_doc_id
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -25,6 +29,20 @@ CHATML_ROLE_ASSISSTANT = "assistant"
 
 
 EPOCH = datetime.datetime.utcfromtimestamp(0)
+
+
+class PublishedRunVisibility(models.IntegerChoices):
+    UNLISTED = 1
+    PUBLIC = 2
+
+    def help_text(self):
+        match self:
+            case PublishedRunVisibility.UNLISTED:
+                return "Only me + people with a link"
+            case PublishedRunVisibility.PUBLIC:
+                return "Public"
+            case _:
+                return self.label
 
 
 class Platform(models.IntegerChoices):
@@ -71,6 +89,7 @@ class Workflow(models.IntegerChoices):
     RELATED_QNA_MAKER_DOC = (28, "Related QnA Maker Doc")
     EMBEDDINGS = (29, "Embeddings")
     BULK_RUNNER = (30, "Bulk Runner")
+    BULK_EVAL = (31, "Bulk Evaluator")
 
     @property
     def short_slug(self):
@@ -122,11 +141,17 @@ class SavedRun(models.Model):
         blank=True,
         related_name="children",
     )
+    parent_version = models.ForeignKey(
+        "bots.PublishedRunVersion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="children_runs",
+    )
 
     workflow = models.IntegerField(
         choices=Workflow.choices, default=Workflow.VIDEO_BOTS
     )
-    example_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
 
@@ -135,8 +160,6 @@ class SavedRun(models.Model):
     error_msg = models.TextField(default="", blank=True)
     run_time = models.DurationField(default=datetime.timedelta, blank=True)
     run_status = models.TextField(default="", blank=True)
-    page_title = models.TextField(default="", blank=True)
-    page_notes = models.TextField(default="", blank=True)
 
     hidden = models.BooleanField(default=False)
     is_flagged = models.BooleanField(default=False)
@@ -153,6 +176,12 @@ class SavedRun(models.Model):
 
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    example_id = models.CharField(
+        max_length=128, default=None, null=True, blank=True, help_text="(Deprecated)"
+    )
+    page_title = models.TextField(default="", blank=True, help_text="(Deprecated)")
+    page_notes = models.TextField(default="", blank=True, help_text="(Deprecated)")
 
     objects = SavedRunQuerySet.as_manager()
 
@@ -200,10 +229,6 @@ class SavedRun(models.Model):
             ret[StateKeys.run_time] = self.run_time.total_seconds()
         if self.run_status:
             ret[StateKeys.run_status] = self.run_status
-        if self.page_title:
-            ret[StateKeys.page_title] = self.page_title
-        if self.page_notes:
-            ret[StateKeys.page_notes] = self.page_notes
         if self.hidden:
             ret[StateKeys.hidden] = self.hidden
         if self.is_flagged:
@@ -234,9 +259,6 @@ class SavedRun(models.Model):
             seconds=state.pop(StateKeys.run_time, None) or 0
         )
         self.run_status = state.pop(StateKeys.run_status, None) or ""
-        self.page_title = state.pop(StateKeys.page_title, None) or ""
-        self.page_notes = state.pop(StateKeys.page_notes, None) or ""
-        # self.hidden = state.pop(StateKeys.hidden, False)
         self.is_flagged = state.pop("is_flagged", False)
         self.state = state
 
@@ -265,6 +287,12 @@ class SavedRun(models.Model):
             )
         return result, page.run_doc_sr(run_id, uid)
 
+    def get_creator(self) -> AppUser | None:
+        if self.uid:
+            return AppUser.objects.filter(uid=self.uid).first()
+        else:
+            return None
+
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):
         return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
@@ -282,7 +310,7 @@ class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
     def reset_fb_pages_for_user(
         self, uid: str, fb_pages: list[dict]
-    ) -> list["BotIntegration"]:
+    ) -> list[BotIntegration]:
         saved = []
         for fb_page in fb_pages:
             fb_page_id = fb_page["id"]
@@ -330,6 +358,15 @@ class BotIntegration(models.Model):
     )
     saved_run = models.ForeignKey(
         "bots.SavedRun",
+        on_delete=models.SET_NULL,
+        related_name="botintegrations",
+        null=True,
+        default=None,
+        blank=True,
+        help_text="The saved run that the bot is based on",
+    )
+    published_run = models.ForeignKey(
+        "bots.PublishedRun",
         on_delete=models.SET_NULL,
         related_name="botintegrations",
         null=True,
@@ -476,6 +513,14 @@ class BotIntegration(models.Model):
             return f"{self.name} ({platform_name})"
         else:
             return self.name or platform_name
+
+    def get_active_saved_run(self) -> SavedRun | None:
+        if self.published_run:
+            return self.published_run.saved_run
+        elif self.saved_run:
+            return self.saved_run
+        else:
+            return None
 
     def get_display_name(self):
         return (
@@ -701,6 +746,17 @@ class MessageQuerySet(models.QuerySet):
         df = pd.DataFrame.from_records(rows)
         return df
 
+    def as_llm_context(self, limit: int = 100) -> list["ConversationEntry"]:
+        msgs = self.order_by("-created_at").prefetch_related("attachments")[:limit]
+        entries = [None] * len(msgs)
+        for i, msg in enumerate(reversed(msgs)):
+            entries[i] = format_chat_entry(
+                role=msg.role,
+                content=msg.content,
+                images=msg.attachments.values_list("url", flat=True),
+            )
+        return entries
+
 
 class Message(models.Model):
     conversation = models.ForeignKey(
@@ -781,6 +837,32 @@ class Message(models.Model):
 
     def local_lang(self):
         return Truncator(self.display_content).words(30)
+
+
+class MessageAttachment(models.Model):
+    message = models.ForeignKey(
+        "bots.Message",
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    url = CustomURLField()
+    metadata = models.ForeignKey(
+        "files.FileMetadata",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        default=None,
+        related_name="message_attachments",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        if self.metadata_id:
+            return f"{self.metadata.name} ({self.url})"
+        return self.url
 
 
 class FeedbackQuerySet(models.QuerySet):
@@ -874,7 +956,10 @@ class Feedback(models.Model):
     objects = FeedbackQuerySet.as_manager()
 
     class Meta:
-        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["-created_at"]),
+        ]
+        ordering = ["-created_at"]
         get_latest_by = "created_at"
 
     def __str__(self):
@@ -898,3 +983,204 @@ class FeedbackComment(models.Model):
     author = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
     comment = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PublishedRun(models.Model):
+    # published_run_id was earlier SavedRun.example_id
+    published_run_id = models.CharField(
+        max_length=128,
+        blank=True,
+    )
+
+    saved_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.PROTECT,
+        related_name="published_runs",
+        null=True,
+    )
+    workflow = models.IntegerField(
+        choices=Workflow.choices,
+    )
+    title = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    visibility = models.IntegerField(
+        choices=PublishedRunVisibility.choices,
+        default=PublishedRunVisibility.UNLISTED,
+    )
+    is_approved_example = models.BooleanField(default=False)
+
+    created_by = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        null=True,
+        related_name="published_runs",
+    )
+    last_edited_by = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        null=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        get_latest_by = "updated_at"
+
+        ordering = ["-updated_at"]
+        unique_together = [
+            ["workflow", "published_run_id"],
+        ]
+
+        indexes = [
+            models.Index(fields=["workflow"]),
+            models.Index(fields=["workflow", "created_by"]),
+            models.Index(fields=["workflow", "published_run_id"]),
+            models.Index(fields=["workflow", "visibility", "is_approved_example"]),
+            models.Index(
+                fields=[
+                    "workflow",
+                    "visibility",
+                    "is_approved_example",
+                    "published_run_id",
+                ]
+            ),
+        ]
+
+    def __str__(self):
+        return self.get_app_url()
+
+    @admin.display(description="Open in Gooey")
+    def open_in_gooey(self):
+        return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
+
+    @classmethod
+    def create_published_run(
+        cls,
+        *,
+        workflow: Workflow,
+        published_run_id: str,
+        saved_run: SavedRun,
+        user: AppUser,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        with transaction.atomic():
+            published_run = PublishedRun(
+                workflow=workflow,
+                published_run_id=published_run_id,
+                created_by=user,
+                last_edited_by=user,
+                title=title,
+            )
+            published_run.save()
+            published_run.add_version(
+                user=user,
+                saved_run=saved_run,
+                title=title,
+                visibility=visibility,
+                notes=notes,
+            )
+            return published_run
+
+    def duplicate(
+        self,
+        *,
+        user: AppUser,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ) -> PublishedRun:
+        return PublishedRun.create_published_run(
+            workflow=Workflow(self.workflow),
+            published_run_id=get_random_doc_id(),
+            saved_run=self.saved_run,
+            user=user,
+            title=title,
+            notes=notes,
+            visibility=visibility,
+        )
+
+    def get_app_url(self):
+        return Workflow(self.workflow).get_app_url(
+            example_id=self.published_run_id, run_id="", uid=""
+        )
+
+    def add_version(
+        self,
+        *,
+        user: AppUser,
+        saved_run: SavedRun,
+        visibility: PublishedRunVisibility,
+        title: str,
+        notes: str,
+    ):
+        assert saved_run.workflow == self.workflow
+
+        with transaction.atomic():
+            version = PublishedRunVersion(
+                published_run=self,
+                version_id=get_random_doc_id(),
+                saved_run=saved_run,
+                changed_by=user,
+                title=title,
+                notes=notes,
+                visibility=visibility,
+            )
+            version.save()
+            self.update_fields_to_latest_version()
+
+    def is_editor(self, user: AppUser):
+        return self.created_by == user
+
+    def is_root_example(self):
+        return not self.published_run_id
+
+    def update_fields_to_latest_version(self):
+        latest_version = self.versions.latest()
+        self.saved_run = latest_version.saved_run
+        self.last_edited_by = latest_version.changed_by
+        self.title = latest_version.title
+        self.notes = latest_version.notes
+        self.visibility = latest_version.visibility
+
+        self.save()
+
+
+class PublishedRunVersion(models.Model):
+    version_id = models.CharField(max_length=128, unique=True)
+
+    published_run = models.ForeignKey(
+        PublishedRun,
+        on_delete=models.CASCADE,
+        related_name="versions",
+    )
+    saved_run = models.ForeignKey(
+        SavedRun,
+        on_delete=models.PROTECT,
+        related_name="published_run_versions",
+    )
+    changed_by = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,  # TODO: set to sentinel instead (e.g. github's ghost user)
+        null=True,
+    )
+    title = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    visibility = models.IntegerField(
+        choices=PublishedRunVisibility.choices,
+        default=PublishedRunVisibility.UNLISTED,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        get_latest_by = "created_at"
+        indexes = [
+            models.Index(fields=["published_run", "-created_at"]),
+            models.Index(fields=["version_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.published_run} - {self.version_id}"

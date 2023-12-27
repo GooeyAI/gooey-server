@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from pydantic import Field
 
 import gooey_ui as st
+from daras_ai_v2.field_render import field_title_desc
 
 
 def serp_search_settings():
@@ -26,7 +27,7 @@ def serp_search_settings():
 
 def serp_search_type_selectbox(key="serp_search_type"):
     st.selectbox(
-        f"###### {GoogleSearchMixin.__fields__[key].field_info.title}\n{GoogleSearchMixin.__fields__[key].field_info.description or ''}",
+        f"###### {field_title_desc(GoogleSearchMixin, key)}",
         options=SerpSearchType,
         format_func=lambda x: x.label,
         key=key,
@@ -35,7 +36,7 @@ def serp_search_type_selectbox(key="serp_search_type"):
 
 def serp_search_location_selectbox(key="serp_search_location"):
     st.selectbox(
-        f"###### {GoogleSearchMixin.__fields__[key].field_info.title}\n{GoogleSearchMixin.__fields__[key].field_info.description or ''}",
+        f"###### {field_title_desc(GoogleSearchMixin, key)}",
         options=SerpSearchLocation,
         format_func=lambda x: f"{x.label} ({x.value})",
         key=key,

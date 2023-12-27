@@ -1,7 +1,9 @@
 import base64
+import html as html_lib
 import math
 import textwrap
 import typing
+from datetime import datetime, timezone
 
 import numpy as np
 
@@ -28,8 +30,18 @@ def dummy(*args, **kwargs):
 spinner = dummy
 set_page_config = dummy
 form = dummy
-plotly_chart = dummy
 dataframe = dummy
+
+
+def countdown_timer(
+    end_time: datetime,
+    delay_text: str,
+) -> state.NestingCtx:
+    return _node(
+        "countdown-timer",
+        endTime=end_time.astimezone(timezone.utc).isoformat(),
+        delayText=delay_text,
+    )
 
 
 def nav_tabs():
@@ -71,9 +83,11 @@ def write(*objs: typing.Any, unsafe_allow_html=False, **props):
         )
 
 
-def markdown(body: str, *, unsafe_allow_html=False, **props):
+def markdown(body: str | None, *, unsafe_allow_html=False, **props):
     if body is None:
         return _node("markdown", body="", **props)
+    if not unsafe_allow_html:
+        body = html_lib.escape(body)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
     )
@@ -202,6 +216,7 @@ def image(
     src: str | np.ndarray,
     caption: str = None,
     alt: str = None,
+    href: str = None,
     **props,
 ):
     if isinstance(src, np.ndarray):
@@ -222,6 +237,7 @@ def image(
             src=src,
             caption=dedent(caption),
             alt=alt or caption,
+            href=href,
             **props,
         ),
     ).mount()
@@ -273,13 +289,14 @@ def text_area(
     **props,
 ) -> str:
     style = props.setdefault("style", {})
-    if key:
-        assert not value, "only one of value or key can be provided"
-    else:
+    # if key:
+    #     assert not value, "only one of value or key can be provided"
+    # else:
+    if not key:
         key = md5_values(
             "textarea", label, height, help, value, placeholder, label_visibility
         )
-    value = str(state.session_state.setdefault(key, value))
+    value = str(state.session_state.setdefault(key, value) or "")
     if label_visibility != "visible":
         label = None
     if disabled:
@@ -418,6 +435,7 @@ def button(
     """
     if not key:
         key = md5_values("button", label, help, type, props)
+    className = f"btn-{type} " + props.pop("className", "")
     state.RenderTreeNode(
         name="gui-button",
         props=dict(
@@ -427,7 +445,7 @@ def button(
             label=dedent(label),
             help=help,
             disabled=disabled,
-            className="btn-" + type,
+            className=className,
             **props,
         ),
     ).mount()
@@ -509,8 +527,13 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     ).mount()
 
 
-def data_table(file_url: str):
-    return _node("data-table", fileUrl=file_url)
+def data_table(file_url_or_cells: str | list):
+    if isinstance(file_url_or_cells, str):
+        file_url = file_url_or_cells
+        return _node("data-table", fileUrl=file_url)
+    else:
+        cells = file_url_or_cells
+        return _node("data-table-raw", cells=cells)
 
 
 def table(df: "pd.DataFrame"):
@@ -562,7 +585,7 @@ def table(df: "pd.DataFrame"):
     ).mount()
 
 
-def radio(
+def horizontal_radio(
     label: str,
     options: typing.Sequence[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
@@ -576,9 +599,81 @@ def radio(
         return None
     options = list(options)
     if not key:
-        key = md5_values("radio", label, options, help, label_visibility)
+        key = md5_values("horizontal_radio", label, options, help, label_visibility)
     value = state.session_state.get(key)
     if key not in state.session_state or value not in options:
+        value = options[0]
+    state.session_state.setdefault(key, value)
+    if label_visibility != "visible":
+        label = None
+    markdown(label)
+    for option in options:
+        if button(
+            format_func(option),
+            key=f"tab-{key}-{option}",
+            type="primary",
+            className="replicate-nav " + ("active" if value == option else ""),
+            disabled=disabled,
+        ):
+            state.session_state[key] = value = option
+            state.experimental_rerun()
+    return value
+
+
+def horizontal_radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    checked_by_default: bool = True,
+    label_visibility: LabelVisibility = "visible",
+) -> T | None:
+    if not options:
+        return None
+    options = list(options)
+    if not key:
+        key = md5_values("horizontal_radio", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if (key not in state.session_state or value not in options) and checked_by_default:
+        value = options[0]
+    state.session_state.setdefault(key, value)
+    if label_visibility != "visible":
+        label = None
+    markdown(label)
+    for option in options:
+        if button(
+            format_func(option),
+            key=f"tab-{key}-{option}",
+            type="primary",
+            className="replicate-nav " + ("active" if value == option else ""),
+            disabled=disabled,
+        ):
+            state.session_state[key] = value = option
+            state.experimental_rerun()
+    return value
+
+
+def radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    checked_by_default: bool = True,
+    label_visibility: LabelVisibility = "visible",
+) -> T | None:
+    if not options:
+        return None
+    options = list(options)
+    if not key:
+        key = md5_values("radio", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if (key not in state.session_state or value not in options) and checked_by_default:
         value = options[0]
     state.session_state.setdefault(key, value)
     if label_visibility != "visible":
@@ -780,13 +875,28 @@ def breadcrumbs(divider: str = "/", **props) -> state.NestingCtx:
 
 
 def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
-    className = "breadcrumb-item lead " + props.pop("className", "")
+    className = "breadcrumb-item " + props.pop("className", "")
     with tag("li", className=className, **props):
         if link_to:
             with tag("a", href=link_to):
                 html(inner_html)
         else:
             html(inner_html)
+
+
+def plotly_chart(figure_or_data, **kwargs):
+    data = (
+        figure_or_data.to_plotly_json()
+        if hasattr(figure_or_data, "to_plotly_json")
+        else figure_or_data
+    )
+    state.RenderTreeNode(
+        name="plotly-chart",
+        props=dict(
+            chart=data,
+            args=kwargs,
+        ),
+    ).mount()
 
 
 def dedent(text: str | None) -> str | None:

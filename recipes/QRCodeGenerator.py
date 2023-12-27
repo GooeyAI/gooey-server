@@ -39,18 +39,19 @@ from recipes.SocialLookupEmail import get_profile_for_email
 from url_shortener.models import ShortenedURL
 
 ATTEMPTS = 1
-DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f09c8cfa-5393-11ee-a837-02420a000190/ai%20art%20qr%20codes1%201.png.png"
+DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a679a410-9456-11ee-bd77-02420a0001ce/QR%20Code.jpg.png"
 
 
 class QrSources(Enum):
     qr_code_data = "🔗 URL or Text"
-    qr_code_vcard = "👩‍🦰 Contact Info"
+    qr_code_vcard = "📇 Contact Card"
     qr_code_file = "📄 Upload File"
-    qr_code_input_image = "📷 Existing QR Code"
+    qr_code_input_image = "🏁 Existing QR Code"
 
 
 class QRCodeGeneratorPage(BasePage):
     title = "AI Art QR Code"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/03d6538e-88d5-11ee-ad97-02420a00016c/W.I.2.png.png"
     workflow = Workflow.QR_CODE
     slug_versions = ["art-qr-code", "qr", "qr-code"]
 
@@ -104,6 +105,8 @@ class QRCodeGeneratorPage(BasePage):
         cleaned_qr_code: str
 
     def preview_image(self, state: dict) -> str | None:
+        if len(state.get("output_images") or []) > 0:
+            return state["output_images"][0]
         return DEFAULT_QR_CODE_META_IMG
 
     def related_workflows(self) -> list:
@@ -136,7 +139,7 @@ class QRCodeGeneratorPage(BasePage):
                 if st.session_state.get(key):
                     st.session_state[qr_code_source_key] = key
                     break
-        source = st.radio(
+        source = st.horizontal_radio(
             "",
             options=QrSources._member_names_,
             key=qr_code_source_key,
@@ -436,7 +439,7 @@ def vcard_form(*, key: str) -> VCARD:
     )
 
     if vcard.email and st.button(
-        "<u>Import other contact info</u> from my email - magic!",
+        "Import other contact info from my email - magic!",
         type="link",
     ):
         imported_vcard = get_vcard_from_email(vcard.email)

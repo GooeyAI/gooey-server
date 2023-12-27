@@ -14,6 +14,7 @@ from daras_ai_v2.text_training_data_widget import text_training_data, TrainingDa
 
 class LetterWriterPage(BasePage):
     title = "Letter Writer"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.LETTER_WRITER
     slug_versions = ["LetterWriter"]
 

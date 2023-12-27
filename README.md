@@ -87,7 +87,7 @@ gooey.ai (dev)
 App ID: 228027632918921
 ```
 
-Create a [meta developer account](https://developers.facebook.com/docs/development/register/) & ask someone to add you to the test app [here](https://developers.facebook.com/apps/228027632918921/roles/roles/?business_id=549319917267066)
+Create a [meta developer account](https://developers.facebook.com/docs/development/register/) & send admin your **facebook ID** to add you to the test app [here](https://developers.facebook.com/apps/228027632918921/roles/roles/?business_id=549319917267066)
 
 1. start ngrok
 
@@ -149,6 +149,11 @@ echo $PWD/fixture.json
 ```
 
 ```bash
+# copy fixture.json from server to local
+rsync -P -a <username>@captain.us-1.gooey.ai:/home/<username>/fixture.json .
+```
+
+```bash
 # reset the database
 ./manage.py reset_db -c
 # create the database
@@ -166,3 +171,4 @@ echo $PWD/fixture.json
 createdb -T template0 $PGDATABASE
 pg_dump $SOURCE_DATABASE | psql -q $PGDATABASE
 ```
+
