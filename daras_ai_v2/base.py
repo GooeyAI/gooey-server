@@ -1087,7 +1087,7 @@ class BasePage:
         notes: str,
         visibility: PublishedRunVisibility,
     ):
-        return PublishedRun.create_published_run(
+        return PublishedRun.objects.create_published_run(
             workflow=cls.workflow,
             published_run_id=published_run_id,
             saved_run=saved_run,
