@@ -1,9 +1,6 @@
 from django.db import models
 
 
-# class CostQuerySet(models.QuerySet):
-
-
 class UsageCost(models.Model):
     saved_run = models.ForeignKey(
         "bots.SavedRun",
@@ -24,9 +21,10 @@ class UsageCost(models.Model):
 
     provider = models.IntegerField(choices=Provider.choices)
     model = models.TextField("model", blank=True)
-    param = models.TextField("param", blank=True)  # combine with quantity as JSON obj
+    param = models.TextField(
+        "param", blank=True
+    )  # contains input/output tokens and quantity
     notes = models.TextField(default="", blank=True)
-    quantity = models.JSONField(default=dict, blank=True)
     calculation_notes = models.TextField(default="", blank=True)
     dollar_amt = models.DecimalField(
         max_digits=13,

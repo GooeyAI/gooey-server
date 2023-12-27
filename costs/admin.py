@@ -7,12 +7,12 @@ from costs import models
 @admin.register(models.UsageCost)
 class CostsAdmin(admin.ModelAdmin):
     list_display = [
-        "run_id",
+        "saved_run",
         "provider",
         "model",
         "param",
         "notes",
-        "quantity",
         "calculation_notes",
-        "cost",
+        "dollar_amt",
+        "created_at",
     ]
