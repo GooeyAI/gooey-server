@@ -314,10 +314,7 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
-                            if sr.page_title:
-                                col = f"({sr.page_title}) {col}"
-                            else:
-                                col = f"({url_ix + 1}) {col}"
+                            col = f"({url_ix + 1}) {col}"
                         out_val = state.get(field)
                         if isinstance(out_val, list):
                             for arr_ix, item in enumerate(out_val):
