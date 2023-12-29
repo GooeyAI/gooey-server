@@ -47,7 +47,7 @@ class Modal:
             right: 0;
             top: 0;
             bottom: 0;
-            z-index: 1000;
+            z-index: 9999;
             background-color: rgba(0, 0, 0, 0.5);
         }}
         .modal-parent {{
