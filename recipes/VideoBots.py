@@ -1016,7 +1016,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                                         key=key,
                                         placeholder=placeholder,
                                     ),
-                                    "default": published_run.title if published_run else bi.name,
+                                    "default": published_run.title
+                                    if published_run 
+                                    else bi.name,
                                     "caption": "This is the name the bot will post as in this specific channel.",
                                 },
                             ]
