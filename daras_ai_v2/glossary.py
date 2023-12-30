@@ -8,7 +8,7 @@ def validate_glossary_document(
     document: str,
 ):
     """
-    Throws for the most common errors in a glossary document.
+    Throws AssertionError for the most common errors in a glossary document.
     I.e. the glossary must have at least 2 columns, top row must be language codes or "description" or "pos"
     """
     import langcodes
@@ -23,7 +23,7 @@ def validate_glossary_document(
     df = bytes_to_df(f_name=metadata.name, f_bytes=f_bytes, ext=ext)
 
     if len(df.columns) < 2:
-        raise ValueError(
+        raise AssertionError(
             f"Invalid glossary: must have at least 2 columns, but has {len(df.columns)}."
         )
     for col in df.columns:
@@ -31,7 +31,7 @@ def validate_glossary_document(
             try:
                 langcodes.Language.get(col).language
             except langcodes.LanguageTagError:
-                raise ValueError(
+                raise AssertionError(
                     f'Invalid glossary: column header "{col}" is not a valid language code.'
                 )
 
