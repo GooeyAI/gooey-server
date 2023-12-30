@@ -1748,7 +1748,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             if published_run.visibility == PublishedRunVisibility.PUBLIC:
                 run_icon = '<i class="fa-regular fa-person-running"></i>'
                 run_count = format_number_with_suffix(published_run.get_run_count())
-                st.caption(f"{run_icon} {run_count} runs")
+                st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
 
         doc = published_run.saved_run.to_dict()
         self.render_example(doc)
@@ -1783,7 +1783,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
             run_icon = '<i class="fa-regular fa-person-running"></i>'
             run_count = format_number_with_suffix(published_run.get_run_count())
-            st.caption(f"{run_icon} {run_count} runs")
+            st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
 
         if allow_hide:
             self._example_hide_button(published_run=published_run)
