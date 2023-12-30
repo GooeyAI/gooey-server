@@ -435,7 +435,7 @@ def button(
     """
     if not key:
         key = md5_values("button", label, help, type, props)
-    props["className"] = props.get("className", "") + " btn-" + type
+    className = f"btn-{type} " + props.pop("className", "")
     state.RenderTreeNode(
         name="gui-button",
         props=dict(
@@ -445,6 +445,7 @@ def button(
             label=dedent(label),
             help=help,
             disabled=disabled,
+            className=className,
             **props,
         ),
     ).mount()
@@ -526,8 +527,13 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     ).mount()
 
 
-def data_table(file_url: str):
-    return _node("data-table", fileUrl=file_url)
+def data_table(file_url_or_cells: str | list):
+    if isinstance(file_url_or_cells, str):
+        file_url = file_url_or_cells
+        return _node("data-table", fileUrl=file_url)
+    else:
+        cells = file_url_or_cells
+        return _node("data-table-raw", cells=cells)
 
 
 def table(df: "pd.DataFrame"):
@@ -614,6 +620,42 @@ def horizontal_radio(
     return value
 
 
+def horizontal_radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    checked_by_default: bool = True,
+    label_visibility: LabelVisibility = "visible",
+) -> T | None:
+    if not options:
+        return None
+    options = list(options)
+    if not key:
+        key = md5_values("horizontal_radio", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if (key not in state.session_state or value not in options) and checked_by_default:
+        value = options[0]
+    state.session_state.setdefault(key, value)
+    if label_visibility != "visible":
+        label = None
+    markdown(label)
+    for option in options:
+        if button(
+            format_func(option),
+            key=f"tab-{key}-{option}",
+            type="primary",
+            className="replicate-nav " + ("active" if value == option else ""),
+            disabled=disabled,
+        ):
+            state.session_state[key] = value = option
+            state.experimental_rerun()
+    return value
+
+
 def radio(
     label: str,
     options: typing.Sequence[T],
@@ -622,6 +664,7 @@ def radio(
     help: str = None,
     *,
     disabled: bool = False,
+    checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
     validate_value: bool = True,
 ) -> T | None:
@@ -631,7 +674,9 @@ def radio(
     if not key:
         key = md5_values("radio", label, options, help, label_visibility)
     value = state.session_state.get(key)
-    if key not in state.session_state or (value not in options and validate_value):
+    if (
+        key not in state.session_state or (value not in options and validate_value)
+    ) and checked_by_default:
         value = options[0]
     state.session_state.setdefault(key, value)
     if label_visibility != "visible":
@@ -891,7 +936,7 @@ def breadcrumbs(divider: str = "/", **props) -> state.NestingCtx:
 
 
 def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
-    className = "breadcrumb-item lead " + props.pop("className", "")
+    className = "breadcrumb-item " + props.pop("className", "")
     with tag("li", className=className, **props):
         if link_to:
             with tag("a", href=link_to):
