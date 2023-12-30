@@ -28,7 +28,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functions import LLMTools
-from daras_ai_v2.glossary import glossary_input
+from daras_ai_v2.glossary import glossary_input, validate_glossary_document
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
@@ -314,6 +314,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             "task_instructions",
             "query_instructions",
             "keyword_instructions",
+        )
+
+    def validate_form_v2(self, state: dict):
+        validate_glossary_document(
+            document=state.get("input_glossary_document", ""),
+        )
+        validate_glossary_document(
+            document=state.get("output_glossary_document", ""),
         )
 
     def render_usage_guide(self):

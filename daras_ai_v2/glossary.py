@@ -40,51 +40,12 @@ def glossary_input(
     label: str = "##### Glossary",
     key: str = "glossary_document",
 ):
-    import gooey_ui as st
-    from daras_ai_v2.base import StateKeys
-
-    old_document: str = st.session_state.get(key, "")
-
     document: str = document_uploader(
         label=label,
         key=key,
         accept=[".csv", ".xlsx", ".xls", ".gsheet", ".ods", ".tsv"],
         accept_multiple_files=False,
     )  # type: ignore
-
-    if not document.strip():
-        return document
-
-    # Validate glossary -- since this can be slow, only do it if the document has changed
-    inline_error_msgs = st.session_state.get(StateKeys.inline_error_msgs, {})
-    if document.strip() != old_document.strip():
-        # new document, we need to re-validate
-        if key in inline_error_msgs:
-            del inline_error_msgs[key]
-        try:
-            validate_glossary_document(document=document)
-        except Exception as e:
-            inline_error_msgs[key] = str(e)
-        st.session_state[StateKeys.inline_error_msgs] = inline_error_msgs
-
-    if key in inline_error_msgs:
-        # even if the document hasn't changed, there could still be errors from a previous time the run was validated, so we always need to check the error session dict
-        st.error(inline_error_msgs[key])
-    else:
-        st.success("Glossary is valid.")
-
-    # in addition to checking when the user uploads a new document, we also give them the option to force a reload in case they changed the file in place
-    if st.button(
-        "Re-validate glossary", key=f"revalidate_{key}", style={"display": "block"}
-    ):
-        if key in inline_error_msgs:
-            del inline_error_msgs[key]
-        try:
-            validate_glossary_document(document=document)
-        except Exception as e:
-            inline_error_msgs[key] = str(e)
-        st.session_state[StateKeys.inline_error_msgs] = inline_error_msgs
-        st.experimental_rerun()
 
     return document
 
