@@ -337,17 +337,6 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
                 "24": "Film: 24 FPS",
             }[str(x)],
             key="fps",
-            custom={
-                "label": "Custom",
-                "input": lambda label, key: st.number_input(
-                    label=label,
-                    min_value=1,
-                    max_value=60,
-                    step=1,
-                    key=key,
-                    style={"margin-top": "-28px"},
-                ),
-            },
         )
 
     #         st.selectbox(

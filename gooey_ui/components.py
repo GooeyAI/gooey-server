@@ -662,7 +662,6 @@ def custom_radio(
     *,
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
-    custom: dict,
 ) -> T | None:
     if not key:
         key = md5_values("custom_radio", label, options, help, label_visibility)
@@ -677,6 +676,17 @@ def custom_radio(
         validate_value=False,
     )
     is_custom = value not in options
+    custom = {
+        "label": "Custom",
+        "input": lambda label, key: number_input(
+            label=label,
+            min_value=1,
+            max_value=60,
+            step=1,
+            key=key,
+            style={"margin-top": "-28px"},
+        ),
+    }
     with div(className="d-flex", style={"gap": "1ch", "flex-direction": "row-reverse"}):
         with div(className="flex-grow-1"):
             state.session_state.setdefault(f"custom-{key}", value)
