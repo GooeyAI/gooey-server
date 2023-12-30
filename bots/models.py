@@ -31,6 +31,12 @@ CHATML_ROLE_ASSISSTANT = "assistant"
 EPOCH = datetime.datetime.utcfromtimestamp(0)
 
 
+class FinishReason(models.IntegerChoices):
+    USER_ERROR = 1
+    SERVER_ERROR = 2
+    DONE = 3
+
+
 class PublishedRunVisibility(models.IntegerChoices):
     UNLISTED = 1
     PUBLIC = 2
@@ -157,6 +163,11 @@ class SavedRun(models.Model):
 
     state = models.JSONField(default=dict, blank=True, encoder=PostgresJSONEncoder)
 
+    finish_reason = models.IntegerField(
+        choices=FinishReason.choices,
+        null=True,
+        default=None,
+    )
     error_msg = models.TextField(default="", blank=True)
     run_time = models.DurationField(default=datetime.timedelta, blank=True)
     run_status = models.TextField(default="", blank=True)
@@ -225,6 +236,8 @@ class SavedRun(models.Model):
             ret[StateKeys.created_at] = self.created_at
         if self.error_msg:
             ret[StateKeys.error_msg] = self.error_msg
+        if self.finish_reason:
+            ret[StateKeys.finish_reason] = self.finish_reason
         if self.run_time:
             ret[StateKeys.run_time] = self.run_time.total_seconds()
         if self.run_status:
@@ -255,6 +268,7 @@ class SavedRun(models.Model):
         if created_at:
             self.created_at = created_at
         self.error_msg = state.pop(StateKeys.error_msg, None) or ""
+        self.finish_reason = state.pop(StateKeys.finish_reason, None)
         self.run_time = datetime.timedelta(
             seconds=state.pop(StateKeys.run_time, None) or 0
         )

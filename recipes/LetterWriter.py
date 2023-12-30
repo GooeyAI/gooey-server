@@ -8,6 +8,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.language_model import run_language_model
 from daras_ai_v2.text_training_data_widget import text_training_data, TrainingDataModel
 
@@ -232,7 +233,7 @@ class LetterWriterPage(BasePage):
         json_body = request.api_json_body.replace("{{ action_id }}", request.action_id)
 
         if not (url and method):
-            raise ValueError("HTTP method / URL is empty. Please check your settings.")
+            raise UserError("HTTP method / URL is empty. Please check your settings.")
 
         if headers:
             headers = json.loads(headers)
@@ -252,7 +253,7 @@ class LetterWriterPage(BasePage):
         yield "Generating Prompt..."
 
         if not request.input_prompt:
-            raise ValueError("Input prompt is Empty. Please check your settings.")
+            raise UserError("Input prompt is Empty. Please check your settings.")
 
         input_prompt = daras_ai_format_str(
             format_str=request.input_prompt,
@@ -263,13 +264,11 @@ class LetterWriterPage(BasePage):
         yield "Generating Prompt..."
 
         if not request.prompt_header:
-            raise ValueError(
+            raise UserError(
                 "Task description not provided. Please check your settings."
             )
         if not request.example_letters:
-            raise ValueError(
-                "Example letters not provided. Please check your settings."
-            )
+            raise UserError("Example letters not provided. Please check your settings.")
 
         prompt_prefix = "TalkingPoints:"
         completion_prefix = "Letter:"

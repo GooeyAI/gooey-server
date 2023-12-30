@@ -20,6 +20,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.descriptions import prompting101
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.img_model_settings_widgets import (
     output_resolution_setting,
     img_model_settings,
@@ -556,10 +557,13 @@ def is_url(url: str) -> bool:
         return True
 
 
-def generate_and_upload_qr_code(
+def get_qr_code_data(
     request: QRCodeGeneratorPage.RequestModel,
     user: AppUser,
-) -> tuple[str, str, bool]:
+) -> tuple[str, bool]:
+    """
+    Returns tuple for the QR code data and whether the input URL was shortened
+    """
     if request.qr_code_vcard:
         vcf_str = request.qr_code_vcard.to_vcf_str()
         qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
@@ -568,7 +572,7 @@ def generate_and_upload_qr_code(
             user=user,
             workflow=Workflow.QR_CODE,
         )[0].shortened_url()
-        using_shortened_url = True
+        return qr_code_data, True
     else:
         if request.qr_code_file:
             qr_code_data = request.qr_code_file
@@ -579,17 +583,29 @@ def generate_and_upload_qr_code(
         if isinstance(qr_code_data, str):
             qr_code_data = qr_code_data.strip()
         if not qr_code_data:
-            raise ValueError("Please provide QR Code URL, text content, or an image")
-        using_shortened_url = request.use_url_shortener and is_url(qr_code_data)
+            raise UserError("Please provide QR Code URL, text content, or an image")
+        using_shortened_url = (
+            request.use_url_shortener and is_url(qr_code_data) or False
+        )
         if using_shortened_url:
             qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
                 url=qr_code_data,
                 user=user,
                 workflow=Workflow.QR_CODE,
             )[0].shortened_url()
+        return qr_code_data, using_shortened_url
+
+
+def generate_and_upload_qr_code(
+    request: QRCodeGeneratorPage.RequestModel,
+    user: AppUser,
+) -> tuple[str, str, bool]:
+    try:
+        qr_code_data, using_shortened_url = get_qr_code_data(request, user)
+    except InvalidQRCode as e:
+        raise UserError from e
 
     img_cv2 = generate_qr_code(qr_code_data)
-
     img_cv2, _ = reposition_object(
         orig_img=img_cv2,
         orig_mask=img_cv2,

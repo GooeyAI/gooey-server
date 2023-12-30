@@ -144,6 +144,25 @@ def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
         markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
 
 
+def warning(body: str, icon: str = "⚠️", *, unsafe_allow_html=False):
+    if not isinstance(body, str):
+        body = repr(body)
+    with div(
+        style=dict(
+            backgroundColor="rgba(238, 210, 2, 0.2)",
+            padding="1rem",
+            paddingBottom="0",
+            marginBottom="0.5rem",
+            borderRadius="0.25rem",
+            display="flex",
+            gap="0.5rem",
+        )
+    ):
+        markdown(icon)
+        with div():
+            markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
+
+
 def caption(body: str, **props):
     style = props.setdefault("style", {"fontSize": "0.9rem"})
     markdown(body, className="text-muted", **props)

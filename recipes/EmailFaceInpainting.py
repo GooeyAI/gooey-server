@@ -9,6 +9,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import db, settings
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
@@ -170,7 +171,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
                 email_regex, email_address
             ), "Please provide a valid Email Address"
         else:
-            raise AssertionError("Please provide an Email Address or Twitter Handle")
+            raise UserError("Please provide an Email Address or Twitter Handle")
 
         from_email = st.session_state.get("email_from")
         email_subject = st.session_state.get("email_subject")

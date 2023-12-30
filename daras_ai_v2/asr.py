@@ -14,6 +14,7 @@ from furl import furl
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gdrive_downloader import (
     is_gdrive_url,
@@ -570,7 +571,7 @@ def run_asr(
             assert data.get("chunks"), f"{selected_model.value} can't generate VTT"
             return generate_vtt(data["chunks"])
         case _:
-            raise ValueError(f"Invalid output format: {output_format}")
+            raise UserError(f"Invalid output format: {output_format}")
 
 
 def _get_or_create_recognizer(

@@ -28,6 +28,7 @@ from starlette.requests import Request
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
 from bots.models import (
+    FinishReason,
     SavedRun,
     PublishedRun,
     PublishedRunVersion,
@@ -46,6 +47,7 @@ from daras_ai_v2.crypto import (
 from daras_ai_v2.db import (
     ANONYMOUS_USER_COOKIE,
 )
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -95,6 +97,7 @@ class StateKeys:
     created_at = "created_at"
     updated_at = "updated_at"
 
+    finish_reason = "__finish_reason"
     error_msg = "__error_msg"
     run_time = "__run_time"
     run_status = "__run_status"
@@ -1381,7 +1384,17 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_failed_output(self):
         err_msg = st.session_state.get(StateKeys.error_msg)
-        st.error(err_msg, unsafe_allow_html=True)
+        finish_reason = st.session_state.get(StateKeys.finish_reason)
+        self._render_error(err_msg, finish_reason)
+
+    def _render_error(self, error_msg: str, finish_reason: FinishReason):
+        match finish_reason:
+            case FinishReason.USER_ERROR:
+                st.warning(error_msg, unsafe_allow_html=True)
+            case FinishReason.SERVER_ERROR:
+                st.error(error_msg, unsafe_allow_html=True)
+            case _:
+                raise ValueError(f"invalid finish reason for error: {finish_reason}")
 
     def _render_running_output(self):
         run_status = st.session_state.get(StateKeys.run_status)
@@ -1421,6 +1434,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
                 example_id, run_id, uid
             )
+            st.session_state[StateKeys.finish_reason] = FinishReason.USER_ERROR
             self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
         else:
             self.call_runner_task(example_id, run_id, uid)
@@ -1439,6 +1453,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
     def create_new_run(self):
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
+        st.session_state.pop(StateKeys.finish_reason, None)
         st.session_state.pop(StateKeys.run_time, None)
         self._setup_rng_seed()
         self.clear_outputs()
@@ -1529,6 +1544,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def clear_outputs(self):
         # clear error msg
         st.session_state.pop(StateKeys.error_msg, None)
+        st.session_state.pop(StateKeys.finish_reason, None)
         # clear outputs
         for field_name in self.ResponseModel.__fields__:
             st.session_state.pop(field_name, None)
@@ -1608,6 +1624,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             for field_name in model.__fields__
         ] + [
             StateKeys.error_msg,
+            StateKeys.finish_reason,
             StateKeys.run_status,
             StateKeys.run_time,
         ]
@@ -1711,7 +1728,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if saved_run.run_status:
             html_spinner(saved_run.run_status)
         elif saved_run.error_msg:
-            st.error(saved_run.error_msg, unsafe_allow_html=True)
+            self._render_error(
+                error_msg=saved_run.error_msg, finish_reason=saved_run.finish_reason
+            )
 
         return self.render_example(saved_run.to_dict())
 
@@ -1963,6 +1982,8 @@ def err_msg_for_exc(e):
                 return f"(GPU) {err_type}: {err_str}"
             err_str = str(err_body)
         return f"(HTTP {response.status_code}) {html.escape(err_str[:1000])}"
+    elif isinstance(e, UserError):
+        return str(e)
     else:
         return f"{type(e).__name__}: {e}"
 

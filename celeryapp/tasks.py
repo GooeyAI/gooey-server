@@ -4,14 +4,16 @@ from time import time
 from types import SimpleNamespace
 
 import sentry_sdk
+import pydantic
 
 import gooey_ui as st
 from app_users.models import AppUser
-from bots.models import SavedRun
+from bots.models import SavedRun, FinishReason
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
-from daras_ai_v2.base import StateKeys, err_msg_for_exc, BasePage
+from daras_ai_v2.base import BasePage, StateKeys, err_msg_for_exc
+from daras_ai_v2.exceptions import UserError, raise_as_user_error
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
@@ -27,15 +29,16 @@ def gui_runner(
     uid: str,
     state: dict,
     channel: str,
-    query_params: dict = None,
+    query_params: dict | None = None,
     is_api_call: bool = False,
 ):
     page = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
     sr = page.run_doc_sr(run_id, uid)
 
     st.set_session_state(state)
-    run_time = 0
+    run_time = 0.0
     yield_val = None
+    finish_reason = None
     error_msg = None
     set_query_params(query_params or {})
 
@@ -53,6 +56,7 @@ def gui_runner(
         # set run status and run time
         status = {
             StateKeys.run_time: run_time,
+            StateKeys.finish_reason: finish_reason,
             StateKeys.error_msg: error_msg,
             StateKeys.run_status: run_status,
         }
@@ -75,30 +79,36 @@ def gui_runner(
     try:
         gen = page.run(st.session_state)
         save()
-        while True:
-            # record time
-            start_time = time()
-            try:
-                # advance the generator (to further progress of run())
-                yield_val = next(gen)
-                # increment total time taken after every iteration
-                run_time += time() - start_time
-                continue
-            # run completed
-            except StopIteration:
-                run_time += time() - start_time
-                sr.transaction, sr.price = page.deduct_credits(st.session_state)
-                break
+        start_time = time()
+        try:
+            with raise_as_user_error([pydantic.ValidationError]):
+                for yield_val in gen:
+                    # increment total time taken after every iteration
+                    run_time += time() - start_time
+                    save()
+        except UserError as e:
+            # handled errors caused due to user input
+            run_time += time() - start_time
+            finish_reason = FinishReason.USER_ERROR
+            traceback.print_exc()
+            sentry_sdk.capture_exception(e)
+            error_msg = err_msg_for_exc(e)
+        except Exception as e:
             # render errors nicely
-            except Exception as e:
-                run_time += time() - start_time
-                traceback.print_exc()
-                sentry_sdk.capture_exception(e)
-                error_msg = err_msg_for_exc(e)
-                break
-            finally:
-                save()
+            run_time += time() - start_time
+            finish_reason = FinishReason.SERVER_ERROR
+            traceback.print_exc()
+            sentry_sdk.capture_exception(e)
+            error_msg = err_msg_for_exc(e)
+        else:
+            # run completed
+            run_time += time() - start_time
+            finish_reason = FinishReason.DONE
+            sr.transaction, sr.price = page.deduct_credits(st.session_state)
     finally:
+        if not finish_reason:
+            finish_reason = FinishReason.SERVER_ERROR
+            error_msg = "Something went wrong. Please try again later."
         save(done=True)
         if not is_api_call:
             send_email_on_completion(page, sr)
