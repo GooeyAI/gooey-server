@@ -19,7 +19,7 @@ USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 router = APIRouter()
 
 
-def generateAccessToken():
+def generate_access_token():
     """
     Generate an OAuth 2.0 access token for authenticating with PayPal REST APIs.
     @see https://developer.paypal.com/api/rest/authentication/
@@ -41,10 +41,10 @@ def generateAccessToken():
 
 # Create an order to start the transaction.
 # @see https://developer.paypal.com/docs/api/orders/v2/#orders_create
-def createOrder(payload: dict, uid: str):
+def create_order(payload: dict, uid: str):
     # use the cart information passed from the front-end to calculate the purchase unit details
 
-    accessToken = generateAccessToken()
+    accessToken = generate_access_token()
     url = str(furl(settings.PAYPAL_BASE) / "v2/checkout/orders")
     payload = {
         "intent": "CAPTURE",
@@ -78,8 +78,8 @@ def createOrder(payload: dict, uid: str):
 
 # Capture payment for the created order to complete the transaction.
 # @see https://developer.paypal.com/docs/api/orders/v2/#orders_capture
-def captureOrder(orderID: str):
-    accessToken = generateAccessToken()
+def capture_order(orderID: str):
+    accessToken = generate_access_token()
     url = str(furl(settings.PAYPAL_BASE) / f"v2/checkout/orders/{orderID}/capture")
 
     response = requests.post(
@@ -105,13 +105,13 @@ async def request_body(request: Request):
 def orders(req: Request, uid: str, _payload: bytes = Depends(request_body)):
     # use the cart information passed from the front-end to calculate the order amount detals
     payload: dict = json.loads(_payload)
-    jsonResponse, httpStatusCode = createOrder(payload, uid)
+    jsonResponse, httpStatusCode = create_order(payload, uid)
     return JSONResponse(jsonResponse, httpStatusCode)
 
 
 @router.post("/__/paypal/orders/{orderID}/capture")
 def capture(req: Request, orderID: str):
-    jsonResponse, httpStatusCode = captureOrder(orderID)
+    jsonResponse, httpStatusCode = capture_order(orderID)
     return JSONResponse(jsonResponse, httpStatusCode)
 
 
@@ -124,7 +124,7 @@ def create_payment(request: Request):
 @router.post("/__/paypal/webhook", status_code=200)
 def create_webhook(request: Request, _payload: bytes = Depends(request_body)):
     # Verify
-    accessToken = generateAccessToken()
+    accessToken = generate_access_token()
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {accessToken}",
