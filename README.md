@@ -2,6 +2,7 @@
 
 * Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile)
 * Install [poetry](https://python-poetry.org/docs/)
+* Clone the github repo to gooey-server (and make sure that's the folder name)
 * Create & activate a virtualenv (e.g. `poetry shell`)
 * Run `poetry install --with dev`
 * Install [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/), [rabbitmq](https://www.rabbitmq.com/install-homebrew.html), and [postgresql](https://formulae.brew.sh/formula/postgresql@15) (e.g. `brew install redis rabbitmq postgresql@15`)
