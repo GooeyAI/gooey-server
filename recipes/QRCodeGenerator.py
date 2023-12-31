@@ -483,28 +483,20 @@ Here is the final output:
             request.selected_controlnet_model = [request.selected_controlnet_model]
         init_images = [image] * len(request.selected_controlnet_model)
         if request.image_prompt:
-            if (
-                request.image_prompt_scale != 1.0
-                or request.image_prompt_pos_x != 0.5
-                or request.image_prompt_pos_y != 0.5
-            ):
-                # we only need to reposition if the user moved/scaled the image
-                image_prompt = bytes_to_cv2_img(
-                    requests.get(request.image_prompt).content
-                )
-                repositioned_image_prompt, _ = reposition_object(
-                    orig_img=image_prompt,
-                    orig_mask=image_prompt,
-                    out_size=(request.output_width, request.output_height),
-                    out_obj_scale=request.image_prompt_scale,
-                    out_pos_x=request.image_prompt_pos_x,
-                    out_pos_y=request.image_prompt_pos_y,
-                    color=255,
-                )
-                request.image_prompt = upload_file_from_bytes(
-                    "repositioned_image_prompt.png",
-                    cv2_img_to_bytes(repositioned_image_prompt),
-                )
+            image_prompt = bytes_to_cv2_img(requests.get(request.image_prompt).content)
+            repositioned_image_prompt, _ = reposition_object(
+                orig_img=image_prompt,
+                orig_mask=image_prompt,
+                out_size=(request.output_width, request.output_height),
+                out_obj_scale=request.image_prompt_scale,
+                out_pos_x=request.image_prompt_pos_x,
+                out_pos_y=request.image_prompt_pos_y,
+                color=255,
+            )
+            request.image_prompt = upload_file_from_bytes(
+                "repositioned_image_prompt.png",
+                cv2_img_to_bytes(repositioned_image_prompt),
+            )
             init_images += [request.image_prompt] * len(
                 request.image_prompt_controlnet_models
             )
