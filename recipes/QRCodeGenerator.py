@@ -150,6 +150,14 @@ class QRCodeGeneratorPage(BasePage):
             key="text_prompt",
             placeholder="Bright sunshine coming through the cracks of a wet, cave wall of big rocks",
         )
+        st.file_uploader(
+            """
+            ### 🏞️ Reference Image [optional]
+            This image will be used as inspiration to blend with the QR Code.
+            """,
+            key="image_prompt",
+            accept=["image/*"],
+        )
 
         qr_code_source_key = "__qr_code_source"
         if qr_code_source_key not in st.session_state:
@@ -376,6 +384,79 @@ Here is the final output:
             st.write(
                 """
                 ##### ⌖ Reference Image Positioning
+                Use this to control where the reference image is placed, and how big it should be.
+                """,
+                className="gui-input",
+            )
+            col1, _ = st.columns(2)
+            with col1:
+                image_prompt_scale = st.slider(
+                    "Scale",
+                    min_value=0.1,
+                    max_value=1.0,
+                    step=0.05,
+                    key="image_prompt_scale",
+                )
+            col1, col2 = st.columns(2, responsive=False)
+            with col1:
+                image_prompt_pos_x = st.slider(
+                    "Position X",
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.05,
+                    key="image_prompt_pos_x",
+                )
+            with col2:
+                image_prompt_pos_y = st.slider(
+                    "Position Y",
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.05,
+                    key="image_prompt_pos_y",
+                )
+
+            img_cv2 = mask_cv2 = bytes_to_cv2_img(
+                requests.get(st.session_state["image_prompt"]).content,
+            )
+            repositioning_preview_widget(
+                img_cv2=img_cv2,
+                mask_cv2=mask_cv2,
+                obj_scale=image_prompt_scale,
+                pos_x=image_prompt_pos_x,
+                pos_y=image_prompt_pos_y,
+                out_size=(
+                    st.session_state["output_width"],
+                    st.session_state["output_height"],
+                ),
+                color=255,
+            )
+
+        if st.session_state.get("image_prompt"):
+            st.write("---")
+            st.write(
+                """
+                ##### 🎨 Inspiration
+                Use this to control how the image prompt should influence the output.
+                """,
+                className="gui-input",
+            )
+            st.slider(
+                "Inspiration Strength",
+                min_value=0.0,
+                max_value=1.0,
+                step=0.05,
+                key="image_prompt_strength",
+            )
+            enum_multiselect(
+                ControlNetModels,
+                label="Control Net Models",
+                key="image_prompt_controlnet_models",
+                checkboxes=False,
+                allow_none=False,
+            )
+            st.write(
+                """
+                ##### ⌖ Positioning
                 Use this to control where the reference image is placed, and how big it should be.
                 """,
                 className="gui-input",
