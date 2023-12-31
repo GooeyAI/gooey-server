@@ -143,20 +143,12 @@ class QRCodeGeneratorPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### 👩‍💻 Prompt
+            ##### 👩‍💻 Prompt
             Describe the subject/scene of the QR Code.
             Choose clear prompts and distinguishable visuals to ensure optimal readability.
             """,
             key="text_prompt",
             placeholder="Bright sunshine coming through the cracks of a wet, cave wall of big rocks",
-        )
-        st.file_uploader(
-            """
-            ### 🏞️ Reference Image [optional]
-            This image will be used as inspiration to blend with the QR Code.
-            """,
-            key="image_prompt",
-            accept=["image/*"],
         )
 
         qr_code_source_key = "__qr_code_source"
@@ -212,6 +204,15 @@ class QRCodeGeneratorPage(BasePage):
             st.caption(
                 'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
             )
+
+        st.file_uploader(
+            """
+            ##### 🏞️ Reference Image *[optional]*
+            This image will be used as inspiration to blend with the QR Code.
+            """,
+            key="image_prompt",
+            accept=["image/*"],
+        )
 
     def validate_form_v2(self):
         assert st.session_state.get("text_prompt"), "Please provide a prompt"
@@ -301,7 +302,7 @@ Here is the final output:
 
         st.write(
             """
-            ##### ⌖ Positioning
+            ##### ⌖ QR Positioning
             Use this to control where the QR code is placed in the image, and how big it should be.
             """,
             className="gui-input",
@@ -374,7 +375,7 @@ Here is the final output:
             )
             st.write(
                 """
-                ##### ⌖ Positioning
+                ##### ⌖ Reference Image Positioning
                 Use this to control where the reference image is placed, and how big it should be.
                 """,
                 className="gui-input",
