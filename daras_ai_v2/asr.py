@@ -757,7 +757,7 @@ def check_wav_audio_format(filename: str) -> bool:
         data = json.loads(subprocess.check_output(args, stderr=subprocess.STDOUT))
     except subprocess.CalledProcessError as e:
         ffmpeg_output_error = ValueError(e.output, e)
-        raise ValueError(
+        raise UserError(
             "Invalid audio file. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
         ) from ffmpeg_output_error
     return (

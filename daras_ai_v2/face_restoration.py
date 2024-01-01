@@ -6,6 +6,7 @@ import replicate
 import requests
 
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
 from daras_ai_v2.stable_diffusion import sd_upscale
 

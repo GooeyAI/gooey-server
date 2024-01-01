@@ -6,13 +6,14 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from daras_ai.extract_face import extract_and_reposition_face_cv2
+from daras_ai.extract_face import FaceNotFoundException, extract_and_reposition_face_cv2
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
 )
 from daras_ai_v2 import stable_diffusion
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.extract_face import extract_face_img_bytes
 from daras_ai_v2.face_restoration import gfpgan
 from daras_ai_v2.functional import map_parallel
@@ -255,13 +256,16 @@ class FaceInpaintingPage(BasePage):
         input_image_url = state["input_image"]
         img_bytes = requests.get(input_image_url).content
 
-        re_img_bytes, face_mask_bytes = extract_face_img_bytes(
-            img_bytes,
-            out_size=(state["output_width"], state["output_height"]),
-            face_scale=state["face_scale"],
-            pos_x=state["face_pos_x"],
-            pos_y=state["face_pos_y"],
-        )
+        try:
+            re_img_bytes, face_mask_bytes = extract_face_img_bytes(
+                img_bytes,
+                out_size=(state["output_width"], state["output_height"]),
+                face_scale=state["face_scale"],
+                pos_x=state["face_pos_x"],
+                pos_y=state["face_pos_y"],
+            )
+        except FaceNotFoundException as e:
+            raise UserError(str(e)) from e
 
         state["resized_image"] = upload_file_from_bytes("re_img.png", re_img_bytes)
         state["face_mask"] = upload_file_from_bytes("face_mask.png", face_mask_bytes)

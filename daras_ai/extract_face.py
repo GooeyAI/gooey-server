@@ -1,6 +1,10 @@
 import numpy as np
 
 
+class FaceNotFoundException(ValueError):
+    pass
+
+
 def extract_and_reposition_face_cv2(
     orig_img,
     *,
@@ -118,7 +122,7 @@ def face_oval_hull_generator(image_cv2):
         results = face_mesh.process(cv2.cvtColor(image_cv2, cv2.COLOR_BGR2RGB))
 
         if not results.multi_face_landmarks:
-            raise ValueError("Face not found")
+            raise FaceNotFoundException("Face not found")
 
         for landmark_list in results.multi_face_landmarks:
             idx_to_coordinates = build_idx_to_coordinates_dict(

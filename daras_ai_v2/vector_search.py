@@ -22,6 +22,7 @@ from daras_ai.image_input import (
     guess_ext_from_response,
     get_mimetype_from_response,
 )
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, run_asr, run_google_translate
 from daras_ai_v2.azure_doc_extract import (
@@ -270,7 +271,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             meta = gdrive_metadata(url_to_gdrive_file_id(f))
         except HttpError as e:
             if e.status_code == 404:
-                raise FileNotFoundError(
+                raise UserError(
                     f"Could not download the google doc at {f_url} "
                     f"Please make sure to make the document public for viewing."
                 ) from e
