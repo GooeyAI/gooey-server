@@ -321,9 +321,6 @@ class SavedRun(models.Model):
         else:
             return None
 
-    def get_run_count(self) -> int:
-        return self.children.count()
-
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):
         return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
