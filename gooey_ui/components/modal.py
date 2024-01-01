@@ -91,3 +91,50 @@ class Modal:
                 if close_:
                     self.close()
             yield self._container
+
+
+class ConfirmationModal(Modal):
+    def __init__(
+        self,
+        *,
+        title: str,
+        key: str,
+        confirm_text: str = "Confirm",
+        cancel_text: str = "Cancel",
+        confirm_button_props: dict | None = None,
+        cancel_button_props: dict | None = None,
+        **props,
+    ):
+        super().__init__(title, key, **props)
+
+        self.confirm_text = confirm_text
+        self.cancel_text = cancel_text
+        self.confirm_button_props = {"type": "secondary", "className": "w-100"} | (confirm_button_props or {})
+        self.cancel_button_props = {"type": "secondary", "className": "w-100"} | (cancel_button_props or {})
+
+        self.is_confirm_pressed = False
+
+    @contextmanager
+    def container(self):
+        with super().container():
+            div = st.div()
+
+            with st.div(className="d-flex"):
+                confirm_button = st.button(
+                    self.confirm_text,
+                    key=f"{self.key}-confirm",
+                    **self.confirm_button_props,
+                )
+                cancel_button = st.button(
+                    self.cancel_text,
+                    key=f"{self.key}-cancel",
+                    **self.cancel_button_props,
+                )
+
+            if cancel_button:
+                self.close()
+
+            self.is_confirm_pressed = confirm_button
+
+            with div:
+                yield

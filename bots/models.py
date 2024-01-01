@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import typing
+from functools import cached_property
 from multiprocessing.pool import ThreadPool
 
 import pytz
@@ -113,6 +114,35 @@ class Workflow(models.IntegerChoices):
         from daras_ai_v2.all_pages import workflow_map
 
         return workflow_map[self]
+
+    @cached_property
+    def metadata(self) -> WorkflowMetadata:
+        metadata, _created = WorkflowMetadata.objects.get_or_create(
+            workflow=self,
+            defaults=dict(
+                short_title=self.page_cls.title,
+                default_image=self.page_cls.explore_image or None,
+                meta_title=self.page_cls.title,
+                meta_image=self.page_cls.explore_image or None,
+            )
+        )
+        return metadata
+
+
+class WorkflowMetadata(models.Model):
+    workflow = models.IntegerField(choices=Workflow.choices, unique=True)
+    short_title = models.TextField()
+    help_url = models.URLField(blank=True, default="")
+
+    # TODO: support the below fields
+    default_image = models.URLField(null=True, help_text="(not implemented)")
+
+    meta_title = models.TextField(help_text="(not implemented)")
+    meta_image = models.URLField(null=True, help_text="(not implemented)")
+    meta_keywords = models.JSONField(default=list, blank=True, help_text="(not implemented)")
+
+    def __str__(self):
+        return f"Workflow Meta ({self.short_title})"
 
 
 class SavedRunQuerySet(models.QuerySet):
