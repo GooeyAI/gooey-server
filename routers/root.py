@@ -207,6 +207,39 @@ async def request_json(request: Request):
     return await request.json()
 
 
+@app.get("/__/status")
+def status(request: Request):
+    from daras_ai_v2.monitoring import get_status
+
+    status = get_status()
+
+    delayed_runs = sum(row["delayed_gt_5_minutes"] for row in status)
+    failed_runs = sum(row["failed_lt_5_minutes"] for row in status)
+    total_runs = sum(row["total"] for row in status) or 1
+
+    failing = failed_runs / total_runs > 0.1
+    delayed = delayed_runs / total_runs > 0.1
+
+    match failing, delayed:
+        case (True, True):
+            one_word_status = "delayed and failing"
+        case (True, False):
+            one_word_status = "failing"
+        case (False, True):
+            one_word_status = "delayed"
+        case (False, False):
+            one_word_status = "ok"
+        case _:
+            raise Exception("unreachable")
+
+    text_status = one_word_status + "\n"
+    if delayed:
+        text_status += f"delay ({delayed_runs} / {total_runs})\n"
+    if failing:
+        text_status += f"failing ({failed_runs} / {total_runs})\n"
+    return text_status
+
+
 @app.post("/explore/")
 def explore_page(request: Request, json_data: dict = Depends(request_json)):
     import explore
