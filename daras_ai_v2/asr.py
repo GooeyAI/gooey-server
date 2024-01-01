@@ -658,9 +658,7 @@ def azure_asr(audio_url: str, language: str):
                 headers={"Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY},
             )
             r.raise_for_status()
-            combined_phrases: list[dict] = dict(r.json()).get(
-                "combinedRecognizedPhrases", [{}]
-            ) or [{}]
+            combined_phrases = r.json().get("combinedRecognizedPhrases") or [{}]
             transcriptions += [combined_phrases[0].get("display", "")]
         return "\n".join(transcriptions)
     assert False, "Max polls exceeded, Azure speech did not yield a response"
