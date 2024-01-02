@@ -947,6 +947,26 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             messages = Message.objects.filter(conversation__in=conversations)
             user_messages = messages.filter(role=CHATML_ROLE_USER)
             bot_messages = messages.filter(role=CHATML_ROLE_ASSISTANT)
+            num_active_users_last_7_days = len(
+                set(
+                    [
+                        message.conversation.get_user_id()
+                        for message in user_messages.filter(
+                            created_at__gte=datetime.now() - timedelta(days=7),
+                        )
+                    ]
+                )
+            )
+            num_active_users_last_30_days = len(
+                set(
+                    [
+                        message.conversation.get_user_id()
+                        for message in user_messages.filter(
+                            created_at__gte=datetime.now() - timedelta(days=30),
+                        )
+                    ]
+                )
+            )
             positive_feedbacks = Feedback.objects.filter(
                 message__conversation__bot_integration=bi,
                 rating=Feedback.Rating.RATING_THUMBS_UP,
@@ -975,6 +995,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 - {run_link}
                 - Connected to: {connection_detail}
                 * {len(users)} Users
+                * {num_active_users_last_7_days} Active Users (Last 7 Days)
+                * {num_active_users_last_30_days} Active Users (Last 30 Days)
                 * {conversations.count()} Conversations
                 * {user_messages.count()} User Messages
                 * {bot_messages.count()} Bot Messages
