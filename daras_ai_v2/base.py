@@ -1596,9 +1596,18 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _render_workflow_metadata_settings(self):
         metadata = self.workflow.metadata
         st.write("---")
-        st.write("###### Workflow Metadata")
+        st.write("##### Workflow Metadata")
         short_title = st.text_input("Short Title", value=metadata.short_title)
         help_url = st.text_input("Help URL", value=metadata.help_url)
+        st.write("###### SEO Meta Tags")
+        meta_title = st.text_input("Meta Title", value=metadata.meta_title)
+        meta_description = st.text_area(
+            "Meta Description", value=metadata.meta_description
+        )
+        st.session_state.setdefault("meta_image", metadata.meta_image)
+        meta_image = st.file_uploader(
+            "Meta Image", accept=["image/*"], key="meta_image"
+        )
         confirm_modal = ConfirmationModal(
             title="Confirm Changes",
             confirm_button_props=dict(
@@ -1617,6 +1626,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if confirm_modal.is_confirm_pressed:
             metadata.short_title = short_title
             metadata.help_url = help_url or ""
+            metadata.meta_title = meta_title
+            metadata.meta_description = meta_description
+            metadata.meta_image = meta_image
             try:
                 metadata.full_clean()
                 metadata.save()
