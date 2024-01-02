@@ -176,7 +176,7 @@ class BasePage:
             tab_name=MenuTabs.paths[tab],
         )
 
-    def render(self):
+    def _setup_render(self) -> tuple:
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
@@ -197,7 +197,7 @@ class BasePage:
 
         if st.session_state.get("show_report_workflow"):
             self.render_report_form()
-            return
+            return ()
 
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         current_run = self.get_sr_from_query_params(example_id, run_id, uid)
@@ -207,6 +207,22 @@ class BasePage:
             current_run=current_run,
             published_run=published_run,
         )
+        return (
+            title,
+            breadcrumbs,
+            current_run,
+            published_run,
+            is_root_example,
+        )
+
+    def render(self):
+        (
+            title,
+            breadcrumbs,
+            current_run,
+            published_run,
+            is_root_example,
+        ) = self._setup_render()
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
                 if not breadcrumbs and not self.run_user:

@@ -1,7 +1,6 @@
 from daras_ai_v2.base import BasePage
 import gooey_ui as st
 from furl import furl
-from pydantic import BaseModel
 
 from bots.models import (
     Workflow,
@@ -33,11 +32,31 @@ class VideoBotsStatsPage(BasePage):
         Workflow.VIDEO_BOTS
     )  # this is a hidden page, so this isn't used but type checking requires a workflow
 
+    def _get_current_app_url(self):
+        # this is overwritten to include the query params in the copied url for the share button
+        args = dict(self.request.query_params)
+        return furl(self.app_url(), args=args).tostr()
+
     def render(self):
+        self._setup_render()
+        with st.div(className="d-flex justify-content-between mt-4"):
+            with st.div(className="d-lg-flex d-block align-items-center"):
+                with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
+                    self._render_breadcrumbs([(self.title, self.app_url())])
+
+                self.render_author(
+                    self.request.user,
+                    show_as_link=self.is_current_user_admin(),
+                )
+
+            with st.div(className="d-flex align-items-center"):
+                with st.div(className="d-flex align-items-start right-action-icons"):
+                    self._render_social_buttons(show_button_text=True)
+
         if not self.request.user or self.request.user.is_anonymous:
             st.write("**Please Login to view stats for your bot integrations**")
             return
-        if self.request.user.email in settings.ADMIN_EMAILS:
+        if self.is_current_user_admin():
             bot_integrations = BotIntegration.objects.all().order_by(
                 "platform", "-created_at"
             )

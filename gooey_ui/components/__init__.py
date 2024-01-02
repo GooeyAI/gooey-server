@@ -914,14 +914,16 @@ def change_url(url: str, request):
     # this is useful to store certain state inputs in the url to allow for sharing/returning to a state
     old_url = furl(request.url).remove(origin=True).tostr()
     url = furl(url).remove(origin=True).tostr()
+    if old_url == url:
+        return
     # the request is likely processing which means it will overwrite the url we set once it is done
     # so we set up a timer to keep setting the url until the request is done at which point we stop
     js(
         f"""
         setTimeout(() => window.history.replaceState(null, '', '{url}'));
         function change_url() {{
-            console.log(window.location.href.replace(window.location.origin, ""), '{old_url}', '{url}');
-            if ('{old_url}' == '{url}' || window.location.href.replace(window.location.origin, "") == '{old_url}') {{
+            console.log(window.location.href.replace(window.location.origin, ""), '{old_url}', '{url}', '{str(furl(request.url).query)}');
+            if (window.location.href.replace(window.location.origin, "") == '{old_url}' || window.location.search != '?{str(furl(request.url).query)}') {{
                 clearInterval(window._change_url_timer);
             }}
             window.history.replaceState(null, '', '{url}');
