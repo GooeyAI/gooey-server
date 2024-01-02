@@ -922,8 +922,7 @@ def change_url(url: str, request):
         f"""
         setTimeout(() => window.history.replaceState(null, '', '{url}'));
         function change_url() {{
-            console.log(window.location.href.replace(window.location.origin, ""), '{old_url}', '{url}', '{str(furl(request.url).query)}');
-            if (window.location.href.replace(window.location.origin, "") == '{old_url}' || window.location.search != '?{str(furl(request.url).query)}') {{
+            if (window.location.href.replace(window.location.origin, "") == '{old_url}') {{
                 clearInterval(window._change_url_timer);
             }}
             window.history.replaceState(null, '', '{url}');

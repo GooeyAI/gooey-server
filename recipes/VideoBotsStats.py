@@ -2,6 +2,8 @@ from daras_ai_v2.base import BasePage, MenuTabs
 import gooey_ui as st
 from furl import furl
 
+from app_users.models import AppUser
+
 from bots.models import (
     Workflow,
     Platform,
@@ -88,8 +90,12 @@ class VideoBotsStatsPage(BasePage):
                         ]
                     )
 
+                author = (
+                    AppUser.objects.filter(uid=bi.billing_account_uid).first()
+                    or self.request.user
+                )
                 self.render_author(
-                    self.request.user,
+                    author,
                     show_as_link=self.is_current_user_admin(),
                 )
 
@@ -428,7 +434,7 @@ class VideoBotsStatsPage(BasePage):
             href = f'<a href="data:file/csv;base64,{b64}" download="{bi.name}.csv">Download CSV File</a>'
             st.markdown(href, unsafe_allow_html=True)
         else:
-            st.write("No data to show. Try selecting a different detail category.")
+            st.write("No data to show yet.")
 
         # we store important inputs in the url so the user can return to the same view (e.g. bookmark it)
         # this also allows them to share the url (once organizations are supported)
