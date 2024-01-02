@@ -298,15 +298,31 @@ class VideoBotsStatsPage(BasePage):
                 ],
                 layout=dict(
                     margin=dict(l=0, r=0, t=28, b=0),
-                    yaxis=dict(title="User Messages Sent"),
-                    xaxis=dict(title="Date"),
+                    yaxis=dict(
+                        title="User Messages Sent",
+                        range=[
+                            0,
+                            df[[col for col in df if col != "date"]].max().max(),
+                        ],
+                        tickvals=[
+                            *range(
+                                0,
+                                int(
+                                    df[[col for col in df if col != "date"]].max().max()
+                                )
+                                + 1,
+                            )
+                        ],
+                    ),
                     title=dict(
                         text=f"{view} Messages Sent",
                     ),
                     height=300,
+                    template="plotly_white",
                 ),
             )
             st.plotly_chart(fig)
+            st.write("---")
             fig = go.Figure(
                 data=[
                     go.Scatter(
@@ -368,12 +384,27 @@ class VideoBotsStatsPage(BasePage):
                 ],
                 layout=dict(
                     margin=dict(l=0, r=0, t=28, b=0),
-                    yaxis=dict(title="Unique Count"),
-                    xaxis=dict(title="Date"),
+                    yaxis=dict(
+                        title="Unique Count",
+                        range=[
+                            -0.2,
+                            df[[col for col in df if col != "date"]].max().max() + 0.2,
+                        ],
+                        tickvals=[
+                            *range(
+                                0,
+                                int(
+                                    df[[col for col in df if col != "date"]].max().max()
+                                )
+                                + 1,
+                            )
+                        ],
+                    ),
                     title=dict(
                         text=f"{view} Usage Trends",
                     ),
                     height=300,
+                    template="plotly_white",
                 ),
             )
             st.plotly_chart(fig)
