@@ -928,22 +928,16 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             )
             return
 
+        allowed_bids = [bi.id for bi in bot_integrations]
+        bid = self.request.query_params.get("bi_id", allowed_bids[0])
+        if int(bid) not in allowed_bids:
+            bid = allowed_bids[0]
+        bot = bot_integrations.get(id=bid).name
+        st.markdown(f"# 📊 {bot} Analytics")
+
         col1, col2 = st.columns([1, 2])
 
         with col1:
-            allowed_bids = [bi.id for bi in bot_integrations]
-            bid = st.selectbox(
-                "Select one of Your Bot Integrations",
-                options=allowed_bids,
-                format_func=lambda bi_id: str(BotIntegration.objects.get(id=bi_id)),
-                default_value=int(
-                    self.request.query_params.get("bi_id", bot_integrations[0].id)
-                ),
-            )
-
-            if bid not in allowed_bids:
-                bid = allowed_bids[0]
-
             bi = BotIntegration.objects.get(id=bid)
             conversations: ConversationQuerySet = Conversation.objects.filter(
                 bot_integration__id=bid
@@ -1343,7 +1337,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     self.get_tab_url(MenuTabs.stats), args={"bi_id": bi.id}
                 )
                 with st.link(to=str(stats_url)):
-                    st.button("📈 Analytics", type="tertiary")
+                    st.button("📊 Analytics", type="tertiary")
             with col3:
                 if bi.platform == Platform.SLACK:
                     with st.expander("📨 Slack Settings"):
