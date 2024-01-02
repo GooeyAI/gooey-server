@@ -13,7 +13,6 @@ from bots.models import (
     FeedbackQuerySet,
     MessageQuerySet,
 )
-from daras_ai_v2 import settings
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import pandas as pd
@@ -23,6 +22,7 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
 )
+from recipes.VideoBots import VideoBotsPage
 
 
 class VideoBotsStatsPage(BasePage):
@@ -39,19 +39,6 @@ class VideoBotsStatsPage(BasePage):
 
     def render(self):
         self._setup_render()
-        with st.div(className="d-flex justify-content-between mt-4"):
-            with st.div(className="d-lg-flex d-block align-items-center"):
-                with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                    self._render_breadcrumbs([(self.title, self.app_url())])
-
-                self.render_author(
-                    self.request.user,
-                    show_as_link=self.is_current_user_admin(),
-                )
-
-            with st.div(className="d-flex align-items-center"):
-                with st.div(className="d-flex align-items-start right-action-icons"):
-                    self._render_social_buttons(show_button_text=True)
 
         if not self.request.user or self.request.user.is_anonymous:
             st.write("**Please Login to view stats for your bot integrations**")
@@ -75,13 +62,43 @@ class VideoBotsStatsPage(BasePage):
         bid = self.request.query_params.get("bi_id", allowed_bids[0])
         if int(bid) not in allowed_bids:
             bid = allowed_bids[0]
-        bot = bot_integrations.get(id=bid).name
-        st.markdown(f"# 📊 {bot} Analytics")
+        bi = BotIntegration.objects.get(id=bid)
+        run_title = (
+            bi.published_run.title
+            if bi.published_run
+            else bi.saved_run.page_title
+            if bi.saved_run and bi.saved_run.page_title
+            else "This Copilot Run"
+            if bi.saved_run
+            else "No Run Connected"
+        )
+        run_url = furl(bi.saved_run.get_app_url()).tostr() if bi.saved_run else ""
+
+        with st.div(className="d-flex justify-content-between mt-4"):
+            with st.div(className="d-lg-flex d-block align-items-center"):
+                with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
+                    self._render_breadcrumbs(
+                        [
+                            (self.title, self.app_url()),
+                            (run_title, run_url),
+                            (bi.name, self._get_current_app_url()),
+                        ]
+                    )
+
+                self.render_author(
+                    self.request.user,
+                    show_as_link=self.is_current_user_admin(),
+                )
+
+            with st.div(className="d-flex align-items-center"):
+                with st.div(className="d-flex align-items-start right-action-icons"):
+                    self._render_social_buttons(show_button_text=True)
+
+        st.markdown(f"# 📊 {bi.name} Analytics")
 
         col1, col2 = st.columns([1, 2])
 
         with col1:
-            bi = BotIntegration.objects.get(id=bid)
             conversations: ConversationQuerySet = Conversation.objects.filter(
                 bot_integration__id=bid
             )  # type: ignore
@@ -118,11 +135,8 @@ class VideoBotsStatsPage(BasePage):
                 message__conversation__bot_integration=bi,
                 rating=Feedback.Rating.RATING_THUMBS_DOWN,
             ).count()
-            run_title = bi.published_run.title if bi.published_run else "This Run"
             run_link = (
-                f'Powered By: <a href="{furl(bi.saved_run.get_app_url()).tostr()}" target="_blank">{run_title}</a>'
-                if bi.saved_run
-                else "Not connected to any run"
+                f'Powered By: <a href="{run_url}" target="_blank">{run_title}</a>'
             )
             connection_detail = (
                 bi.fb_page_name

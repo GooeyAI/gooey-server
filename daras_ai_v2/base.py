@@ -690,19 +690,19 @@ class BasePage:
             """
         )
 
-        render_item1 = items and items[0]
-        render_item2 = items[1:] and items[1]
-        if render_item1 or render_item2:  # avoids empty space
+        render_first_items = items and items[:-1]
+        render_last_item = len(items) > 1 and items[-1]
+        if render_first_items or render_last_item:  # avoids empty space
             with st.breadcrumbs():
-                if render_item1:
-                    text, link = render_item1
+                for item in render_first_items:
+                    text, link = item
                     st.breadcrumb_item(
                         text,
                         link_to=link,
                         className="text-muted",
                     )
-                if render_item2:
-                    text, link = render_item2
+                if render_last_item:
+                    text, link = render_last_item
                     st.breadcrumb_item(
                         text,
                         link_to=link,
