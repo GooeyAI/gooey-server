@@ -1,4 +1,4 @@
-from daras_ai_v2.base import BasePage
+from daras_ai_v2.base import BasePage, MenuTabs
 import gooey_ui as st
 from furl import furl
 
@@ -79,9 +79,12 @@ class VideoBotsStatsPage(BasePage):
                 with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
                     self._render_breadcrumbs(
                         [
-                            (self.title, self.app_url()),
+                            (VideoBotsPage.title, VideoBotsPage.app_url()),
                             (run_title, run_url),
-                            (bi.name, self._get_current_app_url()),
+                            (
+                                bi.name,
+                                VideoBotsPage().get_tab_url(MenuTabs.integrations),
+                            ),
                         ]
                     )
 
