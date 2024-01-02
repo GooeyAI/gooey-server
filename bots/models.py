@@ -682,6 +682,14 @@ class Conversation(models.Model):
     def __str__(self):
         return f"{self.get_display_name()} <> {self.bot_integration}"
 
+    def get_user_id(self):
+        return (
+            self.wa_phone_number
+            or self.ig_account_id
+            or self.fb_page_id
+            or self.slack_user_id
+        )
+
     def get_display_name(self):
         return (
             (self.wa_phone_number and self.wa_phone_number.as_international)

@@ -11,6 +11,7 @@ class MenuTabs:
     history = "📖 History"
     integrations = "🔌 Integrations"
     saved = "📁 Saved"
+    stats = "📊 Analytics"
 
     paths = {
         run: "",
@@ -19,6 +20,7 @@ class MenuTabs:
         history: "history",
         integrations: "integrations",
         saved: "saved",
+        stats: "stats",
     }
     paths_reverse = {v: k for k, v in paths.items()}
 
