@@ -84,7 +84,7 @@ class VideoBotsStatsPage(BasePage):
                             (VideoBotsPage.title, VideoBotsPage.app_url()),
                             (run_title, run_url),
                             (
-                                bi.name,
+                                "Integrations",
                                 VideoBotsPage().get_tab_url(MenuTabs.integrations),
                             ),
                         ]
