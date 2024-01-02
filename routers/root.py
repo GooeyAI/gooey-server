@@ -286,9 +286,6 @@ def st_page(
             url=get_og_url_path(request),
             page=page,
             state=state,
-            run_id=run_id,
-            uid=uid,
-            example_id=example_id,
         )
         + [dict(tagName="link", rel="canonical", href=canonical_url)]
         # + [

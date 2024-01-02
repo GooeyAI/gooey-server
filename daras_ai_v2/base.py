@@ -18,6 +18,7 @@ import sentry_sdk
 from django.utils import timezone
 from fastapi import HTTPException
 from firebase_admin import auth
+from functools import lru_cache
 from furl import furl
 from pydantic import BaseModel
 from sentry_sdk.tracing import (
@@ -183,13 +184,14 @@ class BasePage:
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        if st.session_state.get(StateKeys.run_status):
+        if self.get_run_state() == RecipeRunState.running:
+            _example_id, run_id, uid = extract_query_params(gooey_get_query_params())
             channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
             output = realtime_pull([channel])[0]
             if output:
                 st.session_state.update(output)
-        if not st.session_state.get(StateKeys.run_status):
+
+        if not self.get_run_state() == RecipeRunState.running:
             realtime_clear_subs()
 
         self._user_disabled_check()
@@ -199,8 +201,7 @@ class BasePage:
             self.render_report_form()
             return
 
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        current_run = self.get_sr_from_query_params(example_id, run_id, uid)
+        current_run = self.get_current_sr()
         published_run = self.get_current_published_run()
         is_root_example = published_run and published_run.is_root_example()
         title, breadcrumbs = self._get_title_and_breadcrumbs(
@@ -610,6 +611,14 @@ class BasePage:
         if cancel_button:
             modal.close()
 
+    def get_page_title(self) -> str:
+        """The H1 title of this page"""
+        title, _ = self._get_title_and_breadcrumbs(
+            current_run=self.get_current_sr(),
+            published_run=self.get_current_published_run(),
+        )
+        return title
+
     def _get_title_and_breadcrumbs(
         self,
         current_run: SavedRun,
@@ -637,7 +646,7 @@ class BasePage:
                     recipe_breadcrumb
                 ]
             else:
-                if not published_run or not published_run.published_run_id:
+                if not published_run or published_run.is_root_example():
                     # run created directly from recipe root
                     h1_title = prompt_title or f"Run: {recipe_title}"
                     return h1_title, [recipe_breadcrumb]
@@ -951,10 +960,14 @@ class BasePage:
         example_id, run_id, uid = extract_query_params(query_params)
         return self.get_sr_from_query_params(example_id, run_id, uid)
 
+    def get_current_sr(self) -> SavedRun:
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        return self.get_sr_from_query_params(example_id, run_id, uid)
+
     def get_current_published_run(self) -> PublishedRun | None:
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         if run_id:
-            current_run = self.get_sr_from_query_params(example_id, run_id, uid)
+            current_run = self.get_current_sr()
             if current_run.parent_version:
                 return current_run.parent_version.published_run
             else:
@@ -965,6 +978,7 @@ class BasePage:
             return self.get_root_published_run()
 
     @classmethod
+    @lru_cache
     def get_sr_from_query_params(
         cls, example_id: str, run_id: str, uid: str
     ) -> SavedRun:
@@ -989,6 +1003,7 @@ class BasePage:
         return SavedRun.objects.filter(workflow=cls.workflow).count()
 
     @classmethod
+    @lru_cache
     def get_published_run_from_query_params(
         cls,
         example_id: str,
@@ -1287,7 +1302,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_report_button(self):
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        # only logged in users can report a run (but not explamples/default runs)
+        # only logged in users can report a run (but not examples/default runs)
         if not (self.request.user and run_id and uid):
             return
 
@@ -1555,8 +1570,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if not self.is_current_user_admin():
             return
 
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        current_sr = self.get_sr_from_query_params(example_id, run_id, uid)
+        current_sr = self.get_current_sr()
         published_run = self.get_current_published_run()
 
         with st.expander("🛠️ Admin Options"):
@@ -1846,7 +1860,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return extract_nested_str(out)
 
     def fallback_preivew_image(self) -> str:
-        return DEFAULT_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_META_IMG
 
     def run_as_api_tab(self):
         api_docs_url = str(

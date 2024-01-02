@@ -182,10 +182,49 @@ def forwards_func(apps, schema_editor):
             Discover the AI-based solution for generating images from email lookups, creating unique and engaging visuals using email addresses and AI-generated scenes.
             """.strip(),
         },
+        {
+            "workflow": Workflow.GOOGLE_GPT,
+            "short_title": "LLM Web Search",
+            "meta_title": "Browse the web using ChatGPT",
+            "meta_description": """
+            Like Bing + ChatGPT or perplexity.ai, this workflow queries Google and then summarizes the results (with citations!) using an editable GPT3 script.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.BULK_RUNNER,
+            "short_title": "Bulk",
+            "meta_title": "Bulk Runner",
+            "meta_description": """
+            Which AI model actually works best for your needs? Upload your own data and evaluate any Gooey.AI workflow, LLM or AI model against any other.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.BULK_EVAL,
+            "short_title": "Eval",
+            "meta_title": "Bulk Evaluator",
+            "meta_description": """
+            Summarize and score every row of any CSV, google sheet or excel with GPT4 (or any LLM you choose).  Then average every score in any column to generate automated evaluations.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.TEXT_2_AUDIO,
+            "short_title": "Music",
+            "meta_title": "Text2Audio - AI-Driven Text-to-Sound Generator | Gooey.AI",
+            "meta_description": """
+            Transform text into realistic audio with Gooey.AI's text2audio tool. Create custom sounds using AI-driven technology for your projects and content.
+            """.strip(),
+        },
     ]
+
     workflow_metadata_model = apps.get_model("bots", "WorkflowMetadata")
     workflow_metadata_model.objects.bulk_create(
-        [workflow_metadata_model(**update) for update in workflow_metadata_updates]
+        [
+            workflow_metadata_model(
+                **update,
+                meta_image=update["workflow"].page_cls().preview_image(state={}),
+            )
+            for update in workflow_metadata_updates
+        ]
     )
 
 
@@ -256,11 +295,11 @@ class Migration(migrations.Migration):
                     "default_image",
                     models.URLField(help_text="(not implemented)", null=True),
                 ),
-                ("meta_title", models.TextField(help_text="(not implemented)")),
-                ("meta_description", models.TextField(help_text="(not implemented)")),
+                ("meta_title", models.TextField()),
+                ("meta_description", models.TextField(blank=True, default="")),
                 (
                     "meta_image",
-                    models.URLField(help_text="(not implemented)", null=True),
+                    models.URLField(null=True),
                 ),
                 (
                     "meta_keywords",
