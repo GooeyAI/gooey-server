@@ -309,50 +309,57 @@ class VideoBotsStatsPage(BasePage):
             st.plotly_chart(fig)
             fig = go.Figure(
                 data=[
-                    go.Line(
+                    go.Scatter(
                         name="Senders",
+                        mode="lines+markers",
                         x=list(df["date"]),
                         y=list(df["Senders"]),
                         text=list(df["Senders"]),
                         hovertemplate="Active Users: %{y:.0f}<extra></extra>",
                     ),
-                    go.Line(
+                    go.Scatter(
                         name="Conversations",
+                        mode="lines+markers",
                         x=list(df["date"]),
                         y=list(df["Convos"]),
                         text=list(df["Convos"]),
                         hovertemplate="Conversations: %{y:.0f}<extra></extra>",
                     ),
-                    go.Line(
+                    go.Scatter(
                         name="Feedback Givers",
+                        mode="lines+markers",
                         x=list(df["date"]),
                         y=list(df["Unique_feedback_givers"]),
                         text=list(df["Unique_feedback_givers"]),
                         hovertemplate="Feedback Givers: %{y:.0f}<extra></extra>",
                     ),
-                    go.Line(
+                    go.Scatter(
                         name="Positive Feedbacks",
+                        mode="lines+markers",
                         x=list(df["date"]),
                         y=list(df["Pos_feedback"]),
                         text=list(df["Pos_feedback"]),
                         hovertemplate="Positive Feedbacks: %{y:.0f}<extra></extra>",
                     ),
-                    go.Line(
+                    go.Scatter(
                         name="Negative Feedbacks",
+                        mode="lines+markers",
                         x=list(df["date"]),
                         y=list(df["Neg_feedback"]),
                         text=list(df["Neg_feedback"]),
                         hovertemplate="Negative Feedbacks: %{y:.0f}<extra></extra>",
                     ),
-                    go.Line(
+                    go.Scatter(
                         name="Messages per Convo",
+                        mode="lines+markers",
                         x=list(df["date"]),
                         y=list(df["Msgs_per_convo"]),
                         text=list(df["Msgs_per_convo"]),
                         hovertemplate="Messages per Convo: %{y:.0f}<extra></extra>",
                     ),
-                    go.Line(
+                    go.Scatter(
                         name="Messages per Sender",
+                        mode="lines+markers",
                         x=list(df["date"]),
                         y=list(df["Msgs_per_user"]),
                         text=list(df["Msgs_per_user"]),
