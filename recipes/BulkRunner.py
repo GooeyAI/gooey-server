@@ -100,7 +100,7 @@ List of URLs to the evaluation runs that you requested.
 
         for url in run_urls:
             try:
-                page_cls, sr = url_to_sr(url)
+                page_cls, sr, _ = url_to_runs(url)
             except:
                 continue
 
@@ -247,7 +247,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         if eval_runs:
             _backup = st.session_state
             for url in eval_runs:
-                page_cls, sr = url_to_sr(url)
+                page_cls, sr, _ = url_to_runs(url)
                 st.set_session_state(sr.state)
                 page_cls().render_output()
                 st.write("---")
@@ -314,7 +314,10 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
-                            col = f"({url_ix + 1}) {col}"
+                            if title := page_cls.get_title(run=sr):
+                                col = f"({title}) {col}"
+                            else:
+                                col = f"({url_ix + 1}) {col}"
                         out_val = state.get(field)
                         if isinstance(out_val, list):
                             for arr_ix, item in enumerate(out_val):
@@ -354,8 +357,7 @@ To understand what each field represents, check out our [API docs](https://api.g
 
         response.eval_runs = []
         for url in request.eval_urls:
-            page_cls, sr = url_to_sr(url)
-            published_run = url_to_published_run(url)
+            page_cls, sr, published_run = url_to_runs(url)
             yield f"Running {page_cls.get_title(run=published_run or sr)}..."
             request_body = page_cls.RequestModel(
                 documents=response.output_documents
@@ -462,7 +464,7 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
         del_button(del_key)
 
     try:
-        url_to_sr(url)
+        url_to_runs(url)
     except Exception as e:
         st.error(repr(e))
     d["url"] = url
@@ -513,7 +515,7 @@ def render_eval_url_inputs(key: str, del_key: str, d: dict):
         del_button(del_key)
 
     try:
-        url_to_sr(url)
+        url_to_runs(url)
     except Exception as e:
         st.error(repr(e))
     d["url"] = url
@@ -552,7 +554,7 @@ def _prefill_workflow(d: dict, key: str):
         d.pop("workflow", None)
     elif not d.get("workflow") and d.get("url"):
         try:
-            published_run = url_to_published_run(str(d["url"]))
+            _, _sr, published_run = url_to_runs(str(d["url"]))
         except Exception:
             return
         else:
@@ -567,7 +569,7 @@ def _prefill_workflow(d: dict, key: str):
                 d["url"] = published_run.get_app_url()
 
 
-def url_to_sr(url: str) -> tuple[typing.Type[BasePage], SavedRun]:
+def url_to_runs(url: str) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None]:
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
     f = furl(url)
@@ -575,20 +577,10 @@ def url_to_sr(url: str) -> tuple[typing.Type[BasePage], SavedRun]:
     page_cls = page_slug_map[normalize_slug(slug)]
     example_id, run_id, uid = extract_query_params(f.query.params)
     sr = page_cls.get_sr_from_query_params(example_id, run_id, uid)
-    return page_cls, sr
-
-
-def url_to_published_run(url: str) -> PublishedRun | None:
-    from daras_ai_v2.all_pages import page_slug_map, normalize_slug
-
-    f = furl(url)
-    slug = f.path.segments[0]
-    page_cls = page_slug_map[normalize_slug(slug)]
-    example_id, run_id, uid = extract_query_params(f.query.params)
     published_run = page_cls.get_published_run_from_query_params(
         example_id, run_id, uid
     )
-    return published_run
+    return page_cls, sr, published_run
 
 
 def build_requests_for_df(df, request, df_ix, arr_len):
