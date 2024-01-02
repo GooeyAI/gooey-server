@@ -120,12 +120,13 @@ class Workflow(models.IntegerChoices):
         metadata, _created = WorkflowMetadata.objects.get_or_create(
             workflow=self,
             defaults=dict(
-                short_title=lambda: self.page_cls.get_root_published_run().title or self.page_cls.title,
+                short_title=lambda: self.page_cls.get_root_published_run().title
+                or self.page_cls.title,
                 default_image=self.page_cls.explore_image or None,
                 meta_title=self.page_cls.title,
                 meta_description=self.page_cls().preview_description(state={}),
                 meta_image=self.page_cls.explore_image or None,
-            )
+            ),
         )
         return metadata
 
@@ -140,7 +141,9 @@ class WorkflowMetadata(models.Model):
 
     meta_title = models.TextField(help_text="(not implemented)")
     meta_image = models.URLField(null=True, help_text="(not implemented)")
-    meta_keywords = models.JSONField(default=list, blank=True, help_text="(not implemented)")
+    meta_keywords = models.JSONField(
+        default=list, blank=True, help_text="(not implemented)"
+    )
 
     def __str__(self):
         return f"Workflow Meta ({self.short_title})"

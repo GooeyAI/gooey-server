@@ -109,8 +109,12 @@ class ConfirmationModal(Modal):
 
         self.confirm_text = confirm_text
         self.cancel_text = cancel_text
-        self.confirm_button_props = {"type": "secondary", "className": "w-100"} | (confirm_button_props or {})
-        self.cancel_button_props = {"type": "secondary", "className": "w-100"} | (cancel_button_props or {})
+        self.confirm_button_props = {"type": "secondary", "className": "w-100"} | (
+            confirm_button_props or {}
+        )
+        self.cancel_button_props = {"type": "secondary", "className": "w-100"} | (
+            cancel_button_props or {}
+        )
 
         self.is_confirm_pressed = False
 

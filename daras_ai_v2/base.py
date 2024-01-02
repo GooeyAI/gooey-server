@@ -1601,7 +1601,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         help_url = st.text_input("Help URL", value=metadata.help_url)
         confirm_modal = ConfirmationModal(
             title="Confirm Changes",
-            confirm_button_props=dict(className="w-100 text-danger border border-danger"),
+            confirm_button_props=dict(
+                className="w-100 text-danger border border-danger"
+            ),
             key="confirm_workflow_metadata",
         )
         if st.button("Save", type="primary"):
@@ -1624,7 +1626,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 st.session_state[workflow_metadata_status_key] = {"success": True}
             confirm_modal.close()
 
-        if workflow_metadata_status := st.session_state.get(workflow_metadata_status_key):
+        if workflow_metadata_status := st.session_state.get(
+            workflow_metadata_status_key
+        ):
             if workflow_metadata_status.get("success"):
                 st.success("Saved successfully!")
             elif workflow_metadata_status.get("error"):

@@ -181,14 +181,11 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Discover the AI-based solution for generating images from email lookups, creating unique and engaging visuals using email addresses and AI-generated scenes.
             """.strip(),
-        }
+        },
     ]
     workflow_metadata_model = apps.get_model("bots", "WorkflowMetadata")
     workflow_metadata_model.objects.bulk_create(
-        [
-            workflow_metadata_model(**update)
-            for update in workflow_metadata_updates
-        ]
+        [workflow_metadata_model(**update) for update in workflow_metadata_updates]
     )
 
 
