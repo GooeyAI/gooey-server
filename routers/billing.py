@@ -1,15 +1,20 @@
+import html
 from urllib.parse import quote_plus
 
 import stripe
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from furl import furl
 from starlette.datastructures import FormData
 
+import gooey_ui as st
 from app_users.models import AppUser
 from daras_ai_v2 import settings
+from daras_ai_v2.base import RedirectException
+from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.settings import templates
+from routers.root import page_wrapper, request_json
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
@@ -104,8 +109,79 @@ available_subscriptions = {
 }
 
 
-@router.get("/account/", include_in_schema=False)
-def account(request: Request):
+class AccountTab:
+    billing = "Billing"
+    profile = "Profile"
+    api_keys = "🚀 API Keys"
+
+    paths = {
+        billing: "",
+        profile: "profile",
+        api_keys: "api-keys",
+    }
+    paths_reverse = {v: k for k, v in paths.items()}
+
+    @classmethod
+    def get_url(cls, tab: str) -> str:
+        return str(furl("/account/") / cls.paths[tab])
+
+    @classmethod
+    def get_tabs(cls) -> list[str]:
+        return list(cls.paths.keys())
+
+
+@router.post("/account/", include_in_schema=False)
+@router.post("/account/{tab_path}/", include_in_schema=False)
+def account(request: Request, tab_path: str = "", json_data: dict = Depends(request_json)):
+    if tab_path not in AccountTab.paths_reverse:
+        raise HTTPException(status_code=404)
+
+    tab = AccountTab.paths_reverse[tab_path]
+    try:
+        return st.runner(
+            lambda: page_wrapper(
+                request, render_account_page, tab=tab, request_=request,
+            ),
+            query_params=dict(request.query_params),
+            **json_data,
+        )
+    except RedirectException as e:
+        return RedirectResponse(e.url, status_code=e.status_code)
+
+
+def render_account_page(request_: Request, tab: str):
+    request = request_
+
+    if not request.user or request.user.is_anonymous:
+        next_url = request.query_params.get("next", "/account/")
+        redirect_url = furl("/login", query_params={"next": next_url})
+        raise RedirectException(str(redirect_url))
+
+    st.div(className="mt-5")
+    with st.nav_tabs():
+        tab_names = AccountTab.get_tabs()
+        for name in tab_names:
+            url = AccountTab.get_url(name)
+            with st.nav_item(url, active=name == tab):
+                st.html(name)
+
+    with st.nav_tab_content():
+        render_selected_tab(request, tab)
+
+
+def render_selected_tab(request: Request, tab: str):
+    match tab:
+        case AccountTab.billing:
+            billing_tab(request)
+        case AccountTab.profile:
+            profile_tab(request)
+        case AccountTab.api_keys:
+            api_keys_tab(request)
+        case _:
+            raise HTTPException(status_code=401)
+
+
+def billing_tab(request: Request):
     if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
         redirect_url = furl("/login", query_params={"next": next_url})
@@ -122,7 +198,30 @@ def account(request: Request):
         "is_admin": is_admin,
     }
 
-    return templates.TemplateResponse("account.html", context)
+    st.html(templates.get_template("account.html").render(**context))
+
+
+def profile_tab(request: Request):
+    with st.div(className="user-info"):
+        if request.user and request.user.photo_url:
+            st.html(f"""
+            <img id="profile-picture" src="{html.escape(request.user.photo_url)}" alt="" width="128" height="128">
+            """)
+        with st.div(className="user-info-text-box"):
+            if request.user.display_name:
+                st.write(f"## {request.user.display_name}")
+            if contact := request.user.email or request.user.phone_number:
+                with st.div(style={"font-weight": "normal"}):
+                    st.html(html.escape(contact))
+            with st.div(className="mb-4", style={"font-size": "x-small", "font-weight": "normal"}):
+                st.html("""<a href="/privacy">Privacy</a> & <a href="/terms">Terms</a>""")
+            with st.link(to="/logout"):
+                st.caption("Sign out")
+
+
+def api_keys_tab(request: Request):
+    st.write("# 🔐 API Keys")
+    manage_api_keys(request.user)
 
 
 async def request_form(request: Request):
