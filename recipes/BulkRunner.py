@@ -569,7 +569,9 @@ def _prefill_workflow(d: dict, key: str):
                 d["url"] = published_run.get_app_url()
 
 
-def url_to_runs(url: str) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None]:
+def url_to_runs(
+    url: str,
+) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None]:
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
     f = furl(url)
