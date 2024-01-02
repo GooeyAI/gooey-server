@@ -120,9 +120,10 @@ class Workflow(models.IntegerChoices):
         metadata, _created = WorkflowMetadata.objects.get_or_create(
             workflow=self,
             defaults=dict(
-                short_title=self.page_cls.title,
+                short_title=lambda: self.page_cls.get_root_published_run().title or self.page_cls.title,
                 default_image=self.page_cls.explore_image or None,
                 meta_title=self.page_cls.title,
+                meta_description=self.page_cls().preview_description(state={}),
                 meta_image=self.page_cls.explore_image or None,
             )
         )
