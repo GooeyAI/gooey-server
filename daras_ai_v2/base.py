@@ -18,7 +18,6 @@ import sentry_sdk
 from django.utils import timezone
 from fastapi import HTTPException
 from firebase_admin import auth
-from functools import lru_cache
 from furl import furl
 from pydantic import BaseModel
 from sentry_sdk.tracing import (
@@ -978,7 +977,6 @@ class BasePage:
             return self.get_root_published_run()
 
     @classmethod
-    @lru_cache
     def get_sr_from_query_params(
         cls, example_id: str, run_id: str, uid: str
     ) -> SavedRun:
@@ -1003,7 +1001,6 @@ class BasePage:
         return SavedRun.objects.filter(workflow=cls.workflow).count()
 
     @classmethod
-    @lru_cache
     def get_published_run_from_query_params(
         cls,
         example_id: str,

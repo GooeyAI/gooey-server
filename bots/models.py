@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime
 import typing
-from functools import cached_property
 from multiprocessing.pool import ThreadPool
 
 import pytz
@@ -115,7 +114,6 @@ class Workflow(models.IntegerChoices):
 
         return workflow_map[self]
 
-    @cached_property
     def metadata(self) -> WorkflowMetadata:
         metadata, _created = WorkflowMetadata.objects.get_or_create(
             workflow=self,
