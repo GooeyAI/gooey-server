@@ -20,7 +20,7 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
-from daras_ai_v2.base import BasePage, MenuTabs, StateKeys
+from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
@@ -207,13 +207,13 @@ class VideoBotsPage(BasePage):
         input_glossary_document: str | None = Field(
             title="Input Glossary",
             description="""
-Translation Glossary for User Langauge -> LLM Language (English)  
+Translation Glossary for User Langauge -> LLM Language (English)
             """,
         )
         output_glossary_document: str | None = Field(
             title="Output Glossary",
             description="""
-Translation Glossary for LLM Language (English) -> User Langauge  
+Translation Glossary for LLM Language (English) -> User Langauge
             """,
         )
 
@@ -243,7 +243,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         # doc search
         references: list[SearchReference] | None
         final_search_query: str | None
-        final_keyword_query: str | None
+        final_keyword_query: str | list[str] | None
 
         # function calls
         output_documents: list[str] | None
@@ -275,20 +275,20 @@ Translation Glossary for LLM Language (English) -> User Langauge
     def render_description(self):
         st.write(
             """
-Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how. 
+Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how.
 
-This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot’s face and  voice settings. 
- 
-We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page. 
+This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot’s face and  voice settings.
+
+We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page.
 
 How It Works:
-1. Appends the user's question to the bottom of your dialog script. 
+1. Appends the user's question to the bottom of your dialog script.
 2. Sends the appended script to OpenAI’s GPT3 asking it to respond to the question in the style of your character
 3. Synthesizes your character's response as audio using your voice settings (using Google Text-To-Speech or Uberduck)
 4. Lip syncs the face video clip to the voice clip
 5. Shows the resulting video to the user
 
-PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers. 
+PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers.
         """
         )
 
@@ -355,7 +355,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             """
             ###### 📖 Customize with Glossary
             Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            
+            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
             """
         )
         glossary_input(
@@ -391,8 +391,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.file_uploader(
                 """
                 #### 👩‍🦰 Input Face
-                Upload a video/image that contains faces to use  
-                *Recommended - mp4 / mov / png / jpg / gif* 
+                Upload a video/image that contains faces to use
+                *Recommended - mp4 / mov / png / jpg / gif*
                 """,
                 key="input_face",
             )
@@ -498,9 +498,15 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         final_keyword_query = st.session_state.get("final_keyword_query")
         if final_keyword_query:
-            st.text_area(
-                "**Final Keyword Query**", value=final_keyword_query, disabled=True
-            )
+            if isinstance(final_keyword_query, list):
+                st.write("**Final Keyword Query**")
+                st.json(final_keyword_query)
+            else:
+                st.text_area(
+                    "**Final Keyword Query**",
+                    value=str(final_keyword_query),
+                    disabled=True,
+                )
 
         references = st.session_state.get("references", [])
         if references:
@@ -673,11 +679,19 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
                 yield "Extracting keywords..."
-                state["final_keyword_query"] = generate_final_search_query(
-                    request=request,
+                k_request = request.copy()
+                # other models dont support JSON mode
+                k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
+                keyword_query = generate_final_search_query(
+                    request=k_request,
                     instructions=keyword_instructions,
                     context={**state, "messages": chat_history},
+                    response_format_type="json_object",
                 )
+                if keyword_query and isinstance(keyword_query, dict):
+                    keyword_query = list(keyword_query.values())[0]
+                state["final_keyword_query"] = keyword_query
+            # return
 
             # perform doc search
             references = yield from get_top_k_references(
@@ -867,7 +881,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             with col2:
                 st.write(
                     """
-                    
+
                     #### Part 2:
                     [Interactive Chatbots for your Content - Part 2: Make your Chatbot - How to use Gooey.AI Workflows ](https://youtu.be/h817RolPjq4)
                     """
@@ -876,7 +890,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     """
                     <div style="position: relative; padding-bottom: 56.25%; height: 0;">
                             <iframe src="https://www.youtube.com/embed/h817RolPjq4" title="YouTube video player" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                    </iframe>                    
+                    </iframe>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -896,7 +910,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         st.markdown(
             # language=html
             f"""
-            <h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>       
+            <h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>
 
             Your can connect your FB Messenger account and Slack Workspace here directly.<br>
             If you ping us at support@gooey.ai, we'll add your other accounts too!
@@ -905,26 +919,26 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             <div style='height: 50px'>
                 <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
                 <img height="20" src="https://www.instagram.com/favicon.ico">️
-                &nbsp; 
+                &nbsp;
                 Add Your Instagram Page
                 </a>
             </div>
             -->
             <div style='height: 50px'>
                 <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
-                <img height="20" src="https://www.facebook.com/favicon.ico">️             
-                &nbsp; 
+                <img height="20" src="https://www.facebook.com/favicon.ico">️
+                &nbsp;
                 Add Your Facebook Page
                 </a>
             </div>
             <div style='height: 50px'>
                 <a target="_blank" class="streamlit-like-btn" href="{slack_connect_url}">
-                <img height="20" src="https://www.slack.com/favicon.ico">             
-                &nbsp; 
+                <img height="20" src="https://www.slack.com/favicon.ico">
+                &nbsp;
                 Add Your Slack Workspace
                 </a>
                 <a target="_blank" href="https://docs.google.com/document/d/1EuBaC4TGHTFSOgKYM1eOlisjvPAwLji9dExKwbt2ocA/edit?usp=sharing" class="streamlit-like-btn" aria-label="docs">
-                <img height="20" width="0" src="https://www.slack.com/favicon.ico">   <!-- for vertical alignment -->          
+                <img height="20" width="0" src="https://www.slack.com/favicon.ico">   <!-- for vertical alignment -->
                 ℹ️
                 </a>
             </div>
@@ -979,9 +993,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                             placeholder=bi.name,
                         )
                         if st.button("Reset to Default"):
-                            bi.name = st.session_state.get(
-                                StateKeys.page_title, bi.name
-                            )
+                            title = self.get_current_published_run().title
+                            bi.name = title or bi.name
                             bi.slack_read_receipt_msg = BotIntegration._meta.get_field(
                                 "slack_read_receipt_msg"
                             ).default

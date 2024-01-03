@@ -53,6 +53,8 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
+        elevenlabs_style: float | None
+        elevenlabs_speaker_boost: bool | None
 
     class ResponseModel(BaseModel):
         output_video: str

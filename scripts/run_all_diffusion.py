@@ -108,7 +108,7 @@ for model in Img2ImgModels:
                     selected_controlnet_model=controlnet_model.name,
                     prompt=get_random_string(100, string.ascii_letters),
                     num_outputs=4,
-                    init_image=random_img,
+                    init_images=random_img,
                     num_inference_steps=1,
                     guidance_scale=7,
                 ),

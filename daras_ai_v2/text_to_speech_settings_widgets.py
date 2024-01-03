@@ -79,6 +79,7 @@ ELEVEN_LABS_MODELS = {
     "eleven_multilingual_v2": "Multilingual V2 - High quality speech in 29 languages",
     "eleven_turbo_v2": "English V2 - Very low latency text-to-speech",
     "eleven_monolingual_v1": "English V1 - Low latency text-to-speech",
+    "eleven_multilingual_v1": "Multilingual V1",
 }
 
 ELEVEN_LABS_SUPPORTED_LANGS = [
@@ -345,6 +346,26 @@ def text_to_speech_settings(page):
                     step=0.05,
                     key="elevenlabs_similarity_boost",
                 )
+
+            if st.session_state.get("elevenlabs_model") == "eleven_multilingual_v2":
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.slider(
+                        """
+                        ###### Style Exaggeration
+                        """,
+                        min_value=0,
+                        max_value=1.0,
+                        step=0.05,
+                        key="elevenlabs_style",
+                        value=0.0,
+                    )
+                with col2:
+                    st.checkbox(
+                        "Speaker Boost",
+                        key="elevenlabs_speaker_boost",
+                        value=True,
+                    )
 
             with st.expander(
                 "Eleven Labs Supported Languages",
