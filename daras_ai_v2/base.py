@@ -317,6 +317,7 @@ class BasePage:
     ):
         is_update_mode = bool(
             published_run
+            and not published_run.is_root_example()
             and (
                 published_run.is_editor(self.request.user)
                 or self.is_current_user_admin()
@@ -1563,18 +1564,39 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         published_run = self.get_current_published_run()
 
         with st.expander("🛠️ Admin Options"):
-            if st.button("⭐️ Save Workflow"):
-                root_run = self.get_root_published_run()
-                root_run.add_version(
-                    user=self.request.user,
-                    saved_run=current_sr,
-                    visibility=PublishedRunVisibility.PUBLIC,
-                    title=published_run.title if published_run else root_run.title,
-                    notes=published_run.notes if published_run else root_run.notes,
-                )
-                raise QueryParamsRedirectException(
-                    dict(example_id=root_run.published_run_id)
-                )
+            if (
+                published_run
+                and published_run.saved_run == current_sr
+                and published_run.is_root_example()
+            ):
+                st.write("##### Workflow Options")
+                published_run_title = st.text_input("Workflow Root Title", value=published_run.title or self.title)
+                published_run_notes = st.text_area("Workflow Root Notes", value=published_run.notes)
+                if st.button("💾 Save changes"):
+                    published_run.title = published_run_title
+                    published_run.notes = published_run_notes
+                    try:
+                        published_run.full_clean()
+                        published_run.save(update_fields=["title", "notes"])
+                    except Exception as e:
+                        st.error(str(e))
+                    else:
+                        st.success("Saved Workflow Root")
+                        st.experimental_rerun()
+                st.write("---")
+            else:
+                if st.button("⭐️ Save Workflow"):
+                    root_run = self.get_root_published_run()
+                    root_run.add_version(
+                        user=self.request.user,
+                        saved_run=current_sr,
+                        visibility=PublishedRunVisibility.PUBLIC,
+                        title=published_run.title if published_run else root_run.title,
+                        notes=published_run.notes if published_run else root_run.notes,
+                    )
+                    raise QueryParamsRedirectException(
+                        dict(example_id=root_run.published_run_id)
+                    )
 
             if (
                 published_run
