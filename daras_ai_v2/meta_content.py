@@ -87,16 +87,21 @@ def meta_title_for_page(
         and published_run.saved_run == sr
     ):
         # on root page
-        return page.workflow.metadata.meta_title + " | Gooey.AI"
+        return page.workflow.metadata.meta_title + " • Gooey.AI"
 
-    title = page.get_page_title()
+    parts = []
+
+    parts.append(page.get_page_title())
     if published_run and published_run.saved_run != sr:
         # fork or stale version of a published-run: add user's name
         user = sr.get_creator()
         if user and user.display_name:
-            title = user_name_possesive(user.display_name) + " " + title
+            parts.append(
+                user_name_possesive(user.display_name) + " " + page.workflow.metadata.meta_title
+            )
+    parts.append("AI API, workflow & prompt shared on Gooey.AI")
 
-    return f"{title} | AI API, workflow & prompt shared on Gooey.AI"
+    return " • ".join(parts)
 
 
 def user_name_possesive(name: str) -> str:
@@ -120,7 +125,7 @@ def meta_description_for_page(
 
     if not (published_run and published_run.is_root_example()) or not description:
         # for all non-root examples, or when there is no other description
-        description += " AI API, workflow & prompt shared on Gooey.AI."
+        description += " • AI API, workflow & prompt shared on Gooey.AI."
 
     return description
 
@@ -133,6 +138,6 @@ def meta_image_for_page(
     published_run: PublishedRun | None,
 ) -> str | None:
     return meta_preview_url(
-        file_url=page.workflow.metadata.meta_image or page.preview_image(state),
+        file_url=page.preview_image(state),
         fallback_img=page.fallback_preivew_image(),
     )
