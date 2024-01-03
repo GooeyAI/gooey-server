@@ -13,6 +13,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Easily search within PDFs, Word documents, and other formats using Gooey AI's doc-search feature. Improve efficiency and knowledge extraction with our advanced AI tools.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bcc7aa58-93fe-11ee-a083-02420a0001c8/Search%20your%20docs.jpg.png",
         },
         {
             "workflow": Workflow.DOC_SUMMARY,
@@ -21,6 +22,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Effortlessly summarize large files and collections of PDFs, docs and audio files using AI with Gooey.AI | Gooey.AI Doc-Summary Solution.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f35796d2-93fe-11ee-b86c-02420a0001c7/Summarize%20with%20GPT.jpg.png",
         },
         {
             "workflow": Workflow.GOOGLE_GPT,
@@ -29,6 +31,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Like Bing + ChatGPT or perplexity.ai, this workflow queries Google and then summarizes the results (with citations!) using an editable GPT3 script.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85ed60a2-9405-11ee-9747-02420a0001ce/Web%20search%20GPT.jpg.png",
         },
         {
             "workflow": Workflow.VIDEO_BOTS,
@@ -37,6 +40,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Discover Gooey.AI's Copilot, the most advanced AI bot offering GPT4, PaLM2, LLaAM2, knowledge base integration, conversation analysis & more for farming solutions.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f454d64a-9457-11ee-b6d5-02420a0001cb/Copilot.jpg.png",
         },
         {
             "workflow": Workflow.LIPSYNC_TTS,
@@ -45,6 +49,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Create realistic lipsync videos with custom voices. Just upload a video or image, choose or bring your own voice from EvelenLabs to generate amazing videos with the Gooey.AI Lipsync Maker.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/13b4d352-9456-11ee-8edd-02420a0001c7/Lipsync%20TTS.jpg.png",
         },
         {
             "workflow": Workflow.TEXT_TO_SPEECH,
@@ -53,6 +58,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Experience the most powerful text-to-speech APIs with Gooey.AI. Compare and choose the best voice for podcasts, YouTube videos, websites, bots, and more.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png",
         },
         {
             "workflow": Workflow.ASR,
@@ -61,6 +67,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Generate realistic audio files, lip-sync videos, and experience multilingual chatbots with Gooey.AI speech and AI-based services. Improve user experience!
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1916825c-93fa-11ee-97be-02420a0001c8/Speech.jpg.png",
         },
         {
             "workflow": Workflow.LIPSYNC,
@@ -69,6 +76,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Achieve high-quality, realistic Lipsync animations with Gooey.AI's Lipsync - Just input a face and audio to generate your tailored animation.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7fc4d302-9402-11ee-98dc-02420a0001ca/Lip%20Sync.jpg.png",
         },
         {
             "workflow": Workflow.DEFORUM_SD,
@@ -77,6 +85,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Create AI-generated animations effortlessly with Gooey.AI's Animation Generator and Stable Diffusion's Deforum technology. No complex CoLab notebooks required!
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7dc25196-93fe-11ee-9e3a-02420a0001ce/AI%20Animation%20generator.jpg.png",
         },
         {
             "workflow": Workflow.COMPARE_TEXT2IMG,
@@ -85,6 +94,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Discover the most effective AI image generator for your needs by comparing different models like Stable Diffusion, Dall-E, and more at Gooey.AI.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ae7b2940-93fc-11ee-8edc-02420a0001cc/Compare%20image%20generators.jpg.png",
         },
         {
             "workflow": Workflow.TEXT_2_AUDIO,
@@ -93,6 +103,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Transform text into realistic audio with Gooey.AI's text2audio tool. Create custom sounds using AI-driven technology for your projects and content.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85cf8ea4-9457-11ee-bd77-02420a0001ce/Text%20guided%20audio.jpg.png",
         },
         {
             "workflow": Workflow.IMG_2_IMG,
@@ -101,6 +112,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Transform your images with our AI Photo Editor utilizing the latest AI technology for incredible results. Enhance your photos, create unique art, and more
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/cc2804ea-9401-11ee-940a-02420a0001c7/Edit%20an%20image.jpg.png",
         },
         {
             "workflow": Workflow.FACE_INPAINTING,
@@ -109,6 +121,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Explore Gooey.AI's revolutionary face extraction and AI-generated photo technology, where you can upload, extract, and bring your desired character to life in a new image.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a146bfc0-93ff-11ee-b86c-02420a0001c7/Face%20in%20painting.jpg.png",
         },
         {
             "workflow": Workflow.GOOGLE_IMAGE_GEN,
@@ -117,6 +130,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Discover the power of AI in image rendering with Gooey.AI's cutting-edge technology, transforming text prompts into stunning visuals for any search query.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/dcd82b68-9400-11ee-9e3a-02420a0001ce/Search%20result%20photo.jpg.png",
         },
         {
             "workflow": Workflow.COMPARE_UPSCALER,
@@ -125,6 +139,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Explore the benefits of AI upscalers and discover how they enhance image quality through cutting-edge technology at Gooey.ai.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2e8ee512-93fe-11ee-a083-02420a0001c8/Image%20upscaler.jpg.png",
         },
         {
             "workflow": Workflow.SEO_SUMMARY,
@@ -133,6 +148,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Optimize your content with Gooey's SEO Paragraph Generator - AI powered content optimization for improved search engine rankings and increased traffic.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/13d3ab1e-9457-11ee-98a6-02420a0001c9/SEO.jpg.png",
         },
         {
             "workflow": Workflow.EMAIL_FACE_INPAINTING,
@@ -141,12 +157,16 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Discover the AI-based solution for generating images from email lookups, creating unique and engaging visuals using email addresses and AI-generated scenes.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6937427a-9522-11ee-b6d3-02420a0001ea/Email%20photo.jpg.png",
         },
         {
             "workflow": Workflow.SOCIAL_LOOKUP_EMAIL,
             "short_title": "Emailer",
             "meta_title": "AI-Powered Email Writer with Profile Lookup",
-            "meta_description": "Enhance your outreach with Gooey.AI's Email Writer that finds public social profiles and creates personalized emails using advanced AI mail merge.",
+            "meta_description": """
+            Enhance your outreach with Gooey.AI's Email Writer that finds public social profiles and creates personalized emails using advanced AI mail merge.
+            """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6729ea44-9457-11ee-bd77-02420a0001ce/Profile%20look%20up%20gpt%20email.jpg.png",
         },
         {
             "workflow": Workflow.OBJECT_INPAINTING,
@@ -155,6 +175,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Generate professional background scenery for your product photos with Gooey.AI's advanced inpainting AI technology.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/4bca6982-9456-11ee-bc12-02420a0001cc/Product%20photo%20backgrounds.jpg.png",
         },
         {
             "workflow": Workflow.COMPARE_LLM,
@@ -163,6 +184,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Compare popular large language models like GPT-4, PaLM2, and LLaMA2 to determine which one performs best for your specific needs | Gooey.AI
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5e4f4c58-93fc-11ee-a39e-02420a0001ce/LLMs.jpg.png",
         },
         {
             "workflow": Workflow.SMART_GPT,
@@ -171,6 +193,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Explore powerful AI solutions with Gooey.AI's SmartGPT, a cutting-edge language model designed to transform industries and simplify your work.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3d71b434-9457-11ee-8edd-02420a0001c7/Smart%20GPT.jpg.png",
         },
         {
             "workflow": Workflow.QR_CODE,
@@ -179,6 +202,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Generate AI-empowered artistic QR codes tailored to your style for impactful marketing, branding & more with Gooey.AI.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a679a410-9456-11ee-bd77-02420a0001ce/QR%20Code.jpg.png",
         },
         {
             "workflow": Workflow.DOC_EXTRACT,
@@ -187,6 +211,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Automate YouTube video transcription, run GPT4 prompts, and save data to Google Sheets with Gooey AI's YouTube Bot. Elevate your content creation strategy!
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png",
         },
         {
             "workflow": Workflow.RELATED_QNA_MAKER,
@@ -195,6 +220,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Enhance your document search experience with Gooey.AI's Related QnA Maker API, leveraging advanced machine learning to deliver relevant information from your doc, pdf, or files.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/cbd2c94e-9456-11ee-a95e-02420a0001cc/People%20also%20ask.jpg.png",
         },
         {
             "workflow": Workflow.BULK_RUNNER,
@@ -203,6 +229,7 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Which AI model actually works best for your needs? Upload your own data and evaluate any Gooey.AI workflow, LLM or AI model against any other.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d80fd4d8-93fa-11ee-bc13-02420a0001cc/Bulk%20Runner.jpg.png",
         },
         {
             "workflow": Workflow.BULK_EVAL,
@@ -211,19 +238,14 @@ def forwards_func(apps, schema_editor):
             "meta_description": """
             Summarize and score every row of any CSV, google sheet or excel with GPT4 (or any LLM you choose).  Then average every score in any column to generate automated evaluations.
             """.strip(),
+            "meta_image": "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9631fb74-9a97-11ee-971f-02420a0001c4/evaluator.png.png",
         },
     ]
 
     workflow_metadata_model = apps.get_model("bots", "WorkflowMetadata")
-    workflow_metadata_model.objects.bulk_create(
-        [
-            workflow_metadata_model(
-                **update,
-                meta_image=update["workflow"].page_cls().preview_image(state={}),
-            )
-            for update in workflow_metadata_updates
-        ]
-    )
+    workflow_metadata_model.objects.bulk_create([
+        workflow_metadata_model(**kwargs) for kwargs in workflow_metadata_updates
+    ])
 
 
 def backwards_func(apps, schema_editor):
