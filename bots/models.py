@@ -114,6 +114,7 @@ class Workflow(models.IntegerChoices):
 
         return workflow_map[self]
 
+    @property
     def metadata(self) -> WorkflowMetadata:
         metadata, _created = WorkflowMetadata.objects.get_or_create(
             workflow=self,
