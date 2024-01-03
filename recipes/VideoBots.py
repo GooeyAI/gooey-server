@@ -695,6 +695,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                         url=reference["url"],
                         user=self.request.user,
                         workflow=Workflow.VIDEO_BOTS,
+                        enable_analytics=True,
                     )[0].shortened_url()
             state["references"] = references
         # if doc search is successful, add the search results to the user prompt

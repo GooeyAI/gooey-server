@@ -711,6 +711,7 @@ def generate_and_upload_qr_code(
                 url=qr_code_data,
                 user=user,
                 workflow=Workflow.QR_CODE,
+                enable_analytics=False,
             )[0].shortened_url()
 
     img_cv2 = generate_qr_code(qr_code_data)

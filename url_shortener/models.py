@@ -14,7 +14,12 @@ from daras_ai_v2.query_params_util import extract_query_params
 
 class ShortenedURLQuerySet(models.QuerySet):
     def get_or_create_for_workflow(
-        self, *, user: AppUser, workflow: Workflow, **kwargs
+        self,
+        *,
+        user: AppUser,
+        workflow: Workflow,
+        enable_analytics: bool = True,
+        **kwargs,
     ) -> tuple["ShortenedURL", bool]:
         surl, created = self.filter_first_or_create(user=user, **kwargs)
         _, run_id, uid = extract_query_params(gooey_get_query_params())
@@ -23,6 +28,9 @@ class ShortenedURLQuerySet(models.QuerySet):
                 workflow=workflow,
                 run_id=run_id,
                 uid=uid,
+                defaults={
+                    "enable_analytics": enable_analytics,
+                },
             )[0],
         )
         return surl, created
