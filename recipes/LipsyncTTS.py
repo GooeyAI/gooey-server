@@ -95,7 +95,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         assert st.session_state.get("input_face"), "Please provide an Input Face"
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_LIPSYNC_TTS_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_LIPSYNC_TTS_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Add your text prompt, pick a voice & upload a sample video to quickly create realistic lipsync videos. Discover the ease of text-to-video AI."

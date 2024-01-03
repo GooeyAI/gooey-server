@@ -88,7 +88,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         email_sent: bool = False
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_EMAIL_FACE_INPAINTING_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_EMAIL_FACE_INPAINTING_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Find an email's public photo and then draw the face into an AI generated scene using your own prompt + the latest Stable Diffusion or DallE image generator."

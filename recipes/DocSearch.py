@@ -126,7 +126,7 @@ class DocSearchPage(BasePage):
         doc_search_settings()
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_DOC_SEARCH_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_DOC_SEARCH_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Add your PDF, Word, HTML or Text docs, train our AI on them with OpenAI embeddings & vector search and then process results with a GPT3 script. This workflow is perfect for anything NOT in ChatGPT: 250-page compliance PDFs, training manuals, your diary, etc."

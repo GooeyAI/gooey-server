@@ -71,7 +71,7 @@ class Img2ImgPage(BasePage):
         output_images: list[str]
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_IMG2IMG_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_IMG2IMG_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.QRCodeGenerator import QRCodeGeneratorPage

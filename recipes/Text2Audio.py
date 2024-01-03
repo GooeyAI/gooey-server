@@ -59,7 +59,7 @@ class Text2AudioPage(BasePage):
         ]
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_TEXT2AUDIO_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_TEXT2AUDIO_META_IMG
 
     def render_form_v2(self):
         st.text_area(

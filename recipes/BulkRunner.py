@@ -78,7 +78,7 @@ List of URLs to the evaluation runs that you requested.
         )
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_BULK_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_BULK_META_IMG
 
     def render_form_v2(self):
         st.write(f"##### {field_title_desc(self.RequestModel, 'run_urls')}")

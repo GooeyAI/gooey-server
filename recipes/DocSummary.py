@@ -81,7 +81,7 @@ class DocSummaryPage(BasePage):
         final_prompt: str
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_DOC_SUMMARY_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_DOC_SUMMARY_META_IMG
 
     def render_form_v2(self):
         document_uploader("##### 📎 Documents")

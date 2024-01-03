@@ -49,7 +49,7 @@ class AsrPage(BasePage):
         output_text: list[str | AsrOutputJson]
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_ASR_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_ASR_META_IMG
 
     def preview_description(self, state: dict):
         return "Transcribe mp3, WhatsApp audio + wavs with OpenAI's Whisper or AI4Bharat / Bhashini ASR models. Optionally translate to any language too."

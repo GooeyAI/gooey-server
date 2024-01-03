@@ -37,7 +37,7 @@ class LipsyncPage(BasePage):
         output_video: str
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_LIPSYNC_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_LIPSYNC_META_IMG
 
     def render_form_v2(self) -> bool:
         st.file_uploader(

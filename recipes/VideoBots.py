@@ -250,7 +250,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         reply_buttons: list[ReplyButton] | None
 
     def preview_image(self, state: dict) -> str | None:
-        return DEFAULT_COPILOT_META_IMG
+        return self.workflow.metadata.meta_image or DEFAULT_COPILOT_META_IMG
 
     def related_workflows(self):
         from recipes.LipsyncTTS import LipsyncTTSPage
