@@ -243,7 +243,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         # doc search
         references: list[SearchReference] | None
         final_search_query: str | None
-        final_keyword_query: str | None
+        final_keyword_query: str | list[str] | None
 
         # function calls
         output_documents: list[str] | None
@@ -498,9 +498,15 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         final_keyword_query = st.session_state.get("final_keyword_query")
         if final_keyword_query:
-            st.text_area(
-                "**Final Keyword Query**", value=final_keyword_query, disabled=True
-            )
+            if isinstance(final_keyword_query, list):
+                st.write("**Final Keyword Query**")
+                st.json(final_keyword_query)
+            else:
+                st.text_area(
+                    "**Final Keyword Query**",
+                    value=str(final_keyword_query),
+                    disabled=True,
+                )
 
         references = st.session_state.get("references", [])
         if references:
@@ -673,11 +679,19 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
                 yield "Extracting keywords..."
-                state["final_keyword_query"] = generate_final_search_query(
-                    request=request,
+                k_request = request.copy()
+                # other models dont support JSON mode
+                k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
+                keyword_query = generate_final_search_query(
+                    request=k_request,
                     instructions=keyword_instructions,
                     context={**state, "messages": chat_history},
+                    response_format_type="json_object",
                 )
+                if keyword_query and isinstance(keyword_query, dict):
+                    keyword_query = list(keyword_query.values())[0]
+                state["final_keyword_query"] = keyword_query
+            # return
 
             # perform doc search
             references = yield from get_top_k_references(
