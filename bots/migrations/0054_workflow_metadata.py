@@ -7,83 +7,11 @@ from bots.models import Workflow
 def forwards_func(apps, schema_editor):
     workflow_metadata_updates = [
         {
-            "workflow": Workflow.LIPSYNC,
-            "short_title": "Lipsync",
-            "meta_title": "Lipsync Animation Generator with Audio Input",
-            "meta_description": """
-            Achieve high-quality, realistic Lipsync animations with Gooey.AI's Lipsync - Just input a face and audio to generate your tailored animation.
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.LIPSYNC_TTS,
-            "short_title": "Lipsync + Voice",
-            "meta_title": "Lipsync Video Maker with AI Voice Generation",
-            "meta_description": """
-            Create realistic lipsync videos with custom voices. Just upload a video or image, choose or bring your own voice from EvelenLabs to generate amazing videos with the Gooey.AI Lipsync Maker. 
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.DEFORUM_SD,
-            "short_title": "Animation",
-            "meta_title": "Animation Generator: AI-Powered Animations Simplified",
-            "meta_description": """
-            Create AI-generated animations effortlessly with Gooey.AI's Animation Generator and Stable Diffusion's Deforum technology. No complex CoLab notebooks required!
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.IMG_2_IMG,
-            "short_title": "Photo Editor",
-            "meta_title": "AI Photo Editor for Stunning Image Transformations",
-            "meta_description": """
-            Transform your images with our AI Photo Editor utilizing the latest AI technology for incredible results. Enhance your photos, create unique art, and more
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.QR_CODE,
-            "short_title": "QR Code",
-            "meta_title": "AI Art QR Code Generator",
-            "meta_description": """
-            Generate AI-empowered artistic QR codes tailored to your style for impactful marketing, branding & more with Gooey.AI.
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.VIDEO_BOTS,
-            "short_title": "Copilot",
-            "meta_title": "Advanced AI Copilot for Farming Solutions",
-            "meta_description": """
-            Discover Gooey.AI's Copilot, the most advanced AI bot offering GPT4, PaLM2, LLaAM2, knowledge base integration, conversation analysis & more for farming solutions.
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.COMPARE_LLM,
-            "short_title": "LLM",
-            "meta_title": "Compare GPT-4, PaLM2, and LLaMA2 | Large Language Model Comparison",
-            "meta_description": """
-            Compare popular large language models like GPT-4, PaLM2, and LLaMA2 to determine which one performs best for your specific needs | Gooey.AI
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.ASR,
-            "short_title": "Speech",
-            "meta_title": "Speech and AI Services",
-            "meta_description": """
-            Generate realistic audio files, lip-sync videos, and experience multilingual chatbots with Gooey.AI speech and AI-based services. Improve user experience!
-            """.strip(),
-        },
-        {
             "workflow": Workflow.DOC_SEARCH,
             "short_title": "Doc Search",
             "meta_title": "Advanced Document Search Solution",
             "meta_description": """
             Easily search within PDFs, Word documents, and other formats using Gooey AI's doc-search feature. Improve efficiency and knowledge extraction with our advanced AI tools.
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.SMART_GPT,
-            "short_title": "SmartGPT",
-            "meta_title": "SmartGPT - Advanced AI Language Model",
-            "meta_description": """
-            Explore powerful AI solutions with Gooey.AI's SmartGPT, a cutting-edge language model designed to transform industries and simplify your work.
             """.strip(),
         },
         {
@@ -95,19 +23,59 @@ def forwards_func(apps, schema_editor):
             """.strip(),
         },
         {
-            "workflow": Workflow.DOC_EXTRACT,
-            "short_title": "Synthetic Data",
-            "meta_title": "Efficient YouTube Video Transcription & GPT4 Integration",
+            "workflow": Workflow.GOOGLE_GPT,
+            "short_title": "LLM Web Search",
+            "meta_title": "Browse the web using ChatGPT",
             "meta_description": """
-            Automate YouTube video transcription, run GPT4 prompts, and save data to Google Sheets with Gooey AI's YouTube Bot. Elevate your content creation strategy!
+            Like Bing + ChatGPT or perplexity.ai, this workflow queries Google and then summarizes the results (with citations!) using an editable GPT3 script.
             """.strip(),
         },
         {
-            "workflow": Workflow.RELATED_QNA_MAKER,
-            "short_title": "People Also Ask",
-            "meta_title": "Related QnA Maker API for Document Search",
+            "workflow": Workflow.VIDEO_BOTS,
+            "short_title": "Copilot",
+            "meta_title": "Advanced AI Copilot for Farming Solutions",
             "meta_description": """
-            Enhance your document search experience with Gooey.AI's Related QnA Maker API, leveraging advanced machine learning to deliver relevant information from your doc, pdf, or files.
+            Discover Gooey.AI's Copilot, the most advanced AI bot offering GPT4, PaLM2, LLaAM2, knowledge base integration, conversation analysis & more for farming solutions.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.LIPSYNC_TTS,
+            "short_title": "Lipsync + Voice",
+            "meta_title": "Lipsync Video Maker with AI Voice Generation",
+            "meta_description": """
+            Create realistic lipsync videos with custom voices. Just upload a video or image, choose or bring your own voice from EvelenLabs to generate amazing videos with the Gooey.AI Lipsync Maker.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.TEXT_TO_SPEECH,
+            "short_title": "Text to Speech",
+            "meta_title": "Compare Text-to-Speech AI Engines",
+            "meta_description": """
+            Experience the most powerful text-to-speech APIs with Gooey.AI. Compare and choose the best voice for podcasts, YouTube videos, websites, bots, and more.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.ASR,
+            "short_title": "Speech",
+            "meta_title": "Speech and AI Services",
+            "meta_description": """
+            Generate realistic audio files, lip-sync videos, and experience multilingual chatbots with Gooey.AI speech and AI-based services. Improve user experience!
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.LIPSYNC,
+            "short_title": "Lipsync",
+            "meta_title": "Lipsync Animation Generator with Audio Input",
+            "meta_description": """
+            Achieve high-quality, realistic Lipsync animations with Gooey.AI's Lipsync - Just input a face and audio to generate your tailored animation.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.DEFORUM_SD,
+            "short_title": "Animation",
+            "meta_title": "Animation Generator: AI-Powered Animations Simplified",
+            "meta_description": """
+            Create AI-generated animations effortlessly with Gooey.AI's Animation Generator and Stable Diffusion's Deforum technology. No complex CoLab notebooks required!
             """.strip(),
         },
         {
@@ -119,19 +87,35 @@ def forwards_func(apps, schema_editor):
             """.strip(),
         },
         {
-            "workflow": Workflow.SOCIAL_LOOKUP_EMAIL,
-            "short_title": "Emailer",
-            "meta_title": "AI-Powered Email Writer with Profile Lookup",
+            "workflow": Workflow.TEXT_2_AUDIO,
+            "short_title": "Music",
+            "meta_title": "Text2Audio - AI-Driven Text-to-Sound Generator | Gooey.AI",
             "meta_description": """
-            Enhance your outreach with Gooey.AI's Email Writer that finds public social profiles and creates personalized emails using advanced AI mail merge.
+            Transform text into realistic audio with Gooey.AI's text2audio tool. Create custom sounds using AI-driven technology for your projects and content.
             """.strip(),
         },
         {
-            "workflow": Workflow.OBJECT_INPAINTING,
-            "short_title": "Background Maker",
-            "meta_title": "Product Photo Background Generator",
+            "workflow": Workflow.IMG_2_IMG,
+            "short_title": "Photo Editor",
+            "meta_title": "AI Photo Editor for Stunning Image Transformations",
             "meta_description": """
-            Generate professional background scenery for your product photos with Gooey.AI's advanced inpainting AI technology.
+            Transform your images with our AI Photo Editor utilizing the latest AI technology for incredible results. Enhance your photos, create unique art, and more
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.FACE_INPAINTING,
+            "short_title": "Face Editor",
+            "meta_title": "AI Face Extraction & Generation",
+            "meta_description": """
+            Explore Gooey.AI's revolutionary face extraction and AI-generated photo technology, where you can upload, extract, and bring your desired character to life in a new image.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.GOOGLE_IMAGE_GEN,
+            "short_title": "SEO Renderer",
+            "meta_title": "AI Image Rendering & Generation Solution",
+            "meta_description": """
+            Discover the power of AI in image rendering with Gooey.AI's cutting-edge technology, transforming text prompts into stunning visuals for any search query.
             """.strip(),
         },
         {
@@ -151,30 +135,6 @@ def forwards_func(apps, schema_editor):
             """.strip(),
         },
         {
-            "workflow": Workflow.TEXT_TO_SPEECH,
-            "short_title": "Text to Speech",
-            "meta_title": "Compare Text-to-Speech AI Engines",
-            "meta_description": """
-            Experience the most powerful text-to-speech APIs with Gooey.AI. Compare and choose the best voice for podcasts, YouTube videos, websites, bots, and more.
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.GOOGLE_IMAGE_GEN,
-            "short_title": "SEO Renderer",
-            "meta_title": "AI Image Rendering & Generation Solution",
-            "meta_description": """
-            Discover the power of AI in image rendering with Gooey.AI's cutting-edge technology, transforming text prompts into stunning visuals for any search query.
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.FACE_INPAINTING,
-            "short_title": "Face Editor",
-            "meta_title": "AI Face Extraction & Generation",
-            "meta_description": """
-            Explore Gooey.AI's revolutionary face extraction and AI-generated photo technology, where you can upload, extract, and bring your desired character to life in a new image.
-            """.strip(),
-        },
-        {
             "workflow": Workflow.EMAIL_FACE_INPAINTING,
             "short_title": "Email to Image",
             "meta_title": "AI Image from Email Lookup",
@@ -183,11 +143,57 @@ def forwards_func(apps, schema_editor):
             """.strip(),
         },
         {
-            "workflow": Workflow.GOOGLE_GPT,
-            "short_title": "LLM Web Search",
-            "meta_title": "Browse the web using ChatGPT",
+            "workflow": Workflow.SOCIAL_LOOKUP_EMAIL,
+            "short_title": "Emailer",
+            "meta_title": "AI-Powered Email Writer with Profile Lookup",
+            "meta_description": "Enhance your outreach with Gooey.AI's Email Writer that finds public social profiles and creates personalized emails using advanced AI mail merge.",
+        },
+        {
+            "workflow": Workflow.OBJECT_INPAINTING,
+            "short_title": "Background Maker",
+            "meta_title": "Product Photo Background Generator",
             "meta_description": """
-            Like Bing + ChatGPT or perplexity.ai, this workflow queries Google and then summarizes the results (with citations!) using an editable GPT3 script.
+            Generate professional background scenery for your product photos with Gooey.AI's advanced inpainting AI technology.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.COMPARE_LLM,
+            "short_title": "LLM",
+            "meta_title": "Compare GPT-4, PaLM2, and LLaMA2 | Large Language Model Comparison",
+            "meta_description": """
+            Compare popular large language models like GPT-4, PaLM2, and LLaMA2 to determine which one performs best for your specific needs | Gooey.AI
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.SMART_GPT,
+            "short_title": "SmartGPT",
+            "meta_title": "SmartGPT - Advanced AI Language Model",
+            "meta_description": """
+            Explore powerful AI solutions with Gooey.AI's SmartGPT, a cutting-edge language model designed to transform industries and simplify your work.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.QR_CODE,
+            "short_title": "QR Code",
+            "meta_title": "AI Art QR Code Generator",
+            "meta_description": """
+            Generate AI-empowered artistic QR codes tailored to your style for impactful marketing, branding & more with Gooey.AI.
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.DOC_EXTRACT,
+            "short_title": "Synthetic Data",
+            "meta_title": "Efficient YouTube Video Transcription & GPT4 Integration",
+            "meta_description": """
+            Automate YouTube video transcription, run GPT4 prompts, and save data to Google Sheets with Gooey AI's YouTube Bot. Elevate your content creation strategy!
+            """.strip(),
+        },
+        {
+            "workflow": Workflow.RELATED_QNA_MAKER,
+            "short_title": "People Also Ask",
+            "meta_title": "Related QnA Maker API for Document Search",
+            "meta_description": """
+            Enhance your document search experience with Gooey.AI's Related QnA Maker API, leveraging advanced machine learning to deliver relevant information from your doc, pdf, or files.
             """.strip(),
         },
         {
@@ -204,14 +210,6 @@ def forwards_func(apps, schema_editor):
             "meta_title": "Bulk Evaluator",
             "meta_description": """
             Summarize and score every row of any CSV, google sheet or excel with GPT4 (or any LLM you choose).  Then average every score in any column to generate automated evaluations.
-            """.strip(),
-        },
-        {
-            "workflow": Workflow.TEXT_2_AUDIO,
-            "short_title": "Music",
-            "meta_title": "Text2Audio - AI-Driven Text-to-Sound Generator | Gooey.AI",
-            "meta_description": """
-            Transform text into realistic audio with Gooey.AI's text2audio tool. Create custom sounds using AI-driven technology for your projects and content.
             """.strip(),
         },
     ]
