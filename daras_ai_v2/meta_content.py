@@ -119,7 +119,7 @@ def meta_description_for_page(
     published_run: PublishedRun | None,
 ) -> str:
     if published_run and not published_run.is_root_example():
-        description = published_run.notes
+        description = published_run.notes or page.workflow.metadata.meta_description
     else:
         description = page.workflow.metadata.meta_description
 
