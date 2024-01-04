@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import math
 import requests
 import sentry_sdk
+from django.db import models
 from django.utils import timezone
 from fastapi import HTTPException
 from firebase_admin import auth
@@ -401,6 +402,7 @@ class BasePage:
         current_run: SavedRun,
         published_run: PublishedRun | None,
         is_update_mode: bool = False,
+        for_example: bool = False,
     ):
         if is_update_mode:
             assert published_run is not None, "published_run must be set in update mode"
@@ -415,7 +417,9 @@ class BasePage:
             published_run_visibility = st.radio(
                 "",
                 key="published_run_visibility",
-                options=PublishedRunVisibility.values,
+                options=[PublishedRunVisibility.PUBLIC]
+                if for_example
+                else PublishedRunVisibility.values,
                 format_func=lambda x: PublishedRunVisibility(x).help_text(),
             )
             st.radio(
@@ -1598,23 +1602,79 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                         dict(example_id=root_run.published_run_id)
                     )
 
-            if (
-                published_run
-                and published_run.visibility == PublishedRunVisibility.PUBLIC
-            ):
-                hidden = not published_run.is_approved_example
-                if st.button("✅ Approve as Example" if hidden else "🙈️ Hide"):
-                    if published_run.saved_run != current_sr:
-                        st.error("There are unpublished changes in this run.")
-                    else:
-                        self.set_hidden(
-                            published_run=published_run,
-                            hidden=not hidden,
+                if (
+                    published_run
+                    and published_run.saved_run == current_sr
+                    and published_run.is_approved_example
+                ):
+                    if st.button("🙈 Remove from Examples"):
+                        published_run.is_approved_example = False
+                        self.update_or_show_error(
+                            published_run,
+                            update_fields=["is_approved_example"],
                         )
-            else:
-                st.write(
-                    "Note: To approve a run as an example, it must be published publicly first."
-                )
+                else:
+                    save_example_button = st.button("✅ Approve as Example")
+
+                    if published_run and published_run.saved_run != current_sr:
+                        st.caption(
+                            """
+                            Warning: There are unpublished changes in this run.
+                            A new saved run will be created for this example.
+                        """
+                        )
+
+                    if (
+                        published_run
+                        and published_run.saved_run == current_sr
+                        and published_run.visibility != PublishedRunVisibility.PUBLIC
+                    ):
+                        st.caption(
+                            """
+                            Warning: This run has not been published publicly.
+                            The visibility will be changed to public to create
+                            an example from this run.
+                        """
+                        )
+
+                    publish_modal = Modal("", key="publish-example-modal")
+                    if save_example_button:
+                        if published_run and published_run.saved_run == current_sr:
+                            try:
+                                published_run.add_version(
+                                    user=self.request.user,
+                                    saved_run=published_run.saved_run,
+                                    title=published_run.title,
+                                    notes=published_run.notes,
+                                    visibility=PublishedRunVisibility.PUBLIC,
+                                    is_approved_example=True,
+                                )
+                            except Exception as e:
+                                st.error(str(e))
+                            else:
+                                st.experimental_rerun()
+                        else:
+                            publish_modal.open()
+                    if publish_modal.is_open():
+                        with publish_modal.container(style={"min-width": "min(500px, 100vw)"}):
+                            self._render_publish_modal(
+                                current_run=current_sr,
+                                published_run=None,
+                                is_update_mode=False,
+                                for_example=True,
+                            )
+
+    def update_or_show_error(
+        self, model: models.Model, update_fields: typing.Iterable[str] | None = None
+    ):
+        try:
+            model.full_clean()
+            model.save(update_fields=update_fields)
+        except Exception as e:
+            st.error(str(e))
+            return False
+        else:
+            return True
 
     def state_to_doc(self, state: dict):
         ret = {
