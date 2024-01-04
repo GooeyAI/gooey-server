@@ -97,7 +97,9 @@ def meta_title_for_page(
         user = sr.get_creator()
         if user and user.display_name:
             parts.append(
-                user_name_possesive(user.display_name) + " " + page.workflow.metadata.meta_title
+                user_name_possesive(user.display_name)
+                + " "
+                + page.workflow.metadata.meta_title
             )
     parts.append("AI API, workflow & prompt shared on Gooey.AI")
 

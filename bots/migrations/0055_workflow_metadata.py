@@ -243,9 +243,9 @@ def forwards_func(apps, schema_editor):
     ]
 
     workflow_metadata_model = apps.get_model("bots", "WorkflowMetadata")
-    workflow_metadata_model.objects.bulk_create([
-        workflow_metadata_model(**kwargs) for kwargs in workflow_metadata_updates
-    ])
+    workflow_metadata_model.objects.bulk_create(
+        [workflow_metadata_model(**kwargs) for kwargs in workflow_metadata_updates]
+    )
 
 
 def backwards_func(apps, schema_editor):
