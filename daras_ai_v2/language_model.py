@@ -350,7 +350,7 @@ def run_language_model(
                 format_chat_entry(role=entry["role"], content=get_entry_text(entry))
                 for entry in messages
             ]
-        result = _run_chat_model(
+        result, output_token, input_token = _run_chat_model(
             api=api,
             model=model_name,
             messages=messages,  # type: ignore
@@ -372,10 +372,14 @@ def run_language_model(
                 else (entry.get("content") or "").strip()
                 for entry in result
             ]
+        print("out_contentttt", out_content, input_token, output_token)
         if tools:
-            return out_content, [(entry.get("tool_calls") or []) for entry in result]
+            return (
+                out_content,
+                [(entry.get("tool_calls") or []) for entry in result],
+            )
         else:
-            return out_content
+            return out_content, input_token, output_token
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
@@ -442,7 +446,7 @@ def _run_chat_model(
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
     response_format_type: typing.Literal["text", "json_object"] | None,
-) -> list[ConversationEntry]:
+) -> tuple[list[ConversationEntry], int, int]:
     match api:
         case LLMApis.openai:
             return _run_openai_chat(
@@ -493,7 +497,7 @@ def _run_openai_chat(
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
     response_format_type: typing.Literal["text", "json_object"] | None,
-) -> list[ConversationEntry]:
+) -> tuple[list[ConversationEntry], int, int]:
     from openai._types import NOT_GIVEN
 
     if avoid_repetition:
@@ -524,7 +528,11 @@ def _run_openai_chat(
             for model_str in model
         ],
     )
-    return [choice.message.dict() for choice in r.choices]
+    return (
+        [choice.message.dict() for choice in r.choices],
+        r.usage.completion_tokens,
+        r.usage.prompt_tokens,
+    )
 
 
 @retry_if(openai_should_retry)
@@ -630,7 +638,7 @@ def _run_palm_chat(
     max_output_tokens: int,
     candidate_count: int,
     temperature: float,
-) -> list[ConversationEntry]:
+) -> tuple[list[ConversationEntry], int, int]:
     """
     Args:
         model_id: The model id to use for the request. See available models: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
@@ -670,14 +678,23 @@ def _run_palm_chat(
     )
     r.raise_for_status()
 
-    return [
-        {
-            "role": msg["author"],
-            "content": msg["content"],
-        }
-        for pred in r.json()["predictions"]
-        for msg in pred["candidates"]
-    ]
+    print(
+        "real r.json()",
+        r.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
+    )
+
+    return (
+        [
+            {
+                "role": msg["author"],
+                "content": msg["content"],
+            }
+            for pred in r.json()["predictions"]
+            for msg in pred["candidates"]
+        ],
+        r.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
+        r.json()["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
+    )
 
 
 @retry_if(vertex_ai_should_retry)
@@ -688,7 +705,7 @@ def _run_palm_text(
     max_output_tokens: int,
     candidate_count: int,
     temperature: float,
-) -> list[str]:
+) -> tuple[list[str], int, int]:
     """
     Args:
         model_id: The model id to use for the request. See available models: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
@@ -714,7 +731,12 @@ def _run_palm_text(
         },
     )
     res.raise_for_status()
-    return [prediction["content"] for prediction in res.json()["predictions"]]
+    print("res.json()", res.json())
+    return (
+        [prediction["content"] for prediction in res.json()["predictions"]],
+        res.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
+        res.json()["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
+    )
 
 
 def format_chatml_message(entry: ConversationEntry) -> str:
