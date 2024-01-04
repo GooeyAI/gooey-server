@@ -105,6 +105,7 @@ class CompareLLMPage(BasePage):
                 max_tokens=request.max_tokens,
                 avoid_repetition=request.avoid_repetition,
             )
+            print("final output", output_text)
 
     def render_output(self):
         self._render_outputs(st.session_state, 450)

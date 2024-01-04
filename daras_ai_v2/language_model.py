@@ -329,7 +329,11 @@ def run_language_model(
     avoid_repetition: bool = False,
     tools: list[LLMTools] = None,
     response_format_type: typing.Literal["text", "json_object"] = None,
-) -> list[str] | tuple[list[str], list[list[dict]]] | list[dict]:
+) -> (
+    tuple[list[str], int, int]
+    | tuple[list[str], list[list[dict]], int, int]
+    | tuple[list[dict], int, int]
+):
     assert bool(prompt) != bool(
         messages
     ), "Pleave provide exactly one of { prompt, messages }"
@@ -372,19 +376,20 @@ def run_language_model(
                 else (entry.get("content") or "").strip()
                 for entry in result
             ]
-        print("out_contentttt", out_content, input_token, output_token)
         if tools:
             return (
                 out_content,
                 [(entry.get("tool_calls") or []) for entry in result],
+                output_token,
+                input_token,
             )
         else:
-            return out_content, input_token, output_token
+            return out_content, output_token, input_token
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
         logger.info(f"{model_name=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
-        result = _run_text_model(
+        result, output_token, input_token = _run_text_model(
             api=api,
             model=model_name,
             prompt=prompt,
@@ -395,7 +400,7 @@ def run_language_model(
             avoid_repetition=avoid_repetition,
             quality=quality,
         )
-        return [msg.strip() for msg in result]
+        return [msg.strip() for msg in result], output_token, input_token
 
 
 def _run_text_model(
@@ -409,7 +414,7 @@ def _run_text_model(
     stop: list[str] | None,
     avoid_repetition: bool,
     quality: float,
-) -> list[str]:
+) -> tuple[list[str], int, int]:
     match api:
         case LLMApis.openai:
             return _run_openai_text(
@@ -528,6 +533,7 @@ def _run_openai_chat(
             for model_str in model
         ],
     )
+    print("entire r", r)
     return (
         [choice.message.dict() for choice in r.choices],
         r.usage.completion_tokens,
@@ -557,7 +563,11 @@ def _run_openai_text(
         frequency_penalty=0.1 if avoid_repetition else 0,
         presence_penalty=0.25 if avoid_repetition else 0,
     )
-    return [choice.text for choice in r.choices]
+    return (
+        [choice.text for choice in r.choices],
+        r.usage.completion_tokens,
+        r.usage.prompt_tokens,
+    )
 
 
 def _get_openai_client(model: str):
@@ -586,7 +596,7 @@ def _run_together_chat(
     temperature: float,
     repetition_penalty: float,
     num_outputs: int,
-) -> list[ConversationEntry]:
+) -> tuple[list[ConversationEntry], int, int]:
     """
     Args:
         model: The model version to use for the request.
@@ -614,11 +624,15 @@ def _run_together_chat(
         range(num_outputs),
     )
     ret = []
+    total_out_tokens = 0
+    total_in_tokens = 0
     for r in results:
         r.raise_for_status()
         data = r.json()
         output = data["output"]
         error = output.get("error")
+        total_out_tokens += output.get("usage", {}).get("completion_tokens", 0)
+        total_in_tokens += output.get("usage", {}).get("prompt_tokens", 0)
         if error:
             raise ValueError(error)
         ret.append(
@@ -627,7 +641,7 @@ def _run_together_chat(
                 "content": output["choices"][0]["text"],
             }
         )
-    return ret
+    return ret, total_out_tokens, total_in_tokens
 
 
 @retry_if(vertex_ai_should_retry)
@@ -678,11 +692,6 @@ def _run_palm_chat(
     )
     r.raise_for_status()
 
-    print(
-        "real r.json()",
-        r.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
-    )
-
     return (
         [
             {
@@ -731,7 +740,6 @@ def _run_palm_text(
         },
     )
     res.raise_for_status()
-    print("res.json()", res.json())
     return (
         [prediction["content"] for prediction in res.json()["predictions"]],
         res.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
