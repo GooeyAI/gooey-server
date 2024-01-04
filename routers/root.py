@@ -284,7 +284,7 @@ Authorization: Bearer GOOEY_API_KEY
     }
     workflow = Workflow(
         st.selectbox(
-            "##### Select A Workflow\nChoose a workflow to see how you can interact with it via the API",
+            "##### ⚕ API Generator\nChoose a workflow to see how you can interact with it via the API",
             options=options,
             format_func=lambda x: options[x],
         )
