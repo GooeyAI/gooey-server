@@ -203,7 +203,11 @@ class BasePage:
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         current_run = self.get_sr_from_query_params(example_id, run_id, uid)
         published_run = self.get_current_published_run()
-        is_root_example = published_run and published_run.is_root_example()
+        is_root_example = (
+            published_run
+            and published_run.is_root_example()
+            and published_run.saved_run == current_run
+        )
         title, breadcrumbs = self._get_title_and_breadcrumbs(
             current_run=current_run,
             published_run=published_run,
@@ -225,7 +229,7 @@ class BasePage:
                     )
 
             with st.div(className="d-flex align-items-center"):
-                is_current_user_creator = (
+                can_user_edit_run = self.is_current_user_admin() or (
                     self.request
                     and self.request.user
                     and current_run.get_creator() == self.request.user
@@ -238,7 +242,7 @@ class BasePage:
                     and published_run.is_editor(self.request.user)
                 )
 
-                if (is_current_user_creator or self.is_current_user_admin()) and has_unpublished_changes:
+                if can_user_edit_run and has_unpublished_changes:
                     self._render_unpublished_changes_indicator()
 
                 with st.div(className="d-flex align-items-start right-action-icons"):
@@ -252,14 +256,14 @@ class BasePage:
                     """
                     )
 
-                    if is_current_user_creator or self.is_current_user_admin():
+                    if can_user_edit_run and not is_root_example:
                         self._render_published_run_buttons(
                             current_run=current_run,
                             published_run=published_run,
                         )
 
                     self._render_social_buttons(
-                        show_button_text=not is_current_user_creator
+                        show_button_text=not can_user_edit_run or is_root_example
                     )
 
         with st.div():
@@ -407,29 +411,31 @@ class BasePage:
         if is_update_mode:
             assert published_run is not None, "published_run must be set in update mode"
 
-        with st.div(className="visibility-radio"):
-            st.write("### Publish to")
-            convert_state_type(st.session_state, "published_run_visibility", int)
-            if is_update_mode:
-                st.session_state.setdefault(
-                    "published_run_visibility", published_run.visibility
+        if not for_example:
+            with st.div(className="visibility-radio"):
+                st.write("### Publish to")
+                convert_state_type(st.session_state, "published_run_visibility", int)
+                if is_update_mode:
+                    st.session_state.setdefault(
+                        "published_run_visibility", published_run.visibility
+                    )
+                published_run_visibility = st.radio(
+                    "",
+                    key="published_run_visibility",
+                    options=PublishedRunVisibility.values,
+                    format_func=lambda x: PublishedRunVisibility(x).help_text(),
                 )
-            published_run_visibility = st.radio(
-                "",
-                key="published_run_visibility",
-                options=[PublishedRunVisibility.PUBLIC]
-                if for_example
-                else PublishedRunVisibility.values,
-                format_func=lambda x: PublishedRunVisibility(x).help_text(),
-            )
-            st.radio(
-                "",
-                options=[
-                    '<span class="text-muted">Anyone at my org (coming soon)</span>',
-                ],
-                disabled=True,
-                checked_by_default=False,
-            )
+                st.radio(
+                    "",
+                    options=[
+                        '<span class="text-muted">Anyone at my org (coming soon)</span>',
+                    ],
+                    disabled=True,
+                    checked_by_default=False,
+                )
+        else:
+            published_run_visibility = PublishedRunVisibility.PUBLIC
+            st.caption("Visibility: This will be a public and approved example.")
 
         with st.div(className="mt-4"):
             recipe_title = self.get_root_published_run().title or self.title
@@ -475,6 +481,7 @@ class BasePage:
                     title=published_run_title.strip(),
                     notes=published_run_notes.strip(),
                     visibility=PublishedRunVisibility(published_run_visibility),
+                    is_approved_example=for_example,
                 )
             else:
                 updates = dict(
@@ -482,10 +489,12 @@ class BasePage:
                     title=published_run_title.strip(),
                     notes=published_run_notes.strip(),
                     visibility=PublishedRunVisibility(published_run_visibility),
-                    is_approved_example=False,
+                    is_approved_example=for_example
+                    or None,  # can only be approved from here
                 )
                 if self._has_published_run_changed(
-                    published_run=published_run, **updates
+                    published_run=published_run,
+                    **updates,
                 ):
                     published_run.add_version(
                         user=self.request.user,
@@ -505,14 +514,17 @@ class BasePage:
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
-        is_approved_example: bool = False,
+        is_approved_example: bool | None = None,
     ):
         return (
             published_run.title != title
             or published_run.notes != notes
             or published_run.visibility != visibility
             or published_run.saved_run != saved_run
-            or published_run.is_approved_example != is_approved_example
+            or (
+                is_approved_example is not None
+                and published_run.is_approved_example != is_approved_example
+            )
         )
 
     def _render_run_actions_modal(
@@ -1070,8 +1082,9 @@ class BasePage:
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
+        is_approved_example: bool = False,
     ):
-        return PublishedRun.create_published_run(
+        return PublishedRun.objects.create_published_run(
             workflow=cls.workflow,
             published_run_id=published_run_id,
             saved_run=saved_run,
@@ -1079,6 +1092,7 @@ class BasePage:
             title=title,
             notes=notes,
             visibility=visibility,
+            is_approved_example=is_approved_example,
         )
 
     @classmethod
@@ -1584,26 +1598,24 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                     "Workflow Root Notes", value=published_run.notes
                 )
                 if st.button("💾 Save changes"):
-                    published_run.title = published_run_title
-                    published_run.notes = published_run_notes
-                    try:
-                        published_run.full_clean()
-                        published_run.save(update_fields=["title", "notes"])
-                    except Exception as e:
-                        st.error(str(e))
-                    else:
-                        st.success("Saved Workflow Root")
-                        st.experimental_rerun()
-                st.write("---")
+                    published_run.add_version(
+                        user=self.request.user,
+                        title=published_run_title,
+                        notes=published_run_notes,
+                        saved_run=published_run.saved_run,
+                        visibility=published_run.visibility,
+                    )
+                    st.experimental_rerun()
             else:
                 if st.button("⭐️ Save Workflow"):
                     root_run = self.get_root_published_run()
                     root_run.add_version(
                         user=self.request.user,
-                        saved_run=current_sr,
-                        visibility=PublishedRunVisibility.PUBLIC,
                         title=published_run.title if published_run else root_run.title,
                         notes=published_run.notes if published_run else root_run.notes,
+                        saved_run=current_sr,
+                        visibility=PublishedRunVisibility.PUBLIC,
+                        is_approved_example=True,
                     )
                     raise QueryParamsRedirectException(
                         dict(example_id=root_run.published_run_id)
@@ -1615,11 +1627,19 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                     and published_run.is_approved_example
                 ):
                     if st.button("🙈 Remove from Examples"):
-                        published_run.is_approved_example = False
-                        self.update_or_show_error(
-                            published_run,
-                            update_fields=["is_approved_example"],
-                        )
+                        try:
+                            published_run.add_version(
+                                user=self.request.user,
+                                saved_run=published_run.saved_run,
+                                title=published_run.title,
+                                notes=published_run.notes,
+                                visibility=published_run.visibility,
+                                is_approved_example=False,
+                            )
+                        except Exception as e:
+                            st.error(str(e))
+                        else:
+                            st.experimental_rerun()
                 else:
                     save_example_button = st.button("✅ Approve as Example")
 
@@ -1852,8 +1872,14 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def set_hidden(self, *, published_run: PublishedRun, hidden: bool):
         with st.spinner("Hiding..."):
-            published_run.is_approved_example = not hidden
-            published_run.save()
+            published_run.add_version(
+                user=self.request.user,
+                saved_run=published_run.saved_run,
+                visibility=published_run.visibility,
+                title=published_run.title,
+                notes=published_run.notes,
+                is_approved_example=not hidden,
+            )
 
         st.experimental_rerun()
 

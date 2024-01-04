@@ -1122,7 +1122,7 @@ class PublishedRun(models.Model):
         visibility: PublishedRunVisibility,
         title: str,
         notes: str,
-        is_approved_example: bool = False,
+        is_approved_example: bool | None = None,
     ):
         assert saved_run.workflow == self.workflow
 
@@ -1138,8 +1138,10 @@ class PublishedRun(models.Model):
             )
             version.save()
             update_fields = self.update_fields_to_latest_version()
-            self.is_approved_example = is_approved_example
-            self.save(update_fields=update_fields + ["is_approved_example"])
+            if is_approved_example is not None:
+                self.is_approved_example = is_approved_example
+                update_fields.append("is_approved_example")
+            self.save(update_fields=update_fields)
 
     def is_editor(self, user: AppUser):
         return self.created_by == user
@@ -1156,6 +1158,7 @@ class PublishedRun(models.Model):
         self.visibility = latest_version.visibility
 
         return ["saved_run", "last_edited_by", "title", "notes", "visibility"]
+
 
 class PublishedRunVersion(models.Model):
     version_id = models.CharField(max_length=128, unique=True)
