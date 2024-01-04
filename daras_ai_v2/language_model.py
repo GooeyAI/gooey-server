@@ -66,6 +66,10 @@ class LargeLanguageModels(Enum):
     code_davinci_002 = "Codex [Deprecated] (openai)"
 
     @classmethod
+    def choices(cls):
+        return tuple((e.value, e.name) for e in cls)
+
+    @classmethod
     def _deprecated(cls):
         return {cls.code_davinci_002}
 

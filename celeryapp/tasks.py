@@ -8,6 +8,7 @@ import sentry_sdk
 import gooey_ui as st
 from app_users.models import AppUser
 from bots.models import SavedRun
+from costs.models import UsageCost
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
