@@ -254,7 +254,7 @@ def backwards_func(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bots", "0053_alter_publishedrun_workflow_alter_savedrun_workflow_and_more"),
+        ("bots", "0054_alter_savedrun_example_id_alter_savedrun_page_notes_and_more"),
     ]
 
     operations = [
