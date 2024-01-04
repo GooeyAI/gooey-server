@@ -277,6 +277,7 @@ Authorization: Bearer GOOEY_API_KEY
         unsafe_allow_html=True,
     )
 
+    st.write("---")
     options = {
         page_cls.workflow.value: page_cls().get_recipe_title()
         for page_cls in all_api_pages
@@ -314,13 +315,15 @@ Authorization: Bearer GOOEY_API_KEY
     st.write("###### 🎁 Example Response")
     st.json(response_body, expanded=True)
 
-    if not self.request.user or self.request.user.is_anonymous:
-        st.write("**Please Login to generate the `$GOOEY_API_KEY`**")
-        return
-
     st.write("---")
     with st.tag("a", id="api-keys"):
         st.write("##### 🔐 API keys")
+
+    if not self.request.user or self.request.user.is_anonymous:
+        st.write(
+            "**Please [Login](/login/?next=/api/) to generate the `$GOOEY_API_KEY`**"
+        )
+        return
 
     manage_api_keys(self.request.user)
 
