@@ -282,13 +282,13 @@ Authorization: Bearer GOOEY_API_KEY
         page_cls.workflow.value: page_cls().get_recipe_title()
         for page_cls in all_api_pages
     }
-    workflow = list(Workflow)[
+    workflow = Workflow(
         st.selectbox(
             "##### Select A Workflow\nChoose a workflow to see how you can interact with it via the API",
             options=options,
             format_func=lambda x: options[x],
         )
-    ]
+    )
 
     st.write("###### 📤 Example Request")
 
