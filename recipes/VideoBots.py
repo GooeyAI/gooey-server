@@ -446,6 +446,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.session_state["input_images"] = None
             st.session_state["raw_input_text"] = ""
             self.clear_outputs()
+            st.session_state["final_keyword_query"] = ""
+            st.session_state["final_search_query"] = ""
             st.experimental_rerun()
 
         # render sources
