@@ -1574,8 +1574,12 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 and published_run.is_root_example()
             ):
                 st.write("##### Workflow Options")
-                published_run_title = st.text_input("Workflow Root Title", value=published_run.title or self.title)
-                published_run_notes = st.text_area("Workflow Root Notes", value=published_run.notes)
+                published_run_title = st.text_input(
+                    "Workflow Root Title", value=published_run.title or self.title
+                )
+                published_run_notes = st.text_area(
+                    "Workflow Root Notes", value=published_run.notes
+                )
                 if st.button("💾 Save changes"):
                     published_run.title = published_run_title
                     published_run.notes = published_run_notes
@@ -1656,7 +1660,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                         else:
                             publish_modal.open()
                     if publish_modal.is_open():
-                        with publish_modal.container(style={"min-width": "min(500px, 100vw)"}):
+                        with publish_modal.container(
+                            style={"min-width": "min(500px, 100vw)"}
+                        ):
                             self._render_publish_modal(
                                 current_run=current_sr,
                                 published_run=None,
