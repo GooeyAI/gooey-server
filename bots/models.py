@@ -985,6 +985,40 @@ class FeedbackComment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class PublishedRunQuerySet(models.QuerySet):
+    def create_published_run(
+        self,
+        *,
+        workflow: Workflow,
+        published_run_id: str,
+        saved_run: SavedRun,
+        user: AppUser,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+        is_approved_example: bool,
+    ):
+        with transaction.atomic():
+            published_run = PublishedRun(
+                workflow=workflow,
+                published_run_id=published_run_id,
+                created_by=user,
+                last_edited_by=user,
+                title=title,
+                is_approved_example=is_approved_example,
+            )
+            published_run.save()
+            published_run.add_version(
+                user=user,
+                saved_run=saved_run,
+                title=title,
+                visibility=visibility,
+                notes=notes,
+                is_approved_example=is_approved_example,
+            )
+            return published_run
+
+
 class PublishedRun(models.Model):
     # published_run_id was earlier SavedRun.example_id
     published_run_id = models.CharField(
@@ -1024,6 +1058,8 @@ class PublishedRun(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = PublishedRunQuerySet.as_manager()
+
     class Meta:
         get_latest_by = "updated_at"
 
@@ -1054,36 +1090,6 @@ class PublishedRun(models.Model):
     def open_in_gooey(self):
         return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
 
-    @classmethod
-    def create_published_run(
-        cls,
-        *,
-        workflow: Workflow,
-        published_run_id: str,
-        saved_run: SavedRun,
-        user: AppUser,
-        title: str,
-        notes: str,
-        visibility: PublishedRunVisibility,
-    ):
-        with transaction.atomic():
-            published_run = PublishedRun(
-                workflow=workflow,
-                published_run_id=published_run_id,
-                created_by=user,
-                last_edited_by=user,
-                title=title,
-            )
-            published_run.save()
-            published_run.add_version(
-                user=user,
-                saved_run=saved_run,
-                title=title,
-                visibility=visibility,
-                notes=notes,
-            )
-            return published_run
-
     def duplicate(
         self,
         *,
@@ -1092,7 +1098,7 @@ class PublishedRun(models.Model):
         notes: str,
         visibility: PublishedRunVisibility,
     ) -> PublishedRun:
-        return PublishedRun.create_published_run(
+        return PublishedRun.objects.create_published_run(
             workflow=Workflow(self.workflow),
             published_run_id=get_random_doc_id(),
             saved_run=self.saved_run,
@@ -1100,6 +1106,7 @@ class PublishedRun(models.Model):
             title=title,
             notes=notes,
             visibility=visibility,
+            is_approved_example=False,
         )
 
     def get_app_url(self):
@@ -1115,6 +1122,7 @@ class PublishedRun(models.Model):
         visibility: PublishedRunVisibility,
         title: str,
         notes: str,
+        is_approved_example: bool = False,
     ):
         assert saved_run.workflow == self.workflow
 
@@ -1129,7 +1137,9 @@ class PublishedRun(models.Model):
                 visibility=visibility,
             )
             version.save()
-            self.update_fields_to_latest_version()
+            update_fields = self.update_fields_to_latest_version()
+            self.is_approved_example = is_approved_example
+            self.save(update_fields=update_fields + ["is_approved_example"])
 
     def is_editor(self, user: AppUser):
         return self.created_by == user
@@ -1137,7 +1147,7 @@ class PublishedRun(models.Model):
     def is_root_example(self):
         return not self.published_run_id
 
-    def update_fields_to_latest_version(self):
+    def update_fields_to_latest_version(self) -> list[str]:
         latest_version = self.versions.latest()
         self.saved_run = latest_version.saved_run
         self.last_edited_by = latest_version.changed_by
@@ -1145,8 +1155,7 @@ class PublishedRun(models.Model):
         self.notes = latest_version.notes
         self.visibility = latest_version.visibility
 
-        self.save()
-
+        return ["saved_run", "last_edited_by", "title", "notes", "visibility"]
 
 class PublishedRunVersion(models.Model):
     version_id = models.CharField(max_length=128, unique=True)

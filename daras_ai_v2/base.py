@@ -238,7 +238,7 @@ class BasePage:
                     and published_run.is_editor(self.request.user)
                 )
 
-                if is_current_user_creator and has_unpublished_changes:
+                if (is_current_user_creator or self.is_current_user_admin()) and has_unpublished_changes:
                     self._render_unpublished_changes_indicator()
 
                 with st.div(className="d-flex align-items-start right-action-icons"):
@@ -252,7 +252,7 @@ class BasePage:
                     """
                     )
 
-                    if is_current_user_creator:
+                    if is_current_user_creator or self.is_current_user_admin():
                         self._render_published_run_buttons(
                             current_run=current_run,
                             published_run=published_run,
@@ -482,6 +482,7 @@ class BasePage:
                     title=published_run_title.strip(),
                     notes=published_run_notes.strip(),
                     visibility=PublishedRunVisibility(published_run_visibility),
+                    is_approved_example=False,
                 )
                 if self._has_published_run_changed(
                     published_run=published_run, **updates
@@ -504,12 +505,14 @@ class BasePage:
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
+        is_approved_example: bool = False,
     ):
         return (
             published_run.title != title
             or published_run.notes != notes
             or published_run.visibility != visibility
             or published_run.saved_run != saved_run
+            or published_run.is_approved_example != is_approved_example
         )
 
     def _render_run_actions_modal(
