@@ -78,7 +78,7 @@ class TextToSpeechPage(BasePage):
         audio_url: str
 
     def fallback_preivew_image(self) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_TTS_META_IMG
+        return DEFAULT_TTS_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."

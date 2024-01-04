@@ -77,7 +77,7 @@ class GoogleImageGenPage(BasePage):
         selected_image: str | None
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_GOOGLE_IMG_GEN_META_IMG
+        return DEFAULT_GOOGLE_IMG_GEN_META_IMG
 
     def related_workflows(self):
         from recipes.ObjectInpainting import ObjectInpaintingPage

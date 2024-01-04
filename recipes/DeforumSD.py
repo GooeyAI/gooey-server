@@ -202,7 +202,7 @@ class DeforumSDPage(BasePage):
         output_video: str
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_DEFORUMSD_META_IMG
+        return DEFAULT_DEFORUMSD_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
@@ -359,7 +359,7 @@ Choose fps for the video.
     #         )
 
     def fallback_preivew_image(self) -> str:
-        return self.workflow.metadata.meta_image or DEFAULT_ANIMATION_META_IMG
+        return DEFAULT_ANIMATION_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Create AI-generated Animation without relying on complex CoLab notebooks. Input your prompts + keyframes and bring your ideas to life using the animation capabilities of Gooey & Stable Diffusion's Deforum. For more help on how to use the tool visit https://www.help.gooey.ai/learn-animation"

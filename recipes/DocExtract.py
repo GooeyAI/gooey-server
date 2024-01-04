@@ -89,7 +89,7 @@ class DocExtractPage(BasePage):
         pass
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_YOUTUBE_BOT_META_IMG
+        return DEFAULT_YOUTUBE_BOT_META_IMG
 
     def render_form_v2(self):
         document_uploader(

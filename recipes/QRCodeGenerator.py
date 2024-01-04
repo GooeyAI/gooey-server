@@ -125,7 +125,7 @@ class QRCodeGeneratorPage(BasePage):
     def preview_image(self, state: dict) -> str | None:
         if len(state.get("output_images") or []) > 0:
             return state["output_images"][0]
-        return self.workflow.metadata.meta_image or DEFAULT_QR_CODE_META_IMG
+        return DEFAULT_QR_CODE_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.CompareText2Img import CompareText2ImgPage

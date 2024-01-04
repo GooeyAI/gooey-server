@@ -80,7 +80,7 @@ class FaceInpaintingPage(BasePage):
         output_images: list[str]
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_FACE_INPAINTING_META_IMG
+        return DEFAULT_FACE_INPAINTING_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Upload & extract a face into an AI-generated photo using your text + the latest Stable Diffusion or DallE image generator."

@@ -64,7 +64,7 @@ class CompareUpscalerPage(BasePage):
         )
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_COMPARE_UPSCALER_META_IMG
+        return DEFAULT_COMPARE_UPSCALER_META_IMG
 
     def render_description(self):
         st.write(

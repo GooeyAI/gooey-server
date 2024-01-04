@@ -68,7 +68,7 @@ from daras_ai_v2.user_date_widgets import (
 )
 from gooey_ui import realtime_clear_subs
 from gooey_ui.pubsub import realtime_pull
-from gooey_ui.components.modal import ConfirmationModal, Modal
+from gooey_ui.components.modal import Modal
 
 DEFAULT_META_IMG = (
     # Small
@@ -1605,61 +1605,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                     "Note: To approve a run as an example, it must be published publicly first."
                 )
 
-            self._render_workflow_metadata_settings()
-
-    def _render_workflow_metadata_settings(self):
-        metadata = self.workflow.metadata
-        st.write("---")
-        st.write("##### Workflow Metadata")
-        short_title = st.text_input("Short Title", value=metadata.short_title)
-        help_url = st.text_input("Help URL", value=metadata.help_url)
-        st.write("###### SEO Meta Tags")
-        meta_title = st.text_input("Meta Title", value=metadata.meta_title)
-        meta_description = st.text_area(
-            "Meta Description", value=metadata.meta_description
-        )
-        st.session_state.setdefault("meta_image", metadata.meta_image)
-        meta_image = st.file_uploader(
-            "Meta Image", accept=["image/*"], key="meta_image"
-        )
-        confirm_modal = ConfirmationModal(
-            title="Confirm Changes",
-            confirm_button_props=dict(
-                className="w-100 text-danger border border-danger"
-            ),
-            key="confirm_workflow_metadata",
-        )
-        if st.button("Save", type="primary"):
-            confirm_modal.open()
-
-        if confirm_modal.is_open():
-            with confirm_modal.container():
-                st.write("Are you sure you want to save these changes?")
-
-        workflow_metadata_status_key = "__confirm_workflow_metadata_status"
-        if confirm_modal.is_confirm_pressed:
-            metadata.short_title = short_title
-            metadata.help_url = help_url or ""
-            metadata.meta_title = meta_title
-            metadata.meta_description = meta_description
-            metadata.meta_image = meta_image
-            try:
-                metadata.full_clean()
-                metadata.save()
-            except Exception as e:
-                st.session_state[workflow_metadata_status_key] = {"error": str(e)}
-            else:
-                st.session_state[workflow_metadata_status_key] = {"success": True}
-            confirm_modal.close()
-
-        if workflow_metadata_status := st.session_state.get(
-            workflow_metadata_status_key
-        ):
-            if workflow_metadata_status.get("success"):
-                st.success("Saved successfully!")
-            elif workflow_metadata_status.get("error"):
-                st.error(workflow_metadata_status["error"])
-
     def state_to_doc(self, state: dict):
         ret = {
             field_name: deepcopy(state[field_name])
@@ -1860,7 +1805,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return extract_nested_str(out)
 
     def fallback_preivew_image(self) -> str:
-        return self.workflow.metadata.meta_image or DEFAULT_META_IMG
+        return DEFAULT_META_IMG
 
     def run_as_api_tab(self):
         api_docs_url = str(

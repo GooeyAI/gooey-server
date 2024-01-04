@@ -68,7 +68,7 @@ class ImageSegmentationPage(BasePage):
         resized_mask: str
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_IMG_SEGMENTATION_META_IMG
+        return DEFAULT_IMG_SEGMENTATION_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.ObjectInpainting import ObjectInpaintingPage

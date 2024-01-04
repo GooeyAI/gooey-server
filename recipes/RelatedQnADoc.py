@@ -45,7 +45,7 @@ class RelatedQnADocPage(BasePage):
         serp_results: dict
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_QNA_DOC_META_IMG
+        return DEFAULT_QNA_DOC_META_IMG
 
     def render_description(self) -> str:
         return "This workflow gets the related queries for your Google search, searches your custom domain and builds answers using the results and GPT."

@@ -49,7 +49,7 @@ class SmartGPTPage(BasePage):
         prompt_tree: PromptTree | None
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_SMARTGPT_META_IMG
+        return DEFAULT_SMARTGPT_META_IMG
 
     def render_form_v2(self):
         st.text_area(

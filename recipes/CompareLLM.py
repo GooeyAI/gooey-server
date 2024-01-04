@@ -54,7 +54,7 @@ class CompareLLMPage(BasePage):
         ]
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_COMPARE_LM_META_IMG
+        return DEFAULT_COMPARE_LM_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Which language model works best your prompt? Compare your text generations across multiple large language models (LLMs) like OpenAI's evolving and latest ChatGPT engines and others like Curie, Ada, Babbage."

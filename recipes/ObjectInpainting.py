@@ -77,7 +77,7 @@ class ObjectInpaintingPage(BasePage):
         output_images: list[str]
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_OBJECT_INPAINTING_META_IMG
+        return DEFAULT_OBJECT_INPAINTING_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.ImageSegmentation import ImageSegmentationPage

@@ -68,7 +68,7 @@ class SocialLookupEmailPage(BasePage):
         ]
 
     def preview_image(self, state: dict) -> str | None:
-        return self.workflow.metadata.meta_image or DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG
+        return DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG
 
     def render_description(self):
         st.write(
