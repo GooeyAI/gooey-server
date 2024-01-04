@@ -81,36 +81,40 @@ def meta_title_for_page(
     sr: SavedRun,
     published_run: PublishedRun | None,
 ) -> str:
+    sep = " • "
+
     if (
         published_run
         and published_run.is_root_example()
         and published_run.saved_run == sr
     ):
         # on root page
-        return page.workflow.metadata.meta_title + " • Gooey.AI"
+        return page.workflow.metadata.meta_title + sep + "Gooey.AI"
 
     parts = []
 
     parts.append(page.get_page_title())
-    if published_run and published_run.saved_run != sr:
-        # fork or stale version of a published-run: add user's name
-        user = sr.get_creator()
-        if user and user.display_name:
-            parts.append(
-                user_name_possesive(user.display_name)
-                + " "
-                + page.workflow.metadata.meta_title
-            )
-    parts.append("AI API, workflow & prompt shared on Gooey.AI")
 
-    return " • ".join(parts)
-
-
-def user_name_possesive(name: str) -> str:
-    if name.endswith("s"):
-        return name + "'"
+    if published_run and not published_run.is_root_example():
+        user = published_run.created_by
     else:
-        return name + "'s"
+        user = sr.get_creator()
+
+    if (
+        published_run
+        and published_run.title
+        and published_run.saved_run != sr
+        and not published_run.is_root_example()
+    ):
+        part = f"{published_run.title} {page.workflow.metadata.short_title}"
+    else:
+        part = page.workflow.metadata.short_title
+    if user and user.display_name:
+        part += f" by {user.display_name}"
+    parts.append(part)
+
+    parts.append("Gooey.AI")
+    return sep.join(parts)
 
 
 def meta_description_for_page(
@@ -139,7 +143,16 @@ def meta_image_for_page(
     sr: SavedRun,
     published_run: PublishedRun | None,
 ) -> str | None:
+    if (
+        published_run
+        and published_run.saved_run == sr
+        and published_run.is_root_example()
+    ):
+        file_url = page.workflow.metadata.meta_image or page.preview_image(state)
+    else:
+        file_url = page.preview_image(state)
+
     return meta_preview_url(
-        file_url=page.preview_image(state),
+        file_url=file_url,
         fallback_img=page.fallback_preivew_image(),
     )
