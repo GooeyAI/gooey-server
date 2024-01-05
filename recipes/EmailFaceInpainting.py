@@ -9,6 +9,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import db, settings
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
@@ -365,7 +366,7 @@ def get_photo_for_email(email_address):
         f"https://api.seon.io/SeonRestService/email-api/v2.2/{email_address}",
         headers={"X-API-KEY": settings.SEON_API_KEY},
     )
-    r.raise_for_status()
+    raise_for_status(r)
 
     account_details = glom.glom(r.json(), "data.account_details", default={})
     for spec in [
@@ -398,7 +399,7 @@ def get_photo_for_twitter_handle(twitter_handle):
         f"https://api.twitter.com/2/users/by?usernames={twitter_handle}&user.fields=profile_image_url",
         headers={"Authorization": f"Bearer {settings.TWITTER_BEARER_TOKEN}"},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     error = glom.glom(r.json(), "errors.0.title", default=None)
     if error:
         if error == "Not Found Error":

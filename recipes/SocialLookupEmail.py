@@ -9,6 +9,7 @@ from bots.models import Workflow
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.redis_cache import redis_cache_decorator
@@ -240,7 +241,7 @@ def get_profile_for_email(email_address) -> dict | None:
         "https://api.apollo.io/v1/people/match",
         json={"api_key": settings.APOLLO_API_KEY, "email": email_address},
     )
-    r.raise_for_status()
+    raise_for_status(r)
 
     person = r.json().get("person")
     if not person:

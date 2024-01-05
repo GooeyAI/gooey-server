@@ -14,6 +14,7 @@ from bots.models import BotIntegration, Platform, Conversation, Message
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.slack_bot import (
     SlackBot,
     invite_bot_account_to_channel,
@@ -83,7 +84,7 @@ def slack_connect_redirect(request: Request):
         ).url,
         auth=HTTPBasicAuth(settings.SLACK_CLIENT_ID, settings.SLACK_CLIENT_SECRET),
     )
-    r.raise_for_status()
+    raise_for_status(r)
     print("> slack_connect_redirect:", r.text)
 
     data = r.json()
@@ -255,7 +256,7 @@ def slack_connect_redirect_shortcuts(
         ).url,
         auth=HTTPBasicAuth(settings.SLACK_CLIENT_ID, settings.SLACK_CLIENT_SECRET),
     )
-    res.raise_for_status()
+    raise_for_status(res)
     res = res.json()
     print("> slack_connect_redirect_shortcuts:", res)
 

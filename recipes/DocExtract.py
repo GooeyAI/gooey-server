@@ -26,6 +26,7 @@ from daras_ai_v2.azure_doc_extract import azure_doc_extract_pages
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import (
     apply_parallel,
@@ -290,7 +291,7 @@ def extract_info(url: str) -> list[dict | None]:
                     headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
                     timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
                 )
-                r.raise_for_status()
+                raise_for_status(r)
                 f_bytes = r.content
             inputpdf = PdfReader(io.BytesIO(f_bytes))
             return [

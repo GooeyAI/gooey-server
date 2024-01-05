@@ -13,6 +13,7 @@ from daras_ai.image_input import (
     resize_img_fit,
     get_downscale_factor,
 )
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import (
     b64_img_decode,
@@ -535,7 +536,7 @@ def inpainting(
             out_imgs = []
             for url in out_imgs_urls:
                 r = requests.get(url)
-                r.raise_for_status()
+                raise_for_status(r)
                 out_imgs.append(r.content)
 
         case _:
