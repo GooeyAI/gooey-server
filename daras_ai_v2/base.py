@@ -1462,7 +1462,10 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             parent_example_id, parent_run_id, parent_uid
         )
         published_run = self.get_current_published_run()
-        parent_version = published_run and published_run.versions.latest()
+        try:
+            parent_version = published_run and published_run.versions.latest()
+        except PublishedRunVersion.DoesNotExist:
+            parent_version = None
 
         self.run_doc_sr(
             run_id,

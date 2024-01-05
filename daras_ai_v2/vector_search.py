@@ -52,7 +52,7 @@ from files.models import FileMetadata
 
 class DocSearchRequest(BaseModel):
     search_query: str
-    keyword_query: str | None
+    keyword_query: str | list[str] | None
 
     documents: list[str] | None
 
@@ -134,9 +134,12 @@ def get_top_k_references(
             for ref, _ in embeds
         ]
         bm25 = BM25Okapi(tokenized_corpus, k1=2, b=0.3)
-        sparse_query_tokenized = bm25_tokenizer(
-            request.keyword_query or request.search_query
-        )
+        if request.keyword_query and isinstance(request.keyword_query, list):
+            sparse_query_tokenized = [item.lower() for item in request.keyword_query]
+        else:
+            sparse_query_tokenized = bm25_tokenizer(
+                request.keyword_query or request.search_query
+            )
         if sparse_query_tokenized:
             sparse_scores = np.array(bm25.get_scores(sparse_query_tokenized))
             # sparse_scores *= custom_weights

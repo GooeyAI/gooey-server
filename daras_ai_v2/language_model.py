@@ -54,8 +54,8 @@ class LargeLanguageModels(Enum):
 
     llama2_70b_chat = "Llama 2 (Meta AI)"
 
-    palm2_chat = "PaLM 2 Text (Google)"
-    palm2_text = "PaLM 2 Chat (Google)"
+    palm2_chat = "PaLM 2 Chat (Google)"
+    palm2_text = "PaLM 2 Text (Google)"
 
     text_davinci_003 = "GPT-3.5 Davinci-3 (openai)"
     text_davinci_002 = "GPT-3.5 Davinci-2 (openai)"
@@ -437,7 +437,7 @@ def _run_chat_model(
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
-    response_format_type: typing.Literal["text", "json_object"],
+    response_format_type: typing.Literal["text", "json_object"] | None,
 ) -> list[ConversationEntry]:
     match api:
         case LLMApis.openai:
@@ -488,7 +488,7 @@ def _run_openai_chat(
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
-    response_format_type: typing.Literal["text", "json_object"],
+    response_format_type: typing.Literal["text", "json_object"] | None,
 ) -> list[ConversationEntry]:
     from openai._types import NOT_GIVEN
 
