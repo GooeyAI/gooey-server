@@ -54,8 +54,8 @@ class LargeLanguageModels(Enum):
 
     llama2_70b_chat = "Llama 2 (Meta AI)"
 
-    palm2_chat = "PaLM 2 Text (Google)"
-    palm2_text = "PaLM 2 Chat (Google)"
+    palm2_chat = "PaLM 2 Chat (Google)"
+    palm2_text = "PaLM 2 Text (Google)"
 
     text_davinci_003 = "GPT-3.5 Davinci-3 (openai)"
     text_davinci_002 = "GPT-3.5 Davinci-2 (openai)"
