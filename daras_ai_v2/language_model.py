@@ -437,7 +437,7 @@ def _run_chat_model(
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
-    response_format_type: typing.Literal["text", "json_object"],
+    response_format_type: typing.Literal["text", "json_object"] | None,
 ) -> list[ConversationEntry]:
     match api:
         case LLMApis.openai:
@@ -488,7 +488,7 @@ def _run_openai_chat(
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
-    response_format_type: typing.Literal["text", "json_object"],
+    response_format_type: typing.Literal["text", "json_object"] | None,
 ) -> list[ConversationEntry]:
     from openai._types import NOT_GIVEN
 
