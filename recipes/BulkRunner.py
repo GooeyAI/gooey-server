@@ -295,9 +295,12 @@ To understand what each field represents, check out our [API docs](https://api.g
                     yield f"{progress}%"
 
                     example_id, run_id, uid = extract_query_params(f.query.params)
-                    sr = page_cls.get_sr_from_query_params(example_id, run_id, uid)
+                    parent_sr = page_cls.get_sr_from_query_params(example_id, run_id, uid)
+                    published_run = page_cls.get_published_run_from_query_params(example_id, run_id, uid)
+                    if published_run and published_run.saved_run != parent_sr:
+                        published_run = None
 
-                    result, sr = sr.submit_api_call(
+                    result, sr = parent_sr.submit_api_call(
                         current_user=self.request.user, request_body=request_body
                     )
                     result.get(disable_sync_subtasks=False)
@@ -314,8 +317,8 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
-                            if title := page_cls.get_title(run=sr):
-                                col = f"({title}) {col}"
+                            if published_run and published_run.title:
+                                col = f"({published_run.title}) {col}"
                             else:
                                 col = f"({url_ix + 1}) {col}"
                         out_val = state.get(field)
