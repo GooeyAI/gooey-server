@@ -3,7 +3,7 @@ import sys
 from django.core import serializers
 
 from app_users.models import AppUser
-from bots.models import SavedRun, BotIntegration
+from bots.models import BotIntegration, PublishedRun
 
 
 def run():
@@ -20,9 +20,15 @@ def run():
 
 
 def get_objects():
-    for obj in SavedRun.objects.filter(run_id__isnull=True):
-        set_fk_null(obj)
-        yield obj
+    for pr in PublishedRun.objects.all():
+        set_fk_null(pr.saved_run)
+        if pr.saved_run_id:
+            yield pr.saved_run
+        if pr.created_by_id:
+            yield pr.created_by
+        if pr.last_edited_by_id:
+            yield pr.last_edited_by
+        yield pr
 
     for obj in BotIntegration.objects.all():
         if not obj.saved_run_id:
