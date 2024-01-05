@@ -295,8 +295,12 @@ To understand what each field represents, check out our [API docs](https://api.g
                     yield f"{progress}%"
 
                     example_id, run_id, uid = extract_query_params(f.query.params)
-                    parent_sr = page_cls.get_sr_from_query_params(example_id, run_id, uid)
-                    published_run = page_cls.get_published_run_from_query_params(example_id, run_id, uid)
+                    parent_sr = page_cls.get_sr_from_query_params(
+                        example_id, run_id, uid
+                    )
+                    published_run = page_cls.get_published_run_from_query_params(
+                        example_id, run_id, uid
+                    )
                     if published_run and published_run.saved_run != parent_sr:
                         published_run = None
 
