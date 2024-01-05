@@ -132,7 +132,9 @@ class AccountTab:
 
 @router.post("/account/", include_in_schema=False)
 @router.post("/account/{tab_path}/", include_in_schema=False)
-def account(request: Request, tab_path: str = "", json_data: dict = Depends(request_json)):
+def account(
+    request: Request, tab_path: str = "", json_data: dict = Depends(request_json)
+):
     if tab_path not in AccountTab.paths_reverse:
         raise HTTPException(status_code=404)
 
@@ -140,7 +142,10 @@ def account(request: Request, tab_path: str = "", json_data: dict = Depends(requ
     try:
         return st.runner(
             lambda: page_wrapper(
-                request, render_account_page, tab=tab, request_=request,
+                request,
+                render_account_page,
+                tab=tab,
+                request_=request,
             ),
             query_params=dict(request.query_params),
             **json_data,
@@ -204,17 +209,24 @@ def billing_tab(request: Request):
 def profile_tab(request: Request):
     with st.div(className="user-info"):
         if request.user and request.user.photo_url:
-            st.html(f"""
+            st.html(
+                f"""
             <img id="profile-picture" src="{html.escape(request.user.photo_url)}" alt="" width="128" height="128">
-            """)
+            """
+            )
         with st.div(className="user-info-text-box"):
             if request.user.display_name:
                 st.write(f"## {request.user.display_name}")
             if contact := request.user.email or request.user.phone_number:
                 with st.div(style={"font-weight": "normal"}):
                     st.html(html.escape(contact))
-            with st.div(className="mb-4", style={"font-size": "x-small", "font-weight": "normal"}):
-                st.html("""<a href="/privacy">Privacy</a> & <a href="/terms">Terms</a>""")
+            with st.div(
+                className="mb-4",
+                style={"font-size": "x-small", "font-weight": "normal"},
+            ):
+                st.html(
+                    """<a href="/privacy">Privacy</a> & <a href="/terms">Terms</a>"""
+                )
             with st.link(to="/logout"):
                 st.caption("Sign out")
 
