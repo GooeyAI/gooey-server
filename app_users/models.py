@@ -120,13 +120,13 @@ class AppUser(models.Model):
         # if an invoice entry exists
         try:
             if "-" in invoice_id and "_" not in invoice_id:
-                type = "Paypal"
+                type = Type.PAYPAL
             else:
-                type = "Stripe"
+                type = Type.STRIPE
                 # avoid updating twice for same invoice
                 return AppUserTransaction.objects.get(invoice_id=invoice_id)
         except AppUserTransaction.DoesNotExist:
-            type = "SavedRun"
+            type = Type.SAVED_RUN
             pass
 
         # select_for_update() is very important here
@@ -223,6 +223,12 @@ class AppUser(models.Model):
             return customer
 
 
+class Type(models.TextChoices):
+    STRIPE = 1, "Stripe"
+    PAYPAL = 2, "Paypal"
+    SAVED_RUN = 3, "SavedRun"
+
+
 class AppUserTransaction(models.Model):
     user = models.ForeignKey(
         "AppUser", on_delete=models.CASCADE, related_name="transactions"
@@ -231,7 +237,7 @@ class AppUserTransaction(models.Model):
     amount = models.IntegerField()
     end_balance = models.IntegerField()
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
-    type = models.CharField(max_length=255, default="Stripe")
+    type = models.TextField(choices=Type.choices, default=Type.STRIPE)
     dollar_amt = models.DecimalField(max_digits=6, decimal_places=2, default=0.0)
 
     class Meta:
