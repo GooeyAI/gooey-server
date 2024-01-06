@@ -30,6 +30,13 @@ def get_objects():
             yield pr.last_edited_by
         yield pr
 
+        for version in pr.versions.all():
+            set_fk_null(version.saved_run)
+            yield version.saved_run
+            if version.changed_by_id:
+                yield version.changed_by
+            yield version
+
     for obj in BotIntegration.objects.all():
         if not obj.saved_run_id:
             continue
