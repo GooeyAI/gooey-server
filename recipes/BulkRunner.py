@@ -247,7 +247,10 @@ To understand what each field represents, check out our [API docs](https://api.g
         if eval_runs:
             _backup = st.session_state
             for url in eval_runs:
-                page_cls, sr, _ = url_to_runs(url)
+                try:
+                    page_cls, sr, _ = url_to_runs(url)
+                except SavedRun.DoesNotExist:
+                    continue
                 st.set_session_state(sr.state)
                 page_cls().render_output()
                 st.write("---")
@@ -284,7 +287,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 rec_ix = len(out_recs)
                 out_recs.extend(in_recs[df_ix : df_ix + arr_len])
 
-                for url_ix, f, request_body, page_cls in build_requests_for_df(
+                for url_ix, request_body, page_cls, sr, pr in build_requests_for_df(
                     df, request, df_ix, arr_len
                 ):
                     progress = round(
@@ -294,17 +297,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                     )
                     yield f"{progress}%"
 
-                    example_id, run_id, uid = extract_query_params(f.query.params)
-                    parent_sr = page_cls.get_sr_from_query_params(
-                        example_id, run_id, uid
-                    )
-                    published_run = page_cls.get_published_run_from_query_params(
-                        example_id, run_id, uid
-                    )
-                    if published_run and published_run.saved_run != parent_sr:
-                        published_run = None
-
-                    result, sr = parent_sr.submit_api_call(
+                    result, sr = sr.submit_api_call(
                         current_user=self.request.user, request_body=request_body
                     )
                     result.get(disable_sync_subtasks=False)
@@ -321,8 +314,8 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
-                            if published_run and published_run.title:
-                                col = f"({published_run.title}) {col}"
+                            if pr and pr.title:
+                                col = f"({pr.title}) {col}"
                             else:
                                 col = f"({url_ix + 1}) {col}"
                         out_val = state.get(field)
@@ -364,8 +357,8 @@ To understand what each field represents, check out our [API docs](https://api.g
 
         response.eval_runs = []
         for url in request.eval_urls:
-            page_cls, sr, published_run = url_to_runs(url)
-            yield f"Running {page_cls.get_title(run=published_run or sr)}..."
+            page_cls, sr, pr = url_to_runs(url)
+            yield f"Running {page_cls.get_title_and_breadcrumbs(sr, pr)[0]}..."
             request_body = page_cls.RequestModel(
                 documents=response.output_documents
             ).dict(exclude_unset=True)
@@ -443,13 +436,13 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
                 # use this to set default for next time
                 st.session_state[last_workflow_key] = workflow
         with scol2:
-            page_cls = Workflow(d["workflow"]).page_cls
+            page_cls = Workflow(workflow).page_cls
             options = {
                 page_cls.get_root_published_run().get_app_url(): "Default",
             } | {
                 # approved examples
-                pub_run.get_app_url(): page_cls.get_title(run=pub_run)
-                for pub_run in PublishedRun.objects.filter(
+                pr.get_app_url(): pr.title
+                for pr in PublishedRun.objects.filter(
                     workflow=d["workflow"],
                     is_approved_example=True,
                     visibility=PublishedRunVisibility.PUBLIC,
@@ -499,12 +492,12 @@ def render_eval_url_inputs(key: str, del_key: str, d: dict):
             options = {
                 BulkEvalPage.get_root_published_run().get_app_url(): "Default",
             } | {
-                run.get_app_url(): BulkEvalPage.get_title(run=run)
-                for run in PublishedRun.objects.filter(
+                pr.get_app_url(): pr.title
+                for pr in PublishedRun.objects.filter(
                     workflow=Workflow.BULK_EVAL,
                     is_approved_example=True,
                     visibility=PublishedRunVisibility.PUBLIC,
-                )
+                ).exclude(published_run_id="")
             }
             with st.div(className="pt-1"):
                 url = st.selectbox(
@@ -561,19 +554,18 @@ def _prefill_workflow(d: dict, key: str):
         d.pop("workflow", None)
     elif not d.get("workflow") and d.get("url"):
         try:
-            _, _sr, published_run = url_to_runs(str(d["url"]))
+            _, sr, pr = url_to_runs(str(d["url"]))
         except Exception:
             return
         else:
             if (
-                published_run
-                and published_run.visibility == PublishedRunVisibility.PUBLIC
-                and (
-                    published_run.is_approved_example or published_run.is_root_example()
-                )
+                pr
+                and pr.saved_run == sr
+                and pr.visibility == PublishedRunVisibility.PUBLIC
+                and (pr.is_approved_example or pr.is_root_example())
             ):
-                d["workflow"] = published_run.workflow
-                d["url"] = published_run.get_app_url()
+                d["workflow"] = pr.workflow
+                d["url"] = pr.get_app_url()
 
 
 def url_to_runs(
@@ -584,21 +576,19 @@ def url_to_runs(
     f = furl(url)
     slug = f.path.segments[0]
     page_cls = page_slug_map[normalize_slug(slug)]
-    example_id, run_id, uid = extract_query_params(f.query.params)
-    sr = page_cls.get_sr_from_query_params(example_id, run_id, uid)
-    published_run = page_cls.get_published_run_from_query_params(
-        example_id, run_id, uid
-    )
-    return page_cls, sr, published_run
+    example_id, run_id, uid = extract_query_params(f.query.params, default="")
+    if run_id and uid:
+        sr = page_cls.run_doc_sr(run_id, uid)
+        pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
+    else:
+        pr = page_cls.get_published_run(published_run_id=example_id)
+        sr = pr.saved_run
+    return page_cls, sr, pr
 
 
 def build_requests_for_df(df, request, df_ix, arr_len):
-    from daras_ai_v2.all_pages import page_slug_map, normalize_slug
-
     for url_ix, url in enumerate(request.run_urls):
-        f = furl(url)
-        slug = f.path.segments[0]
-        page_cls = page_slug_map[normalize_slug(slug)]
+        page_cls, sr, pr = url_to_runs(url)
         schema = page_cls.RequestModel.schema()
         properties = schema["properties"]
 
@@ -628,7 +618,7 @@ def build_requests_for_df(df, request, df_ix, arr_len):
             exclude_unset=True
         )
 
-        yield url_ix, f, request_body, page_cls
+        yield url_ix, request_body, page_cls, sr, pr
 
 
 def slice_request_df(df, request):
