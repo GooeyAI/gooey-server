@@ -27,6 +27,8 @@ from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
 from daras_ai_v2.text_splitter import default_length_function
+from daras_ai_v2.query_params_util import extract_query_params
+from daras_ai_v2.query_params import gooey_get_query_params
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
 
@@ -64,10 +66,6 @@ class LargeLanguageModels(Enum):
     text_ada_001 = "Ada (openai)"
 
     code_davinci_002 = "Codex [Deprecated] (openai)"
-
-    @classmethod
-    def choices(cls):
-        return tuple((e.value, e.name) for e in cls)
 
     @classmethod
     def _deprecated(cls):
@@ -329,11 +327,9 @@ def run_language_model(
     avoid_repetition: bool = False,
     tools: list[LLMTools] = None,
     response_format_type: typing.Literal["text", "json_object"] = None,
-) -> (
-    tuple[list[str], int, int]
-    | tuple[list[str], list[list[dict]], int, int]
-    | tuple[list[dict], int, int]
-):
+) -> list[str] | tuple[list[str], list[list[dict]]] | list[dict]:
+    from costs.cost_utils import record_cost, get_provider_pricing
+
     assert bool(prompt) != bool(
         messages
     ), "Pleave provide exactly one of { prompt, messages }"
@@ -380,11 +376,35 @@ def run_language_model(
             return (
                 out_content,
                 [(entry.get("tool_calls") or []) for entry in result],
-                output_token,
-                input_token,
             )
         else:
-            return out_content, output_token, input_token
+            provider_pricing_in = get_provider_pricing(
+                type="LLM",
+                provider=api.name,
+                product=model_name,
+                param="Input",
+            )
+
+            provider_pricing_out = get_provider_pricing(
+                type="LLM",
+                provider=api.name,
+                product=model_name,
+                param="Output",
+            )
+            example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+            record_cost(
+                run_id=run_id,
+                uid=uid,
+                provider_pricing=provider_pricing_in,
+                quantity=input_token,
+            )
+            record_cost(
+                run_id=run_id,
+                uid=uid,
+                provider_pricing=provider_pricing_out,
+                quantity=output_token,
+            )
+            return out_content
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
@@ -533,7 +553,6 @@ def _run_openai_chat(
             for model_str in model
         ],
     )
-    print("entire r", r)
     return (
         [choice.message.dict() for choice in r.choices],
         r.usage.completion_tokens,

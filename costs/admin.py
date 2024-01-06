@@ -8,11 +8,9 @@ from costs import models
 class CostsAdmin(admin.ModelAdmin):
     list_display = [
         "saved_run",
-        "provider",
-        "model",
-        "param",
+        "provider_pricing",
+        "quantity",
         "notes",
-        "calculation_notes",
         "dollar_amt",
         "created_at",
     ]
@@ -27,6 +25,7 @@ class ProviderAdmin(admin.ModelAdmin):
         "param",
         "cost",
         "unit",
+        "notes",
         "created_at",
         "last_updated",
         "updated_by",

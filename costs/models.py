@@ -2,12 +2,17 @@ from django.db import models
 from daras_ai_v2.language_model import LargeLanguageModels
 
 
-class Provider(models.IntegerChoices):
-    OpenAI = 1, "OpenAI"
-    GPT_4 = 2, "GPT-4"
-    dalle_e = 3, "dalle-e"
-    whisper = 4, "whisper"
-    GPT_3_5 = 5, "GPT-3.5"
+class Provider(models.TextChoices):
+    vertex_ai = "vertex_ai", "Vertex AI"
+    openai = "openai", "OpenAI"
+    together = "together", "Together"
+
+
+class Product(models.TextChoices):
+    gpt_4_vision = (
+        "gpt-4-vision-preview",
+        "gpt-4-vision-preview",
+    )
 
 
 class UsageCost(models.Model):
@@ -21,13 +26,15 @@ class UsageCost(models.Model):
         help_text="The run that was last saved by the user.",
     )
 
-    provider = models.IntegerField(choices=Provider.choices)
-    model = models.TextField("model", blank=True)
-    param = models.TextField(
-        "param", blank=True
-    )  # contains input/output tokens and quantity
+    provider_pricing = models.ForeignKey(
+        "costs.ProviderPricing",
+        on_delete=models.CASCADE,
+        related_name="usage_costs",
+        null=True,
+        default=None,
+    )
+    quantity = models.IntegerField(default=1)
     notes = models.TextField(default="", blank=True)
-    calculation_notes = models.TextField(default="", blank=True)
     dollar_amt = models.DecimalField(
         max_digits=13,
         decimal_places=8,
@@ -37,17 +44,15 @@ class UsageCost(models.Model):
 
 class ProviderPricing(models.Model):
     class Type(models.TextChoices):
-        LLM = "LLM"
+        LLM = "LLM", "LLM"
 
     class Param(models.TextChoices):
-        input = "input"
-        output = "output"
-        input_image = "input image"
-        output_image = "output image"
+        input = "Input", "input"
+        output = "Output", "output"
 
     type = models.TextField(choices=Type.choices)
-    provider = models.IntegerField(choices=Provider.choices)
-    product = models.TextField(choices=LargeLanguageModels.choices())
+    provider = models.TextField(choices=Provider.choices)
+    product = models.TextField(choices=Product.choices)
     param = models.TextField(choices=Param.choices)
     cost = models.DecimalField(max_digits=13, decimal_places=8)
     unit = models.TextField(default="")
@@ -56,3 +61,6 @@ class ProviderPricing(models.Model):
     last_updated = models.DateTimeField(auto_now=True)
     updated_by = models.TextField(default="")
     pricing_url = models.TextField(default="")
+
+    def __str__(self):
+        return self.type + " " + self.provider + " " + self.product + " " + self.param
