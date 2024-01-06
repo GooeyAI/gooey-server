@@ -108,7 +108,9 @@ class AppUser(models.Model):
 
     @db_middleware
     @transaction.atomic
-    def add_balance(self, amount: int, invoice_id: str) -> "AppUserTransaction":
+    def add_balance(
+        self, amount: int, invoice_id: str, **kwargs
+    ) -> "AppUserTransaction":
         """
         Used to add/deduct credits when they are bought or consumed.
 
@@ -119,14 +121,9 @@ class AppUser(models.Model):
         """
         # if an invoice entry exists
         try:
-            if "-" in invoice_id and "_" not in invoice_id:
-                type = Type.PAYPAL
-            else:
-                type = Type.STRIPE
-                # avoid updating twice for same invoice
-                return AppUserTransaction.objects.get(invoice_id=invoice_id)
+            # avoid updating twice for same invoice
+            return AppUserTransaction.objects.get(invoice_id=invoice_id)
         except AppUserTransaction.DoesNotExist:
-            type = Type.SAVED_RUN
             pass
 
         # select_for_update() is very important here
@@ -137,14 +134,12 @@ class AppUser(models.Model):
         user: AppUser = AppUser.objects.select_for_update().get(pk=self.pk)
         user.balance += amount
         user.save(update_fields=["balance"])
-        dollar_amt = amount / 100
         return AppUserTransaction.objects.create(
             user=self,
             invoice_id=invoice_id,
             amount=amount,
             end_balance=user.balance,
-            type=type,
-            dollar_amt=dollar_amt,
+            **kwargs,
         )
 
     def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
@@ -223,10 +218,9 @@ class AppUser(models.Model):
             return customer
 
 
-class Type(models.TextChoices):
+class PaymentProvider(models.IntegerChoices):
     STRIPE = 1, "Stripe"
     PAYPAL = 2, "Paypal"
-    SAVED_RUN = 3, "SavedRun"
 
 
 class AppUserTransaction(models.Model):
@@ -237,8 +231,20 @@ class AppUserTransaction(models.Model):
     amount = models.IntegerField()
     end_balance = models.IntegerField()
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
-    type = models.TextField(choices=Type.choices, default=Type.STRIPE)
-    dollar_amt = models.DecimalField(max_digits=6, decimal_places=2, default=0.0)
+    payment_provider = models.IntegerField(
+        choices=PaymentProvider.choices,
+        null=True,
+        blank=True,
+        default=None,
+        help_text="The payment provider used for this transaction.<br>"
+        "If this is provided, the Charged Amount should also be provided.",
+    )
+    charged_amount = models.PositiveIntegerField(
+        help_text="The charged dollar amount in the currency’s smallest unit.<br>"
+        "E.g. for 10 USD, this would be of 1000 (that is, 1000 cents).<br>"
+        "<a href='https://stripe.com/docs/currencies'>Learn More</a>",
+        default=0,
+    )
 
     class Meta:
         verbose_name = "Transaction"

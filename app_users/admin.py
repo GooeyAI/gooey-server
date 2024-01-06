@@ -128,12 +128,18 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         "invoice_id",
         "user",
         "amount",
-        "created_at",
         "end_balance",
-        "type",
-        "dollar_amt",
+        "payment_provider",
+        "dollar_amount",
+        "created_at",
     ]
     readonly_fields = ["created_at"]
-    list_filter = ["created_at", IsStripeFilter]
+    list_filter = ["created_at", IsStripeFilter, "payment_provider"]
     inlines = [SavedRunInline]
     ordering = ["-created_at"]
+
+    @admin.display(description="Charged Amount")
+    def dollar_amount(self, obj: models.AppUserTransaction):
+        if not obj.payment_provider:
+            return
+        return f"${obj.charged_amount / 100}"

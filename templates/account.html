@@ -54,9 +54,22 @@
             <div class="buy-credits-container">
                 <h2>Buy Credits</h2>
                 <div class="pb-2">
-                    Payments processed via 
-                    <input type="radio" id="stripe-checked" value="Stripe" onchange="stripeLayout()" name="payment-type" checked="checked"><label for="stripe">Stripe</label>
-                    <input type="radio" value="Paypal" onchange="paypalLayout()" name="payment-type"><label for="paypal">Paypal or Venmo</label>
+                    Pay via
+
+                    <input class="form-check-input mx-1"
+                           type="radio"
+                           id="payment-method-stripe"
+                           name="payment-method"
+                           onchange="stripeLayout()"
+                           checked>
+                    <label class="form-check-label" for="payment-method-stripe"><b>Stripe</b></label>
+
+                    <input class="form-check-input mx-1"
+                           type="radio"
+                           id="payment-method-paypal"
+                           name="payment-method"
+                           onchange="paypalLayout()">
+                    <label class="form-check-label" for="payment-method-paypal"><b>Paypal</b></label>
                 </div>
                 <div id="stripe-plans" class="plans-container">
                     {% for lookup_key, subscription in available_subscriptions.items() %}
