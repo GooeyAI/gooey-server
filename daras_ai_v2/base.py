@@ -1385,7 +1385,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_running_output(self):
         run_status = st.session_state.get(StateKeys.run_status)
-        st.caption("Your changes are saved in the above URL. Save it for later!")
         html_spinner(run_status)
         self.render_extra_waiting_output()
 
