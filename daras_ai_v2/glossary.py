@@ -39,15 +39,13 @@ def validate_glossary_document(
 def glossary_input(
     label: str = "##### Glossary",
     key: str = "glossary_document",
-):
-    document: str = document_uploader(
+) -> str:
+    return document_uploader(
         label=label,
         key=key,
         accept=[".csv", ".xlsx", ".xls", ".gsheet", ".ods", ".tsv"],
         accept_multiple_files=False,
     )  # type: ignore
-
-    return document
 
 
 def create_glossary(
