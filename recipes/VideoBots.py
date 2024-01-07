@@ -4,6 +4,7 @@ import os.path
 import typing
 
 from django.db.models import QuerySet
+from django.core.exceptions import ValidationError
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -21,6 +22,7 @@ from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
+from recipes.BulkRunner import url_to_sr
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
@@ -202,7 +204,10 @@ class VideoBotsPage(BasePage):
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
 
-        user_language: str | None
+        user_language: str | None = Field(
+            title="🔠 User Language",
+            description="If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.",
+        )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
         input_glossary_document: str | None = Field(
             title="Input Glossary",
@@ -353,10 +358,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         st.write("---")
         google_translate_language_selector(
-            """
-            ##### 🔠 User Language
-            If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
-            """,
+            f"##### {field_title_desc(self.RequestModel, 'user_language')}",
             key="user_language",
         )
         enable_glossary = st.checkbox(
@@ -988,44 +990,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                         <a class="btn btn-theme btn-tertiary d-inline-block" target="blank" href="{wa_link}">📱 Test</a>
                         """
                     )
-            with col3:
-                if is_connected:
+            if is_connected:
+                with col3, st.expander(f"📨 {bi.get_platform_display()} Settings"):
                     if bi.platform == Platform.SLACK:
-                        with st.expander("📨 Slack Settings"):
-                            published_run = self.get_current_published_run()
-                            slack_settings = [
-                                {
-                                    "field": "slack_read_receipt_msg",
-                                    "value": bi.slack_read_receipt_msg,
-                                    "input": lambda key, placeholder: st.text_input(
-                                        "###### Read Receipt (leave blank to disable)",
-                                        key=key,
-                                        placeholder=placeholder,
-                                    ),
-                                    "caption": "This message is sent immediately after recieving a user message and replaced with the copilot's response once it's ready.",
-                                },
-                                {
-                                    "field": "name",
-                                    "value": bi.name,
-                                    "input": lambda key, placeholder: st.text_input(
-                                        "###### Channel Specific Bot Name (to be displayed in Slack)",
-                                        key=key,
-                                        placeholder=placeholder,
-                                    ),
-                                    "default": published_run.title
-                                    if published_run
-                                    else bi.name,
-                                    "caption": "This is the name the bot will post as in this specific channel.",
-                                },
-                            ]
-                            general_integration_settings(
-                                bi, extra_settings=slack_settings
-                            )
-                    else:
-                        with st.expander(
-                            f"📨 {Platform(bi.platform).name.capitalize()} Settings"
-                        ):
-                            general_integration_settings(bi)
+                        self.slack_specific_settings(bi)
+                    general_integration_settings(bi)
             if not pressed:
                 continue
             if is_connected:
@@ -1045,85 +1014,103 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         st.write("---")
 
+    def slack_specific_settings(self, bi: BotIntegration):
+        if st.session_state.get(f"--botintegration_reset_{bi.id}"):
+            pr = self.get_current_published_run()
+            st.session_state[f"botintegration_name_{bi.id}"] = (
+                pr and pr.title
+            ) or self.get_recipe_title()
+            st.session_state[
+                f"botintegration_slack_read_receipt_msg_{bi.id}"
+            ] = BotIntegration._meta.get_field("slack_read_receipt_msg").default
 
-def general_integration_settings(bi: BotIntegration, extra_settings: list = []):
-    settings = extra_settings + [
-        {
-            "field": "user_language",
-            "value": bi.user_language,
-            "input": lambda key, _: google_translate_language_selector(
-                "###### 🔠 Language",
-                key=key,
-                allow_none=False,
-            ),
-            "caption": "Set a default language for the copilot's responses and to better understand incoming audio messages.",
-        },
-        {
-            "field": "show_feedback_buttons",
-            "value": bi.show_feedback_buttons,
-            "input": lambda key, _: st.checkbox(
-                "###### 👍🏾 👎🏽 Show Feedback Buttons",
-                key=key,
-            ),
-            "caption": "Users can rate and provide feedback on every copilot response if enabled.",
-        },
-        {
-            "field": "analysis_run",
-            "value": bi.analysis_run.get_app_url() if bi.analysis_run else "",
-            "input": lambda key, placeholder: st.text_input(
-                "###### 🧠 Analysis Run URL",
-                key=key,
-                placeholder=placeholder,
-            ),
-            "default": None,
-            "parse_input": lambda x: (
-                VideoBotsPage.get_sr_from_run_url(x) if x else None
-            ),
-            "caption": "Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow url. Leave blank to disable. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).",
-        },
-    ]
+        bi.slack_read_receipt_msg = st.text_input(
+            """
+            ###### ✅ Read Receipt (leave blank to disable)
+            This message is sent immediately after recieving a user message and replaced with the copilot's response once it's ready.
+            """,
+            placeholder=bi.slack_read_receipt_msg,
+            value=bi.slack_read_receipt_msg,
+            key=f"botintegration_slack_read_receipt_msg_{bi.id}",
+        )
+        bi.name = st.text_input(
+            """
+            ###### 🪪 Channel Specific Bot Name (to be displayed in Slack)
+            This is the name the bot will post as in this specific channel.
+            """,
+            placeholder=bi.name,
+            value=bi.name,
+            key=f"botintegration_name_{bi.id}",
+        )
 
-    for input in settings:
-        field = input["field"]
-        key = input["key"] = "botintegration_" + field + "_" + str(bi.id)
-        value = input["value"]
 
-        st.session_state.setdefault(key, value)
-        input["input"](key, value)
-        input["value"] = st.session_state.get(key, "")
-        if "caption" in input:
-            st.caption(input["caption"])
+def general_integration_settings(bi: BotIntegration):
+    if st.session_state.get(f"--botintegration_reset_{bi.id}"):
+        st.session_state[
+            f"botintegration_user_language_{bi.id}"
+        ] = BotIntegration._meta.get_field("user_language").default
+        st.session_state[
+            f"botintegration_show_feedback_buttons_{bi.id}"
+        ] = BotIntegration._meta.get_field("show_feedback_buttons").default
+        st.session_state[f"botintegration_analysis_url_{bi.id}"] = None
+        st.session_state[f"--botintegration_update_{bi.id}"] = True
 
-    errors = []
-    if st.button("Update", key=f"btn_update_{bi.id}"):
-        for input in settings:
-            field = input["field"]
-            value = input["value"]
-            if "parse_input" in input:
-                try:
-                    value = input["parse_input"](value)
-                except Exception:
-                    field_name = BotIntegration._meta.get_field(field).verbose_name
-                    errors.append(f"Invalid {field_name}")
-            bi.__setattr__(field, value)
-        if not errors:
+    bi.user_language = (
+        google_translate_language_selector(
+            f"""
+###### {field_title_desc(VideoBotsPage.RequestModel, 'user_language')} \\
+This will also help better understand incoming audio messages by automatically choosing the best [Speech](https://gooey.ai/speech/) model.
+            """,
+            default_value=bi.user_language,
+            allow_none=False,
+            key=f"botintegration_user_language_{bi.id}",
+        )
+        or "en"
+    )
+    st.caption(
+        "Please note that this language is distinct from the one provided in the workflow settings. Hence, this allows you to integrate the same bot in many languages."
+    )
+
+    bi.show_feedback_buttons = st.checkbox(
+        "###### 👍🏾 👎🏽 Show Feedback Buttons",
+        value=bi.show_feedback_buttons,
+        key=f"botintegration_show_feedback_buttons_{bi.id}",
+    )
+    st.caption(
+        "Users can rate and provide feedback on every copilot response if enabled."
+    )
+
+    analysis_url = st.text_input(
+        """
+        ###### 🧠 Analysis Run URL
+        Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow url. Leave blank to disable. 
+        [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).
+        """,
+        value=bi.analysis_run and bi.analysis_run.get_app_url(),
+        key=f"botintegration_analysis_url_{bi.id}",
+    )
+    if analysis_url:
+        try:
+            page_cls, analysis_run = url_to_sr(analysis_url)
+            assert page_cls.workflow in [
+                Workflow.COMPARE_LLM,
+                Workflow.VIDEO_BOTS,
+                Workflow.GOOGLE_GPT,
+                Workflow.DOC_SEARCH,
+            ], "We only support Compare LLM, Copilot, Google GPT and Doc Search workflows for analysis."
+            bi.analysis_run = analysis_run
+        except Exception as e:
+            st.error(repr(e))
+    else:
+        bi.analysis_run = None
+
+    if st.button("Update", key=f"--botintegration_update_{bi.id}"):
+        try:
+            bi.full_clean()
             bi.save()
-            st.experimental_rerun()
-    if st.button("Reset to Default", key=f"btn_reset_{bi.id}", type="tertiary"):
-        for input in settings:
-            field = input["field"]
-            default = (
-                input["default"]
-                if "default" in input
-                else BotIntegration._meta.get_field(field).default
-            )
-            setattr(bi, field, default)
-            st.session_state[input["key"]] = default
-        bi.save()
-        st.experimental_rerun()
-
-    for error in errors:
-        st.error(error)
+        except ValidationError as e:
+            st.error(str(e))
+    st.button("Reset", key=f"--botintegration_reset_{bi.id}", type="tertiary")
 
 
 def show_landbot_widget():

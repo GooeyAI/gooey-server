@@ -119,6 +119,7 @@ def google_translate_language_selector(
     """,
     key="google_translate_target",
     allow_none=True,
+    **kwargs,
 ):
     """
     Streamlit widget for selecting a language for Google Translate.
@@ -130,11 +131,12 @@ def google_translate_language_selector(
     options = list(languages.keys())
     if allow_none:
         options.insert(0, None)
-    st.selectbox(
+    return st.selectbox(
         label=label,
         key=key,
         format_func=lambda k: languages[k] if k else "———",
         options=options,
+        **kwargs,
     )
 
 
