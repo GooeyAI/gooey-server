@@ -979,14 +979,15 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     type="tertiary",
                 )
                 if bi.platform == Platform.WHATSAPP and is_connected:
-                    with st.link(to=f"https://wa.me/{bi.wa_phone_number}?text=Hi"):
-                        st.html(
-                            "📱 Test",
-                            style={
-                                "display": "inline-block",
-                            },
-                            className="btn btn-theme btn-tertiary",
-                        )
+                    wa_link = (
+                        furl("https://wa.me/", query_params={"text": "Hi"})
+                        / bi.wa_phone_number.as_e164
+                    )
+                    st.html(
+                        f"""
+                        <a class="btn btn-theme btn-tertiary d-inline-block" target="blank" href="{wa_link}">📱 Test</a>
+                        """
+                    )
             with col3:
                 if is_connected:
                     if bi.platform == Platform.SLACK:
