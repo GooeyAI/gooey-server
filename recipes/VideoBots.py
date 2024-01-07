@@ -317,14 +317,12 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         )
 
     def validate_form_v2(self):
-        if st.session_state.get("input_glossary_document"):
-            validate_glossary_document(
-                st.session_state.get("input_glossary_document", "")
-            )
-        if st.session_state.get("output_glossary_document"):
-            validate_glossary_document(
-                st.session_state.get("output_glossary_document", "")
-            )
+        input_glossary = st.session_state.get("input_glossary_document", "")
+        output_glossary = st.session_state.get("output_glossary_document", "")
+        if input_glossary:
+            validate_glossary_document(input_glossary)
+        if output_glossary:
+            validate_glossary_document(output_glossary)
 
     def render_usage_guide(self):
         youtube_video("-j2su1r8pEg")
