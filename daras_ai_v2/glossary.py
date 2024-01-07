@@ -3,10 +3,7 @@ from daras_ai_v2.asr import google_translate_languages
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 
 
-def validate_glossary_document(
-    *,
-    document: str,
-):
+def validate_glossary_document(document: str):
     """
     Throws AssertionError for the most common errors in a glossary document.
     I.e. the glossary must have at least 2 columns, top row must be language codes or "description" or "pos"
