@@ -1058,6 +1058,7 @@ def general_integration_settings(bi: BotIntegration, extra_settings: list = []):
             "input": lambda key, _: google_translate_language_selector(
                 "###### 🔠 Language",
                 key=key,
+                allow_none=False,
             ),
             "caption": "Set a default language for the copilot's responses and to better understand incoming audio messages.",
         },
