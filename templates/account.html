@@ -71,23 +71,14 @@
                            onchange="paypalLayout()">
                     <label class="form-check-label" for="payment-method-paypal"><b>Paypal</b></label>
                 </div>
-                <div id="stripe-plans" class="plans-container">
+                <div id="stripe-container">
                     {% for lookup_key, subscription in available_subscriptions.items() %}
-                        <ul class="product" id="{{ subscription['display']['name'] }}">
+                        <ul id="{{ subscription['display']['name'] }}">
                             <li>
                                 <h4>{{ subscription["display"]["title"] }}</h4>
-                                <h5>{{ subscription["display"]["description"] |safe }}</h5>
+                                <h5>{{ subscription["display"]["description"] | safe }}</h5>
                                 {% if lookup_key == "addon" %}
                                     {% include 'add_on_credits.html' %}
-                                        {% for amt in [10, 30, 50, 100, 300, 500] %}
-                                            <form class="d-inline" onsubmit="submitAmount({{ amt }}); return false;" method="POST">
-                                                <input type="hidden" name="quantity" value="{{ amt * 100 }}"/>
-                                                <input type="hidden" name="lookup_key" value="addon"/>
-                                                <button class="streamlit-like-btn paypal-checkout" type="submit" style="display: none;">Buy ${{ amt }}</button>
-                                            </form>
-                                        {% endfor %}
-                                        <div style="width: fit-content; display: none;" id="paypal-button-container"></div>
-                                        <p id="result-message"></p>
                                 {% else %}
                                     <form action="/__/stripe/create-checkout-session" method="POST">
                                         <!-- Add a hidden field with the lookup_key of your Price -->
@@ -97,6 +88,23 @@
                                 {% endif %}
                             </li>
                         </ul>
+                    {% endfor %}
+                </div>
+                <div id="paypal-container">
+                    {% for lookup_key, subscription in available_subscriptions.items() %}
+                        {% if lookup_key == "addon" %}
+                            <h4>{{ subscription["display"]["title"] }}</h4>
+                            <h5>{{ subscription["display"]["description"] | safe }}</h5>
+                            {% for option in [10, 30, 50, 100, 300, 500] %}
+                                <button class="streamlit-like-btn paypal-checkout-option"
+                                        onclick="setQuantity(this, {{ option * 100 }});">
+                                    Buy ${{ option }}
+                                </button>
+                            {% endfor %}
+                            <div class="pt-3" style="width: fit-content; display: none;"
+                                 id="paypal-button-container"></div>
+                            <p id="result-message"></p>
+                        {% endif %}
                     {% endfor %}
                 </div>
             </div>
@@ -129,45 +137,37 @@
             }
         }
         function stripeLayout() {
-            for (let plan of document.getElementsByClassName("product")) {
-                plan.style.display = "block";
-            }
-            for (let planBtn of document.getElementsByClassName("paypal-checkout")) {
-                planBtn.style.display = "none";
-            }
-            for (let planBtn of document.getElementsByClassName("stripe-checkout")) {
-                planBtn.style.display = "inline-block";
-            }
-            document.getElementById("paypal-button-container").style.display = "none";
+            document.getElementById("paypal-container").style.display = "none";
+            document.getElementById("stripe-container").style.display = "block";
         }
 
         function paypalLayout() {
-            for (let plan of document.getElementsByClassName("product")) {
-                if (plan.id === "Add-on") {
-                    plan.style.display = "block";
-                } else {
-                    plan.style.display = "none";
-                }
-            }
-            for (let planBtn of document.getElementsByClassName("paypal-checkout")) {
-                planBtn.style.display = "inline-block";
-            }
-            for (let planBtn of document.getElementsByClassName("stripe-checkout")) {
-                planBtn.style.display = "none";
-            }
+            document.getElementById("stripe-container").style.display = "none";
+            document.getElementById("paypal-container").style.display = "block";
         }
 
-        let price = 0;
+        let selectedQty = 0;
         // Handle Paypal
+        function setQuantity(el, qty) {
+            for (let btn of document.getElementsByClassName("paypal-checkout-option")) {
+                btn.className = el.className.replace(" bg-secondary", "");
+            }
+            el.className += " bg-secondary";
+            document.getElementById("paypal-button-container").style.display = "block";
+            selectedQty = qty;
+        }
         function submitAmount(amt) {
             document.getElementById("paypal-button-container").style.display = "block";
-            price = amt;
+            selectedQty = amt;
         }
+        // function renderPaypalButtons() {
+        //     window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
+        // }
         window.paypal
             .Buttons({
                 async createOrder() {
                 try {
-                    const response = await fetch("/__/paypal/orders/{{ request.user.uid }}", {
+                    const response = await fetch("/__/paypal/orders/create/", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
@@ -175,7 +175,7 @@
                         // use the "body" param to optionally pass additional order information
                         // like product ids and quantities
                         body: JSON.stringify({
-                            price: price,
+                            quantity: selectedQty,
                         }),
                     });
                     const orderData = await response.json();
