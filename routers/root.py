@@ -21,16 +21,21 @@ from starlette.responses import (
 
 import gooey_ui as st
 from app_users.models import AppUser
+from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages, normalize_slug, page_slug_map
+from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
 from daras_ai_v2.base import (
     RedirectException,
+    get_example_request_body,
 )
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
+from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
+from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from routers.api import request_form_files
@@ -223,6 +228,104 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
         ),
     }
     return ret
+
+
+@app.post("/api/")
+def api_docs_page(request: Request, json_data: dict = Depends(request_json)):
+    ret = st.runner(
+        lambda: page_wrapper(
+            request=request, render_fn=lambda: _api_docs_page(request)
+        ),
+        **json_data,
+    )
+    ret |= {
+        "meta": raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title="Gooey.AI API Platform",
+            description="Explore resources, tutorials, API docs, and dynamic examples to get the most out of GooeyAI's developer platform.",
+            image=meta_preview_url(
+                "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/e48d59be-aaee-11ee-b112-02420a000175/API%20Docs.png.png"
+            ),
+        ),
+    }
+    return ret
+
+
+def _api_docs_page(request):
+    api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
+
+    st.markdown(
+        f"""
+# Gooey.AI API Platform
+
+##### 📖 Introduction 
+You can interact with the API through HTTP requests from any language.
+
+If you're comfortable with OpenAPI specs, jump straight to our <a href="{api_docs_url}" target="_blank">complete API</a>
+
+##### 🔐 Authentication
+The Gooey.AI API uses API keys for authentication. Visit the [API Keys](#api-keys) section to retrieve the API key you'll use in your requests.
+
+Remember that your API key is a secret! Do not share it with others or expose it in any client-side code (browsers, apps). Production requests must be routed through your own backend server where your API key can be securely loaded from an environment variable or key management service.
+
+All API requests should include your API key in an Authorization HTTP header as follows:
+
+```bash
+Authorization: Bearer GOOEY_API_KEY
+```
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.write("---")
+    options = {
+        page_cls.workflow.value: page_cls().get_recipe_title()
+        for page_cls in all_api_pages
+    }
+    workflow = Workflow(
+        st.selectbox(
+            "##### ⚕ API Generator\nChoose a workflow to see how you can interact with it via the API",
+            options=options,
+            format_func=lambda x: options[x],
+        )
+    )
+
+    st.write("###### 📤 Example Request")
+
+    include_all = st.checkbox("Show all fields")
+    as_async = st.checkbox("Run Async")
+    as_form_data = st.checkbox("Upload Files via Form Data")
+
+    self = workflow.page_cls(request=request)
+    request_body = get_example_request_body(
+        self.RequestModel, st.session_state, include_all=include_all
+    )
+    response_body = self.get_example_response_body(
+        st.session_state, as_async=as_async, include_all=include_all
+    )
+
+    api_example_generator(
+        api_url=self._get_current_api_url(),
+        request_body=request_body,
+        as_form_data=as_form_data,
+        as_async=as_async,
+    )
+    st.write("")
+
+    st.write("###### 🎁 Example Response")
+    st.json(response_body, expanded=True)
+
+    st.write("---")
+    with st.tag("a", id="api-keys"):
+        st.write("##### 🔐 API keys")
+
+    if not self.request.user or self.request.user.is_anonymous:
+        st.write(
+            "**Please [Login](/login/?next=/api/) to generate the `$GOOEY_API_KEY`**"
+        )
+        return
+
+    manage_api_keys(self.request.user)
 
 
 @app.post("/")
