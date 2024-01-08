@@ -3,8 +3,8 @@ import os
 import os.path
 import typing
 
-from django.db.models import QuerySet
 from django.core.exceptions import ValidationError
+from django.db.models import QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -22,7 +22,6 @@ from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
-from recipes.BulkRunner import url_to_runs
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
@@ -60,6 +59,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_settings,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
+from recipes.BulkRunner import url_to_runs
 from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
@@ -1031,13 +1031,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         st.write("---")
 
     def slack_specific_settings(self, bi: BotIntegration):
-        if st.session_state.get(f"--botintegration_reset_{bi.id}"):
+        if st.session_state.get(f"_bi_reset_{bi.id}"):
             pr = self.get_current_published_run()
-            st.session_state[f"botintegration_name_{bi.id}"] = (
+            st.session_state[f"_bi_name_{bi.id}"] = (
                 pr and pr.title
             ) or self.get_recipe_title()
             st.session_state[
-                f"botintegration_slack_read_receipt_msg_{bi.id}"
+                f"_bi_slack_read_receipt_msg_{bi.id}"
             ] = BotIntegration._meta.get_field("slack_read_receipt_msg").default
 
         bi.slack_read_receipt_msg = st.text_input(
@@ -1047,7 +1047,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             """,
             placeholder=bi.slack_read_receipt_msg,
             value=bi.slack_read_receipt_msg,
-            key=f"botintegration_slack_read_receipt_msg_{bi.id}",
+            key=f"_bi_slack_read_receipt_msg_{bi.id}",
         )
         bi.name = st.text_input(
             """
@@ -1056,20 +1056,19 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             """,
             placeholder=bi.name,
             value=bi.name,
-            key=f"botintegration_name_{bi.id}",
+            key=f"_bi_name_{bi.id}",
         )
 
 
 def general_integration_settings(bi: BotIntegration):
-    if st.session_state.get(f"--botintegration_reset_{bi.id}"):
+    if st.session_state.get(f"_bi_reset_{bi.id}"):
+        st.session_state[f"_bi_user_language_{bi.id}"] = BotIntegration._meta.get_field(
+            "user_language"
+        ).default
         st.session_state[
-            f"botintegration_user_language_{bi.id}"
-        ] = BotIntegration._meta.get_field("user_language").default
-        st.session_state[
-            f"botintegration_show_feedback_buttons_{bi.id}"
+            f"_bi_show_feedback_buttons_{bi.id}"
         ] = BotIntegration._meta.get_field("show_feedback_buttons").default
-        st.session_state[f"botintegration_analysis_url_{bi.id}"] = None
-        st.session_state[f"--botintegration_update_{bi.id}"] = True
+        st.session_state[f"_bi_analysis_url_{bi.id}"] = None
 
     bi.user_language = (
         google_translate_language_selector(
@@ -1079,7 +1078,7 @@ This will also help better understand incoming audio messages by automatically c
             """,
             default_value=bi.user_language,
             allow_none=False,
-            key=f"botintegration_user_language_{bi.id}",
+            key=f"_bi_user_language_{bi.id}",
         )
         or "en"
     )
@@ -1090,7 +1089,7 @@ This will also help better understand incoming audio messages by automatically c
     bi.show_feedback_buttons = st.checkbox(
         "###### 👍🏾 👎🏽 Show Feedback Buttons",
         value=bi.show_feedback_buttons,
-        key=f"botintegration_show_feedback_buttons_{bi.id}",
+        key=f"_bi_show_feedback_buttons_{bi.id}",
     )
     st.caption(
         "Users can rate and provide feedback on every copilot response if enabled."
@@ -1103,30 +1102,31 @@ This will also help better understand incoming audio messages by automatically c
         [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).
         """,
         value=bi.analysis_run and bi.analysis_run.get_app_url(),
-        key=f"botintegration_analysis_url_{bi.id}",
+        key=f"_bi_analysis_url_{bi.id}",
     )
     if analysis_url:
         try:
-            page_cls, analysis_run, _ = url_to_runs(analysis_url)
+            page_cls, bi.analysis_run, _ = url_to_runs(analysis_url)
             assert page_cls.workflow in [
                 Workflow.COMPARE_LLM,
                 Workflow.VIDEO_BOTS,
                 Workflow.GOOGLE_GPT,
                 Workflow.DOC_SEARCH,
             ], "We only support Compare LLM, Copilot, Google GPT and Doc Search workflows for analysis."
-            bi.analysis_run = analysis_run
         except Exception as e:
+            bi.analysis_run = None
             st.error(repr(e))
     else:
         bi.analysis_run = None
 
-    if st.button("Update", key=f"--botintegration_update_{bi.id}"):
+    pressed_update = st.button("Update")
+    pressed_reset = st.button("Reset", key=f"_bi_reset_{bi.id}", type="tertiary")
+    if pressed_update or pressed_reset:
         try:
             bi.full_clean()
             bi.save()
         except ValidationError as e:
             st.error(str(e))
-    st.button("Reset", key=f"--botintegration_reset_{bi.id}", type="tertiary")
 
 
 def show_landbot_widget():
