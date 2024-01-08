@@ -14,6 +14,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from recipes.GoogleGPT import GoogleSearchMixin
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
@@ -446,6 +447,6 @@ def _call_summarize_url(url: str) -> (str, str):
         headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         timeout=EXTERNAL_REQUEST_TIMEOUT_SEC,
     )
-    r.raise_for_status()
+    raise_for_status(r)
     doc = readability.Document(r.text)
     return doc.title(), doc.summary()

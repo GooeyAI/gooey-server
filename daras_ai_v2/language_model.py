@@ -21,6 +21,7 @@ from loguru import logger
 from openai.types.chat import ChatCompletionContentPartParam
 
 from daras_ai_v2.asr import get_google_auth_session
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.redis_cache import (
@@ -650,7 +651,7 @@ def _run_together_chat(
     total_out_tokens = 0
     total_in_tokens = 0
     for r in results:
-        r.raise_for_status()
+        raise_for_status(r)
         data = r.json()
         output = data["output"]
         error = output.get("error")
@@ -713,7 +714,7 @@ def _run_palm_chat(
             },
         },
     )
-    r.raise_for_status()
+    raise_for_status(r)
 
     return (
         [
@@ -762,7 +763,7 @@ def _run_palm_text(
             },
         },
     )
-    res.raise_for_status()
+    raise_for_status(res)
     return (
         [prediction["content"] for prediction in res.json()["predictions"]],
         res.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],

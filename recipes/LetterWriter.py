@@ -8,6 +8,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import run_language_model
 from daras_ai_v2.text_training_data_widget import text_training_data, TrainingDataModel
 
@@ -245,7 +246,7 @@ class LetterWriterPage(BasePage):
             body = None
 
         r = requests.request(method=method, url=url, headers=headers, json=body)
-        r.raise_for_status()
+        raise_for_status(r)
         response_json = r.json()
 
         state["response_json"] = response_json

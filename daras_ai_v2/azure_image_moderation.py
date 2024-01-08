@@ -4,6 +4,7 @@ from furl import furl
 import requests
 
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import raise_for_status
 
 
 def get_auth_headers():
@@ -21,7 +22,7 @@ def run_moderator(image_url: str, cache: bool) -> dict[str, Any]:
         headers=get_auth_headers(),
         json={"DataRepresentation": "URL", "Value": image_url},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     return r.json()
 
 
