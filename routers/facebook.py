@@ -171,6 +171,7 @@ def _get_access_token_from_code(code: str) -> str:
             "code": code,
         },
     )
+    r.reason
     r.raise_for_status()
     return r.json()["access_token"]
 

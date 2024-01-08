@@ -127,6 +127,7 @@ docker cp $cid:/app/$fname .
 echo $PWD/$fname
 ```
 
+**on local**
 ```bash
 # reset the database
 ./manage.py reset_db -c
@@ -138,6 +139,7 @@ pg_restore --no-privileges --no-owner -d $PGDATABASE $fname
 
 ### create & load fixtures
 
+**on server**
 ```bash
 # select a running container
 cid=$(docker ps  | grep gooey-api-prod | cut -d " " -f 1 | head -1)
@@ -149,6 +151,7 @@ docker cp $cid:/app/fixture.json .
 echo $PWD/fixture.json
 ```
 
+**on local**
 ```bash
 # copy fixture.json from server to local
 rsync -P -a <username>@captain.us-1.gooey.ai:/home/<username>/fixture.json .
@@ -163,13 +166,15 @@ rsync -P -a <username>@captain.us-1.gooey.ai:/home/<username>/fixture.json .
 ./manage.py migrate
 # load the fixture
 ./manage.py loaddata fixture.json
+# create a superuser to access admin
+./manage.py createsuperuser
 ```
 
 ### copy one postgres db to another
 
-```
+**on server**
+```bash
 ./manage.py reset_db
 createdb -T template0 $PGDATABASE
 pg_dump $SOURCE_DATABASE | psql -q $PGDATABASE
 ```
-
