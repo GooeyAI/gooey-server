@@ -203,7 +203,7 @@ class BasePage:
         current_run = self.get_sr_from_query_params(example_id, run_id, uid)
         published_run = self.get_current_published_run()
         is_root_example = published_run and published_run.is_root_example()
-        title, breadcrumbs = self._get_title_and_breadcrumbs(
+        title, breadcrumbs = self.get_title_and_breadcrumbs(
             current_run=current_run,
             published_run=published_run,
         )
@@ -611,26 +611,7 @@ class BasePage:
             modal.close()
 
     @classmethod
-    def get_title(cls, run: PublishedRun | SavedRun):
-        if isinstance(run, PublishedRun):
-            title, _ = cls._get_title_and_breadcrumbs(
-                current_run=run.saved_run,
-                published_run=run,
-            )
-        elif isinstance(run, SavedRun):
-            published_run = (
-                run and run.parent_version and run.parent_version.published_run or None
-            )
-            title, _ = cls._get_title_and_breadcrumbs(
-                current_run=run,
-                published_run=published_run,
-            )
-        else:
-            raise TypeError(f"Invalid type: {type(run)}")
-        return title
-
-    @classmethod
-    def _get_title_and_breadcrumbs(
+    def get_title_and_breadcrumbs(
         cls,
         current_run: SavedRun,
         published_run: PublishedRun | None,
