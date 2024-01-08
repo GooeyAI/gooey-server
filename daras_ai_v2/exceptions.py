@@ -25,14 +25,13 @@ def raise_for_status(resp: requests.Response):
         reason = resp.reason
 
     response_body: str | bytes = ""
-    content_type = resp.headers.get("Content-Type", "")
     try:
-        if content_type.startswith("application/json"):
-            response_body = str(resp.json())
-        else:
+        response_body = str(resp.json())
+    except JSONDecodeError:
+        try:
             response_body = resp.text
-    except (JSONDecodeError, ValueError):
-        response_body = resp.content
+        except ValueError:
+            response_body = resp.content
 
     response_body = response_body[:500]  # truncate to at max 500 characters
 
@@ -43,6 +42,4 @@ def raise_for_status(resp: requests.Response):
         http_error_msg = f"{resp.status_code} Server Error: {reason} | URL: {resp.url} | Response Body: {response_body!r}"
 
     if http_error_msg:
-        e = HTTPError(http_error_msg, response=resp)
-        print(f"{str(e)=}")
-        raise e
+        raise HTTPError(http_error_msg, response=resp)
