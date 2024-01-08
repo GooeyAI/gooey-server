@@ -227,10 +227,21 @@ class AppUserTransaction(models.Model):
     user = models.ForeignKey(
         "AppUser", on_delete=models.CASCADE, related_name="transactions"
     )
-    invoice_id = models.CharField(max_length=255, unique=True)
-    amount = models.IntegerField()
-    end_balance = models.IntegerField()
-    created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
+    invoice_id = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="The Payment Provider's Invoice ID for this transaction.<br>"
+        "For Gooey, this will be of the form 'gooey_in_{uuid}'",
+    )
+
+    amount = models.IntegerField(
+        help_text="The amount (Gooey credits) added/deducted in this transaction.<br>"
+        "Positive for credits added, negative for credits deducted."
+    )
+    end_balance = models.IntegerField(
+        help_text="The end balance (Gooey credits) of the user after this transaction"
+    )
+
     payment_provider = models.IntegerField(
         choices=PaymentProvider.choices,
         null=True,
@@ -245,6 +256,8 @@ class AppUserTransaction(models.Model):
         "<a href='https://stripe.com/docs/currencies'>Learn More</a>",
         default=0,
     )
+
+    created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
 
     class Meta:
         verbose_name = "Transaction"

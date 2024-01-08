@@ -1,34 +1,30 @@
-from urllib.parse import quote_plus
-
 import base64
-import requests
+
 import requests
 from fastapi import APIRouter, Depends
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from furl import furl
-from daras_ai_v2.bots import request_json
 
 from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import settings
-from daras_ai_v2.settings import templates
+from daras_ai_v2.bots import request_json
 from routers.billing import available_subscriptions
-
-USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
 router = APIRouter()
 
 
-def generate_access_token():
+def generate_auth_header() -> str:
     """
     Generate an OAuth 2.0 access token for authenticating with PayPal REST APIs.
     @see https://developer.paypal.com/api/rest/authentication/
     """
-    if not settings.PAYPAL_CLIENT_ID or not settings.PAYPAL_SECRET:
-        raise Exception("MISSING_API_CREDENTIALS")
+    assert (
+        settings.PAYPAL_CLIENT_ID and settings.PAYPAL_SECRET
+    ), "Missing API Credentials"
     auth = base64.b64encode(
-        (settings.PAYPAL_CLIENT_ID + ":" + settings.PAYPAL_SECRET).encode("utf-8")
-    ).decode("utf-8")
+        (settings.PAYPAL_CLIENT_ID + ":" + settings.PAYPAL_SECRET).encode()
+    ).decode()
     response = requests.post(
         str(furl(settings.PAYPAL_BASE) / "v1/oauth2/token"),
         data="grant_type=client_credentials",
@@ -36,7 +32,9 @@ def generate_access_token():
     )
     response.raise_for_status()
     data = response.json()
-    return data.get("access_token")
+    access_token = data.get("access_token")
+    assert access_token, "Missing access token in response"
+    return f"Bearer " + access_token
 
 
 # Create an order to start the transaction.
@@ -117,33 +115,6 @@ def capture_order(order_id: str):
     return JSONResponse(response.json(), response.status_code)
 
 
-async def request_body(request: Request):
-    return await request.body()
-
-
-def generate_auth_header() -> str:
-    """
-    Generate an OAuth 2.0 access token for authenticating with PayPal REST APIs.
-    @see https://developer.paypal.com/api/rest/authentication/
-    """
-    assert (
-        settings.PAYPAL_CLIENT_ID and settings.PAYPAL_SECRET
-    ), "Missing API Credentials"
-    auth = base64.b64encode(
-        (settings.PAYPAL_CLIENT_ID + ":" + settings.PAYPAL_SECRET).encode()
-    ).decode()
-    response = requests.post(
-        str(furl(settings.PAYPAL_BASE) / "v1/oauth2/token"),
-        data="grant_type=client_credentials",
-        headers={"Authorization": f"Basic {auth}"},
-    )
-    response.raise_for_status()
-    data = response.json()
-    access_token = data.get("access_token")
-    assert access_token, "Missing access token in response"
-    return f"Bearer " + access_token
-
-
 def _handle_invoice_paid(order_id: str):
     response = requests.get(
         str(furl(settings.PAYPAL_BASE) / f"v2/checkout/orders/{order_id}"),
@@ -154,7 +125,6 @@ def _handle_invoice_paid(order_id: str):
     purchase_unit = order["purchase_units"][0]
     uid = purchase_unit["payments"]["captures"][0]["custom_id"]
     user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    print("purchaseeee", purchase_unit)
     user.add_balance(
         payment_provider=PaymentProvider.PAYPAL,
         invoice_id=order_id,
