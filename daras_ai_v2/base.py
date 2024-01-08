@@ -200,10 +200,7 @@ class BasePage:
         current_run = self.get_current_sr()
         published_run = self.get_current_published_run()
         is_root_example = published_run and published_run.is_root_example()
-        title, breadcrumbs = self.get_title_and_breadcrumbs(
-            sr=current_run,
-            pr=published_run,
-        )
+        title, breadcrumbs = self.get_title_and_breadcrumbs(current_run, published_run)
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
                 if not breadcrumbs and not self.run_user:
@@ -610,8 +607,7 @@ class BasePage:
     def get_page_title(self) -> str:
         """The H1 title of this page"""
         title, _ = self.get_title_and_breadcrumbs(
-            self.get_current_sr(),
-            self.get_current_published_run(),
+            self.get_current_sr(), self.get_current_published_run()
         )
         return title
 
