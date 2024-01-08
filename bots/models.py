@@ -1081,7 +1081,7 @@ class PublishedRun(models.Model):
         ]
 
     def __str__(self):
-        return self.get_app_url()
+        return self.title or self.get_app_url()
 
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):
