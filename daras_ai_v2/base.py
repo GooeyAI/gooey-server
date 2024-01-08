@@ -1186,7 +1186,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             try:
                 self.validate_form_v2()
             except AssertionError as e:
-                st.error(e)
+                st.error(str(e))
                 return False
             else:
                 return True
