@@ -296,16 +296,17 @@ Authorization: Bearer GOOEY_API_KEY
     as_async = st.checkbox("Run Async")
     as_form_data = st.checkbox("Upload Files via Form Data")
 
-    self = workflow.page_cls(request=request)
+    page = workflow.page_cls(request=request)
+    state = page.get_root_published_run().saved_run.to_dict()
     request_body = get_example_request_body(
-        self.RequestModel, st.session_state, include_all=include_all
+        page.RequestModel, state, include_all=include_all
     )
-    response_body = self.get_example_response_body(
-        st.session_state, as_async=as_async, include_all=include_all
+    response_body = page.get_example_response_body(
+        state, as_async=as_async, include_all=include_all
     )
 
     api_example_generator(
-        api_url=self._get_current_api_url(),
+        api_url=page._get_current_api_url(),
         request_body=request_body,
         as_form_data=as_form_data,
         as_async=as_async,
@@ -319,13 +320,13 @@ Authorization: Bearer GOOEY_API_KEY
     with st.tag("a", id="api-keys"):
         st.write("##### 🔐 API keys")
 
-    if not self.request.user or self.request.user.is_anonymous:
+    if not page.request.user or page.request.user.is_anonymous:
         st.write(
             "**Please [Login](/login/?next=/api/) to generate the `$GOOEY_API_KEY`**"
         )
         return
 
-    manage_api_keys(self.request.user)
+    manage_api_keys(page.request.user)
 
 
 @app.post("/")
@@ -352,7 +353,7 @@ def st_page(
 
     page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
 
-    state = json_data.setdefault("state", {})
+    state = json_data.get("state", {})
     if not state:
         db_state = page.get_sr_from_query_params(example_id, run_id, uid).to_dict()
         if db_state is not None:
@@ -366,7 +367,7 @@ def st_page(
         ret = st.runner(
             lambda: page_wrapper(request, page.render),
             query_params=dict(request.query_params),
-            **json_data,
+            state=state,
         )
     except RedirectException as e:
         return RedirectResponse(e.url, status_code=e.status_code)

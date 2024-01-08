@@ -1025,6 +1025,37 @@ class FeedbackComment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class PublishedRunQuerySet(models.QuerySet):
+    def create_published_run(
+        self,
+        *,
+        workflow: Workflow,
+        published_run_id: str,
+        saved_run: SavedRun,
+        user: AppUser,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        with transaction.atomic():
+            published_run = PublishedRun(
+                workflow=workflow,
+                published_run_id=published_run_id,
+                created_by=user,
+                last_edited_by=user,
+                title=title,
+            )
+            published_run.save()
+            published_run.add_version(
+                user=user,
+                saved_run=saved_run,
+                title=title,
+                visibility=visibility,
+                notes=notes,
+            )
+            return published_run
+
+
 class PublishedRun(models.Model):
     # published_run_id was earlier SavedRun.example_id
     published_run_id = models.CharField(
@@ -1064,6 +1095,8 @@ class PublishedRun(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = PublishedRunQuerySet.as_manager()
+
     class Meta:
         get_latest_by = "updated_at"
 
@@ -1088,41 +1121,11 @@ class PublishedRun(models.Model):
         ]
 
     def __str__(self):
-        return self.get_app_url()
+        return self.title or self.get_app_url()
 
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):
         return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
-
-    @classmethod
-    def create_published_run(
-        cls,
-        *,
-        workflow: Workflow,
-        published_run_id: str,
-        saved_run: SavedRun,
-        user: AppUser,
-        title: str,
-        notes: str,
-        visibility: PublishedRunVisibility,
-    ):
-        with transaction.atomic():
-            published_run = PublishedRun(
-                workflow=workflow,
-                published_run_id=published_run_id,
-                created_by=user,
-                last_edited_by=user,
-                title=title,
-            )
-            published_run.save()
-            published_run.add_version(
-                user=user,
-                saved_run=saved_run,
-                title=title,
-                visibility=visibility,
-                notes=notes,
-            )
-            return published_run
 
     def duplicate(
         self,
@@ -1132,7 +1135,7 @@ class PublishedRun(models.Model):
         notes: str,
         visibility: PublishedRunVisibility,
     ) -> PublishedRun:
-        return PublishedRun.create_published_run(
+        return PublishedRun.objects.create_published_run(
             workflow=Workflow(self.workflow),
             published_run_id=get_random_doc_id(),
             saved_run=self.saved_run,

@@ -9,6 +9,7 @@ from furl import furl
 from jinja2.lexer import whitespace_re
 
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function
 
@@ -33,7 +34,7 @@ def azure_form_recognizer_models() -> dict[str, str]:
         params={"api-version": "2023-07-31"},
         headers=auth_headers,
     )
-    r.raise_for_status()
+    raise_for_status(r)
     return {value["modelId"]: value["description"] for value in r.json()["value"]}
 
 
@@ -48,11 +49,11 @@ def azure_form_recognizer(url: str, model_id: str):
         headers=auth_headers,
         json={"urlSource": url},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     location = r.headers["Operation-Location"]
     while True:
         r = requests.get(location, headers=auth_headers)
-        r.raise_for_status()
+        raise_for_status(r)
         r_json = r.json()
         match r_json.get("status"):
             case "succeeded":
