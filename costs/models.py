@@ -1,11 +1,11 @@
 from django.db import models
-from daras_ai_v2.language_model import LargeLanguageModels
+from daras_ai_v2.language_model import LLMApis
 
 
-class Provider(models.TextChoices):
-    vertex_ai = "vertex_ai", "Vertex AI"
-    openai = "openai", "OpenAI"
-    together = "together", "Together"
+# class Provider(models.TextChoices):
+#     vertex_ai = "vertex_ai", "Vertex AI"
+#     openai = "openai", "OpenAI"
+#     together = "together", "Together"
 
 
 class Product(models.TextChoices):
@@ -51,7 +51,7 @@ class ProviderPricing(models.Model):
         output = "Output", "output"
 
     type = models.TextField(choices=Type.choices)
-    provider = models.TextField(choices=Provider.choices)
+    provider = models.TextField(choices=LLMApis.choices())
     product = models.TextField(choices=Product.choices)
     param = models.TextField(choices=Param.choices)
     cost = models.DecimalField(max_digits=13, decimal_places=8)

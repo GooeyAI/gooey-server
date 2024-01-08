@@ -45,6 +45,10 @@ class LLMApis(Enum):
     openai = "OpenAI"
     together = "Together"
 
+    @classmethod
+    def choices(cls):
+        return tuple((api.name, api.value) for api in cls)
+
 
 class LargeLanguageModels(Enum):
     gpt_4_vision = "GPT-4 Vision (openai)"

@@ -1,6 +1,5 @@
 from costs.models import UsageCost, ProviderPricing
 from bots.models import SavedRun
-from django.forms.models import model_to_dict
 
 
 def get_provider_pricing(
