@@ -1,9 +1,9 @@
-from firebase_admin import auth
-
-from bots.models import PublishedRun, SavedRun
-from daras_ai.image_input import truncate_text_words
+from bots.models import PublishedRun, SavedRun, WorkflowMetadata
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.meta_preview_url import meta_preview_url
+
+sep = " • "
 
 
 def build_meta_tags(
@@ -11,26 +11,28 @@ def build_meta_tags(
     url: str,
     page: BasePage,
     state: dict,
+    run_id: str,
+    uid: str,
+    example_id: str,
 ) -> list[dict]:
-    sr = page.get_current_sr()
-    published_run = page.get_current_published_run()
+    sr, published_run = page.get_runs_from_query_params(example_id, run_id, uid)
+    metadata = page.workflow.get_or_create_metadata()
 
     title = meta_title_for_page(
         page=page,
-        state=state,
+        metadata=metadata,
         sr=sr,
         published_run=published_run,
     )
     description = meta_description_for_page(
-        page=page,
-        state=state,
-        sr=sr,
+        metadata=metadata,
         published_run=published_run,
     )
     image = meta_image_for_page(
         page=page,
         state=state,
         sr=sr,
+        metadata=metadata,
         published_run=published_run,
     )
 
@@ -77,41 +79,27 @@ def raw_build_meta_tags(
 def meta_title_for_page(
     *,
     page: BasePage,
-    state: dict,
+    metadata: WorkflowMetadata,
     sr: SavedRun,
     published_run: PublishedRun | None,
 ) -> str:
-    sep = " • "
-
-    if (
-        published_run
-        and published_run.is_root_example()
-        and published_run.saved_run == sr
-    ):
-        # on root page
-        return page.workflow.metadata.meta_title + sep + "Gooey.AI"
+    tbreadcrumbs = get_title_breadcrumbs(page, sr, published_run)
 
     parts = []
-
-    parts.append(page.get_page_title())
-
-    if published_run and not published_run.is_root_example():
-        user = published_run.created_by
-    else:
+    if tbreadcrumbs.published_title or tbreadcrumbs.root_title:
+        parts.append(tbreadcrumbs.h1_title)
+        # use the short title for non-root examples
+        part = metadata.short_title
+        if tbreadcrumbs.published_title:
+            part = f"{published_run.title} {part}"
+        # add the creator's name
         user = sr.get_creator()
-
-    if (
-        published_run
-        and published_run.title
-        and published_run.saved_run != sr
-        and not published_run.is_root_example()
-    ):
-        part = f"{published_run.title} {page.workflow.metadata.short_title}"
+        if user and user.display_name:
+            part += f" by {user.display_name}"
+        parts.append(part)
     else:
-        part = page.workflow.metadata.short_title
-    if user and user.display_name:
-        part += f" by {user.display_name}"
-    parts.append(part)
+        # for root recipe, a longer, SEO-friendly title
+        parts.append(metadata.meta_title)
 
     parts.append("Gooey.AI")
     return sep.join(parts)
@@ -119,19 +107,17 @@ def meta_title_for_page(
 
 def meta_description_for_page(
     *,
-    page: BasePage,
-    state: dict,
-    sr: SavedRun,
+    metadata: WorkflowMetadata,
     published_run: PublishedRun | None,
 ) -> str:
     if published_run and not published_run.is_root_example():
-        description = published_run.notes or page.workflow.metadata.meta_description
+        description = published_run.notes or metadata.meta_description
     else:
-        description = page.workflow.metadata.meta_description
+        description = metadata.meta_description
 
     if not (published_run and published_run.is_root_example()) or not description:
         # for all non-root examples, or when there is no other description
-        description += " • AI API, workflow & prompt shared on Gooey.AI."
+        description += sep + "AI API, workflow & prompt shared on Gooey.AI."
 
     return description
 
@@ -140,6 +126,7 @@ def meta_image_for_page(
     *,
     page: BasePage,
     state: dict,
+    metadata: WorkflowMetadata,
     sr: SavedRun,
     published_run: PublishedRun | None,
 ) -> str | None:
@@ -148,7 +135,7 @@ def meta_image_for_page(
         and published_run.saved_run == sr
         and published_run.is_root_example()
     ):
-        file_url = page.workflow.metadata.meta_image or page.preview_image(state)
+        file_url = metadata.meta_image or page.preview_image(state)
     else:
         file_url = page.preview_image(state)
 

@@ -17,8 +17,8 @@ from phonenumber_field.modelfields import PhoneNumberField
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
-from daras_ai_v2.language_model import format_chat_entry
 from daras_ai_v2.crypto import get_random_doc_id
+from daras_ai_v2.language_model import format_chat_entry
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -114,8 +114,7 @@ class Workflow(models.IntegerChoices):
 
         return workflow_map[self]
 
-    @property
-    def metadata(self) -> WorkflowMetadata:
+    def get_or_create_metadata(self) -> WorkflowMetadata:
         metadata, _created = WorkflowMetadata.objects.get_or_create(
             workflow=self,
             defaults=dict(
@@ -142,17 +141,22 @@ class WorkflowMetadata(models.Model):
     help_url = models.URLField(blank=True, default="")
 
     # TODO: support the below fields
-    default_image = models.URLField(null=True, help_text="(not implemented)")
+    default_image = models.URLField(
+        blank=True, default="", help_text="(not implemented)"
+    )
 
     meta_title = models.TextField()
     meta_description = models.TextField(blank=True, default="")
-    meta_image = models.URLField(null=True)
+    meta_image = CustomURLField(default="", blank=True)
     meta_keywords = models.JSONField(
         default=list, blank=True, help_text="(not implemented)"
     )
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
-        return f"WorkflowMetadata({self.short_title})"
+        return self.meta_title
 
 
 class SavedRunQuerySet(models.QuerySet):

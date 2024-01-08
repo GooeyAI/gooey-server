@@ -10,6 +10,7 @@ import gooey_ui as st
 from bots.models import Workflow, PublishedRun, PublishedRunVisibility, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
@@ -358,7 +359,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         response.eval_runs = []
         for url in request.eval_urls:
             page_cls, sr, pr = url_to_runs(url)
-            yield f"Running {page_cls.get_title_and_breadcrumbs(sr, pr)[0]}..."
+            yield f"Running {get_title_breadcrumbs(page_cls, sr, pr).h1_title}..."
             request_body = page_cls.RequestModel(
                 documents=response.output_documents
             ).dict(exclude_unset=True)
@@ -576,13 +577,8 @@ def url_to_runs(
     f = furl(url)
     slug = f.path.segments[0]
     page_cls = page_slug_map[normalize_slug(slug)]
-    example_id, run_id, uid = extract_query_params(f.query.params, default="")
-    if run_id and uid:
-        sr = page_cls.run_doc_sr(run_id, uid)
-        pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
-    else:
-        pr = page_cls.get_published_run(published_run_id=example_id)
-        sr = pr.saved_run
+    example_id, run_id, uid = extract_query_params(f.query.params)
+    sr, pr = page_cls.get_runs_from_query_params(example_id, run_id, uid)
     return page_cls, sr, pr
 
 

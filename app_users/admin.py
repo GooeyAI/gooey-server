@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.admin.models import LogEntry
 
 from app_users import models
 from bots.admin_links import open_in_new_tab, list_related_html_url
@@ -143,3 +144,25 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         if not obj.payment_provider:
             return
         return f"${obj.charged_amount / 100}"
+
+
+@admin.register(LogEntry)
+class LogEntryAdmin(admin.ModelAdmin):
+    list_display = readonly_fields = [
+        "action_time",
+        "user",
+        "action_flag",
+        "content_type",
+        "object_repr",
+        "object_id",
+        "change_message",
+    ]
+
+    # to have a date-based drilldown navigation in the admin page
+    date_hierarchy = "action_time"
+
+    # to filter the results by users, content types and action flags
+    list_filter = ["action_time", "user", "content_type", "action_flag"]
+
+    # when searching the user will be able to search in both object_repr and change_message
+    search_fields = ["object_repr", "change_message"]

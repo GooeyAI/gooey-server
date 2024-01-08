@@ -11,6 +11,7 @@ from django.utils import dateformat
 from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
 
+from app_users.models import AppUser
 from bots.admin_links import list_related_html_url, change_obj_url
 from bots.models import (
     FeedbackComment,
@@ -24,8 +25,8 @@ from bots.models import (
     Conversation,
     BotIntegration,
     MessageAttachment,
+    WorkflowMetadata,
 )
-from app_users.models import AppUser
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.base import BasePage
@@ -701,3 +702,18 @@ class FeedbackAdmin(admin.ModelAdmin):
         )
 
     conversation_link.short_description = "Conversation"
+
+
+@admin.register(WorkflowMetadata)
+class WorkflowMetadata(admin.ModelAdmin):
+    list_display = [
+        "workflow",
+        "short_title",
+        "meta_title",
+        "meta_description",
+        "created_at",
+        "updated_at",
+    ]
+    search_fields = ["workflow", "meta_title", "meta_description"]
+    list_filter = ["workflow"]
+    readonly_fields = ["created_at", "updated_at"]
