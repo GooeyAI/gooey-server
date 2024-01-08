@@ -8,6 +8,7 @@ from furl import furl
 
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import raise_for_status
 
 
 class GpuEndpoints:
@@ -32,7 +33,7 @@ def call_gpu_server(*, endpoint: str, input_data: dict) -> typing.Any:
         f"{endpoint}/predictions",
         json={"input": input_data},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     return r.json()["output"]
 
 
@@ -97,7 +98,7 @@ def call_gooey_gpu(
         str(endpoint),
         json={"pipeline": pipeline, "inputs": inputs},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     return [blob.public_url for blob in blobs]
 
 

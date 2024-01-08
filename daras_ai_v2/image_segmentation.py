@@ -2,6 +2,7 @@ from enum import Enum
 
 import requests
 
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.gpu_server import (
     call_celery_task_outfile,
 )
@@ -21,7 +22,7 @@ def u2net(input_image: str) -> bytes:
         filename="u2net.png",
     )[0]
     r = requests.get(url)
-    r.raise_for_status()
+    raise_for_status(r)
     return r.content
 
 
@@ -34,5 +35,5 @@ def dis(input_image: str) -> bytes:
         filename="dis.png",
     )[0]
     r = requests.get(url)
-    r.raise_for_status()
+    raise_for_status(r)
     return r.content

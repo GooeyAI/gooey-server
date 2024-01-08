@@ -3,6 +3,7 @@ import typing
 import requests
 
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.serp_search_locations import SerpSearchType, SerpSearchLocation
 
 
@@ -72,6 +73,6 @@ def call_serp_api(
         ),
         headers={"X-API-KEY": settings.SERPER_API_KEY},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     data = r.json()
     return data
