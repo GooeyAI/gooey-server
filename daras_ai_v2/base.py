@@ -608,25 +608,6 @@ class BasePage:
             modal.close()
 
     @classmethod
-    def get_title(cls, run: PublishedRun | SavedRun):
-        if isinstance(run, PublishedRun):
-            title, _ = cls.get_title_and_breadcrumbs(
-                sr=run.saved_run,
-                pr=run,
-            )
-        elif isinstance(run, SavedRun):
-            published_run = (
-                run and run.parent_version and run.parent_version.published_run
-            ) or None
-            title, _ = cls.get_title_and_breadcrumbs(
-                sr=run,
-                pr=published_run,
-            )
-        else:
-            raise TypeError(f"Invalid type: {type(run)}")
-        return title
-
-    @classmethod
     def get_title_and_breadcrumbs(
         cls,
         sr: SavedRun,
