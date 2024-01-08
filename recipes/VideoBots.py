@@ -22,7 +22,7 @@ from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
-from recipes.BulkRunner import url_to_sr
+from recipes.BulkRunner import url_to_runs
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
@@ -1107,7 +1107,7 @@ This will also help better understand incoming audio messages by automatically c
     )
     if analysis_url:
         try:
-            page_cls, analysis_run = url_to_sr(analysis_url)
+            page_cls, analysis_run, _ = url_to_runs(analysis_url)
             assert page_cls.workflow in [
                 Workflow.COMPARE_LLM,
                 Workflow.VIDEO_BOTS,
