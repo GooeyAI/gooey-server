@@ -9,6 +9,7 @@ from furl import furl
 from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import request_json
+from daras_ai_v2.exceptions import raise_for_status
 from routers.billing import available_subscriptions
 
 router = APIRouter()
@@ -30,7 +31,7 @@ def generate_auth_header() -> str:
         data="grant_type=client_credentials",
         headers={"Authorization": f"Basic {auth}"},
     )
-    response.raise_for_status()
+    raise_for_status(response)
     data = response.json()
     access_token = data.get("access_token")
     assert access_token, "Missing access token in response"
@@ -91,7 +92,7 @@ def create_order(request: Request, payload=Depends(request_json)):
             ],
         },
     )
-    response.raise_for_status()
+    raise_for_status(response)
     return JSONResponse(response.json(), response.status_code)
 
 
@@ -120,7 +121,7 @@ def _handle_invoice_paid(order_id: str):
         str(furl(settings.PAYPAL_BASE) / f"v2/checkout/orders/{order_id}"),
         headers={"Authorization": generate_auth_header()},
     )
-    response.raise_for_status()
+    raise_for_status(response)
     order = response.json()
     purchase_unit = order["purchase_units"][0]
     uid = purchase_unit["payments"]["captures"][0]["custom_id"]
