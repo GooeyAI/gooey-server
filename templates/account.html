@@ -92,7 +92,7 @@
                         </ul>
                     {% endfor %}
                 </div>
-                <div id="paypal-container">
+                <div id="paypal-container" style="display: none;">
                     {% for lookup_key, subscription in available_subscriptions.items() %}
                         {% if lookup_key == "addon" %}
                             <h4>{{ subscription["display"]["title"] }}</h4>
@@ -130,12 +130,6 @@
         {% endif %}
     </div>
     <script>
-        if (document.getElementById("stripe-checked").checked) {
-            stripeLayout();
-        } else {
-            paypalLayout();
-        }
-
         function stripeLayout() {
             document.getElementById("paypal-container").style.display = "none";
             document.getElementById("stripe-container").style.display = "block";
