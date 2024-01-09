@@ -572,7 +572,7 @@ def _prefill_workflow(d: dict, key: str):
                 pr
                 and pr.saved_run == sr
                 and pr.visibility == PublishedRunVisibility.PUBLIC
-                and (pr.is_approved_example or pr.is_root_example())
+                and (pr.is_approved_example or pr.is_root())
             ):
                 d["workflow"] = pr.workflow
                 d["url"] = pr.get_app_url()

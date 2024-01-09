@@ -110,12 +110,12 @@ def meta_description_for_page(
     metadata: WorkflowMetadata,
     published_run: PublishedRun | None,
 ) -> str:
-    if published_run and not published_run.is_root_example():
+    if published_run and not published_run.is_root():
         description = published_run.notes or metadata.meta_description
     else:
         description = metadata.meta_description
 
-    if not (published_run and published_run.is_root_example()) or not description:
+    if not (published_run and published_run.is_root()) or not description:
         # for all non-root examples, or when there is no other description
         description += sep + "AI API, workflow & prompt shared on Gooey.AI."
 
@@ -130,11 +130,7 @@ def meta_image_for_page(
     sr: SavedRun,
     published_run: PublishedRun | None,
 ) -> str | None:
-    if (
-        published_run
-        and published_run.saved_run == sr
-        and published_run.is_root_example()
-    ):
+    if published_run and published_run.saved_run == sr and published_run.is_root():
         file_url = metadata.meta_image or page.preview_image(state)
     else:
         file_url = page.preview_image(state)

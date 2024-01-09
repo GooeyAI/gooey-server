@@ -15,7 +15,6 @@ from types import SimpleNamespace
 
 import requests
 import sentry_sdk
-from django.db import models
 from django.utils import timezone
 from fastapi import HTTPException
 from firebase_admin import auth
@@ -35,7 +34,6 @@ from bots.models import (
     PublishedRunVisibility,
     Workflow,
 )
-from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
@@ -202,7 +200,7 @@ class BasePage:
         published_run = self.get_current_published_run()
         is_root_example = (
             published_run
-            and published_run.is_root_example()
+            and published_run.is_root()
             and published_run.saved_run == current_run
         )
         tbreadcrumbs = get_title_breadcrumbs(self, current_run, published_run)
@@ -226,14 +224,14 @@ class BasePage:
                 can_user_edit_run = self.is_current_user_admin() or (
                     self.request
                     and self.request.user
-                    and current_run.get_creator() == self.request.user
+                    and current_run.uid == self.request.user.uid
                 )
                 has_unpublished_changes = (
                     published_run
                     and published_run.saved_run != current_run
                     and self.request
                     and self.request.user
-                    and published_run.is_editor(self.request.user)
+                    and published_run.created_by == self.request.user
                 )
 
                 if can_user_edit_run and has_unpublished_changes:
@@ -250,15 +248,13 @@ class BasePage:
                     """
                     )
 
-                    if can_user_edit_run and not is_root_example:
+                    if published_run and can_user_edit_run:
                         self._render_published_run_buttons(
                             current_run=current_run,
                             published_run=published_run,
                         )
 
-                    self._render_social_buttons(
-                        show_button_text=not can_user_edit_run or is_root_example
-                    )
+                    self._render_social_buttons(show_button_text=not can_user_edit_run)
 
         with st.div():
             if tbreadcrumbs or self.run_user:
@@ -312,21 +308,16 @@ class BasePage:
         self,
         *,
         current_run: SavedRun,
-        published_run: PublishedRun | None,
+        published_run: PublishedRun,
     ):
-        is_update_mode = bool(
-            published_run
-            and not published_run.is_root_example()
-            and (
-                published_run.is_editor(self.request.user)
-                or self.is_current_user_admin()
-            )
+        is_update_mode = (
+            self.is_current_user_admin()
+            or published_run.created_by == self.request.user
         )
 
-        with st.div():
-            with st.div(className="d-flex justify-content-end"):
-                st.html(
-                    """
+        with st.div(className="d-flex justify-content-end"):
+            st.html(
+                """
                 <style>
                     .save-button-menu .gui-input label p { color: black; }
                     .visibility-radio .gui-input {
@@ -337,168 +328,147 @@ class BasePage:
                     }
                 </style>
                 """
-                )
+            )
 
-                run_actions_button = (
-                    st.button(
-                        '<i class="fa-regular fa-ellipsis"></i>',
-                        className="mb-0 ms-lg-2",
-                        type="tertiary",
+            pressed_options = is_update_mode and st.button(
+                '<i class="fa-regular fa-ellipsis"></i>',
+                className="mb-0 ms-lg-2",
+                type="tertiary",
+            )
+            options_modal = Modal("Options", key="published-run-options-modal")
+            if pressed_options:
+                options_modal.open()
+            if options_modal.is_open():
+                with options_modal.container(style={"min-width": "min(300px, 100vw)"}):
+                    self._render_options_modal(
+                        current_run=current_run,
+                        published_run=published_run,
+                        modal=options_modal,
                     )
-                    if is_update_mode
-                    else None
-                )
-                run_actions_modal = Modal("Options", key="published-run-options-modal")
-                if run_actions_button:
-                    run_actions_modal.open()
 
-                save_icon = '<i class="fa-regular fa-floppy-disk"></i>'
-                save_text = "Update" if is_update_mode else "Save"
-                save_button = st.button(
-                    f'{save_icon}<span class="d-none d-lg-inline"> {save_text}</span>',
-                    className="mb-0 ms-lg-2 px-lg-4",
-                    type="primary",
-                )
-                publish_modal = Modal("", key="publish-modal")
-                if save_button:
-                    if self.request.user.is_anonymous:
-                        redirect_url = furl(
-                            "/login",
-                            query_params={
-                                "next": furl(self.request.url).set(origin=None)
-                            },
-                        )
-                        # TODO: investigate why RedirectException does not work here
-                        force_redirect(redirect_url)
-                        return
-                    else:
-                        publish_modal.open()
-
-                if publish_modal.is_open():
-                    with publish_modal.container(
-                        style={"min-width": "min(500px, 100vw)"}
-                    ):
-                        self._render_publish_modal(
-                            current_run=current_run,
-                            published_run=published_run,
-                            is_update_mode=is_update_mode,
-                        )
-
-                if run_actions_modal.is_open():
-                    with run_actions_modal.container(
-                        style={"min-width": "min(300px, 100vw)"}
-                    ):
-                        self._render_run_actions_modal(
-                            current_run=current_run,
-                            published_run=published_run,
-                            modal=run_actions_modal,
-                        )
+            save_icon = '<i class="fa-regular fa-floppy-disk"></i>'
+            if is_update_mode:
+                save_text = "Update"
+            else:
+                save_text = "Save"
+            pressed_save = st.button(
+                f'{save_icon} <span class="d-none d-lg-inline">{save_text}</span>',
+                className="mb-0 ms-lg-2 px-lg-4",
+                type="primary",
+            )
+            publish_modal = Modal("Publish to", key="publish-modal")
+            if pressed_save:
+                publish_modal.open()
+            if publish_modal.is_open():
+                with publish_modal.container(style={"min-width": "min(500px, 100vw)"}):
+                    self._render_publish_modal(
+                        current_run=current_run,
+                        published_run=published_run,
+                        modal=publish_modal,
+                        is_update_mode=is_update_mode,
+                    )
 
     def _render_publish_modal(
         self,
         *,
         current_run: SavedRun,
-        published_run: PublishedRun | None,
+        published_run: PublishedRun,
+        modal: Modal,
         is_update_mode: bool = False,
-        for_example: bool = False,
     ):
-        if is_update_mode:
-            assert published_run is not None, "published_run must be set in update mode"
-
-        if not for_example:
+        if published_run.is_root() and self.is_current_user_admin():
+            with st.div(className="text-danger"):
+                st.write(
+                    "###### You're about to update the root workflow as an admin. "
+                )
+            st.html(
+                'If you want to create a new example, press <i class="fa-regular fa-ellipsis"></i> and "Duplicate" instead.'
+            )
+            published_run_visibility = PublishedRunVisibility.PUBLIC
+        else:
             with st.div(className="visibility-radio"):
-                st.write("### Publish to")
-                convert_state_type(st.session_state, "published_run_visibility", int)
-                if is_update_mode:
-                    st.session_state.setdefault(
-                        "published_run_visibility", published_run.visibility
+                options = {
+                    str(enum.value): enum.help_text() for enum in PublishedRunVisibility
+                }
+                published_run_visibility = PublishedRunVisibility(
+                    int(
+                        st.radio(
+                            "",
+                            options=options,
+                            format_func=options.__getitem__,
+                            value=str(published_run.visibility),
+                        )
                     )
-                published_run_visibility = st.radio(
-                    "",
-                    key="published_run_visibility",
-                    options=PublishedRunVisibility.values,
-                    format_func=lambda x: PublishedRunVisibility(x).help_text(),
                 )
                 st.radio(
                     "",
                     options=[
-                        '<span class="text-muted">Anyone at my org (coming soon)</span>',
+                        '<span class="text-muted">Anyone at my org (coming soon)</span>'
                     ],
                     disabled=True,
                     checked_by_default=False,
                 )
-        else:
-            published_run_visibility = PublishedRunVisibility.PUBLIC
-            st.caption("Visibility: This will be a public and approved example.")
 
         with st.div(className="mt-4"):
             recipe_title = self.get_root_published_run().title or self.title
-            default_title = (
-                published_run.title
-                if is_update_mode
-                else f"{self.request.user.display_name}'s {recipe_title}"
-            )
             published_run_title = st.text_input(
-                "Title",
+                "##### Title",
                 key="published_run_title",
-                value=default_title,
-            )
-            st.session_state.setdefault(
-                "published_run_notes",
-                published_run and published_run.notes or "",
+                value=(
+                    published_run.title
+                    if is_update_mode
+                    else f"{self.request.user.display_name}'s {recipe_title}"
+                ),
             )
             published_run_notes = st.text_area(
-                "Notes",
+                "##### Notes",
                 key="published_run_notes",
+                value=(published_run and published_run.notes) or "",
             )
 
         with st.div(className="mt-4 d-flex justify-content-center"):
-            save_icon = '<i class="fa-regular fa-floppy-disk"></i>'
-            publish_button = st.button(
-                f"{save_icon} Save", className="px-4", type="primary"
+            pressed_save = st.button(
+                f'<i class="fa-regular fa-floppy-disk"></i> Save',
+                className="px-4",
+                type="primary",
             )
 
-        if publish_button:
-            recipe_title = self.get_root_published_run().title or self.title
-            is_root_published_run = is_update_mode and published_run.is_root_example()
-            if (
-                not is_root_published_run
-                and published_run_title.strip() == recipe_title.strip()
-            ):
-                st.error("Title can't be the same as the recipe title")
-                return
-            if not is_update_mode:
-                published_run = self.create_published_run(
-                    published_run_id=get_random_doc_id(),
-                    saved_run=current_run,
-                    user=self.request.user,
-                    title=published_run_title.strip(),
-                    notes=published_run_notes.strip(),
-                    visibility=PublishedRunVisibility(published_run_visibility),
-                    is_approved_example=for_example,
-                )
-            else:
-                updates = dict(
-                    saved_run=current_run,
-                    title=published_run_title.strip(),
-                    notes=published_run_notes.strip(),
-                    visibility=PublishedRunVisibility(published_run_visibility),
-                    is_approved_example=for_example
-                    or None,  # can only be approved from here
-                )
-                if self._has_published_run_changed(
-                    published_run=published_run,
-                    **updates,
-                ):
-                    published_run.add_version(
-                        user=self.request.user,
-                        **updates,
-                    )
-                else:
-                    st.error("No changes to publish")
-                    return
+        self._render_admin_options(current_run, published_run)
 
-            force_redirect(published_run.get_app_url())
+        if not pressed_save:
+            return
+        recipe_title = self.get_root_published_run().title or self.title
+        is_root_published_run = is_update_mode and published_run.is_root()
+        if (
+            not is_root_published_run
+            and published_run_title.strip() == recipe_title.strip()
+        ):
+            st.error("Title can't be the same as the recipe title", icon="⚠️")
+            return
+
+        if is_update_mode:
+            updates = dict(
+                saved_run=current_run,
+                title=published_run_title.strip(),
+                notes=published_run_notes.strip(),
+                visibility=published_run_visibility,
+            )
+            if not self._has_published_run_changed(
+                published_run=published_run, **updates
+            ):
+                st.error("No changes to publish", icon="⚠️")
+                return
+            published_run.add_version(user=self.request.user, **updates)
+        else:
+            published_run = self.create_published_run(
+                published_run_id=get_random_doc_id(),
+                saved_run=current_run,
+                user=self.request.user,
+                title=published_run_title.strip(),
+                notes=published_run_notes.strip(),
+                visibility=published_run_visibility,
+            )
+        force_redirect(published_run.get_app_url())
 
     def _has_published_run_changed(
         self,
@@ -508,28 +478,21 @@ class BasePage:
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
-        is_approved_example: bool | None = None,
     ):
         return (
             published_run.title != title
             or published_run.notes != notes
             or published_run.visibility != visibility
             or published_run.saved_run != saved_run
-            or (
-                is_approved_example is not None
-                and published_run.is_approved_example != is_approved_example
-            )
         )
 
-    def _render_run_actions_modal(
+    def _render_options_modal(
         self,
         *,
         current_run: SavedRun,
         published_run: PublishedRun,
         modal: Modal,
     ):
-        assert published_run is not None
-
         is_latest_version = published_run.saved_run == current_run
 
         with st.div(className="mt-4"):
@@ -538,17 +501,15 @@ class BasePage:
             duplicate_icon = save_as_new_icon = '<i class="fa-regular fa-copy"></i>'
             if is_latest_version:
                 duplicate_button = st.button(
-                    f"{duplicate_icon} Duplicate", type="secondary", className="w-100"
+                    f"{duplicate_icon} Duplicate", className="w-100"
                 )
             else:
                 save_as_new_button = st.button(
-                    f"{save_as_new_icon} Save as New",
-                    type="secondary",
-                    className="w-100",
+                    f"{save_as_new_icon} Save as New", className="w-100"
                 )
-            delete_icon = '<i class="fa-regular fa-trash"></i>'
-            delete_button = st.button(
-                f"{delete_icon} Delete", type="secondary", className="w-100 text-danger"
+            delete_button = not published_run.is_root() and st.button(
+                f'<i class="fa-regular fa-trash"></i> Delete',
+                className="w-100 text-danger",
             )
 
         if duplicate_button:
@@ -575,17 +536,13 @@ class BasePage:
                 query_params=dict(example_id=new_pr.published_run_id)
             )
 
-        confirm_delete_modal = Modal("Confirm Delete", key="confirm-delete-modal")
-        if delete_button:
-            if not published_run.published_run_id:
-                st.error("Cannot delete root example")
-                return
-            confirm_delete_modal.open()
-
         with st.div(className="mt-4"):
             st.write("#### Version History", className="mb-4")
             self._render_version_history()
 
+        confirm_delete_modal = Modal("Confirm Delete", key="confirm-delete-modal")
+        if delete_button:
+            confirm_delete_modal.open()
         if confirm_delete_modal.is_open():
             modal.empty()
             with confirm_delete_modal.container():
@@ -623,6 +580,49 @@ class BasePage:
 
         if cancel_button:
             modal.close()
+
+    def _render_admin_options(self, current_run: SavedRun, published_run: PublishedRun):
+        if (
+            not self.is_current_user_admin()
+            or published_run.is_root()
+            or published_run.saved_run != current_run
+        ):
+            return
+
+        with st.expander("🛠️ Admin Options"):
+            st.write(
+                f"This will hide/show this workflow from {self.app_url(tab_name=MenuTabs.paths[MenuTabs.examples])}  \n"
+                f"(Given that you have set public visibility above)"
+            )
+            if st.session_state.get("--toggle-approve-example"):
+                published_run.is_approved_example = (
+                    not published_run.is_approved_example
+                )
+                published_run.save(update_fields=["is_approved_example"])
+            if published_run.is_approved_example:
+                btn_text = "🙈 Hide from Examples"
+            else:
+                btn_text = "✅ Approve as Example"
+            st.button(btn_text, key="--toggle-approve-example")
+
+            st.write("---")
+
+            if st.checkbox("⭐️ Save as Root Workflow"):
+                st.write(
+                    f"Are you Sure?  \n"
+                    f"This will overwrite the contents of {self.app_url()}",
+                    className="text-danger",
+                )
+                if st.button("👌 Yes, Update the Root Workflow"):
+                    root_run = self.get_root_published_run()
+                    root_run.add_version(
+                        user=self.request.user,
+                        title=published_run.title,
+                        notes=published_run.notes,
+                        saved_run=published_run.saved_run,
+                        visibility=PublishedRunVisibility.PUBLIC,
+                    )
+                    raise QueryParamsRedirectException(dict())
 
     @classmethod
     def get_recipe_title(cls) -> str:
@@ -666,8 +666,6 @@ class BasePage:
                 col1, col2 = st.columns(2)
                 with col1:
                     self._render_help()
-                with col2:
-                    self._render_save_options()
 
                 self.render_related_workflows()
                 render_js_dynamic_dates()
@@ -1009,7 +1007,6 @@ class BasePage:
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
-        is_approved_example: bool = False,
     ):
         return PublishedRun.objects.create_published_run(
             workflow=cls.workflow,
@@ -1019,7 +1016,6 @@ class BasePage:
             title=title,
             notes=notes,
             visibility=visibility,
-            is_approved_example=is_approved_example,
         )
 
     def duplicate_published_run(
@@ -1495,134 +1491,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         with col3:
             self._render_report_button()
 
-    def _render_save_options(self):
-        if not self.is_current_user_admin():
-            return
-
-        current_sr = self.get_current_sr()
-        published_run = self.get_current_published_run()
-
-        with st.expander("🛠️ Admin Options"):
-            if (
-                published_run
-                and published_run.saved_run == current_sr
-                and published_run.is_root_example()
-            ):
-                st.write("##### Workflow Options")
-                published_run_title = st.text_input(
-                    "Workflow Root Title", value=published_run.title or self.title
-                )
-                published_run_notes = st.text_area(
-                    "Workflow Root Notes", value=published_run.notes
-                )
-                if st.button("💾 Save changes"):
-                    published_run.add_version(
-                        user=self.request.user,
-                        title=published_run_title,
-                        notes=published_run_notes,
-                        saved_run=published_run.saved_run,
-                        visibility=published_run.visibility,
-                    )
-                    st.experimental_rerun()
-            else:
-                if st.button("⭐️ Save Workflow"):
-                    root_run = self.get_root_published_run()
-                    root_run.add_version(
-                        user=self.request.user,
-                        title=published_run.title if published_run else root_run.title,
-                        notes=published_run.notes if published_run else root_run.notes,
-                        saved_run=current_sr,
-                        visibility=PublishedRunVisibility.PUBLIC,
-                        is_approved_example=True,
-                    )
-                    raise QueryParamsRedirectException(
-                        dict(example_id=root_run.published_run_id)
-                    )
-
-                if (
-                    published_run
-                    and published_run.saved_run == current_sr
-                    and published_run.is_approved_example
-                ):
-                    if st.button("🙈 Remove from Examples"):
-                        try:
-                            published_run.add_version(
-                                user=self.request.user,
-                                saved_run=published_run.saved_run,
-                                title=published_run.title,
-                                notes=published_run.notes,
-                                visibility=published_run.visibility,
-                                is_approved_example=False,
-                            )
-                        except Exception as e:
-                            st.error(str(e))
-                        else:
-                            st.experimental_rerun()
-                else:
-                    save_example_button = st.button("✅ Approve as Example")
-
-                    if published_run and published_run.saved_run != current_sr:
-                        st.caption(
-                            """
-                            Warning: There are unpublished changes in this run.
-                            A new saved run will be created for this example.
-                        """
-                        )
-
-                    if (
-                        published_run
-                        and published_run.saved_run == current_sr
-                        and published_run.visibility != PublishedRunVisibility.PUBLIC
-                    ):
-                        st.caption(
-                            """
-                            Warning: This run has not been published publicly.
-                            The visibility will be changed to public to create
-                            an example from this run.
-                        """
-                        )
-
-                    publish_modal = Modal("", key="publish-example-modal")
-                    if save_example_button:
-                        if published_run and published_run.saved_run == current_sr:
-                            try:
-                                published_run.add_version(
-                                    user=self.request.user,
-                                    saved_run=published_run.saved_run,
-                                    title=published_run.title,
-                                    notes=published_run.notes,
-                                    visibility=PublishedRunVisibility.PUBLIC,
-                                    is_approved_example=True,
-                                )
-                            except Exception as e:
-                                st.error(str(e))
-                            else:
-                                st.experimental_rerun()
-                        else:
-                            publish_modal.open()
-                    if publish_modal.is_open():
-                        with publish_modal.container(
-                            style={"min-width": "min(500px, 100vw)"}
-                        ):
-                            self._render_publish_modal(
-                                current_run=current_sr,
-                                published_run=None,
-                                is_update_mode=False,
-                                for_example=True,
-                            )
-
-    def update_or_show_error(
-        self, model: models.Model, update_fields: typing.Iterable[str] | None = None
-    ):
-        try:
-            model.full_clean()
-            model.save(update_fields=update_fields)
-        except Exception as e:
-            st.error(str(e))
-            return False
-        else:
-            return True
-
     def state_to_doc(self, state: dict):
         ret = {
             field_name: deepcopy(state[field_name])
@@ -1662,11 +1530,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         grid_layout(3, example_runs, _render)
 
     def _saved_tab(self):
-        if not self.request.user or self.request.user.is_anonymous:
-            redirect_url = furl(
-                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
-            )
-            raise RedirectException(str(redirect_url))
+        self.ensure_authentication()
 
         published_runs = PublishedRun.objects.filter(
             workflow=self.workflow,
@@ -1683,6 +1547,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             )
 
         grid_layout(3, published_runs, _render)
+
+    def ensure_authentication(self):
+        if not self.request.user or self.request.user.is_anonymous:
+            redirect_url = furl(
+                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
+            )
+            raise RedirectException(str(redirect_url))
 
     def _history_tab(self):
         assert self.request, "request must be set to render history tab"
@@ -1790,14 +1661,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def set_hidden(self, *, published_run: PublishedRun, hidden: bool):
         with st.spinner("Hiding..."):
-            published_run.add_version(
-                user=self.request.user,
-                saved_run=published_run.saved_run,
-                visibility=published_run.visibility,
-                title=published_run.title,
-                notes=published_run.notes,
-                is_approved_example=not hidden,
-            )
+            published_run.is_approved_example = not hidden
+            published_run.save()
 
         st.experimental_rerun()
 
@@ -2027,11 +1892,6 @@ def force_redirect(url: str):
     </script>
     """
     )
-
-
-def convert_state_type(state, key, fn):
-    if key in state:
-        state[key] = fn(state[key])
 
 
 def reverse_enumerate(start, iterator):

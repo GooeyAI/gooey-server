@@ -1040,7 +1040,6 @@ class PublishedRunQuerySet(models.QuerySet):
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
-        is_approved_example: bool,
     ):
         with transaction.atomic():
             published_run = PublishedRun(
@@ -1049,7 +1048,6 @@ class PublishedRunQuerySet(models.QuerySet):
                 created_by=user,
                 last_edited_by=user,
                 title=title,
-                is_approved_example=is_approved_example,
             )
             published_run.save()
             published_run.add_version(
@@ -1058,7 +1056,6 @@ class PublishedRunQuerySet(models.QuerySet):
                 title=title,
                 visibility=visibility,
                 notes=notes,
-                is_approved_example=is_approved_example,
             )
             return published_run
 
@@ -1150,7 +1147,6 @@ class PublishedRun(models.Model):
             title=title,
             notes=notes,
             visibility=visibility,
-            is_approved_example=False,
         )
 
     def get_app_url(self):
@@ -1166,7 +1162,6 @@ class PublishedRun(models.Model):
         visibility: PublishedRunVisibility,
         title: str,
         notes: str,
-        is_approved_example: bool | None = None,
     ):
         assert saved_run.workflow == self.workflow
 
@@ -1181,19 +1176,15 @@ class PublishedRun(models.Model):
                 visibility=visibility,
             )
             version.save()
-            update_fields = self.update_fields_to_latest_version()
-            if is_approved_example is not None:
-                self.is_approved_example = is_approved_example
-                update_fields.append("is_approved_example")
-            self.save(update_fields=update_fields)
+            self.update_fields_to_latest_version()
 
     def is_editor(self, user: AppUser):
         return self.created_by == user
 
-    def is_root_example(self):
+    def is_root(self):
         return not self.published_run_id
 
-    def update_fields_to_latest_version(self) -> list[str]:
+    def update_fields_to_latest_version(self):
         latest_version = self.versions.latest()
         self.saved_run = latest_version.saved_run
         self.last_edited_by = latest_version.changed_by
@@ -1201,7 +1192,7 @@ class PublishedRun(models.Model):
         self.notes = latest_version.notes
         self.visibility = latest_version.visibility
 
-        return ["saved_run", "last_edited_by", "title", "notes", "visibility"]
+        self.save()
 
 
 class PublishedRunVersion(models.Model):
