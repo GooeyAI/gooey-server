@@ -632,6 +632,7 @@ def radio(
     disabled: bool = False,
     checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
+    validate_value: bool = True,
 ) -> T | None:
     if not options:
         return None
@@ -639,7 +640,9 @@ def radio(
     if not key:
         key = md5_values("radio", label, options, help, label_visibility)
     value = state.session_state.get(key)
-    if (key not in state.session_state or value not in options) and checked_by_default:
+    if (
+        key not in state.session_state or (value not in options and validate_value)
+    ) and checked_by_default:
         value = options[0]
     state.session_state.setdefault(key, value)
     if label_visibility != "visible":
@@ -658,6 +661,62 @@ def radio(
                 disabled=disabled,
             ),
         ).mount()
+    return value
+
+
+def custom_radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+) -> T | None:
+    if not key:
+        key = md5_values("custom_radio", label, options, help, label_visibility)
+    value = radio(
+        label=label,
+        options=options,
+        format_func=format_func,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        validate_value=False,
+    )
+    is_custom = value not in options
+    custom = {
+        "label": "Custom",
+        "input": lambda label, key: number_input(
+            label=label,
+            min_value=1,
+            max_value=60,
+            step=1,
+            key=key,
+            style={"margin-top": "-28px"},
+        ),
+    }
+    with div(className="d-flex", style={"gap": "1ch", "flex-direction": "row-reverse"}):
+        with div(className="flex-grow-1"):
+            state.session_state.setdefault(f"custom-{key}", value)
+            val = custom["input"](label="", key=f"custom-{key}")
+        with div():
+            state.RenderTreeNode(
+                name="input",
+                props=dict(
+                    type="radio",
+                    name=key,
+                    label=dedent(str(custom["label"])),
+                    value=val,
+                    defaultChecked=is_custom,
+                    help=help,
+                    disabled=disabled,
+                ),
+            ).mount()
+    if type(options[0])(value) not in options:
+        value = state.session_state[key] = state.session_state[f"custom-{key}"]
     return value
 
 
@@ -750,6 +809,7 @@ def number_input(
     help: str = None,
     *,
     disabled: bool = False,
+    **props,
 ) -> float:
     value = _input_widget(
         input_type="number",
@@ -762,6 +822,7 @@ def number_input(
         min=min_value,
         max=max_value,
         step=_step_value(min_value, max_value, step),
+        **props,
     )
     return value or 0
 
