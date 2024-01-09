@@ -627,6 +627,7 @@ def radio(
     options: typing.Sequence[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
     key: str = None,
+    value: T = None,
     help: str = None,
     *,
     disabled: bool = False,
@@ -638,10 +639,10 @@ def radio(
     options = list(options)
     if not key:
         key = md5_values("radio", label, options, help, label_visibility)
-    value = state.session_state.get(key)
-    if (key not in state.session_state or value not in options) and checked_by_default:
+    value = state.session_state.setdefault(key, value)
+    if value not in options and checked_by_default:
         value = options[0]
-    state.session_state.setdefault(key, value)
+        state.session_state[key] = value
     if label_visibility != "visible":
         label = None
     markdown(label)
