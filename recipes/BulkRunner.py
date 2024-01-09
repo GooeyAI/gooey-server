@@ -438,17 +438,7 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
                 st.session_state[last_workflow_key] = workflow
         with scol2:
             page_cls = Workflow(workflow).page_cls
-            options = {
-                page_cls.get_root_published_run().get_app_url(): "Default",
-            } | {
-                # approved examples
-                pr.get_app_url(): pr.title
-                for pr in PublishedRun.objects.filter(
-                    workflow=d["workflow"],
-                    is_approved_example=True,
-                    visibility=PublishedRunVisibility.PUBLIC,
-                ).exclude(published_run_id="")
-            }
+            options = _get_approved_example_options(page_cls, workflow)
             with st.div(className="pt-1"):
                 url = st.selectbox(
                     "",
@@ -469,6 +459,25 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
     except Exception as e:
         st.error(repr(e))
     d["url"] = url
+
+
+@st.cache_in_session_state
+def _get_approved_example_options(
+    page_cls: typing.Type[BasePage], workflow: Workflow
+) -> dict[str, str]:
+    options = {
+        # root recipe
+        page_cls.get_root_published_run().get_app_url(): "Default",
+    } | {
+        # approved examples
+        pr.get_app_url(): get_title_breadcrumbs(page_cls, pr.saved_run, pr).h1_title
+        for pr in PublishedRun.objects.filter(
+            workflow=workflow,
+            is_approved_example=True,
+            visibility=PublishedRunVisibility.PUBLIC,
+        ).exclude(published_run_id="")
+    }
+    return options
 
 
 def render_eval_url_inputs(key: str, del_key: str, d: dict):
