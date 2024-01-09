@@ -98,7 +98,7 @@ def doc_search_settings(
     st.text_area(
         """
 ###### 👁‍🗨 Summarization Instructions
-Prompt to transform the conversation history into a vector search query.
+Prompt to transform the conversation history into a vector search query.  \\
 These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.
         """,
         key="query_instructions",
@@ -107,7 +107,9 @@ These instructions run before the workflow performs a search of the knowledge ba
     if keyword_instructions_allowed:
         st.text_area(
             """
-###### 🔑 Keyword Extraction
+###### 🔑 Keyword Extraction 
+Prompt to extract a query for hybrid BM25 search.  \\
+These instructions run after the Summarization Instructions above and can use its result via `{{ final_search_query }}`. In general, you shouldn't need to adjust these instructions.
         """,
             key="keyword_instructions",
             height=300,

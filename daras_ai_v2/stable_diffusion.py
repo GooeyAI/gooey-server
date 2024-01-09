@@ -13,6 +13,7 @@ from daras_ai.image_input import (
     resize_img_fit,
     get_downscale_factor,
 )
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import (
     b64_img_decode,
@@ -422,7 +423,7 @@ def controlnet(
     scheduler: str = None,
     prompt: str,
     num_outputs: int = 1,
-    init_image: str,
+    init_images: list[str] | str,
     num_inference_steps: int = 50,
     negative_prompt: str = None,
     guidance_scale: float = 7.5,
@@ -431,6 +432,8 @@ def controlnet(
 ):
     if isinstance(selected_controlnet_model, str):
         selected_controlnet_model = [selected_controlnet_model]
+    if isinstance(init_images, str):
+        init_images = [init_images] * len(selected_controlnet_model)
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
         "diffusion.controlnet",
@@ -452,7 +455,7 @@ def controlnet(
             "num_images_per_prompt": num_outputs,
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
-            "image": [init_image] * len(selected_controlnet_model),
+            "image": init_images,
             "controlnet_conditioning_scale": controlnet_conditioning_scale,
             # "strength": prompt_strength,
         },
@@ -533,7 +536,7 @@ def inpainting(
             out_imgs = []
             for url in out_imgs_urls:
                 r = requests.get(url)
-                r.raise_for_status()
+                raise_for_status(r)
                 out_imgs.append(r.content)
 
         case _:

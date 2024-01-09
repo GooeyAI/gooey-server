@@ -537,52 +537,18 @@ def data_table(file_url_or_cells: str | list):
 
 
 def table(df: "pd.DataFrame"):
-    state.RenderTreeNode(
-        name="table",
-        children=[
-            state.RenderTreeNode(
-                name="thead",
-                children=[
-                    state.RenderTreeNode(
-                        name="tr",
-                        children=[
-                            state.RenderTreeNode(
-                                name="th",
-                                children=[
-                                    state.RenderTreeNode(
-                                        name="markdown",
-                                        props=dict(body=dedent(col)),
-                                    ),
-                                ],
-                            )
-                            for col in df.columns
-                        ],
-                    ),
-                ],
-            ),
-            state.RenderTreeNode(
-                name="tbody",
-                children=[
-                    state.RenderTreeNode(
-                        name="tr",
-                        children=[
-                            state.RenderTreeNode(
-                                name="td",
-                                children=[
-                                    state.RenderTreeNode(
-                                        name="markdown",
-                                        props=dict(body=dedent(str(value))),
-                                    ),
-                                ],
-                            )
-                            for value in row
-                        ],
-                    )
-                    for row in df.itertuples(index=False)
-                ],
-            ),
-        ],
-    ).mount()
+    with tag("table", className="table table-striped table-sm"):
+        with tag("thead"):
+            with tag("tr"):
+                for col in df.columns:
+                    with tag("th", scope="col"):
+                        html(dedent(col))
+        with tag("tbody"):
+            for row in df.itertuples(index=False):
+                with tag("tr"):
+                    for value in row:
+                        with tag("td"):
+                            html(dedent(str(value)))
 
 
 def horizontal_radio(

@@ -439,7 +439,8 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
 
         st.video(state.get("output_video"), autoplay=True)
 
-    def preview_input(self, state: dict) -> str:
+    @classmethod
+    def preview_input(cls, state: dict) -> str:
         input_prompt = state.get("input_prompt")
         if input_prompt:
             animation_prompts = input_prompt_to_animation_prompts(input_prompt)

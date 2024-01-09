@@ -1,6 +1,7 @@
 import datetime
 import html
 import inspect
+import math
 import typing
 import urllib
 import urllib.parse
@@ -12,7 +13,6 @@ from random import Random
 from time import sleep
 from types import SimpleNamespace
 
-import math
 import requests
 import sentry_sdk
 from django.utils import timezone
@@ -37,6 +37,7 @@ from bots.models import (
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
+from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
 )
@@ -55,9 +56,6 @@ from daras_ai_v2.query_params import (
 )
 from daras_ai_v2.query_params_util import (
     extract_query_params,
-    EXAMPLE_ID_QUERY_PARAM,
-    RUN_ID_QUERY_PARAM,
-    USER_ID_QUERY_PARAM,
 )
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.tabs_widget import MenuTabs
@@ -67,8 +65,8 @@ from daras_ai_v2.user_date_widgets import (
     js_dynamic_date,
 )
 from gooey_ui import realtime_clear_subs
-from gooey_ui.pubsub import realtime_pull
 from gooey_ui.components.modal import Modal
+from gooey_ui.pubsub import realtime_pull
 
 DEFAULT_META_IMG = (
     # Small
@@ -183,13 +181,13 @@ class BasePage:
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        if st.session_state.get(StateKeys.run_status):
+        if self.get_run_state() == RecipeRunState.running:
+            _, run_id, uid = extract_query_params(gooey_get_query_params())
             channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
             output = realtime_pull([channel])[0]
             if output:
                 st.session_state.update(output)
-        if not st.session_state.get(StateKeys.run_status):
+        else:
             realtime_clear_subs()
 
         self._user_disabled_check()
@@ -199,22 +197,18 @@ class BasePage:
             self.render_report_form()
             return
 
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        current_run = self.get_sr_from_query_params(example_id, run_id, uid)
+        current_run = self.get_current_sr()
         published_run = self.get_current_published_run()
         is_root_example = published_run and published_run.is_root_example()
-        title, breadcrumbs = self._get_title_and_breadcrumbs(
-            current_run=current_run,
-            published_run=published_run,
-        )
+        tbreadcrumbs = get_title_breadcrumbs(self, current_run, published_run)
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
-                if not breadcrumbs and not self.run_user:
-                    self._render_title(title)
+                if not tbreadcrumbs and not self.run_user:
+                    self._render_title(tbreadcrumbs.h1_title)
 
-                if breadcrumbs:
+                if tbreadcrumbs:
                     with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                        self._render_breadcrumbs(breadcrumbs)
+                        render_breadcrumbs(tbreadcrumbs)
 
                 author = self.run_user or current_run.get_creator()
                 if not is_root_example:
@@ -262,9 +256,9 @@ class BasePage:
                     )
 
         with st.div():
-            if breadcrumbs or self.run_user:
+            if tbreadcrumbs or self.run_user:
                 # only render title here if the above row was not empty
-                self._render_title(title)
+                self._render_title(tbreadcrumbs.h1_title)
             if published_run and published_run.notes:
                 st.write(published_run.notes)
             elif is_root_example:
@@ -610,93 +604,12 @@ class BasePage:
         if cancel_button:
             modal.close()
 
-    def _get_title_and_breadcrumbs(
-        self,
-        current_run: SavedRun,
-        published_run: PublishedRun | None,
-    ) -> tuple[str, list[tuple[str, str | None]]]:
-        if (
-            published_run
-            and not published_run.published_run_id
-            and current_run == published_run.saved_run
-        ):
-            # when published_run.published_run_id is blank, the run is the root example
-            return self.get_recipe_title(), []
-        else:
-            # the title on the saved root / the hardcoded title
-            recipe_title = self.get_root_published_run().title or self.title
-            prompt_title = truncate_text_words(
-                self.preview_input(current_run.to_dict()) or "",
-                maxlen=60,
-            ).replace("\n", " ")
-
-            recipe_breadcrumb = (recipe_title, self.app_url())
-            if published_run and current_run == published_run.saved_run:
-                # recipe root
-                return published_run.title or prompt_title or recipe_title, [
-                    recipe_breadcrumb
-                ]
-            else:
-                if not published_run or not published_run.published_run_id:
-                    # run created directly from recipe root
-                    h1_title = prompt_title or f"Run: {recipe_title}"
-                    return h1_title, [recipe_breadcrumb]
-                else:
-                    h1_title = (
-                        prompt_title or f"Run: {published_run.title or recipe_title}"
-                    )
-                    return h1_title, [
-                        recipe_breadcrumb,
-                        (
-                            published_run.title
-                            or f"Fork {published_run.published_run_id}",
-                            published_run.get_app_url(),
-                        ),
-                    ]
-
-    def _render_breadcrumbs(self, items: list[tuple[str, str | None]]):
-        st.html(
-            """
-            <style>
-            @media (min-width: 1024px) {
-                .breadcrumb-item {
-                    font-size: 1.25rem !important;
-                }
-            }
-
-            @media (max-width: 1024px) {
-                .breadcrumb-item {
-                    font-size: 0.85rem !important;
-                    padding-top: 6px;
-                }
-            }
-            </style>
-            """
-        )
-
-        render_item1 = items and items[0]
-        render_item2 = items[1:] and items[1]
-        if render_item1 or render_item2:  # avoids empty space
-            with st.breadcrumbs():
-                if render_item1:
-                    text, link = render_item1
-                    st.breadcrumb_item(
-                        text,
-                        link_to=link,
-                        className="text-muted",
-                    )
-                if render_item2:
-                    text, link = render_item2
-                    st.breadcrumb_item(
-                        text,
-                        link_to=link,
-                    )
-
-    def get_recipe_title(self) -> str:
+    @classmethod
+    def get_recipe_title(cls) -> str:
         return (
-            self.get_or_create_root_published_run().title
-            or self.title
-            or self.workflow.label
+            cls.get_or_create_root_published_run().title
+            or cls.title
+            or cls.workflow.label
         )
 
     def get_explore_image(self, state: dict) -> str:
@@ -947,22 +860,56 @@ class BasePage:
             # Return and Don't render the run any further
             st.stop()
 
-    def get_sr_from_query_params_dict(self, query_params) -> SavedRun:
-        example_id, run_id, uid = extract_query_params(query_params)
-        return self.get_sr_from_query_params(example_id, run_id, uid)
-
-    def get_current_published_run(self) -> PublishedRun | None:
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        if run_id:
-            current_run = self.get_sr_from_query_params(example_id, run_id, uid)
-            if current_run.parent_version:
-                return current_run.parent_version.published_run
-            else:
-                return None
-        elif example_id:
-            return self.get_published_run_from_query_params(example_id, "", "")
+    @classmethod
+    def get_runs_from_query_params(
+        cls, example_id: str, run_id: str, uid: str
+    ) -> tuple[SavedRun, PublishedRun | None]:
+        if run_id and uid:
+            sr = cls.run_doc_sr(run_id, uid)
+            pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
         else:
-            return self.get_root_published_run()
+            pr = cls.get_published_run(published_run_id=example_id or "")
+            sr = pr.saved_run
+        return sr, pr
+
+    @classmethod
+    def get_current_published_run(cls) -> PublishedRun | None:
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        return cls.get_pr_from_query_params(example_id, run_id, uid)
+
+    @classmethod
+    def get_pr_from_query_params(
+        cls, example_id: str, run_id: str, uid: str
+    ) -> PublishedRun:
+        if run_id and uid:
+            sr = cls.get_sr_from_query_params(example_id, run_id, uid)
+            return (
+                sr and sr.parent_version and sr.parent_version.published_run
+            ) or None
+        elif example_id:
+            return cls.get_published_run(published_run_id=example_id)
+        else:
+            return cls.get_root_published_run()
+
+    @classmethod
+    def get_root_published_run(cls) -> PublishedRun:
+        return cls.get_published_run(published_run_id="")
+
+    @classmethod
+    def get_published_run(cls, *, published_run_id: str):
+        return PublishedRun.objects.get(
+            workflow=cls.workflow,
+            published_run_id=published_run_id,
+        )
+
+    @classmethod
+    def get_current_sr(cls) -> SavedRun:
+        return cls.get_sr_from_query_params_dict(gooey_get_query_params())
+
+    @classmethod
+    def get_sr_from_query_params_dict(cls, query_params) -> SavedRun:
+        example_id, run_id, uid = extract_query_params(query_params)
+        return cls.get_sr_from_query_params(example_id, run_id, uid)
 
     @classmethod
     def get_sr_from_query_params(
@@ -989,43 +936,23 @@ class BasePage:
         return SavedRun.objects.filter(workflow=cls.workflow).count()
 
     @classmethod
-    def get_published_run_from_query_params(
-        cls,
-        example_id: str,
-        run_id: str,
-        uid: str,
-    ) -> PublishedRun | None:
-        if not example_id and not run_id:
-            return cls.get_root_published_run()
-        elif example_id:
-            return cls.get_published_run(published_run_id=example_id)
-        else:
-            return None
-
-    @classmethod
-    def get_root_published_run(cls) -> PublishedRun:
-        return cls.get_published_run(published_run_id="")
-
-    @classmethod
     def get_or_create_root_published_run(cls) -> PublishedRun:
-        try:
-            return cls.get_root_published_run()
-        except PublishedRun.DoesNotExist:
-            saved_run = cls.run_doc_sr(
-                run_id="",
-                uid="",
-                create=True,
-                parent=None,
-                parent_version=None,
-            )
-            return cls.create_published_run(
-                published_run_id="",
-                saved_run=saved_run,
-                user=None,
-                title=cls.title,
-                notes=cls().preview_description(state=saved_run.to_dict()),
-                visibility=PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
-            )
+        published_run, _ = PublishedRun.objects.get_or_create(
+            workflow=cls.workflow,
+            published_run_id="",
+            defaults={
+                "saved_run": lambda: cls.run_doc_sr(
+                    run_id="", uid="", create=True, parent=None, parent_version=None
+                ),
+                "created_by": None,
+                "last_edited_by": None,
+                "title": cls.title,
+                "notes": cls().preview_description(state=cls.sane_defaults),
+                "visibility": PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
+                "is_approved_example": True,
+            },
+        )
+        return published_run
 
     @classmethod
     def recipe_doc_sr(cls, create: bool = False) -> SavedRun:
@@ -1063,7 +990,7 @@ class BasePage:
         notes: str,
         visibility: PublishedRunVisibility,
     ):
-        return PublishedRun.create_published_run(
+        return PublishedRun.objects.create_published_run(
             workflow=cls.workflow,
             published_run_id=published_run_id,
             saved_run=saved_run,
@@ -1071,13 +998,6 @@ class BasePage:
             title=title,
             notes=notes,
             visibility=visibility,
-        )
-
-    @classmethod
-    def get_published_run(cls, *, published_run_id: str):
-        return PublishedRun.objects.get(
-            workflow=cls.workflow,
-            published_run_id=published_run_id,
         )
 
     def duplicate_published_run(
@@ -1212,7 +1132,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             try:
                 self.validate_form_v2()
             except AssertionError as e:
-                st.error(e)
+                st.error(str(e))
                 return False
             else:
                 return True
@@ -1287,7 +1207,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_report_button(self):
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        # only logged in users can report a run (but not explamples/default runs)
+        # only logged in users can report a run (but not examples/default runs)
         if not (self.request.user and run_id and uid):
             return
 
@@ -1385,7 +1305,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_running_output(self):
         run_status = st.session_state.get(StateKeys.run_status)
-        st.caption("Your changes are saved in the above URL. Save it for later!")
         html_spinner(run_status)
         self.render_extra_waiting_output()
 
@@ -1462,7 +1381,10 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             parent_example_id, parent_run_id, parent_uid
         )
         published_run = self.get_current_published_run()
-        parent_version = published_run and published_run.versions.latest()
+        try:
+            parent_version = published_run and published_run.versions.latest()
+        except PublishedRunVersion.DoesNotExist:
+            parent_version = None
 
         self.run_doc_sr(
             run_id,
@@ -1555,8 +1477,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if not self.is_current_user_admin():
             return
 
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        current_sr = self.get_sr_from_query_params(example_id, run_id, uid)
+        current_sr = self.get_current_sr()
         published_run = self.get_current_published_run()
 
         with st.expander("🛠️ Admin Options"):

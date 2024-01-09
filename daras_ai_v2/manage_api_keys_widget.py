@@ -1,9 +1,6 @@
 import datetime
 
-
 import gooey_ui as st
-from firebase_admin import auth
-
 from app_users.models import AppUser
 from daras_ai_v2 import db
 from daras_ai_v2.copy_to_clipboard_button_widget import (
