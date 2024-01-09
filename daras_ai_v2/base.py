@@ -410,20 +410,30 @@ class BasePage:
                 )
 
         with st.div(className="mt-4"):
-            recipe_title = self.get_root_published_run().title or self.title
+            if is_update_mode:
+                title = published_run.title or self.title
+            else:
+                recipe_title = self.get_root_published_run().title or self.title
+                if self.request.user.display_name:
+                    username = self.request.user.display_name + "'s"
+                elif self.request.user.email:
+                    username = self.request.user.email.split("@")[0] + "'s"
+                else:
+                    username = "My"
+                title = f"{username} {recipe_title}"
             published_run_title = st.text_input(
                 "##### Title",
                 key="published_run_title",
-                value=(
-                    published_run.title
-                    if is_update_mode
-                    else f"{self.request.user.display_name}'s {recipe_title}"
-                ),
+                value=title,
             )
             published_run_notes = st.text_area(
                 "##### Notes",
                 key="published_run_notes",
-                value=(published_run and published_run.notes) or "",
+                value=(
+                    published_run.notes
+                    or self.preview_description(st.session_state)
+                    or ""
+                ),
             )
 
         with st.div(className="mt-4 d-flex justify-content-center"):
