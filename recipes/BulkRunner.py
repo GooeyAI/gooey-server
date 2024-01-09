@@ -195,18 +195,18 @@ To understand what each field represents, check out our [API docs](https://api.g
         with hidden_col2:
             st.write("##### Outputs")
 
-        # only show the first output field by default, and hide others
-        try:
-            first_out_field = next(
-                field for field in output_fields if "output" in field
-            )
-        except StopIteration:
-            first_out_field = next(iter(output_fields))
+        visible_out_fields = {}
+        # only show the first output & run url field by default, and hide others
+        if output_fields:
+            try:
+                first_out_field = next(
+                    field for field in output_fields if "output" in field
+                )
+            except StopIteration:
+                first_out_field = next(iter(output_fields))
+            visible_out_fields[first_out_field] = output_fields[first_out_field]
+        visible_out_fields["run_url"] = "Run URL"
 
-        visible_out_fields = {
-            first_out_field: output_fields[first_out_field],
-            "run_url": "Run URL",
-        }
         hidden_out_fields = {
             "price": "Price",
             "run_time": "Run Time",
