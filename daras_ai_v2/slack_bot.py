@@ -13,6 +13,7 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
 from daras_ai_v2.bots import BotInterface
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import fetch_parallel
 from daras_ai_v2.text_splitter import text_splitter
 from recipes.VideoBots import ReplyButton
@@ -110,7 +111,7 @@ class SlackBot(BotInterface):
         ), f"Unsupported mime type {mime_type} for {url}"
         # download file from slack
         r = requests.get(url, headers={"Authorization": f"Bearer {self._access_token}"})
-        r.raise_for_status()
+        raise_for_status(r)
         # convert to wav
         data, _ = audio_bytes_to_wav(r.content)
         mime_type = "audio/wav"
@@ -594,7 +595,7 @@ def send_confirmation_msg(bot: BotIntegration):
         str(bot.slack_channel_hook_url),
         json={"text": text},
     )
-    res.raise_for_status()
+    raise_for_status(res)
 
 
 def invite_bot_account_to_channel(channel: str, bot_user_id: str, token: str):
@@ -613,7 +614,7 @@ def invite_bot_account_to_channel(channel: str, bot_user_id: str, token: str):
 
 
 def parse_slack_response(res: Response):
-    res.raise_for_status()
+    raise_for_status(res)
     data = res.json()
     print(f'> {res.request.url.split("/")[-1]}: {data}')
     if data.get("ok"):

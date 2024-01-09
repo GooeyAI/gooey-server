@@ -17,8 +17,8 @@ from phonenumber_field.modelfields import PhoneNumberField
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
-from daras_ai_v2.language_model import format_chat_entry
 from daras_ai_v2.crypto import get_random_doc_id
+from daras_ai_v2.language_model import format_chat_entry
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -113,6 +113,50 @@ class Workflow(models.IntegerChoices):
         from daras_ai_v2.all_pages import workflow_map
 
         return workflow_map[self]
+
+    def get_or_create_metadata(self) -> WorkflowMetadata:
+        metadata, _created = WorkflowMetadata.objects.get_or_create(
+            workflow=self,
+            defaults=dict(
+                short_title=lambda: (
+                    self.page_cls.get_root_published_run().title or self.page_cls.title
+                ),
+                default_image=self.page_cls.explore_image or None,
+                meta_title=lambda: (
+                    self.page_cls.get_root_published_run().title or self.page_cls.title
+                ),
+                meta_description=lambda: (
+                    self.page_cls().preview_description(state={})
+                    or self.page_cls.get_root_published_run().notes
+                ),
+                meta_image=lambda: (self.page_cls.explore_image or None),
+            ),
+        )
+        return metadata
+
+
+class WorkflowMetadata(models.Model):
+    workflow = models.IntegerField(choices=Workflow.choices, unique=True)
+    short_title = models.TextField()
+    help_url = models.URLField(blank=True, default="")
+
+    # TODO: support the below fields
+    default_image = models.URLField(
+        blank=True, default="", help_text="(not implemented)"
+    )
+
+    meta_title = models.TextField()
+    meta_description = models.TextField(blank=True, default="")
+    meta_image = CustomURLField(default="", blank=True)
+    meta_keywords = models.JSONField(
+        default=list, blank=True, help_text="(not implemented)"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.meta_title
 
 
 class SavedRunQuerySet(models.QuerySet):
@@ -1084,7 +1128,7 @@ class PublishedRun(models.Model):
         ]
 
     def __str__(self):
-        return self.get_app_url()
+        return self.title or self.get_app_url()
 
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):

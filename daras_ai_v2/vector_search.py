@@ -30,6 +30,7 @@ from daras_ai_v2.azure_doc_extract import (
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import flatmap_parallel
 from daras_ai_v2.gdrive_downloader import (
@@ -290,7 +291,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
                 headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
                 timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
             )
-            r.raise_for_status()
+            raise_for_status(r)
         except requests.RequestException as e:
             print(f"ignore error while downloading {f_url}: {e}")
             name = None
@@ -492,7 +493,7 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
             headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
             timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
         )
-        r.raise_for_status()
+        raise_for_status(r)
     except requests.RequestException as e:
         print(f"ignore error while downloading {f_url}: {e}")
         return b"", ""

@@ -6,6 +6,7 @@ from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_respo
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
 from daras_ai_v2.bots import BotInterface, ReplyButton
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.text_splitter import text_splitter
 
 WA_MSG_MAX_SIZE = 1024
@@ -269,14 +270,14 @@ def retrieve_wa_media_by_id(media_id: str) -> (bytes, str):
         f"https://graph.facebook.com/v16.0/{media_id}/",
         headers=WHATSAPP_AUTH_HEADER,
     )
-    r1.raise_for_status()
+    raise_for_status(r1)
     media_info = r1.json()
     # download media
     r2 = requests.get(
         media_info["url"],
         headers=WHATSAPP_AUTH_HEADER,
     )
-    r2.raise_for_status()
+    raise_for_status(r2)
     content = r2.content
     # return content and mime type
     return content, media_info["mime_type"]
@@ -317,7 +318,7 @@ def send_wa_msgs_raw(*, bot_number, user_number, messages: list) -> str | None:
         )
         confirmation = r.json()
         print("send_wa_msgs_raw:", r.status_code, confirmation)
-        r.raise_for_status()
+        raise_for_status(r)
         try:
             msg_id = confirmation["messages"][0]["id"]
         except (KeyError, IndexError):
@@ -424,7 +425,7 @@ class FacebookBot(BotInterface):
             return None
         # downlad file from facebook
         r = requests.get(url)
-        r.raise_for_status()
+        raise_for_status(r)
         # ensure file is audio/video
         mime_type = get_mimetype_from_response(r)
         assert (

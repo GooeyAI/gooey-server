@@ -21,6 +21,7 @@ from loguru import logger
 from openai.types.chat import ChatCompletionContentPartParam
 
 from daras_ai_v2.asr import get_google_auth_session
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.redis_cache import (
@@ -54,8 +55,8 @@ class LargeLanguageModels(Enum):
 
     llama2_70b_chat = "Llama 2 (Meta AI)"
 
-    palm2_chat = "PaLM 2 Text (Google)"
-    palm2_text = "PaLM 2 Chat (Google)"
+    palm2_chat = "PaLM 2 Chat (Google)"
+    palm2_text = "PaLM 2 Text (Google)"
 
     text_davinci_003 = "GPT-3.5 Davinci-3 (openai)"
     text_davinci_002 = "GPT-3.5 Davinci-2 (openai)"
@@ -603,7 +604,7 @@ def _run_together_chat(
     )
     ret = []
     for r in results:
-        r.raise_for_status()
+        raise_for_status(r)
         data = r.json()
         output = data["output"]
         error = output.get("error")
@@ -664,7 +665,7 @@ def _run_palm_chat(
             },
         },
     )
-    r.raise_for_status()
+    raise_for_status(r)
 
     return [
         {
@@ -709,7 +710,7 @@ def _run_palm_text(
             },
         },
     )
-    res.raise_for_status()
+    raise_for_status(res)
     return [prediction["content"] for prediction in res.json()["predictions"]]
 
 
