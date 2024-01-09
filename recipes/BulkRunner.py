@@ -10,6 +10,7 @@ import gooey_ui as st
 from bots.models import Workflow, PublishedRun, PublishedRunVisibility, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
@@ -194,18 +195,18 @@ To understand what each field represents, check out our [API docs](https://api.g
         with hidden_col2:
             st.write("##### Outputs")
 
-        # only show the first output field by default, and hide others
-        try:
-            first_out_field = next(
-                field for field in output_fields if "output" in field
-            )
-        except StopIteration:
-            first_out_field = next(iter(output_fields))
+        visible_out_fields = {}
+        # only show the first output & run url field by default, and hide others
+        if output_fields:
+            try:
+                first_out_field = next(
+                    field for field in output_fields if "output" in field
+                )
+            except StopIteration:
+                first_out_field = next(iter(output_fields))
+            visible_out_fields[first_out_field] = output_fields[first_out_field]
+        visible_out_fields["run_url"] = "Run URL"
 
-        visible_out_fields = {
-            first_out_field: output_fields[first_out_field],
-            "run_url": "Run URL",
-        }
         hidden_out_fields = {
             "price": "Price",
             "run_time": "Run Time",
@@ -358,7 +359,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         response.eval_runs = []
         for url in request.eval_urls:
             page_cls, sr, pr = url_to_runs(url)
-            yield f"Running {page_cls.get_title_and_breadcrumbs(sr, pr)[0]}..."
+            yield f"Running {get_title_breadcrumbs(page_cls, sr, pr).h1_title}..."
             request_body = page_cls.RequestModel(
                 documents=response.output_documents
             ).dict(exclude_unset=True)
@@ -437,17 +438,7 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
                 st.session_state[last_workflow_key] = workflow
         with scol2:
             page_cls = Workflow(workflow).page_cls
-            options = {
-                page_cls.get_root_published_run().get_app_url(): "Default",
-            } | {
-                # approved examples
-                pr.get_app_url(): pr.title
-                for pr in PublishedRun.objects.filter(
-                    workflow=d["workflow"],
-                    is_approved_example=True,
-                    visibility=PublishedRunVisibility.PUBLIC,
-                ).exclude(published_run_id="")
-            }
+            options = _get_approved_example_options(page_cls, workflow)
             with st.div(className="pt-1"):
                 url = st.selectbox(
                     "",
@@ -468,6 +459,25 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
     except Exception as e:
         st.error(repr(e))
     d["url"] = url
+
+
+@st.cache_in_session_state
+def _get_approved_example_options(
+    page_cls: typing.Type[BasePage], workflow: Workflow
+) -> dict[str, str]:
+    options = {
+        # root recipe
+        page_cls.get_root_published_run().get_app_url(): "Default",
+    } | {
+        # approved examples
+        pr.get_app_url(): get_title_breadcrumbs(page_cls, pr.saved_run, pr).h1_title
+        for pr in PublishedRun.objects.filter(
+            workflow=workflow,
+            is_approved_example=True,
+            visibility=PublishedRunVisibility.PUBLIC,
+        ).exclude(published_run_id="")
+    }
+    return options
 
 
 def render_eval_url_inputs(key: str, del_key: str, d: dict):
@@ -562,7 +572,7 @@ def _prefill_workflow(d: dict, key: str):
                 pr
                 and pr.saved_run == sr
                 and pr.visibility == PublishedRunVisibility.PUBLIC
-                and (pr.is_approved_example or pr.is_root_example())
+                and (pr.is_approved_example or pr.is_root())
             ):
                 d["workflow"] = pr.workflow
                 d["url"] = pr.get_app_url()
@@ -576,13 +586,8 @@ def url_to_runs(
     f = furl(url)
     slug = f.path.segments[0]
     page_cls = page_slug_map[normalize_slug(slug)]
-    example_id, run_id, uid = extract_query_params(f.query.params, default="")
-    if run_id and uid:
-        sr = page_cls.run_doc_sr(run_id, uid)
-        pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
-    else:
-        pr = page_cls.get_published_run(published_run_id=example_id)
-        sr = pr.saved_run
+    example_id, run_id, uid = extract_query_params(f.query.params)
+    sr, pr = page_cls.get_runs_from_query_params(example_id, run_id, uid)
     return page_cls, sr, pr
 
 
