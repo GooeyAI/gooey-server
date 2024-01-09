@@ -1180,12 +1180,10 @@ class PublishedRun(models.Model):
                 notes=notes,
                 visibility=visibility,
             )
-            version.save()
-            update_fields = self.update_fields_to_latest_version()
             if is_approved_example is not None:
-                self.is_approved_example = is_approved_example
-                update_fields.append("is_approved_example")
-            self.save(update_fields=update_fields)
+                version.is_approved_example = is_approved_example
+            version.save()
+            self.update_fields_to_latest_version()
 
     def is_editor(self, user: AppUser):
         return self.created_by == user
@@ -1193,15 +1191,16 @@ class PublishedRun(models.Model):
     def is_root_example(self):
         return not self.published_run_id
 
-    def update_fields_to_latest_version(self) -> list[str]:
+    def update_fields_to_latest_version(self):
         latest_version = self.versions.latest()
         self.saved_run = latest_version.saved_run
         self.last_edited_by = latest_version.changed_by
         self.title = latest_version.title
         self.notes = latest_version.notes
         self.visibility = latest_version.visibility
+        self.is_approved_example = latest_version.is_approved_example
 
-        return ["saved_run", "last_edited_by", "title", "notes", "visibility"]
+        self.save()
 
 
 class PublishedRunVersion(models.Model):
@@ -1228,6 +1227,7 @@ class PublishedRunVersion(models.Model):
         choices=PublishedRunVisibility.choices,
         default=PublishedRunVisibility.UNLISTED,
     )
+    is_approved_example = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

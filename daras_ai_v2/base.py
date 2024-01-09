@@ -484,7 +484,7 @@ class BasePage:
                     notes=published_run_notes.strip(),
                     visibility=PublishedRunVisibility(published_run_visibility),
                     is_approved_example=for_example
-                    or None,  # can only be approved from here
+                    or None,  # can only be approved from here - not unapproved
                 )
                 if self._has_published_run_changed(
                     published_run=published_run,
@@ -1508,6 +1508,20 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 and published_run.saved_run == current_sr
                 and published_run.is_root_example()
             ):
+                root_options_modal = Modal("", key="root-options")
+                if st.button("🕣 Root Version History"):
+                    root_options_modal.open()
+                if root_options_modal.is_open():
+                    with root_options_modal.container(
+                        style={"min-width": "min(300px, 100vw)"}
+                    ):
+                        st.write(
+                            "To revert, click on Version -> Admin Options -> [⭐️ Save Workflow]"
+                        )
+                        self._render_version_history()
+
+                st.write("---")
+
                 st.write("##### Workflow Options")
                 published_run_title = st.text_input(
                     "Workflow Root Title", value=published_run.title or self.title
