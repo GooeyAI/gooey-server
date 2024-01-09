@@ -1181,7 +1181,7 @@ class PublishedRun(models.Model):
     def is_editor(self, user: AppUser):
         return self.created_by == user
 
-    def is_root_example(self):
+    def is_root(self):
         return not self.published_run_id
 
     def update_fields_to_latest_version(self):
