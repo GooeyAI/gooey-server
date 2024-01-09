@@ -178,7 +178,10 @@ class AppUser(models.Model):
         default_balance = settings.LOGIN_USER_FREE_CREDITS
         if self.is_anonymous:
             default_balance = settings.ANON_USER_FREE_CREDITS
-        elif provider_list[-1].provider_id == "password":
+        elif "+" in str(self.email) or (
+            "@gmail.com" not in str(self.email)
+            and provider_list[-1].provider_id == "password"
+        ):
             default_balance = settings.EMAIL_USER_FREE_CREDITS
         self.balance = db.get_doc_field(
             doc_ref=db.get_user_doc_ref(user.uid),
