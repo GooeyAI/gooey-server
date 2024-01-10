@@ -11,6 +11,7 @@ from django.utils import dateformat
 from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
 
+from app_users.models import AppUser
 from bots.admin_links import list_related_html_url, change_obj_url
 from bots.models import (
     FeedbackComment,
@@ -24,8 +25,8 @@ from bots.models import (
     Conversation,
     BotIntegration,
     MessageAttachment,
+    WorkflowMetadata,
 )
-from app_users.models import AppUser
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.base import BasePage
@@ -214,13 +215,14 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 class PublishedRunAdmin(admin.ModelAdmin):
     list_display = [
         "__str__",
-        "published_run_id",
+        "visibility",
         "view_user",
-        "view_saved_run",
+        "open_in_gooey",
+        "linked_saved_run",
         "created_at",
         "updated_at",
     ]
-    list_filter = ["workflow"]
+    list_filter = ["workflow", "visibility", "created_by__is_paying"]
     search_fields = ["workflow", "published_run_id"]
     autocomplete_fields = ["saved_run", "created_by", "last_edited_by"]
     readonly_fields = [
@@ -236,10 +238,10 @@ class PublishedRunAdmin(admin.ModelAdmin):
 
     view_user.short_description = "View User"
 
-    def view_saved_run(self, published_run: PublishedRun):
+    def linked_saved_run(self, published_run: PublishedRun):
         return change_obj_url(published_run.saved_run)
 
-    view_saved_run.short_description = "View Saved Run"
+    linked_saved_run.short_description = "Linked Run"
 
 
 @admin.register(SavedRun)
@@ -700,3 +702,18 @@ class FeedbackAdmin(admin.ModelAdmin):
         )
 
     conversation_link.short_description = "Conversation"
+
+
+@admin.register(WorkflowMetadata)
+class WorkflowMetadata(admin.ModelAdmin):
+    list_display = [
+        "workflow",
+        "short_title",
+        "meta_title",
+        "meta_description",
+        "created_at",
+        "updated_at",
+    ]
+    search_fields = ["workflow", "meta_title", "meta_description"]
+    list_filter = ["workflow"]
+    readonly_fields = ["created_at", "updated_at"]

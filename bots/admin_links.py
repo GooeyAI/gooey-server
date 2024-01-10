@@ -1,3 +1,4 @@
+import re
 import typing
 
 from django.db import models
@@ -8,6 +9,7 @@ from furl import furl
 
 
 def open_in_new_tab(url: str, *, label: str = "", add_related_url: str = None) -> str:
+    label = re.sub(r"https?://", "", label)
     context = {
         "url": url,
         "label": label,

@@ -20,6 +20,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.descriptions import prompting101
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.img_model_settings_widgets import (
     output_resolution_setting,
     img_model_settings,
@@ -730,7 +731,7 @@ def generate_qr_code(qr_code_data: str) -> np.ndarray:
 
 def download_qr_code_data(url: str) -> str:
     r = requests.get(url)
-    r.raise_for_status()
+    raise_for_status(r)
     img = bytes_to_cv2_img(r.content, greyscale=True)
     return extract_qr_code_data(img)
 
