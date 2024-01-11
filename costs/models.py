@@ -2,16 +2,63 @@ from django.db import models
 from daras_ai_v2.language_model import LLMApis
 
 
-# class Provider(models.TextChoices):
-#     vertex_ai = "vertex_ai", "Vertex AI"
-#     openai = "openai", "OpenAI"
-#     together = "together", "Together"
-
-
 class Product(models.TextChoices):
     gpt_4_vision = (
         "gpt-4-vision-preview",
         "gpt-4-vision-preview",
+    )
+    gpt_4_turbo = (
+        "('openai-gpt-4-turbo-prod-ca-1', 'gpt-4-1106-preview')",
+        "('openai-gpt-4-turbo-prod-ca-1', 'gpt-4-1106-preview')",
+    )
+
+    gpt_4_32k = (
+        "('openai-gpt-4-prod-ca-1', 'gpt-4')",
+        "('openai-gpt-4-prod-ca-1', 'gpt-4')",
+    )
+    gpt_3_5_turbo = (
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo",
+    )
+    gpt_3_5_turbo_16k = (
+        "gpt-3.5-turbo-16k",
+        "gpt-3.5-turbo-16k",
+    )
+    text_davinci_003 = (
+        "text-davinci-003",
+        "text-davinci-003",
+    )
+    text_davinci_002 = (
+        "text-davinci-002",
+        "text-davinci-002",
+    )
+    code_davinci_002 = (
+        "code-davinci-002",
+        "code-davinci-002",
+    )
+    text_curie_001 = (
+        "text-curie-001",
+        "text-curie-001",
+    )
+    text_babbage_001 = (
+        "text-babbage-001",
+        "text-babbage-001",
+    )
+    text_ada_001 = (
+        "text-ada-001",
+        "text-ada-001",
+    )
+    palm2_text = (
+        "text-bison",
+        "text-bison",
+    )
+    palm2_chat = (
+        "chat-bison",
+        "chat-bison",
+    )
+    llama2_70b_chat = (
+        "togethercomputer/llama-2-70b-chat",
+        "togethercomputer/llama-2-70b-chat",
     )
 
 
@@ -43,14 +90,14 @@ class UsageCost(models.Model):
 
 
 class ProviderPricing(models.Model):
-    class Type(models.TextChoices):
+    class Group(models.TextChoices):  # change to different name than type
         LLM = "LLM", "LLM"
 
     class Param(models.TextChoices):
         input = "Input", "input"
         output = "Output", "output"
 
-    type = models.TextField(choices=Type.choices)
+    type = models.TextField(choices=Group.choices)
     provider = models.TextField(choices=LLMApis.choices())
     product = models.TextField(choices=Product.choices)
     param = models.TextField(choices=Param.choices)
