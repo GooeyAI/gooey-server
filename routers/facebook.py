@@ -9,6 +9,7 @@ from starlette.responses import HTMLResponse, Response
 
 from bots.models import BotIntegration
 from daras_ai_v2 import settings, db
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.bots import _on_msg, request_json
@@ -80,7 +81,7 @@ def get_currently_connected_fb_pages(user_access_token):
             "fields": "id,name,access_token,instagram_business_account{id,username}",
         },
     )
-    r.raise_for_status()
+    raise_for_status(r)
     fb_pages = r.json()["data"]
     return fb_pages
 
@@ -190,7 +191,7 @@ def _get_access_token_from_code(code: str) -> str:
             "code": code,
         },
     )
-    r.raise_for_status()
+    raise_for_status(r)
     return r.json()["access_token"]
 
 
@@ -204,4 +205,4 @@ def _subscribe_to_page(fb_page: dict):
             "access_token": fb_page["access_token"],
         },
     )
-    r.raise_for_status()
+    raise_for_status(r)

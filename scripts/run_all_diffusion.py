@@ -43,7 +43,7 @@ blank_img_bytes = cv2_img_to_bytes(np.zeros((768, 768, 3), dtype=np.uint8))
 #         guidance_scale=7,
 #     )
 #     # r = requests.get(GpuEndpoints.sd_multi / "magic")
-#     # r.raise_for_status()
+#     # raise_for_status(r)
 #     # img2img(
 #     #     selected_model=Img2ImgModels.sd_1_5.name,
 #     #     prompt=get_random_string(100, string.ascii_letters),
@@ -108,7 +108,7 @@ for model in Img2ImgModels:
                     selected_controlnet_model=controlnet_model.name,
                     prompt=get_random_string(100, string.ascii_letters),
                     num_outputs=4,
-                    init_image=random_img,
+                    init_images=random_img,
                     num_inference_steps=1,
                     guidance_scale=7,
                 ),

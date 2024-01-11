@@ -1,20 +1,21 @@
 import datetime
 import html
 import inspect
+import math
 import typing
 import urllib
 import urllib.parse
 import uuid
 from copy import deepcopy
+from enum import Enum
+from itertools import pairwise
 from random import Random
 from time import sleep
 from types import SimpleNamespace
 
-import math
 import requests
 import sentry_sdk
 from django.utils import timezone
-from enum import Enum
 from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
@@ -26,10 +27,16 @@ from starlette.requests import Request
 
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
-from bots.models import SavedRun, Workflow
-from daras_ai.image_input import truncate_text_words
+from bots.models import (
+    SavedRun,
+    PublishedRun,
+    PublishedRunVersion,
+    PublishedRunVisibility,
+    Workflow,
+)
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
+from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
     copy_to_clipboard_button,
 )
@@ -48,14 +55,16 @@ from daras_ai_v2.query_params import (
 )
 from daras_ai_v2.query_params_util import (
     extract_query_params,
-    EXAMPLE_ID_QUERY_PARAM,
-    RUN_ID_QUERY_PARAM,
-    USER_ID_QUERY_PARAM,
 )
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.tabs_widget import MenuTabs
-from daras_ai_v2.user_date_widgets import render_js_dynamic_dates, js_dynamic_date
+from daras_ai_v2.user_date_widgets import (
+    render_js_dynamic_dates,
+    re_render_js_dynamic_dates,
+    js_dynamic_date,
+)
 from gooey_ui import realtime_clear_subs
+from gooey_ui.components.modal import Modal
 from gooey_ui.pubsub import realtime_pull
 
 DEFAULT_META_IMG = (
@@ -80,9 +89,6 @@ class RecipeRunState(Enum):
 
 
 class StateKeys:
-    page_title = "__title"
-    page_notes = "__notes"
-
     created_at = "created_at"
     updated_at = "updated_at"
 
@@ -174,13 +180,13 @@ class BasePage:
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        if st.session_state.get(StateKeys.run_status):
+        if self.get_run_state() == RecipeRunState.running:
+            _, run_id, uid = extract_query_params(gooey_get_query_params())
             channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
             output = realtime_pull([channel])[0]
             if output:
                 st.session_state.update(output)
-        if not st.session_state.get(StateKeys.run_status):
+        else:
             realtime_clear_subs()
 
         self._user_disabled_check()
@@ -190,13 +196,74 @@ class BasePage:
             self.render_report_form()
             return
 
-        st.session_state.setdefault(StateKeys.page_title, self.title)
-        st.session_state.setdefault(
-            StateKeys.page_notes, self.preview_description(st.session_state)
+        current_run = self.get_current_sr()
+        published_run = self.get_current_published_run()
+        is_root_example = (
+            published_run
+            and published_run.is_root()
+            and published_run.saved_run == current_run
         )
+        tbreadcrumbs = get_title_breadcrumbs(self, current_run, published_run)
+        with st.div(className="d-flex justify-content-between mt-4"):
+            with st.div(className="d-lg-flex d-block align-items-center"):
+                if not tbreadcrumbs and not self.run_user:
+                    self._render_title(tbreadcrumbs.h1_title)
 
-        self._render_page_title_with_breadcrumbs(example_id, run_id, uid)
-        st.write(st.session_state.get(StateKeys.page_notes))
+                if tbreadcrumbs:
+                    with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
+                        render_breadcrumbs(tbreadcrumbs)
+
+                author = self.run_user or current_run.get_creator()
+                if not is_root_example:
+                    self.render_author(
+                        author,
+                        show_as_link=self.is_current_user_admin(),
+                    )
+
+            with st.div(className="d-flex align-items-center"):
+                can_user_edit_run = self.is_current_user_admin() or (
+                    self.request
+                    and self.request.user
+                    and current_run.uid == self.request.user.uid
+                )
+                has_unpublished_changes = (
+                    published_run
+                    and published_run.saved_run != current_run
+                    and self.request
+                    and self.request.user
+                    and published_run.created_by == self.request.user
+                )
+
+                if can_user_edit_run and has_unpublished_changes:
+                    self._render_unpublished_changes_indicator()
+
+                with st.div(className="d-flex align-items-start right-action-icons"):
+                    st.html(
+                        """
+                    <style>
+                    .right-action-icons .btn {
+                        padding: 6px;
+                    }
+                    </style>
+                    """
+                    )
+
+                    if published_run and can_user_edit_run:
+                        self._render_published_run_buttons(
+                            current_run=current_run,
+                            published_run=published_run,
+                        )
+
+                    self._render_social_buttons(show_button_text=not can_user_edit_run)
+
+        with st.div():
+            if tbreadcrumbs or self.run_user:
+                # only render title here if the above row was not empty
+                self._render_title(tbreadcrumbs.h1_title)
+            if published_run and published_run.notes:
+                st.write(published_run.notes)
+            elif is_root_example:
+                st.write(self.preview_description(current_run.to_dict()))
 
         try:
             selected_tab = MenuTabs.paths_reverse[self.tab]
@@ -213,57 +280,367 @@ class BasePage:
         with st.nav_tab_content():
             self.render_selected_tab(selected_tab)
 
-    def _render_page_title_with_breadcrumbs(
-        self, example_id: str, run_id: str, uid: str
+    def _render_title(self, title: str):
+        st.write(f"# {title}")
+
+    def _render_unpublished_changes_indicator(self):
+        with st.div(
+            className="d-none d-lg-flex h-100 align-items-center text-muted ms-2"
+        ):
+            with st.tag("span", className="d-inline-block"):
+                st.html("Unpublished changes")
+
+    def _render_social_buttons(self, show_button_text: bool = False):
+        button_text = (
+            '<span class="d-none d-lg-inline"> Copy Link</span>'
+            if show_button_text
+            else ""
+        )
+
+        copy_to_clipboard_button(
+            f'<i class="fa-regular fa-link"></i>{button_text}',
+            value=self._get_current_app_url(),
+            type="secondary",
+            className="mb-0 ms-lg-2",
+        )
+
+    def _render_published_run_buttons(
+        self,
+        *,
+        current_run: SavedRun,
+        published_run: PublishedRun,
     ):
-        if example_id or run_id:
-            # the title on the saved root / the hardcoded title
-            recipe_title = (
-                self.recipe_doc_sr().to_dict().get(StateKeys.page_title) or self.title
+        is_update_mode = (
+            self.is_current_user_admin()
+            or published_run.created_by == self.request.user
+        )
+
+        with st.div(className="d-flex justify-content-end"):
+            st.html(
+                """
+                <style>
+                    .save-button-menu .gui-input label p { color: black; }
+                    .visibility-radio .gui-input {
+                        margin-bottom: 0;
+                    }
+                    .published-options-menu {
+                        z-index: 1;
+                    }
+                </style>
+                """
             )
 
-            # the user saved title for the current run (if its not the same as the recipe title)
-            current_title = st.session_state.get(StateKeys.page_title)
-            if current_title == recipe_title:
-                current_title = ""
+            pressed_options = is_update_mode and st.button(
+                '<i class="fa-regular fa-ellipsis"></i>',
+                className="mb-0 ms-lg-2",
+                type="tertiary",
+            )
+            options_modal = Modal("Options", key="published-run-options-modal")
+            if pressed_options:
+                options_modal.open()
+            if options_modal.is_open():
+                with options_modal.container(style={"min-width": "min(300px, 100vw)"}):
+                    self._render_options_modal(
+                        current_run=current_run,
+                        published_run=published_run,
+                        modal=options_modal,
+                    )
 
-            # prefer the prompt as h1 title for runs, but not for examples
-            prompt_title = truncate_text_words(
-                self.preview_input(st.session_state) or "", maxlen=60
-            ).replace("\n", " ")
-            if run_id:
-                h1_title = prompt_title or current_title or recipe_title
+            save_icon = '<i class="fa-regular fa-floppy-disk"></i>'
+            if is_update_mode:
+                save_text = "Update"
             else:
-                h1_title = current_title or prompt_title or recipe_title
+                save_text = "Save"
+            pressed_save = st.button(
+                f'{save_icon} <span class="d-none d-lg-inline">{save_text}</span>',
+                className="mb-0 ms-lg-2 px-lg-4",
+                type="primary",
+            )
+            publish_modal = Modal("Publish to", key="publish-modal")
+            if pressed_save:
+                publish_modal.open()
+            if publish_modal.is_open():
+                with publish_modal.container(style={"min-width": "min(500px, 100vw)"}):
+                    self._render_publish_modal(
+                        current_run=current_run,
+                        published_run=published_run,
+                        modal=publish_modal,
+                        is_update_mode=is_update_mode,
+                    )
 
-            # render recipe title if it doesn't clash with the h1 title
-            render_item1 = recipe_title and recipe_title != h1_title
-            # render current title if it doesn't clash with the h1 title
-            render_item2 = current_title and current_title != h1_title
-            if render_item1 or render_item2:  # avoids empty space
-                with st.breadcrumbs(className="mt-4"):
-                    if render_item1:
-                        st.breadcrumb_item(
-                            recipe_title,
-                            link_to=self.app_url(),
-                            className="text-muted",
-                        )
-                    if render_item2:
-                        current_sr = self.get_sr_from_query_params(
-                            example_id, run_id, uid
-                        )
-                        st.breadcrumb_item(
-                            current_title,
-                            link_to=current_sr.parent.get_app_url()
-                            if current_sr.parent_id
-                            else None,
-                        )
-            st.write(f"# {h1_title}")
+    def _render_publish_modal(
+        self,
+        *,
+        current_run: SavedRun,
+        published_run: PublishedRun,
+        modal: Modal,
+        is_update_mode: bool = False,
+    ):
+        if published_run.is_root() and self.is_current_user_admin():
+            with st.div(className="text-danger"):
+                st.write(
+                    "###### You're about to update the root workflow as an admin. "
+                )
+            st.html(
+                'If you want to create a new example, press <i class="fa-regular fa-ellipsis"></i> and "Duplicate" instead.'
+            )
+            published_run_visibility = PublishedRunVisibility.PUBLIC
         else:
-            st.write(f"# {self.get_recipe_title(st.session_state)}")
+            with st.div(className="visibility-radio"):
+                options = {
+                    str(enum.value): enum.help_text() for enum in PublishedRunVisibility
+                }
+                published_run_visibility = PublishedRunVisibility(
+                    int(
+                        st.radio(
+                            "",
+                            options=options,
+                            format_func=options.__getitem__,
+                            value=str(published_run.visibility),
+                        )
+                    )
+                )
+                st.radio(
+                    "",
+                    options=[
+                        '<span class="text-muted">Anyone at my org (coming soon)</span>'
+                    ],
+                    disabled=True,
+                    checked_by_default=False,
+                )
 
-    def get_recipe_title(self, state: dict) -> str:
-        return state.get(StateKeys.page_title) or self.title or ""
+        with st.div(className="mt-4"):
+            if is_update_mode:
+                title = published_run.title or self.title
+            else:
+                recipe_title = self.get_root_published_run().title or self.title
+                if self.request.user.display_name:
+                    username = self.request.user.display_name + "'s"
+                elif self.request.user.email:
+                    username = self.request.user.email.split("@")[0] + "'s"
+                else:
+                    username = "My"
+                title = f"{username} {recipe_title}"
+            published_run_title = st.text_input(
+                "##### Title",
+                key="published_run_title",
+                value=title,
+            )
+            published_run_notes = st.text_area(
+                "##### Notes",
+                key="published_run_notes",
+                value=(
+                    published_run.notes
+                    or self.preview_description(st.session_state)
+                    or ""
+                ),
+            )
+
+        with st.div(className="mt-4 d-flex justify-content-center"):
+            pressed_save = st.button(
+                f'<i class="fa-regular fa-floppy-disk"></i> Save',
+                className="px-4",
+                type="primary",
+            )
+
+        self._render_admin_options(current_run, published_run)
+
+        if not pressed_save:
+            return
+        recipe_title = self.get_root_published_run().title or self.title
+        is_root_published_run = is_update_mode and published_run.is_root()
+        if (
+            not is_root_published_run
+            and published_run_title.strip() == recipe_title.strip()
+        ):
+            st.error("Title can't be the same as the recipe title", icon="⚠️")
+            return
+
+        if is_update_mode:
+            updates = dict(
+                saved_run=current_run,
+                title=published_run_title.strip(),
+                notes=published_run_notes.strip(),
+                visibility=published_run_visibility,
+            )
+            if not self._has_published_run_changed(
+                published_run=published_run, **updates
+            ):
+                st.error("No changes to publish", icon="⚠️")
+                return
+            published_run.add_version(user=self.request.user, **updates)
+        else:
+            published_run = self.create_published_run(
+                published_run_id=get_random_doc_id(),
+                saved_run=current_run,
+                user=self.request.user,
+                title=published_run_title.strip(),
+                notes=published_run_notes.strip(),
+                visibility=published_run_visibility,
+            )
+        force_redirect(published_run.get_app_url())
+
+    def _has_published_run_changed(
+        self,
+        *,
+        published_run: PublishedRun,
+        saved_run: SavedRun,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        return (
+            published_run.title != title
+            or published_run.notes != notes
+            or published_run.visibility != visibility
+            or published_run.saved_run != saved_run
+        )
+
+    def _render_options_modal(
+        self,
+        *,
+        current_run: SavedRun,
+        published_run: PublishedRun,
+        modal: Modal,
+    ):
+        is_latest_version = published_run.saved_run == current_run
+
+        with st.div(className="mt-4"):
+            duplicate_button = None
+            save_as_new_button = None
+            duplicate_icon = save_as_new_icon = '<i class="fa-regular fa-copy"></i>'
+            if is_latest_version:
+                duplicate_button = st.button(
+                    f"{duplicate_icon} Duplicate", className="w-100"
+                )
+            else:
+                save_as_new_button = st.button(
+                    f"{save_as_new_icon} Save as New", className="w-100"
+                )
+            delete_button = not published_run.is_root() and st.button(
+                f'<i class="fa-regular fa-trash"></i> Delete',
+                className="w-100 text-danger",
+            )
+
+        if duplicate_button:
+            duplicate_pr = self.duplicate_published_run(
+                published_run,
+                title=f"{published_run.title} (Copy)",
+                notes=published_run.notes,
+                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+            )
+            raise QueryParamsRedirectException(
+                query_params=dict(example_id=duplicate_pr.published_run_id),
+            )
+
+        if save_as_new_button:
+            new_pr = self.create_published_run(
+                published_run_id=get_random_doc_id(),
+                saved_run=current_run,
+                user=self.request.user,
+                title=f"{published_run.title} (Copy)",
+                notes=published_run.notes,
+                visibility=PublishedRunVisibility(PublishedRunVisibility.UNLISTED),
+            )
+            raise QueryParamsRedirectException(
+                query_params=dict(example_id=new_pr.published_run_id)
+            )
+
+        with st.div(className="mt-4"):
+            st.write("#### Version History", className="mb-4")
+            self._render_version_history()
+
+        confirm_delete_modal = Modal("Confirm Delete", key="confirm-delete-modal")
+        if delete_button:
+            confirm_delete_modal.open()
+        if confirm_delete_modal.is_open():
+            modal.empty()
+            with confirm_delete_modal.container():
+                self._render_confirm_delete_modal(
+                    published_run=published_run,
+                    modal=confirm_delete_modal,
+                )
+
+    def _render_confirm_delete_modal(
+        self,
+        *,
+        published_run: PublishedRun,
+        modal: Modal,
+    ):
+        st.write(
+            "Are you sure you want to delete this published run? "
+            f"_({published_run.title})_"
+        )
+        st.caption("This will also delete all the associated versions.")
+        with st.div(className="d-flex"):
+            confirm_button = st.button(
+                '<span class="text-danger">Confirm</span>',
+                type="secondary",
+                className="w-100",
+            )
+            cancel_button = st.button(
+                "Cancel",
+                type="secondary",
+                className="w-100",
+            )
+
+        if confirm_button:
+            published_run.delete()
+            raise QueryParamsRedirectException(query_params={})
+
+        if cancel_button:
+            modal.close()
+
+    def _render_admin_options(self, current_run: SavedRun, published_run: PublishedRun):
+        if (
+            not self.is_current_user_admin()
+            or published_run.is_root()
+            or published_run.saved_run != current_run
+        ):
+            return
+
+        with st.expander("🛠️ Admin Options"):
+            st.write(
+                f"This will hide/show this workflow from {self.app_url(tab_name=MenuTabs.paths[MenuTabs.examples])}  \n"
+                f"(Given that you have set public visibility above)"
+            )
+            if st.session_state.get("--toggle-approve-example"):
+                published_run.is_approved_example = (
+                    not published_run.is_approved_example
+                )
+                published_run.save(update_fields=["is_approved_example"])
+            if published_run.is_approved_example:
+                btn_text = "🙈 Hide from Examples"
+            else:
+                btn_text = "✅ Approve as Example"
+            st.button(btn_text, key="--toggle-approve-example")
+
+            st.write("---")
+
+            if st.checkbox("⭐️ Save as Root Workflow"):
+                st.write(
+                    f"Are you Sure?  \n"
+                    f"This will overwrite the contents of {self.app_url()}",
+                    className="text-danger",
+                )
+                if st.button("👌 Yes, Update the Root Workflow"):
+                    root_run = self.get_root_published_run()
+                    root_run.add_version(
+                        user=self.request.user,
+                        title=published_run.title,
+                        notes=published_run.notes,
+                        saved_run=published_run.saved_run,
+                        visibility=PublishedRunVisibility.PUBLIC,
+                    )
+                    raise QueryParamsRedirectException(dict())
+
+    @classmethod
+    def get_recipe_title(cls) -> str:
+        return (
+            cls.get_or_create_root_published_run().title
+            or cls.title
+            or cls.workflow.label
+        )
 
     def get_explore_image(self, state: dict) -> str:
         return self.explore_image or ""
@@ -281,6 +658,8 @@ class BasePage:
         tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
         if self.request.user:
             tabs.extend([MenuTabs.history])
+        if self.request.user and not self.request.user.is_anonymous:
+            tabs.extend([MenuTabs.saved])
         return tabs
 
     def render_selected_tab(self, selected_tab: str):
@@ -297,10 +676,9 @@ class BasePage:
                 col1, col2 = st.columns(2)
                 with col1:
                     self._render_help()
-                with col2:
-                    self._render_save_options()
 
                 self.render_related_workflows()
+                render_js_dynamic_dates()
 
             case MenuTabs.examples:
                 self._examples_tab()
@@ -313,6 +691,76 @@ class BasePage:
             case MenuTabs.run_as_api:
                 self.run_as_api_tab()
 
+            case MenuTabs.saved:
+                self._saved_tab()
+                render_js_dynamic_dates()
+
+    def _render_version_history(self):
+        published_run = self.get_current_published_run()
+
+        if published_run:
+            versions = published_run.versions.all()
+            first_version = versions[0]
+            for version, older_version in pairwise(versions):
+                first_version = older_version
+                self._render_version_row(version, older_version)
+            self._render_version_row(first_version, None)
+            re_render_js_dynamic_dates()
+
+    def _render_version_row(
+        self,
+        version: PublishedRunVersion,
+        older_version: PublishedRunVersion | None,
+    ):
+        st.html(
+            """
+            <style>
+            .disable-p-margin p {
+                margin-bottom: 0;
+            }
+            </style>
+            """
+        )
+        url = self.app_url(
+            example_id=version.published_run.published_run_id,
+            run_id=version.saved_run.run_id,
+            uid=version.saved_run.uid,
+        )
+        with st.link(to=url, className="text-decoration-none"):
+            with st.div(
+                className="d-flex mb-4 disable-p-margin",
+                style={"min-width": "min(100vw, 500px)"},
+            ):
+                col1 = st.div(className="me-4")
+                col2 = st.div()
+        with col1:
+            with st.div(className="fs-5 mt-1"):
+                st.html('<i class="fa-regular fa-clock"></i>')
+        with col2:
+            is_first_version = not older_version
+            with st.div(className="fs-5 d-flex align-items-center"):
+                js_dynamic_date(
+                    version.created_at,
+                    container=self._render_version_history_date,
+                    date_options={"month": "short", "day": "numeric"},
+                )
+                if is_first_version:
+                    with st.tag("span", className="badge bg-secondary px-3 ms-2"):
+                        st.write("FIRST VERSION")
+            with st.div(className="text-muted"):
+                if older_version and older_version.title != version.title:
+                    st.write(f"Renamed: {version.title}")
+                elif not older_version:
+                    st.write(version.title)
+            with st.div(className="mt-1", style={"font-size": "0.85rem"}):
+                self.render_author(
+                    version.changed_by, image_size="18px", responsive=False
+                )
+
+    def _render_version_history_date(self, text, **props):
+        with st.tag("span", **props):
+            st.html(text)
+
     def render_related_workflows(self):
         page_clses = self.related_workflows()
         if not page_clses:
@@ -321,9 +769,10 @@ class BasePage:
         with st.link(to="/explore/"):
             st.html("<h2>Related Workflows</h2>")
 
-        def _render(page_cls):
+        def _render(page_cls: typing.Type[BasePage]):
             page = page_cls()
-            state = page_cls().recipe_doc_sr().to_dict()
+            root_run = page.get_root_published_run()
+            state = root_run.saved_run.to_dict()
             preview_image = meta_preview_url(
                 page.get_explore_image(state), page.fallback_preivew_image()
             )
@@ -335,7 +784,7 @@ class BasePage:
 <div class="w-100 mb-2" style="height:150px; background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
                     """
                 )
-                st.markdown(f"###### {page.title}")
+                st.markdown(f"###### {root_run.title or page.title}")
             st.caption(page.preview_description(state))
 
         grid_layout(4, page_clses, _render)
@@ -439,9 +888,56 @@ class BasePage:
             # Return and Don't render the run any further
             st.stop()
 
-    def get_sr_from_query_params_dict(self, query_params) -> SavedRun:
+    @classmethod
+    def get_runs_from_query_params(
+        cls, example_id: str, run_id: str, uid: str
+    ) -> tuple[SavedRun, PublishedRun | None]:
+        if run_id and uid:
+            sr = cls.run_doc_sr(run_id, uid)
+            pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
+        else:
+            pr = cls.get_published_run(published_run_id=example_id or "")
+            sr = pr.saved_run
+        return sr, pr
+
+    @classmethod
+    def get_current_published_run(cls) -> PublishedRun | None:
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        return cls.get_pr_from_query_params(example_id, run_id, uid)
+
+    @classmethod
+    def get_pr_from_query_params(
+        cls, example_id: str, run_id: str, uid: str
+    ) -> PublishedRun:
+        if run_id and uid:
+            sr = cls.get_sr_from_query_params(example_id, run_id, uid)
+            return (
+                sr and sr.parent_version and sr.parent_version.published_run
+            ) or None
+        elif example_id:
+            return cls.get_published_run(published_run_id=example_id)
+        else:
+            return cls.get_root_published_run()
+
+    @classmethod
+    def get_root_published_run(cls) -> PublishedRun:
+        return cls.get_published_run(published_run_id="")
+
+    @classmethod
+    def get_published_run(cls, *, published_run_id: str):
+        return PublishedRun.objects.get(
+            workflow=cls.workflow,
+            published_run_id=published_run_id,
+        )
+
+    @classmethod
+    def get_current_sr(cls) -> SavedRun:
+        return cls.get_sr_from_query_params_dict(gooey_get_query_params())
+
+    @classmethod
+    def get_sr_from_query_params_dict(cls, query_params) -> SavedRun:
         example_id, run_id, uid = extract_query_params(query_params)
-        return self.get_sr_from_query_params(example_id, run_id, uid)
+        return cls.get_sr_from_query_params(example_id, run_id, uid)
 
     @classmethod
     def get_sr_from_query_params(
@@ -451,45 +947,101 @@ class BasePage:
             if run_id and uid:
                 sr = cls.run_doc_sr(run_id, uid)
             elif example_id:
-                sr = cls.example_doc_sr(example_id)
+                pr = cls.get_published_run(published_run_id=example_id)
+                assert (
+                    pr.saved_run is not None
+                ), "invalid published run: without a saved run"
+                sr = pr.saved_run
             else:
                 sr = cls.recipe_doc_sr()
             return sr
-        except SavedRun.DoesNotExist:
+        except (SavedRun.DoesNotExist, PublishedRun.DoesNotExist):
             raise HTTPException(status_code=404)
 
     @classmethod
     def get_total_runs(cls) -> int:
+        # TODO: fix to also handle published run case
         return SavedRun.objects.filter(workflow=cls.workflow).count()
 
     @classmethod
-    def recipe_doc_sr(cls) -> SavedRun:
-        return SavedRun.objects.get_or_create(
+    def get_or_create_root_published_run(cls) -> PublishedRun:
+        published_run, _ = PublishedRun.objects.get_or_create(
             workflow=cls.workflow,
-            run_id__isnull=True,
-            uid__isnull=True,
-            example_id__isnull=True,
-        )[0]
+            published_run_id="",
+            defaults={
+                "saved_run": lambda: cls.run_doc_sr(
+                    run_id="", uid="", create=True, parent=None, parent_version=None
+                ),
+                "created_by": None,
+                "last_edited_by": None,
+                "title": cls.title,
+                "notes": cls().preview_description(state=cls.sane_defaults),
+                "visibility": PublishedRunVisibility(PublishedRunVisibility.PUBLIC),
+                "is_approved_example": True,
+            },
+        )
+        return published_run
+
+    @classmethod
+    def recipe_doc_sr(cls, create: bool = False) -> SavedRun:
+        if create:
+            return cls.get_or_create_root_published_run().saved_run
+        else:
+            return cls.get_root_published_run().saved_run
 
     @classmethod
     def run_doc_sr(
-        cls, run_id: str, uid: str, create: bool = False, parent: SavedRun = None
+        cls,
+        run_id: str,
+        uid: str,
+        create: bool = False,
+        parent: SavedRun | None = None,
+        parent_version: PublishedRunVersion | None = None,
     ) -> SavedRun:
         config = dict(workflow=cls.workflow, uid=uid, run_id=run_id)
         if create:
             return SavedRun.objects.get_or_create(
-                **config, defaults=dict(parent=parent)
+                **config,
+                defaults=dict(parent=parent, parent_version=parent_version),
             )[0]
         else:
             return SavedRun.objects.get(**config)
 
     @classmethod
-    def example_doc_sr(cls, example_id: str, create: bool = False) -> SavedRun:
-        config = dict(workflow=cls.workflow, example_id=example_id)
-        if create:
-            return SavedRun.objects.get_or_create(**config)[0]
-        else:
-            return SavedRun.objects.get(**config)
+    def create_published_run(
+        cls,
+        *,
+        published_run_id: str,
+        saved_run: SavedRun,
+        user: AppUser,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        return PublishedRun.objects.create_published_run(
+            workflow=cls.workflow,
+            published_run_id=published_run_id,
+            saved_run=saved_run,
+            user=user,
+            title=title,
+            notes=notes,
+            visibility=visibility,
+        )
+
+    def duplicate_published_run(
+        self,
+        published_run: PublishedRun,
+        *,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        return published_run.duplicate(
+            user=self.request.user,
+            title=title,
+            notes=notes,
+            visibility=visibility,
+        )
 
     def render_description(self):
         pass
@@ -506,27 +1058,60 @@ class BasePage:
     def validate_form_v2(self):
         pass
 
-    def render_author(self):
-        if not self.run_user or (
-            not self.run_user.photo_url and not self.run_user.display_name
-        ):
+    def render_author(
+        self,
+        user: AppUser,
+        *,
+        image_size: str = "30px",
+        responsive: bool = True,
+        show_as_link: bool = False,
+    ):
+        if not user or (not user.photo_url and not user.display_name):
             return
 
-        html = "<div style='display:flex; align-items:center; padding-bottom:16px'>"
-        if self.run_user.photo_url:
-            html += f"""
-                <img style="width:38px; height:38px;border-radius:50%; pointer-events: none;" src="{self.run_user.photo_url}">
-                <div style="width:8px;"></div>
+        responsive_image_size = (
+            f"calc({image_size} * 0.67)" if responsive else image_size
+        )
+
+        # new class name so that different ones don't conflict
+        class_name = f"author-image-{image_size}"
+        if responsive:
+            class_name += "-responsive"
+
+        html = "<div style='display:flex; align-items:center;'>"
+        if user.photo_url:
+            st.html(
+                f"""
+                <style>
+                .{class_name} {{
+                    width: {responsive_image_size};
+                    height: {responsive_image_size};
+                    margin-right: 6px;
+                    border-radius: 50%;
+                    pointer-events: none;
+                }}
+
+                @media (min-width: 1024px) {{
+                    .{class_name} {{
+                        width: {image_size};
+                        height: {image_size};
+                    }}
+                }}
+                </style>
             """
-        if self.run_user.display_name:
-            html += f"<div>{self.run_user.display_name}</div>"
+            )
+            html += f"""
+                <img class="{class_name}" src="{user.photo_url}">
+            """
+        if user.display_name:
+            html += f"<span>{user.display_name}</span>"
         html += "</div>"
 
-        if self.is_current_user_admin():
+        if show_as_link:
             linkto = lambda: st.link(
                 to=self.app_url(
                     tab_name=MenuTabs.paths[MenuTabs.history],
-                    query_params={"uid": self.run_user.uid},
+                    query_params={"uid": user.uid},
                 )
             )
         else:
@@ -575,7 +1160,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             try:
                 self.validate_form_v2()
             except AssertionError as e:
-                st.error(e)
+                st.error(str(e))
                 return False
             else:
                 return True
@@ -650,7 +1235,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_report_button(self):
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        # only logged in users can report a run (but not explamples/default runs)
+        # only logged in users can report a run (but not examples/default runs)
         if not (self.request.user and run_id and uid):
             return
 
@@ -670,20 +1255,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         if not url:
             return
 
-        with st.div(className="d-flex gap-1"):
-            with st.div(className="flex-grow-1"):
-                st.text_input(
-                    "recipe url",
-                    label_visibility="collapsed",
-                    disabled=True,
-                    value=url.split("://")[1].rstrip("/"),
-                )
-            copy_to_clipboard_button(
-                "🔗 Copy URL",
-                value=url,
-                style="height: 3.2rem",
-            )
-
     def _get_current_app_url(self) -> str | None:
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         return self.app_url(example_id, run_id, uid)
@@ -699,14 +1270,10 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         st.session_state["is_flagged"] = is_flagged
 
     def _render_input_col(self):
-        self.render_author()
         self.render_form_v2()
         with st.expander("⚙️ Settings"):
             self.render_settings()
             st.write("---")
-            st.write("##### 🖌️ Personalize")
-            st.text_input("Title", key=StateKeys.page_title)
-            st.text_area("Notes", key=StateKeys.page_notes)
         submitted = self.render_submit_button()
         with st.div(style={"textAlign": "right"}):
             st.caption(
@@ -766,7 +1333,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_running_output(self):
         run_status = st.session_state.get(StateKeys.run_status)
-        st.caption("Your changes are saved in the above URL. Save it for later!")
         html_spinner(run_status)
         self.render_extra_waiting_output()
 
@@ -806,7 +1372,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         else:
             self.call_runner_task(example_id, run_id, uid)
         raise QueryParamsRedirectException(
-            self.clean_query_params(example_id=example_id, run_id=run_id, uid=uid)
+            self.clean_query_params(example_id=None, run_id=run_id, uid=uid)
         )
 
     def should_submit_after_login(self) -> bool:
@@ -842,12 +1408,21 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         parent = self.get_sr_from_query_params(
             parent_example_id, parent_run_id, parent_uid
         )
+        published_run = self.get_current_published_run()
+        try:
+            parent_version = published_run and published_run.versions.latest()
+        except PublishedRunVersion.DoesNotExist:
+            parent_version = None
 
-        self.run_doc_sr(run_id, uid, create=True, parent=parent).set(
-            self.state_to_doc(st.session_state)
-        )
+        self.run_doc_sr(
+            run_id,
+            uid,
+            create=True,
+            parent=parent,
+            parent_version=parent_version,
+        ).set(self.state_to_doc(st.session_state))
 
-        return parent_example_id, run_id, uid
+        return None, run_id, uid
 
     def call_runner_task(self, example_id, run_id, uid, is_api_call=False):
         from celeryapp.tasks import gui_runner
@@ -926,65 +1501,12 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         with col3:
             self._render_report_button()
 
-    def _render_save_options(self):
-        if not self.is_current_user_admin():
-            return
-
-        parent_example_id, parent_run_id, parent_uid = extract_query_params(
-            gooey_get_query_params()
-        )
-        current_sr = self.get_sr_from_query_params(
-            parent_example_id, parent_run_id, parent_uid
-        )
-
-        with st.expander("🛠️ Admin Options"):
-            sr_to_save = None
-
-            if st.button("⭐️ Save Workflow"):
-                sr_to_save = self.recipe_doc_sr()
-
-            if st.button("🔖 Create new Example"):
-                sr_to_save = self.example_doc_sr(get_random_doc_id(), create=True)
-
-            if parent_example_id:
-                if st.button("💾 Save this Example"):
-                    sr_to_save = self.example_doc_sr(parent_example_id)
-
-            if current_sr.example_id:
-                hidden = st.session_state.get(StateKeys.hidden)
-                if st.button("👁️ Make Public" if hidden else "🙈️ Hide"):
-                    self.set_hidden(
-                        example_id=current_sr.example_id,
-                        doc=st.session_state,
-                        hidden=not hidden,
-                    )
-
-            if sr_to_save:
-                if current_sr != sr_to_save:  # ensure parent != child
-                    sr_to_save.parent = current_sr
-                sr_to_save.set(self.state_to_doc(st.session_state))
-                ## TODO: pass the success message to the redirect
-                # st.success("Saved", icon="✅")
-                raise QueryParamsRedirectException(
-                    dict(example_id=sr_to_save.example_id)
-                )
-
-            if current_sr.parent_id:
-                st.write(f"Parent: {current_sr.parent.get_app_url()}")
-
     def state_to_doc(self, state: dict):
         ret = {
             field_name: deepcopy(state[field_name])
             for field_name in self.fields_to_save()
             if field_name in state
         }
-
-        title = state.get(StateKeys.page_title)
-        notes = state.get(StateKeys.page_notes)
-        if title and title.strip() != self.title.strip():
-            ret[StateKeys.page_title] = title
-        if notes and notes.strip() != self.preview_description(state).strip():
-            ret[StateKeys.page_notes] = notes
 
         return ret
 
@@ -1001,28 +1523,47 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         ]
 
     def _examples_tab(self):
-        allow_delete = self.is_current_user_admin()
+        allow_hide = self.is_current_user_admin()
 
-        def _render(sr: SavedRun):
-            url = str(
-                furl(
-                    self.app_url(), query_params={EXAMPLE_ID_QUERY_PARAM: sr.example_id}
-                )
-            )
-            self._render_doc_example(
-                allow_delete=allow_delete,
-                doc=sr.to_dict(),
-                url=url,
-                query_params=dict(example_id=sr.example_id),
+        def _render(pr: PublishedRun):
+            self._render_example_preview(
+                published_run=pr,
+                allow_hide=allow_hide,
             )
 
-        example_runs = SavedRun.objects.filter(
+        example_runs = PublishedRun.objects.filter(
             workflow=self.workflow,
-            hidden=False,
-            example_id__isnull=False,
-        )[:50]
+            visibility=PublishedRunVisibility.PUBLIC,
+            is_approved_example=True,
+        ).exclude(published_run_id="")[:50]
 
         grid_layout(3, example_runs, _render)
+
+    def _saved_tab(self):
+        self.ensure_authentication()
+
+        published_runs = PublishedRun.objects.filter(
+            workflow=self.workflow,
+            created_by=self.request.user,
+        )[:50]
+        if not published_runs:
+            st.write("No published runs yet")
+            return
+
+        def _render(pr: PublishedRun):
+            self._render_example_preview(
+                published_run=pr,
+                allow_hide=False,
+            )
+
+        grid_layout(3, published_runs, _render)
+
+    def ensure_authentication(self):
+        if not self.request.user or self.request.user.is_anonymous:
+            redirect_url = furl(
+                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
+            )
+            raise RedirectException(str(redirect_url))
 
     def _history_tab(self):
         assert self.request, "request must be set to render history tab"
@@ -1051,29 +1592,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.write("No history yet")
             return
 
-        def _render(sr: SavedRun):
-            url = str(
-                furl(
-                    self.app_url(),
-                    query_params={
-                        RUN_ID_QUERY_PARAM: sr.run_id,
-                        USER_ID_QUERY_PARAM: uid,
-                    },
-                )
-            )
-
-            self._render_doc_example(
-                allow_delete=False,
-                doc=sr.to_dict(),
-                url=url,
-                query_params=dict(run_id=sr.run_id, uid=uid),
-            )
-            if sr.run_status:
-                html_spinner(sr.run_status)
-            elif sr.error_msg:
-                st.error(sr.error_msg, unsafe_allow_html=True)
-
-        grid_layout(3, run_history, _render)
+        grid_layout(3, run_history, self._render_run_preview)
 
         next_url = (
             furl(self._get_current_app_url(), query_params=self.request.query_params)
@@ -1089,52 +1608,71 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 f"""<button type="button" class="btn btn-theme">Load More</button>"""
             )
 
-    def _render_doc_example(
-        self, *, allow_delete: bool, doc: dict, url: str, query_params: dict
-    ):
+    def _render_run_preview(self, saved_run: SavedRun):
+        url = saved_run.get_app_url()
         with st.link(to=url):
             st.html(
                 # language=HTML
                 f"""<button type="button" class="btn btn-theme">✏️ Tweak</button>"""
             )
         copy_to_clipboard_button("🔗 Copy URL", value=url)
-        if allow_delete:
-            self._example_delete_button(**query_params, doc=doc)
 
-        updated_at = doc.get("updated_at")
+        updated_at = saved_run.updated_at
         if updated_at and isinstance(updated_at, datetime.datetime):
             js_dynamic_date(updated_at)
 
-        title = doc.get(StateKeys.page_title)
+        if saved_run.run_status:
+            html_spinner(saved_run.run_status)
+        elif saved_run.error_msg:
+            st.error(saved_run.error_msg, unsafe_allow_html=True)
+
+        return self.render_example(saved_run.to_dict())
+
+    def _render_example_preview(
+        self,
+        *,
+        published_run: PublishedRun,
+        allow_hide: bool,
+    ):
+        url = published_run.get_app_url()
+        with st.link(to=url):
+            st.html(
+                # language=HTML
+                f"""<button type="button" class="btn btn-theme">✏️ Tweak</button>"""
+            )
+        copy_to_clipboard_button("🔗 Copy URL", value=url)
+
+        if allow_hide:
+            self._example_hide_button(published_run=published_run)
+
+        updated_at = published_run.updated_at
+        if updated_at and isinstance(updated_at, datetime.datetime):
+            js_dynamic_date(updated_at)
+
+        title = published_run.title
         if title and title.strip() != self.title.strip():
             st.write("#### " + title)
 
-        notes = doc.get(StateKeys.page_notes)
-        if (
-            notes
-            and notes.strip() != self.preview_description(st.session_state).strip()
-        ):
-            st.write(notes)
+        if published_run.notes:
+            st.write(published_run.notes)
 
+        doc = published_run.saved_run.to_dict()
         self.render_example(doc)
 
-    def _example_delete_button(self, example_id, doc):
+    def _example_hide_button(self, published_run: PublishedRun):
         pressed_delete = st.button(
             "🙈️ Hide",
-            key=f"delete_example_{example_id}",
+            key=f"delete_example_{published_run.published_run_id}",
             style={"color": "red"},
         )
         if not pressed_delete:
             return
-        self.set_hidden(example_id=example_id, doc=doc, hidden=True)
+        self.set_hidden(published_run=published_run, hidden=True)
 
-    def set_hidden(self, *, example_id, doc, hidden: bool):
-        sr = self.example_doc_sr(example_id)
-
+    def set_hidden(self, *, published_run: PublishedRun, hidden: bool):
         with st.spinner("Hiding..."):
-            doc[StateKeys.hidden] = hidden
-            sr.hidden = hidden
-            sr.save(update_fields=["hidden", "updated_at"])
+            published_run.is_approved_example = not hidden
+            published_run.save()
 
         st.experimental_rerun()
 
@@ -1353,3 +1891,18 @@ class QueryParamsRedirectException(RedirectException):
         query_params = {k: v for k, v in query_params.items() if v is not None}
         url = "?" + urllib.parse.urlencode(query_params)
         super().__init__(url, status_code)
+
+
+def force_redirect(url: str):
+    # note: assumes sanitized URLs
+    st.html(
+        f"""
+    <script>
+    window.location = '{url}';
+    </script>
+    """
+    )
+
+
+def reverse_enumerate(start, iterator):
+    return zip(range(start, -1, -1), iterator)

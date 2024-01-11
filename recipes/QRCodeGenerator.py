@@ -20,6 +20,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.descriptions import prompting101
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.img_model_settings_widgets import (
     output_resolution_setting,
     img_model_settings,
@@ -37,6 +38,7 @@ from daras_ai_v2.vcard import VCARD
 from recipes.EmailFaceInpainting import get_photo_for_email
 from recipes.SocialLookupEmail import get_profile_for_email
 from url_shortener.models import ShortenedURL
+from daras_ai_v2.enum_selector_widget import enum_multiselect
 
 ATTEMPTS = 1
 DEFAULT_QR_CODE_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a679a410-9456-11ee-bd77-02420a0001ce/QR%20Code.jpg.png"
@@ -60,6 +62,15 @@ class QRCodeGeneratorPage(BasePage):
         obj_scale=0.65,
         obj_pos_x=0.5,
         obj_pos_y=0.5,
+        image_prompt_controlnet_models=[
+            ControlNetModels.sd_controlnet_canny.name,
+            ControlNetModels.sd_controlnet_depth.name,
+            ControlNetModels.sd_controlnet_tile.name,
+        ],
+        image_prompt_strength=0.3,
+        image_prompt_scale=1.0,
+        image_prompt_pos_x=0.5,
+        image_prompt_pos_y=0.5,
     )
 
     def __init__(self, *args, **kwargs):
@@ -76,6 +87,14 @@ class QRCodeGeneratorPage(BasePage):
 
         text_prompt: str
         negative_prompt: str | None
+        image_prompt: str | None
+        image_prompt_controlnet_models: list[
+            typing.Literal[tuple(e.name for e in ControlNetModels)], ...
+        ] | None
+        image_prompt_strength: float | None
+        image_prompt_scale: float | None
+        image_prompt_pos_x: float | None
+        image_prompt_pos_y: float | None
 
         selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
         selected_controlnet_model: list[
@@ -125,7 +144,7 @@ class QRCodeGeneratorPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### 👩‍💻 Prompt
+            ##### 👩‍💻 Prompt
             Describe the subject/scene of the QR Code.
             Choose clear prompts and distinguishable visuals to ensure optimal readability.
             """,
@@ -186,6 +205,15 @@ class QRCodeGeneratorPage(BasePage):
             st.caption(
                 'A shortened URL enables the QR code to be more beautiful and less "QR-codey" with fewer blocky pixels.'
             )
+
+        st.file_uploader(
+            """
+            ##### 🏞️ Reference Image *[optional]*
+            This image will be used as inspiration to blend with the QR Code.
+            """,
+            key="image_prompt",
+            accept=["image/*"],
+        )
 
     def validate_form_v2(self):
         assert st.session_state.get("text_prompt"), "Please provide a prompt"
@@ -275,7 +303,7 @@ Here is the final output:
 
         st.write(
             """
-            ##### ⌖ Positioning
+            ##### ⌖ QR Positioning
             Use this to control where the QR code is placed in the image, and how big it should be.
             """,
             className="gui-input",
@@ -322,6 +350,79 @@ Here is the final output:
             ),
             color=255,
         )
+
+        if st.session_state.get("image_prompt"):
+            st.write("---")
+            st.write(
+                """
+                ##### 🎨 Inspiration
+                Use this to control how the image prompt should influence the output.
+                """,
+                className="gui-input",
+            )
+            st.slider(
+                "Inspiration Strength",
+                min_value=0.0,
+                max_value=1.0,
+                step=0.05,
+                key="image_prompt_strength",
+            )
+            enum_multiselect(
+                ControlNetModels,
+                label="Control Net Models",
+                key="image_prompt_controlnet_models",
+                checkboxes=False,
+                allow_none=False,
+            )
+            st.write(
+                """
+                ##### ⌖ Reference Image Positioning
+                Use this to control where the reference image is placed, and how big it should be.
+                """,
+                className="gui-input",
+            )
+            col1, _ = st.columns(2)
+            with col1:
+                image_prompt_scale = st.slider(
+                    "Scale",
+                    min_value=0.1,
+                    max_value=1.0,
+                    step=0.05,
+                    key="image_prompt_scale",
+                )
+            col1, col2 = st.columns(2, responsive=False)
+            with col1:
+                image_prompt_pos_x = st.slider(
+                    "Position X",
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.05,
+                    key="image_prompt_pos_x",
+                )
+            with col2:
+                image_prompt_pos_y = st.slider(
+                    "Position Y",
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.05,
+                    key="image_prompt_pos_y",
+                )
+
+            img_cv2 = mask_cv2 = bytes_to_cv2_img(
+                requests.get(st.session_state["image_prompt"]).content,
+            )
+            repositioning_preview_widget(
+                img_cv2=img_cv2,
+                mask_cv2=mask_cv2,
+                obj_scale=image_prompt_scale,
+                pos_x=image_prompt_pos_x,
+                pos_y=image_prompt_pos_y,
+                out_size=(
+                    st.session_state["output_width"],
+                    st.session_state["output_height"],
+                ),
+                color=255,
+            )
 
     def render_output(self):
         state = st.session_state
@@ -379,11 +480,36 @@ Here is the final output:
         state["raw_images"] = raw_images = []
 
         yield f"Running {Text2ImgModels[request.selected_model].value}..."
+        if isinstance(request.selected_controlnet_model, str):
+            request.selected_controlnet_model = [request.selected_controlnet_model]
+        init_images = [image] * len(request.selected_controlnet_model)
+        if request.image_prompt:
+            image_prompt = bytes_to_cv2_img(requests.get(request.image_prompt).content)
+            repositioned_image_prompt, _ = reposition_object(
+                orig_img=image_prompt,
+                orig_mask=image_prompt,
+                out_size=(request.output_width, request.output_height),
+                out_obj_scale=request.image_prompt_scale,
+                out_pos_x=request.image_prompt_pos_x,
+                out_pos_y=request.image_prompt_pos_y,
+                color=255,
+            )
+            request.image_prompt = upload_file_from_bytes(
+                "repositioned_image_prompt.png",
+                cv2_img_to_bytes(repositioned_image_prompt),
+            )
+            init_images += [request.image_prompt] * len(
+                request.image_prompt_controlnet_models
+            )
+            request.selected_controlnet_model += request.image_prompt_controlnet_models
+            request.controlnet_conditioning_scale += [
+                request.image_prompt_strength
+            ] * len(request.image_prompt_controlnet_models)
         state["output_images"] = controlnet(
             selected_model=request.selected_model,
             selected_controlnet_model=request.selected_controlnet_model,
             prompt=request.text_prompt,
-            init_image=image,
+            init_images=init_images,
             num_outputs=request.num_outputs,
             num_inference_steps=request.quality,
             negative_prompt=request.negative_prompt,
@@ -612,7 +738,7 @@ def generate_qr_code(qr_code_data: str) -> np.ndarray:
 
 def download_qr_code_data(url: str) -> str:
     r = requests.get(url)
-    r.raise_for_status()
+    raise_for_status(r)
     img = bytes_to_cv2_img(r.content, greyscale=True)
     return extract_qr_code_data(img)
 

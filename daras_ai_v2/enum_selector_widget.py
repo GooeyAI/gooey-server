@@ -70,7 +70,6 @@ def enum_selector(
     except AttributeError:
         deprecated = set()
     enums = [e for e in enum_cls if not e in deprecated]
-    label = label or enum_cls.__name__
     options = [e.name for e in enums]
     if exclude:
         options = [o for o in options if o not in exclude]

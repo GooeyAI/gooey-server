@@ -12,6 +12,7 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, storage_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -71,6 +72,8 @@ class TextToSpeechPage(BasePage):
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
+        elevenlabs_style: float | None
+        elevenlabs_speaker_boost: bool | None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -199,7 +202,7 @@ class TextToSpeechPage(BasePage):
                         "pace": pace,
                     },
                 )
-                response.raise_for_status()
+                raise_for_status(response)
                 file_uuid = json.loads(response.text)["uuid"]
                 while True:
                     data = requests.get(
@@ -268,6 +271,14 @@ class TextToSpeechPage(BasePage):
 
                 stability = state.get("elevenlabs_stability", 0.5)
                 similarity_boost = state.get("elevenlabs_similarity_boost", 0.75)
+                voice_settings = dict(
+                    stability=stability, similarity_boost=similarity_boost
+                )
+                if voice_model == "eleven_multilingual_v2":
+                    voice_settings["style"] = state.get("elevenlabs_style", 0.0)
+                    voice_settings["speaker_boost"] = state.get(
+                        "elevenlabs_speaker_boost", True
+                    )
 
                 response = requests.post(
                     f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
@@ -278,13 +289,10 @@ class TextToSpeechPage(BasePage):
                     json={
                         "text": text,
                         "model_id": voice_model,
-                        "voice_settings": {
-                            "stability": stability,
-                            "similarity_boost": similarity_boost,
-                        },
+                        "voice_settings": voice_settings,
                     },
                 )
-                response.raise_for_status()
+                raise_for_status(response)
 
                 yield "Uploading Audio file..."
                 state["audio_url"] = upload_file_from_bytes(

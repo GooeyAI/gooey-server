@@ -435,7 +435,7 @@ def button(
     """
     if not key:
         key = md5_values("button", label, help, type, props)
-    props["className"] = props.get("className", "") + " btn-" + type
+    className = f"btn-{type} " + props.pop("className", "")
     state.RenderTreeNode(
         name="gui-button",
         props=dict(
@@ -445,6 +445,7 @@ def button(
             label=dedent(label),
             help=help,
             disabled=disabled,
+            className=className,
             **props,
         ),
     ).mount()
@@ -526,57 +527,28 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     ).mount()
 
 
-def data_table(file_url: str):
-    return _node("data-table", fileUrl=file_url)
+def data_table(file_url_or_cells: str | list):
+    if isinstance(file_url_or_cells, str):
+        file_url = file_url_or_cells
+        return _node("data-table", fileUrl=file_url)
+    else:
+        cells = file_url_or_cells
+        return _node("data-table-raw", cells=cells)
 
 
 def table(df: "pd.DataFrame"):
-    state.RenderTreeNode(
-        name="table",
-        children=[
-            state.RenderTreeNode(
-                name="thead",
-                children=[
-                    state.RenderTreeNode(
-                        name="tr",
-                        children=[
-                            state.RenderTreeNode(
-                                name="th",
-                                children=[
-                                    state.RenderTreeNode(
-                                        name="markdown",
-                                        props=dict(body=dedent(col)),
-                                    ),
-                                ],
-                            )
-                            for col in df.columns
-                        ],
-                    ),
-                ],
-            ),
-            state.RenderTreeNode(
-                name="tbody",
-                children=[
-                    state.RenderTreeNode(
-                        name="tr",
-                        children=[
-                            state.RenderTreeNode(
-                                name="td",
-                                children=[
-                                    state.RenderTreeNode(
-                                        name="markdown",
-                                        props=dict(body=dedent(str(value))),
-                                    ),
-                                ],
-                            )
-                            for value in row
-                        ],
-                    )
-                    for row in df.itertuples(index=False)
-                ],
-            ),
-        ],
-    ).mount()
+    with tag("table", className="table table-striped table-sm"):
+        with tag("thead"):
+            with tag("tr"):
+                for col in df.columns:
+                    with tag("th", scope="col"):
+                        html(dedent(col))
+        with tag("tbody"):
+            for row in df.itertuples(index=False):
+                with tag("tr"):
+                    for value in row:
+                        with tag("td"):
+                            html(dedent(str(value)))
 
 
 def horizontal_radio(
@@ -614,7 +586,7 @@ def horizontal_radio(
     return value
 
 
-def radio(
+def horizontal_radio(
     label: str,
     options: typing.Sequence[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
@@ -622,6 +594,44 @@ def radio(
     help: str = None,
     *,
     disabled: bool = False,
+    checked_by_default: bool = True,
+    label_visibility: LabelVisibility = "visible",
+) -> T | None:
+    if not options:
+        return None
+    options = list(options)
+    if not key:
+        key = md5_values("horizontal_radio", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if (key not in state.session_state or value not in options) and checked_by_default:
+        value = options[0]
+    state.session_state.setdefault(key, value)
+    if label_visibility != "visible":
+        label = None
+    markdown(label)
+    for option in options:
+        if button(
+            format_func(option),
+            key=f"tab-{key}-{option}",
+            type="primary",
+            className="replicate-nav " + ("active" if value == option else ""),
+            disabled=disabled,
+        ):
+            state.session_state[key] = value = option
+            state.experimental_rerun()
+    return value
+
+
+def radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    value: T = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
 ) -> T | None:
     if not options:
@@ -629,10 +639,10 @@ def radio(
     options = list(options)
     if not key:
         key = md5_values("radio", label, options, help, label_visibility)
-    value = state.session_state.get(key)
-    if key not in state.session_state or value not in options:
+    value = state.session_state.setdefault(key, value)
+    if value not in options and checked_by_default:
         value = options[0]
-    state.session_state.setdefault(key, value)
+        state.session_state[key] = value
     if label_visibility != "visible":
         label = None
     markdown(label)
@@ -832,7 +842,7 @@ def breadcrumbs(divider: str = "/", **props) -> state.NestingCtx:
 
 
 def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
-    className = "breadcrumb-item lead " + props.pop("className", "")
+    className = "breadcrumb-item " + props.pop("className", "")
     with tag("li", className=className, **props):
         if link_to:
             with tag("a", href=link_to):
