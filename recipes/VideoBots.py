@@ -3,7 +3,6 @@ import os
 import os.path
 import typing
 
-from django.core.exceptions import ValidationError
 from django.db.models import QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
@@ -22,6 +21,11 @@ from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
+from daras_ai_v2.bot_integration_widgets import (
+    general_integration_settings,
+    broadcast_input,
+    render_bot_test_link,
+)
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
     document_uploader,
@@ -52,6 +56,7 @@ from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.query_params import gooey_get_query_params
+from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -59,7 +64,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_settings,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
-from recipes.BulkRunner import url_to_runs
 from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
@@ -926,9 +930,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         show_landbot_widget()
 
     def messenger_bot_integration(self):
-        from routers.facebook import ig_connect_url, fb_connect_url
-        from routers.slack import slack_connect_url
-        from daras_ai_v2.bots import broadcast_input
+        from routers.facebook_api import ig_connect_url, fb_connect_url
+        from routers.slack_api import slack_connect_url
 
         st.markdown(
             # language=html
@@ -978,46 +981,53 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         if not integrations:
             return
 
-        current_sr = self.get_sr_from_query_params_dict(gooey_get_query_params())
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )
         for bi in integrations:
-            is_connected = bi.saved_run == current_sr
+            is_connected = (bi.saved_run == current_run) or (
+                (
+                    bi.saved_run
+                    and published_run
+                    and bi.saved_run.example_id == published_run.published_run_id
+                )
+                or (
+                    bi.published_run
+                    and published_run
+                    and bi.published_run == published_run
+                )
+            )
             col1, col2, col3, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()
-                st.markdown(
-                    f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                    f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
-                    if bi.saved_run
-                    else f"<span>{bi}</span>",
-                    unsafe_allow_html=True,
-                )
+                with st.div(className="mt-2"):
+                    st.markdown(
+                        f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
+                        f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
+                        if bi.saved_run
+                        else f"<span>{bi}</span>",
+                        unsafe_allow_html=True,
+                    )
             with col2:
-                pressed = st.button(
+                pressed_connect = st.button(
                     "🔌💔️ Disconnect" if is_connected else "🖇️ Connect",
                     key=f"btn_connect_{bi.id}",
                     type="tertiary",
                 )
-                if bi.platform == Platform.WHATSAPP and is_connected:
-                    wa_link = (
-                        furl("https://wa.me/", query_params={"text": "Hi"})
-                        / bi.wa_phone_number.as_e164
-                    )
-                    st.html(
-                        f"""
-                        <a class="btn btn-theme btn-tertiary d-inline-block" target="blank" href="{wa_link}">📱 Test</a>
-                        """
-                    )
+                render_bot_test_link(bi)
             if is_connected:
                 with col3, st.expander(f"📨 {bi.get_platform_display()} Settings"):
+                    general_integration_settings(bi)
                     if bi.platform == Platform.SLACK:
                         self.slack_specific_settings(bi)
-                    general_integration_settings(bi)
-                    st.write("---")
-                    broadcast_input(bi, key=f"slack_broadcast_{bi.id}")
-            if not pressed:
+                    if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
+                        st.write("---")
+                        broadcast_input(bi)
+            if not pressed_connect:
                 continue
             if is_connected:
                 bi.saved_run = None
+                bi.published_run = None
             else:
                 # set bot language from state
                 bi.user_language = (
@@ -1046,8 +1056,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         bi.slack_read_receipt_msg = st.text_input(
             """
-            ###### ✅ Read Receipt (leave blank to disable)
+            ##### ✅ Read Receipt
             This message is sent immediately after recieving a user message and replaced with the copilot's response once it's ready.
+            (leave blank to disable)
             """,
             placeholder=bi.slack_read_receipt_msg,
             value=bi.slack_read_receipt_msg,
@@ -1055,82 +1066,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         )
         bi.name = st.text_input(
             """
-            ###### 🪪 Channel Specific Bot Name (to be displayed in Slack)
-            This is the name the bot will post as in this specific channel.
+            ##### 🪪 Channel Specific Bot Name
+            This is the name the bot will post as in this specific channel (to be displayed in Slack)
             """,
             placeholder=bi.name,
             value=bi.name,
             key=f"_bi_name_{bi.id}",
         )
-
-
-def general_integration_settings(bi: BotIntegration):
-    if st.session_state.get(f"_bi_reset_{bi.id}"):
-        st.session_state[f"_bi_user_language_{bi.id}"] = BotIntegration._meta.get_field(
-            "user_language"
-        ).default
-        st.session_state[
-            f"_bi_show_feedback_buttons_{bi.id}"
-        ] = BotIntegration._meta.get_field("show_feedback_buttons").default
-        st.session_state[f"_bi_analysis_url_{bi.id}"] = None
-
-    bi.user_language = (
-        google_translate_language_selector(
-            f"""
-###### {field_title_desc(VideoBotsPage.RequestModel, 'user_language')} \\
-This will also help better understand incoming audio messages by automatically choosing the best [Speech](https://gooey.ai/speech/) model.
-            """,
-            default_value=bi.user_language,
-            allow_none=False,
-            key=f"_bi_user_language_{bi.id}",
-        )
-        or "en"
-    )
-    st.caption(
-        "Please note that this language is distinct from the one provided in the workflow settings. Hence, this allows you to integrate the same bot in many languages."
-    )
-
-    bi.show_feedback_buttons = st.checkbox(
-        "###### 👍🏾 👎🏽 Show Feedback Buttons",
-        value=bi.show_feedback_buttons,
-        key=f"_bi_show_feedback_buttons_{bi.id}",
-    )
-    st.caption(
-        "Users can rate and provide feedback on every copilot response if enabled."
-    )
-
-    analysis_url = st.text_input(
-        """
-        ###### 🧠 Analysis Run URL
-        Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow url. Leave blank to disable. 
-        [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis).
-        """,
-        value=bi.analysis_run and bi.analysis_run.get_app_url(),
-        key=f"_bi_analysis_url_{bi.id}",
-    )
-    if analysis_url:
-        try:
-            page_cls, bi.analysis_run, _ = url_to_runs(analysis_url)
-            assert page_cls.workflow in [
-                Workflow.COMPARE_LLM,
-                Workflow.VIDEO_BOTS,
-                Workflow.GOOGLE_GPT,
-                Workflow.DOC_SEARCH,
-            ], "We only support Compare LLM, Copilot, Google GPT and Doc Search workflows for analysis."
-        except Exception as e:
-            bi.analysis_run = None
-            st.error(repr(e))
-    else:
-        bi.analysis_run = None
-
-    pressed_update = st.button("Update")
-    pressed_reset = st.button("Reset", key=f"_bi_reset_{bi.id}", type="tertiary")
-    if pressed_update or pressed_reset:
-        try:
-            bi.full_clean()
-            bi.save()
-        except ValidationError as e:
-            st.error(str(e))
 
 
 def show_landbot_widget():

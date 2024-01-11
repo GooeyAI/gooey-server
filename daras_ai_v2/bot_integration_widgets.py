@@ -4,6 +4,7 @@ from furl import furl
 import gooey_ui as st
 from bots.models import BotIntegration, Platform
 from bots.models import Workflow
+from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
     google_translate_language_selector,
 )
@@ -83,15 +84,22 @@ This will also help better understand incoming audio messages by automatically c
 
 
 def broadcast_input(bi: BotIntegration):
-    from bots.tasks import send_broadcast_msg
+    from bots.tasks import send_broadcast_msgs_chunked
+    from recipes.VideoBots import VideoBotsPage
 
     key = f"__broadcast_msg_{bi.id}"
-    platform = Platform(bi.platform).name.lower()
+    api_docs_url = (
+        furl(
+            settings.API_BASE_URL,
+            fragment_path=f"operation/{VideoBotsPage.slug_versions[0]}__broadcast",
+        )
+        / "docs"
+    )
     text = st.text_area(
         f"""
         ##### Broadcast Message
         Broadcast a message to all users of this integration using this bot account.  \\
-        Use the [API](https://api.gooey.ai/docs#operation/{platform}__broadcast) with `bot_id={bi.id}`.
+        You can also do this via the [API]({api_docs_url}).
         """,
         key=key + ":text",
         placeholder="Type your message here...",
@@ -130,17 +138,14 @@ def broadcast_input(bi: BotIntegration):
         st.success("Started sending broadcast!")
         st.session_state.pop(confirmed_send_btn)
         st.session_state.pop(should_confirm_key)
-        convo_ids = list(convos.values_list("id", flat=True))
-        for i in range(0, len(convo_ids), 100):
-            send_broadcast_msg.delay(
-                text=text,
-                audio=audio,
-                video=video,
-                buttons=None,
-                documents=documents,
-                bi_id=bi.id,
-                convo_ids=convo_ids[i : i + 100],
-            )
+        send_broadcast_msgs_chunked(
+            text=text,
+            audio=audio,
+            video=video,
+            documents=documents,
+            bi=bi,
+            convo_qs=convos,
+        )
     else:
         if not convos.exists():
             st.error("No users have interacted with this bot yet.", icon="⚠️")

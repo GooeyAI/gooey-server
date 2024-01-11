@@ -24,10 +24,6 @@ from daras_ai_v2.slack_bot import (
     parse_slack_response,
 )
 
-from routers.api import bot_integration_to_api
-
-bot_integration_to_api(SlackBot)
-
 router = APIRouter()
 
 slack_connect_url = furl(

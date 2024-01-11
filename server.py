@@ -25,7 +25,7 @@ from auth.auth_backend import (
     SessionAuthBackend,
 )
 from daras_ai_v2 import settings
-from routers import billing, facebook_api, api, root, slack_api, paypal
+from routers import billing, facebook_api, api, root, slack_api, paypal, broadcast_api
 import url_shortener.routers as url_shortener
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
@@ -33,6 +33,7 @@ app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url="/docs")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(api.app)
+app.include_router(broadcast_api.app)
 app.include_router(billing.router, include_in_schema=False)
 app.include_router(facebook_api.router, include_in_schema=False)
 app.include_router(slack_api.router, include_in_schema=False)

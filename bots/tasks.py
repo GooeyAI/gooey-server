@@ -1,6 +1,7 @@
 import json
 
 from celery import shared_task
+from django.db.models import QuerySet
 
 from app_users.models import AppUser
 from bots.models import (
@@ -66,6 +67,29 @@ def msg_analysis(msg_id: int):
     Message.objects.filter(id=msg_id).update(
         analysis_result=json.loads(flatten(sr.state["output_text"].values())[0]),
     )
+
+
+def send_broadcast_msgs_chunked(
+    *,
+    text: str,
+    audio: str,
+    video: str,
+    documents: list[str],
+    buttons: list[ReplyButton] = None,
+    convo_qs: QuerySet[Conversation],
+    bi: BotIntegration,
+):
+    convo_ids = list(convo_qs.values_list("id", flat=True))
+    for i in range(0, len(convo_ids), 100):
+        send_broadcast_msg.delay(
+            text=text,
+            audio=audio,
+            video=video,
+            buttons=buttons,
+            documents=documents,
+            bi_id=bi.id,
+            convo_ids=convo_ids[i : i + 100],
+        )
 
 
 @shared_task

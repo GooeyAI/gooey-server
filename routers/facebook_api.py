@@ -9,29 +9,10 @@ from starlette.responses import HTMLResponse, Response
 
 from bots.models import BotIntegration
 from daras_ai_v2 import settings, db
+from daras_ai_v2.bots import _on_msg, request_json
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.bots import _on_msg, request_json
-
-from routers.api import bot_integration_to_api, BotBroadcastRequestModel
-from pydantic import Field
-
-
-class WhatsappBroadcastRequestModel(BotBroadcastRequestModel):
-    wa_numbers: list[str] | None = Field(
-        description="List of whatsapp numbers to broadcast to. If not provided, will broadcast to all whatsapp numbers of this bot."
-    )
-
-
-def getConvoFilterKwargs(bot_request: WhatsappBroadcastRequestModel):
-    convo_filter_kwargs = {}
-    if bot_request.wa_numbers:
-        convo_filter_kwargs["wa_phone_number__in"] = bot_request.wa_numbers
-    return convo_filter_kwargs
-
-
-bot_integration_to_api(WhatsappBot, WhatsappBroadcastRequestModel, getConvoFilterKwargs)
 
 router = APIRouter()
 
