@@ -5,8 +5,8 @@ from starlette.testclient import TestClient
 from bots.models import SavedRun
 from daras_ai_v2.all_pages import all_api_pages
 from daras_ai_v2.tabs_widget import MenuTabs
-from routers import facebook
-from routers.slack import slack_connect_redirect_shortcuts, slack_connect_redirect
+from routers import facebook_api
+from routers.slack_api import slack_connect_redirect_shortcuts, slack_connect_redirect
 from server import app
 
 client = TestClient(app)
