@@ -18,14 +18,12 @@ from bots.models import (
     ConvoState,
     Workflow,
     MessageAttachment,
-    BotIntegration,
 )
 from daras_ai_v2.asr import AsrModels, run_google_translate
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
-from celeryapp.celeryconfig import app
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 
 PAGE_NOT_CONNECTED_ERROR = (
@@ -119,19 +117,6 @@ class BotInterface:
         documents: list[str] = None,
         should_translate: bool = False,
     ) -> str | None:
-        raise NotImplementedError
-
-    @classmethod
-    def broadcast(
-        cls,
-        *,
-        bi: BotIntegration,
-        text: str = "",
-        audio: str | None = None,
-        video: str | None = None,
-        buttons: list | None = None,
-        convo_filter_kwargs: dict | None = None,
-    ):
         raise NotImplementedError
 
     def mark_read(self):
@@ -568,129 +553,3 @@ def _feedback_start_buttons() -> list[ReplyButton]:
         {"id": ButtonIds.feedback_thumbs_up, "title": "👍🏾"},
         {"id": ButtonIds.feedback_thumbs_down, "title": "👎🏽"},
     ]
-
-
-def _process_msg(
-    *,
-    page_cls,
-    api_user: AppUser,
-    query_params: dict,
-    convo: Conversation,
-    input_images: list[str] | None,
-    input_text: str,
-    user_language: str,
-    speech_run: str | None,
-) -> tuple[str, str | None, str | None, Message, Message]:
-    from routers.api import call_api
-
-    # get latest messages for context (upto 100)
-    saved_msgs = convo.messages.all().as_llm_context()
-
-    # # mock testing
-    # result = _mock_api_output(input_text)
-
-    # call the api with provided input
-    result = call_api(
-        page_cls=page_cls,
-        user=api_user,
-        request_body={
-            "input_prompt": input_text,
-            "input_images": input_images,
-            "messages": saved_msgs,
-            "user_language": user_language,
-        },
-        query_params=query_params,
-    )
-
-    # extract response video/audio/text
-    try:
-        response_video = result["output"]["output_video"][0]
-    except (KeyError, IndexError):
-        response_video = None
-    try:
-        response_audio = result["output"]["output_audio"][0]
-    except (KeyError, IndexError):
-        response_audio = None
-    raw_input_text = result["output"]["raw_input_text"]
-    output_text = result["output"]["output_text"][0]
-    raw_output_text = result["output"]["raw_output_text"][0]
-    response_text = result["output"]["output_text"][0]
-    # save new messages for future context
-    user_msg = Message(
-        conversation=convo,
-        role=CHATML_ROLE_USER,
-        content=raw_input_text,
-        display_content=input_text,
-        saved_run=SavedRun.objects.get_or_create(
-            workflow=Workflow.ASR, **furl(speech_run).query.params
-        )[0]
-        if speech_run
-        else None,
-    )
-    assistant_msg = Message(
-        conversation=convo,
-        role=CHATML_ROLE_ASSISTANT,
-        content=raw_output_text,
-        display_content=output_text,
-        saved_run=SavedRun.objects.get_or_create(
-            workflow=Workflow.VIDEO_BOTS, **furl(result.get("url", "")).query.params
-        )[0],
-    )
-    return response_text, response_audio, response_video, user_msg, assistant_msg
-
-
-def save_broadcast_message(convo: Conversation, text: str, id: str | None = None):
-    message = Message(
-        conversation=convo,
-        role=CHATML_ROLE_ASSISTANT,
-        content=text,
-        display_content=text,
-        saved_run=None,
-    )
-    if id:
-        message.platform_msg_id = id
-    message.save()
-    return message
-
-
-@app.task
-def save_broadcast_messages(
-    convos: list[Conversation],
-    text: str,
-    ids: typing.Sequence[str | None] | None = None,
-) -> "celery.result.AsyncResult":
-    if ids == None:
-        ids = [None] * len(convos)
-    for convo, id in zip(convos, ids):
-        save_broadcast_message(convo, text, id)
-
-
-def broadcast_input(bi: BotIntegration, key="broadcast_message"):
-    import gooey_ui as st
-    from routers.api import registered_broadcasts
-
-    platform = Platform(bi.platform).name.lower()
-
-    if platform not in registered_broadcasts:
-        st.write(f"Broadcasting is not supported for {platform}")
-        return
-
-    with st.div(
-        className="px-3 pt-3 d-flex gap-1",
-        style=dict(background="rgba(239, 239, 239, 0.6)"),
-    ):
-        with st.div(className="flex-grow-1"):
-            broadcast_message = st.text_area(
-                "",
-                key="slack_broadcast_message_" + str(bi.id),
-                placeholder="Broadcast Message",
-                style=dict(height="3.2rem"),
-            )
-        if st.button("Broadcast", style=dict(height="3.2rem"), key=key):
-            registered_broadcasts[platform].broadcast(
-                bi=bi,
-                text=broadcast_message,
-            )
-    st.caption(
-        f"Broadcast a message to all users of this integration using this bot account. Use the [API](https://api.gooey.ai/docs#operation/{platform}__broadcast) (with bot_id={bi.id}) for the full feature set: sending audio, videos, buttons, etc."
-    )

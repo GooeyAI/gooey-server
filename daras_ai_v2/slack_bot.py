@@ -126,51 +126,6 @@ class SlackBot(BotInterface):
         button_id = self._actions[0]["value"]
         return button_id, self._msg_ts
 
-    @classmethod
-    def broadcast(
-        cls,
-        *,
-        bi: BotIntegration,
-        text: str = "",
-        audio: str | None = None,
-        video: str | None = None,
-        buttons: list | None = None,
-        convo_filter_kwargs: dict | None = None,
-    ):
-        if buttons is None:
-            buttons = []
-        res = requests.post(
-            str(bi.slack_channel_hook_url),
-            json={
-                "text": text,
-                "username": bi.name,
-                "icon_emoji": ":robot_face:",
-                "blocks": [
-                    {
-                        "type": "section",
-                        "text": {"type": "mrkdwn", "text": text},
-                    },
-                ]
-                + create_file_block("Audio", bi.slack_access_token, audio)
-                + create_file_block("Video", bi.slack_access_token, video)
-                + create_button_block(buttons),
-            },
-        )
-        if res.ok:
-            # the message went through, so we'll save it under all main channel (not personal channel) conversations (since we broadcasted to the main channel)
-            from daras_ai_v2.bots import save_broadcast_messages
-            from bots.models import Conversation
-
-            # save the message in the background so we can return immediately from the api call
-            save_broadcast_messages.delay(
-                convos=Conversation.objects.filter(
-                    bot_integration=bi, slack_channel_is_personal=False
-                ),
-                text=text,
-            )
-
-        return res
-
     def send_msg(
         self,
         *,
@@ -195,28 +150,57 @@ class SlackBot(BotInterface):
             )
             self._read_rcpt_ts = None
 
+        self._msg_ts = self.send_msg_to(
+            text=text,
+            audio=audio,
+            video=video,
+            buttons=buttons,
+            channel=self.bot_id,
+            channel_is_personal=self.convo.slack_channel_is_personal,
+            username=self.convo.bot_integration.name,
+            token=self._access_token,
+            thread_ts=self._msg_ts,
+        )
+        return self._msg_ts
+
+    @classmethod
+    def send_msg_to(
+        cls,
+        *,
+        text: str | None = None,
+        audio: str = None,
+        video: str = None,
+        buttons: list[ReplyButton] = None,
+        documents: list[str] = None,
+        ## whatsapp specific
+        channel: str,
+        channel_is_personal: bool,
+        username: str,
+        token: str,
+        thread_ts: str = None,
+    ) -> str | None:
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
         for doc in splits[:-1]:
-            self._msg_ts = chat_post_message(
+            thread_ts = chat_post_message(
                 text=doc.text,
-                channel=self.bot_id,
-                channel_is_personal=self.convo.slack_channel_is_personal,
-                thread_ts=self._msg_ts,
-                username=self.convo.bot_integration.name,
-                token=self._access_token,
+                channel=channel,
+                channel_is_personal=channel_is_personal,
+                thread_ts=thread_ts,
+                username=username,
+                token=token,
             )
-        self._msg_ts = chat_post_message(
+        thread_ts = chat_post_message(
             text=splits[-1].text,
             audio=audio,
             video=video,
-            channel=self.bot_id,
-            channel_is_personal=self.convo.slack_channel_is_personal,
-            thread_ts=self._msg_ts,
-            username=self.convo.bot_integration.name,
-            token=self._access_token,
             buttons=buttons or [],
+            channel=channel,
+            channel_is_personal=channel_is_personal,
+            thread_ts=thread_ts,
+            username=username,
+            token=token,
         )
-        return self._msg_ts
+        return thread_ts
 
     def mark_read(self):
         text = self.convo.bot_integration.slack_read_receipt_msg.strip()

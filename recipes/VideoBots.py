@@ -1023,7 +1023,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 bi.user_language = (
                     st.session_state.get("user_language") or bi.user_language
                 )
-                bi.saved_run = current_sr
+                bi.saved_run = current_run
+                bi.published_run = published_run
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg
 
