@@ -1017,9 +1017,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 render_bot_test_link(bi)
             if is_connected:
                 with col3, st.expander(f"📨 {bi.get_platform_display()} Settings"):
-                    general_integration_settings(bi)
                     if bi.platform == Platform.SLACK:
                         self.slack_specific_settings(bi)
+                    general_integration_settings(bi)
                     if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
                         st.write("---")
                         broadcast_input(bi)
