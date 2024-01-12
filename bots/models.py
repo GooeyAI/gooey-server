@@ -102,7 +102,7 @@ class Workflow(models.IntegerChoices):
             query_params |= dict(example_id=example_id)
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
-            / self.short_slug
+            / self.page_cls.slug_versions[-1]
             / "/"
         )
 
