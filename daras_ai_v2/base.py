@@ -204,7 +204,7 @@ class BasePage:
 
         self._render_header()
 
-        self._render_tab_menu(self, selected_tab=self.tab)
+        self._render_tab_menu(selected_tab=self.tab)
         with st.nav_tab_content():
             self.render_selected_tab(self.tab)
 
@@ -916,7 +916,7 @@ class BasePage:
     @classmethod
     def get_pr_from_query_params(
         cls, example_id: str, run_id: str, uid: str
-    ) -> PublishedRun:
+    ) -> PublishedRun | None:
         if run_id and uid:
             sr = cls.get_sr_from_query_params(example_id, run_id, uid)
             return (
