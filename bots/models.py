@@ -17,6 +17,7 @@ from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
+from daras_ai_v2.slugify import slugify
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -93,7 +94,7 @@ class Workflow(models.IntegerChoices):
     def short_slug(self):
         return min(self.page_cls.slug_versions, key=len)
 
-    def get_app_url(self, example_id: str, run_id: str, uid: str):
+    def get_app_url(self, example_id: str, run_id: str, uid: str, run_slug: str = ""):
         """return the url to the gooey app"""
         query_params = {}
         if run_id and uid:
@@ -103,6 +104,7 @@ class Workflow(models.IntegerChoices):
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
             / self.page_cls.slug_versions[-1]
+            / run_slug
             / "/"
         )
 
@@ -1149,7 +1151,10 @@ class PublishedRun(models.Model):
 
     def get_app_url(self):
         return Workflow(self.workflow).get_app_url(
-            example_id=self.published_run_id, run_id="", uid=""
+            example_id=self.published_run_id,
+            run_id="",
+            uid="",
+            run_slug=self.title and slugify(self.title),
         )
 
     def add_version(

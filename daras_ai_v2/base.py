@@ -57,6 +57,7 @@ from daras_ai_v2.query_params_util import (
     extract_query_params,
 )
 from daras_ai_v2.send_email import send_reported_run_email
+from daras_ai_v2.slugify import slugify
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import (
     render_js_dynamic_dates,
@@ -139,6 +140,10 @@ class BasePage:
         f = furl(settings.APP_BASE_URL, query_params=query_params) / (
             cls.slug_versions[-1] + "/"
         )
+        if example_id := query_params.get("example_id"):
+            pr = cls.get_published_run(published_run_id=example_id)
+            if pr and pr.title:
+                f /= slugify(pr.title)
         if tab_name:
             f /= tab_name + "/"
         return str(f)
