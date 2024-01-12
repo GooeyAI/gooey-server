@@ -196,6 +196,22 @@ class BasePage:
             self.render_report_form()
             return
 
+        self._render_header()
+
+        self._render_tab_menu(self, selected_tab=self.tab)
+        with st.nav_tab_content():
+            self.render_selected_tab(self.tab)
+
+    def _render_tab_menu(self, selected_tab: str):
+        assert selected_tab in MenuTabs.paths
+
+        with st.nav_tabs():
+            for name in self.get_tabs():
+                url = self.get_tab_url(name)
+                with st.nav_item(url, active=name == selected_tab):
+                    st.html(name)
+
+    def _render_header(self):
         current_run = self.get_current_sr()
         published_run = self.get_current_published_run()
         is_root_example = (
@@ -204,6 +220,7 @@ class BasePage:
             and published_run.saved_run == current_run
         )
         tbreadcrumbs = get_title_breadcrumbs(self, current_run, published_run)
+
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
                 if not tbreadcrumbs.has_breadcrumbs() and not self.run_user:
@@ -264,21 +281,6 @@ class BasePage:
                 st.write(published_run.notes)
             elif is_root_example:
                 st.write(self.preview_description(current_run.to_dict()))
-
-        try:
-            selected_tab = MenuTabs.paths_reverse[self.tab]
-        except KeyError:
-            st.error(f"## 404 - Tab {self.tab!r} Not found")
-            return
-
-        with st.nav_tabs():
-            tab_names = self.get_tabs()
-            for name in tab_names:
-                url = self.get_tab_url(name)
-                with st.nav_item(url, active=name == selected_tab):
-                    st.html(name)
-        with st.nav_tab_content():
-            self.render_selected_tab(selected_tab)
 
     def _render_title(self, title: str):
         st.write(f"# {title}")
@@ -1880,19 +1882,6 @@ def err_msg_for_exc(e):
         return f"{type(e).__name__}: {e}"
 
 
-class RedirectException(Exception):
-    def __init__(self, url, status_code=302):
-        self.url = url
-        self.status_code = status_code
-
-
-class QueryParamsRedirectException(RedirectException):
-    def __init__(self, query_params: dict, status_code=303):
-        query_params = {k: v for k, v in query_params.items() if v is not None}
-        url = "?" + urllib.parse.urlencode(query_params)
-        super().__init__(url, status_code)
-
-
 def force_redirect(url: str):
     # note: assumes sanitized URLs
     st.html(
@@ -1904,5 +1893,16 @@ def force_redirect(url: str):
     )
 
 
-def reverse_enumerate(start, iterator):
-    return zip(range(start, -1, -1), iterator)
+
+
+class RedirectException(Exception):
+    def __init__(self, url, status_code=302):
+        self.url = url
+        self.status_code = status_code
+
+
+class QueryParamsRedirectException(RedirectException):
+    def __init__(self, query_params: dict, status_code=303):
+        query_params = {k: v for k, v in query_params.items() if v is not None}
+        url = "?" + urllib.parse.urlencode(query_params)
+        super().__init__(url, status_code)
