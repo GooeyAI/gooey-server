@@ -173,19 +173,25 @@ class BasePage:
             tab_name=MenuTabs.paths[tab],
         )
 
-    def render(self):
+    def setup_render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
+    def refresh_state(self):
+        _, run_id, uid = extract_query_params(gooey_get_query_params())
+        channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
+        output = realtime_pull([channel])[0]
+        if output:
+            st.session_state.update(output)
+
+    def render(self):
+        self.setup_render()
+
         if self.get_run_state() == RecipeRunState.running:
-            _, run_id, uid = extract_query_params(gooey_get_query_params())
-            channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
-            output = realtime_pull([channel])[0]
-            if output:
-                st.session_state.update(output)
+            self.refresh_state()
         else:
             realtime_clear_subs()
 
