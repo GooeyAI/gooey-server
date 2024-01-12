@@ -460,14 +460,14 @@ class BasePage:
 
         if not pressed_save:
             return
-        recipe_title = self.get_root_published_run().title or self.title
+
         is_root_published_run = is_update_mode and published_run.is_root()
-        if (
-            not is_root_published_run
-            and published_run_title.strip() == recipe_title.strip()
-        ):
-            st.error("Title can't be the same as the recipe title", icon="⚠️")
-            return
+        if not is_root_published_run:
+            try:
+                self._validate_published_run_title(published_run_title)
+            except TitleValidationError as e:
+                st.error(str(e))
+                return
 
         if is_update_mode:
             updates = dict(
@@ -492,6 +492,18 @@ class BasePage:
                 visibility=published_run_visibility,
             )
         force_redirect(published_run.get_app_url())
+
+    def _validate_published_run_title(self, title: str):
+        if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
+            raise TitleValidationError(
+                "This title is not allowed. Please choose a different title."
+            )
+        elif title.strip() == self.get_recipe_title():
+            raise TitleValidationError(
+                "Please choose a different title for your published run."
+            )
+        elif title.strip() == "":
+            raise TitleValidationError("Title cannot be empty.")
 
     def _has_published_run_changed(
         self,
@@ -1915,3 +1927,7 @@ class QueryParamsRedirectException(RedirectException):
         query_params = {k: v for k, v in query_params.items() if v is not None}
         url = "?" + urllib.parse.urlencode(query_params)
         super().__init__(url, status_code)
+
+
+class TitleValidationError(Exception):
+    pass
