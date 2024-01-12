@@ -1893,8 +1893,6 @@ def force_redirect(url: str):
     )
 
 
-
-
 class RedirectException(Exception):
     def __init__(self, url, status_code=302):
         self.url = url
