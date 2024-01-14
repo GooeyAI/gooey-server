@@ -40,7 +40,7 @@ class VideoBotsStatsPage(BasePage):
         return furl(self.app_url(), args=args).tostr()
 
     def render(self):
-        self._setup_render()
+        self.setup_render()
 
         if not self.request.user or self.request.user.is_anonymous:
             st.write("**Please Login to view stats for your bot integrations**")
@@ -79,16 +79,21 @@ class VideoBotsStatsPage(BasePage):
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
                 with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                    self._render_breadcrumbs(
-                        [
-                            (VideoBotsPage.title, VideoBotsPage.app_url()),
-                            (run_title, run_url),
-                            (
-                                "Integrations",
-                                VideoBotsPage().get_tab_url(MenuTabs.integrations),
-                            ),
-                        ]
-                    )
+                    with st.breadcrumbs():
+                        st.breadcrumb_item(
+                            VideoBotsPage.title,
+                            link_to=VideoBotsPage.app_url(),
+                            className="text-muted",
+                        )
+                        st.breadcrumb_item(
+                            run_title,
+                            link_to=run_url,
+                            className="text-muted",
+                        )
+                        st.breadcrumb_item(
+                            "Integrations",
+                            link_to=VideoBotsPage().get_tab_url(MenuTabs.integrations),
+                        )
 
                 author = (
                     AppUser.objects.filter(uid=bi.billing_account_uid).first()

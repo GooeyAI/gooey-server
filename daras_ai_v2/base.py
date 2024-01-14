@@ -173,7 +173,7 @@ class BasePage:
             tab_name=MenuTabs.paths[tab],
         )
 
-    def render(self):
+    def setup_render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
@@ -195,6 +195,9 @@ class BasePage:
         if st.session_state.get("show_report_workflow"):
             self.render_report_form()
             return
+
+    def render(self):
+        self.setup_render()
 
         current_run = self.get_current_sr()
         published_run = self.get_current_published_run()
