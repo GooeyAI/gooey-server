@@ -189,14 +189,18 @@ class VideoBotsStatsPage(BasePage):
                     "start_date", start_of_year_date.strftime("%Y-%m-%d")
                 ),
             )
-            start_date: datetime = st.date_input("Start date", key="start_date")  # type: ignore
+            start_date: datetime = (
+                st.date_input("Start date", key="start_date") or start_of_year_date
+            )
             st.session_state.setdefault(
                 "end_date",
                 self.request.query_params.get(
                     "end_date", datetime.now().strftime("%Y-%m-%d")
                 ),
             )
-            end_date: datetime = st.date_input("End date", key="end_date")  # type: ignore
+            end_date: datetime = (
+                st.date_input("End date", key="end_date") or datetime.now()
+            )
             st.session_state.setdefault(
                 "view", self.request.query_params.get("view", "Weekly")
             )
@@ -291,6 +295,9 @@ class VideoBotsStatsPage(BasePage):
             }
             data.append(ctx)
             date += delta
+        if len(data) == 0:
+            st.write("No data to show yet.")
+            return
         df = pd.DataFrame(data)
 
         with col2:

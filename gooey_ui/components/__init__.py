@@ -688,7 +688,10 @@ def date_input(
         ),
         **props,
     )
-    return datetime.strptime(value, "%Y-%m-%d") if value else None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d") if value else None
+    except ValueError:
+        return None
 
 
 def password_input(
