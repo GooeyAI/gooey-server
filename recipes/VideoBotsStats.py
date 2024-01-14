@@ -312,15 +312,13 @@ class VideoBotsStatsPage(BasePage):
                         title="User Messages Sent",
                         range=[
                             0,
-                            df[[col for col in df if col != "date"]].max().max(),
+                            df["Messages_Sent"].max() + 10,
                         ],
                         tickvals=[
                             *range(
-                                0,
-                                int(
-                                    df[[col for col in df if col != "date"]].max().max()
-                                )
-                                + 1,
+                                int(df["Messages_Sent"].max() / 10),
+                                int(df["Messages_Sent"].max()) + 1,
+                                int(df["Messages_Sent"].max() / 10) + 1,
                             )
                         ],
                     ),
@@ -396,19 +394,6 @@ class VideoBotsStatsPage(BasePage):
                     margin=dict(l=0, r=0, t=28, b=0),
                     yaxis=dict(
                         title="Unique Count",
-                        range=[
-                            -0.2,
-                            df[[col for col in df if col != "date"]].max().max() + 0.2,
-                        ],
-                        tickvals=[
-                            *range(
-                                0,
-                                int(
-                                    df[[col for col in df if col != "date"]].max().max()
-                                )
-                                + 1,
-                            )
-                        ],
                     ),
                     title=dict(
                         text=f"{view} Usage Trends",
@@ -417,6 +402,37 @@ class VideoBotsStatsPage(BasePage):
                     template="plotly_white",
                 ),
             )
+            max_value = (
+                df[
+                    [
+                        "Senders",
+                        "Convos",
+                        "Unique_feedback_givers",
+                        "Pos_feedback",
+                        "Neg_feedback",
+                        "Msgs_per_convo",
+                        "Msgs_per_user",
+                    ]
+                ]
+                .max()
+                .max()
+            )
+            if max_value < 10:
+                # only set fixed axis scale if the data doesn't have enough values to make it look good
+                # otherwise default behaviour is better since it adapts when user deselects a line
+                fig.update_yaxes(
+                    range=[
+                        -0.2,
+                        max_value + 10,
+                    ],
+                    tickvals=[
+                        *range(
+                            int(max_value / 10),
+                            int(max_value) + 10,
+                            int(max_value / 10) + 1,
+                        )
+                    ],
+                )
             st.plotly_chart(fig)
 
         st.write("---")
