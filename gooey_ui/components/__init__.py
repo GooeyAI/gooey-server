@@ -479,6 +479,7 @@ def file_uploader(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     upload_meta: dict = None,
+    optional: bool = False,
 ):
     if label_visibility != "visible":
         label = None
@@ -492,6 +493,13 @@ def file_uploader(
             help,
             label_visibility,
         )
+    if optional:
+        if not checkbox(
+            label, value=bool(state.session_state.get(key)), disabled=disabled
+        ):
+            state.session_state.pop(key, None)
+            return None
+        label = None
     value = state.session_state.get(key)
     if not value:
         if accept_multiple_files:
@@ -537,52 +545,18 @@ def data_table(file_url_or_cells: str | list):
 
 
 def table(df: "pd.DataFrame"):
-    state.RenderTreeNode(
-        name="table",
-        children=[
-            state.RenderTreeNode(
-                name="thead",
-                children=[
-                    state.RenderTreeNode(
-                        name="tr",
-                        children=[
-                            state.RenderTreeNode(
-                                name="th",
-                                children=[
-                                    state.RenderTreeNode(
-                                        name="markdown",
-                                        props=dict(body=dedent(col)),
-                                    ),
-                                ],
-                            )
-                            for col in df.columns
-                        ],
-                    ),
-                ],
-            ),
-            state.RenderTreeNode(
-                name="tbody",
-                children=[
-                    state.RenderTreeNode(
-                        name="tr",
-                        children=[
-                            state.RenderTreeNode(
-                                name="td",
-                                children=[
-                                    state.RenderTreeNode(
-                                        name="markdown",
-                                        props=dict(body=dedent(str(value))),
-                                    ),
-                                ],
-                            )
-                            for value in row
-                        ],
-                    )
-                    for row in df.itertuples(index=False)
-                ],
-            ),
-        ],
-    ).mount()
+    with tag("table", className="table table-striped table-sm"):
+        with tag("thead"):
+            with tag("tr"):
+                for col in df.columns:
+                    with tag("th", scope="col"):
+                        html(dedent(col))
+        with tag("tbody"):
+            for row in df.itertuples(index=False):
+                with tag("tr"):
+                    for value in row:
+                        with tag("td"):
+                            html(dedent(str(value)))
 
 
 def horizontal_radio(
@@ -626,6 +600,7 @@ def radio(
     options: typing.Sequence[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
     key: str = None,
+    value: T = None,
     help: str = None,
     *,
     disabled: bool = False,
@@ -637,10 +612,10 @@ def radio(
     options = list(options)
     if not key:
         key = md5_values("radio", label, options, help, label_visibility)
-    value = state.session_state.get(key)
-    if (key not in state.session_state or value not in options) and checked_by_default:
+    value = state.session_state.setdefault(key, value)
+    if value not in options and checked_by_default:
         value = options[0]
-    state.session_state.setdefault(key, value)
+        state.session_state[key] = value
     if label_visibility != "visible":
         label = None
     markdown(label)

@@ -7,7 +7,7 @@ from furl import furl
 
 def meta_preview_url(
     file_url: str | None,
-    fallback_img: str | None,
+    fallback_img: str = None,
     size: typing.Literal[
         "400x400", "1170x1560", "40x40", "72x72", "80x80", "96x96"
     ] = "400x400",

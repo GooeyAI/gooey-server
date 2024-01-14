@@ -1,4 +1,6 @@
-import jinja2
+import typing
+
+from pydantic import BaseModel
 
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -7,13 +9,16 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.prompt_vars import render_prompt_vars
 
+Model = typing.TypeVar("Model", bound=BaseModel)
+
 
 def generate_final_search_query(
     *,
-    request,
-    response=None,
+    request: Model,
+    response: Model = None,
     instructions: str,
     context: dict = None,
+    response_format_type: typing.Literal["text", "json_object"] = None,
 ):
     if context is None:
         context = request.dict()
@@ -31,4 +36,5 @@ def generate_final_search_query(
         quality=request.quality,
         temperature=request.sampling_temperature,
         avoid_repetition=request.avoid_repetition,
+        response_format_type=response_format_type,
     )[0]

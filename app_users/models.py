@@ -108,7 +108,9 @@ class AppUser(models.Model):
 
     @db_middleware
     @transaction.atomic
-    def add_balance(self, amount: int, invoice_id: str) -> "AppUserTransaction":
+    def add_balance(
+        self, amount: int, invoice_id: str, **kwargs
+    ) -> "AppUserTransaction":
         """
         Used to add/deduct credits when they are bought or consumed.
 
@@ -117,7 +119,6 @@ class AppUser(models.Model):
         When credits are deducted due to a run -- invoice_id is of the
         form "gooey_in_{uuid}"
         """
-
         # if an invoice entry exists
         try:
             # avoid updating twice for same invoice
@@ -133,12 +134,12 @@ class AppUser(models.Model):
         user: AppUser = AppUser.objects.select_for_update().get(pk=self.pk)
         user.balance += amount
         user.save(update_fields=["balance"])
-
         return AppUserTransaction.objects.create(
             user=self,
             invoice_id=invoice_id,
             amount=amount,
             end_balance=user.balance,
+            **kwargs,
         )
 
     def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
@@ -177,7 +178,9 @@ class AppUser(models.Model):
         default_balance = settings.LOGIN_USER_FREE_CREDITS
         if self.is_anonymous:
             default_balance = settings.ANON_USER_FREE_CREDITS
-        elif provider_list[-1].provider_id == "password":
+        elif (
+            "+" in str(self.email) or "@gmail.com" not in str(self.email)
+        ) and provider_list[-1].provider_id == "password":
             default_balance = settings.EMAIL_USER_FREE_CREDITS
         self.balance = db.get_doc_field(
             doc_ref=db.get_user_doc_ref(user.uid),
@@ -217,13 +220,45 @@ class AppUser(models.Model):
             return customer
 
 
+class PaymentProvider(models.IntegerChoices):
+    STRIPE = 1, "Stripe"
+    PAYPAL = 2, "Paypal"
+
+
 class AppUserTransaction(models.Model):
     user = models.ForeignKey(
         "AppUser", on_delete=models.CASCADE, related_name="transactions"
     )
-    invoice_id = models.CharField(max_length=255, unique=True)
-    amount = models.IntegerField()
-    end_balance = models.IntegerField()
+    invoice_id = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="The Payment Provider's Invoice ID for this transaction.<br>"
+        "For Gooey, this will be of the form 'gooey_in_{uuid}'",
+    )
+
+    amount = models.IntegerField(
+        help_text="The amount (Gooey credits) added/deducted in this transaction.<br>"
+        "Positive for credits added, negative for credits deducted."
+    )
+    end_balance = models.IntegerField(
+        help_text="The end balance (Gooey credits) of the user after this transaction"
+    )
+
+    payment_provider = models.IntegerField(
+        choices=PaymentProvider.choices,
+        null=True,
+        blank=True,
+        default=None,
+        help_text="The payment provider used for this transaction.<br>"
+        "If this is provided, the Charged Amount should also be provided.",
+    )
+    charged_amount = models.PositiveIntegerField(
+        help_text="The charged dollar amount in the currency’s smallest unit.<br>"
+        "E.g. for 10 USD, this would be of 1000 (that is, 1000 cents).<br>"
+        "<a href='https://stripe.com/docs/currencies'>Learn More</a>",
+        default=0,
+    )
+
     created_at = models.DateTimeField(editable=False, blank=True, default=timezone.now)
 
     class Meta:
