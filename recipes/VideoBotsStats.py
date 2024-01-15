@@ -472,7 +472,7 @@ class VideoBotsStatsPage(BasePage):
         if details == "All Conversations":
             df = conversations.to_df()
         elif details == "All Messages":
-            df = messages.order_by("conversation__id").to_df()
+            df = messages.order_by("conversation__id", "-created_at").to_df_formatv2()
         elif details == "Feedback Positive":
             pos_feedbacks: FeedbackQuerySet = Feedback.objects.filter(
                 message__conversation__bot_integration=bi,

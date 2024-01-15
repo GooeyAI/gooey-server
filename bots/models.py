@@ -794,6 +794,37 @@ class MessageQuerySet(models.QuerySet):
         df = pd.DataFrame.from_records(rows)
         return df
 
+    def to_df_formatv2(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
+        # columns:
+        # User
+        # Bot or User
+        # Message (english)
+        # Sent Time
+        # Feedback
+        # Analysis JSON
+        import pandas as pd
+
+        qs = self.all().prefetch_related("feedbacks")
+        rows = []
+        for message in qs[:10000]:
+            message: Message
+            row = {
+                "User": message.conversation.get_display_name(),
+                "Role": message.role,
+                "Message (english)": message.content,
+                "Sent Time": message.created_at.astimezone(tz).replace(tzinfo=None),
+            }
+            row |= {
+                f"Feedback {i + 1}": feedback.get_display_text()
+                for i, feedback in enumerate(message.feedbacks.all())
+            }
+            row |= {
+                "Analysis JSON": message.analysis_result,
+            }
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
     def as_llm_context(self, limit: int = 100) -> list["ConversationEntry"]:
         msgs = self.order_by("-created_at").prefetch_related("attachments")[:limit]
         entries = [None] * len(msgs)
