@@ -16,7 +16,6 @@ from bots.models import (
     MessageQuerySet,
 )
 from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
 import pandas as pd
 import plotly.graph_objects as go
 import base64
