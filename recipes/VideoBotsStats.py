@@ -25,6 +25,14 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
 )
 from recipes.VideoBots import VideoBotsPage
+from django.db.models.functions import (
+    TruncMonth,
+    TruncDay,
+    TruncWeek,
+    TruncYear,
+    Concat,
+)
+from django.db.models import Count
 
 
 class VideoBotsStatsPage(BasePage):
@@ -201,101 +209,109 @@ class VideoBotsStatsPage(BasePage):
             )
             factor = 1
             if view == "Weekly":
-                delta = timedelta(days=7)
+                trunc_fn = TruncWeek
             elif view == "Daily":
                 if end_date - start_date > timedelta(days=31):
                     st.write(
                         "**Note: Date ranges greater than 31 days show weekly averages in daily view**"
                     )
-                    delta = timedelta(days=7)
                     factor = 1.0 / 7.0
+                    trunc_fn = TruncWeek
                 else:
-                    delta = timedelta(days=1)
+                    trunc_fn = TruncDay
             elif view == "Monthly":
-                delta = relativedelta(months=1)
+                trunc_fn = TruncMonth
             else:
-                delta = relativedelta(years=1)
+                trunc_fn = TruncYear
 
-        data = []
-        date = start_date
-        while date <= end_date:
-            messages_received = Message.objects.filter(
-                created_at__date__gte=date,
-                created_at__date__lt=date + delta,
+        messages_received = (
+            Message.objects.filter(
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
                 conversation__bot_integration=bi,
                 role=CHATML_ROLE_USER,
-            ).order_by()
-
-            unique_active_convos = (
-                messages_received.values_list("conversation_id", flat=True)
-                .distinct()
-                .order_by()
             )
+            .order_by()
+            .annotate(date=trunc_fn("created_at"))
+            .values("date")
+            .annotate(Messages_Sent=Count("id"))
+            .annotate(Convos=Count("conversation_id", distinct=True))
+            .annotate(
+                Senders=Count(
+                    Concat(
+                        "conversation__fb_page_id",
+                        "conversation__ig_account_id",
+                        "conversation__wa_phone_number",
+                        "conversation__slack_user_id",
+                    ),
+                    distinct=True,
+                )
+            )
+            .annotate(Unique_feedback_givers=Count("feedbacks", distinct=True))
+            .values(
+                "date",
+                "Messages_Sent",
+                "Convos",
+                "Senders",
+                "Unique_feedback_givers",
+            )
+        )
 
-            unique_active_users = (
-                Conversation.objects.filter(id__in=unique_active_convos)
-                .get_unique_users()
-                .order_by()
-                .count()
-            )  # type: ignore
-
-            unique_active_convos = unique_active_convos.count()
-
-            positive_feedbacks = Feedback.objects.filter(
+        positive_feedbacks = (
+            Feedback.objects.filter(
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
                 message__conversation__bot_integration=bi,
                 rating=Feedback.Rating.RATING_THUMBS_UP,
-                created_at__date__gte=date,
-                created_at__date__lt=date + delta,
-            ).count()
+            )
+            .order_by()
+            .annotate(date=trunc_fn("created_at"))
+            .values("date")
+            .annotate(Pos_feedback=Count("id"))
+            .values("date", "Pos_feedback")
+        )
 
-            negative_feedbacks = Feedback.objects.filter(
+        negative_feedbacks = (
+            Feedback.objects.filter(
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
                 message__conversation__bot_integration=bi,
                 rating=Feedback.Rating.RATING_THUMBS_DOWN,
-                created_at__date__gte=date,
-                created_at__date__lt=date + delta,
-            ).count()
-
-            unique_feedback_givers = (
-                Conversation.objects.filter(
-                    bot_integration=bi,
-                    messages__feedbacks__isnull=False,
-                    created_at__date__gte=date,
-                    created_at__date__lt=date + delta,
-                )
-                .distinct()
-                .count()
             )
-            try:
-                messages_per_unique_convo = round(
-                    len(messages_received) / unique_active_convos
-                )
-            except ZeroDivisionError:
-                messages_per_unique_convo = 0
+            .order_by()
+            .annotate(date=trunc_fn("created_at"))
+            .values("date")
+            .annotate(Neg_feedback=Count("id"))
+            .values("date", "Neg_feedback")
+        )
 
-            try:
-                messages_per_unique_user = round(
-                    len(messages_received) / unique_active_users
-                )
-            except ZeroDivisionError:
-                messages_per_unique_user = 0
+        df = pd.DataFrame(messages_received)
+        df = df.merge(
+            pd.DataFrame(positive_feedbacks),
+            how="outer",
+            left_on="date",
+            right_on="date",
+        )
+        df = df.merge(
+            pd.DataFrame(negative_feedbacks),
+            how="outer",
+            left_on="date",
+            right_on="date",
+        )
+        df["Messages_Sent"] = df["Messages_Sent"] * factor
+        df["Convos"] = df["Convos"] * factor
+        df["Senders"] = df["Senders"] * factor
+        df["Unique_feedback_givers"] = df["Unique_feedback_givers"] * factor
+        df["Pos_feedback"] = df["Pos_feedback"] * factor
+        df["Neg_feedback"] = df["Neg_feedback"] * factor
+        df["Msgs_per_convo"] = df["Messages_Sent"] / df["Convos"]
+        df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
+        df.fillna(0, inplace=True)
+        df = df.round(0).astype("int32", errors="ignore")
 
-            ctx = {
-                "date": date,
-                "Messages_Sent": round(messages_received.count() * factor),
-                "Neg_feedback": round(negative_feedbacks * factor),
-                "Pos_feedback": round(positive_feedbacks * factor),
-                "Convos": round(unique_active_convos * factor),
-                "Senders": round(unique_active_users * factor),
-                "Unique_feedback_givers": round(unique_feedback_givers * factor),
-                "Msgs_per_convo": round(messages_per_unique_convo * factor),
-                "Msgs_per_user": round(messages_per_unique_user * factor),
-            }
-            data.append(ctx)
-            date += delta
-        if len(data) == 0:
+        if df.empty or "date" not in df.columns:
             st.write("No data to show yet.")
             return
-        df = pd.DataFrame(data)
 
         with col2:
             fig = go.Figure(
