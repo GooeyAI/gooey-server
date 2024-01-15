@@ -70,16 +70,17 @@ class VideoBotsStatsPage(BasePage):
         if int(bid) not in allowed_bids:
             bid = allowed_bids[0]
         bi = BotIntegration.objects.get(id=bid)
+        saved_run = bi.get_active_saved_run()
         run_title = (
             bi.published_run.title
             if bi.published_run
-            else bi.saved_run.page_title
-            if bi.saved_run and bi.saved_run.page_title
+            else saved_run.page_title
+            if saved_run and saved_run.page_title
             else "This Copilot Run"
-            if bi.saved_run
+            if saved_run
             else "No Run Connected"
         )
-        run_url = furl(bi.saved_run.get_app_url()).tostr() if bi.saved_run else ""
+        run_url = furl(saved_run.get_app_url()).tostr() if saved_run else ""
 
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
@@ -120,32 +121,20 @@ class VideoBotsStatsPage(BasePage):
         with col1:
             conversations: ConversationQuerySet = Conversation.objects.filter(
                 bot_integration__id=bid
-            )  # type: ignore
+            ).order_by()  # type: ignore
             # due to things like personal convos for slack, each user can have multiple conversations
-            users = set([convo.get_user_id() for convo in conversations])
-            messages = Message.objects.filter(conversation__in=conversations)
-            user_messages = messages.filter(role=CHATML_ROLE_USER)
-            bot_messages = messages.filter(role=CHATML_ROLE_ASSISTANT)
-            num_active_users_last_7_days = len(
-                set(
-                    [
-                        message.conversation.get_user_id()
-                        for message in user_messages.filter(
-                            created_at__gte=datetime.now() - timedelta(days=7),
-                        )
-                    ]
-                )
-            )
-            num_active_users_last_30_days = len(
-                set(
-                    [
-                        message.conversation.get_user_id()
-                        for message in user_messages.filter(
-                            created_at__gte=datetime.now() - timedelta(days=30),
-                        )
-                    ]
-                )
-            )
+            users = conversations.get_unique_users().order_by()
+            messages: MessageQuerySet = Message.objects.filter(conversation__in=conversations).order_by()  # type: ignore
+            user_messages = messages.filter(role=CHATML_ROLE_USER).order_by()
+            bot_messages = messages.filter(role=CHATML_ROLE_ASSISTANT).order_by()
+            num_active_users_last_7_days = user_messages.filter(
+                conversation__in=users,
+                created_at__gte=datetime.now() - timedelta(days=7),
+            ).count()
+            num_active_users_last_30_days = user_messages.filter(
+                conversation__in=users,
+                created_at__gte=datetime.now() - timedelta(days=30),
+            ).count()
             positive_feedbacks = Feedback.objects.filter(
                 message__conversation__bot_integration=bi,
                 rating=Feedback.Rating.RATING_THUMBS_UP,
@@ -170,7 +159,7 @@ class VideoBotsStatsPage(BasePage):
                 - Last Updated: {bi.updated_at.strftime("%b %d, %Y")}
                 - {run_link}
                 - Connected to: {connection_detail}
-                * {len(users)} Users
+                * {users.count()} Users
                 * {num_active_users_last_7_days} Active Users (Last 7 Days)
                 * {num_active_users_last_30_days} Active Users (Last 30 Days)
                 * {conversations.count()} Conversations
@@ -210,39 +199,45 @@ class VideoBotsStatsPage(BasePage):
                 key="view",
                 label_visibility="collapsed",
             )
+            factor = 1
+            if view == "Weekly":
+                delta = timedelta(days=7)
+            elif view == "Daily":
+                if end_date - start_date > timedelta(days=31):
+                    st.write(
+                        "**Note: Date ranges greater than 31 days show weekly averages in daily view**"
+                    )
+                    delta = timedelta(days=7)
+                    factor = 1.0 / 7.0
+                else:
+                    delta = timedelta(days=1)
+            elif view == "Monthly":
+                delta = relativedelta(months=1)
+            else:
+                delta = relativedelta(years=1)
 
         data = []
         date = start_date
-        if view == "Weekly":
-            delta = timedelta(days=7)
-        elif view == "Daily":
-            delta = timedelta(days=1)
-        elif view == "Monthly":
-            delta = relativedelta(months=1)
-        else:
-            delta = timedelta(days=1)
         while date <= end_date:
             messages_received = Message.objects.filter(
                 created_at__date__gte=date,
                 created_at__date__lt=date + delta,
-            ).filter(conversation__bot_integration=bi, role=CHATML_ROLE_USER)
+                conversation__bot_integration=bi,
+                role=CHATML_ROLE_USER,
+            ).order_by()
 
             unique_active_convos = (
-                messages_received.values_list("conversation__id", flat=True)
+                messages_received.values_list("conversation_id", flat=True)
                 .distinct()
                 .order_by()
             )
 
-            unique_users = len(
-                set(
-                    [
-                        convo.get_user_id()
-                        for convo in Conversation.objects.filter(
-                            id__in=unique_active_convos
-                        )
-                    ]
-                )
-            )
+            unique_active_users = (
+                Conversation.objects.filter(id__in=unique_active_convos)
+                .get_unique_users()
+                .order_by()
+                .count()
+            )  # type: ignore
 
             unique_active_convos = unique_active_convos.count()
 
@@ -278,20 +273,22 @@ class VideoBotsStatsPage(BasePage):
                 messages_per_unique_convo = 0
 
             try:
-                messages_per_unique_user = round(len(messages_received) / unique_users)
+                messages_per_unique_user = round(
+                    len(messages_received) / unique_active_users
+                )
             except ZeroDivisionError:
                 messages_per_unique_user = 0
 
             ctx = {
                 "date": date,
-                "Messages_Sent": len(messages_received),
-                "Neg_feedback": negative_feedbacks,
-                "Pos_feedback": positive_feedbacks,
-                "Convos": unique_active_convos,
-                "Senders": unique_users,
-                "Unique_feedback_givers": unique_feedback_givers,
-                "Msgs_per_convo": messages_per_unique_convo,
-                "Msgs_per_user": messages_per_unique_user,
+                "Messages_Sent": round(messages_received.count() * factor),
+                "Neg_feedback": round(negative_feedbacks * factor),
+                "Pos_feedback": round(positive_feedbacks * factor),
+                "Convos": round(unique_active_convos * factor),
+                "Senders": round(unique_active_users * factor),
+                "Unique_feedback_givers": round(unique_feedback_givers * factor),
+                "Msgs_per_convo": round(messages_per_unique_convo * factor),
+                "Msgs_per_user": round(messages_per_unique_user * factor),
             }
             data.append(ctx)
             date += delta
@@ -448,6 +445,7 @@ class VideoBotsStatsPage(BasePage):
             "### Details",
             options=[
                 "All Conversations",
+                "All Messages",
                 "Feedback Positive",
                 "Feedback Negative",
                 "Answered Successfully",
@@ -458,6 +456,8 @@ class VideoBotsStatsPage(BasePage):
 
         if details == "All Conversations":
             df = conversations.to_df()
+        elif details == "All Messages":
+            df = messages.order_by("conversation__id").to_df()
         elif details == "Feedback Positive":
             pos_feedbacks: FeedbackQuerySet = Feedback.objects.filter(
                 message__conversation__bot_integration=bi,
