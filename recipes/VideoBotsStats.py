@@ -284,15 +284,24 @@ class VideoBotsStatsPage(BasePage):
             .values("date", "Neg_feedback")
         )
 
-        df = pd.DataFrame(messages_received)
+        df = pd.DataFrame(
+            messages_received,
+            columns=[
+                "date",
+                "Messages_Sent",
+                "Convos",
+                "Senders",
+                "Unique_feedback_givers",
+            ],
+        )
         df = df.merge(
-            pd.DataFrame(positive_feedbacks),
+            pd.DataFrame(positive_feedbacks, columns=["date", "Pos_feedback"]),
             how="outer",
             left_on="date",
             right_on="date",
         )
         df = df.merge(
-            pd.DataFrame(negative_feedbacks),
+            pd.DataFrame(negative_feedbacks, columns=["date", "Neg_feedback"]),
             how="outer",
             left_on="date",
             right_on="date",
