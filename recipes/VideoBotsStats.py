@@ -481,7 +481,9 @@ class VideoBotsStatsPage(BasePage):
         if details == "All Conversations":
             df = conversations.to_df()
         elif details == "All Messages":
-            df = messages.order_by("conversation__id", "-created_at").to_df_formatv2()
+            df = messages.order_by("-created_at", "conversation__id").to_df_formatv2()
+            df = df.sort_values(by=["User", "Sent Time"], ascending=False).reset_index()
+            df.drop(columns=["index"], inplace=True)
         elif details == "Feedback Positive":
             pos_feedbacks: FeedbackQuerySet = Feedback.objects.filter(
                 message__conversation__bot_integration=bi,
@@ -520,13 +522,13 @@ class VideoBotsStatsPage(BasePage):
                         )
                         for col in range(len(columns))
                     ]
-                    for idx in range(len(df))
+                    for idx in range(min(500, len(df)))
                 ]
             )
             # download as csv button
             csv = df.to_csv()
             b64 = base64.b64encode(csv.encode()).decode()
-            href = f'<a href="data:file/csv;base64,{b64}" download="{bi.name}.csv">Download CSV File</a>'
+            href = f'<a href="data:file/csv;base64,{b64}" download="{bi.name}.csv">Download CSV File</a> with full data (UI only shows first 500 rows)'
             st.markdown(href, unsafe_allow_html=True)
         else:
             st.write("No data to show yet.")

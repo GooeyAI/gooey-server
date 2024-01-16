@@ -795,13 +795,6 @@ class MessageQuerySet(models.QuerySet):
         return df
 
     def to_df_formatv2(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
-        # columns:
-        # User
-        # Bot or User
-        # Message (english)
-        # Sent Time
-        # Feedback
-        # Analysis JSON
         import pandas as pd
 
         qs = self.all().prefetch_related("feedbacks")
@@ -812,7 +805,9 @@ class MessageQuerySet(models.QuerySet):
                 "User": message.conversation.get_display_name(),
                 "Role": message.role,
                 "Message (english)": message.content,
-                "Sent Time": message.created_at.astimezone(tz).replace(tzinfo=None),
+                "Sent Time": message.created_at.astimezone(tz)
+                .replace(tzinfo=None)
+                .strftime("%Y-%m-%d %H:%M"),
             }
             row |= {
                 f"Feedback {i + 1}": feedback.get_display_text()
