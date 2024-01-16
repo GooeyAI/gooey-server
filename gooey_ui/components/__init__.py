@@ -479,6 +479,7 @@ def file_uploader(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     upload_meta: dict = None,
+    optional: bool = False,
 ):
     if label_visibility != "visible":
         label = None
@@ -492,6 +493,13 @@ def file_uploader(
             help,
             label_visibility,
         )
+    if optional:
+        if not checkbox(
+            label, value=bool(state.session_state.get(key)), disabled=disabled
+        ):
+            state.session_state.pop(key, None)
+            return None
+        label = None
     value = state.session_state.get(key)
     if not value:
         if accept_multiple_files:

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
@@ -114,7 +112,7 @@ class Workflow(models.IntegerChoices):
 
         return workflow_map[self]
 
-    def get_or_create_metadata(self) -> WorkflowMetadata:
+    def get_or_create_metadata(self) -> "WorkflowMetadata":
         metadata, _created = WorkflowMetadata.objects.get_or_create(
             workflow=self,
             defaults=dict(
@@ -354,7 +352,7 @@ class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
     def reset_fb_pages_for_user(
         self, uid: str, fb_pages: list[dict]
-    ) -> list[BotIntegration]:
+    ) -> list["BotIntegration"]:
         saved = []
         for fb_page in fb_pages:
             fb_page_id = fb_page["id"]
@@ -1138,7 +1136,7 @@ class PublishedRun(models.Model):
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
-    ) -> PublishedRun:
+    ) -> "PublishedRun":
         return PublishedRun.objects.create_published_run(
             workflow=Workflow(self.workflow),
             published_run_id=get_random_doc_id(),

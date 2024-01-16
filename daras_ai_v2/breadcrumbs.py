@@ -21,6 +21,9 @@ class TitleBreadCrumbs(typing.NamedTuple):
     root_title: TitleUrl | None
     published_title: TitleUrl | None
 
+    def has_breadcrumbs(self):
+        return bool(self.root_title or self.published_title)
+
 
 def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs):
     st.html(
