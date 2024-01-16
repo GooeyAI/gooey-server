@@ -52,7 +52,7 @@ class VideoBotsStatsPage(BasePage):
         if not self.request.user or self.request.user.is_anonymous:
             st.write("**Please Login to view stats for your bot integrations**")
             return
-        if not self.request.user.is_paying:
+        if not self.request.user.is_paying and not self.is_current_user_admin():
             st.write(
                 "**Please upgrade to a paid plan to view stats for your bot integrations**"
             )
