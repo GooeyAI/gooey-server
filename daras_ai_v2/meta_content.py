@@ -46,6 +46,7 @@ def build_meta_tags(
         metadata=metadata,
         pr=pr,
     )
+    is_indexable = get_is_indexable_for_page(page=page, sr=sr, pr=pr)
 
     return raw_build_meta_tags(
         url=url,
@@ -53,6 +54,7 @@ def build_meta_tags(
         description=description,
         image=image,
         canonical_url=canonical_url,
+        is_indexable=is_indexable,
     )
 
 
@@ -63,6 +65,7 @@ def raw_build_meta_tags(
     description: str | None = None,
     image: str | None = None,
     canonical_url: str | None = None,
+    is_indexable: bool | None = None,
 ) -> list[dict[str, str]]:
     ret = [
         dict(title=title),
@@ -91,6 +94,9 @@ def raw_build_meta_tags(
 
     if canonical_url:
         ret += [dict(tagName="link", rel="canonical", href=canonical_url)]
+
+    if is_indexable is False:
+        ret += [dict(name="robots", content="noindex,nofollow")]
 
     return ret
 
@@ -167,35 +173,47 @@ def canonical_url_for_page(
     metadata: WorkflowMetadata,
     sr: SavedRun,
     pr: PublishedRun | None,
-):
+) -> str:
     """
     Assumes that `page.tab` is a valid tab defined in MenuTabs
     """
 
-    latest_slug = page.slug_versions[-1]  # recipe slug
+    latest_slug = page.slug_versions[-1]  # for recipe
+    recipe_url = furl(str(settings.APP_BASE_URL)) / latest_slug
 
-    if (
-        pr
-        and pr.saved_run == sr
-        and not pr.is_root()
-        and page.tab in {MenuTabs.run, MenuTabs.run_as_api, MenuTabs.integrations}
-    ):
-        # on non-root saved workflows, when tab is Run / API / Integrations
-        # the page content depends on the example_id an must be indexed
-        pr_slug = slugify(pr.title) if pr.title else ""
-        query_params = {"example_id": pr.published_run_id}
-    else:
-        # for all other runs and the root workflow, let only the root workflow page be indexed
-        pr_slug = ""
+    if pr and pr.saved_run == sr and pr.is_root():
         query_params = {}
+        pr_slug = ""
+    elif pr and pr.saved_run == sr:
+        query_params = {"example_id": pr.published_run_id}
+        pr_slug = (pr.title and slugify(pr.title)) or ""
+    else:
+        query_params = {"run_id": sr.run_id, "uid": sr.uid}
+        pr_slug = ""
 
-    return str(
-        furl(
-            str(settings.APP_BASE_URL),
-            query_params=query_params,
-        )
-        / latest_slug
-        / pr_slug
-        / MenuTabs.paths[page.tab]
-        / "/"  # preserve trailing slash
-    )
+    tab_path = MenuTabs.paths[page.tab]
+    match page.tab:
+        case MenuTabs.examples:
+            # no query params / run_slug in this case
+            return str(recipe_url / tab_path / "/")
+        case MenuTabs.history, MenuTabs.saved:
+            # no run slug in this case
+            return str(furl(recipe_url, query_params=query_params) / tab_path / "/")
+        case _:
+            # all other cases
+            return str(
+                furl(recipe_url, query_params=query_params) / pr_slug / tab_path / "/"
+            )
+
+
+def get_is_indexable_for_page(
+    *,
+    page: BasePage,
+    sr: SavedRun,
+    pr: PublishedRun | None,
+) -> bool:
+    if pr and pr.saved_run == sr and pr.is_root():
+        # index all tabs on root
+        return True
+
+    return bool(pr and pr.saved_run == sr and page.tab == MenuTabs.run)
