@@ -178,9 +178,9 @@ def canonical_url_for_page(
         pr
         and pr.saved_run == sr
         and not pr.is_root()
-        and page.tab in {MenuTabs.run, MenuTabs.run_as_api}
+        and page.tab in {MenuTabs.run, MenuTabs.run_as_api, MenuTabs.integrations}
     ):
-        # on non-root saved workflows, when tab is Run / API
+        # on non-root saved workflows, when tab is Run / API / Integrations
         # the page content depends on the example_id an must be indexed
         pr_slug = slugify(pr.title) if pr.title else ""
         query_params = {"example_id": pr.published_run_id}
