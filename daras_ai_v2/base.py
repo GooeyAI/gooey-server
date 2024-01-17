@@ -137,15 +137,17 @@ class BasePage:
         query_params = cls.clean_query_params(
             example_id=example_id, run_id=run_id, uid=uid
         ) | (query_params or {})
-        f = furl(settings.APP_BASE_URL, query_params=query_params) / (
-            cls.slug_versions[-1] + "/"
+        f = (
+            furl(settings.APP_BASE_URL, query_params=query_params)
+            / cls.slug_versions[-1]
         )
         if example_id := query_params.get("example_id"):
             pr = cls.get_published_run(published_run_id=example_id)
             if pr and pr.title:
                 f /= slugify(pr.title)
         if tab_name:
-            f /= tab_name + "/"
+            f /= tab_name
+        f /= "/"  # keep trailing slash
         return str(f)
 
     @classmethod

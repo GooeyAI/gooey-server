@@ -333,7 +333,7 @@ Authorization: Bearer GOOEY_API_KEY
 @app.post("/")
 @app.post("/{page_slug}/")
 @app.post("/{page_slug}/{run_slug_or_tab}/")
-@app.post("/{page_slug}/{run_slug_or_tab}/{tab}")
+@app.post("/{page_slug}/{run_slug_or_tab}/{tab}/")
 def st_page(
     request: Request,
     page_slug="",
@@ -342,9 +342,9 @@ def st_page(
     json_data: dict = Depends(request_json),
 ):
     _run_slug, tab = _extract_run_slug_and_tab(run_slug_or_tab, tab)
-    if tab in MenuTabs.paths_reverse:
+    try:
         selected_tab = MenuTabs.paths_reverse[tab]
-    else:
+    except KeyError:
         raise HTTPException(status_code=404)
 
     try:
@@ -356,7 +356,7 @@ def st_page(
     latest_slug = page_cls.slug_versions[-1]
     if latest_slug != page_slug:
         return RedirectResponse(
-            request.url.replace(path=os.path.join("/", latest_slug, tab, ""))
+            request.url.replace(path=os.path.join("/", latest_slug, run_slug, tab, ""))
         )
 
     example_id, run_id, uid = extract_query_params(request.query_params)
