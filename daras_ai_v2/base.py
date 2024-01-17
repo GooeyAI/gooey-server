@@ -206,7 +206,7 @@ class BasePage:
         tbreadcrumbs = get_title_breadcrumbs(self, current_run, published_run)
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
-                if not tbreadcrumbs and not self.run_user:
+                if not tbreadcrumbs.has_breadcrumbs() and not self.run_user:
                     self._render_title(tbreadcrumbs.h1_title)
 
                 if tbreadcrumbs:
@@ -257,7 +257,7 @@ class BasePage:
                     self._render_social_buttons(show_button_text=not can_user_edit_run)
 
         with st.div():
-            if tbreadcrumbs or self.run_user:
+            if tbreadcrumbs.has_breadcrumbs() or self.run_user:
                 # only render title here if the above row was not empty
                 self._render_title(tbreadcrumbs.h1_title)
             if published_run and published_run.notes:

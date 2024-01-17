@@ -9,10 +9,10 @@ from starlette.responses import HTMLResponse, Response
 
 from bots.models import BotIntegration
 from daras_ai_v2 import settings, db
+from daras_ai_v2.bots import _on_msg, request_json
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.bots import _on_msg, request_json
 
 router = APIRouter()
 
