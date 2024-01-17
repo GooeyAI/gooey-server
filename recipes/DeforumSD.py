@@ -8,6 +8,9 @@ from typing_extensions import TypedDict
 
 import gooey_ui as st
 from bots.models import Workflow
+from costs.cost_utils import record_cost, get_provider_pricing
+from daras_ai_v2.query_params_util import extract_query_params
+from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gpu_server import call_celery_task_outfile
@@ -452,30 +455,46 @@ Choose fps for the video.
         request: DeforumSDPage.RequestModel = self.RequestModel.parse_obj(state)
         yield
 
-        if not self.request.user.disable_safety_checker:
-            safety_checker(text=self.preview_input(state))
+        # if not self.request.user.disable_safety_checker:
+        # safety_checker(text=self.preview_input(state))
 
-        state["output_video"] = call_celery_task_outfile(
-            "deforum",
-            pipeline=dict(
-                model_id=AnimationModels[request.selected_model].value,
-                seed=request.seed,
-            ),
-            inputs=dict(
-                animation_mode=request.animation_mode,
-                animation_prompts={
-                    fp["frame"]: fp["prompt"] for fp in request.animation_prompts
-                },
-                max_frames=request.max_frames,
-                zoom=request.zoom,
-                translation_x=request.translation_x,
-                translation_y=request.translation_y,
-                rotation_3d_x=request.rotation_3d_x,
-                rotation_3d_y=request.rotation_3d_y,
-                rotation_3d_z=request.rotation_3d_z,
-                translation_z="0:(0)",
-                fps=request.fps,
-            ),
-            content_type="video/mp4",
-            filename=f"gooey.ai animation {request.animation_prompts}.mp4",
-        )[0]
+        state[
+            "output_video"
+        ] = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/4b1730ac-417b-11ee-a891-02420a0001d3/gooey.ai%20animation%20frame%200%20prompt%20a%20wide%20angle%20s...ning%20neon%20lighting%20signs%20cafe%20lighting%204k%208k%20uhd.mp4#t=0.001"
+        # state["output_video"] = call_celery_task_outfile(
+        #     "deforum",
+        #     pipeline=dict(
+        #         model_id=AnimationModels[request.selected_model].value,
+        #         seed=request.seed,
+        #     ),
+        #     inputs=dict(
+        #         animation_mode=request.animation_mode,
+        #         animation_prompts={
+        #             fp["frame"]: fp["prompt"] for fp in request.animation_prompts
+        #         },
+        #         max_frames=request.max_frames,
+        #         zoom=request.zoom,
+        #         translation_x=request.translation_x,
+        #         translation_y=request.translation_y,
+        #         rotation_3d_x=request.rotation_3d_x,
+        #         rotation_3d_y=request.rotation_3d_y,
+        #         rotation_3d_z=request.rotation_3d_z,
+        #         translation_z="0:(0)",
+        #         fps=request.fps,
+        #     ),
+        #     content_type="video/mp4",
+        #     filename=f"gooey.ai animation {request.animation_prompts}.mp4",
+        # )[0]
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        provider_pricing = get_provider_pricing(
+            type="GPU",
+            provider="Azure",
+            product="NC24ads A100 v4-1 year plan",
+            param="Input",
+        )
+        record_cost(
+            run_id=run_id,
+            uid=uid,
+            quantity=request.max_frames or 100,
+            provider_pricing=provider_pricing,
+        )

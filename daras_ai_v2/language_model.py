@@ -28,8 +28,6 @@ from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
 from daras_ai_v2.text_splitter import default_length_function
-from daras_ai_v2.query_params_util import extract_query_params
-from daras_ai_v2.query_params import gooey_get_query_params
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
 
@@ -45,10 +43,6 @@ class LLMApis(Enum):
     vertex_ai = "Vertex AI"
     openai = "OpenAI"
     together = "Together"
-
-    @classmethod
-    def choices(cls):
-        return tuple((api.name, api.value) for api in cls)
 
 
 class LargeLanguageModels(Enum):
@@ -333,8 +327,6 @@ def run_language_model(
     tools: list[LLMTools] = None,
     response_format_type: typing.Literal["text", "json_object"] = None,
 ) -> list[str] | tuple[list[str], list[list[dict]]] | list[dict]:
-    from costs.cost_utils import record_cost, get_provider_pricing
-
     assert bool(prompt) != bool(
         messages
     ), "Pleave provide exactly one of { prompt, messages }"
@@ -355,7 +347,7 @@ def run_language_model(
                 format_chat_entry(role=entry["role"], content=get_entry_text(entry))
                 for entry in messages
             ]
-        result, output_token, input_token = _run_chat_model(
+        result = _run_chat_model(
             api=api,
             model=model_name,
             messages=messages,  # type: ignore
@@ -378,43 +370,14 @@ def run_language_model(
                 for entry in result
             ]
         if tools:
-            return (
-                out_content,
-                [(entry.get("tool_calls") or []) for entry in result],
-            )
+            return out_content, [(entry.get("tool_calls") or []) for entry in result]
         else:
-            provider_pricing_in = get_provider_pricing(
-                type="LLM",
-                provider=api.name,
-                product=model_name,
-                param="Input",
-            )
-
-            provider_pricing_out = get_provider_pricing(
-                type="LLM",
-                provider=api.name,
-                product=model_name,
-                param="Output",
-            )
-            example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-            record_cost(
-                run_id=run_id,
-                uid=uid,
-                provider_pricing=provider_pricing_in,
-                quantity=input_token,
-            )
-            record_cost(
-                run_id=run_id,
-                uid=uid,
-                provider_pricing=provider_pricing_out,
-                quantity=output_token,
-            )
             return out_content
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
         logger.info(f"{model_name=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
-        result, output_token, input_token = _run_text_model(
+        result = _run_text_model(
             api=api,
             model=model_name,
             prompt=prompt,
@@ -425,7 +388,7 @@ def run_language_model(
             avoid_repetition=avoid_repetition,
             quality=quality,
         )
-        return [msg.strip() for msg in result], output_token, input_token
+        return [msg.strip() for msg in result]
 
 
 def _run_text_model(
@@ -439,7 +402,7 @@ def _run_text_model(
     stop: list[str] | None,
     avoid_repetition: bool,
     quality: float,
-) -> tuple[list[str], int, int]:
+) -> list[str]:
     match api:
         case LLMApis.openai:
             return _run_openai_text(
@@ -476,7 +439,7 @@ def _run_chat_model(
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
     response_format_type: typing.Literal["text", "json_object"] | None,
-) -> tuple[list[ConversationEntry], int, int]:
+) -> list[ConversationEntry]:
     match api:
         case LLMApis.openai:
             return _run_openai_chat(
@@ -527,7 +490,7 @@ def _run_openai_chat(
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
     response_format_type: typing.Literal["text", "json_object"] | None,
-) -> tuple[list[ConversationEntry], int, int]:
+) -> list[ConversationEntry]:
     from openai._types import NOT_GIVEN
 
     if avoid_repetition:
@@ -558,11 +521,7 @@ def _run_openai_chat(
             for model_str in model
         ],
     )
-    return (
-        [choice.message.dict() for choice in r.choices],
-        r.usage.completion_tokens,
-        r.usage.prompt_tokens,
-    )
+    return [choice.message.dict() for choice in r.choices]
 
 
 @retry_if(openai_should_retry)
@@ -587,11 +546,7 @@ def _run_openai_text(
         frequency_penalty=0.1 if avoid_repetition else 0,
         presence_penalty=0.25 if avoid_repetition else 0,
     )
-    return (
-        [choice.text for choice in r.choices],
-        r.usage.completion_tokens,
-        r.usage.prompt_tokens,
-    )
+    return [choice.text for choice in r.choices]
 
 
 def _get_openai_client(model: str):
@@ -620,7 +575,7 @@ def _run_together_chat(
     temperature: float,
     repetition_penalty: float,
     num_outputs: int,
-) -> tuple[list[ConversationEntry], int, int]:
+) -> list[ConversationEntry]:
     """
     Args:
         model: The model version to use for the request.
@@ -648,15 +603,11 @@ def _run_together_chat(
         range(num_outputs),
     )
     ret = []
-    total_out_tokens = 0
-    total_in_tokens = 0
     for r in results:
         raise_for_status(r)
         data = r.json()
         output = data["output"]
         error = output.get("error")
-        total_out_tokens += output.get("usage", {}).get("completion_tokens", 0)
-        total_in_tokens += output.get("usage", {}).get("prompt_tokens", 0)
         if error:
             raise ValueError(error)
         ret.append(
@@ -665,7 +616,7 @@ def _run_together_chat(
                 "content": output["choices"][0]["text"],
             }
         )
-    return ret, total_out_tokens, total_in_tokens
+    return ret
 
 
 @retry_if(vertex_ai_should_retry)
@@ -676,7 +627,7 @@ def _run_palm_chat(
     max_output_tokens: int,
     candidate_count: int,
     temperature: float,
-) -> tuple[list[ConversationEntry], int, int]:
+) -> list[ConversationEntry]:
     """
     Args:
         model_id: The model id to use for the request. See available models: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
@@ -716,18 +667,14 @@ def _run_palm_chat(
     )
     raise_for_status(r)
 
-    return (
-        [
-            {
-                "role": msg["author"],
-                "content": msg["content"],
-            }
-            for pred in r.json()["predictions"]
-            for msg in pred["candidates"]
-        ],
-        r.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
-        r.json()["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
-    )
+    return [
+        {
+            "role": msg["author"],
+            "content": msg["content"],
+        }
+        for pred in r.json()["predictions"]
+        for msg in pred["candidates"]
+    ]
 
 
 @retry_if(vertex_ai_should_retry)
@@ -738,7 +685,7 @@ def _run_palm_text(
     max_output_tokens: int,
     candidate_count: int,
     temperature: float,
-) -> tuple[list[str], int, int]:
+) -> list[str]:
     """
     Args:
         model_id: The model id to use for the request. See available models: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
@@ -764,11 +711,7 @@ def _run_palm_text(
         },
     )
     raise_for_status(res)
-    return (
-        [prediction["content"] for prediction in res.json()["predictions"]],
-        res.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
-        res.json()["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
-    )
+    return [prediction["content"] for prediction in res.json()["predictions"]]
 
 
 def format_chatml_message(entry: ConversationEntry) -> str:

@@ -1,5 +1,11 @@
 from django.db import models
-from daras_ai_v2.language_model import LLMApis
+
+
+class Provider(models.TextChoices):
+    vertex_ai = "Vertex AI"
+    openai = "OpenAI"
+    together = "Together"
+    Azure = "Azure"
 
 
 class Product(models.TextChoices):
@@ -60,6 +66,10 @@ class Product(models.TextChoices):
         "togethercomputer/llama-2-70b-chat",
         "togethercomputer/llama-2-70b-chat",
     )
+    NC24ads_A100_v4_1_year_plan = (
+        "NC24ads A100 v4-1 year plan",
+        "NC24ads A100 v4-1 year plan",
+    )
 
 
 class UsageCost(models.Model):
@@ -90,15 +100,16 @@ class UsageCost(models.Model):
 
 
 class ProviderPricing(models.Model):
-    class Group(models.TextChoices):  # change to different name than type
+    class Group(models.TextChoices):
         LLM = "LLM", "LLM"
+        GPU = "GPU", "GPU"
 
     class Param(models.TextChoices):
         input = "Input", "input"
         output = "Output", "output"
 
     type = models.TextField(choices=Group.choices)
-    provider = models.TextField(choices=LLMApis.choices())
+    provider = models.TextField(choices=Provider.choices)
     product = models.TextField(choices=Product.choices)
     param = models.TextField(choices=Param.choices)
     cost = models.DecimalField(max_digits=13, decimal_places=8)
