@@ -853,7 +853,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         tts_state = dict(state)
         for text in state.get("raw_tts_text", state["raw_output_text"]):
             tts_state["text_prompt"] = text
-            yield from TextToSpeechPage().run(tts_state)
+            yield from TextToSpeechPage(
+                request=self.request, run_user=self.run_user
+            ).run(tts_state)
             state["output_audio"].append(tts_state["audio_url"])
 
         if not request.input_face:
@@ -861,7 +863,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         lip_state = dict(state)
         for audio_url in state["output_audio"]:
             lip_state["input_audio"] = audio_url
-            yield from LipsyncPage().run(lip_state)
+            yield from LipsyncPage(request=self.request, run_user=self.run_user).run(
+                lip_state
+            )
             state["output_video"].append(lip_state["output_video"])
 
     def get_tabs(self):
