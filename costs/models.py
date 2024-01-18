@@ -99,21 +99,23 @@ class UsageCost(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class Group(models.TextChoices):
+    LLM = "LLM", "LLM"
+    GPU = "GPU", "GPU"
+
+
+class Unit(models.TextChoices):
+    input_tokens = "Input Tokens", "input tokens"
+    output_tokens = "Output Tokens", "output tokens"
+    frames = "Frames", "frames"
+
+
 class ProviderPricing(models.Model):
-    class Group(models.TextChoices):
-        LLM = "LLM", "LLM"
-        GPU = "GPU", "GPU"
-
-    class Param(models.TextChoices):
-        input = "Input", "input"
-        output = "Output", "output"
-
     type = models.TextField(choices=Group.choices)
     provider = models.TextField(choices=Provider.choices)
     product = models.TextField(choices=Product.choices)
-    param = models.TextField(choices=Param.choices)
     cost = models.DecimalField(max_digits=13, decimal_places=8)
-    unit = models.TextField(default="")
+    unit = models.TextField(choices=Unit.choices)
     notes = models.TextField(default="")
     created_at = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(auto_now=True)
@@ -121,4 +123,4 @@ class ProviderPricing(models.Model):
     pricing_url = models.TextField(default="")
 
     def __str__(self):
-        return self.type + " " + self.provider + " " + self.product + " " + self.param
+        return self.type + " " + self.provider + " " + self.product + " " + self.unit

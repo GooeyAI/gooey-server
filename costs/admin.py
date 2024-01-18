@@ -22,7 +22,6 @@ class ProviderAdmin(admin.ModelAdmin):
         "type",
         "provider",
         "product",
-        "param",
         "cost",
         "unit",
         "notes",

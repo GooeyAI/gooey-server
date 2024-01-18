@@ -6,14 +6,14 @@ def get_provider_pricing(
     type: str,
     provider: str,
     product: str,
-    param: str,
+    unit: str,
 ) -> ProviderPricing:
-    print("get_provider_pricing", type, provider, product, param)
+    print("get_provider_pricing", type, provider, product, unit)
     return ProviderPricing.objects.get(
         type=type,
         provider=provider,
         product=product,
-        param=param,
+        unit=unit,
     )
 
 
