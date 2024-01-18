@@ -46,7 +46,7 @@ def build_meta_tags(
         metadata=metadata,
         pr=pr,
     )
-    is_indexable = get_is_indexable_for_page(page=page, sr=sr, pr=pr)
+    robots = robots_tag_for_page(page=page, sr=sr, pr=pr)
 
     return raw_build_meta_tags(
         url=url,
@@ -54,7 +54,7 @@ def build_meta_tags(
         description=description,
         image=image,
         canonical_url=canonical_url,
-        is_indexable=is_indexable,
+        robots=robots,
     )
 
 
@@ -65,7 +65,7 @@ def raw_build_meta_tags(
     description: str | None = None,
     image: str | None = None,
     canonical_url: str | None = None,
-    is_indexable: bool | None = None,
+    robots: str | None = None,
 ) -> list[dict[str, str]]:
     ret = [
         dict(title=title),
@@ -95,8 +95,8 @@ def raw_build_meta_tags(
     if canonical_url:
         ret += [dict(tagName="link", rel="canonical", href=canonical_url)]
 
-    if is_indexable is False:
-        ret += [dict(name="robots", content="noindex,nofollow")]
+    if robots:
+        ret += [dict(name="robots", content=robots)]
 
     return ret
 
@@ -204,6 +204,41 @@ def canonical_url_for_page(
             return str(
                 furl(recipe_url, query_params=query_params) / pr_slug / tab_path / "/"
             )
+
+
+def robots_tag_for_page(
+    *,
+    page: BasePage,
+    sr: SavedRun,
+    pr: PublishedRun | None,
+) -> str:
+    is_root = pr and pr.saved_run == sr and pr.is_root()
+    is_example = pr and pr.saved_run == sr and not pr.is_root()
+
+    match page.tab:
+        case MenuTabs.run if is_root or is_example:
+            no_follow, no_index = False, False
+        case MenuTabs.run:  # ordinary run (not example)
+            no_follow, no_index = False, True
+        case MenuTabs.examples:
+            no_follow, no_index = False, False
+        case MenuTabs.run_as_api:
+            no_follow, no_index = False, True
+        case MenuTabs.integrations:
+            no_follow, no_index = True, True
+        case MenuTabs.history:
+            no_follow, no_index = True, True
+        case MenuTabs.saved:
+            no_follow, no_index = True, True
+        case _:
+            raise ValueError(f"Unknown tab: {page.tab}")
+
+    parts = []
+    if no_follow:
+        parts.append("nofollow")
+    if no_index:
+        parts.append("noindex")
+    return ",".join(parts)
 
 
 def get_is_indexable_for_page(
