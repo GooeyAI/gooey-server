@@ -83,6 +83,7 @@ openpyxl = "^3.1.2"
 loguru = "^0.7.2"
 aifail = "^0.1.0"
 pytest-playwright = "^0.4.3"
+flower = "^2.0.1"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"
