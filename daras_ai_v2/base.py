@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import requests
 import sentry_sdk
 from django.utils import timezone
+from django.utils.text import slugify
 from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
@@ -57,7 +58,6 @@ from daras_ai_v2.query_params_util import (
     extract_query_params,
 )
 from daras_ai_v2.send_email import send_reported_run_email
-from daras_ai_v2.slugify import slugify
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import (
     render_js_dynamic_dates,
