@@ -1,8 +1,9 @@
+from django.utils.text import slugify
 from furl import furl
 
 from bots.models import PublishedRun, SavedRun, WorkflowMetadata
 from daras_ai_v2 import settings
-from daras_ai_v2.base import BasePage, slugify
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.tabs_widget import MenuTabs

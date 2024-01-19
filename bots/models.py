@@ -8,7 +8,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
-from django.utils.text import Truncator
+from django.utils.text import Truncator, slugify
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
@@ -17,7 +17,6 @@ from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.language_model import format_chat_entry
-from daras_ai_v2.slugify import slugify
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
