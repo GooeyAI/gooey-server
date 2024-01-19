@@ -623,6 +623,61 @@ class ConversationQuerySet(models.QuerySet):
         df = pd.DataFrame.from_records(rows)
         return df
 
+    def to_df_format(
+        self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=1000
+    ) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.all()
+        rows = []
+        for convo in qs[:row_limit]:
+            convo: Conversation
+            row = {
+                "Name": convo.get_display_name(),
+                "Messages": convo.messages.count(),
+                "Correct Answers": convo.messages.filter(
+                    analysis_result__contains={"Answered": True}
+                ).count(),
+                "Thumbs up": convo.messages.filter(
+                    feedbacks__rating=Feedback.Rating.RATING_THUMBS_UP
+                ).count(),
+                "Thumbs down": convo.messages.filter(
+                    feedbacks__rating=Feedback.Rating.RATING_THUMBS_DOWN
+                ).count(),
+            }
+            try:
+                first_time = (
+                    convo.messages.earliest()
+                    .created_at.astimezone(tz)
+                    .replace(tzinfo=None)
+                )
+                last_time = (
+                    convo.messages.latest()
+                    .created_at.astimezone(tz)
+                    .replace(tzinfo=None)
+                )
+                row |= {
+                    "Last Sent": last_time.strftime("%b %d, %Y %I:%M %p"),
+                    "First Sent": first_time.strftime("%b %d, %Y %I:%M %p"),
+                    "A7": not convo.d7(),
+                    "A30": not convo.d30(),
+                    "R1": last_time - first_time < datetime.timedelta(days=1),
+                    "R7": last_time - first_time < datetime.timedelta(days=7),
+                    "R30": last_time - first_time < datetime.timedelta(days=30),
+                    "Delta Hours": round(
+                        convo.last_active_delta().total_seconds() / 3600
+                    ),
+                }
+            except Message.DoesNotExist:
+                pass
+            row |= {
+                "Created At": convo.created_at.astimezone(tz).replace(tzinfo=None),
+                "Bot": str(convo.bot_integration),
+            }
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
 
 class Conversation(models.Model):
     bot_integration = models.ForeignKey(
@@ -794,26 +849,47 @@ class MessageQuerySet(models.QuerySet):
         df = pd.DataFrame.from_records(rows)
         return df
 
-    def to_df_formatv2(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
+    def to_df_format(
+        self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
+    ) -> "pd.DataFrame":
         import pandas as pd
 
         qs = self.all().prefetch_related("feedbacks")
         rows = []
-        for message in qs[:10000]:
+        for message in qs[:row_limit]:
             message: Message
             row = {
-                "User": message.conversation.get_display_name(),
+                "Name": message.conversation.get_display_name(),
                 "Role": message.role,
-                "Message (english)": message.content,
-                "Sent Time": message.created_at.astimezone(tz)
+                "Message (EN)": message.content,
+                "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%Y-%m-%d %H:%M"),
+                .strftime("%b %d, %Y %I:%M %p"),
+                "Feedback": message.feedbacks.first().get_display_text()
+                if message.feedbacks.first()
+                else None,  # only show first feedback as per Sean's request
+                "Analysis JSON": message.analysis_result,
             }
-            row |= {
-                f"Feedback {i + 1}": feedback.get_display_text()
-                for i, feedback in enumerate(message.feedbacks.all())
-            }
-            row |= {
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
+    def to_df_analysis_format(
+        self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
+    ) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.filter(role=CHATML_ROLE_USER).prefetch_related("feedbacks")
+        rows = []
+        for message in qs[:row_limit]:
+            message: Message
+            row = {
+                "Name": message.conversation.get_display_name(),
+                "Question (EN)": message.content,
+                "Answer (EN)": message.get_next_by_created_at().content,
+                "Sent": message.created_at.astimezone(tz)
+                .replace(tzinfo=None)
+                .strftime("%b %d, %Y %I:%M %p"),
                 "Analysis JSON": message.analysis_result,
             }
             rows.append(row)
@@ -967,6 +1043,37 @@ class FeedbackQuerySet(models.QuerySet):
                     tzinfo=None
                 ),
                 "QUESTION_ANSWERED": feedback.message.question_answered,
+            }
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
+    def to_df_format(
+        self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
+    ) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.all().prefetch_related("message", "message__conversation")
+        rows = []
+        for feedback in qs[:row_limit]:
+            feedback: Feedback
+            row = {
+                "Name": feedback.message.conversation.get_display_name(),
+                "Question (EN)": feedback.message.get_previous_by_created_at().content,
+                "Question Sent": feedback.message.get_previous_by_created_at()
+                .created_at.astimezone(tz)
+                .replace(tzinfo=None)
+                .strftime("%b %d, %Y %I:%M %p"),
+                "Answer (EN)": feedback.message.content,
+                "Answer Sent": feedback.message.created_at.astimezone(tz)
+                .replace(tzinfo=None)
+                .strftime("%b %d, %Y %I:%M %p"),
+                "Rating": Feedback.Rating(feedback.rating).label,
+                "Feedback (EN)": feedback.text_english,
+                "Feedback Sent": feedback.created_at.astimezone(tz)
+                .replace(tzinfo=None)
+                .strftime("%b %d, %Y %I:%M %p"),
+                "Question Answered": feedback.message.question_answered,
             }
             rows.append(row)
         df = pd.DataFrame.from_records(rows)
