@@ -36,13 +36,7 @@ def document_uploader(
     documents = st.session_state.get(key) or []
     if isinstance(documents, str):
         documents = [documents]
-    has_custom_urls = not all(map(is_user_uploaded_url, documents))
-    custom_key = "__custom_" + key
-    if st.checkbox(
-        "Enter Custom URLs", key=f"__custom_checkbox_{key}", value=has_custom_urls
-    ):
-        if not custom_key in st.session_state:
-            st.session_state[custom_key] = "\n".join(documents)
+    if st.session_state.get(f"__custom_checkbox_{key}"):
         if accept_multiple_files:
             widget = st.text_area
             kwargs = dict(height=150)
@@ -51,7 +45,7 @@ def document_uploader(
             kwargs = {}
         text_value = widget(
             label,
-            key=custom_key,
+            value="\n".join(documents),
             label_visibility="collapsed",
             style={
                 "whiteSpace": "pre",
@@ -67,7 +61,6 @@ def document_uploader(
         else:
             st.session_state[key] = text_value
     else:
-        st.session_state.pop(custom_key, None)
         st.file_uploader(
             label,
             label_visibility="collapsed",
@@ -75,6 +68,7 @@ def document_uploader(
             accept=accept,
             accept_multiple_files=accept_multiple_files,
         )
+    st.checkbox("Manually Edit URLs", key=f"__custom_checkbox_{key}")
     return st.session_state.get(key, [])
 
 

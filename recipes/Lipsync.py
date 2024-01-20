@@ -47,6 +47,7 @@ class LipsyncPage(BasePage):
             *Recommended - mp4 / mov / png / jpg* 
             """,
             key="input_face",
+            accept=["video/*", "image/*", "application/octet-stream"],
         )
 
         st.file_uploader(
