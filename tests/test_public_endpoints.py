@@ -12,7 +12,7 @@ from server import app
 client = TestClient(app)
 
 excluded_endpoints = [
-    facebook.fb_webhook_verify.__name__,  # gives 403
+    facebook_api.fb_webhook_verify.__name__,  # gives 403
     slack_connect_redirect.__name__,
     slack_connect_redirect_shortcuts.__name__,
     "get_run_status",  # needs query params
