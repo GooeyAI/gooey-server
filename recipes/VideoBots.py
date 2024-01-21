@@ -544,6 +544,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             if isinstance(final_prompt, str):
                 text_output("**Final Prompt**", value=final_prompt, height=300)
             else:
+                st.write("**Final Prompt**")
                 st.json(final_prompt)
 
         for idx, text in enumerate(st.session_state.get("raw_output_text", [])):
@@ -666,18 +667,16 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         # except IndexError:
         #     user_display_name = CHATML_ROLE_USER
 
-        # construct user prompt
+        # save raw input for reference
         state["raw_input_text"] = user_input
-        user_prompt = {
-            "role": CHATML_ROLE_USER,
-            "content": user_input,
-        }
 
         # if documents are provided, run doc search on the saved msgs and get back the references
         references = None
         if request.documents:
             # formulate the search query as a history of all the messages
-            query_msgs = saved_msgs + [user_prompt]
+            query_msgs = saved_msgs + [
+                format_chat_entry(role=CHATML_ROLE_USER, content=user_input)
+            ]
             clip_idx = convo_window_clipper(
                 query_msgs, model_max_tokens[model] // 2, sep=" "
             )
@@ -741,17 +740,22 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         if references:
             # add task instructions
             task_instructions = render_prompt_vars(request.task_instructions, state)
-            user_prompt["content"] = (
+            user_input = (
                 references_as_prompt(references)
                 + f"\n**********\n{task_instructions.strip()}\n**********\n"
-                + user_prompt["content"]
+                + user_input
             )
+
+        # construct user prompt
+        user_prompt = format_chat_entry(
+            role=CHATML_ROLE_USER, content=user_input, images=request.input_images
+        )
 
         # truncate the history to fit the model's max tokens
         history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
             model_max_tokens[model]
-            - calc_gpt_tokens([system_prompt, user_prompt], is_chat_model=is_chat_model)
+            - calc_gpt_tokens([system_prompt, user_input], is_chat_model=is_chat_model)
             - request.max_tokens
             - SAFETY_BUFFER
         )
