@@ -4,7 +4,7 @@
 <div class="container">
     <div class="user-info">
     <div class="credits-container">
-        <h2>Remaining Credits: {{ humanize.intcomma(user_credits) }}</h2>
+        <div class="h2">Remaining Credits: {{ humanize.intcomma(user_credits) }}</div>
         <p>
             Every time you submit a workflow or make an API call,
             we deduct credits from your account.
@@ -14,7 +14,7 @@
     {% if not subscription %}
         <hr>
         <div class="buy-credits-container">
-            <h2>Buy Credits</h2>
+            <div class="h2">Buy Credits</div>
             <div class="pb-2">
                 Pay via
 
@@ -37,8 +37,8 @@
                 {% for lookup_key, subscription in available_subscriptions.items() %}
                     <ul id="{{ subscription['display']['name'] }}">
                         <li>
-                            <h4>{{ subscription["display"]["title"] }}</h4>
-                            <h5>{{ subscription["display"]["description"] | safe }}</h5>
+                            <div class="h4">{{ subscription["display"]["title"] }}</div>
+                            <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
                             {% if lookup_key == "addon" %}
                                 {% include 'add_on_credits.html' %}
                             {% else %}
@@ -55,8 +55,8 @@
             <div id="paypal-container" style="display: none;">
                 {% for lookup_key, subscription in available_subscriptions.items() %}
                     {% if lookup_key == "addon" %}
-                        <h4>{{ subscription["display"]["title"] }}</h4>
-                        <h5>{{ subscription["display"]["description"] | safe }}</h5>
+                        <div class="h4">{{ subscription["display"]["title"] }}</div>
+                        <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
                         {% for option in [10, 30, 50, 100, 300, 500] %}
                             <button class="streamlit-like-btn paypal-checkout-option"
                                     onclick="setQuantity(this, {{ option * 100 }});">
@@ -72,9 +72,9 @@
         </div>
     {% else %}
         <hr/>
-        <h4 id="subscription-text">
+        <div class="h4" id="subscription-text">
             You are subscribed to {{ subscription["display"]["name"] }}, {{ subscription["display"]["title"] }}
-        </h4>
+        </div>
         <form class="d-inline" action="/__/stripe/cancel-subscription" method="POST">
             <button class="bg-danger streamlit-like-btn" id="cancel-button" type="submit">Cancel Subscription
             </button>
