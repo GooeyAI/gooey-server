@@ -38,6 +38,7 @@ from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
+from daras_ai_v2.tabs_widget import MenuTabs
 from routers.api import request_form_files
 
 app = APIRouter()
@@ -331,27 +332,38 @@ Authorization: Bearer GOOEY_API_KEY
 
 @app.post("/")
 @app.post("/{page_slug}/")
-@app.post("/{page_slug}/{tab}/")
+@app.post("/{page_slug}/{run_slug_or_tab}/")
+@app.post("/{page_slug}/{run_slug_or_tab}/{tab}/")
 def st_page(
     request: Request,
     page_slug="",
+    run_slug_or_tab="",
     tab="",
     json_data: dict = Depends(request_json),
 ):
+    run_slug, tab = _extract_run_slug_and_tab(run_slug_or_tab, tab)
+    try:
+        selected_tab = MenuTabs.paths_reverse[tab]
+    except KeyError:
+        raise HTTPException(status_code=404)
+
     try:
         page_cls = page_slug_map[normalize_slug(page_slug)]
     except KeyError:
         raise HTTPException(status_code=404)
+
     # ensure the latest slug is used
     latest_slug = page_cls.slug_versions[-1]
     if latest_slug != page_slug:
         return RedirectResponse(
-            request.url.replace(path=os.path.join("/", latest_slug, tab, ""))
+            request.url.replace(path=os.path.join("/", latest_slug, run_slug, tab, ""))
         )
 
     example_id, run_id, uid = extract_query_params(request.query_params)
 
-    page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
+    page = page_cls(
+        tab=selected_tab, request=request, run_user=get_run_user(request, uid)
+    )
 
     state = json_data.get("state", {})
     if not state:
@@ -372,19 +384,6 @@ def st_page(
     except RedirectException as e:
         return RedirectResponse(e.url, status_code=e.status_code)
 
-    # Canonical URLs should not include uid or run_id (don't index specific runs).
-    # In the case of examples, all tabs other than "Run" are duplicates of the page
-    # without the `example_id`, and so their canonical shouldn't include `example_id`
-    canonical_url = str(
-        furl(
-            str(settings.APP_BASE_URL),
-            query_params={"example_id": example_id} if not tab and example_id else {},
-        )
-        / latest_slug
-        / tab
-        / "/"  # preserve trailing slash
-    )
-
     ret |= {
         "meta": build_meta_tags(
             url=get_og_url_path(request),
@@ -394,11 +393,6 @@ def st_page(
             uid=uid,
             example_id=example_id,
         )
-        + [dict(tagName="link", rel="canonical", href=canonical_url)]
-        # + [
-        #     dict(tagName="link", rel="icon", href="/static/favicon.ico"),
-        #     dict(tagName="link", rel="stylesheet", href="/static/css/app.css"),
-        # ],
     }
     return ret
 
@@ -440,3 +434,12 @@ def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
 
     st.html(templates.get_template("footer.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))
+
+
+def _extract_run_slug_and_tab(run_slug_or_tab, tab) -> tuple[str, str]:
+    if run_slug_or_tab and tab:
+        return run_slug_or_tab, tab
+    elif run_slug_or_tab in MenuTabs.paths_reverse:
+        return "", run_slug_or_tab
+    else:
+        return run_slug_or_tab, ""
