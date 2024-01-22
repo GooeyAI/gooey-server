@@ -459,34 +459,37 @@ Choose fps for the video.
         # if not self.request.user.disable_safety_checker:
         # safety_checker(text=self.preview_input(state))
 
-        state["output_video"] = state["output_video"] = call_celery_task_outfile(
-            "deforum",
-            pipeline=dict(
-                model_id=AnimationModels[request.selected_model].value,
-                seed=request.seed,
-            ),
-            inputs=dict(
-                animation_mode=request.animation_mode,
-                animation_prompts={
-                    fp["frame"]: fp["prompt"] for fp in request.animation_prompts
-                },
-                max_frames=request.max_frames,
-                zoom=request.zoom,
-                translation_x=request.translation_x,
-                translation_y=request.translation_y,
-                rotation_3d_x=request.rotation_3d_x,
-                rotation_3d_y=request.rotation_3d_y,
-                rotation_3d_z=request.rotation_3d_z,
-                translation_z="0:(0)",
-                fps=request.fps,
-            ),
-            content_type="video/mp4",
-            filename=f"gooey.ai animation {request.animation_prompts}.mp4",
-        )[0]
+        state[
+            "output_video"
+        ] = "http://localhost:3000/animation-generator/?run_id=h6jljkx1&uid=iKJ9nPny8MaO1rHf4Zs08zETLbl2"
+        # state["output_video"] = call_celery_task_outfile(
+        #     "deforum",
+        #     pipeline=dict(
+        #         model_id=AnimationModels[request.selected_model].value,
+        #         seed=request.seed,
+        #     ),
+        #     inputs=dict(
+        #         animation_mode=request.animation_mode,
+        #         animation_prompts={
+        #             fp["frame"]: fp["prompt"] for fp in request.animation_prompts
+        #         },
+        #         max_frames=request.max_frames,
+        #         zoom=request.zoom,
+        #         translation_x=request.translation_x,
+        #         translation_y=request.translation_y,
+        #         rotation_3d_x=request.rotation_3d_x,
+        #         rotation_3d_y=request.rotation_3d_y,
+        #         rotation_3d_z=request.rotation_3d_z,
+        #         translation_z="0:(0)",
+        #         fps=request.fps,
+        #     ),
+        #     content_type="video/mp4",
+        #     filename=f"gooey.ai animation {request.animation_prompts}.mp4",
+        # )[0]
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         provider_pricing = get_provider_pricing(
             type=Group.GPU,
-            provider=Provider.Azure,
+            provider=Provider.azure,
             product=Product.NC24ads_A100_v4_1_year_plan,
             unit=Unit.frames,
         )

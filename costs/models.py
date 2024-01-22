@@ -5,7 +5,7 @@ class Provider(models.TextChoices):
     vertex_ai = "Vertex AI"
     openai = "OpenAI"
     together = "Together"
-    Azure = "Azure"
+    azure = "Azure"
 
 
 class Product(models.TextChoices):
