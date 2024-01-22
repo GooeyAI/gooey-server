@@ -7,9 +7,10 @@ from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
-from bots.models import Workflow, SavedRun
+from bots.models import Workflow, PublishedRun, PublishedRunVisibility, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
@@ -100,7 +101,7 @@ List of URLs to the evaluation runs that you requested.
 
         for url in run_urls:
             try:
-                page_cls, sr = url_to_sr(url)
+                page_cls, sr, _ = url_to_runs(url)
             except:
                 continue
 
@@ -194,18 +195,18 @@ To understand what each field represents, check out our [API docs](https://api.g
         with hidden_col2:
             st.write("##### Outputs")
 
-        # only show the first output field by default, and hide others
-        try:
-            first_out_field = next(
-                field for field in output_fields if "output" in field
-            )
-        except StopIteration:
-            first_out_field = next(iter(output_fields))
+        visible_out_fields = {}
+        # only show the first output & run url field by default, and hide others
+        if output_fields:
+            try:
+                first_out_field = next(
+                    field for field in output_fields if "output" in field
+                )
+            except StopIteration:
+                first_out_field = next(iter(output_fields))
+            visible_out_fields[first_out_field] = output_fields[first_out_field]
+        visible_out_fields["run_url"] = "Run URL"
 
-        visible_out_fields = {
-            first_out_field: output_fields[first_out_field],
-            "run_url": "Run URL",
-        }
         hidden_out_fields = {
             "price": "Price",
             "run_time": "Run Time",
@@ -247,7 +248,10 @@ To understand what each field represents, check out our [API docs](https://api.g
         if eval_runs:
             _backup = st.session_state
             for url in eval_runs:
-                page_cls, sr = url_to_sr(url)
+                try:
+                    page_cls, sr, _ = url_to_runs(url)
+                except SavedRun.DoesNotExist:
+                    continue
                 st.set_session_state(sr.state)
                 page_cls().render_output()
                 st.write("---")
@@ -284,7 +288,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 rec_ix = len(out_recs)
                 out_recs.extend(in_recs[df_ix : df_ix + arr_len])
 
-                for url_ix, f, request_body, page_cls in build_requests_for_df(
+                for url_ix, request_body, page_cls, sr, pr in build_requests_for_df(
                     df, request, df_ix, arr_len
                 ):
                     progress = round(
@@ -293,9 +297,6 @@ To understand what each field represents, check out our [API docs](https://api.g
                         * 100
                     )
                     yield f"{progress}%"
-
-                    example_id, run_id, uid = extract_query_params(f.query.params)
-                    sr = page_cls.get_sr_from_query_params(example_id, run_id, uid)
 
                     result, sr = sr.submit_api_call(
                         current_user=self.request.user, request_body=request_body
@@ -314,8 +315,8 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                     for field, col in request.output_columns.items():
                         if len(request.run_urls) > 1:
-                            if sr.page_title:
-                                col = f"({sr.page_title}) {col}"
+                            if pr and pr.title:
+                                col = f"({pr.title}) {col}"
                             else:
                                 col = f"({url_ix + 1}) {col}"
                         out_val = state.get(field)
@@ -357,8 +358,8 @@ To understand what each field represents, check out our [API docs](https://api.g
 
         response.eval_runs = []
         for url in request.eval_urls:
-            page_cls, sr = url_to_sr(url)
-            yield f"Running {page_cls().get_recipe_title()}..."
+            page_cls, sr, pr = url_to_runs(url)
+            yield f"Running {get_title_breadcrumbs(page_cls, sr, pr).h1_title}..."
             request_body = page_cls.RequestModel(
                 documents=response.output_documents
             ).dict(exclude_unset=True)
@@ -419,7 +420,7 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
         with scol1:
             with st.div(className="pt-1"):
                 options = {
-                    page_cls.workflow: page_cls().get_recipe_title()
+                    page_cls.workflow: page_cls.get_recipe_title()
                     for page_cls in all_home_pages
                 }
                 last_workflow_key = "__last_run_url_workflow"
@@ -436,23 +437,8 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
                 # use this to set default for next time
                 st.session_state[last_workflow_key] = workflow
         with scol2:
-            options = {
-                SavedRun.objects.get(
-                    workflow=d["workflow"],
-                    example_id__isnull=True,
-                    run_id__isnull=True,
-                    uid__isnull=True,
-                ).get_app_url(): "Default"
-            } | {
-                sr.get_app_url(): sr.page_title
-                for sr in SavedRun.objects.filter(
-                    workflow=d["workflow"],
-                    example_id__isnull=False,
-                    run_id__isnull=True,
-                    uid__isnull=True,
-                    hidden=False,
-                ).exclude(page_title="")
-            }
+            page_cls = Workflow(workflow).page_cls
+            options = _get_approved_example_options(page_cls, workflow)
             with st.div(className="pt-1"):
                 url = st.selectbox(
                     "",
@@ -469,10 +455,29 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
         del_button(del_key)
 
     try:
-        url_to_sr(url)
+        url_to_runs(url)
     except Exception as e:
         st.error(repr(e))
     d["url"] = url
+
+
+@st.cache_in_session_state
+def _get_approved_example_options(
+    page_cls: typing.Type[BasePage], workflow: Workflow
+) -> dict[str, str]:
+    options = {
+        # root recipe
+        page_cls.get_root_published_run().get_app_url(): "Default",
+    } | {
+        # approved examples
+        pr.get_app_url(): get_title_breadcrumbs(page_cls, pr.saved_run, pr).h1_title
+        for pr in PublishedRun.objects.filter(
+            workflow=workflow,
+            is_approved_example=True,
+            visibility=PublishedRunVisibility.PUBLIC,
+        ).exclude(published_run_id="")
+    }
+    return options
 
 
 def render_eval_url_inputs(key: str, del_key: str, d: dict):
@@ -495,16 +500,14 @@ def render_eval_url_inputs(key: str, del_key: str, d: dict):
             from recipes.BulkEval import BulkEvalPage
 
             options = {
-                BulkEvalPage().recipe_doc_sr().get_app_url(): "Default",
+                BulkEvalPage.get_root_published_run().get_app_url(): "Default",
             } | {
-                sr.get_app_url(): sr.page_title
-                for sr in SavedRun.objects.filter(
+                pr.get_app_url(): pr.title
+                for pr in PublishedRun.objects.filter(
                     workflow=Workflow.BULK_EVAL,
-                    example_id__isnull=False,
-                    run_id__isnull=True,
-                    uid__isnull=True,
-                    hidden=False,
-                ).exclude(page_title="")
+                    is_approved_example=True,
+                    visibility=PublishedRunVisibility.PUBLIC,
+                ).exclude(published_run_id="")
             }
             with st.div(className="pt-1"):
                 url = st.selectbox(
@@ -522,7 +525,7 @@ def render_eval_url_inputs(key: str, del_key: str, d: dict):
         del_button(del_key)
 
     try:
-        url_to_sr(url)
+        url_to_runs(url)
     except Exception as e:
         st.error(repr(e))
     d["url"] = url
@@ -561,34 +564,36 @@ def _prefill_workflow(d: dict, key: str):
         d.pop("workflow", None)
     elif not d.get("workflow") and d.get("url"):
         try:
-            page_cls, sr = url_to_sr(d.get("url"))
-        except:
+            _, sr, pr = url_to_runs(str(d["url"]))
+        except Exception:
             return
-        if (sr.example_id and sr.page_title and not sr.hidden) or not (
-            sr.example_id or sr.run_id or sr.uid
-        ):
-            d["workflow"] = sr.workflow
-            d["url"] = sr.get_app_url()
+        else:
+            if (
+                pr
+                and pr.saved_run == sr
+                and pr.visibility == PublishedRunVisibility.PUBLIC
+                and (pr.is_approved_example or pr.is_root())
+            ):
+                d["workflow"] = pr.workflow
+                d["url"] = pr.get_app_url()
 
 
-def url_to_sr(url: str) -> tuple[typing.Type[BasePage], SavedRun]:
+def url_to_runs(
+    url: str,
+) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None]:
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
     f = furl(url)
     slug = f.path.segments[0]
     page_cls = page_slug_map[normalize_slug(slug)]
     example_id, run_id, uid = extract_query_params(f.query.params)
-    sr = page_cls.get_sr_from_query_params(example_id, run_id, uid)
-    return page_cls, sr
+    sr, pr = page_cls.get_runs_from_query_params(example_id, run_id, uid)
+    return page_cls, sr, pr
 
 
 def build_requests_for_df(df, request, df_ix, arr_len):
-    from daras_ai_v2.all_pages import page_slug_map, normalize_slug
-
     for url_ix, url in enumerate(request.run_urls):
-        f = furl(url)
-        slug = f.path.segments[0]
-        page_cls = page_slug_map[normalize_slug(slug)]
+        page_cls, sr, pr = url_to_runs(url)
         schema = page_cls.RequestModel.schema()
         properties = schema["properties"]
 
@@ -618,7 +623,7 @@ def build_requests_for_df(df, request, df_ix, arr_len):
             exclude_unset=True
         )
 
-        yield url_ix, f, request_body, page_cls
+        yield url_ix, request_body, page_cls, sr, pr
 
 
 def slice_request_df(df, request):

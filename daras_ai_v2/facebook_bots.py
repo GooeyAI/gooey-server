@@ -6,6 +6,7 @@ from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_respo
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
 from daras_ai_v2.bots import BotInterface, ReplyButton
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.text_splitter import text_splitter
 
 WA_MSG_MAX_SIZE = 1024
@@ -16,6 +17,8 @@ WHATSAPP_AUTH_HEADER = {
 
 
 class WhatsappBot(BotInterface):
+    platform = Platform.WHATSAPP
+
     def __init__(self, message: dict, metadata: dict):
         self.input_message = message
         self.platform = Platform.WHATSAPP
@@ -98,7 +101,7 @@ class WhatsappBot(BotInterface):
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
         text = text or "\u200b"  # handle empty text with zero-width space
-        return send_wa_msg(
+        return self.send_msg_to(
             bot_number=self.bot_id,
             user_number=self.user_id,
             text=text,
@@ -111,156 +114,160 @@ class WhatsappBot(BotInterface):
     def mark_read(self):
         wa_mark_read(self.bot_id, self.input_message["id"])
 
+    @classmethod
+    def send_msg_to(
+        self,
+        *,
+        text: str,
+        audio: str = None,
+        video: str = None,
+        documents: list[str] = None,
+        buttons: list[ReplyButton] = None,
+        ## whatsapp specific
+        bot_number: str,
+        user_number: str,
+    ) -> str | None:
+        # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
 
-def send_wa_msg(
-    *,
-    bot_number: str,
-    user_number: str,
-    text: str,
-    audio: str = None,
-    video: str = None,
-    documents: list[str] = None,
-    buttons: list[ReplyButton] = None,
-) -> str | None:
-    # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
-
-    # split text into chunks if too long
-    if len(text) > WA_MSG_MAX_SIZE:
-        splits = text_splitter(text, chunk_size=WA_MSG_MAX_SIZE, length_function=len)
-        # preserve last chunk for later
-        text = splits[-1].text
-        # send all but last chunk
-        send_wa_msgs_raw(
-            bot_number=bot_number,
-            user_number=user_number,
-            messages=[
-                # simple text msg
-                {
-                    "type": "text",
-                    "text": {
-                        "body": doc.text,
-                        "preview_url": True,
-                    },
-                }
-                for doc in splits[:-1]
-            ],
-        )
-
-    if video:
-        if buttons:
-            messages = [
-                # interactive text msg + video in header
-                _build_msg_buttons(
-                    buttons,
-                    {
-                        "body": {
-                            "text": text,
-                        },
-                        "header": {
-                            "type": "video",
-                            "video": {"link": video},
-                        },
-                    },
-                ),
-            ]
-        else:
-            messages = [
-                # simple video msg + text caption
-                {
-                    "type": "video",
-                    "video": {
-                        "link": video,
-                        "caption": text,
-                    },
-                },
-            ]
-    elif audio:
-        if buttons:
-            # audio can't be sent as an interaction, so send text and audio separately
-            messages = [
-                # simple audio msg
-                {
-                    "type": "audio",
-                    "audio": {"link": audio},
-                },
-            ]
+        # split text into chunks if too long
+        if len(text) > WA_MSG_MAX_SIZE:
+            splits = text_splitter(
+                text, chunk_size=WA_MSG_MAX_SIZE, length_function=len
+            )
+            # preserve last chunk for later
+            text = splits[-1].text
+            # send all but last chunk
             send_wa_msgs_raw(
                 bot_number=bot_number,
                 user_number=user_number,
-                messages=messages,
-            )
-            messages = [
-                # interactive text msg
-                _build_msg_buttons(
-                    buttons,
+                messages=[
+                    # simple text msg
                     {
-                        "body": {
-                            "text": text,
+                        "type": "text",
+                        "text": {
+                            "body": doc.text,
+                            "preview_url": True,
+                        },
+                    }
+                    for doc in splits[:-1]
+                ],
+            )
+
+        if video:
+            if buttons:
+                messages = [
+                    # interactive text msg + video in header
+                    _build_msg_buttons(
+                        buttons,
+                        {
+                            "body": {
+                                "text": text,
+                            },
+                            "header": {
+                                "type": "video",
+                                "video": {"link": video},
+                            },
+                        },
+                    ),
+                ]
+            else:
+                messages = [
+                    # simple video msg + text caption
+                    {
+                        "type": "video",
+                        "video": {
+                            "link": video,
+                            "caption": text,
                         },
                     },
-                )
-            ]
-        else:
-            # audio doesn't support captions, so send text and audio separately
-            messages = [
-                # simple text msg
-                {
-                    "type": "text",
-                    "text": {
-                        "body": text,
-                        "preview_url": True,
-                    },
-                },
-                # simple audio msg
-                {
-                    "type": "audio",
-                    "audio": {"link": audio},
-                },
-            ]
-    else:
-        # text message
-        if buttons:
-            messages = [
-                # interactive text msg
-                _build_msg_buttons(
-                    buttons,
+                ]
+        elif audio:
+            if buttons:
+                # audio can't be sent as an interaction, so send text and audio separately
+                messages = [
+                    # simple audio msg
                     {
-                        "body": {
-                            "text": text,
-                        }
+                        "type": "audio",
+                        "audio": {"link": audio},
                     },
-                ),
-            ]
+                ]
+                send_wa_msgs_raw(
+                    bot_number=bot_number,
+                    user_number=user_number,
+                    messages=messages,
+                )
+                messages = [
+                    # interactive text msg
+                    _build_msg_buttons(
+                        buttons,
+                        {
+                            "body": {
+                                "text": text,
+                            },
+                        },
+                    )
+                ]
+            else:
+                # audio doesn't support captions, so send text and audio separately
+                messages = [
+                    # simple text msg
+                    {
+                        "type": "text",
+                        "text": {
+                            "body": text,
+                            "preview_url": True,
+                        },
+                    },
+                    # simple audio msg
+                    {
+                        "type": "audio",
+                        "audio": {"link": audio},
+                    },
+                ]
         else:
-            messages = [
-                # simple text msg
-                {
-                    "type": "text",
-                    "text": {
-                        "body": text,
-                        "preview_url": True,
+            # text message
+            if buttons:
+                messages = [
+                    # interactive text msg
+                    _build_msg_buttons(
+                        buttons,
+                        {
+                            "body": {
+                                "text": text,
+                            }
+                        },
+                    ),
+                ]
+            else:
+                messages = [
+                    # simple text msg
+                    {
+                        "type": "text",
+                        "text": {
+                            "body": text,
+                            "preview_url": True,
+                        },
                     },
-                },
+                ]
+
+        if documents:
+            messages += [
+                # simple document msg
+                {
+                    "type": "document",
+                    "document": {
+                        "link": link,
+                        "filename": furl(link).path.segments[-1],
+                    },
+                }
+                for link in documents
             ]
 
-    if documents:
-        messages += [
-            # simple document msg
-            {
-                "type": "document",
-                "document": {
-                    "link": link,
-                    "filename": furl(link).path.segments[-1],
-                },
-            }
-            for link in documents
-        ]
-
-    return send_wa_msgs_raw(
-        bot_number=bot_number,
-        user_number=user_number,
-        messages=messages,
-    )
+        return send_wa_msgs_raw(
+            bot_number=bot_number,
+            user_number=user_number,
+            messages=messages,
+        )
 
 
 def retrieve_wa_media_by_id(media_id: str) -> (bytes, str):
@@ -269,14 +276,14 @@ def retrieve_wa_media_by_id(media_id: str) -> (bytes, str):
         f"https://graph.facebook.com/v16.0/{media_id}/",
         headers=WHATSAPP_AUTH_HEADER,
     )
-    r1.raise_for_status()
+    raise_for_status(r1)
     media_info = r1.json()
     # download media
     r2 = requests.get(
         media_info["url"],
         headers=WHATSAPP_AUTH_HEADER,
     )
-    r2.raise_for_status()
+    raise_for_status(r2)
     content = r2.content
     # return content and mime type
     return content, media_info["mime_type"]
@@ -317,7 +324,7 @@ def send_wa_msgs_raw(*, bot_number, user_number, messages: list) -> str | None:
         )
         confirmation = r.json()
         print("send_wa_msgs_raw:", r.status_code, confirmation)
-        r.raise_for_status()
+        raise_for_status(r)
         try:
             msg_id = confirmation["messages"][0]["id"]
         except (KeyError, IndexError):
@@ -424,7 +431,7 @@ class FacebookBot(BotInterface):
             return None
         # downlad file from facebook
         r = requests.get(url)
-        r.raise_for_status()
+        raise_for_status(r)
         # ensure file is audio/video
         mime_type = get_mimetype_from_response(r)
         assert (

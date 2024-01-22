@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
@@ -10,15 +8,15 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
-from django.utils.text import Truncator
+from django.utils.text import Truncator, slugify
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder, CustomURLField
-from daras_ai_v2.language_model import format_chat_entry
 from daras_ai_v2.crypto import get_random_doc_id
+from daras_ai_v2.language_model import format_chat_entry
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -95,7 +93,7 @@ class Workflow(models.IntegerChoices):
     def short_slug(self):
         return min(self.page_cls.slug_versions, key=len)
 
-    def get_app_url(self, example_id: str, run_id: str, uid: str):
+    def get_app_url(self, example_id: str, run_id: str, uid: str, run_slug: str = ""):
         """return the url to the gooey app"""
         query_params = {}
         if run_id and uid:
@@ -104,7 +102,8 @@ class Workflow(models.IntegerChoices):
             query_params |= dict(example_id=example_id)
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
-            / self.short_slug
+            / self.page_cls.slug_versions[-1]
+            / run_slug
             / "/"
         )
 
@@ -113,6 +112,50 @@ class Workflow(models.IntegerChoices):
         from daras_ai_v2.all_pages import workflow_map
 
         return workflow_map[self]
+
+    def get_or_create_metadata(self) -> "WorkflowMetadata":
+        metadata, _created = WorkflowMetadata.objects.get_or_create(
+            workflow=self,
+            defaults=dict(
+                short_title=lambda: (
+                    self.page_cls.get_root_published_run().title or self.page_cls.title
+                ),
+                default_image=self.page_cls.explore_image or None,
+                meta_title=lambda: (
+                    self.page_cls.get_root_published_run().title or self.page_cls.title
+                ),
+                meta_description=lambda: (
+                    self.page_cls().preview_description(state={})
+                    or self.page_cls.get_root_published_run().notes
+                ),
+                meta_image=lambda: (self.page_cls.explore_image or None),
+            ),
+        )
+        return metadata
+
+
+class WorkflowMetadata(models.Model):
+    workflow = models.IntegerField(choices=Workflow.choices, unique=True)
+    short_title = models.TextField()
+    help_url = models.URLField(blank=True, default="")
+
+    # TODO: support the below fields
+    default_image = models.URLField(
+        blank=True, default="", help_text="(not implemented)"
+    )
+
+    meta_title = models.TextField()
+    meta_description = models.TextField(blank=True, default="")
+    meta_image = CustomURLField(default="", blank=True)
+    meta_keywords = models.JSONField(
+        default=list, blank=True, help_text="(not implemented)"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.meta_title
 
 
 class SavedRunQuerySet(models.QuerySet):
@@ -310,7 +353,7 @@ class BotIntegrationQuerySet(models.QuerySet):
     @transaction.atomic()
     def reset_fb_pages_for_user(
         self, uid: str, fb_pages: list[dict]
-    ) -> list[BotIntegration]:
+    ) -> list["BotIntegration"]:
         saved = []
         for fb_page in fb_pages:
             fb_page_id = fb_page["id"]
@@ -985,6 +1028,37 @@ class FeedbackComment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class PublishedRunQuerySet(models.QuerySet):
+    def create_published_run(
+        self,
+        *,
+        workflow: Workflow,
+        published_run_id: str,
+        saved_run: SavedRun,
+        user: AppUser,
+        title: str,
+        notes: str,
+        visibility: PublishedRunVisibility,
+    ):
+        with transaction.atomic():
+            published_run = PublishedRun(
+                workflow=workflow,
+                published_run_id=published_run_id,
+                created_by=user,
+                last_edited_by=user,
+                title=title,
+            )
+            published_run.save()
+            published_run.add_version(
+                user=user,
+                saved_run=saved_run,
+                title=title,
+                visibility=visibility,
+                notes=notes,
+            )
+            return published_run
+
+
 class PublishedRun(models.Model):
     # published_run_id was earlier SavedRun.example_id
     published_run_id = models.CharField(
@@ -1024,6 +1098,8 @@ class PublishedRun(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = PublishedRunQuerySet.as_manager()
+
     class Meta:
         get_latest_by = "updated_at"
 
@@ -1048,41 +1124,11 @@ class PublishedRun(models.Model):
         ]
 
     def __str__(self):
-        return self.get_app_url()
+        return self.title or self.get_app_url()
 
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):
         return open_in_new_tab(self.get_app_url(), label=self.get_app_url())
-
-    @classmethod
-    def create_published_run(
-        cls,
-        *,
-        workflow: Workflow,
-        published_run_id: str,
-        saved_run: SavedRun,
-        user: AppUser,
-        title: str,
-        notes: str,
-        visibility: PublishedRunVisibility,
-    ):
-        with transaction.atomic():
-            published_run = PublishedRun(
-                workflow=workflow,
-                published_run_id=published_run_id,
-                created_by=user,
-                last_edited_by=user,
-                title=title,
-            )
-            published_run.save()
-            published_run.add_version(
-                user=user,
-                saved_run=saved_run,
-                title=title,
-                visibility=visibility,
-                notes=notes,
-            )
-            return published_run
 
     def duplicate(
         self,
@@ -1091,8 +1137,8 @@ class PublishedRun(models.Model):
         title: str,
         notes: str,
         visibility: PublishedRunVisibility,
-    ) -> PublishedRun:
-        return PublishedRun.create_published_run(
+    ) -> "PublishedRun":
+        return PublishedRun.objects.create_published_run(
             workflow=Workflow(self.workflow),
             published_run_id=get_random_doc_id(),
             saved_run=self.saved_run,
@@ -1104,7 +1150,10 @@ class PublishedRun(models.Model):
 
     def get_app_url(self):
         return Workflow(self.workflow).get_app_url(
-            example_id=self.published_run_id, run_id="", uid=""
+            example_id=self.published_run_id,
+            run_id="",
+            uid="",
+            run_slug=self.title and slugify(self.title),
         )
 
     def add_version(
@@ -1134,7 +1183,7 @@ class PublishedRun(models.Model):
     def is_editor(self, user: AppUser):
         return self.created_by == user
 
-    def is_root_example(self):
+    def is_root(self):
         return not self.published_run_id
 
     def update_fields_to_latest_version(self):

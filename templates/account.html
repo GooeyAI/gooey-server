@@ -1,5 +1,8 @@
 <script src="https://js.stripe.com/v3/" async defer></script>
+<script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater"
+        async defer onload="renderPaypalButtons()"></script>
 <div class="container">
+    <div class="user-info">
     <div class="credits-container">
         <h2>Remaining Credits: {{ humanize.intcomma(user_credits) }}</h2>
         <p>
@@ -13,18 +16,29 @@
         <div class="buy-credits-container">
             <h2>Buy Credits</h2>
             <div class="pb-2">
-                1000 credits is good for ~200 runs, depending on which <a
-                    href="https://gooey.ai/explore/">workflows</a>
-                you call.
+                Pay via
+
+                <input class="form-check-input mx-1"
+                        type="radio"
+                        id="payment-method-stripe"
+                        name="payment-method"
+                        onchange="stripeLayout()"
+                        checked>
+                <label class="form-check-label" for="payment-method-stripe"><b>Stripe</b></label>
+
+                <input class="form-check-input mx-1"
+                        type="radio"
+                        id="payment-method-paypal"
+                        name="payment-method"
+                        onchange="paypalLayout()">
+                <label class="form-check-label" for="payment-method-paypal"><b>Paypal</b></label>
             </div>
-            <div class="plans-container">
+            <div id="stripe-container">
                 {% for lookup_key, subscription in available_subscriptions.items() %}
-                    <ul class="product">
+                    <ul id="{{ subscription['display']['name'] }}">
                         <li>
-                            <div class="h4">{{ subscription["display"]["title"] }}</div>
-                            {% if subscription["display"]["description"] %}
-                            <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
-                            {% endif %}
+                            <h4>{{ subscription["display"]["title"] }}</h4>
+                            <h5>{{ subscription["display"]["description"] | safe }}</h5>
                             {% if lookup_key == "addon" %}
                                 {% include 'add_on_credits.html' %}
                             {% else %}
@@ -36,6 +50,23 @@
                             {% endif %}
                         </li>
                     </ul>
+                {% endfor %}
+            </div>
+            <div id="paypal-container" style="display: none;">
+                {% for lookup_key, subscription in available_subscriptions.items() %}
+                    {% if lookup_key == "addon" %}
+                        <h4>{{ subscription["display"]["title"] }}</h4>
+                        <h5>{{ subscription["display"]["description"] | safe }}</h5>
+                        {% for option in [10, 30, 50, 100, 300, 500] %}
+                            <button class="streamlit-like-btn paypal-checkout-option"
+                                    onclick="setQuantity(this, {{ option * 100 }});">
+                                Buy ${{ option }}
+                            </button>
+                        {% endfor %}
+                        <div class="pt-3" style="width: fit-content; display: none;"
+                                id="paypal-button-container"></div>
+                        <p id="result-message"></p>
+                    {% endif %}
                 {% endfor %}
             </div>
         </div>
@@ -57,24 +88,107 @@
         <div class="p-1"></div>
         {% include 'add_on_credits.html' %}
     {% endif %}
-
-    {% if is_admin %}
-        <hr>
-        <div class="admin-div">
-            <h2>Admin Links</h2>
-            <ul>
-                <li><a href="https://gooey-dash-prod.us-1.gooey.ai/" target="_blank">Usage Dashboard</a></li>
-                <li><a href="https://datastudio.google.com/reporting/5c9bb981-ef13-4e46-a5af-eef92f3c42d7"
-                        target="_blank">Traffic Dashboard</a></li>
-                <li><a href="https://sentry.io/organizations/dara-network/issues/?project=4504338635423744"
-                        target="_blank">Sentry</a></li>
-                <li>
-                    <a href="https://analytics.google.com/analytics/web/#/p342900654/reports/reportinghub?params=_u..nav%3Dmaui "
-                        target="_blank">Analytics Summary</a></li>
-                <li>
-                    <a href="https://analytics.google.com/analytics/web/#/p342900654/reports/explorer?params=_u..nav%3Dmaui%26_u.date00%3D20221115%26_u.date01%3D20230108%26_u.comparisonOption%3Ddisabled%26_r.explorerCard..seldim%3D%5B%22unifiedPagePathScreen%22%5D%26_r.explorerCard..rowsPerPage%3D25%26_r.explorerCard..startRow%3D0%26_r.explorerCard..selmet%3D%5B%22screenPageViews%22,%22activeUsers%22%5D%26_r.explorerCard..sortKey%3DscreenPageViews&r=4354450696&ruid=all-pages-and-screens,life-cycle,engagement&collectionId=4354433299"
-                        target="_blank">Most Popular Pages</a></li>
-            </ul>
-        </div>
-    {% endif %}
 </div>
+
+<script>
+    function stripeLayout() {
+        document.getElementById("paypal-container").style.display = "none";
+        document.getElementById("stripe-container").style.display = "block";
+    }
+
+    function paypalLayout() {
+        document.getElementById("stripe-container").style.display = "none";
+        document.getElementById("paypal-container").style.display = "block";
+    }
+
+    let selectedQty = 0;
+
+    // Handle Paypal
+    function setQuantity(el, qty) {
+        for (let btn of document.getElementsByClassName("paypal-checkout-option")) {
+            btn.className = el.className.replace(" bg-secondary", "");
+        }
+        el.className += " bg-secondary";
+        document.getElementById("paypal-button-container").style.display = "block";
+        selectedQty = qty;
+    }
+
+    function renderPaypalButtons() {
+        window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
+    }
+
+    async function createOrder() {
+        try {
+            const response = await fetch("/__/paypal/orders/create/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                // use the "body" param to optionally pass additional order information
+                // like product ids and quantities
+                body: JSON.stringify({
+                    quantity: selectedQty,
+                }),
+            });
+            const orderData = await response.json();
+            if (orderData.id) {
+                return orderData.id;
+            } else {
+                const errorDetail = orderData?.details?.[0];
+                const errorMessage = errorDetail
+                    ? `${errorDetail.issue} ${errorDetail.description} (${orderData.debug_id})`
+                    : JSON.stringify(orderData);
+
+                throw new Error(errorMessage);
+            }
+        } catch (error) {
+            console.error(error);
+            resultMessage(`Could not initiate PayPal Checkout...<br><br>${error}`);
+        }
+    }
+
+    async function onApprove(data, actions) {
+        try {
+            const response = await fetch(`/__/paypal/orders/${data.orderID}/capture`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+
+            const orderData = await response.json();
+            // Three cases to handle:
+            //   (1) Recoverable INSTRUMENT_DECLINED -> call actions.restart()
+            //   (2) Other non-recoverable errors -> Show a failure message
+            //   (3) Successful transaction -> Show confirmation or thank you message
+
+            const errorDetail = orderData?.details?.[0];
+
+            if (errorDetail?.issue === "INSTRUMENT_DECLINED") {
+                // (1) Recoverable INSTRUMENT_DECLINED -> call actions.restart()
+                // recoverable state, per https://developer.paypal.com/docs/checkout/standard/customize/handle-funding-failures/
+                return actions.restart();
+            } else if (errorDetail) {
+                // (2) Other non-recoverable errors -> Show a failure message
+                throw new Error(`${errorDetail.description} (${orderData.debug_id})`);
+            } else if (!orderData.purchase_units) {
+                throw new Error(JSON.stringify(orderData));
+            } else {
+                // (3) Successful transaction -> Show confirmation or thank you message
+                // Or go to another URL:  actions.redirect('thank_you.html');
+                actions.redirect(window.location.origin + "/payment-success/");
+            }
+        } catch (error) {
+            console.error(error);
+            resultMessage(
+                `Sorry, your transaction could not be processed...<br><br>${error}`,
+            );
+        }
+    }
+
+    // Example function to show a result to the user. Your site's UI library can be used instead.
+    function resultMessage(message) {
+        const container = document.querySelector("#result-message");
+        container.innerHTML = message;
+    }
+</script>

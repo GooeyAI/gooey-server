@@ -5,6 +5,7 @@ from google.cloud import texttospeech
 
 import gooey_ui as st
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
 
 SESSION_ELEVENLABS_API_KEY = "__user__elevenlabs_api_key"
@@ -423,7 +424,7 @@ def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
         "https://api.elevenlabs.io/v1/voices",
         headers={"Accept": "application/json", "xi-api-key": api_key},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     print(r.json()["voices"])
     sorted_voices = sorted(
         r.json()["voices"],

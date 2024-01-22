@@ -80,7 +80,10 @@ class Modal:
 
         with self._container:
             with st.div(className="d-flex justify-content-between align-items-center"):
-                st.markdown(f"### {self.title or ''}")
+                if self.title:
+                    st.markdown(f"### {self.title}")
+                else:
+                    st.div()
 
                 close_ = st.button(
                     "&#10006;",
