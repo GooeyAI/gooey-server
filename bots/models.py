@@ -796,7 +796,9 @@ class MessageQuerySet(models.QuerySet):
             entries[i] = format_chat_entry(
                 role=msg.role,
                 content=msg.content,
-                images=msg.attachments.values_list("url", flat=True),
+                images=msg.attachments.filter(
+                    metadata__mime_type__startswith="image/"
+                ).values_list("url", flat=True),
             )
         return entries
 

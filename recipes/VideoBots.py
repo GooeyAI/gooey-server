@@ -1,4 +1,5 @@
 import json
+import mimetypes
 import os
 import os.path
 import typing
@@ -150,6 +151,7 @@ class VideoBotsPage(BasePage):
 
         input_prompt: str
         input_images: list[str] | None
+        input_documents: list[str] | None
 
         # conversation history/context
         messages: list[ConversationEntry] | None
@@ -458,16 +460,22 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         # chat window
         with st.div(className="pb-3"):
             chat_list_view()
-            pressed_send, new_input, new_input_images = chat_input_view()
+            (
+                pressed_send,
+                new_input,
+                new_input_images,
+                new_input_documents,
+            ) = chat_input_view()
 
         if pressed_send:
-            self.on_send(new_input, new_input_images)
+            self.on_send(new_input, new_input_images, new_input_documents)
 
         # clear chat inputs
         if st.button("🗑️ Clear"):
             st.session_state["messages"] = []
             st.session_state["input_prompt"] = ""
             st.session_state["input_images"] = None
+            st.session_state["new_input_documents"] = None
             st.session_state["raw_input_text"] = ""
             self.clear_outputs()
             st.session_state["final_keyword_query"] = ""
@@ -487,12 +495,18 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     label_visibility="collapsed",
                 )
 
-    def on_send(self, new_input: str, new_input_images: list[str]):
+    def on_send(
+        self,
+        new_input: str,
+        new_input_images: list[str],
+        new_input_documents: list[str],
+    ):
         prev_input = st.session_state.get("raw_input_text") or ""
         prev_output = (st.session_state.get("raw_output_text") or [""])[0]
         prev_input_images = st.session_state.get("input_images")
+        prev_input_documents = st.session_state.get("input_documents")
 
-        if (prev_input or prev_input_images) and prev_output:
+        if (prev_input or prev_input_images or prev_input_documents) and prev_output:
             # append previous input to the history
             st.session_state["messages"] = st.session_state.get("messages", []) + [
                 format_chat_entry(
@@ -507,8 +521,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             ]
 
         # add new input to the state
+        if new_input_documents:
+            filenames = ", ".join(
+                furl(url.strip("/")).path.segments[-1] for url in new_input_documents
+            )
+            new_input = f"Files: {filenames}\n\n{new_input}"
         st.session_state["input_prompt"] = new_input
         st.session_state["input_images"] = new_input_images or None
+        st.session_state["input_documents"] = new_input_documents or None
 
         self.on_submit()
 
@@ -602,7 +622,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 """
 
         user_input = request.input_prompt.strip()
-        if not (user_input or request.input_images):
+        if not (user_input or request.input_images or request.input_documents):
             return
         model = LargeLanguageModels[request.selected_model]
         is_chat_model = model.is_chat_model()
@@ -610,13 +630,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         bot_script = request.bot_script
 
         ocr_texts = []
-        if request.input_images:
+        if request.document_model and (request.input_images or request.input_documents):
             yield "Running Azure Form Recognizer..."
-            for img in request.input_images:
+            for url in (request.input_images or []) + (request.input_documents or []):
                 ocr_text = (
-                    azure_form_recognizer(
-                        img, model_id=request.document_model or "prebuilt-read"
-                    )
+                    azure_form_recognizer(url, model_id="prebuilt-read")
                     .get("content", "")
                     .strip()
                 )
@@ -642,7 +660,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 target_language="en",
             )
             for text in ocr_texts:
-                user_input = f"Image: {text!r}\n{user_input}"
+                user_input = f"Exracted Text: {text!r}\n\n{user_input}"
 
         # parse the bot script
         # system_message, scripted_msgs = parse_script(bot_script)
@@ -1219,7 +1237,7 @@ def chat_list_view():
                         st.image(im, style={"maxHeight": "200px"})
 
 
-def chat_input_view() -> tuple[bool, str, list[str]]:
+def chat_input_view() -> tuple[bool, str, list[str], list[str]]:
     with st.div(
         className="px-3 pt-3 d-flex gap-1",
         style=dict(background="rgba(239, 239, 239, 0.6)"),
@@ -1239,14 +1257,20 @@ def chat_input_view() -> tuple[bool, str, list[str]]:
         pressed_send = st.button("✈ Send", style=dict(height="3.2rem"))
 
     if show_uploader:
-        new_input_images = st.file_uploader(
-            "",
-            accept_multiple_files=True,
-        )
+        uploaded_files = st.file_uploader("", accept_multiple_files=True)
+        new_input_images = []
+        new_input_documents = []
+        for f in uploaded_files:
+            mime_type = mimetypes.guess_type(f)[0] or ""
+            if mime_type.startswith("image/"):
+                new_input_images.append(f)
+            else:
+                new_input_documents.append(f)
     else:
         new_input_images = None
+        new_input_documents = None
 
-    return pressed_send, new_input, new_input_images
+    return pressed_send, new_input, new_input_images, new_input_documents
 
 
 def msg_container_widget(role: str):

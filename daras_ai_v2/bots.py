@@ -131,9 +131,12 @@ class BotInterface:
     def get_input_images(self) -> list[str] | None:
         raise NotImplementedError
 
+    def get_input_documents(self) -> list[str] | None:
+        raise NotImplementedError
+
     def nice_filename(self, mime_type: str) -> str:
         ext = mimetypes.guess_extension(mime_type) or ""
-        return f"{self.platform}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
+        return f"{self.platform.name}_{self.input_type}_from_{self.user_id}_to_{self.bot_id}{ext}"
 
     def _unpack_bot_integration(self):
         bi = self.convo.bot_integration
@@ -198,6 +201,7 @@ def _mock_api_output(input_text):
 def _on_msg(bot: BotInterface):
     speech_run = None
     input_images = None
+    input_documents = None
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
@@ -240,6 +244,17 @@ def _on_msg(bot: BotInterface):
                     status_code=400, detail="No image found in request."
                 )
             input_text = (bot.get_input_text() or "").strip()
+        case "document":
+            input_documents = bot.get_input_documents()
+            if not input_documents:
+                raise HTTPException(
+                    status_code=400, detail="No documents found in request."
+                )
+            filenames = ", ".join(
+                furl(url.strip("/")).path.segments[-1] for url in input_documents
+            )
+            input_text = (bot.get_input_text() or "").strip()
+            input_text = f"Files: {filenames}\n\n{input_text}"
         case "text":
             input_text = (bot.get_input_text() or "").strip()
             if not input_text:
@@ -268,6 +283,7 @@ def _on_msg(bot: BotInterface):
             billing_account_user=billing_account_user,
             bot=bot,
             input_images=input_images,
+            input_documents=input_documents,
             input_text=input_text,
             speech_run=speech_run,
         )
@@ -306,6 +322,7 @@ def _process_and_send_msg(
     billing_account_user: AppUser,
     bot: BotInterface,
     input_images: list[str] | None,
+    input_documents: list[str] | None,
     input_text: str,
     speech_run: str | None,
 ):
@@ -324,6 +341,7 @@ def _process_and_send_msg(
             user_language=bot.language,
             speech_run=speech_run,
             input_images=input_images,
+            input_documents=input_documents,
         )
     except HTTPException as e:
         traceback.print_exc()
@@ -345,6 +363,7 @@ def _process_and_send_msg(
     _save_msgs(
         bot=bot,
         input_images=input_images,
+        input_documents=input_documents,
         input_text=input_text,
         speech_run=speech_run,
         platform_msg_id=msg_id,
@@ -356,6 +375,7 @@ def _process_and_send_msg(
 def _save_msgs(
     bot: BotInterface,
     input_images: list[str] | None,
+    input_documents: list[str] | None,
     input_text: str,
     speech_run: str | None,
     platform_msg_id: str | None,
@@ -376,10 +396,10 @@ def _save_msgs(
         else None,
     )
     attachments = []
-    for img in input_images or []:
-        metadata = doc_url_to_file_metadata(img)
+    for f_url in (input_images or []) + (input_documents or []):
+        metadata = doc_url_to_file_metadata(f_url)
         attachments.append(
-            MessageAttachment(message=user_msg, url=img, metadata=metadata)
+            MessageAttachment(message=user_msg, url=f_url, metadata=metadata)
         )
     assistant_msg = Message(
         platform_msg_id=platform_msg_id,
@@ -407,6 +427,7 @@ def _process_msg(
     query_params: dict,
     convo: Conversation,
     input_images: list[str] | None,
+    input_documents: list[str] | None,
     input_text: str,
     user_language: str,
     speech_run: str | None,
@@ -426,6 +447,7 @@ def _process_msg(
         request_body={
             "input_prompt": input_text,
             "input_images": input_images,
+            "input_documents": input_documents,
             "messages": saved_msgs,
             "user_language": user_language,
         },
