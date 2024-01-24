@@ -952,12 +952,12 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.text_input(
                 "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
             )
-
-        show_landbot_widget()
+            show_landbot_widget()
 
     def messenger_bot_integration(self):
         from routers.facebook_api import ig_connect_url, fb_connect_url
         from routers.slack_api import slack_connect_url
+        from recipes.VideoBotsStats import VideoBotsStatsPage
 
         st.markdown(
             # language=html
@@ -989,7 +989,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 &nbsp;
                 Add Your Slack Workspace
                 </a>
-                <a target="_blank" href="https://docs.google.com/document/d/1EuBaC4TGHTFSOgKYM1eOlisjvPAwLji9dExKwbt2ocA/edit?usp=sharing" class="streamlit-like-btn" aria-label="docs">
+                <a target="_blank" href="https://gooey.ai/docs/guides/copilot/deploy-to-slack" class="streamlit-like-btn" aria-label="docs">
                 <img height="20" width="0" src="https://www.slack.com/favicon.ico">   <!-- for vertical alignment -->
                 ℹ️
                 </a>
@@ -1041,6 +1041,12 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     type="tertiary",
                 )
                 render_bot_test_link(bi)
+                stats_url = furl(VideoBotsStatsPage.app_url(), args={"bi_id": bi.id})
+                st.html(
+                    f"""
+                    <a class="btn btn-theme btn-tertiary d-inline-block" target="blank" href="{stats_url}">📊 Analytics</a>
+                    """
+                )
             if is_connected:
                 with col3, st.expander(f"📨 {bi.get_platform_display()} Settings"):
                     if bi.platform == Platform.SLACK:
