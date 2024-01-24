@@ -5,14 +5,14 @@ from starlette.testclient import TestClient
 from bots.models import SavedRun
 from daras_ai_v2.all_pages import all_api_pages
 from daras_ai_v2.tabs_widget import MenuTabs
-from routers import facebook
-from routers.slack import slack_connect_redirect_shortcuts, slack_connect_redirect
+from routers import facebook_api
+from routers.slack_api import slack_connect_redirect_shortcuts, slack_connect_redirect
 from server import app
 
 client = TestClient(app)
 
 excluded_endpoints = [
-    facebook.fb_webhook_verify.__name__,  # gives 403
+    facebook_api.fb_webhook_verify.__name__,  # gives 403
     slack_connect_redirect.__name__,
     slack_connect_redirect_shortcuts.__name__,
     "get_run_status",  # needs query params

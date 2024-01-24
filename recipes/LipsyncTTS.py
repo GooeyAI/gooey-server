@@ -62,13 +62,12 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
         from recipes.DeforumSD import DeforumSDPage
-        from recipes.CompareText2Img import CompareText2ImgPage
 
         return [
             VideoBotsPage,
             TextToSpeechPage,
             DeforumSDPage,
-            CompareText2ImgPage,
+            LipsyncPage,
         ]
 
     def render_form_v2(self):

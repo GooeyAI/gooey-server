@@ -34,6 +34,7 @@ from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import VideoBotsPage
 from recipes.asr import AsrPage
 from recipes.embeddings_page import EmbeddingsPage
+from recipes.VideoBotsStats import VideoBotsStatsPage
 
 # note: the ordering here matters!
 all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
@@ -80,6 +81,11 @@ all_home_pages: list[typing.Type[BasePage]] = [
     page for page_group in all_home_pages_by_category.values() for page in page_group
 ]
 
+# hidden UI pages (that don't have api and don't show up in /explore)
+all_hidden_pages = [
+    VideoBotsStatsPage,
+]
+
 # exposed as API
 all_api_pages = all_home_pages.copy() + [
     ChyronPlantPage,
@@ -99,7 +105,9 @@ def normalize_slug(page_slug):
 
 
 page_slug_map: dict[str, typing.Type[BasePage]] = {
-    normalize_slug(slug): page for page in all_api_pages for slug in page.slug_versions
+    normalize_slug(slug): page
+    for page in (all_api_pages + all_hidden_pages)
+    for slug in page.slug_versions
 }
 
 workflow_map: dict[Workflow, typing.Type[BasePage]] = {
