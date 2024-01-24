@@ -8,7 +8,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
-from django.utils.text import Truncator
+from django.utils.text import Truncator, slugify
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
@@ -93,7 +93,7 @@ class Workflow(models.IntegerChoices):
     def short_slug(self):
         return min(self.page_cls.slug_versions, key=len)
 
-    def get_app_url(self, example_id: str, run_id: str, uid: str):
+    def get_app_url(self, example_id: str, run_id: str, uid: str, run_slug: str = ""):
         """return the url to the gooey app"""
         query_params = {}
         if run_id and uid:
@@ -102,7 +102,8 @@ class Workflow(models.IntegerChoices):
             query_params |= dict(example_id=example_id)
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
-            / self.short_slug
+            / self.page_cls.slug_versions[-1]
+            / run_slug
             / "/"
         )
 
@@ -903,7 +904,9 @@ class MessageQuerySet(models.QuerySet):
             entries[i] = format_chat_entry(
                 role=msg.role,
                 content=msg.content,
-                images=msg.attachments.values_list("url", flat=True),
+                images=msg.attachments.filter(
+                    metadata__mime_type__startswith="image/"
+                ).values_list("url", flat=True),
             )
         return entries
 
@@ -1288,7 +1291,10 @@ class PublishedRun(models.Model):
 
     def get_app_url(self):
         return Workflow(self.workflow).get_app_url(
-            example_id=self.published_run_id, run_id="", uid=""
+            example_id=self.published_run_id,
+            run_id="",
+            uid="",
+            run_slug=self.title and slugify(self.title),
         )
 
     def add_version(
