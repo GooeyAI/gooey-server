@@ -199,7 +199,7 @@ def file_upload(request: Request, form_data: FormData = Depends(request_form_fil
 
     if content_type.startswith("image/"):
         with Image(blob=data) as img:
-            if img.format not in ["png", "jpeg", "jpg", "gif"]:
+            if img.format.lower() not in ["png", "jpeg", "jpg", "gif"]:
                 img.format = "png"
                 content_type = "image/png"
                 filename += ".png"

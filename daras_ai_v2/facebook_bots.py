@@ -71,6 +71,13 @@ class WhatsappBot(BotInterface):
             return None
         return [self._download_wa_media(media_id)]
 
+    def get_input_documents(self) -> list[str] | None:
+        try:
+            media_id = self.input_message["document"]["id"]
+        except KeyError:
+            return None
+        return [self._download_wa_media(media_id)]
+
     def _download_wa_media(self, media_id: str) -> str:
         # download file from whatsapp
         data, mime_type = retrieve_wa_media_by_id(media_id)
