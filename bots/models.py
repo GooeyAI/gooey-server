@@ -937,14 +937,14 @@ class MessageQuerySet(models.QuerySet):
     ) -> "pd.DataFrame":
         import pandas as pd
 
-        qs = self.filter(role=CHATML_ROLE_USER).prefetch_related("feedbacks")
+        qs = self.filter(role=CHATML_ROLE_ASSISSTANT).prefetch_related("feedbacks")
         rows = []
         for message in qs[:row_limit]:
             message: Message
             row = {
                 "Name": message.conversation.get_display_name(),
-                "Question (EN)": message.content,
-                "Answer (EN)": message.get_next_by_created_at().content,
+                "Question (EN)": message.get_previous_by_created_at().content,
+                "Answer (EN)": message.content,
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
                 .strftime("%b %d, %Y %I:%M %p"),
