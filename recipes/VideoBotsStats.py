@@ -667,7 +667,7 @@ class VideoBotsStatsPage(BasePage):
             df["Run URL"] = run_url
             df["Bot"] = bi.name
 
-        if sort_by:
+        if sort_by and sort_by in df.columns:
             df.sort_values(by=[sort_by], ascending=False, inplace=True)
 
         return df
