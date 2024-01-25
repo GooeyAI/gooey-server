@@ -116,10 +116,22 @@ def meta_title_for_page(
     match tab:
         case MenuTabs.examples:
             return f"Examples: {metadata.meta_title}" + suffix
-        case _ if pr and pr.saved_run == sr and pr.is_root():
+        case MenuTabs.run_as_api:
+            return "API: " + meta_title_for_page(
+                page=page, metadata=metadata, sr=sr, pr=pr, tab=MenuTabs.run
+            )
+        case MenuTabs.integrations:
+            return "Integrations: " + meta_title_for_page(
+                page=page, metadata=metadata, sr=sr, pr=pr, tab=MenuTabs.run
+            )
+        case MenuTabs.history:
+            return f"History for {metadata.short_title}" + suffix
+        case MenuTabs.saved:
+            return f"Saved Runs for {metadata.short_title}" + suffix
+        case MenuTabs.run if pr and pr.saved_run == sr and pr.is_root():
             # for root page
             return metadata.meta_title + suffix
-        case _:
+        case MenuTabs.run:
             # non-root runs and examples
             parts = []
 

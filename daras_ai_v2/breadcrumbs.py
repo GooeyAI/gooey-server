@@ -92,22 +92,16 @@ def get_title_breadcrumbs(
     )
 
     match tab:
-        case MenuTabs.examples:
-            return TitleBreadCrumbs(
-                f"Examples: {metadata.short_title}",
-                root_title=root_breadcrumb,
-                published_title=None,
-            )
-        case _ if is_root:
+        case MenuTabs.run if is_root:
             return TitleBreadCrumbs(page_cls.get_recipe_title(), None, None)
-        case _ if is_example:
+        case MenuTabs.run if is_example:
             assert pr is not None
             return TitleBreadCrumbs(
                 pr.title or prompt_title or recipe_title,
                 root_title=root_breadcrumb,
                 published_title=None,
             )
-        case _ if is_run:
+        case MenuTabs.run if is_run:
             return TitleBreadCrumbs(
                 prompt_title or f"Run: {recipe_title}",
                 root_title=root_breadcrumb,
@@ -118,5 +112,41 @@ def get_title_breadcrumbs(
                 if pr and not pr.is_root()
                 else None,
             )
+        case MenuTabs.examples:
+            return TitleBreadCrumbs(
+                f"Examples: {metadata.short_title}",
+                root_title=root_breadcrumb,
+                published_title=None,
+            )
+        case MenuTabs.run_as_api:
+            tbreadcrumbs_on_run = get_title_breadcrumbs(
+                page_cls=page_cls, sr=sr, pr=pr, tab=MenuTabs.run
+            )
+            return TitleBreadCrumbs(
+                f"API: {tbreadcrumbs_on_run.h1_title}",
+                root_title=tbreadcrumbs_on_run.root_title or root_breadcrumb,
+                published_title=tbreadcrumbs_on_run.published_title,
+            )
+        case MenuTabs.integrations:
+            tbreadcrumbs_on_run = get_title_breadcrumbs(
+                page_cls=page_cls, sr=sr, pr=pr, tab=MenuTabs.run
+            )
+            return TitleBreadCrumbs(
+                f"Integrations: {tbreadcrumbs_on_run.h1_title}",
+                root_title=tbreadcrumbs_on_run.root_title or root_breadcrumb,
+                published_title=tbreadcrumbs_on_run.published_title,
+            )
+        case MenuTabs.history:
+            return TitleBreadCrumbs(
+                f"History: {metadata.short_title}",
+                root_title=root_breadcrumb,
+                published_title=None,
+            )
+        case MenuTabs.saved:
+            return TitleBreadCrumbs(
+                f"Saved Runs: {metadata.short_title}",
+                root_title=root_breadcrumb,
+                published_title=None,
+            )
         case _:
-            raise AssertionError("Invalid tab or run")
+            raise ValueError(f"Unknown tab: {tab}")
