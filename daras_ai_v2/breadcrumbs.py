@@ -86,10 +86,7 @@ def get_title_breadcrumbs(
     ).replace("\n", " ")
 
     metadata = page_cls.workflow.get_or_create_metadata()
-    root_breadcrumb = TitleUrl(
-        metadata.short_title,
-        page_cls.app_url(),
-    )
+    root_breadcrumb = TitleUrl(metadata.short_title, page_cls.app_url())
 
     match tab:
         case MenuTabs.examples:
@@ -108,15 +105,17 @@ def get_title_breadcrumbs(
                 published_title=None,
             )
         case _ if is_run:
-            return TitleBreadCrumbs(
-                prompt_title or f"Run: {recipe_title}",
-                root_title=root_breadcrumb,
-                published_title=TitleUrl(
+            if pr and not pr.is_root():
+                published_title = TitleUrl(
                     pr.title or f"Fork: {pr.published_run_id}",
                     pr.get_app_url(),
                 )
-                if pr and not pr.is_root()
-                else None,
+            else:
+                published_title = None
+            return TitleBreadCrumbs(
+                prompt_title or f"Run: {recipe_title}",
+                root_title=root_breadcrumb,
+                published_title=published_title,
             )
         case _:
             raise AssertionError("Invalid tab or run")
