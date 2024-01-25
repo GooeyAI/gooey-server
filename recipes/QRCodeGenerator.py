@@ -429,20 +429,13 @@ Here is the final output:
         self._render_outputs(state)
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(
-                f"""
-                ```text
-                {state.get("text_prompt", "")}
-                ```
-                """
-            )
-        with col2:
-            self._render_outputs(state)
+        self._render_outputs(state, max_count=1)
 
-    def _render_outputs(self, state: dict):
-        for img in state.get("output_images", []):
+    def _render_outputs(self, state: dict, max_count: int | None = None):
+        output_images = list(state.get("output_images", []))
+        if max_count:
+            output_images = output_images[:max_count]
+        for img in output_images:
             st.image(img)
             qr_code_data = (
                 state.get(QrSources.qr_code_data.name)

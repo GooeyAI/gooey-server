@@ -1092,6 +1092,7 @@ class BasePage:
         image_size: str = "30px",
         responsive: bool = True,
         show_as_link: bool = False,
+        text_size: str | None = None,
     ):
         if not user or (not user.photo_url and not user.display_name):
             return
@@ -1105,47 +1106,44 @@ class BasePage:
         if responsive:
             class_name += "-responsive"
 
-        html = "<div style='display:flex; align-items:center;'>"
-        if user.photo_url:
-            st.html(
-                f"""
-                <style>
-                .{class_name} {{
-                    width: {responsive_image_size};
-                    height: {responsive_image_size};
-                    margin-right: 6px;
-                    border-radius: 50%;
-                    pointer-events: none;
-                }}
-
-                @media (min-width: 1024px) {{
-                    .{class_name} {{
-                        width: {image_size};
-                        height: {image_size};
-                    }}
-                }}
-                </style>
-            """
-            )
-            html += f"""
-                <img class="{class_name}" src="{user.photo_url}">
-            """
-        if user.display_name:
-            html += f"<span>{user.display_name}</span>"
-        html += "</div>"
-
         if show_as_link:
-            linkto = lambda: st.link(
+            linkto = st.link(
                 to=self.app_url(
                     tab_name=MenuTabs.paths[MenuTabs.history],
                     query_params={"uid": user.uid},
                 )
             )
         else:
-            linkto = st.dummy
+            linkto = st.dummy()
 
-        with linkto():
-            st.html(html)
+        with linkto, st.div(className="d-flex align-items-center"):
+            if user.photo_url:
+                st.html(
+                    f"""
+                    <style>
+                    .{class_name} {{
+                        width: {responsive_image_size};
+                        height: {responsive_image_size};
+                        margin-right: 6px;
+                        border-radius: 50%;
+                        pointer-events: none;
+                    }}
+
+                    @media (min-width: 1024px) {{
+                        .{class_name} {{
+                            width: {image_size};
+                            height: {image_size};
+                        }}
+                    }}
+                    </style>
+                """
+                )
+                st.image(user.photo_url, className=class_name)
+
+            if user.display_name:
+                name_style = {"fontSize": text_size} if text_size else {}
+                with st.tag("span", style=name_style):
+                    st.html(html.escape(user.display_name))
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -1564,7 +1562,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             is_approved_example=True,
         ).exclude(published_run_id="")[:50]
 
-        grid_layout(3, example_runs, _render)
+        grid_layout(3, example_runs, _render, column_props=dict(className="mb-0 pb-0"))
 
     def _saved_tab(self):
         self.ensure_authentication()
@@ -1578,10 +1576,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             return
 
         def _render(pr: PublishedRun):
-            self._render_example_preview(
-                published_run=pr,
-                allow_hide=False,
-            )
+            self._render_published_run_preview(published_run=pr)
 
         grid_layout(3, published_runs, _render)
 
@@ -1636,13 +1631,22 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             )
 
     def _render_run_preview(self, saved_run: SavedRun):
-        url = saved_run.get_app_url()
-        with st.link(to=url):
-            st.html(
-                # language=HTML
-                f"""<button type="button" class="btn btn-theme">✏️ Tweak</button>"""
-            )
-        copy_to_clipboard_button("🔗 Copy URL", value=url)
+        published_run: PublishedRun | None = (
+            saved_run.parent_version.published_run if saved_run.parent_version else None
+        )
+        is_latest_version = published_run and published_run.saved_run == saved_run
+        tb = get_title_breadcrumbs(self, sr=saved_run, pr=published_run)
+
+        with st.link(to=saved_run.get_app_url(), className="text-decoration-none"):
+            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
+                if is_latest_version:
+                    st.html(
+                        PublishedRunVisibility(
+                            published_run.visibility
+                        ).get_badge_html()
+                    )
+
+            st.write(f"#### {tb.h1_title}")
 
         updated_at = saved_run.updated_at
         if updated_at and isinstance(updated_at, datetime.datetime):
@@ -1655,33 +1659,62 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         return self.render_example(saved_run.to_dict())
 
+    def _render_published_run_preview(self, published_run: PublishedRun):
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
+
+        with st.link(to=published_run.get_app_url(), className="text-decoration-none"):
+            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
+                st.html(
+                    PublishedRunVisibility(published_run.visibility).get_badge_html()
+                )
+
+            st.write(f"#### {tb.h1_title}")
+
+        with st.div(className="d-flex align-items-center justify-content-between"):
+            with st.div():
+                updated_at = published_run.updated_at
+                if updated_at and isinstance(updated_at, datetime.datetime):
+                    js_dynamic_date(updated_at)
+
+            if published_run.visibility == PublishedRunVisibility.PUBLIC:
+                run_icon = '<i class="fa-regular fa-person-running"></i>'
+                run_count = format_number_with_suffix(published_run.get_run_count())
+                st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
+
+        doc = published_run.saved_run.to_dict()
+        self.render_example(doc)
+
     def _render_example_preview(
         self,
         *,
         published_run: PublishedRun,
         allow_hide: bool,
     ):
-        url = published_run.get_app_url()
-        with st.link(to=url):
-            st.html(
-                # language=HTML
-                f"""<button type="button" class="btn btn-theme">✏️ Tweak</button>"""
-            )
-        copy_to_clipboard_button("🔗 Copy URL", value=url)
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
+
+        with st.link(to=published_run.get_app_url(), className="text-decoration-none"):
+            with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
+                if published_run.created_by and self.is_user_admin(
+                    published_run.created_by
+                ):
+                    self.render_author(
+                        published_run.created_by, image_size="20px", text_size="0.9rem"
+                    )
+
+            st.write(f"#### {tb.h1_title}")
+
+        with st.div(className="d-flex align-items-center justify-content-between"):
+            with st.div():
+                updated_at = published_run.updated_at
+                if updated_at and isinstance(updated_at, datetime.datetime):
+                    js_dynamic_date(updated_at)
+
+            run_icon = '<i class="fa-regular fa-person-running"></i>'
+            run_count = format_number_with_suffix(published_run.get_run_count())
+            st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
 
         if allow_hide:
             self._example_hide_button(published_run=published_run)
-
-        updated_at = published_run.updated_at
-        if updated_at and isinstance(updated_at, datetime.datetime):
-            js_dynamic_date(updated_at)
-
-        title = published_run.title
-        if title and title.strip() != self.title.strip():
-            st.write("#### " + title)
-
-        if published_run.notes:
-            st.write(published_run.notes)
 
         doc = published_run.saved_run.to_dict()
         self.render_example(doc)
@@ -1843,11 +1876,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_cost_note(self) -> str | None:
         pass
 
+    @classmethod
+    def is_user_admin(cls, user: AppUser) -> bool:
+        email = user.email
+        return email and email in settings.ADMIN_EMAILS
+
     def is_current_user_admin(self) -> bool:
         if not self.request or not self.request.user:
             return False
-        email = self.request.user.email
-        return email and email in settings.ADMIN_EMAILS
+        return self.is_user_admin(self.request.user)
 
     def is_current_user_paying(self) -> bool:
         return bool(self.request and self.request.user and self.request.user.is_paying)
@@ -1933,3 +1970,20 @@ class QueryParamsRedirectException(RedirectException):
 
 class TitleValidationError(Exception):
     pass
+
+
+def format_number_with_suffix(num: int) -> str:
+    """
+    Formats large number with a suffix.
+
+    Ref: https://stackoverflow.com/a/45846841
+    """
+    num_float = float("{:.3g}".format(num))
+    magnitude = 0
+    while abs(num_float) >= 1000:
+        magnitude += 1
+        num_float /= 1000.0
+    return "{}{}".format(
+        "{:f}".format(num_float).rstrip("0").rstrip("."),
+        ["", "K", "M", "B", "T"][magnitude],
+    )

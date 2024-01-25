@@ -1,6 +1,7 @@
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
+from textwrap import dedent
 
 import pytz
 from django.conf import settings
@@ -41,6 +42,33 @@ class PublishedRunVisibility(models.IntegerChoices):
                 return "Public"
             case _:
                 return self.label
+
+    def get_badge_html(self):
+        badge_container_class = (
+            "text-sm bg-light border border-dark rounded-pill px-2 py-1"
+        )
+
+        match self:
+            case PublishedRunVisibility.UNLISTED:
+                return dedent(
+                    f"""\
+                <span class="{badge_container_class}">
+                    <i class="fa-regular fa-lock"></i>
+                    Private
+                </span>
+                """
+                )
+            case PublishedRunVisibility.PUBLIC:
+                return dedent(
+                    f"""\
+                <span class="{badge_container_class}">
+                    <i class="fa-regular fa-globe"></i>
+                    Public
+                </span>
+                """
+                )
+            case _:
+                raise NotImplementedError(self)
 
 
 class Platform(models.IntegerChoices):
@@ -1336,6 +1364,17 @@ class PublishedRun(models.Model):
         self.visibility = latest_version.visibility
 
         self.save()
+
+    def get_run_count(self):
+        annotated_versions = self.versions.annotate(
+            children_runs_count=models.Count("children_runs")
+        )
+        return (
+            annotated_versions.aggregate(run_count=models.Sum("children_runs_count"))[
+                "run_count"
+            ]
+            or 0
+        )
 
 
 class PublishedRunVersion(models.Model):
