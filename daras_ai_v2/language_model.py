@@ -55,23 +55,31 @@ class LargeLanguageModels(Enum):
     gpt_4_32k = "GPT-4 32K (openai)"
     gpt_3_5_turbo = "ChatGPT (openai)"
     gpt_3_5_turbo_16k = "ChatGPT 16k (openai)"
+    gpt_3_5_turbo_instruct = "GPT-3.5 Instruct (openai)"
 
     llama2_70b_chat = "Llama 2 (Meta AI)"
 
     palm2_chat = "PaLM 2 Chat (Google)"
     palm2_text = "PaLM 2 Text (Google)"
 
-    text_davinci_003 = "GPT-3.5 Davinci-3 (openai)"
-    text_davinci_002 = "GPT-3.5 Davinci-2 (openai)"
-    text_curie_001 = "Curie (openai)"
-    text_babbage_001 = "Babbage (openai)"
-    text_ada_001 = "Ada (openai)"
+    text_davinci_003 = "GPT-3.5 Davinci-3 [Deprecated] (openai)"
+    text_davinci_002 = "GPT-3.5 Davinci-2 [Deprecated] (openai)"
+    text_curie_001 = "Curie [Deprecated] (openai)"
+    text_babbage_001 = "Babbage [Deprecated] (openai)"
+    text_ada_001 = "Ada [Deprecated] (openai)"
 
     code_davinci_002 = "Codex [Deprecated] (openai)"
 
     @classmethod
     def _deprecated(cls):
-        return {cls.code_davinci_002}
+        return {
+            cls.text_davinci_003,
+            cls.text_davinci_002,
+            cls.text_curie_001,
+            cls.text_babbage_001,
+            cls.text_ada_001,
+            cls.code_davinci_002,
+        }
 
     def is_vision_model(self) -> bool:
         return self in {
@@ -80,6 +88,7 @@ class LargeLanguageModels(Enum):
 
     def is_chat_model(self) -> bool:
         return self not in {
+            self.gpt_3_5_turbo_instruct,
             self.palm2_text,
             self.text_davinci_003,
             self.text_davinci_002,
@@ -111,6 +120,7 @@ llm_model_names = {
         "openai-gpt-35-turbo-16k-prod-ca-1",
         "gpt-3.5-turbo-16k-0613",
     ),
+    LargeLanguageModels.gpt_3_5_turbo_instruct: "gpt-3.5-turbo-instruct",
     LargeLanguageModels.text_davinci_003: "text-davinci-003",
     LargeLanguageModels.text_davinci_002: "text-davinci-002",
     LargeLanguageModels.code_davinci_002: "code-davinci-002",
@@ -129,6 +139,7 @@ llm_api = {
     LargeLanguageModels.gpt_4_32k: LLMApis.openai,
     LargeLanguageModels.gpt_3_5_turbo: LLMApis.openai,
     LargeLanguageModels.gpt_3_5_turbo_16k: LLMApis.openai,
+    LargeLanguageModels.gpt_3_5_turbo_instruct: LLMApis.openai,
     LargeLanguageModels.text_davinci_003: LLMApis.openai,
     LargeLanguageModels.text_davinci_002: LLMApis.openai,
     LargeLanguageModels.code_davinci_002: LLMApis.openai,
@@ -153,6 +164,7 @@ model_max_tokens = {
     # https://platform.openai.com/docs/models/gpt-3-5
     LargeLanguageModels.gpt_3_5_turbo: 4096,
     LargeLanguageModels.gpt_3_5_turbo_16k: 16_384,
+    LargeLanguageModels.gpt_3_5_turbo_instruct: 4096,
     LargeLanguageModels.text_davinci_003: 4097,
     LargeLanguageModels.text_davinci_002: 4097,
     LargeLanguageModels.code_davinci_002: 8001,
@@ -174,6 +186,7 @@ llm_price = {
     LargeLanguageModels.gpt_4_32k: 20,
     LargeLanguageModels.gpt_3_5_turbo: 1,
     LargeLanguageModels.gpt_3_5_turbo_16k: 2,
+    LargeLanguageModels.gpt_3_5_turbo_instruct: 1,
     LargeLanguageModels.text_davinci_003: 10,
     LargeLanguageModels.text_davinci_002: 10,
     LargeLanguageModels.code_davinci_002: 10,
