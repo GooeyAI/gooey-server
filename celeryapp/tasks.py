@@ -152,13 +152,14 @@ def err_msg_for_exc(e: Exception):
         except requests.JSONDecodeError:
             err_str = response.text
         else:
-            format_exc = err_body.get("format_exc")
-            if format_exc:
-                print("⚡️ " + format_exc)
-            err_type = err_body.get("type")
-            err_str = err_body.get("str")
-            if err_type and err_str:
-                return f"(GPU) {err_type}: {err_str}"
+            if isinstance(err_body, dict):
+                format_exc = err_body.get("format_exc")
+                if format_exc:
+                    print("⚡️ " + format_exc)
+                err_type = err_body.get("type")
+                err_str = err_body.get("str")
+                if err_type and err_str:
+                    return f"(GPU) {err_type}: {err_str}"
             err_str = str(err_body)
         return f"(HTTP {response.status_code}) {html.escape(err_str[:1000])}"
     elif isinstance(e, HTTPException):
