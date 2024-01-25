@@ -704,7 +704,26 @@ class ConversationQuerySet(models.QuerySet):
                 "Bot": str(convo.bot_integration),
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=[
+                "Name",
+                "Messages",
+                "Correct Answers",
+                "Thumbs up",
+                "Thumbs down",
+                "Last Sent",
+                "First Sent",
+                "A7",
+                "A30",
+                "R1",
+                "R7",
+                "R30",
+                "Delta Hours",
+                "Created At",
+                "Bot",
+            ],
+        )
         return df
 
 
@@ -900,7 +919,17 @@ class MessageQuerySet(models.QuerySet):
                 "Analysis JSON": message.analysis_result,
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=[
+                "Name",
+                "Role",
+                "Message (EN)",
+                "Sent",
+                "Feedback",
+                "Analysis JSON",
+            ],
+        )
         return df
 
     def to_df_analysis_format(
@@ -922,7 +951,10 @@ class MessageQuerySet(models.QuerySet):
                 "Analysis JSON": message.analysis_result,
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=["Name", "Question (EN)", "Answer (EN)", "Sent", "Analysis JSON"],
+        )
         return df
 
     def as_llm_context(self, limit: int = 100) -> list["ConversationEntry"]:
@@ -1107,7 +1139,20 @@ class FeedbackQuerySet(models.QuerySet):
                 "Question Answered": feedback.message.question_answered,
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=[
+                "Name",
+                "Question (EN)",
+                "Question Sent",
+                "Answer (EN)",
+                "Answer Sent",
+                "Rating",
+                "Feedback (EN)",
+                "Feedback Sent",
+                "Question Answered",
+            ],
+        )
         return df
 
 
