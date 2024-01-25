@@ -28,6 +28,7 @@ def build_meta_tags(
         metadata=metadata,
         sr=sr,
         pr=pr,
+        tab=page.tab,
     )
     description = meta_description_for_page(
         metadata=metadata,
@@ -108,19 +109,21 @@ def meta_title_for_page(
     metadata: WorkflowMetadata,
     sr: SavedRun,
     pr: PublishedRun | None,
+    tab: str,
 ) -> str:
-    parts = []
+    suffix = f" {sep} Gooey.AI"
 
-    match page.tab:
+    match tab:
         case MenuTabs.examples:
-            parts.append(f"Examples: {metadata.meta_title}")
+            return f"Examples: {metadata.meta_title}" + suffix
         case _ if pr and pr.saved_run == sr and pr.is_root():
             # for root page
-            parts.append(metadata.meta_title)
+            return metadata.meta_title + suffix
         case _:
             # non-root runs and examples
-            tbreadcrumbs = get_title_breadcrumbs(page, sr, pr)
+            parts = []
 
+            tbreadcrumbs = get_title_breadcrumbs(page, sr, pr)
             parts.append(tbreadcrumbs.h1_title)
 
             # use the short title for non-root examples
@@ -133,8 +136,9 @@ def meta_title_for_page(
                 part += f" by {user.display_name}"
             parts.append(part)
 
-    parts.append("Gooey.AI")
-    return sep.join(parts)
+            return sep.join(parts) + suffix
+        case _:
+            raise ValueError(f"Unknown tab: {tab}")
 
 
 def meta_description_for_page(
