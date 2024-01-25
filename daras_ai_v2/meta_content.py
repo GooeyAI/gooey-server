@@ -109,23 +109,29 @@ def meta_title_for_page(
     sr: SavedRun,
     pr: PublishedRun | None,
 ) -> str:
-    tbreadcrumbs = get_title_breadcrumbs(page, sr, pr)
-
     parts = []
-    if tbreadcrumbs.published_title or tbreadcrumbs.root_title:
-        parts.append(tbreadcrumbs.h1_title)
-        # use the short title for non-root examples
-        part = metadata.short_title
-        if tbreadcrumbs.published_title:
-            part = f"{pr.title} {part}"
-        # add the creator's name
-        user = sr.get_creator()
-        if user and user.display_name:
-            part += f" by {user.display_name}"
-        parts.append(part)
-    else:
-        # for root recipe, a longer, SEO-friendly title
-        parts.append(metadata.meta_title)
+
+    match page.tab:
+        case MenuTabs.examples:
+            parts.append(f"Examples: {metadata.meta_title}")
+        case _ if pr and pr.saved_run == sr and pr.is_root():
+            # for root page
+            parts.append(metadata.meta_title)
+        case _:
+            # non-root runs and examples
+            tbreadcrumbs = get_title_breadcrumbs(page, sr, pr)
+
+            parts.append(tbreadcrumbs.h1_title)
+
+            # use the short title for non-root examples
+            part = metadata.short_title
+            if tbreadcrumbs.published_title:
+                part = f"{pr.title} {part}"
+            # add the creator's name
+            user = sr.get_creator()
+            if user and user.display_name:
+                part += f" by {user.display_name}"
+            parts.append(part)
 
     parts.append("Gooey.AI")
     return sep.join(parts)
