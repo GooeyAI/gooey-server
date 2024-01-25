@@ -224,8 +224,8 @@ class QRCodeGeneratorPage(BasePage):
     def render_description(self):
         st.markdown(
             """
-            Create interactive and engaging QR codes with stunning visuals that are amazing for marketing, branding, and more. Combining AI Art and QR Code has never been easier!
-            Enter your URL and image prompt, and in just 30 seconds, we'll generate an artistic QR codes tailored to your style.
+            Create interactive and engaging QR codes with stunning visuals that are amazing for marketing, branding, and more. Combining AI Art and QR Code has never been easier! 
+            Enter your URL and image prompt, and in just 30 seconds, we'll generate an artistic QR codes tailored to your style. 
             It is made possible by the open source [Control Net](https://github.com/lllyasviel/ControlNet).
             """
         )
@@ -281,7 +281,7 @@ Here is the final output:
     def render_settings(self):
         st.write(
             """
-            Customize the QR Code output for your text prompt with these Settings.
+            Customize the QR Code output for your text prompt with these Settings. 
             """
         )
 
@@ -528,8 +528,8 @@ Here is the final output:
 
     def preview_description(self, state: dict) -> str:
         return """
-            Create interactive and engaging QR codes with stunning visuals that are amazing for marketing, branding, and more. Combining AI Art and QR Codes has never been easier!
-            Enter your URL and image prompt, and in just 30 seconds, we'll generate an artistic QR code tailored to your style.
+            Create interactive and engaging QR codes with stunning visuals that are amazing for marketing, branding, and more. Combining AI Art and QR Codes has never been easier! 
+            Enter your URL and image prompt, and in just 30 seconds, we'll generate an artistic QR code tailored to your style. 
         """
 
     def get_raw_price(self, state: dict) -> int:
@@ -597,7 +597,7 @@ def vcard_form(*, key: str) -> VCARD:
     vcard.urls = (
         st.text_area(
             """
-            Website Links
+            Website Links  
             *([calend.ly](https://calend.ly) works great!)*
             """,
             placeholder="https://www.gooey.ai\nhttps://calend.ly/seanblagsvedt",

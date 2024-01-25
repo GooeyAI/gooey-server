@@ -1107,19 +1107,16 @@ class BasePage:
             class_name += "-responsive"
 
         if show_as_link:
-            linkto = lambda: st.link(
+            linkto = st.link(
                 to=self.app_url(
                     tab_name=MenuTabs.paths[MenuTabs.history],
                     query_params={"uid": user.uid},
                 )
             )
         else:
-            linkto = st.dummy
+            linkto = st.dummy()
 
-        with linkto():
-            div = st.div(className="d-flex align-items-center")
-
-        with div:
+        with linkto, st.div(className="d-flex align-items-center"):
             if user.photo_url:
                 st.html(
                     f"""
@@ -1638,10 +1635,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             saved_run.parent_version.published_run if saved_run.parent_version else None
         )
         is_latest_version = published_run and published_run.saved_run == saved_run
-        title, _ = self._get_title_and_breadcrumbs(
-            current_run=saved_run,
-            published_run=published_run,
-        )
+        tb = get_title_breadcrumbs(self, sr=saved_run, pr=published_run)
 
         with st.link(to=saved_run.get_app_url(), className="text-decoration-none"):
             with st.div(className="mb-1", style={"font-size": "0.9rem"}):
@@ -1652,7 +1646,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                         ).get_badge_html()
                     )
 
-            st.write(f"#### {title}")
+            st.write(f"#### {tb.h1_title}")
 
         updated_at = saved_run.updated_at
         if updated_at and isinstance(updated_at, datetime.datetime):
@@ -1666,10 +1660,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return self.render_example(saved_run.to_dict())
 
     def _render_published_run_preview(self, published_run: PublishedRun):
-        title, _ = self._get_title_and_breadcrumbs(
-            current_run=published_run.saved_run,
-            published_run=published_run,
-        )
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
         with st.link(to=published_run.get_app_url(), className="text-decoration-none"):
             with st.div(className="mb-1", style={"font-size": "0.9rem"}):
@@ -1677,7 +1668,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                     PublishedRunVisibility(published_run.visibility).get_badge_html()
                 )
 
-            st.write(f"#### {title}")
+            st.write(f"#### {tb.h1_title}")
 
         with st.div(className="d-flex align-items-center justify-content-between"):
             with st.div():
@@ -1699,10 +1690,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         published_run: PublishedRun,
         allow_hide: bool,
     ):
-        title, _ = self._get_title_and_breadcrumbs(
-            current_run=published_run.saved_run,
-            published_run=published_run,
-        )
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
         with st.link(to=published_run.get_app_url(), className="text-decoration-none"):
             with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
@@ -1713,7 +1701,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                         published_run.created_by, image_size="20px", text_size="0.9rem"
                     )
 
-            st.write(f"#### {title}")
+            st.write(f"#### {tb.h1_title}")
 
         with st.div(className="d-flex align-items-center justify-content-between"):
             with st.div():
