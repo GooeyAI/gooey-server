@@ -232,7 +232,9 @@ class BasePage:
             and published_run.is_root()
             and published_run.saved_run == current_run
         )
-        tbreadcrumbs = get_title_breadcrumbs(self, current_run, published_run)
+        tbreadcrumbs = get_title_breadcrumbs(
+            self, current_run, published_run, tab=self.tab
+        )
 
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
