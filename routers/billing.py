@@ -114,6 +114,7 @@ def account(request: Request):
     is_admin = request.user.email in settings.ADMIN_EMAILS
 
     context = {
+        "title": "Account • Gooey.AI",
         "request": request,
         "settings": settings,
         "available_subscriptions": available_subscriptions,
