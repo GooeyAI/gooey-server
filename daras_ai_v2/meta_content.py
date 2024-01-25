@@ -111,14 +111,12 @@ def meta_title_for_page(
     pr: PublishedRun | None,
     tab: str,
 ) -> str:
-    suffix = f" {sep} Gooey.AI"
-
     match tab:
         case MenuTabs.examples:
-            return f"Examples: {metadata.meta_title}" + suffix
+            ret = f"Examples: {metadata.meta_title}"
         case _ if pr and pr.saved_run == sr and pr.is_root():
             # for root page
-            return metadata.meta_title + suffix
+            ret = metadata.meta_title
         case _:
             # non-root runs and examples
             parts = []
@@ -136,9 +134,9 @@ def meta_title_for_page(
                 part += f" by {user.display_name}"
             parts.append(part)
 
-            return sep.join(parts) + suffix
-        case _:
-            raise ValueError(f"Unknown tab: {tab}")
+            ret = sep.join(parts)
+
+    return f"{ret} {sep} Gooey.AI"
 
 
 def meta_description_for_page(
