@@ -1512,6 +1512,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.session_state.pop(field_name, None)
 
     def _render_after_output(self):
+        if "seed" in self.RequestModel.schema_json():
+            randomize = st.button(
+                '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
+            )
+            if randomize:
+                st.session_state[StateKeys.pressed_randomize] = True
+                st.experimental_rerun()
         caption = ""
         caption += f'\\\nGenerated in <span style="color: black;">{st.session_state.get(StateKeys.run_time, 0):.2f}s</span>'
         if "seed" in self.RequestModel.schema_json():
@@ -1532,13 +1539,6 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             url=url,
             type="secondary",
         )
-        if "seed" in self.RequestModel.schema_json():
-            randomize = st.button(
-                '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
-            )
-            if randomize:
-                st.session_state[StateKeys.pressed_randomize] = True
-                st.experimental_rerun()
         self._render_report_button()
 
     def state_to_doc(self, state: dict):
