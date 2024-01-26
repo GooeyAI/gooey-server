@@ -28,9 +28,7 @@ def url_to_gdrive_file_id(f: furl) -> str:
 def gdrive_list_urls_of_files_in_folder(f: furl) -> list[str]:
     # get drive folder id from url (e.g. https://drive.google.com/drive/folders/1Xijcsj7oBvDn1OWx4UmNAT8POVKG4W73?usp=drive_link)
     folder_id = f.path.segments[-1]
-    # get metadata
     service = discovery.build("drive", "v3")
-    # get files in drive directly
     if f.host == "drive.google.com":
         request = service.files().list(
             supportsAllDrives=True,
@@ -38,10 +36,8 @@ def gdrive_list_urls_of_files_in_folder(f: furl) -> list[str]:
             q=f"'{folder_id}' in parents",
             fields="files(mimeType,webViewLink)",
         )
-    # export google docs to appropriate type
     else:
         raise ValueError(f"Can't list files non google folder url: {str(f)!r}")
-    # download
     response = request.execute()
     files = response.get("files", [])
     urls = []
