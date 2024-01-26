@@ -32,7 +32,6 @@ def document_uploader(
     ),
     accept_multiple_files=True,
 ) -> list[str] | str:
-    st.write(label, className="gui-input")
     documents = st.session_state.get(key) or []
     if isinstance(documents, str):
         documents = [documents]
@@ -46,7 +45,6 @@ def document_uploader(
         text_value = widget(
             label,
             value="\n".join(documents),
-            label_visibility="collapsed",
             style={
                 "whiteSpace": "pre",
                 "overflowWrap": "normal",
@@ -63,12 +61,11 @@ def document_uploader(
     else:
         st.file_uploader(
             label,
-            label_visibility="collapsed",
             key=key,
             accept=accept,
             accept_multiple_files=accept_multiple_files,
         )
-    st.checkbox("Manually Edit URLs", key=f"__custom_checkbox_{key}")
+    st.checkbox("Upload Links in Bulk", key=f"__custom_checkbox_{key}")
     return st.session_state.get(key, [])
 
 
