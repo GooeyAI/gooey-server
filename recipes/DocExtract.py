@@ -94,11 +94,11 @@ class DocExtractPage(BasePage):
 
     def render_form_v2(self):
         document_uploader(
-            "##### 🤖 Youtube URLS",
+            "#### 🤖 Youtube URLS",
             accept=("audio/*", "application/pdf", "video/*"),
         )
         st.text_input(
-            "##### 📊 Google Sheets URL",
+            "#### 📊 Google Sheets URL",
             key="sheet_url",
         )
 

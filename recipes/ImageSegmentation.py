@@ -86,7 +86,7 @@ class ImageSegmentationPage(BasePage):
     def render_form_v2(self):
         st.file_uploader(
             """
-            ### Input Photo
+            #### Input Photo
             Give us a photo of anything
             """,
             key="input_image",

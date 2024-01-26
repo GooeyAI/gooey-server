@@ -100,7 +100,7 @@ class TextToSpeechPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            #### Prompt
             Enter text you want to convert to speech
             """,
             key="text_prompt",
