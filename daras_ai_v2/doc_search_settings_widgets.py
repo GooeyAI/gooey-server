@@ -75,7 +75,19 @@ def document_uploader(
             accept=accept,
             accept_multiple_files=accept_multiple_files,
         )
-    return st.session_state.get(key, [])
+    documents = st.session_state.get(key, [])
+    for document in documents:
+        if not document.startswith("https://drive.google.com/drive/folders"):
+            continue
+        from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
+        from furl import furl
+
+        folder_content_urls = gdrive_list_urls_of_files_in_folder(furl(document))
+        documents.remove(document)
+        documents.extend(folder_content_urls)
+    st.session_state[key] = documents
+    st.session_state[custom_key] = "\n".join(documents)
+    return documents
 
 
 def doc_search_settings(
