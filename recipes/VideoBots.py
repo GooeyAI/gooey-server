@@ -157,9 +157,9 @@ class VideoBotsPage(BasePage):
         messages: list[ConversationEntry] | None
 
         # tts settings
-        tts_provider: typing.Literal[
-            tuple(e.name for e in TextToSpeechProviders)
-        ] | None
+        tts_provider: (
+            typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+        )
         uberduck_voice_name: str | None
         uberduck_speaking_rate: float | None
         google_voice_name: str | None
@@ -174,9 +174,9 @@ class VideoBotsPage(BasePage):
         elevenlabs_similarity_boost: float | None
 
         # llm settings
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         document_model: str | None = Field(
             title="🩻 Photo / Document Intelligence",
             description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
@@ -1028,10 +1028,12 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 favicon = Platform(bi.platform).get_favicon()
                 with st.div(className="mt-2"):
                     st.markdown(
-                        f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                        f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
-                        if bi.saved_run
-                        else f"<span>{bi}</span>",
+                        (
+                            f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
+                            f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
+                            if bi.saved_run
+                            else f"<span>{bi}</span>"
+                        ),
                         unsafe_allow_html=True,
                     )
             with col2:
@@ -1082,9 +1084,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.session_state[f"_bi_name_{bi.id}"] = (
                 pr and pr.title
             ) or self.get_recipe_title()
-            st.session_state[
-                f"_bi_slack_read_receipt_msg_{bi.id}"
-            ] = BotIntegration._meta.get_field("slack_read_receipt_msg").default
+            st.session_state[f"_bi_slack_read_receipt_msg_{bi.id}"] = (
+                BotIntegration._meta.get_field("slack_read_receipt_msg").default
+            )
 
         bi.slack_read_receipt_msg = st.text_input(
             """
@@ -1283,9 +1285,9 @@ def msg_container_widget(role: str):
     return st.div(
         className="px-3 py-1 pt-2",
         style=dict(
-            background="rgba(239, 239, 239, 0.6)"
-            if role == CHATML_ROLE_USER
-            else "#fff",
+            background=(
+                "rgba(239, 239, 239, 0.6)" if role == CHATML_ROLE_USER else "#fff"
+            ),
         ),
     )
 

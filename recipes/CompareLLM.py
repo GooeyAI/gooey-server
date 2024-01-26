@@ -36,9 +36,9 @@ class CompareLLMPage(BasePage):
 
     class RequestModel(BaseModel):
         input_prompt: str | None
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
+        )
 
         avoid_repetition: bool | None
         num_outputs: int | None

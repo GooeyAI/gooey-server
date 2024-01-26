@@ -389,11 +389,13 @@ def _save_msgs(
         role=CHATML_ROLE_USER,
         content=response.raw_input_text,
         display_content=input_text,
-        saved_run=SavedRun.objects.get_or_create(
-            workflow=Workflow.ASR, **furl(speech_run).query.params
-        )[0]
-        if speech_run
-        else None,
+        saved_run=(
+            SavedRun.objects.get_or_create(
+                workflow=Workflow.ASR, **furl(speech_run).query.params
+            )[0]
+            if speech_run
+            else None
+        ),
     )
     attachments = []
     for f_url in (input_images or []) + (input_documents or []):
