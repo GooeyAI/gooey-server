@@ -201,6 +201,7 @@ class FaceInpaintingPage(BasePage):
                     url,
                     caption="```" + text_prompt.replace("\n", "") + "```",
                 )
+                self.render_buttons(url)
         else:
             st.div()
 

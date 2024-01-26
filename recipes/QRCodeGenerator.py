@@ -144,7 +144,7 @@ class QRCodeGeneratorPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ##### 👩‍💻 Prompt
+            #### 👩‍💻 Prompt
             Describe the subject/scene of the QR Code.
             Choose clear prompts and distinguishable visuals to ensure optimal readability.
             """,
@@ -208,7 +208,7 @@ class QRCodeGeneratorPage(BasePage):
 
         st.file_uploader(
             """
-            ##### 🏞️ Reference Image *[optional]*
+            #### 🏞️ Reference Image *[optional]*
             This image will be used as inspiration to blend with the QR Code.
             """,
             key="image_prompt",
@@ -458,6 +458,7 @@ Here is the final output:
                 st.caption(f"{shortened_url} → {qr_code_data} (Views: {clicks})")
             else:
                 st.caption(f"{shortened_url} → {qr_code_data}")
+            self.render_buttons(img)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)

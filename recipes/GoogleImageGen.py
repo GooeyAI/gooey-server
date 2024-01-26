@@ -207,6 +207,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         if out_imgs:
             for img in out_imgs:
                 st.image(img, caption="Generated Image")
+                self.render_buttons(img)
         else:
             st.div()
 

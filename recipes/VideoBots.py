@@ -306,7 +306,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_form_v2(self):
         st.text_area(
             """
-            ##### 📝 Prompt
+            #### 📝 Prompt
             High-level system instructions.
             """,
             key="bot_script",
@@ -315,7 +315,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         document_uploader(
             """
-##### 📄 Documents (*optional*)
+#### 📄 Documents (*optional*)
 Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
 """
         )

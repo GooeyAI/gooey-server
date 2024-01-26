@@ -89,7 +89,7 @@ class Img2ImgPage(BasePage):
     def render_form_v2(self):
         st.file_uploader(
             """
-            ### Input Image
+            #### Input Image
             """,
             key="input_image",
             upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
@@ -98,7 +98,7 @@ class Img2ImgPage(BasePage):
         if st.session_state.get("selected_model") != InpaintingModels.dall_e.name:
             st.text_area(
                 """
-                ### Prompt
+                #### Prompt
                 Describe your edits 
                 """,
                 key="text_prompt",
@@ -127,9 +127,10 @@ class Img2ImgPage(BasePage):
     def render_output(self):
         text_prompt = st.session_state.get("text_prompt", "")
         output_images = st.session_state.get("output_images", [])
-
+        st.write("#### Output Image")
         for img in output_images:
-            st.image(img, caption="```" + text_prompt.replace("\n", "") + "```")
+            st.image(img)
+            self.render_buttons(img)
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
