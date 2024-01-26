@@ -1519,14 +1519,12 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         if "seed" in self.RequestModel.schema_json():
             seed = st.session_state.get("seed")
             caption += f' with seed <span style="color: black;">{seed}</span> '
-        try:
-            format_created_at = st.session_state.get(
-                "created_at", datetime.datetime.today()
-            ).strftime("%d %b %Y %-I:%M%p")
-        except:
-            format_created_at = format_created_at = st.session_state.get(
-                "created_at", datetime.datetime.today()
-            )
+        created_at = st.session_state.get(
+            StateKeys.created_at, datetime.datetime.today()
+        )
+        if not isinstance(created_at, datetime.datetime):
+            created_at = datetime.datetime.fromisoformat(created_at)
+        format_created_at = created_at.strftime("%d %b %Y %-I:%M%p")
         caption += f' at <span style="color: black;">{format_created_at}</span>'
         st.caption(caption, unsafe_allow_html=True)
 
