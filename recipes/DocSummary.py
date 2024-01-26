@@ -84,8 +84,8 @@ class DocSummaryPage(BasePage):
         return DEFAULT_DOC_SUMMARY_META_IMG
 
     def render_form_v2(self):
-        document_uploader("##### 📎 Documents")
-        st.text_area("##### 👩‍💻 Instructions", key="task_instructions", height=150)
+        document_uploader("#### 📎 Documents")
+        st.text_area("#### 👩‍💻 Instructions", key="task_instructions", height=150)
 
     def render_settings(self):
         st.text_area(

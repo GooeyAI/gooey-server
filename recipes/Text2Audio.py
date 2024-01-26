@@ -64,7 +64,7 @@ class Text2AudioPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### 👩‍💻 Prompt
+            #### 👩‍💻 Prompt
             Describe the audio that you'd like to generate.
             """,
             key="text_prompt",

@@ -34,7 +34,7 @@ class CompareUpscalerPage(BasePage):
     def render_form_v2(self):
         st.file_uploader(
             """
-            ### Input Image
+            #### Input Image
             """,
             key="input_image",
             upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
