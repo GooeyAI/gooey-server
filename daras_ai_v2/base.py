@@ -1264,7 +1264,9 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         if not (self.request.user and run_id and uid):
             return
 
-        reported = st.button("❗Report")
+        reported = st.button(
+            '<i class="fa-regular fa-flag"></i> Report', type="tertiary"
+        )
         if not reported:
             return
 
@@ -1351,7 +1353,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def _render_completed_output(self):
         run_time = st.session_state.get(StateKeys.run_time, 0)
-        st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
 
     def _render_failed_output(self):
         err_msg = st.session_state.get(StateKeys.error_msg)
@@ -1513,22 +1514,36 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.session_state.pop(field_name, None)
 
     def _render_after_output(self):
-        col1, col2, col3 = st.columns([1, 1, 1], responsive=False)
-        col2.node.props[
-            "className"
-        ] += " d-flex justify-content-center align-items-center"
-        col3.node.props["className"] += " d-flex justify-content-end align-items-center"
+        caption = ""
+        caption += f'\\\nGenerated in <span style="color: black;">{st.session_state.get(StateKeys.run_time, 0):.2f}s</span>'
         if "seed" in self.RequestModel.schema_json():
             seed = st.session_state.get("seed")
-            with col1:
-                st.caption(f"*Seed\\\n`{seed}`*")
-            with col2:
-                randomize = st.button("♻️ Regenerate")
-                if randomize:
-                    st.session_state[StateKeys.pressed_randomize] = True
-                    st.experimental_rerun()
-        with col3:
-            self._render_report_button()
+            caption += f' with seed <span style="color: black;">{seed}</span> '
+        try:
+            format_created_at = st.session_state.get(
+                "created_at", datetime.datetime.today()
+            ).strftime("%d %b %Y %-I:%M%p")
+        except:
+            format_created_at = format_created_at = st.session_state.get(
+                "created_at", datetime.datetime.today()
+            )
+        caption += f' at <span style="color: black;">{format_created_at}</span>'
+        st.caption(caption, unsafe_allow_html=True)
+
+    def render_buttons(self, url: str):
+        st.download_button(
+            label='<i class="fa-regular fa-download"></i> Download',
+            url=url,
+            type="secondary",
+        )
+        if "seed" in self.RequestModel.schema_json():
+            randomize = st.button(
+                '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
+            )
+            if randomize:
+                st.session_state[StateKeys.pressed_randomize] = True
+                st.experimental_rerun()
+        self._render_report_button()
 
     def state_to_doc(self, state: dict):
         ret = {

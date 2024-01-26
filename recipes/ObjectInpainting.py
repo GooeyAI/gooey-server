@@ -202,6 +202,7 @@ class ObjectInpaintingPage(BasePage):
         if output_images:
             for url in output_images:
                 st.image(url, caption=f"{text_prompt}")
+                self.render_buttons(url)
         else:
             st.div()
 

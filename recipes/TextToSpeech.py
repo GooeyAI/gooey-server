@@ -135,6 +135,7 @@ class TextToSpeechPage(BasePage):
         audio_url = st.session_state.get("audio_url")
         if audio_url:
             st.audio(audio_url)
+            self.render_buttons(audio_url)
         else:
             st.div()
 

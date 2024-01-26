@@ -453,6 +453,43 @@ def button(
 form_submit_button = button
 
 
+def download_button(
+    label: str,
+    url: str,
+    key: str = None,
+    help: str = None,
+    *,
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
+    disabled: bool = False,
+    **props,
+) -> bool:
+    """
+    Example:
+        st.button("Primary", key="test0", type="primary")
+        st.button("Secondary", key="test1")
+        st.button("Tertiary", key="test3", type="tertiary")
+        st.button("Link Button", key="test3", type="link")
+    """
+    if not key:
+        key = md5_values("button", label, help, type, props)
+    className = f"btn-{type} " + props.pop("className", "")
+    state.RenderTreeNode(
+        name="download-button",
+        props=dict(
+            type="submit",
+            value="yes",
+            url=url,
+            name=key,
+            label=dedent(label),
+            help=help,
+            disabled=disabled,
+            className=className,
+            **props,
+        ),
+    ).mount()
+    return bool(state.session_state.pop(key, False))
+
+
 def expander(label: str, *, expanded: bool = False, **props):
     node = state.RenderTreeNode(
         name="expander",

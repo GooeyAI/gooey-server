@@ -108,6 +108,7 @@ class CompareUpscalerPage(BasePage):
             if not img:
                 continue
             st.image(img, caption=UpscalerModels[key].value)
+            self.render_buttons(img)
 
     def get_raw_price(self, state: dict) -> int:
         selected_models = state.get("selected_models", [])
