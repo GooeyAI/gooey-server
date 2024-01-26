@@ -24,9 +24,9 @@ class CompareUpscalerPage(BasePage):
 
         scale: int
 
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in UpscalerModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in UpscalerModels)]] | None
+        )
 
     class ResponseModel(BaseModel):
         output_images: dict[typing.Literal[tuple(e.name for e in UpscalerModels)], str]

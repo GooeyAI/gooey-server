@@ -98,9 +98,9 @@ class SEOSummaryPage(BasePage):
 
         enable_html: bool | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         sampling_temperature: float | None
         max_tokens: int | None
         num_outputs: int | None

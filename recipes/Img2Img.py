@@ -46,9 +46,11 @@ class Img2ImgPage(BasePage):
         text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
-        selected_controlnet_model: list[
-            typing.Literal[tuple(e.name for e in ControlNetModels)]
-        ] | typing.Literal[tuple(e.name for e in ControlNetModels)] | None
+        selected_controlnet_model: (
+            list[typing.Literal[tuple(e.name for e in ControlNetModels)]]
+            | typing.Literal[tuple(e.name for e in ControlNetModels)]
+            | None
+        )
         negative_prompt: str | None
 
         num_outputs: int | None

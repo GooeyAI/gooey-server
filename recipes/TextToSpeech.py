@@ -53,9 +53,9 @@ class TextToSpeechPage(BasePage):
     class RequestModel(BaseModel):
         text_prompt: str
 
-        tts_provider: typing.Literal[
-            tuple(e.name for e in TextToSpeechProviders)
-        ] | None
+        tts_provider: (
+            typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+        )
 
         uberduck_voice_name: str | None
         uberduck_speaking_rate: float | None
