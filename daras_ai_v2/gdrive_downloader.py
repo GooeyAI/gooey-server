@@ -25,7 +25,7 @@ def url_to_gdrive_file_id(f: furl) -> str:
     return file_id
 
 
-def gdrive_list_urls_of_files_in_folder(f: furl) -> list[str]:
+def gdrive_list_urls_of_files_in_folder(f: furl, max_depth=10) -> list[str]:
     # get drive folder id from url (e.g. https://drive.google.com/drive/folders/1Xijcsj7oBvDn1OWx4UmNAT8POVKG4W73?usp=drive_link)
     folder_id = f.path.segments[-1]
     service = discovery.build("drive", "v3")
@@ -37,7 +37,7 @@ def gdrive_list_urls_of_files_in_folder(f: furl) -> list[str]:
             fields="files(mimeType,webViewLink)",
         )
     else:
-        raise ValueError(f"Can't list files non google folder url: {str(f)!r}")
+        raise ValueError(f"Can't list files from non google folder url: {str(f)!r}")
     response = request.execute()
     files = response.get("files", [])
     urls = []
@@ -45,7 +45,9 @@ def gdrive_list_urls_of_files_in_folder(f: furl) -> list[str]:
         mime_type = file.get("mimeType")
         url = file.get("webViewLink")
         if mime_type == "application/vnd.google-apps.folder":
-            continue
+            urls += gdrive_list_urls_of_files_in_folder(
+                furl(url), max_depth=max_depth - 1
+            )
         elif url:
             urls.append(url)
     return urls
