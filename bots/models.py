@@ -913,9 +913,11 @@ class MessageQuerySet(models.QuerySet):
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
                 .strftime("%b %d, %Y %I:%M %p"),
-                "Feedback": message.feedbacks.first().get_display_text()
-                if message.feedbacks.first()
-                else None,  # only show first feedback as per Sean's request
+                "Feedback": (
+                    message.feedbacks.first().get_display_text()
+                    if message.feedbacks.first()
+                    else None
+                ),  # only show first feedback as per Sean's request
                 "Analysis JSON": message.analysis_result,
             }
             rows.append(row)
@@ -1050,6 +1052,10 @@ class Message(models.Model):
 
     def local_lang(self):
         return Truncator(self.display_content).words(30)
+
+    @property
+    def response_time(self):
+        return self.created_at - self.get_previous_by_created_at().created_at
 
 
 class MessageAttachment(models.Model):

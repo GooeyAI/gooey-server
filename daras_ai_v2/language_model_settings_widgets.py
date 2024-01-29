@@ -24,9 +24,9 @@ def language_model_settings(show_selector=True, show_document_model=False):
                 f"###### {field_title_desc(VideoBotsPage.RequestModel, 'document_model')}",
                 key="document_model",
                 options=[None, *doc_model_descriptions],
-                format_func=lambda x: f"{doc_model_descriptions[x]} ({x})"
-                if x
-                else "———",
+                format_func=lambda x: (
+                    f"{doc_model_descriptions[x]} ({x})" if x else "———"
+                ),
             )
 
     st.checkbox("Avoid Repetition", key="avoid_repetition")

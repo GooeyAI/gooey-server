@@ -19,9 +19,9 @@ def general_integration_settings(bi: BotIntegration):
         st.session_state[f"_bi_user_language_{bi.id}"] = BotIntegration._meta.get_field(
             "user_language"
         ).default
-        st.session_state[
-            f"_bi_show_feedback_buttons_{bi.id}"
-        ] = BotIntegration._meta.get_field("show_feedback_buttons").default
+        st.session_state[f"_bi_show_feedback_buttons_{bi.id}"] = (
+            BotIntegration._meta.get_field("show_feedback_buttons").default
+        )
         st.session_state[f"_bi_analysis_url_{bi.id}"] = None
 
     bi.show_feedback_buttons = st.checkbox(
