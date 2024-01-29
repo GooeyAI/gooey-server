@@ -31,7 +31,8 @@ from django.db.models.functions import (
     TruncYear,
     Concat,
 )
-from django.db.models import Count
+from django.db.models import Count, F, Window
+from django.db.models.functions import Lag
 
 ID_COLUMNS = [
     "conversation__fb_page_id",
@@ -388,6 +389,33 @@ class VideoBotsStatsPage(BasePage):
     def calculate_stats_binned_by_time(
         self, bi, start_date, end_date, factor, trunc_fn
     ):
+        average_response_time = (
+            Message.objects.filter(
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
+                conversation__bot_integration=bi,
+            )
+            .values("conversation_id")
+            .order_by("created_at")
+            .annotate(
+                response_time=F("created_at") - Window(expression=Lag("created_at")),
+            )
+            .annotate(date=trunc_fn("created_at"))
+            .values("date", "response_time", "role")
+        )
+        average_response_time = (
+            pd.DataFrame(
+                average_response_time,
+                columns=["date", "response_time", "role"],
+            )
+            .loc[lambda df: df["role"] == CHATML_ROLE_ASSISTANT]
+            .groupby("date")
+            .agg({"response_time": "median"})
+            .apply(lambda x: x.clip(lower=timedelta(0)))
+            .rename(columns={"response_time": "Average_response_time"})
+            .reset_index()
+        )
+
         messages_received = (
             Message.objects.filter(
                 created_at__date__gte=start_date,
@@ -468,6 +496,12 @@ class VideoBotsStatsPage(BasePage):
             left_on="date",
             right_on="date",
         )
+        df = df.merge(
+            average_response_time,
+            how="outer",
+            left_on="date",
+            right_on="date",
+        )
         df["Messages_Sent"] = df["Messages_Sent"] * factor
         df["Convos"] = df["Convos"] * factor
         df["Senders"] = df["Senders"] * factor
@@ -476,6 +510,7 @@ class VideoBotsStatsPage(BasePage):
         df["Neg_feedback"] = df["Neg_feedback"] * factor
         df["Msgs_per_convo"] = df["Messages_Sent"] / df["Convos"]
         df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
+        df["Average_response_time"] = df["Average_response_time"] * factor
         df.fillna(0, inplace=True)
         df = df.round(0).astype("int32", errors="ignore")
         return df
@@ -575,6 +610,14 @@ class VideoBotsStatsPage(BasePage):
                     y=list(df["Msgs_per_user"]),
                     text=list(df["Msgs_per_user"]),
                     hovertemplate="Messages per User: %{y:.0f}<extra></extra>",
+                ),
+                go.Scatter(
+                    name="Average Response Time",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Average_response_time"]),
+                    text=list(df["Average_response_time"]),
+                    hovertemplate="Average Response Time: %{y:.0f}<extra></extra>",
                 ),
             ],
             layout=dict(
