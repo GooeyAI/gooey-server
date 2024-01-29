@@ -223,7 +223,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
         "updated_at",
     ]
     list_filter = ["workflow", "visibility", "created_by__is_paying"]
-    search_fields = ["workflow", "published_run_id"]
+    search_fields = ["workflow", "published_run_id", "title", "notes"]
     autocomplete_fields = ["saved_run", "created_by", "last_edited_by"]
     readonly_fields = [
         "open_in_gooey",
