@@ -154,8 +154,8 @@ class VideoBotsStatsPage(BasePage):
         details = st.horizontal_radio(
             "### Details",
             options=[
-                "All Conversations",
-                "All Messages",
+                "Conversations",
+                "Messages",
                 "Feedback Positive",
                 "Feedback Negative",
                 "Answered Successfully",
@@ -164,7 +164,7 @@ class VideoBotsStatsPage(BasePage):
             key="details",
         )
 
-        if details == "All Conversations":
+        if details == "Conversations":
             options = [
                 "Messages",
                 "Correct Answers",
@@ -310,11 +310,11 @@ class VideoBotsStatsPage(BasePage):
         run_title = (
             bi.published_run.title
             if bi.published_run
-            else saved_run.page_title
-            if saved_run and saved_run.page_title
-            else "This Copilot Run"
-            if saved_run
-            else "No Run Connected"
+            else (
+                saved_run.page_title
+                if saved_run and saved_run.page_title
+                else "This Copilot Run" if saved_run else "No Run Connected"
+            )
         )
         run_url = furl(saved_run.get_app_url()).tostr() if saved_run else ""
         return run_title, run_url
@@ -626,9 +626,9 @@ class VideoBotsStatsPage(BasePage):
         self, bi, run_url, conversations, messages, details, sort_by, rows=10000
     ):
         df = pd.DataFrame()
-        if details == "All Conversations":
+        if details == "Conversations":
             df = conversations.to_df_format(row_limit=rows)
-        elif details == "All Messages":
+        elif details == "Messages":
             df = messages.order_by("-created_at", "conversation__id").to_df_format(
                 row_limit=rows
             )
