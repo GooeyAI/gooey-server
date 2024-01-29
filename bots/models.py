@@ -919,6 +919,7 @@ class MessageQuerySet(models.QuerySet):
                     else None
                 ),  # only show first feedback as per Sean's request
                 "Analysis JSON": message.analysis_result,
+                "Response Time": message.response_time.total_seconds(),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -930,6 +931,7 @@ class MessageQuerySet(models.QuerySet):
                 "Sent",
                 "Feedback",
                 "Analysis JSON",
+                "Response Time",
             ],
         )
         return df
@@ -1055,7 +1057,20 @@ class Message(models.Model):
 
     @property
     def response_time(self):
-        return self.created_at - self.get_previous_by_created_at().created_at
+        import pandas as pd
+
+        if self.role == CHATML_ROLE_USER:
+            return pd.NaT
+        return (
+            self.created_at
+            - Message.objects.filter(
+                conversation=self.conversation,
+                role=CHATML_ROLE_USER,
+                created_at__lt=self.created_at,
+            )
+            .latest()
+            .created_at
+        )
 
 
 class MessageAttachment(models.Model):
