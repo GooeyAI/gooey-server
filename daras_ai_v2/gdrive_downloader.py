@@ -26,6 +26,8 @@ def url_to_gdrive_file_id(f: furl) -> str:
 
 
 def gdrive_list_urls_of_files_in_folder(f: furl, max_depth=10) -> list[str]:
+    if max_depth <= 0:
+        return []
     # get drive folder id from url (e.g. https://drive.google.com/drive/folders/1Xijcsj7oBvDn1OWx4UmNAT8POVKG4W73?usp=drive_link)
     folder_id = f.path.segments[-1]
     service = discovery.build("drive", "v3")
