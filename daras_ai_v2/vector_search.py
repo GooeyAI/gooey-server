@@ -12,6 +12,7 @@ import numpy as np
 import requests
 from furl import furl
 from googleapiclient.errors import HttpError
+from loguru import logger
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
 
@@ -162,6 +163,13 @@ def get_top_k_references(
     else:
         sparse_ranks = np.zeros(len(embeds))
 
+    # just in case sparse and dense ranks are different lengths, truncate to the shorter one
+    if len(sparse_ranks) != len(dense_ranks):
+        logger.warning(
+            f"sparse and dense ranks are different lengths, truncating... {len(sparse_ranks)=} {len(dense_ranks)=} {len(embeds)=}"
+        )
+        sparse_ranks = sparse_ranks[: len(dense_ranks)]
+        dense_ranks = dense_ranks[: len(sparse_ranks)]
     # RRF formula: 1 / (k + rank)
     k = 60
     rrf_scores = (
@@ -171,11 +179,7 @@ def get_top_k_references(
     # Final ranking
     max_references = min(request.max_references, len(rrf_scores))
     top_k = np.argpartition(rrf_scores, -max_references)[-max_references:]
-    final_ranks = sorted(
-        top_k,
-        key=lambda idx: rrf_scores[idx],
-        reverse=True,
-    )
+    final_ranks = sorted(top_k, key=rrf_scores.__getitem__, reverse=True)
 
     references = [embeds[idx][0] | {"score": rrf_scores[idx]} for idx in final_ranks]
 
