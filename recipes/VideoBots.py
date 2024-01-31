@@ -879,9 +879,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             state["output_text"] = output_text
             yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
-        apply_response_formattings_suffix(
-            all_refs_list, state["output_text"], citation_style
-        )
+        if all_refs_list:
+            apply_response_formattings_suffix(
+                all_refs_list, state["output_text"], citation_style
+            )
         state["output_audio"] = []
         state["output_video"] = []
 
