@@ -45,6 +45,9 @@ CHATML_ROLE_SYSTEM = "system"
 CHATML_ROLE_ASSISTANT = "assistant"
 CHATML_ROLE_USER = "user"
 
+# nice for showing streaming progress
+SUPERSCRIPT = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+
 
 class LLMApis(Enum):
     vertex_ai = "Vertex AI"

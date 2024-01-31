@@ -11,6 +11,7 @@ from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
     llm_price,
+    SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -107,7 +108,7 @@ class CompareLLMPage(BasePage):
             )
             for i, item in enumerate(ret):
                 output_text[selected_model] = item
-                yield f"Streaming {model.value}... {i + 1}"
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
         self._render_outputs(st.session_state, 450)
