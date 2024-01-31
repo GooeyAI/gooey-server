@@ -2,6 +2,7 @@ import hashlib
 import json
 import threading
 import typing
+from contextlib import contextmanager
 from time import time
 
 import redis
@@ -47,6 +48,34 @@ def realtime_push(channel: str, value: typing.Any = "ping"):
         logger.info(f"publish {channel=} {run_status=}")
     else:
         logger.info(f"publish {channel=}")
+
+
+@contextmanager
+def realtime_subscribe(channel: str) -> typing.Generator:
+    channel = f"gooey-gui/state/{channel}"
+    pubsub = r.pubsub()
+    pubsub.subscribe(channel)
+    logger.info(f"subscribe {channel=}")
+    try:
+        yield _realtime_sub_gen(channel, pubsub)
+    finally:
+        logger.info(f"unsubscribe {channel=}")
+        pubsub.unsubscribe(channel)
+        pubsub.close()
+
+
+def _realtime_sub_gen(channel: str, pubsub: redis.client.PubSub) -> typing.Generator:
+    while True:
+        message = pubsub.get_message(timeout=10)
+        if not (message and message["type"] == "message"):
+            continue
+        value = json.loads(r.get(channel))
+        if isinstance(value, dict):
+            run_status = value.get("__run_status")
+            logger.info(f"realtime_subscribe: {channel=} {run_status=}")
+        else:
+            logger.info(f"realtime_subscribe: {channel=}")
+        yield value
 
 
 # def use_state(

@@ -168,6 +168,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
             "Settings",
             {
                 "fields": [
+                    "streaming_enabled",
                     "show_feedback_buttons",
                     "analysis_run",
                     "view_analysis_results",

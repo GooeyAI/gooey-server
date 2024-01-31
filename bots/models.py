@@ -571,6 +571,11 @@ class BotIntegration(models.Model):
         help_text="If provided, the message content will be analyzed for this bot using this saved run",
     )
 
+    streaming_enabled = models.BooleanField(
+        default=False,
+        help_text="If set, the bot will stream messages to the frontend (Slack only)",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
