@@ -23,8 +23,9 @@ from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
     render_output_with_refs,
-    apply_response_template,
     CitationStyles,
+    apply_response_formattings_prefix,
+    apply_response_formattings_suffix,
 )
 from daras_ai_v2.vector_search import (
     DocSearchRequest,
@@ -194,8 +195,11 @@ class DocSearchPage(BasePage):
         citation_style = (
             request.citation_style and CitationStyles[request.citation_style]
         ) or None
-        apply_response_template(
+        all_refs_list = apply_response_formattings_prefix(
             response.output_text, response.references, citation_style
+        )
+        apply_response_formattings_suffix(
+            all_refs_list, response.output_text, citation_style
         )
 
     def get_raw_price(self, state: dict) -> float:
