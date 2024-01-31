@@ -108,7 +108,7 @@ page_slug_map: dict[str, typing.Type[BasePage]] = {
     normalize_slug(slug): page
     for page in (all_api_pages + all_hidden_pages)
     for slug in page.slug_versions
-}
+} | {str(page.workflow.value): page for page in (all_api_pages + all_hidden_pages)}
 
 workflow_map: dict[Workflow, typing.Type[BasePage]] = {
     page.workflow: page for page in all_api_pages
