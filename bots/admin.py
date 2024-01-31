@@ -219,6 +219,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
         "view_user",
         "open_in_gooey",
         "linked_saved_run",
+        "view_runs",
         "created_at",
         "updated_at",
     ]
@@ -227,6 +228,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
     autocomplete_fields = ["saved_run", "created_by", "last_edited_by"]
     readonly_fields = [
         "open_in_gooey",
+        "view_runs",
         "created_at",
         "updated_at",
     ]
@@ -243,19 +245,28 @@ class PublishedRunAdmin(admin.ModelAdmin):
 
     linked_saved_run.short_description = "Linked Run"
 
+    @admin.display(description="View Runs")
+    def view_runs(self, published_run: PublishedRun):
+        return list_related_html_url(
+            SavedRun.objects.filter(parent_version__published_run=published_run),
+            query_param="parent_version__published_run__id__exact",
+            instance_id=published_run.id,
+            show_add=False,
+        )
+
 
 @admin.register(SavedRun)
 class SavedRunAdmin(admin.ModelAdmin):
     list_display = [
         "__str__",
-        "example_id",
         "run_id",
         "view_user",
-        "created_at",
+        "open_in_gooey",
+        "view_parent_published_run",
         "run_time",
-        "updated_at",
         "price",
-        "preview_input",
+        "created_at",
+        "updated_at",
     ]
     list_filter = ["workflow"]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
@@ -278,6 +289,11 @@ class SavedRunAdmin(admin.ModelAdmin):
         django.db.models.JSONField: {"widget": JSONEditorWidget},
     }
 
+    def lookup_allowed(self, key, value):
+        if key in ["parent_version__published_run__id__exact"]:
+            return True
+        return super().lookup_allowed(key, value)
+
     def view_user(self, saved_run: SavedRun):
         return change_obj_url(
             AppUser.objects.get(uid=saved_run.uid),
@@ -291,9 +307,10 @@ class SavedRunAdmin(admin.ModelAdmin):
 
     view_bots.short_description = "View Bots"
 
-    @admin.display(description="Input")
-    def preview_input(self, saved_run: SavedRun):
-        return truncate_text_words(BasePage.preview_input(saved_run.state) or "", 100)
+    @admin.display(description="View Published Run")
+    def view_parent_published_run(self, saved_run: SavedRun):
+        pr = saved_run.parent_published_run()
+        return pr and change_obj_url(pr)
 
 
 @admin.register(PublishedRunVersion)
