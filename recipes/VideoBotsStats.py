@@ -136,7 +136,7 @@ class VideoBotsStatsPage(BasePage):
                 view,
                 factor,
                 trunc_fn,
-            ) = self.render_date_view_inputs()
+            ) = self.render_date_view_inputs(bi)
 
         df = self.calculate_stats_binned_by_time(
             bi, start_date, end_date, factor, trunc_fn
@@ -260,27 +260,34 @@ class VideoBotsStatsPage(BasePage):
         ).tostr()
         st.change_url(new_url, self.request)
 
-    def render_date_view_inputs(self):
-        start_of_year_date = datetime.now().replace(month=1, day=1)
-        st.session_state.setdefault(
-            "start_date",
-            self.request.query_params.get(
-                "start_date", start_of_year_date.strftime("%Y-%m-%d")
-            ),
-        )
-        start_date: datetime = (
-            st.date_input("Start date", key="start_date") or start_of_year_date
-        )
-        st.session_state.setdefault(
-            "end_date",
-            self.request.query_params.get(
-                "end_date", datetime.now().strftime("%Y-%m-%d")
-            ),
-        )
-        end_date: datetime = st.date_input("End date", key="end_date") or datetime.now()
-        st.session_state.setdefault(
-            "view", self.request.query_params.get("view", "Weekly")
-        )
+    def render_date_view_inputs(self, bi):
+        if st.checkbox("Show All"):
+            start_date = bi.created_at
+            end_date = datetime.now()
+        else:
+            start_of_year_date = datetime.now().replace(month=1, day=1)
+            st.session_state.setdefault(
+                "start_date",
+                self.request.query_params.get(
+                    "start_date", start_of_year_date.strftime("%Y-%m-%d")
+                ),
+            )
+            start_date: datetime = (
+                st.date_input("Start date", key="start_date") or start_of_year_date
+            )
+            st.session_state.setdefault(
+                "end_date",
+                self.request.query_params.get(
+                    "end_date", datetime.now().strftime("%Y-%m-%d")
+                ),
+            )
+            end_date: datetime = (
+                st.date_input("End date", key="end_date") or datetime.now()
+            )
+            st.session_state.setdefault(
+                "view", self.request.query_params.get("view", "Weekly")
+            )
+        st.write("---")
         view = st.horizontal_radio(
             "### View",
             options=["Daily", "Weekly", "Monthly"],
