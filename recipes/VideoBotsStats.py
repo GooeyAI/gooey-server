@@ -210,7 +210,15 @@ class VideoBotsStatsPage(BasePage):
             sort_by = st.session_state["sort_by"]
 
         df = self.get_tabular_data(
-            bi, run_url, conversations, messages, details, sort_by, rows=500
+            bi,
+            run_url,
+            conversations,
+            messages,
+            details,
+            sort_by,
+            rows=500,
+            start_date=start_date,
+            end_date=end_date,
         )
 
         if not df.empty:
@@ -233,7 +241,14 @@ class VideoBotsStatsPage(BasePage):
             st.html("<br/>")
             if st.checkbox("Export"):
                 df = self.get_tabular_data(
-                    bi, run_url, conversations, messages, details, sort_by
+                    bi,
+                    run_url,
+                    conversations,
+                    messages,
+                    details,
+                    sort_by,
+                    start_date=start_date,
+                    end_date=end_date,
                 )
                 csv = df.to_csv()
                 b64 = base64.b64encode(csv.encode()).decode()
@@ -642,12 +657,29 @@ class VideoBotsStatsPage(BasePage):
         st.plotly_chart(fig)
 
     def get_tabular_data(
-        self, bi, run_url, conversations, messages, details, sort_by, rows=10000
+        self,
+        bi,
+        run_url,
+        conversations,
+        messages,
+        details,
+        sort_by,
+        rows=10000,
+        start_date=None,
+        end_date=None,
     ):
         df = pd.DataFrame()
         if details == "Conversations":
+            if start_date and end_date:
+                conversations = conversations.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = conversations.to_df_format(row_limit=rows)
         elif details == "Messages":
+            if start_date and end_date:
+                messages = messages.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = messages.order_by("-created_at", "conversation__id").to_df_format(
                 row_limit=rows
             )
@@ -658,6 +690,10 @@ class VideoBotsStatsPage(BasePage):
                 message__conversation__bot_integration=bi,
                 rating=Feedback.Rating.RATING_THUMBS_UP,
             )  # type: ignore
+            if start_date and end_date:
+                pos_feedbacks = pos_feedbacks.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = pos_feedbacks.to_df_format(row_limit=rows)
             df["Run URL"] = run_url
             df["Bot"] = bi.name
@@ -665,7 +701,13 @@ class VideoBotsStatsPage(BasePage):
             neg_feedbacks: FeedbackQuerySet = Feedback.objects.filter(
                 message__conversation__bot_integration=bi,
                 rating=Feedback.Rating.RATING_THUMBS_DOWN,
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
             )  # type: ignore
+            if start_date and end_date:
+                neg_feedbacks = neg_feedbacks.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = neg_feedbacks.to_df_format(row_limit=rows)
             df["Run URL"] = run_url
             df["Bot"] = bi.name
@@ -673,7 +715,13 @@ class VideoBotsStatsPage(BasePage):
             successful_messages: MessageQuerySet = Message.objects.filter(
                 conversation__bot_integration=bi,
                 analysis_result__contains={"Answered": True},
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
             )  # type: ignore
+            if start_date and end_date:
+                successful_messages = successful_messages.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = successful_messages.to_df_analysis_format(row_limit=rows)
             df["Run URL"] = run_url
             df["Bot"] = bi.name
@@ -681,7 +729,13 @@ class VideoBotsStatsPage(BasePage):
             unsuccessful_messages: MessageQuerySet = Message.objects.filter(
                 conversation__bot_integration=bi,
                 analysis_result__contains={"Answered": False},
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
             )  # type: ignore
+            if start_date and end_date:
+                unsuccessful_messages = unsuccessful_messages.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = unsuccessful_messages.to_df_analysis_format(row_limit=rows)
             df["Run URL"] = run_url
             df["Bot"] = bi.name
