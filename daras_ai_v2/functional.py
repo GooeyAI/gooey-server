@@ -8,8 +8,8 @@ R = typing.TypeVar("R")
 
 
 def flatapply_parallel(
-    fn: typing.Callable[[T], list[R]],
-    *iterables: typing.Sequence[T],
+    fn: typing.Callable[..., list[R]],
+    *iterables,
     max_workers: int = None,
     message: str = "",
 ) -> typing.Generator[str, None, list[R]]:
@@ -20,8 +20,8 @@ def flatapply_parallel(
 
 
 def apply_parallel(
-    fn: typing.Callable[[T], R],
-    *iterables: typing.Sequence[T],
+    fn: typing.Callable[..., R],
+    *iterables,
     max_workers: int = None,
     message: str = "",
 ) -> typing.Generator[str, None, list[R]]:
@@ -42,8 +42,8 @@ def apply_parallel(
 
 
 def fetch_parallel(
-    fn: typing.Callable[[T], R],
-    *iterables: typing.Sequence[T],
+    fn: typing.Callable[..., R],
+    *iterables,
     max_workers: int = None,
 ) -> typing.Generator[R, None, None]:
     assert iterables, "fetch_parallel() requires at least one iterable"
@@ -57,16 +57,16 @@ def fetch_parallel(
 
 
 def flatmap_parallel(
-    fn: typing.Callable[[T], list[R]],
-    *iterables: typing.Sequence[T],
+    fn: typing.Callable[..., list[R]],
+    *iterables,
     max_workers: int = None,
 ) -> list[R]:
     return flatten(map_parallel(fn, *iterables, max_workers=max_workers))
 
 
 def map_parallel(
-    fn: typing.Callable[[T], R],
-    *iterables: typing.Sequence[T],
+    fn: typing.Callable[..., R],
+    *iterables,
     max_workers: int = None,
 ) -> list[R]:
     assert iterables, "map_parallel() requires at least one iterable"

@@ -21,10 +21,11 @@ def url_shortener(hashid: str, request: Request):
         return Response(status_code=410, content="This link has expired")
     # increment the click count
     ShortenedURL.objects.filter(id=surl.id).update(clicks=F("clicks") + 1)
-    if surl.enable_analytics:
-        save_click_info.delay(
-            surl.id, request.client.host, request.headers.get("user-agent", "")
-        )
+    # disable because iplist.cc is down
+    # if surl.enable_analytics:
+    #     save_click_info.delay(
+    #         surl.id, request.client.host, request.headers.get("user-agent", "")
+    #     )
     if surl.url:
         return RedirectResponse(
             url=surl.url, status_code=303  # because youtu.be redirects are 303

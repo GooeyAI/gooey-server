@@ -923,7 +923,7 @@ class BasePage:
     ) -> tuple[SavedRun, PublishedRun | None]:
         if run_id and uid:
             sr = cls.run_doc_sr(run_id, uid)
-            pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
+            pr = sr.parent_published_run()
         else:
             pr = cls.get_published_run(published_run_id=example_id or "")
             sr = pr.saved_run
@@ -940,9 +940,7 @@ class BasePage:
     ) -> PublishedRun | None:
         if run_id and uid:
             sr = cls.get_sr_from_query_params(example_id, run_id, uid)
-            return (
-                sr and sr.parent_version and sr.parent_version.published_run
-            ) or None
+            return sr.parent_published_run()
         elif example_id:
             return cls.get_published_run(published_run_id=example_id)
         else:
