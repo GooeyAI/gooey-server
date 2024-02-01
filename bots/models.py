@@ -927,7 +927,7 @@ class MessageQuerySet(models.QuerySet):
                     else None
                 ),  # only show first feedback as per Sean's request
                 "Analysis JSON": message.analysis_result,
-                "Response Time": message.response_time.total_seconds(),
+                "Response Time": round(message.response_time.total_seconds(), 1),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
