@@ -1048,6 +1048,11 @@ class Message(models.Model):
         help_text="Subject of given question (DEPRECATED)",
     )
 
+    response_time = models.DurationField(
+        default=datetime.timedelta(seconds=-1),
+        help_text="The time it took for the bot to respond to the corresponding user message",
+    )
+
     _analysis_started = False
 
     objects = MessageQuerySet.as_manager()
@@ -1062,24 +1067,6 @@ class Message(models.Model):
 
     def local_lang(self):
         return Truncator(self.display_content).words(30)
-
-    @property
-    def response_time(self):
-        return self.saved_run.run_time
-        # import pandas as pd
-
-        # if self.role == CHATML_ROLE_USER:
-        #     return pd.NaT
-        # return (
-        #     self.created_at
-        #     - Message.objects.filter(
-        #         conversation=self.conversation,
-        #         role=CHATML_ROLE_USER,
-        #         created_at__lt=self.created_at,
-        #     )
-        #     .latest()
-        #     .created_at
-        # )
 
 
 class MessageAttachment(models.Model):

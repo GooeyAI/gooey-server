@@ -408,7 +408,7 @@ class VideoBotsStatsPage(BasePage):
                     distinct=True,
                 )
             )
-            .annotate(Average_response_time=Avg("saved_run__run_time"))
+            .annotate(Average_response_time=Avg("response_time"))
             .annotate(Unique_feedback_givers=Count("feedbacks", distinct=True))
             .values(
                 "date",

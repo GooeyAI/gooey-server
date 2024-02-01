@@ -3,11 +3,14 @@ import traceback
 import typing
 from urllib.parse import parse_qs
 
+import pytz
+from datetime import datetime
 from django.db import transaction
 from fastapi import HTTPException, Request
 from furl import furl
 from sentry_sdk import capture_exception
 
+from daras_ai_v2 import settings
 from app_users.models import AppUser
 from bots.models import (
     Platform,
@@ -202,6 +205,7 @@ def _on_msg(bot: BotInterface):
     speech_run = None
     input_images = None
     input_documents = None
+    recieved_time: datetime = datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
@@ -286,6 +290,7 @@ def _on_msg(bot: BotInterface):
             input_documents=input_documents,
             input_text=input_text,
             speech_run=speech_run,
+            recieved_time=recieved_time,
         )
 
 
@@ -324,6 +329,7 @@ def _process_and_send_msg(
     input_images: list[str] | None,
     input_documents: list[str] | None,
     input_text: str,
+    recieved_time: datetime,
     speech_run: str | None,
 ):
     try:
@@ -369,6 +375,7 @@ def _process_and_send_msg(
         platform_msg_id=msg_id,
         response=response,
         url=url,
+        received_time=recieved_time,
     )
 
 
@@ -381,6 +388,7 @@ def _save_msgs(
     platform_msg_id: str | None,
     response: VideoBotsPage.ResponseModel,
     url: str,
+    received_time: datetime,
 ):
     # create messages for future context
     user_msg = Message(
@@ -396,6 +404,8 @@ def _save_msgs(
             if speech_run
             else None
         ),
+        response_time=datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
+        - received_time,
     )
     attachments = []
     for f_url in (input_images or []) + (input_documents or []):
@@ -412,6 +422,8 @@ def _save_msgs(
         saved_run=SavedRun.objects.get_or_create(
             workflow=Workflow.VIDEO_BOTS, **furl(url).query.params
         )[0],
+        response_time=datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
+        - received_time,
     )
     # save the messages & attachments
     with transaction.atomic():
