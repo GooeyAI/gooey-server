@@ -50,6 +50,7 @@ from daras_ai_v2.language_model import (
     get_entry_images,
     get_entry_text,
     format_chat_entry,
+    SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -58,7 +59,12 @@ from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
-from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
+from daras_ai_v2.search_ref import (
+    parse_refs,
+    CitationStyles,
+    apply_response_formattings_prefix,
+    apply_response_formattings_suffix,
+)
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
@@ -805,7 +811,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         yield f"Running {model.value}..."
         if is_chat_model:
-            output_text = run_language_model(
+            chunks = run_language_model(
                 model=request.selected_model,
                 messages=[
                     {"role": s["role"], "content": s["content"]}
@@ -816,12 +822,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
                 tools=request.tools,
+                stream=True,
             )
         else:
             prompt = "\n".join(
                 format_chatml_message(entry) for entry in prompt_messages
             )
-            output_text = run_language_model(
+            chunks = run_language_model(
                 model=request.selected_model,
                 prompt=prompt,
                 max_tokens=max_allowed_tokens,
@@ -830,43 +837,52 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
                 stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
+                stream=True,
             )
-        if request.tools:
-            output_text, tool_call_choices = output_text
-            state["output_documents"] = output_documents = []
-            for tool_calls in tool_call_choices:
-                for call in tool_calls:
-                    result = yield from exec_tool_call(call)
-                    output_documents.append(result)
+        citation_style = (
+            request.citation_style and CitationStyles[request.citation_style]
+        ) or None
+        all_refs_list = []
+        for i, output_text in enumerate(chunks):
+            if request.tools:
+                output_text, tool_call_choices = output_text
+                state["output_documents"] = output_documents = []
+                for tool_calls in tool_call_choices:
+                    for call in tool_calls:
+                        result = yield from exec_tool_call(call)
+                        output_documents.append(result)
 
-        # save model response
-        state["raw_output_text"] = [
-            "".join(snippet for snippet, _ in parse_refs(text, references))
-            for text in output_text
-        ]
-
-        # translate response text
-        if request.user_language and request.user_language != "en":
-            yield f"Translating response to {request.user_language}..."
-            output_text = run_google_translate(
-                texts=output_text,
-                source_language="en",
-                target_language=request.user_language,
-                glossary_url=request.output_glossary_document,
-            )
-            state["raw_tts_text"] = [
+            # save model response
+            state["raw_output_text"] = [
                 "".join(snippet for snippet, _ in parse_refs(text, references))
                 for text in output_text
             ]
 
-        if references:
-            citation_style = (
-                request.citation_style and CitationStyles[request.citation_style]
-            ) or None
-            apply_response_template(output_text, references, citation_style)
+            # translate response text
+            if request.user_language and request.user_language != "en":
+                yield f"Translating response to {request.user_language}..."
+                output_text = run_google_translate(
+                    texts=output_text,
+                    source_language="en",
+                    target_language=request.user_language,
+                    glossary_url=request.output_glossary_document,
+                )
+                state["raw_tts_text"] = [
+                    "".join(snippet for snippet, _ in parse_refs(text, references))
+                    for text in output_text
+                ]
 
-        state["output_text"] = output_text
+            if references:
+                all_refs_list = apply_response_formattings_prefix(
+                    output_text, references, citation_style
+                )
+            state["output_text"] = output_text
+            yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
+        if all_refs_list:
+            apply_response_formattings_suffix(
+                all_refs_list, state["output_text"], citation_style
+            )
         state["output_audio"] = []
         state["output_video"] = []
 

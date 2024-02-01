@@ -232,7 +232,9 @@ class BasePage:
             and published_run.is_root()
             and published_run.saved_run == current_run
         )
-        tbreadcrumbs = get_title_breadcrumbs(self, current_run, published_run)
+        tbreadcrumbs = get_title_breadcrumbs(
+            self, current_run, published_run, tab=self.tab
+        )
 
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
@@ -921,7 +923,7 @@ class BasePage:
     ) -> tuple[SavedRun, PublishedRun | None]:
         if run_id and uid:
             sr = cls.run_doc_sr(run_id, uid)
-            pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
+            pr = sr.parent_published_run()
         else:
             pr = cls.get_published_run(published_run_id=example_id or "")
             sr = pr.saved_run
@@ -938,9 +940,7 @@ class BasePage:
     ) -> PublishedRun | None:
         if run_id and uid:
             sr = cls.get_sr_from_query_params(example_id, run_id, uid)
-            return (
-                sr and sr.parent_version and sr.parent_version.published_run
-            ) or None
+            return sr.parent_published_run()
         elif example_id:
             return cls.get_published_run(published_run_id=example_id)
         else:
@@ -1637,7 +1637,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         is_latest_version = published_run and published_run.saved_run == saved_run
         tb = get_title_breadcrumbs(self, sr=saved_run, pr=published_run)
 
-        with st.link(to=saved_run.get_app_url(), className="text-decoration-none"):
+        with st.link(to=saved_run.get_app_url()):
             with st.div(className="mb-1", style={"font-size": "0.9rem"}):
                 if is_latest_version:
                     st.html(
@@ -1662,7 +1662,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def _render_published_run_preview(self, published_run: PublishedRun):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        with st.link(to=published_run.get_app_url(), className="text-decoration-none"):
+        with st.link(to=published_run.get_app_url()):
             with st.div(className="mb-1", style={"font-size": "0.9rem"}):
                 st.html(
                     PublishedRunVisibility(published_run.visibility).get_badge_html()
@@ -1681,6 +1681,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 run_count = format_number_with_suffix(published_run.get_run_count())
                 st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
 
+        if published_run.notes:
+            st.caption(published_run.notes)
+
         doc = published_run.saved_run.to_dict()
         self.render_example(doc)
 
@@ -1692,7 +1695,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        with st.link(to=published_run.get_app_url(), className="text-decoration-none"):
+        with st.link(to=published_run.get_app_url()):
             with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
                 if published_run.created_by and self.is_user_admin(
                     published_run.created_by
@@ -1712,6 +1715,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             run_icon = '<i class="fa-regular fa-person-running"></i>'
             run_count = format_number_with_suffix(published_run.get_run_count())
             st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
+
+        if published_run.notes:
+            st.caption(published_run.notes)
 
         if allow_hide:
             self._example_hide_button(published_run=published_run)
