@@ -31,8 +31,7 @@ from django.db.models.functions import (
     TruncYear,
     Concat,
 )
-from django.db.models import Count, F, Window
-from django.db.models.functions import Lag
+from django.db.models import Count, Avg
 
 ID_COLUMNS = [
     "conversation__fb_page_id",
@@ -389,33 +388,6 @@ class VideoBotsStatsPage(BasePage):
     def calculate_stats_binned_by_time(
         self, bi, start_date, end_date, factor, trunc_fn
     ):
-        average_response_time = (
-            Message.objects.filter(
-                created_at__date__gte=start_date,
-                created_at__date__lte=end_date,
-                conversation__bot_integration=bi,
-            )
-            .values("conversation_id")
-            .order_by("created_at")
-            .annotate(
-                response_time=F("created_at") - Window(expression=Lag("created_at")),
-            )
-            .annotate(date=trunc_fn("created_at"))
-            .values("date", "response_time", "role")
-        )
-        average_response_time = (
-            pd.DataFrame(
-                average_response_time,
-                columns=["date", "response_time", "role"],
-            )
-            .loc[lambda df: df["role"] == CHATML_ROLE_ASSISTANT]
-            .groupby("date")
-            .agg({"response_time": "median"})
-            .apply(lambda x: x.clip(lower=timedelta(0)))
-            .rename(columns={"response_time": "Average_response_time"})
-            .reset_index()
-        )
-
         messages_received = (
             Message.objects.filter(
                 created_at__date__gte=start_date,
@@ -436,6 +408,7 @@ class VideoBotsStatsPage(BasePage):
                     distinct=True,
                 )
             )
+            .annotate(Average_response_time=Avg("saved_run__run_time"))
             .annotate(Unique_feedback_givers=Count("feedbacks", distinct=True))
             .values(
                 "date",
@@ -443,6 +416,7 @@ class VideoBotsStatsPage(BasePage):
                 "Convos",
                 "Senders",
                 "Unique_feedback_givers",
+                "Average_response_time",
             )
         )
 
@@ -482,6 +456,7 @@ class VideoBotsStatsPage(BasePage):
                 "Convos",
                 "Senders",
                 "Unique_feedback_givers",
+                "Average_response_time",
             ],
         )
         df = df.merge(
@@ -492,12 +467,6 @@ class VideoBotsStatsPage(BasePage):
         )
         df = df.merge(
             pd.DataFrame(negative_feedbacks, columns=["date", "Neg_feedback"]),
-            how="outer",
-            left_on="date",
-            right_on="date",
-        )
-        df = df.merge(
-            average_response_time,
             how="outer",
             left_on="date",
             right_on="date",

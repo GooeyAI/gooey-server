@@ -1065,20 +1065,21 @@ class Message(models.Model):
 
     @property
     def response_time(self):
-        import pandas as pd
+        return self.saved_run.run_time
+        # import pandas as pd
 
-        if self.role == CHATML_ROLE_USER:
-            return pd.NaT
-        return (
-            self.created_at
-            - Message.objects.filter(
-                conversation=self.conversation,
-                role=CHATML_ROLE_USER,
-                created_at__lt=self.created_at,
-            )
-            .latest()
-            .created_at
-        )
+        # if self.role == CHATML_ROLE_USER:
+        #     return pd.NaT
+        # return (
+        #     self.created_at
+        #     - Message.objects.filter(
+        #         conversation=self.conversation,
+        #         role=CHATML_ROLE_USER,
+        #         created_at__lt=self.created_at,
+        #     )
+        #     .latest()
+        #     .created_at
+        # )
 
 
 class MessageAttachment(models.Model):
