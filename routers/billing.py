@@ -121,6 +121,7 @@ def account(request: Request):
         "user_credits": request.user.balance,
         "subscription": get_user_subscription(request.user),
         "is_admin": is_admin,
+        "canonical_url": str(furl(settings.APP_BASE_URL) / "account" / "/"),
     }
 
     return templates.TemplateResponse("account.html", context)
