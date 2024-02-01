@@ -42,7 +42,11 @@ def realtime_push(channel: str, value: typing.Any = "ping"):
     msg = json.dumps(jsonable_encoder(value))
     r.set(channel, msg)
     r.publish(channel, json.dumps(time()))
-    logger.info(f"publish {channel=}")
+    if isinstance(value, dict):
+        run_status = value.get("__run_status")
+        logger.info(f"publish {channel=} {run_status=}")
+    else:
+        logger.info(f"publish {channel=}")
 
 
 # def use_state(

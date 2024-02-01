@@ -1,6 +1,7 @@
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
+from textwrap import dedent
 
 import pytz
 from django.conf import settings
@@ -41,6 +42,33 @@ class PublishedRunVisibility(models.IntegerChoices):
                 return "Public"
             case _:
                 return self.label
+
+    def get_badge_html(self):
+        badge_container_class = (
+            "text-sm bg-light border border-dark rounded-pill px-2 py-1"
+        )
+
+        match self:
+            case PublishedRunVisibility.UNLISTED:
+                return dedent(
+                    f"""\
+                <span class="{badge_container_class}">
+                    <i class="fa-regular fa-lock"></i>
+                    Private
+                </span>
+                """
+                )
+            case PublishedRunVisibility.PUBLIC:
+                return dedent(
+                    f"""\
+                <span class="{badge_container_class}">
+                    <i class="fa-regular fa-globe"></i>
+                    Public
+                </span>
+                """
+                )
+            case _:
+                raise NotImplementedError(self)
 
 
 class Platform(models.IntegerChoices):
@@ -252,7 +280,15 @@ class SavedRun(models.Model):
         ]
 
     def __str__(self):
-        return self.get_app_url()
+        from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
+
+        title = get_title_breadcrumbs(
+            Workflow(self.workflow).page_cls, self, self.parent_published_run()
+        ).h1_title
+        return title or self.get_app_url()
+
+    def parent_published_run(self) -> "PublishedRun":
+        return self.parent_version and self.parent_version.published_run
 
     def get_app_url(self):
         workflow = Workflow(self.workflow)
@@ -587,6 +623,12 @@ class ConvoState(models.IntegerChoices):
 
 
 class ConversationQuerySet(models.QuerySet):
+    def get_unique_users(self) -> "ConversationQuerySet":
+        """Get unique conversations"""
+        return self.distinct(
+            "fb_page_id", "ig_account_id", "wa_phone_number", "slack_user_id"
+        )
+
     def to_df(self, tz=pytz.timezone(settings.TIME_ZONE)) -> "pd.DataFrame":
         import pandas as pd
 
@@ -614,6 +656,61 @@ class ConversationQuerySet(models.QuerySet):
                 }
             except Message.DoesNotExist:
                 pass
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
+    def to_df_format(
+        self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=1000
+    ) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.all()
+        rows = []
+        for convo in qs[:row_limit]:
+            convo: Conversation
+            row = {
+                "Name": convo.get_display_name(),
+                "Messages": convo.messages.count(),
+                "Correct Answers": convo.messages.filter(
+                    analysis_result__contains={"Answered": True}
+                ).count(),
+                "Thumbs up": convo.messages.filter(
+                    feedbacks__rating=Feedback.Rating.RATING_THUMBS_UP
+                ).count(),
+                "Thumbs down": convo.messages.filter(
+                    feedbacks__rating=Feedback.Rating.RATING_THUMBS_DOWN
+                ).count(),
+            }
+            try:
+                first_time = (
+                    convo.messages.earliest()
+                    .created_at.astimezone(tz)
+                    .replace(tzinfo=None)
+                )
+                last_time = (
+                    convo.messages.latest()
+                    .created_at.astimezone(tz)
+                    .replace(tzinfo=None)
+                )
+                row |= {
+                    "Last Sent": last_time.strftime("%b %d, %Y %I:%M %p"),
+                    "First Sent": first_time.strftime("%b %d, %Y %I:%M %p"),
+                    "A7": not convo.d7(),
+                    "A30": not convo.d30(),
+                    "R1": last_time - first_time < datetime.timedelta(days=1),
+                    "R7": last_time - first_time < datetime.timedelta(days=7),
+                    "R30": last_time - first_time < datetime.timedelta(days=30),
+                    "Delta Hours": round(
+                        convo.last_active_delta().total_seconds() / 3600
+                    ),
+                }
+            except Message.DoesNotExist:
+                pass
+            row |= {
+                "Created At": convo.created_at.astimezone(tz).replace(tzinfo=None),
+                "Bot": str(convo.bot_integration),
+            }
             rows.append(row)
         df = pd.DataFrame.from_records(rows)
         return df
@@ -789,6 +886,53 @@ class MessageQuerySet(models.QuerySet):
         df = pd.DataFrame.from_records(rows)
         return df
 
+    def to_df_format(
+        self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
+    ) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.all().prefetch_related("feedbacks")
+        rows = []
+        for message in qs[:row_limit]:
+            message: Message
+            row = {
+                "Name": message.conversation.get_display_name(),
+                "Role": message.role,
+                "Message (EN)": message.content,
+                "Sent": message.created_at.astimezone(tz)
+                .replace(tzinfo=None)
+                .strftime("%b %d, %Y %I:%M %p"),
+                "Feedback": message.feedbacks.first().get_display_text()
+                if message.feedbacks.first()
+                else None,  # only show first feedback as per Sean's request
+                "Analysis JSON": message.analysis_result,
+            }
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
+    def to_df_analysis_format(
+        self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
+    ) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.filter(role=CHATML_ROLE_USER).prefetch_related("feedbacks")
+        rows = []
+        for message in qs[:row_limit]:
+            message: Message
+            row = {
+                "Name": message.conversation.get_display_name(),
+                "Question (EN)": message.content,
+                "Answer (EN)": message.get_next_by_created_at().content,
+                "Sent": message.created_at.astimezone(tz)
+                .replace(tzinfo=None)
+                .strftime("%b %d, %Y %I:%M %p"),
+                "Analysis JSON": message.analysis_result,
+            }
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
     def as_llm_context(self, limit: int = 100) -> list["ConversationEntry"]:
         msgs = self.order_by("-created_at").prefetch_related("attachments")[:limit]
         entries = [None] * len(msgs)
@@ -938,6 +1082,37 @@ class FeedbackQuerySet(models.QuerySet):
                     tzinfo=None
                 ),
                 "QUESTION_ANSWERED": feedback.message.question_answered,
+            }
+            rows.append(row)
+        df = pd.DataFrame.from_records(rows)
+        return df
+
+    def to_df_format(
+        self, tz=pytz.timezone(settings.TIME_ZONE), row_limit=10000
+    ) -> "pd.DataFrame":
+        import pandas as pd
+
+        qs = self.all().prefetch_related("message", "message__conversation")
+        rows = []
+        for feedback in qs[:row_limit]:
+            feedback: Feedback
+            row = {
+                "Name": feedback.message.conversation.get_display_name(),
+                "Question (EN)": feedback.message.get_previous_by_created_at().content,
+                "Question Sent": feedback.message.get_previous_by_created_at()
+                .created_at.astimezone(tz)
+                .replace(tzinfo=None)
+                .strftime("%b %d, %Y %I:%M %p"),
+                "Answer (EN)": feedback.message.content,
+                "Answer Sent": feedback.message.created_at.astimezone(tz)
+                .replace(tzinfo=None)
+                .strftime("%b %d, %Y %I:%M %p"),
+                "Rating": Feedback.Rating(feedback.rating).label,
+                "Feedback (EN)": feedback.text_english,
+                "Feedback Sent": feedback.created_at.astimezone(tz)
+                .replace(tzinfo=None)
+                .strftime("%b %d, %Y %I:%M %p"),
+                "Question Answered": feedback.message.question_answered,
             }
             rows.append(row)
         df = pd.DataFrame.from_records(rows)
@@ -1197,6 +1372,17 @@ class PublishedRun(models.Model):
         self.visibility = latest_version.visibility
 
         self.save()
+
+    def get_run_count(self):
+        annotated_versions = self.versions.annotate(
+            children_runs_count=models.Count("children_runs")
+        )
+        return (
+            annotated_versions.aggregate(run_count=models.Sum("children_runs_count"))[
+                "run_count"
+            ]
+            or 0
+        )
 
 
 class PublishedRunVersion(models.Model):

@@ -6,6 +6,7 @@ from bots.models import (
     PublishedRun,
 )
 from daras_ai.image_input import truncate_text_words
+from daras_ai_v2.tabs_widget import MenuTabs
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -17,6 +18,11 @@ class TitleUrl(typing.NamedTuple):
 
 
 class TitleBreadCrumbs(typing.NamedTuple):
+    """
+    Breadcrumbs: root_title / published_title
+    Title: h1_title
+    """
+
     h1_title: str
     root_title: TitleUrl | None
     published_title: TitleUrl | None
@@ -67,36 +73,49 @@ def get_title_breadcrumbs(
     page_cls: typing.Union["BasePage", typing.Type["BasePage"]],
     sr: SavedRun,
     pr: PublishedRun | None,
+    tab: str = MenuTabs.run,
 ) -> TitleBreadCrumbs:
-    if pr and sr == pr.saved_run and not pr.published_run_id:
-        # when published_run.published_run_id is blank, the run is the root example
-        return TitleBreadCrumbs(page_cls.get_recipe_title(), None, None)
+    is_root = pr and pr.saved_run == sr and pr.is_root()
+    is_example = not is_root and pr and pr.saved_run == sr
+    is_run = not is_root and not is_example
 
-    # the title on the saved root / the hardcoded title
-    recipe_title = page_cls.get_root_published_run().title or page_cls.title
+    recipe_title = page_cls.get_recipe_title()
     prompt_title = truncate_text_words(
         page_cls.preview_input(sr.to_dict()) or "",
         maxlen=60,
     ).replace("\n", " ")
 
-    root_title = TitleUrl(recipe_title, page_cls.app_url())
+    metadata = page_cls.workflow.get_or_create_metadata()
+    root_breadcrumb = TitleUrl(metadata.short_title, page_cls.app_url())
 
-    if pr and sr == pr.saved_run:
-        # published run root
-        return TitleBreadCrumbs(
-            pr.title or prompt_title or recipe_title,
-            root_title,
-            None,
-        )
-
-    if not pr or not pr.published_run_id:
-        # run created directly from recipe root
-        h1_title = prompt_title or f"Run: {recipe_title}"
-        return TitleBreadCrumbs(h1_title, root_title, None)
-
-    # run created from a published run
-    h1_title = prompt_title or f"Run: {pr.title or recipe_title}"
-    published_title = TitleUrl(
-        pr.title or f"Fork {pr.published_run_id}", pr.get_app_url()
-    )
-    return TitleBreadCrumbs(h1_title, root_title, published_title)
+    match tab:
+        case MenuTabs.examples:
+            return TitleBreadCrumbs(
+                f"Examples: {metadata.short_title}",
+                root_title=root_breadcrumb,
+                published_title=None,
+            )
+        case _ if is_root:
+            return TitleBreadCrumbs(page_cls.get_recipe_title(), None, None)
+        case _ if is_example:
+            assert pr is not None
+            return TitleBreadCrumbs(
+                pr.title or prompt_title or recipe_title,
+                root_title=root_breadcrumb,
+                published_title=None,
+            )
+        case _ if is_run:
+            if pr and not pr.is_root():
+                published_title = TitleUrl(
+                    pr.title or f"Fork: {pr.published_run_id}",
+                    pr.get_app_url(),
+                )
+            else:
+                published_title = None
+            return TitleBreadCrumbs(
+                prompt_title or f"Run: {recipe_title}",
+                root_title=root_breadcrumb,
+                published_title=published_title,
+            )
+        case _:
+            raise AssertionError("Invalid tab or run")
