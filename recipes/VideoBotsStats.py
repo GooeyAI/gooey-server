@@ -119,6 +119,7 @@ class VideoBotsStatsPage(BasePage):
         if int(bid) not in allowed_bids:
             bid = allowed_bids[0]
         bi = BotIntegration.objects.get(id=bid)
+        has_analysis_run = bi.analysis_run is not None
         run_title, run_url = self.parse_run_info(bi)
 
         self.show_title_breadcrumb_share(run_title, run_url, bi)
@@ -153,14 +154,22 @@ class VideoBotsStatsPage(BasePage):
         st.session_state.setdefault("details", self.request.query_params.get("details"))
         details = st.horizontal_radio(
             "### Details",
-            options=[
-                "Conversations",
-                "Messages",
-                "Feedback Positive",
-                "Feedback Negative",
-                "Answered Successfully",
-                "Answered Unsuccessfully",
-            ],
+            options=(
+                [
+                    "Conversations",
+                    "Messages",
+                    "Feedback Positive",
+                    "Feedback Negative",
+                ]
+                + (
+                    [
+                        "Answered Successfully",
+                        "Answered Unsuccessfully",
+                    ]
+                    if has_analysis_run
+                    else []
+                )
+            ),
             key="details",
         )
 
@@ -430,7 +439,9 @@ class VideoBotsStatsPage(BasePage):
                     distinct=True,
                 )
             )
+            .annotate(Average_runtime=Avg("saved_run__run_time"))
             .annotate(Average_response_time=Avg("response_time"))
+            .annotate(Average_analysis_time=Avg("analysis_run__run_time"))
             .annotate(Unique_feedback_givers=Count("feedbacks", distinct=True))
             .values(
                 "date",
@@ -439,6 +450,8 @@ class VideoBotsStatsPage(BasePage):
                 "Senders",
                 "Unique_feedback_givers",
                 "Average_response_time",
+                "Average_runtime",
+                "Average_analysis_time",
             )
         )
 
@@ -470,6 +483,20 @@ class VideoBotsStatsPage(BasePage):
             .values("date", "Neg_feedback")
         )
 
+        successfully_answered = (
+            Message.objects.filter(
+                conversation__bot_integration=bi,
+                analysis_result__contains={"Answered": True},
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
+            )
+            .order_by()
+            .annotate(date=trunc_fn("created_at"))
+            .values("date")
+            .annotate(Successfully_Answered=Count("id"))
+            .values("date", "Successfully_Answered")
+        )
+
         df = pd.DataFrame(
             messages_received,
             columns=[
@@ -479,6 +506,8 @@ class VideoBotsStatsPage(BasePage):
                 "Senders",
                 "Unique_feedback_givers",
                 "Average_response_time",
+                "Average_runtime",
+                "Average_analysis_time",
             ],
         )
         df = df.merge(
@@ -493,6 +522,14 @@ class VideoBotsStatsPage(BasePage):
             left_on="date",
             right_on="date",
         )
+        df = df.merge(
+            pd.DataFrame(
+                successfully_answered, columns=["date", "Successfully_Answered"]
+            ),
+            how="outer",
+            left_on="date",
+            right_on="date",
+        )
         df["Messages_Sent"] = df["Messages_Sent"] * factor
         df["Convos"] = df["Convos"] * factor
         df["Senders"] = df["Senders"] * factor
@@ -500,10 +537,13 @@ class VideoBotsStatsPage(BasePage):
         df["Pos_feedback"] = df["Pos_feedback"] * factor
         df["Neg_feedback"] = df["Neg_feedback"] * factor
         df["Percentage_positive_feedback"] = (
-            df["Pos_feedback"] / (df["Pos_feedback"] + df["Neg_feedback"])
+            df["Pos_feedback"] / df["Messages_Sent"]
         ) * 100
         df["Percentage_negative_feedback"] = (
-            df["Neg_feedback"] / (df["Pos_feedback"] + df["Neg_feedback"])
+            df["Neg_feedback"] / df["Messages_Sent"]
+        ) * 100
+        df["Percentage_successfully_answered"] = (
+            df["Successfully_Answered"] / df["Messages_Sent"]
         ) * 100
         df["Msgs_per_convo"] = df["Messages_Sent"] / df["Convos"]
         df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
@@ -653,7 +693,48 @@ class VideoBotsStatsPage(BasePage):
                 ],
             )
         st.plotly_chart(fig)
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.write("---")
+        fig = go.Figure(
+            data=[
+                go.Scatter(
+                    name="Average Response Time",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Average_response_time"]),
+                    text=list(df["Average_response_time"]),
+                    hovertemplate="Average Response Time: %{y:.0f}<extra></extra>",
+                ),
+                go.Scatter(
+                    name="Average Run Time",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Average_runtime"]),
+                    text=list(df["Average_runtime"]),
+                    hovertemplate="Average Runtime: %{y:.0f}<extra></extra>",
+                ),
+                go.Scatter(
+                    name="Average Analysis Time",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Average_analysis_time"]),
+                    text=list(df["Average_analysis_time"]),
+                    hovertemplate="Average Analysis Time: %{y:.0f}<extra></extra>",
+                ),
+            ],
+            layout=dict(
+                margin=dict(l=0, r=0, t=28, b=0),
+                yaxis=dict(
+                    title="Seconds",
+                ),
+                title=dict(
+                    text=f"{view} Performance Metrics",
+                ),
+                height=300,
+                template="plotly_white",
+            ),
+        )
+        st.plotly_chart(fig)
+        st.write("---")
         fig = go.Figure(
             data=[
                 go.Scatter(
@@ -662,7 +743,7 @@ class VideoBotsStatsPage(BasePage):
                     x=list(df["date"]),
                     y=list(df["Percentage_positive_feedback"]),
                     text=list(df["Percentage_positive_feedback"]),
-                    hovertemplate="Positive Feedback: %{y:.0f}\\%<extra></extra>",
+                    hovertemplate="Positive Feedback: %{y:.0f}%<extra></extra>",
                 ),
                 go.Scatter(
                     name="Negative Feedback",
@@ -670,7 +751,15 @@ class VideoBotsStatsPage(BasePage):
                     x=list(df["date"]),
                     y=list(df["Percentage_negative_feedback"]),
                     text=list(df["Percentage_negative_feedback"]),
-                    hovertemplate="Negative Feedback: %{y:.0f}\\%<extra></extra>",
+                    hovertemplate="Negative Feedback: %{y:.0f}%<extra></extra>",
+                ),
+                go.Scatter(
+                    name="Successfully Answered",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Percentage_successfully_answered"]),
+                    text=list(df["Percentage_successfully_answered"]),
+                    hovertemplate="Successfully Answered: %{y:.0f}%<extra></extra>",
                 ),
             ],
             layout=dict(
@@ -688,31 +777,6 @@ class VideoBotsStatsPage(BasePage):
                 ),
                 title=dict(
                     text=f"{view} Feedback Distribution",
-                ),
-                height=300,
-                template="plotly_white",
-            ),
-        )
-        st.plotly_chart(fig)
-        st.write("---")
-        fig = go.Figure(
-            data=[
-                go.Scatter(
-                    name="Average Response Time",
-                    mode="lines+markers",
-                    x=list(df["date"]),
-                    y=list(df["Average_response_time"]),
-                    text=list(df["Average_response_time"]),
-                    hovertemplate="Average Response Time: %{y:.0f}<extra></extra>",
-                ),
-            ],
-            layout=dict(
-                margin=dict(l=0, r=0, t=28, b=0),
-                yaxis=dict(
-                    title="Seconds",
-                ),
-                title=dict(
-                    text=f"{view} Performance Metrics",
                 ),
                 height=300,
                 template="plotly_white",
