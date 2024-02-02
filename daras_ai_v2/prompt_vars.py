@@ -28,11 +28,14 @@ def prompt_vars_widget(*keys: str, variables_key: str = "variables"):
     if not (template_vars or err):
         return
 
-    st.write("##### ⌥ Variables")
+    st.write("###### ⌥ Variables")
     old_state = st.session_state.get(variables_key, {})
     new_state = {}
     for name in sorted(template_vars):
         if name in st.session_state:
+            st.write(
+                f"⚠️ `{name}` is a reserved variable name. If you meant to create a custom variable, please use a different name."
+            )
             continue
         var_key = f"__{variables_key}_{name}"
         st.session_state.setdefault(var_key, old_state.get(name, ""))

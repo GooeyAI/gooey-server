@@ -32,7 +32,8 @@ from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
 )
 from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.field_render import field_title_desc, field_desc
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input, validate_glossary_document
 from daras_ai_v2.language_model import (
@@ -163,9 +164,9 @@ class VideoBotsPage(BasePage):
         messages: list[ConversationEntry] | None
 
         # tts settings
-        tts_provider: typing.Literal[
-            tuple(e.name for e in TextToSpeechProviders)
-        ] | None
+        tts_provider: (
+            typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+        )
         uberduck_voice_name: str | None
         uberduck_speaking_rate: float | None
         google_voice_name: str | None
@@ -180,9 +181,9 @@ class VideoBotsPage(BasePage):
         elevenlabs_similarity_boost: float | None
 
         # llm settings
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         document_model: str | None = Field(
             title="🩻 Photo / Document Intelligence",
             description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
@@ -312,26 +313,104 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_form_v2(self):
         st.text_area(
             """
-            ##### 📝 Prompt
-            High-level system instructions.
+            #### 📝 Instructions
             """,
             key="bot_script",
             height=300,
         )
+        prompt_vars_widget(
+            "bot_script",
+        )
+
+        enum_selector(
+            LargeLanguageModels,
+            label="#### 🧠 Language Model",
+            key="selected_model",
+            use_selectbox=True,
+        )
 
         document_uploader(
             """
-##### 📄 Documents (*optional*)
-Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
-"""
+            #### 📄 Knowledge
+            Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
+            """
         )
 
-        prompt_vars_widget(
-            "bot_script",
-            "task_instructions",
-            "query_instructions",
-            "keyword_instructions",
-        )
+        st.markdown("#### Capabilities")
+        if not "__enable_audio" in st.session_state:
+            st.session_state["__enable_audio"] = bool(
+                st.session_state.get("tts_provider")
+            )
+        enable_audio = st.checkbox("##### 🗣️ Speech Responses", key="__enable_audio")
+        if not enable_audio:
+            st.session_state["tts_provider"] = None
+        else:
+            text_to_speech_settings(page=self, show_label=False)
+
+        if not "__enable_video" in st.session_state:
+            st.session_state["__enable_video"] = bool(
+                st.session_state.get("input_face")
+            )
+        if enable_audio:
+            st.write("---")
+            enable_video = st.checkbox(
+                "##### 🫦 Add Lipsync Video", key="__enable_video"
+            )
+        else:
+            enable_video = False
+        if not enable_video:
+            st.session_state["input_face"] = None
+        else:
+            st.file_uploader(
+                """
+                #### 👩‍🦰 Input Face
+                Upload a video/image that contains faces to use
+                *Recommended - mp4 / mov / png / jpg / gif*
+                """,
+                key="input_face",
+            )
+            lipsync_settings()
+            st.write("---")
+
+        if st.checkbox(
+            "##### 🔠 Translation", value=bool(st.session_state.get("user_language"))
+        ):
+            google_translate_language_selector(
+                f"{field_desc(self.RequestModel, 'user_language')}",
+                key="user_language",
+            )
+            enable_glossary = st.checkbox(
+                "📖 Add Glossary",
+                value=bool(
+                    st.session_state.get("input_glossary_document")
+                    or st.session_state.get("output_glossary_document")
+                ),
+            )
+            if enable_glossary:
+                st.caption(
+                    """
+                    Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+                    If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
+                    """
+                )
+                glossary_input(
+                    f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
+                    key="input_glossary_document",
+                )
+                glossary_input(
+                    f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
+                    key="output_glossary_document",
+                )
+            else:
+                st.session_state["input_glossary_document"] = None
+                st.session_state["output_glossary_document"] = None
+            st.write("---")
+
+        if st.checkbox(
+            "##### 🩻 Photo & Document Intelligence"
+           , value=bool(st.session_state.get("document_model"),)
+        ):
+            language_model_settings(show_only_document=True)
 
     def validate_form_v2(self):
         input_glossary = st.session_state.get("input_glossary_document", "")
@@ -356,6 +435,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 key="task_instructions",
                 height=300,
             )
+            prompt_vars_widget(
+                "task_instructions",
+            )
 
             st.write("---")
             st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
@@ -366,71 +448,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             doc_search_settings(keyword_instructions_allowed=True)
             st.write("---")
 
-        language_model_settings(show_document_model=True)
+        language_model_settings(show_selector=False)
 
-        st.write("---")
-        google_translate_language_selector(
-            f"##### {field_title_desc(self.RequestModel, 'user_language')}",
-            key="user_language",
-        )
-        enable_glossary = st.checkbox(
-            "📖 Customize with Glossary",
-            value=bool(
-                st.session_state.get("input_glossary_document")
-                or st.session_state.get("output_glossary_document")
-            ),
-        )
-        st.markdown(
-            """
-            Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
-            """
-        )
-        if enable_glossary:
-            glossary_input(
-                f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
-                key="input_glossary_document",
-            )
-            glossary_input(
-                f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
-                key="output_glossary_document",
-            )
-        else:
-            st.session_state["input_glossary_document"] = None
-            st.session_state["output_glossary_document"] = None
-        st.write("---")
-
-        if not "__enable_audio" in st.session_state:
-            st.session_state["__enable_audio"] = bool(
-                st.session_state.get("tts_provider")
-            )
-        enable_audio = st.checkbox("Enable Audio Output?", key="__enable_audio")
-        if not enable_audio:
-            st.write("---")
-            st.session_state["tts_provider"] = None
-        else:
-            text_to_speech_settings(page=self)
-
-        st.write("---")
-        if not "__enable_video" in st.session_state:
-            st.session_state["__enable_video"] = bool(
-                st.session_state.get("input_face")
-            )
-        enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
-        if not enable_video:
-            st.session_state["input_face"] = None
-        else:
-            st.file_uploader(
-                """
-                #### 👩‍🦰 Input Face
-                Upload a video/image that contains faces to use
-                *Recommended - mp4 / mov / png / jpg / gif*
-                """,
-                key="input_face",
-            )
-            lipsync_settings()
-
-        st.write("---")
         enum_multiselect(
             enum_cls=LLMTools,
             label="##### " + field_title_desc(self.RequestModel, "tools"),
@@ -1044,10 +1063,12 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 favicon = Platform(bi.platform).get_favicon()
                 with st.div(className="mt-2"):
                     st.markdown(
-                        f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                        f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
-                        if bi.saved_run
-                        else f"<span>{bi}</span>",
+                        (
+                            f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
+                            f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
+                            if bi.saved_run
+                            else f"<span>{bi}</span>"
+                        ),
                         unsafe_allow_html=True,
                     )
             with col2:
@@ -1098,9 +1119,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.session_state[f"_bi_name_{bi.id}"] = (
                 pr and pr.title
             ) or self.get_recipe_title()
-            st.session_state[
-                f"_bi_slack_read_receipt_msg_{bi.id}"
-            ] = BotIntegration._meta.get_field("slack_read_receipt_msg").default
+            st.session_state[f"_bi_slack_read_receipt_msg_{bi.id}"] = (
+                BotIntegration._meta.get_field("slack_read_receipt_msg").default
+            )
 
         bi.slack_read_receipt_msg = st.text_input(
             """
@@ -1299,9 +1320,9 @@ def msg_container_widget(role: str):
     return st.div(
         className="px-3 py-1 pt-2",
         style=dict(
-            background="rgba(239, 239, 239, 0.6)"
-            if role == CHATML_ROLE_USER
-            else "#fff",
+            background=(
+                "rgba(239, 239, 239, 0.6)" if role == CHATML_ROLE_USER else "#fff"
+            ),
         ),
     )
 
