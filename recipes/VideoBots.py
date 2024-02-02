@@ -1067,7 +1067,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 if url:
                     href = f'<a href="{url}">{bi}</a>'
                 else:
-                    f"<span>{bi}</span>"
+                    href = f"<span>{bi}</span>"
                 with st.div(className="mt-2"):
                     st.markdown(
                         f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;{href}',
