@@ -499,6 +499,12 @@ class VideoBotsStatsPage(BasePage):
         df["Unique_feedback_givers"] = df["Unique_feedback_givers"] * factor
         df["Pos_feedback"] = df["Pos_feedback"] * factor
         df["Neg_feedback"] = df["Neg_feedback"] * factor
+        df["Percentage_positive_feedback"] = (
+            df["Pos_feedback"] / (df["Pos_feedback"] + df["Neg_feedback"])
+        ) * 100
+        df["Percentage_negative_feedback"] = (
+            df["Neg_feedback"] / (df["Pos_feedback"] + df["Neg_feedback"])
+        ) * 100
         df["Msgs_per_convo"] = df["Messages_Sent"] / df["Convos"]
         df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
         df["Average_response_time"] = df["Average_response_time"] * factor
@@ -602,14 +608,6 @@ class VideoBotsStatsPage(BasePage):
                     text=list(df["Msgs_per_user"]),
                     hovertemplate="Messages per User: %{y:.0f}<extra></extra>",
                 ),
-                go.Scatter(
-                    name="Average Response Time",
-                    mode="lines+markers",
-                    x=list(df["date"]),
-                    y=list(df["Average_response_time"]),
-                    text=list(df["Average_response_time"]),
-                    hovertemplate="Average Response Time: %{y:.0f}<extra></extra>",
-                ),
             ],
             layout=dict(
                 margin=dict(l=0, r=0, t=28, b=0),
@@ -654,6 +652,72 @@ class VideoBotsStatsPage(BasePage):
                     )
                 ],
             )
+        st.plotly_chart(fig)
+        st.markdown("<br>", unsafe_allow_html=True)
+        fig = go.Figure(
+            data=[
+                go.Scatter(
+                    name="Positive Feedback",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Percentage_positive_feedback"]),
+                    text=list(df["Percentage_positive_feedback"]),
+                    hovertemplate="Positive Feedback: %{y:.0f}\\%<extra></extra>",
+                ),
+                go.Scatter(
+                    name="Negative Feedback",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Percentage_negative_feedback"]),
+                    text=list(df["Percentage_negative_feedback"]),
+                    hovertemplate="Negative Feedback: %{y:.0f}\\%<extra></extra>",
+                ),
+            ],
+            layout=dict(
+                margin=dict(l=0, r=0, t=28, b=0),
+                yaxis=dict(
+                    title="Percentage",
+                    range=[0, 100],
+                    tickvals=[
+                        *range(
+                            0,
+                            101,
+                            10,
+                        )
+                    ],
+                ),
+                title=dict(
+                    text=f"{view} Feedback Distribution",
+                ),
+                height=300,
+                template="plotly_white",
+            ),
+        )
+        st.plotly_chart(fig)
+        st.write("---")
+        fig = go.Figure(
+            data=[
+                go.Scatter(
+                    name="Average Response Time",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Average_response_time"]),
+                    text=list(df["Average_response_time"]),
+                    hovertemplate="Average Response Time: %{y:.0f}<extra></extra>",
+                ),
+            ],
+            layout=dict(
+                margin=dict(l=0, r=0, t=28, b=0),
+                yaxis=dict(
+                    title="Seconds",
+                ),
+                title=dict(
+                    text=f"{view} Performance Metrics",
+                ),
+                height=300,
+                template="plotly_white",
+            ),
+        )
         st.plotly_chart(fig)
 
     def get_tabular_data(
