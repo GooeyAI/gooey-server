@@ -2,6 +2,7 @@ import base64
 import datetime
 import os
 import typing
+import uuid
 
 import requests
 from furl import furl
@@ -9,6 +10,7 @@ from furl import furl
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.redis_cache import redis_cache_decorator
 
 
 class GpuEndpoints:
@@ -41,6 +43,7 @@ def call_sd_multi(
     endpoint: str,
     pipeline: dict,
     inputs: dict,
+    task_id: str | None = None,
 ) -> typing.List[str]:
     prompt = inputs["prompt"]
     num_images_per_prompt = inputs["num_images_per_prompt"]
@@ -54,6 +57,7 @@ def call_sd_multi(
             content_type="image/png",
             filename=f"gooey.ai - {prompt}.png",
             num_outputs=num_outputs,
+            task_id=task_id,
         )
 
     # deepfloyd
@@ -86,7 +90,7 @@ def call_gooey_gpu(
     pipeline["upload_urls"] = [
         blob.generate_signed_url(
             version="v4",
-            # This URL is valid for 15 minutes
+            # This URL is valid for 12 hours
             expiration=datetime.timedelta(hours=12),
             # Allow PUT requests using this URL.
             method="PUT",
@@ -102,17 +106,13 @@ def call_gooey_gpu(
     return [blob.public_url for blob in blobs]
 
 
-def call_celery_task_outfile(
-    task_name: str,
-    *,
-    pipeline: dict,
-    inputs: dict,
-    content_type: str,
+def create_storage_blob_urls(
     filename: str,
-    num_outputs: int = 1,
-):
+    content_type: str,
+    num_outputs: int,
+) -> tuple[list[str], list[str]]:
     blobs = [storage_blob_for(filename) for i in range(num_outputs)]
-    pipeline["upload_urls"] = [
+    signed_urls = [
         blob.generate_signed_url(
             version="v4",
             # This URL is valid for 15 minutes
@@ -123,8 +123,50 @@ def call_celery_task_outfile(
         )
         for blob in blobs
     ]
-    call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
-    return [blob.public_url for blob in blobs]
+    public_urls = [blob.public_url for blob in blobs]
+    return signed_urls, public_urls
+
+
+@redis_cache_decorator
+def get_or_create_storage_blob_urls(
+    task_id: str,
+    filename: str,
+    content_type: str,
+    num_outputs: int,
+) -> tuple[list[str], list[str]]:
+    # task_id has no purpose other than to serve as the caching key
+    assert task_id
+
+    # cache decorator makes it fetch from cache if it exists
+    return create_storage_blob_urls(filename, content_type, num_outputs)
+
+
+def call_celery_task_outfile(
+    task_name: str,
+    *,
+    pipeline: dict,
+    inputs: dict,
+    content_type: str,
+    filename: str,
+    num_outputs: int = 1,
+    task_id: str | None = None,
+):
+    if task_id:
+        signed_urls, public_urls = get_or_create_storage_blob_urls(
+            task_id=task_id,
+            filename=filename,
+            content_type=content_type,
+            num_outputs=num_outputs,
+        )
+    else:
+        signed_urls, public_urls = create_storage_blob_urls(
+            filename=filename,
+            content_type=content_type,
+            num_outputs=num_outputs,
+        )
+    pipeline["upload_urls"] = signed_urls
+    call_celery_task(task_name, pipeline=pipeline, inputs=inputs, task_id=task_id)
+    return public_urls
 
 
 _app = None
@@ -148,9 +190,15 @@ def call_celery_task(
     pipeline: dict,
     inputs: dict,
     queue_prefix: str = "gooey-gpu",
+    task_id: str | None = None,
 ):
     queue = os.path.join(queue_prefix, pipeline["model_id"].strip()).strip("/")
+    task_id = task_id or str(uuid.uuid4())
     result = get_celery().send_task(
-        task_name, kwargs=dict(pipeline=pipeline, inputs=inputs), queue=queue
+        task_name,
+        kwargs=dict(pipeline=pipeline, inputs=inputs),
+        queue=queue,
+        task_id=task_id,
     )
+    print(f"{task_id=} {queue=} {result=}")
     return result.get(disable_sync_subtasks=False)

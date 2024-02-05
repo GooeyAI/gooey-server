@@ -75,3 +75,7 @@ def get_random_api_key() -> str:
 
 def get_random_string(length: int, allowed_chars: str) -> str:
     return "".join(secrets.choice(allowed_chars) for _ in range(length))
+
+
+def hash_together(*args, **kwargs) -> str:
+    return hashlib.md5(f"{args}{kwargs}".encode()).hexdigest()

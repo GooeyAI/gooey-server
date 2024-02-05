@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.crypto import hash_together
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.stable_diffusion import (
@@ -190,6 +191,7 @@ class Img2ImgPage(BasePage):
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
+                task_id=hash_together(run_id, uid) if run_id and uid else None,
             )
 
     def preview_description(self, state: dict) -> str:

@@ -429,6 +429,7 @@ def controlnet(
     guidance_scale: float = 7.5,
     seed: int = 42,
     controlnet_conditioning_scale: typing.List[float] | float = 1.0,
+    task_id: str | None = None,
 ):
     if isinstance(selected_controlnet_model, str):
         selected_controlnet_model = [selected_controlnet_model]
@@ -459,6 +460,7 @@ def controlnet(
             "controlnet_conditioning_scale": controlnet_conditioning_scale,
             # "strength": prompt_strength,
         },
+        task_id=task_id,
     )
 
 

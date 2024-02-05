@@ -19,6 +19,7 @@ from daras_ai.image_input import (
     cv2_img_to_bytes,
 )
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.crypto import hash_together
 from daras_ai_v2.descriptions import prompting101
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.img_model_settings_widgets import (
@@ -26,6 +27,8 @@ from daras_ai_v2.img_model_settings_widgets import (
     img_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.query_params import gooey_get_query_params
+from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.repositioning import reposition_object, repositioning_preview_widget
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
@@ -498,6 +501,8 @@ Here is the final output:
             request.controlnet_conditioning_scale += [
                 request.image_prompt_strength
             ] * len(request.image_prompt_controlnet_models)
+
+        _, run_id, uid = extract_query_params(gooey_get_query_params())
         state["output_images"] = controlnet(
             selected_model=request.selected_model,
             selected_controlnet_model=request.selected_controlnet_model,
@@ -510,6 +515,7 @@ Here is the final output:
             seed=request.seed,
             controlnet_conditioning_scale=request.controlnet_conditioning_scale,
             scheduler=request.scheduler,
+            task_id=hash_together(run_id, uid) if run_id and uid else None,
         )
 
         # TODO: properly detect bad qr code
