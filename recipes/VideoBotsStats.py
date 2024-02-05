@@ -338,15 +338,12 @@ class VideoBotsStatsPage(BasePage):
 
     def parse_run_info(self, bi):
         saved_run = bi.get_active_saved_run()
-        run_title = (
-            bi.published_run.title
-            if bi.published_run
-            else (
-                saved_run.page_title
-                if saved_run and saved_run.page_title
-                else "This Copilot Run" if saved_run else "No Run Connected"
-            )
-        )
+        if bi.published_run:
+            run_title = bi.published_run.title
+        elif saved_run:
+            run_title = "This Copilot Run"
+        else:
+            run_title = "No Run Connected"
         run_url = furl(saved_run.get_app_url()).tostr() if saved_run else ""
         return run_title, run_url
 
@@ -424,7 +421,7 @@ class VideoBotsStatsPage(BasePage):
                 created_at__date__gte=start_date,
                 created_at__date__lte=end_date,
                 conversation__bot_integration=bi,
-                role=CHATML_ROLE_USER,
+                role=CHATML_ROLE_ASSISTANT,
             )
             .order_by()
             .annotate(date=trunc_fn("created_at"))

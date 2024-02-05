@@ -492,6 +492,7 @@ class MessageAdmin(admin.ModelAdmin):
         "prev_msg_content",
         "prev_msg_display_content",
         "prev_msg_saved_run",
+        "response_time",
     ]
     ordering = ["created_at"]
     actions = [export_to_csv, export_to_excel]
@@ -551,6 +552,7 @@ class MessageAdmin(admin.ModelAdmin):
                 "Analysis",
                 {
                     "fields": [
+                        "response_time",
                         "analysis_result",
                         "analysis_run",
                         "question_answered",
