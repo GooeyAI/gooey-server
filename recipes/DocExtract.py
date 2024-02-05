@@ -77,9 +77,9 @@ class DocExtractPage(BasePage):
 
         task_instructions: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None

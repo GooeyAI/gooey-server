@@ -92,3 +92,66 @@ def test_create_bot_integration_conversation_message(transactional_db):
     assert message_b.role == CHATML_ROLE_ASSISSTANT
     assert message_b.content == "Red, green, and yellow grow the best."
     assert message_b.display_content == "Red, green, and yellow grow the best."
+
+
+def test_stats_get_tabular_data_invalid_sorting_options(transactional_db):
+    from recipes.VideoBotsStats import VideoBotsStatsPage
+
+    page = VideoBotsStatsPage()
+
+    # setup
+    run_url = "https://my_run_url"
+    bi = BotIntegration.objects.create(
+        name="My Bot Integration",
+        saved_run=None,
+        billing_account_uid="fdnacsFSBQNKVW8z6tzhBLHKpAm1",  # digital green's account id
+        user_language="en",
+        show_feedback_buttons=True,
+        platform=Platform.WHATSAPP,
+        wa_phone_number="my_whatsapp_number",
+        wa_phone_number_id="my_whatsapp_number_id",
+    )
+    convos = Conversation.objects.filter(bot_integration=bi)
+    msgs = Message.objects.filter(conversation__in=convos)
+
+    # valid option but no data
+    df = page.get_tabular_data(
+        bi, run_url, convos, msgs, "Answered Successfully", "Name"
+    )
+    assert df.shape[0] == 0
+    assert "Name" in df.columns
+
+    # valid option and data
+    convo = Conversation.objects.create(
+        bot_integration=bi,
+        state=ConvoState.INITIAL,
+        wa_phone_number="+919876543210",
+    )
+    Message.objects.create(
+        conversation=convo,
+        role=CHATML_ROLE_USER,
+        content="What types of chilies can be grown in Mumbai?",
+        display_content="What types of chilies can be grown in Mumbai?",
+    )
+    Message.objects.create(
+        conversation=convo,
+        role=CHATML_ROLE_ASSISSTANT,
+        content="Red, green, and yellow grow the best.",
+        display_content="Red, green, and yellow grow the best.",
+        analysis_result={"Answered": True},
+    )
+    convos = Conversation.objects.filter(bot_integration=bi)
+    msgs = Message.objects.filter(conversation__in=convos)
+    assert msgs.count() == 2
+    df = page.get_tabular_data(
+        bi, run_url, convos, msgs, "Answered Successfully", "Name"
+    )
+    assert df.shape[0] == 1
+    assert "Name" in df.columns
+
+    # invalid sort option should be ignored
+    df = page.get_tabular_data(
+        bi, run_url, convos, msgs, "Answered Successfully", "Invalid"
+    )
+    assert df.shape[0] == 1
+    assert "Name" in df.columns

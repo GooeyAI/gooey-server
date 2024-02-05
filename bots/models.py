@@ -717,7 +717,26 @@ class ConversationQuerySet(models.QuerySet):
                 "Bot": str(convo.bot_integration),
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=[
+                "Name",
+                "Messages",
+                "Correct Answers",
+                "Thumbs up",
+                "Thumbs down",
+                "Last Sent",
+                "First Sent",
+                "A7",
+                "A30",
+                "R1",
+                "R7",
+                "R30",
+                "Delta Hours",
+                "Created At",
+                "Bot",
+            ],
+        )
         return df
 
 
@@ -907,13 +926,30 @@ class MessageQuerySet(models.QuerySet):
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
                 .strftime("%b %d, %Y %I:%M %p"),
-                "Feedback": message.feedbacks.first().get_display_text()
-                if message.feedbacks.first()
-                else None,  # only show first feedback as per Sean's request
+                "Feedback": (
+                    message.feedbacks.first().get_display_text()
+                    if message.feedbacks.first()
+                    else None
+                ),  # only show first feedback as per Sean's request
                 "Analysis JSON": message.analysis_result,
+                "Response Time": (
+                    message.response_time
+                    and round(message.response_time.total_seconds(), 1)
+                ),
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=[
+                "Name",
+                "Role",
+                "Message (EN)",
+                "Sent",
+                "Feedback",
+                "Analysis JSON",
+                "Response Time",
+            ],
+        )
         return df
 
     def to_df_analysis_format(
@@ -921,21 +957,24 @@ class MessageQuerySet(models.QuerySet):
     ) -> "pd.DataFrame":
         import pandas as pd
 
-        qs = self.filter(role=CHATML_ROLE_USER).prefetch_related("feedbacks")
+        qs = self.filter(role=CHATML_ROLE_ASSISSTANT).prefetch_related("feedbacks")
         rows = []
         for message in qs[:row_limit]:
             message: Message
             row = {
                 "Name": message.conversation.get_display_name(),
-                "Question (EN)": message.content,
-                "Answer (EN)": message.get_next_by_created_at().content,
+                "Question (EN)": message.get_previous_by_created_at().content,
+                "Answer (EN)": message.content,
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
                 .strftime("%b %d, %Y %I:%M %p"),
                 "Analysis JSON": message.analysis_result,
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=["Name", "Question (EN)", "Answer (EN)", "Sent", "Analysis JSON"],
+        )
         return df
 
     def as_llm_context(self, limit: int = 100) -> list["ConversationEntry"]:
@@ -1015,6 +1054,12 @@ class Message(models.Model):
         blank=True,
         default="",
         help_text="Subject of given question (DEPRECATED)",
+    )
+
+    response_time = models.DurationField(
+        default=None,
+        null=True,
+        help_text="The time it took for the bot to respond to the corresponding user message",
     )
 
     _analysis_started = False
@@ -1120,7 +1165,20 @@ class FeedbackQuerySet(models.QuerySet):
                 "Question Answered": feedback.message.question_answered,
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=[
+                "Name",
+                "Question (EN)",
+                "Question Sent",
+                "Answer (EN)",
+                "Answer Sent",
+                "Rating",
+                "Feedback (EN)",
+                "Feedback Sent",
+                "Question Answered",
+            ],
+        )
         return df
 
 

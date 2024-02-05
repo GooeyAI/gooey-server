@@ -247,9 +247,9 @@ def instruct_pix2pix(
         },
         inputs={
             "prompt": [prompt] * len(images),
-            "negative_prompt": [negative_prompt] * len(images)
-            if negative_prompt
-            else None,
+            "negative_prompt": (
+                [negative_prompt] * len(images) if negative_prompt else None
+            ),
             "num_images_per_prompt": num_outputs,
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
@@ -440,9 +440,9 @@ def controlnet(
         pipeline={
             "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
             "seed": seed,
-            "scheduler": Schedulers[scheduler].label
-            if scheduler
-            else "UniPCMultistepScheduler",
+            "scheduler": (
+                Schedulers[scheduler].label if scheduler else "UniPCMultistepScheduler"
+            ),
             "disable_safety_checker": True,
             "controlnet_model_id": [
                 controlnet_model_ids[ControlNetModels[model]]

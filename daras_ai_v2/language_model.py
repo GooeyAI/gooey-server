@@ -208,12 +208,14 @@ def calc_gpt_tokens(
         for entry in messages
         if (
             content := (
-                format_chatml_message(entry) + "\n"
-                if is_chat_model
-                else entry.get("content", "")
+                (
+                    format_chatml_message(entry) + "\n"
+                    if is_chat_model
+                    else entry.get("content", "")
+                )
+                if isinstance(entry, dict)
+                else str(entry)
             )
-            if isinstance(entry, dict)
-            else str(entry)
         )
     )
     return default_length_function(combined)
@@ -570,9 +572,11 @@ def _run_openai_chat(
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty,
                 tools=[tool.spec for tool in tools] if tools else NOT_GIVEN,
-                response_format={"type": response_format_type}
-                if response_format_type
-                else NOT_GIVEN,
+                response_format=(
+                    {"type": response_format_type}
+                    if response_format_type
+                    else NOT_GIVEN
+                ),
                 stream=stream,
             )
             for model_str in model
