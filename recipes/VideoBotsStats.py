@@ -546,9 +546,11 @@ class VideoBotsStatsPage(BasePage):
         ) * 100
         df["Msgs_per_convo"] = df["Messages_Sent"] / df["Convos"]
         df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
-        df["Average_response_time"] = (
-            df["Average_response_time"].dt.total_seconds() * factor
-        )
+        try:
+            df["Average_response_time"] = df["Average_response_time"].dt.total_seconds()
+        except AttributeError:
+            pass
+        df["Average_response_time"] = df["Average_response_time"] * factor
         df.fillna(0, inplace=True)
         df = df.round(0).astype("int32", errors="ignore")
         return df
