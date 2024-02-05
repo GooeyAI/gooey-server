@@ -1,16 +1,15 @@
 import mimetypes
 import traceback
 import typing
+from datetime import datetime
 from urllib.parse import parse_qs
 
-import pytz
-from datetime import datetime
 from django.db import transaction
+from django.utils import timezone
 from fastapi import HTTPException, Request
 from furl import furl
 from sentry_sdk import capture_exception
 
-from daras_ai_v2 import settings
 from app_users.models import AppUser
 from bots.models import (
     Platform,
@@ -191,7 +190,7 @@ def _on_msg(bot: BotInterface):
     speech_run = None
     input_images = None
     input_documents = None
-    recieved_time: datetime = datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
+    recieved_time: datetime = timezone.now()
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
@@ -463,8 +462,7 @@ def _save_msgs(
             if speech_run
             else None
         ),
-        response_time=datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
-        - received_time,
+        response_time=timezone.now() - received_time,
     )
     attachments = []
     for f_url in (input_images or []) + (input_documents or []):
@@ -481,8 +479,7 @@ def _save_msgs(
         saved_run=SavedRun.objects.get_or_create(
             workflow=Workflow.VIDEO_BOTS, **furl(url).query.params
         )[0],
-        response_time=datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
-        - received_time,
+        response_time=timezone.now() - received_time,
     )
     # save the messages & attachments
     with transaction.atomic():
