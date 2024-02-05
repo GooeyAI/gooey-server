@@ -56,7 +56,7 @@ django-phonenumber-field = { extras = ["phonenumberslite"], version = "^7.0.2" }
 gunicorn = "^20.1.0"
 psycopg2-binary = "^2.9.6"
 whitenoise = "^6.4.0"
-black = "^23.3.0"
+black = "^24.1.1"
 django-extensions = "^3.2.1"
 pytest-django = "^4.5.2"
 celery = "^5.3.1"
