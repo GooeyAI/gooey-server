@@ -932,7 +932,10 @@ class MessageQuerySet(models.QuerySet):
                     else None
                 ),  # only show first feedback as per Sean's request
                 "Analysis JSON": message.analysis_result,
-                "Response Time": round(message.response_time.total_seconds(), 1),
+                "Response Time": (
+                    message.response_time
+                    and round(message.response_time.total_seconds(), 1)
+                ),
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -1054,7 +1057,8 @@ class Message(models.Model):
     )
 
     response_time = models.DurationField(
-        default=datetime.timedelta(seconds=-1),
+        default=None,
+        null=True,
         help_text="The time it took for the bot to respond to the corresponding user message",
     )
 
