@@ -1124,9 +1124,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.session_state[f"_bi_name_{bi.id}"] = (
                 pr and pr.title
             ) or self.get_recipe_title()
-            st.session_state[
-                f"_bi_slack_read_receipt_msg_{bi.id}"
-            ] = BotIntegration._meta.get_field("slack_read_receipt_msg").default
+            st.session_state[f"_bi_slack_read_receipt_msg_{bi.id}"] = (
+                BotIntegration._meta.get_field("slack_read_receipt_msg").default
+            )
 
         bi.slack_read_receipt_msg = st.text_input(
             """
