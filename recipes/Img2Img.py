@@ -9,6 +9,8 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.crypto import hash_together
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.query_params import gooey_get_query_params
+from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.stable_diffusion import (
     InpaintingModels,
     Img2ImgModels,
@@ -155,6 +157,8 @@ class Img2ImgPage(BasePage):
         if not self.request.user.disable_safety_checker:
             safety_checker(text=request.text_prompt, image=request.input_image)
 
+        _, run_id, uid = extract_query_params(gooey_get_query_params())
+        task_id = hash_together(run_id, uid) if run_id and uid else None
         if request.selected_model == Img2ImgModels.instruct_pix2pix.name:
             state["output_images"] = instruct_pix2pix(
                 prompt=request.text_prompt,
@@ -165,6 +169,7 @@ class Img2ImgPage(BasePage):
                 seed=request.seed,
                 images=[init_image],
                 image_guidance_scale=request.image_guidance_scale,
+                task_id=task_id,
             )
         elif request.selected_controlnet_model:
             state["output_images"] = controlnet(
@@ -178,6 +183,7 @@ class Img2ImgPage(BasePage):
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
                 controlnet_conditioning_scale=request.controlnet_conditioning_scale,
+                task_id=task_id,
             )
         else:
             state["output_images"] = img2img(
@@ -191,7 +197,7 @@ class Img2ImgPage(BasePage):
                 negative_prompt=request.negative_prompt,
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
-                task_id=hash_together(run_id, uid) if run_id and uid else None,
+                task_id=task_id,
             )
 
     def preview_description(self, state: dict) -> str:

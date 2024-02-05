@@ -236,6 +236,7 @@ def instruct_pix2pix(
     guidance_scale: float,
     image_guidance_scale: float,
     seed: int = 42,
+    task_id: str | None = None,
 ):
     return call_sd_multi(
         "diffusion.instruct_pix2pix",
@@ -256,6 +257,7 @@ def instruct_pix2pix(
             "image": images,
             "image_guidance_scale": image_guidance_scale,
         },
+        task_id=task_id,
     )
 
 
@@ -364,6 +366,7 @@ def img2img(
     negative_prompt: str = None,
     guidance_scale: float,
     seed: int = 42,
+    task_id: str | None = None,
 ):
     prompt_strength = prompt_strength or 0.7
     assert 0 <= prompt_strength <= 0.9, "Prompt Strength must be in range [0, 0.9]"
@@ -409,6 +412,7 @@ def img2img(
                     "image": [init_image],
                     "strength": prompt_strength,
                 },
+                task_id=task_id,
             )
     return [
         upload_file_from_bytes(f"gooey.ai - {prompt}.png", sd_img_bytes)
