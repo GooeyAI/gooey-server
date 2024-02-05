@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from daras_ai_v2.base import BasePage, MenuTabs
 import gooey_ui as st
 from furl import furl
@@ -287,9 +289,9 @@ class VideoBotsStatsPage(BasePage):
     def render_date_view_inputs(self, bi):
         if st.checkbox("Show All"):
             start_date = bi.created_at
-            end_date = datetime.now()
+            end_date = timezone.now()
         else:
-            start_of_year_date = datetime.now().replace(month=1, day=1)
+            start_of_year_date = timezone.now().replace(month=1, day=1)
             st.session_state.setdefault(
                 "start_date",
                 self.request.query_params.get(
@@ -302,11 +304,11 @@ class VideoBotsStatsPage(BasePage):
             st.session_state.setdefault(
                 "end_date",
                 self.request.query_params.get(
-                    "end_date", datetime.now().strftime("%Y-%m-%d")
+                    "end_date", timezone.now().strftime("%Y-%m-%d")
                 ),
             )
             end_date: datetime = (
-                st.date_input("End date", key="end_date") or datetime.now()
+                st.date_input("End date", key="end_date") or timezone.now()
             )
             st.session_state.setdefault(
                 "view", self.request.query_params.get("view", "Weekly")
@@ -359,7 +361,7 @@ class VideoBotsStatsPage(BasePage):
         num_active_users_last_7_days = (
             user_messages.filter(
                 conversation__in=users,
-                created_at__gte=datetime.now() - timedelta(days=7),
+                created_at__gte=timezone.now() - timedelta(days=7),
             )
             .distinct(
                 *ID_COLUMNS,
@@ -369,7 +371,7 @@ class VideoBotsStatsPage(BasePage):
         num_active_users_last_30_days = (
             user_messages.filter(
                 conversation__in=users,
-                created_at__gte=datetime.now() - timedelta(days=30),
+                created_at__gte=timezone.now() - timedelta(days=30),
             )
             .distinct(
                 *ID_COLUMNS,
@@ -544,7 +546,9 @@ class VideoBotsStatsPage(BasePage):
         ) * 100
         df["Msgs_per_convo"] = df["Messages_Sent"] / df["Convos"]
         df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
-        df["Average_response_time"] = df["Average_response_time"] * factor
+        df["Average_response_time"] = (
+            df["Average_response_time"].dt.total_seconds() * factor
+        )
         df.fillna(0, inplace=True)
         df = df.round(0).astype("int32", errors="ignore")
         return df
