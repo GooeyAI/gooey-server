@@ -342,7 +342,7 @@ def run_language_model(
 ) -> (
     list[str]
     | tuple[list[str], list[list[dict]]]
-    | typing.Generator[list[str], None, None]
+    | typing.Generator[list[dict], None, None]
 ):
     assert bool(prompt) != bool(
         messages
@@ -378,7 +378,7 @@ def run_language_model(
             stream=stream and not (tools or response_format_type),
         )
         if stream:
-            return _stream_llm_outputs(entries, is_chatml, response_format_type, tools)
+            return _stream_llm_outputs(entries, response_format_type)
         else:
             return _parse_entries(entries, is_chatml, response_format_type, tools)
     else:
@@ -398,15 +398,28 @@ def run_language_model(
         )
         ret = [msg.strip() for msg in msgs]
         if stream:
-            ret = [ret]
+            ret = [
+                [
+                    format_chat_entry(role=CHATML_ROLE_ASSISTANT, content=msg)
+                    for msg in ret
+                ]
+            ]
         return ret
 
 
-def _stream_llm_outputs(result, is_chatml, response_format_type, tools):
+def _stream_llm_outputs(
+    result: list | typing.Generator[list[ConversationEntry], None, None],
+    response_format_type: typing.Literal["text", "json_object"] | None,
+):
     if isinstance(result, list):  # compatibility with non-streaming apis
         result = [result]
     for entries in result:
-        yield _parse_entries(entries, is_chatml, response_format_type, tools)
+        if response_format_type == "json_object":
+            for i, entry in enumerate(entries):
+                entries[i] = json.loads(entry["content"])
+        for i, entry in enumerate(entries):
+            entries[i]["content"] = entry.get("content") or ""
+        yield entries
 
 
 def _parse_entries(
@@ -580,24 +593,28 @@ def _stream_openai_chunked(
     start_chunk_size: int = 50,
     stop_chunk_size: int = 400,
     step_chunk_size: int = 150,
-):
+) -> typing.Generator[list[ConversationEntry], None, None]:
     ret = []
     chunk_size = start_chunk_size
 
     for completion_chunk in r:
         changed = False
         for choice in completion_chunk.choices:
+            delta = choice.delta
             try:
+                # get the entry for this choice
                 entry = ret[choice.index]
             except IndexError:
                 # initialize the entry
-                entry = choice.delta.dict() | {"content": "", "chunk": ""}
+                entry = delta.dict() | {"content": "", "chunk": ""}
                 ret.append(entry)
+            # this is to mark the end of streaming
+            entry["finish_reason"] = choice.finish_reason
 
             # append the delta to the current chunk
-            if not choice.delta.content:
+            if not delta.content:
                 continue
-            entry["chunk"] += choice.delta.content
+            entry["chunk"] += delta.content
             # if the chunk is too small, we need to wait for more data
             chunk = entry["chunk"]
             if len(chunk) < chunk_size:

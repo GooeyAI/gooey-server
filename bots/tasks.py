@@ -128,7 +128,7 @@ def send_broadcast_msg(
                     channel_is_personal=convo.slack_channel_is_personal,
                     username=bi.name,
                     token=bi.slack_access_token,
-                )
+                )[0]
             case _:
                 raise NotImplementedError(
                     f"Platform {bi.platform} doesn't support broadcasts yet"

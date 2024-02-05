@@ -713,7 +713,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
-                yield "Generating search query..."
+                yield "Creating search query..."
                 state["final_search_query"] = generate_final_search_query(
                     request=request,
                     instructions=query_instructions,
@@ -727,7 +727,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
-                yield "Extracting keywords..."
+                yield "Finding keywords..."
                 k_request = request.copy()
                 # other models dont support JSON mode
                 k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
@@ -809,7 +809,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         if max_allowed_tokens < 0:
             raise ValueError("Input Script is too long! Please reduce the script size.")
 
-        yield f"Running {model.value}..."
+        yield f"Summarizing with {model.value}..."
         if is_chat_model:
             chunks = run_language_model(
                 model=request.selected_model,
@@ -842,15 +842,16 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         citation_style = (
             request.citation_style and CitationStyles[request.citation_style]
         ) or None
-        all_refs_list = []
-        for i, output_text in enumerate(chunks):
+        for i, entries in enumerate(chunks):
+            if not entries:
+                continue
+            output_text = [entry["content"] for entry in entries]
             if request.tools:
-                output_text, tool_call_choices = output_text
+                # output_text, tool_call_choices = output_text
                 state["output_documents"] = output_documents = []
-                for tool_calls in tool_call_choices:
-                    for call in tool_calls:
-                        result = yield from exec_tool_call(call)
-                        output_documents.append(result)
+                for call in entries[0].get("tool_calls") or []:
+                    result = yield from exec_tool_call(call)
+                    output_documents.append(result)
 
             # save model response
             state["raw_output_text"] = [
@@ -876,13 +877,20 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 all_refs_list = apply_response_formattings_prefix(
                     output_text, references, citation_style
                 )
-            state["output_text"] = output_text
-            yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
+            else:
+                all_refs_list = None
 
-        if all_refs_list:
-            apply_response_formattings_suffix(
-                all_refs_list, state["output_text"], citation_style
-            )
+            state["output_text"] = output_text
+            if all(entry.get("finish_reason") for entry in entries):
+                if all_refs_list:
+                    apply_response_formattings_suffix(
+                        all_refs_list, state["output_text"], citation_style
+                    )
+                finish_reason = entries[0]["finish_reason"]
+                yield f"Completed with {finish_reason=}"  # avoid changing this message since it's used to detect end of stream
+            else:
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
+
         state["output_audio"] = []
         state["output_video"] = []
 
@@ -1042,14 +1050,27 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             col1, col2, col3, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()
+                if bi.published_run:
+                    url = self.app_url(
+                        example_id=bi.published_run.published_run_id,
+                        tab_name=MenuTabs.paths[MenuTabs.integrations],
+                    )
+                elif bi.saved_run:
+                    url = self.app_url(
+                        run_id=bi.saved_run.run_id,
+                        uid=bi.saved_run.uid,
+                        example_id=bi.saved_run.example_id,
+                        tab_name=MenuTabs.paths[MenuTabs.integrations],
+                    )
+                else:
+                    url = None
+                if url:
+                    href = f'<a href="{url}">{bi}</a>'
+                else:
+                    href = f"<span>{bi}</span>"
                 with st.div(className="mt-2"):
                     st.markdown(
-                        (
-                            f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                            f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
-                            if bi.saved_run
-                            else f"<span>{bi}</span>"
-                        ),
+                        f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;{href}',
                         unsafe_allow_html=True,
                     )
             with col2:
@@ -1084,7 +1105,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     st.session_state.get("user_language") or bi.user_language
                 )
                 bi.saved_run = current_run
-                bi.published_run = published_run
+                if published_run and published_run.saved_run_id == current_run.id:
+                    bi.published_run = published_run
+                else:
+                    bi.published_run = None
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg
 
@@ -1123,6 +1147,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             value=bi.name,
             key=f"_bi_name_{bi.id}",
         )
+        st.caption("Enable streaming messages to Slack in real-time.")
 
 
 def show_landbot_widget():

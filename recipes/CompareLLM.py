@@ -106,8 +106,8 @@ class CompareLLMPage(BasePage):
                 avoid_repetition=request.avoid_repetition,
                 stream=True,
             )
-            for i, item in enumerate(ret):
-                output_text[selected_model] = item
+            for i, entries in enumerate(ret):
+                output_text[selected_model] = [e["content"] for e in entries]
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
