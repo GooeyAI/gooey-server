@@ -509,13 +509,25 @@ def _handle_interactive_msg(bot: BotInterface):
                 return
             if button_id == ButtonIds.feedback_thumbs_up:
                 rating = Feedback.Rating.RATING_THUMBS_UP
-                bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
-                response_text = FEEDBACK_THUMBS_UP_MSG
+                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
+                # response_text = FEEDBACK_THUMBS_UP_MSG
             else:
                 rating = Feedback.Rating.RATING_THUMBS_DOWN
-                bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
-                response_text = FEEDBACK_THUMBS_DOWN_MSG
+                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
+                # response_text = FEEDBACK_THUMBS_DOWN_MSG
+            response_text = FEEDBACK_CONFIRMED_MSG.format(
+                bot_name=str(bot.convo.bot_integration.name)
+            )
             bot.convo.save()
+            # save the feedback
+            Feedback.objects.create(message=context_msg, rating=rating)
+            # send a confirmation msg + post click buttons
+            bot.send_msg(
+                text=response_text,
+                # buttons=_feedback_post_click_buttons(),
+                should_translate=True,
+            )
+
         # handle skip
         case ButtonIds.action_skip:
             bot.send_msg(text=TAPPED_SKIP_MSG, should_translate=True)
@@ -523,6 +535,7 @@ def _handle_interactive_msg(bot: BotInterface):
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
             return
+
         # not sure what button was pressed, ignore
         case _:
             bot_name = str(bot.convo.bot_integration.name)
@@ -534,14 +547,6 @@ def _handle_interactive_msg(bot: BotInterface):
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
             return
-    # save the feedback
-    Feedback.objects.create(message=context_msg, rating=rating)
-    # send a confirmation msg + post click buttons
-    bot.send_msg(
-        text=response_text,
-        buttons=_feedback_post_click_buttons(),
-        should_translate=True,
-    )
 
 
 def _handle_audio_msg(billing_account_user, bot: BotInterface):
