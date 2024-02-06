@@ -5,7 +5,7 @@ import django.db.models
 from django import forms
 from django.conf import settings
 from django.contrib import admin
-from django.db.models import Max, Count, F
+from django.db.models import Max, Count, F, Sum
 from django.template import loader
 from django.utils import dateformat
 from django.utils.safestring import mark_safe
@@ -28,8 +28,6 @@ from bots.models import (
     WorkflowMetadata,
 )
 from bots.tasks import create_personal_channels_for_all_members
-from daras_ai.image_input import truncate_text_words
-from daras_ai_v2.base import BasePage
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
@@ -278,6 +276,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "parent",
         "view_bots",
         "price",
+        "view_usage_cost",
         "transaction",
         "created_at",
         "updated_at",
@@ -312,6 +311,15 @@ class SavedRunAdmin(admin.ModelAdmin):
     def view_parent_published_run(self, saved_run: SavedRun):
         pr = saved_run.parent_published_run()
         return pr and change_obj_url(pr)
+
+    @admin.display(description="Usage Costs")
+    def view_usage_cost(self, saved_run: SavedRun):
+        total_cost = saved_run.usage_costs.aggregate(total_cost=Sum("dollar_amount"))[
+            "total_cost"
+        ]
+        return list_related_html_url(
+            saved_run.usage_costs, extra_label=f"${total_cost.normalize()}"
+        )
 
 
 @admin.register(PublishedRunVersion)
