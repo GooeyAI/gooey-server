@@ -106,41 +106,6 @@ def call_gooey_gpu(
     return [blob.public_url for blob in blobs]
 
 
-def create_storage_blob_urls(
-    filename: str,
-    content_type: str,
-    num_outputs: int,
-) -> tuple[list[str], list[str]]:
-    blobs = [storage_blob_for(filename) for i in range(num_outputs)]
-    signed_urls = [
-        blob.generate_signed_url(
-            version="v4",
-            # This URL is valid for 15 minutes
-            expiration=datetime.timedelta(hours=12),
-            # Allow PUT requests using this URL.
-            method="PUT",
-            content_type=content_type,
-        )
-        for blob in blobs
-    ]
-    public_urls = [blob.public_url for blob in blobs]
-    return signed_urls, public_urls
-
-
-@redis_cache_decorator
-def get_or_create_storage_blob_urls(
-    task_id: str,
-    filename: str,
-    content_type: str,
-    num_outputs: int,
-) -> tuple[list[str], list[str]]:
-    # task_id has no purpose other than to serve as the caching key
-    assert task_id
-
-    # cache decorator makes it fetch from cache if it exists
-    return create_storage_blob_urls(filename, content_type, num_outputs)
-
-
 def call_celery_task_outfile(
     task_name: str,
     *,
@@ -151,22 +116,26 @@ def call_celery_task_outfile(
     num_outputs: int = 1,
     task_id: str | None = None,
 ):
-    if task_id:
-        signed_urls, public_urls = get_or_create_storage_blob_urls(
-            task_id=task_id,
-            filename=filename,
-            content_type=content_type,
-            num_outputs=num_outputs,
+    blobs = [
+        storage_blob_for(
+            filename,
+            prefix=f"{task_id}-{i+1}" if task_id else None,
         )
-    else:
-        signed_urls, public_urls = create_storage_blob_urls(
-            filename=filename,
+        for i in range(num_outputs)
+    ]
+    pipeline["upload_urls"] = [
+        blob.generate_signed_url(
+            version="v4",
+            # This URL is valid for 12 hours
+            expiration=datetime.timedelta(hours=12),
+            # Allow PUT requests using this URL.
+            method="PUT",
             content_type=content_type,
-            num_outputs=num_outputs,
         )
-    pipeline["upload_urls"] = signed_urls
+        for blob in blobs
+    ]
     call_celery_task(task_name, pipeline=pipeline, inputs=inputs, task_id=task_id)
-    return public_urls
+    return [blob.public_url for blob in blobs]
 
 
 _app = None

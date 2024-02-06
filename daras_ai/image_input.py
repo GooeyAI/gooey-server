@@ -64,14 +64,15 @@ def upload_file_from_bytes(
     return blob.public_url
 
 
-def storage_blob_for(filename: str) -> "storage.storage.Blob":
+def storage_blob_for(
+    filename: str, prefix: str | None = None
+) -> "storage.storage.Blob":
     from firebase_admin import storage
 
+    prefix = prefix or str(uuid.uuid1())
     filename = safe_filename(filename)
     bucket = storage.bucket(settings.GS_BUCKET_NAME)
-    blob = bucket.blob(
-        os.path.join(settings.GS_MEDIA_PATH, str(uuid.uuid1()), filename)
-    )
+    blob = bucket.blob(os.path.join(settings.GS_MEDIA_PATH, prefix, filename))
     return blob
 
 
