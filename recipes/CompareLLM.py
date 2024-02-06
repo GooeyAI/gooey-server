@@ -36,9 +36,9 @@ class CompareLLMPage(BasePage):
 
     class RequestModel(BaseModel):
         input_prompt: str | None
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
+        )
 
         avoid_repetition: bool | None
         num_outputs: int | None
@@ -106,8 +106,8 @@ class CompareLLMPage(BasePage):
                 avoid_repetition=request.avoid_repetition,
                 stream=True,
             )
-            for i, item in enumerate(ret):
-                output_text[selected_model] = item
+            for i, entries in enumerate(ret):
+                output_text[selected_model] = [e["content"] for e in entries]
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):

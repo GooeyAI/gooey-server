@@ -49,9 +49,9 @@ class ImageSegmentationPage(BasePage):
     class RequestModel(BaseModel):
         input_image: str
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in ImageSegmentationModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None
+        )
         mask_threshold: float | None
 
         rect_persepective_transform: bool | None

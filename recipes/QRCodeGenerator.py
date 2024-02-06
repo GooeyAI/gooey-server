@@ -88,18 +88,18 @@ class QRCodeGeneratorPage(BasePage):
         text_prompt: str
         negative_prompt: str | None
         image_prompt: str | None
-        image_prompt_controlnet_models: list[
-            typing.Literal[tuple(e.name for e in ControlNetModels)], ...
-        ] | None
+        image_prompt_controlnet_models: (
+            list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
+        )
         image_prompt_strength: float | None
         image_prompt_scale: float | None
         image_prompt_pos_x: float | None
         image_prompt_pos_y: float | None
 
         selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
-        selected_controlnet_model: list[
-            typing.Literal[tuple(e.name for e in ControlNetModels)], ...
-        ] | None
+        selected_controlnet_model: (
+            list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
+        )
 
         output_width: int | None
         output_height: int | None

@@ -88,11 +88,11 @@ def get_top_k_references(
     Returns:
         the top k documents
     """
-    yield "Checking docs..."
+    yield "Fetching latest knowledge docs..."
     input_docs = request.documents or []
     doc_metas = map_parallel(doc_url_to_metadata, input_docs)
 
-    yield "Getting embeddings..."
+    yield "Creating knowledge embeddings..."
     embeds: list[tuple[SearchReference, np.ndarray]] = flatmap_parallel(
         lambda f_url, doc_meta: get_embeds_for_doc(
             f_url=f_url,
@@ -107,7 +107,7 @@ def get_top_k_references(
     )
     dense_query_embeds = openai_embedding_create([request.search_query])[0]
 
-    yield "Searching documents..."
+    yield "Searching knowledge base..."
 
     dense_weight = request.dense_weight
     if dense_weight is None:  # for backwards compatibility
@@ -133,7 +133,7 @@ def get_top_k_references(
         dense_ranks = np.zeros(len(embeds))
 
     if sparse_weight:
-        yield "Getting sparse scores..."
+        yield "Considering results..."
         # get sparse scores
         bm25_corpus = flatmap_parallel(
             lambda f_url, doc_meta: get_bm25_embeds_for_doc(

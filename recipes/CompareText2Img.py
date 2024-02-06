@@ -64,9 +64,9 @@ class CompareText2ImgPage(BasePage):
         seed: int | None
         sd_2_upscaling: bool | None
 
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in Text2ImgModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in Text2ImgModels)]] | None
+        )
         scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
 
         edit_instruction: str | None
