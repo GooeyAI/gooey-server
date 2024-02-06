@@ -245,6 +245,17 @@ ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="sean@dara.network")
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
 SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 20)
 
+DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default="") + [
+    # tab names
+    "api",
+    "examples",
+    "history",
+    "saved",
+    "integrations",
+    # other
+    "docs",
+]
+
 SAFTY_CHECKER_EXAMPLE_ID = "3rcxqx0r"
 SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"
 

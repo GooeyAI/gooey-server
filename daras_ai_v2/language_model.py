@@ -18,7 +18,11 @@ from aifail import (
 from django.conf import settings
 from jinja2.lexer import whitespace_re
 from loguru import logger
-from openai.types.chat import ChatCompletionContentPartParam
+from openai import Stream
+from openai.types.chat import (
+    ChatCompletionContentPartParam,
+    ChatCompletionChunk,
+)
 
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status
@@ -27,9 +31,10 @@ from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
-from daras_ai_v2.text_splitter import default_length_function
-from daras_ai_v2.query_params_util import extract_query_params
-from daras_ai_v2.query_params import gooey_get_query_params
+from daras_ai_v2.text_splitter import (
+    default_length_function,
+    default_separators,
+)
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
 
@@ -40,15 +45,14 @@ CHATML_ROLE_SYSTEM = "system"
 CHATML_ROLE_ASSISTANT = "assistant"
 CHATML_ROLE_USER = "user"
 
+# nice for showing streaming progress
+SUPERSCRIPT = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+
 
 class LLMApis(Enum):
     vertex_ai = "Vertex AI"
     openai = "OpenAI"
     together = "Together"
-
-    @classmethod
-    def choices(cls):
-        return tuple((api.name, api.value) for api in cls)
 
 
 class LargeLanguageModels(Enum):
@@ -204,12 +208,14 @@ def calc_gpt_tokens(
         for entry in messages
         if (
             content := (
-                format_chatml_message(entry) + "\n"
-                if is_chat_model
-                else entry.get("content", "")
+                (
+                    format_chatml_message(entry) + "\n"
+                    if is_chat_model
+                    else entry.get("content", "")
+                )
+                if isinstance(entry, dict)
+                else str(entry)
             )
-            if isinstance(entry, dict)
-            else str(entry)
         )
     )
     return default_length_function(combined)
@@ -331,10 +337,13 @@ def run_language_model(
     stop: list[str] = None,
     avoid_repetition: bool = False,
     tools: list[LLMTools] = None,
+    stream: bool = False,
     response_format_type: typing.Literal["text", "json_object"] = None,
-) -> list[str] | tuple[list[str], list[list[dict]]] | list[dict]:
-    from costs.cost_utils import record_cost, get_provider_pricing
-
+) -> (
+    list[str]
+    | tuple[list[str], list[list[dict]]]
+    | typing.Generator[list[dict], None, None]
+):
     assert bool(prompt) != bool(
         messages
     ), "Pleave provide exactly one of { prompt, messages }"
@@ -342,10 +351,9 @@ def run_language_model(
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
     api = llm_api[model]
     model_name = llm_model_names[model]
+    is_chatml = False
     if model.is_chat_model():
-        if messages:
-            is_chatml = False
-        else:
+        if not messages:
             # if input is chatml, convert it into json messages
             is_chatml, messages = parse_chatml(prompt)  # type: ignore
         messages = messages or []
@@ -355,7 +363,7 @@ def run_language_model(
                 format_chat_entry(role=entry["role"], content=get_entry_text(entry))
                 for entry in messages
             ]
-        result, output_token, input_token = _run_chat_model(
+        entries = _run_chat_model(
             api=api,
             model=model_name,
             messages=messages,  # type: ignore
@@ -366,55 +374,47 @@ def run_language_model(
             avoid_repetition=avoid_repetition,
             tools=tools,
             response_format_type=response_format_type,
+            # we can't stream with tools or json yet
+            stream=stream and not (tools or response_format_type),
         )
-        if response_format_type == "json_object":
-            out_content = [json.loads(entry["content"]) for entry in result]
-        else:
-            out_content = [
-                # return messages back as either chatml or json messages
-                format_chatml_message(entry)
-                if is_chatml
-                else (entry.get("content") or "").strip()
-                for entry in result
-            ]
-        if tools:
-            return (
-                out_content,
-                [(entry.get("tool_calls") or []) for entry in result],
-            )
-        else:
-            provider_pricing_in = get_provider_pricing(
-                type="LLM",
-                provider=api.name,
-                product=model_name,
-                param="Input",
-            )
 
-            provider_pricing_out = get_provider_pricing(
-                type="LLM",
-                provider=api.name,
-                product=model_name,
-                param="Output",
-            )
-            example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-            record_cost(
-                run_id=run_id,
-                uid=uid,
-                provider_pricing=provider_pricing_in,
-                quantity=input_token,
-            )
-            record_cost(
-                run_id=run_id,
-                uid=uid,
-                provider_pricing=provider_pricing_out,
-                quantity=output_token,
-            )
-            return out_content
+        ## incorportate down the call chain
+        # provider_pricing_in = get_provider_pricing(
+        #     type="LLM",
+        #     provider=api.name,
+        #     product=model_name,
+        #     param="Input",
+        # )
+        #
+        # provider_pricing_out = get_provider_pricing(
+        #     type="LLM",
+        #     provider=api.name,
+        #     product=model_name,
+        #     param="Output",
+        # )
+        # example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        # record_cost(
+        #     run_id=run_id,
+        #     uid=uid,
+        #     provider_pricing=provider_pricing_in,
+        #     quantity=input_token,
+        # )
+        # record_cost(
+        #     run_id=run_id,
+        #     uid=uid,
+        #     provider_pricing=provider_pricing_out,
+        #     quantity=output_token,
+        # )
+
+        if stream:
+            return _stream_llm_outputs(entries, response_format_type)
+        else:
+            return _parse_entries(entries, is_chatml, response_format_type, tools)
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
         logger.info(f"{model_name=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
-        result, output_token, input_token = _run_text_model(
+        msgs = _run_text_model(
             api=api,
             model=model_name,
             prompt=prompt,
@@ -425,7 +425,54 @@ def run_language_model(
             avoid_repetition=avoid_repetition,
             quality=quality,
         )
-        return [msg.strip() for msg in result], output_token, input_token
+        ret = [msg.strip() for msg in msgs]
+        if stream:
+            ret = [
+                [
+                    format_chat_entry(role=CHATML_ROLE_ASSISTANT, content=msg)
+                    for msg in ret
+                ]
+            ]
+        return ret
+
+
+def _stream_llm_outputs(
+    result: list | typing.Generator[list[ConversationEntry], None, None],
+    response_format_type: typing.Literal["text", "json_object"] | None,
+):
+    if isinstance(result, list):  # compatibility with non-streaming apis
+        result = [result]
+    for entries in result:
+        if response_format_type == "json_object":
+            for i, entry in enumerate(entries):
+                entries[i] = json.loads(entry["content"])
+        for i, entry in enumerate(entries):
+            entries[i]["content"] = entry.get("content") or ""
+        yield entries
+
+
+def _parse_entries(
+    entries: list[dict],
+    is_chatml: bool,
+    response_format_type: typing.Literal["text", "json_object"] | None,
+    tools: list[dict] | None,
+):
+    if response_format_type == "json_object":
+        ret = [json.loads(entry["content"]) for entry in entries]
+    else:
+        ret = [
+            # return messages back as either chatml or json messages
+            (
+                format_chatml_message(entry)
+                if is_chatml
+                else (entry.get("content") or "").strip()
+            )
+            for entry in entries
+        ]
+    if tools:
+        return ret, [(entry.get("tool_calls") or []) for entry in entries]
+    else:
+        return ret
 
 
 def _run_text_model(
@@ -439,7 +486,7 @@ def _run_text_model(
     stop: list[str] | None,
     avoid_repetition: bool,
     quality: float,
-) -> tuple[list[str], int, int]:
+) -> list[str]:
     match api:
         case LLMApis.openai:
             return _run_openai_text(
@@ -476,7 +523,8 @@ def _run_chat_model(
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
     response_format_type: typing.Literal["text", "json_object"] | None,
-) -> tuple[list[ConversationEntry], int, int]:
+    stream: bool = False,
+) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     match api:
         case LLMApis.openai:
             return _run_openai_chat(
@@ -489,6 +537,7 @@ def _run_chat_model(
                 temperature=temperature,
                 tools=tools,
                 response_format_type=response_format_type,
+                stream=stream,
             )
         case LLMApis.vertex_ai:
             if tools:
@@ -527,7 +576,8 @@ def _run_openai_chat(
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
     response_format_type: typing.Literal["text", "json_object"] | None,
-) -> tuple[list[ConversationEntry], int, int]:
+    stream: bool = False,
+) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai._types import NOT_GIVEN
 
     if avoid_repetition:
@@ -551,18 +601,83 @@ def _run_openai_chat(
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty,
                 tools=[tool.spec for tool in tools] if tools else NOT_GIVEN,
-                response_format={"type": response_format_type}
-                if response_format_type
-                else NOT_GIVEN,
+                response_format=(
+                    {"type": response_format_type}
+                    if response_format_type
+                    else NOT_GIVEN
+                ),
+                stream=stream,
             )
             for model_str in model
         ],
     )
-    return (
-        [choice.message.dict() for choice in r.choices],
-        r.usage.completion_tokens,
-        r.usage.prompt_tokens,
-    )
+    if stream:
+        return _stream_openai_chunked(r)
+    else:
+        r.usage.completion_tokens
+        r.usage.prompt_tokens
+        return [choice.message.dict() for choice in r.choices]
+
+
+def _stream_openai_chunked(
+    r: Stream[ChatCompletionChunk],
+    start_chunk_size: int = 50,
+    stop_chunk_size: int = 400,
+    step_chunk_size: int = 150,
+) -> typing.Generator[list[ConversationEntry], None, None]:
+    ret = []
+    chunk_size = start_chunk_size
+
+    for completion_chunk in r:
+        changed = False
+        for choice in completion_chunk.choices:
+            delta = choice.delta
+            try:
+                # get the entry for this choice
+                entry = ret[choice.index]
+            except IndexError:
+                # initialize the entry
+                entry = delta.dict() | {"content": "", "chunk": ""}
+                ret.append(entry)
+            # this is to mark the end of streaming
+            entry["finish_reason"] = choice.finish_reason
+
+            # append the delta to the current chunk
+            if not delta.content:
+                continue
+            entry["chunk"] += delta.content
+            # if the chunk is too small, we need to wait for more data
+            chunk = entry["chunk"]
+            if len(chunk) < chunk_size:
+                continue
+
+            # iterate through the separators and find the best one that matches
+            for sep in default_separators[:-1]:
+                # find the last occurrence of the separator
+                match = None
+                for match in re.finditer(sep, chunk):
+                    pass
+                if not match:
+                    continue  # no match, try the next separator or wait for more data
+                # append text before the separator to the content
+                part = chunk[: match.end()]
+                if len(part) < chunk_size:
+                    continue  # not enough text, try the next separator or wait for more data
+                entry["content"] += part
+                # set text after the separator as the next chunk
+                entry["chunk"] = chunk[match.end() :]
+                # increase the chunk size, but don't go over the max
+                chunk_size = min(chunk_size + step_chunk_size, stop_chunk_size)
+                # we found a separator, so we can stop looking and yield the partial result
+                changed = True
+                break
+        if changed:
+            yield ret
+
+    # add the leftover chunks
+    for entry in ret:
+        entry["content"] += entry["chunk"]
+    yield ret
 
 
 @retry_if(openai_should_retry)
@@ -587,11 +702,9 @@ def _run_openai_text(
         frequency_penalty=0.1 if avoid_repetition else 0,
         presence_penalty=0.25 if avoid_repetition else 0,
     )
-    return (
-        [choice.text for choice in r.choices],
-        r.usage.completion_tokens,
-        r.usage.prompt_tokens,
-    )
+    r.usage.completion_tokens,
+    r.usage.prompt_tokens,
+    return [choice.text for choice in r.choices]
 
 
 def _get_openai_client(model: str):
@@ -620,7 +733,7 @@ def _run_together_chat(
     temperature: float,
     repetition_penalty: float,
     num_outputs: int,
-) -> tuple[list[ConversationEntry], int, int]:
+) -> list[ConversationEntry]:
     """
     Args:
         model: The model version to use for the request.
@@ -665,7 +778,7 @@ def _run_together_chat(
                 "content": output["choices"][0]["text"],
             }
         )
-    return ret, total_out_tokens, total_in_tokens
+    return ret
 
 
 @retry_if(vertex_ai_should_retry)
@@ -676,7 +789,7 @@ def _run_palm_chat(
     max_output_tokens: int,
     candidate_count: int,
     temperature: float,
-) -> tuple[list[ConversationEntry], int, int]:
+) -> list[ConversationEntry]:
     """
     Args:
         model_id: The model id to use for the request. See available models: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
@@ -715,19 +828,18 @@ def _run_palm_chat(
         },
     )
     raise_for_status(r)
+    
+    r.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"]
+    r.json()["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"]
 
-    return (
-        [
-            {
-                "role": msg["author"],
-                "content": msg["content"],
-            }
-            for pred in r.json()["predictions"]
-            for msg in pred["candidates"]
-        ],
-        r.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
-        r.json()["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
-    )
+    return [
+        {
+            "role": msg["author"],
+            "content": msg["content"],
+        }
+        for pred in r.json()["predictions"]
+        for msg in pred["candidates"]
+    ]
 
 
 @retry_if(vertex_ai_should_retry)
@@ -738,7 +850,7 @@ def _run_palm_text(
     max_output_tokens: int,
     candidate_count: int,
     temperature: float,
-) -> tuple[list[str], int, int]:
+) -> list[str]:
     """
     Args:
         model_id: The model id to use for the request. See available models: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
@@ -764,11 +876,11 @@ def _run_palm_text(
         },
     )
     raise_for_status(res)
-    return (
-        [prediction["content"] for prediction in res.json()["predictions"]],
-        res.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
-        res.json()["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
-    )
+
+    res.json()["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"]
+    res.json()["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"]
+
+    return [prediction["content"] for prediction in res.json()["predictions"]]
 
 
 def format_chatml_message(entry: ConversationEntry) -> str:

@@ -73,7 +73,7 @@ def test_apis_examples(mock_gui_runner, force_authentication, threadpool_subtest
             hidden=False,
             example_id__isnull=False,
         ):
-            threadpool_subtest(_test_apis_examples, sr)
+            threadpool_subtest(_test_apis_examples, sr, msg=sr.get_app_url())
 
 
 def _test_apis_examples(sr: SavedRun):

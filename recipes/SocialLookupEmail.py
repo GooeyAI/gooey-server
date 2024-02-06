@@ -25,7 +25,7 @@ class SocialLookupEmailPage(BasePage):
     slug_versions = ["SocialLookupEmail", "email-writer-with-profile-lookup"]
 
     sane_defaults = {
-        "selected_model": LargeLanguageModels.text_davinci_003.name,
+        "selected_model": LargeLanguageModels.gpt_4.name,
     }
 
     class RequestModel(BaseModel):
@@ -40,9 +40,9 @@ class SocialLookupEmailPage(BasePage):
         domain: str | None
         key_words: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         sampling_temperature: float | None
         max_tokens: int | None
 

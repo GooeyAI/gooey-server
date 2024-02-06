@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import requests
 import sentry_sdk
 from django.utils import timezone
+from django.utils.text import slugify
 from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
@@ -136,11 +137,17 @@ class BasePage:
         query_params = cls.clean_query_params(
             example_id=example_id, run_id=run_id, uid=uid
         ) | (query_params or {})
-        f = furl(settings.APP_BASE_URL, query_params=query_params) / (
-            cls.slug_versions[-1] + "/"
+        f = (
+            furl(settings.APP_BASE_URL, query_params=query_params)
+            / cls.slug_versions[-1]
         )
+        if example_id := query_params.get("example_id"):
+            pr = cls.get_published_run(published_run_id=example_id)
+            if pr and pr.title:
+                f /= slugify(pr.title)
         if tab_name:
-            f /= tab_name + "/"
+            f /= tab_name
+        f /= "/"  # keep trailing slash
         return str(f)
 
     @classmethod
@@ -173,19 +180,25 @@ class BasePage:
             tab_name=MenuTabs.paths[tab],
         )
 
-    def render(self):
+    def setup_render(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
 
-        if self.get_run_state() == RecipeRunState.running:
-            _, run_id, uid = extract_query_params(gooey_get_query_params())
-            channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
-            output = realtime_pull([channel])[0]
-            if output:
-                st.session_state.update(output)
+    def refresh_state(self):
+        _, run_id, uid = extract_query_params(gooey_get_query_params())
+        channel = self.realtime_channel_name(run_id, uid)
+        output = realtime_pull([channel])[0]
+        if output:
+            st.session_state.update(output)
+
+    def render(self):
+        self.setup_render()
+
+        if self.get_run_state(st.session_state) == RecipeRunState.running:
+            self.refresh_state()
         else:
             realtime_clear_subs()
 
@@ -196,6 +209,22 @@ class BasePage:
             self.render_report_form()
             return
 
+        self._render_header()
+
+        self._render_tab_menu(selected_tab=self.tab)
+        with st.nav_tab_content():
+            self.render_selected_tab(self.tab)
+
+    def _render_tab_menu(self, selected_tab: str):
+        assert selected_tab in MenuTabs.paths
+
+        with st.nav_tabs():
+            for name in self.get_tabs():
+                url = self.get_tab_url(name)
+                with st.nav_item(url, active=name == selected_tab):
+                    st.html(name)
+
+    def _render_header(self):
         current_run = self.get_current_sr()
         published_run = self.get_current_published_run()
         is_root_example = (
@@ -203,10 +232,13 @@ class BasePage:
             and published_run.is_root()
             and published_run.saved_run == current_run
         )
-        tbreadcrumbs = get_title_breadcrumbs(self, current_run, published_run)
+        tbreadcrumbs = get_title_breadcrumbs(
+            self, current_run, published_run, tab=self.tab
+        )
+
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
-                if not tbreadcrumbs and not self.run_user:
+                if not tbreadcrumbs.has_breadcrumbs() and not self.run_user:
                     self._render_title(tbreadcrumbs.h1_title)
 
                 if tbreadcrumbs:
@@ -257,28 +289,13 @@ class BasePage:
                     self._render_social_buttons(show_button_text=not can_user_edit_run)
 
         with st.div():
-            if tbreadcrumbs or self.run_user:
+            if tbreadcrumbs.has_breadcrumbs() or self.run_user:
                 # only render title here if the above row was not empty
                 self._render_title(tbreadcrumbs.h1_title)
             if published_run and published_run.notes:
                 st.write(published_run.notes)
             elif is_root_example:
                 st.write(self.preview_description(current_run.to_dict()))
-
-        try:
-            selected_tab = MenuTabs.paths_reverse[self.tab]
-        except KeyError:
-            st.error(f"## 404 - Tab {self.tab!r} Not found")
-            return
-
-        with st.nav_tabs():
-            tab_names = self.get_tabs()
-            for name in tab_names:
-                url = self.get_tab_url(name)
-                with st.nav_item(url, active=name == selected_tab):
-                    st.html(name)
-        with st.nav_tab_content():
-            self.render_selected_tab(selected_tab)
 
     def _render_title(self, title: str):
         st.write(f"# {title}")
@@ -447,14 +464,14 @@ class BasePage:
 
         if not pressed_save:
             return
-        recipe_title = self.get_root_published_run().title or self.title
+
         is_root_published_run = is_update_mode and published_run.is_root()
-        if (
-            not is_root_published_run
-            and published_run_title.strip() == recipe_title.strip()
-        ):
-            st.error("Title can't be the same as the recipe title", icon="⚠️")
-            return
+        if not is_root_published_run:
+            try:
+                self._validate_published_run_title(published_run_title)
+            except TitleValidationError as e:
+                st.error(str(e))
+                return
 
         if is_update_mode:
             updates = dict(
@@ -479,6 +496,18 @@ class BasePage:
                 visibility=published_run_visibility,
             )
         force_redirect(published_run.get_app_url())
+
+    def _validate_published_run_title(self, title: str):
+        if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
+            raise TitleValidationError(
+                "This title is not allowed. Please choose a different title."
+            )
+        elif title.strip() == self.get_recipe_title():
+            raise TitleValidationError(
+                "Please choose a different title for your published run."
+            )
+        elif title.strip() == "":
+            raise TitleValidationError("Title cannot be empty.")
 
     def _has_published_run_changed(
         self,
@@ -894,7 +923,7 @@ class BasePage:
     ) -> tuple[SavedRun, PublishedRun | None]:
         if run_id and uid:
             sr = cls.run_doc_sr(run_id, uid)
-            pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
+            pr = sr.parent_published_run()
         else:
             pr = cls.get_published_run(published_run_id=example_id or "")
             sr = pr.saved_run
@@ -908,12 +937,10 @@ class BasePage:
     @classmethod
     def get_pr_from_query_params(
         cls, example_id: str, run_id: str, uid: str
-    ) -> PublishedRun:
+    ) -> PublishedRun | None:
         if run_id and uid:
             sr = cls.get_sr_from_query_params(example_id, run_id, uid)
-            return (
-                sr and sr.parent_version and sr.parent_version.published_run
-            ) or None
+            return sr.parent_published_run()
         elif example_id:
             return cls.get_published_run(published_run_id=example_id)
         else:
@@ -1065,6 +1092,7 @@ class BasePage:
         image_size: str = "30px",
         responsive: bool = True,
         show_as_link: bool = False,
+        text_size: str | None = None,
     ):
         if not user or (not user.photo_url and not user.display_name):
             return
@@ -1078,47 +1106,44 @@ class BasePage:
         if responsive:
             class_name += "-responsive"
 
-        html = "<div style='display:flex; align-items:center;'>"
-        if user.photo_url:
-            st.html(
-                f"""
-                <style>
-                .{class_name} {{
-                    width: {responsive_image_size};
-                    height: {responsive_image_size};
-                    margin-right: 6px;
-                    border-radius: 50%;
-                    pointer-events: none;
-                }}
-
-                @media (min-width: 1024px) {{
-                    .{class_name} {{
-                        width: {image_size};
-                        height: {image_size};
-                    }}
-                }}
-                </style>
-            """
-            )
-            html += f"""
-                <img class="{class_name}" src="{user.photo_url}">
-            """
-        if user.display_name:
-            html += f"<span>{user.display_name}</span>"
-        html += "</div>"
-
         if show_as_link:
-            linkto = lambda: st.link(
+            linkto = st.link(
                 to=self.app_url(
                     tab_name=MenuTabs.paths[MenuTabs.history],
                     query_params={"uid": user.uid},
                 )
             )
         else:
-            linkto = st.dummy
+            linkto = st.dummy()
 
-        with linkto():
-            st.html(html)
+        with linkto, st.div(className="d-flex align-items-center"):
+            if user.photo_url:
+                st.html(
+                    f"""
+                    <style>
+                    .{class_name} {{
+                        width: {responsive_image_size};
+                        height: {responsive_image_size};
+                        margin-right: 6px;
+                        border-radius: 50%;
+                        pointer-events: none;
+                    }}
+
+                    @media (min-width: 1024px) {{
+                        .{class_name} {{
+                            width: {image_size};
+                            height: {image_size};
+                        }}
+                    }}
+                    </style>
+                """
+                )
+                st.image(user.photo_url, className=class_name)
+
+            if user.display_name:
+                name_style = {"fontSize": text_size} if text_size else {}
+                with st.tag("span", style=name_style):
+                    st.html(html.escape(user.display_name))
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -1282,12 +1307,13 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
         return submitted
 
-    def get_run_state(self) -> RecipeRunState:
-        if st.session_state.get(StateKeys.run_status):
+    @classmethod
+    def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
+        if state.get(StateKeys.run_status):
             return RecipeRunState.running
-        elif st.session_state.get(StateKeys.error_msg):
+        elif state.get(StateKeys.error_msg):
             return RecipeRunState.failed
-        elif st.session_state.get(StateKeys.run_time):
+        elif state.get(StateKeys.run_time):
             return RecipeRunState.completed
         else:
             # when user is at a recipe root, and not running anything
@@ -1306,7 +1332,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
         self._render_before_output()
 
-        run_state = self.get_run_state()
+        run_state = self.get_run_state(st.session_state)
         match run_state:
             case RecipeRunState.completed:
                 self._render_completed_output()
@@ -1433,12 +1459,15 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             run_id=run_id,
             uid=uid,
             state=st.session_state,
-            channel=f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}",
+            channel=self.realtime_channel_name(run_id, uid),
             query_params=self.clean_query_params(
                 example_id=example_id, run_id=run_id, uid=uid
             ),
             is_api_call=is_api_call,
         )
+
+    def realtime_channel_name(self, run_id, uid):
+        return f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
 
     def generate_credit_error_message(self, example_id, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"
@@ -1537,7 +1566,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             is_approved_example=True,
         ).exclude(published_run_id="")[:50]
 
-        grid_layout(3, example_runs, _render)
+        grid_layout(3, example_runs, _render, column_props=dict(className="mb-0 pb-0"))
 
     def _saved_tab(self):
         self.ensure_authentication()
@@ -1551,10 +1580,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             return
 
         def _render(pr: PublishedRun):
-            self._render_example_preview(
-                published_run=pr,
-                allow_hide=False,
-            )
+            self._render_published_run_preview(published_run=pr)
 
         grid_layout(3, published_runs, _render)
 
@@ -1609,13 +1635,22 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             )
 
     def _render_run_preview(self, saved_run: SavedRun):
-        url = saved_run.get_app_url()
-        with st.link(to=url):
-            st.html(
-                # language=HTML
-                f"""<button type="button" class="btn btn-theme">✏️ Tweak</button>"""
-            )
-        copy_to_clipboard_button("🔗 Copy URL", value=url)
+        published_run: PublishedRun | None = (
+            saved_run.parent_version.published_run if saved_run.parent_version else None
+        )
+        is_latest_version = published_run and published_run.saved_run == saved_run
+        tb = get_title_breadcrumbs(self, sr=saved_run, pr=published_run)
+
+        with st.link(to=saved_run.get_app_url()):
+            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
+                if is_latest_version:
+                    st.html(
+                        PublishedRunVisibility(
+                            published_run.visibility
+                        ).get_badge_html()
+                    )
+
+            st.write(f"#### {tb.h1_title}")
 
         updated_at = saved_run.updated_at
         if updated_at and isinstance(updated_at, datetime.datetime):
@@ -1628,33 +1663,68 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         return self.render_example(saved_run.to_dict())
 
+    def _render_published_run_preview(self, published_run: PublishedRun):
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
+
+        with st.link(to=published_run.get_app_url()):
+            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
+                st.html(
+                    PublishedRunVisibility(published_run.visibility).get_badge_html()
+                )
+
+            st.write(f"#### {tb.h1_title}")
+
+        with st.div(className="d-flex align-items-center justify-content-between"):
+            with st.div():
+                updated_at = published_run.updated_at
+                if updated_at and isinstance(updated_at, datetime.datetime):
+                    js_dynamic_date(updated_at)
+
+            if published_run.visibility == PublishedRunVisibility.PUBLIC:
+                run_icon = '<i class="fa-regular fa-person-running"></i>'
+                run_count = format_number_with_suffix(published_run.get_run_count())
+                st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
+
+        if published_run.notes:
+            st.caption(published_run.notes)
+
+        doc = published_run.saved_run.to_dict()
+        self.render_example(doc)
+
     def _render_example_preview(
         self,
         *,
         published_run: PublishedRun,
         allow_hide: bool,
     ):
-        url = published_run.get_app_url()
-        with st.link(to=url):
-            st.html(
-                # language=HTML
-                f"""<button type="button" class="btn btn-theme">✏️ Tweak</button>"""
-            )
-        copy_to_clipboard_button("🔗 Copy URL", value=url)
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
+
+        with st.link(to=published_run.get_app_url()):
+            with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
+                if published_run.created_by and self.is_user_admin(
+                    published_run.created_by
+                ):
+                    self.render_author(
+                        published_run.created_by, image_size="20px", text_size="0.9rem"
+                    )
+
+            st.write(f"#### {tb.h1_title}")
+
+        with st.div(className="d-flex align-items-center justify-content-between"):
+            with st.div():
+                updated_at = published_run.updated_at
+                if updated_at and isinstance(updated_at, datetime.datetime):
+                    js_dynamic_date(updated_at)
+
+            run_icon = '<i class="fa-regular fa-person-running"></i>'
+            run_count = format_number_with_suffix(published_run.get_run_count())
+            st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
+
+        if published_run.notes:
+            st.caption(published_run.notes)
 
         if allow_hide:
             self._example_hide_button(published_run=published_run)
-
-        updated_at = published_run.updated_at
-        if updated_at and isinstance(updated_at, datetime.datetime):
-            js_dynamic_date(updated_at)
-
-        title = published_run.title
-        if title and title.strip() != self.title.strip():
-            st.write("#### " + title)
-
-        if published_run.notes:
-            st.write(published_run.notes)
 
         doc = published_run.saved_run.to_dict()
         self.render_example(doc)
@@ -1816,11 +1886,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_cost_note(self) -> str | None:
         pass
 
+    @classmethod
+    def is_user_admin(cls, user: AppUser) -> bool:
+        email = user.email
+        return email and email in settings.ADMIN_EMAILS
+
     def is_current_user_admin(self) -> bool:
         if not self.request or not self.request.user:
             return False
-        email = self.request.user.email
-        return email and email in settings.ADMIN_EMAILS
+        return self.is_user_admin(self.request.user)
 
     def is_current_user_paying(self) -> bool:
         return bool(self.request and self.request.user and self.request.user.is_paying)
@@ -1880,6 +1954,17 @@ def err_msg_for_exc(e):
         return f"{type(e).__name__}: {e}"
 
 
+def force_redirect(url: str):
+    # note: assumes sanitized URLs
+    st.html(
+        f"""
+    <script>
+    window.location = '{url}';
+    </script>
+    """
+    )
+
+
 class RedirectException(Exception):
     def __init__(self, url, status_code=302):
         self.url = url
@@ -1893,16 +1978,22 @@ class QueryParamsRedirectException(RedirectException):
         super().__init__(url, status_code)
 
 
-def force_redirect(url: str):
-    # note: assumes sanitized URLs
-    st.html(
-        f"""
-    <script>
-    window.location = '{url}';
-    </script>
+class TitleValidationError(Exception):
+    pass
+
+
+def format_number_with_suffix(num: int) -> str:
     """
+    Formats large number with a suffix.
+
+    Ref: https://stackoverflow.com/a/45846841
+    """
+    num_float = float("{:.3g}".format(num))
+    magnitude = 0
+    while abs(num_float) >= 1000:
+        magnitude += 1
+        num_float /= 1000.0
+    return "{}{}".format(
+        "{:f}".format(num_float).rstrip("0").rstrip("."),
+        ["", "K", "M", "B", "T"][magnitude],
     )
-
-
-def reverse_enumerate(start, iterator):
-    return zip(range(start, -1, -1), iterator)

@@ -479,6 +479,7 @@ def file_uploader(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     upload_meta: dict = None,
+    optional: bool = False,
 ):
     if label_visibility != "visible":
         label = None
@@ -492,6 +493,13 @@ def file_uploader(
             help,
             label_visibility,
         )
+    if optional:
+        if not checkbox(
+            label, value=bool(state.session_state.get(key)), disabled=disabled
+        ):
+            state.session_state.pop(key, None)
+            return None
+        label = None
     value = state.session_state.get(key)
     if not value:
         if accept_multiple_files:
@@ -549,41 +557,6 @@ def table(df: "pd.DataFrame"):
                     for value in row:
                         with tag("td"):
                             html(dedent(str(value)))
-
-
-def horizontal_radio(
-    label: str,
-    options: typing.Sequence[T],
-    format_func: typing.Callable[[T], typing.Any] = _default_format,
-    key: str = None,
-    help: str = None,
-    *,
-    disabled: bool = False,
-    label_visibility: LabelVisibility = "visible",
-) -> T | None:
-    if not options:
-        return None
-    options = list(options)
-    if not key:
-        key = md5_values("horizontal_radio", label, options, help, label_visibility)
-    value = state.session_state.get(key)
-    if key not in state.session_state or value not in options:
-        value = options[0]
-    state.session_state.setdefault(key, value)
-    if label_visibility != "visible":
-        label = None
-    markdown(label)
-    for option in options:
-        if button(
-            format_func(option),
-            key=f"tab-{key}-{option}",
-            type="primary",
-            className="replicate-nav " + ("active" if value == option else ""),
-            disabled=disabled,
-        ):
-            state.session_state[key] = value = option
-            state.experimental_rerun()
-    return value
 
 
 def horizontal_radio(
@@ -687,6 +660,38 @@ def text_input(
         **props,
     )
     return value or ""
+
+
+def date_input(
+    label: str,
+    value: str | None = None,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    **props,
+) -> datetime | None:
+    value = _input_widget(
+        input_type="date",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        style=dict(
+            border="1px solid hsl(0, 0%, 80%)",
+            padding="0.375rem 0.75rem",
+            borderRadius="0.25rem",
+            margin="0 0.5rem 0 0.5rem",
+        ),
+        **props,
+    )
+    try:
+        return datetime.strptime(value, "%Y-%m-%d") if value else None
+    except ValueError:
+        return None
 
 
 def password_input(
@@ -880,3 +885,29 @@ def js(src: str, **kwargs):
             args=kwargs,
         ),
     ).mount()
+
+
+def change_url(url: str, request):
+    """Change the url of the page, without reloading the page. Only for urls on the current domain due to browser security policies."""
+    # this is useful to store certain state inputs in the url to allow for sharing/returning to a state
+    old_url = furl(request.url).remove(origin=True).tostr()
+    url = furl(url).remove(origin=True).tostr()
+    if old_url == url:
+        return
+    # the request is likely processing which means it will overwrite the url we set once it is done
+    # so we set up a timer to keep setting the url until the request is done at which point we stop
+    js(
+        f"""
+        setTimeout(() => window.history.replaceState(null, '', '{url}'));
+        function change_url() {{
+            if (window.location.href.replace(window.location.origin, "") == '{old_url}') {{
+                clearInterval(window._change_url_timer);
+            }}
+            window.history.replaceState(null, '', '{url}');
+        }}
+        clearInterval(window._change_url_timer);
+        if (window.location.href.replace(window.location.origin, "") != '{url}') {{
+            window._change_url_timer = setInterval(change_url, 100);
+        }}
+        """,
+    )
