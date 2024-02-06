@@ -50,6 +50,7 @@ from daras_ai_v2.language_model import (
     get_entry_images,
     get_entry_text,
     format_chat_entry,
+    SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -58,7 +59,12 @@ from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
-from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
+from daras_ai_v2.search_ref import (
+    parse_refs,
+    CitationStyles,
+    apply_response_formattings_prefix,
+    apply_response_formattings_suffix,
+)
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
@@ -707,7 +713,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
-                yield "Generating search query..."
+                yield "Creating search query..."
                 state["final_search_query"] = generate_final_search_query(
                     request=request,
                     instructions=query_instructions,
@@ -721,7 +727,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
-                yield "Extracting keywords..."
+                yield "Finding keywords..."
                 k_request = request.copy()
                 # other models dont support JSON mode
                 k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
@@ -803,9 +809,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         if max_allowed_tokens < 0:
             raise ValueError("Input Script is too long! Please reduce the script size.")
 
-        yield f"Running {model.value}..."
+        yield f"Summarizing with {model.value}..."
         if is_chat_model:
-            output_text = run_language_model(
+            chunks = run_language_model(
                 model=request.selected_model,
                 messages=[
                     {"role": s["role"], "content": s["content"]}
@@ -816,12 +822,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
                 tools=request.tools,
+                stream=True,
             )
         else:
             prompt = "\n".join(
                 format_chatml_message(entry) for entry in prompt_messages
             )
-            output_text = run_language_model(
+            chunks = run_language_model(
                 model=request.selected_model,
                 prompt=prompt,
                 max_tokens=max_allowed_tokens,
@@ -830,42 +837,59 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 temperature=request.sampling_temperature,
                 avoid_repetition=request.avoid_repetition,
                 stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
+                stream=True,
             )
-        if request.tools:
-            output_text, tool_call_choices = output_text
-            state["output_documents"] = output_documents = []
-            for tool_calls in tool_call_choices:
-                for call in tool_calls:
+        citation_style = (
+            request.citation_style and CitationStyles[request.citation_style]
+        ) or None
+        for i, entries in enumerate(chunks):
+            if not entries:
+                continue
+            output_text = [entry["content"] for entry in entries]
+            if request.tools:
+                # output_text, tool_call_choices = output_text
+                state["output_documents"] = output_documents = []
+                for call in entries[0].get("tool_calls") or []:
                     result = yield from exec_tool_call(call)
                     output_documents.append(result)
 
-        # save model response
-        state["raw_output_text"] = [
-            "".join(snippet for snippet, _ in parse_refs(text, references))
-            for text in output_text
-        ]
-
-        # translate response text
-        if request.user_language and request.user_language != "en":
-            yield f"Translating response to {request.user_language}..."
-            output_text = run_google_translate(
-                texts=output_text,
-                source_language="en",
-                target_language=request.user_language,
-                glossary_url=request.output_glossary_document,
-            )
-            state["raw_tts_text"] = [
+            # save model response
+            state["raw_output_text"] = [
                 "".join(snippet for snippet, _ in parse_refs(text, references))
                 for text in output_text
             ]
 
-        if references:
-            citation_style = (
-                request.citation_style and CitationStyles[request.citation_style]
-            ) or None
-            apply_response_template(output_text, references, citation_style)
+            # translate response text
+            if request.user_language and request.user_language != "en":
+                yield f"Translating response to {request.user_language}..."
+                output_text = run_google_translate(
+                    texts=output_text,
+                    source_language="en",
+                    target_language=request.user_language,
+                    glossary_url=request.output_glossary_document,
+                )
+                state["raw_tts_text"] = [
+                    "".join(snippet for snippet, _ in parse_refs(text, references))
+                    for text in output_text
+                ]
 
-        state["output_text"] = output_text
+            if references:
+                all_refs_list = apply_response_formattings_prefix(
+                    output_text, references, citation_style
+                )
+            else:
+                all_refs_list = None
+
+            state["output_text"] = output_text
+            if all(entry.get("finish_reason") for entry in entries):
+                if all_refs_list:
+                    apply_response_formattings_suffix(
+                        all_refs_list, state["output_text"], citation_style
+                    )
+                finish_reason = entries[0]["finish_reason"]
+                yield f"Completed with {finish_reason=}"  # avoid changing this message since it's used to detect end of stream
+            else:
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
         state["output_audio"] = []
         state["output_video"] = []
@@ -1026,12 +1050,27 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             col1, col2, col3, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()
+                if bi.published_run:
+                    url = self.app_url(
+                        example_id=bi.published_run.published_run_id,
+                        tab_name=MenuTabs.paths[MenuTabs.integrations],
+                    )
+                elif bi.saved_run:
+                    url = self.app_url(
+                        run_id=bi.saved_run.run_id,
+                        uid=bi.saved_run.uid,
+                        example_id=bi.saved_run.example_id,
+                        tab_name=MenuTabs.paths[MenuTabs.integrations],
+                    )
+                else:
+                    url = None
+                if url:
+                    href = f'<a href="{url}">{bi}</a>'
+                else:
+                    href = f"<span>{bi}</span>"
                 with st.div(className="mt-2"):
                     st.markdown(
-                        f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                        f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
-                        if bi.saved_run
-                        else f"<span>{bi}</span>",
+                        f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;{href}',
                         unsafe_allow_html=True,
                     )
             with col2:
@@ -1066,7 +1105,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     st.session_state.get("user_language") or bi.user_language
                 )
                 bi.saved_run = current_run
-                bi.published_run = published_run
+                if published_run and published_run.saved_run_id == current_run.id:
+                    bi.published_run = published_run
+                else:
+                    bi.published_run = None
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg
 
@@ -1105,6 +1147,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             value=bi.name,
             key=f"_bi_name_{bi.id}",
         )
+        st.caption("Enable streaming messages to Slack in real-time.")
 
 
 def show_landbot_widget():

@@ -17,6 +17,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     scheduler_setting,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
     text2img,
@@ -177,6 +178,10 @@ class CompareText2ImgPage(BasePage):
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareText2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
+
+        if not self.request.user.disable_safety_checker:
+            yield "Running safety checker..."
+            safety_checker(text=request.text_prompt)
 
         state["output_images"] = output_images = {}
 

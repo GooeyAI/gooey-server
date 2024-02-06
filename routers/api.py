@@ -367,7 +367,7 @@ def build_api_response(
     run_async: bool,
     created_at: str,
 ):
-    web_url = str(furl(self.app_url(run_id=run_id, uid=uid)))
+    web_url = self.app_url(run_id=run_id, uid=uid)
     if run_async:
         status_url = str(
             furl(settings.API_BASE_URL, query_params=dict(run_id=run_id))

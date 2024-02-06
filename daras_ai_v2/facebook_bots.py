@@ -102,12 +102,12 @@ class WhatsappBot(BotInterface):
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
         should_translate: bool = False,
+        update_msg_id: str = None,
     ) -> str | None:
         if text and should_translate and self.language and self.language != "en":
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
-        text = text or "\u200b"  # handle empty text with zero-width space
         return self.send_msg_to(
             bot_number=self.bot_id,
             user_number=self.user_id,
@@ -123,9 +123,9 @@ class WhatsappBot(BotInterface):
 
     @classmethod
     def send_msg_to(
-        self,
+        cls,
         *,
-        text: str,
+        text: str = None,
         audio: str = None,
         video: str = None,
         documents: list[str] = None,
@@ -137,7 +137,7 @@ class WhatsappBot(BotInterface):
         # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
 
         # split text into chunks if too long
-        if len(text) > WA_MSG_MAX_SIZE:
+        if text and len(text) > WA_MSG_MAX_SIZE:
             splits = text_splitter(
                 text, chunk_size=WA_MSG_MAX_SIZE, length_function=len
             )
@@ -160,6 +160,7 @@ class WhatsappBot(BotInterface):
                 ],
             )
 
+        messages = []
         if video:
             if buttons:
                 messages = [
@@ -168,7 +169,7 @@ class WhatsappBot(BotInterface):
                         buttons,
                         {
                             "body": {
-                                "text": text,
+                                "text": text or "\u200b",
                             },
                             "header": {
                                 "type": "video",
@@ -188,74 +189,38 @@ class WhatsappBot(BotInterface):
                         },
                     },
                 ]
-        elif audio:
-            if buttons:
-                # audio can't be sent as an interaction, so send text and audio separately
-                messages = [
-                    # simple audio msg
+        elif buttons:
+            # interactive text msg
+            messages = [
+                _build_msg_buttons(
+                    buttons,
                     {
-                        "type": "audio",
-                        "audio": {"link": audio},
+                        "body": {
+                            "text": text or "\u200b",
+                        }
                     },
-                ]
-                send_wa_msgs_raw(
-                    bot_number=bot_number,
-                    user_number=user_number,
-                    messages=messages,
-                )
-                messages = [
-                    # interactive text msg
-                    _build_msg_buttons(
-                        buttons,
-                        {
-                            "body": {
-                                "text": text,
-                            },
-                        },
-                    )
-                ]
-            else:
-                # audio doesn't support captions, so send text and audio separately
-                messages = [
-                    # simple text msg
-                    {
-                        "type": "text",
-                        "text": {
-                            "body": text,
-                            "preview_url": True,
-                        },
+                ),
+            ]
+        elif text:
+            # simple text msg
+            messages = [
+                {
+                    "type": "text",
+                    "text": {
+                        "body": text,
+                        "preview_url": True,
                     },
-                    # simple audio msg
-                    {
-                        "type": "audio",
-                        "audio": {"link": audio},
-                    },
-                ]
-        else:
-            # text message
-            if buttons:
-                messages = [
-                    # interactive text msg
-                    _build_msg_buttons(
-                        buttons,
-                        {
-                            "body": {
-                                "text": text,
-                            }
-                        },
-                    ),
-                ]
-            else:
-                messages = [
-                    # simple text msg
-                    {
-                        "type": "text",
-                        "text": {
-                            "body": text,
-                            "preview_url": True,
-                        },
-                    },
-                ]
+                },
+            ]
+
+        if audio and not video:  # video already has audio
+            # simple audio msg
+            messages.append(
+                {
+                    "type": "audio",
+                    "audio": {"link": audio},
+                }
+            )
 
         if documents:
             messages += [
@@ -398,6 +363,7 @@ class FacebookBot(BotInterface):
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
         should_translate: bool = False,
+        update_msg_id: str = None,
     ) -> str | None:
         if text and should_translate and self.language and self.language != "en":
             text = run_google_translate(

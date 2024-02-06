@@ -280,7 +280,15 @@ class SavedRun(models.Model):
         ]
 
     def __str__(self):
-        return self.get_app_url()
+        from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
+
+        title = get_title_breadcrumbs(
+            Workflow(self.workflow).page_cls, self, self.parent_published_run()
+        ).h1_title
+        return title or self.get_app_url()
+
+    def parent_published_run(self) -> "PublishedRun":
+        return self.parent_version and self.parent_version.published_run
 
     def get_app_url(self):
         workflow = Workflow(self.workflow)
@@ -561,6 +569,11 @@ class BotIntegration(models.Model):
         blank=True,
         default=None,
         help_text="If provided, the message content will be analyzed for this bot using this saved run",
+    )
+
+    streaming_enabled = models.BooleanField(
+        default=False,
+        help_text="If set, the bot will stream messages to the frontend (Slack only)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

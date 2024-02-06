@@ -13,13 +13,13 @@ files = [
 
 [[package]]
 name = "aifail"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 optional = false
 python-versions = ">=3.10,<4.0"
 files = [
-    {file = "aifail-0.1.0-py3-none-any.whl", hash = "sha256:d51fa56b1b8531a298a38cf91a3979f7d427afc88f5af635f86865b8f721bd23"},
-    {file = "aifail-0.1.0.tar.gz", hash = "sha256:40f95fd45c07f9a7f0478d9702e3ea0d811f8582da7f6b841618de2a52803177"},
+    {file = "aifail-0.2.0-py3-none-any.whl", hash = "sha256:83f3a842dbe523ee10a4d53ee00f06e794176122b93b57752566fb98d60db603"},
+    {file = "aifail-0.2.0.tar.gz", hash = "sha256:d3e19e16740577181922055883a00e894d11413d12803e8d443094846040d6df"},
 ]
 
 [package.dependencies]
@@ -6510,4 +6510,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "a5ef77e11ff5b9bb9a5ab5ec5a07c2d3ffa0ef3204d332653d3039e8aba04e14"
+content-hash = "a0d934b2a9b3b5c54d3b14ad5e524ff4b163eaa5eaeb794fe38bc3a8d8d60e04"

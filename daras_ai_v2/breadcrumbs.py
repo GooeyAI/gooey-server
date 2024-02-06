@@ -86,10 +86,7 @@ def get_title_breadcrumbs(
     ).replace("\n", " ")
 
     metadata = page_cls.workflow.get_or_create_metadata()
-    root_breadcrumb = TitleUrl(
-        metadata.short_title,
-        page_cls.app_url(),
-    )
+    root_breadcrumb = TitleUrl(metadata.short_title, page_cls.app_url())
 
     match tab:
         case MenuTabs.run if is_root:
