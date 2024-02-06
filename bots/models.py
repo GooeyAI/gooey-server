@@ -260,7 +260,7 @@ class SavedRun(models.Model):
         ordering = ["-updated_at"]
         unique_together = [
             ["workflow", "example_id"],
-            ["workflow", "run_id", "uid"],
+            ["run_id", "uid"],
         ]
         constraints = [
             models.CheckConstraint(
@@ -273,6 +273,7 @@ class SavedRun(models.Model):
             models.Index(fields=["-created_at"]),
             models.Index(fields=["-updated_at"]),
             models.Index(fields=["workflow"]),
+            models.Index(fields=["run_id", "uid"]),
             models.Index(fields=["workflow", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "hidden"]),
