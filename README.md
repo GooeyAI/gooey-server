@@ -2,6 +2,7 @@
 
 * Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile)
 * Install [poetry](https://python-poetry.org/docs/)
+* Clone the github repo to gooey-server (and make sure that's the folder name)
 * Create & activate a virtualenv (e.g. `poetry shell`)
 * Run `poetry install --with dev`
 * Install [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/), [rabbitmq](https://www.rabbitmq.com/install-homebrew.html), and [postgresql](https://formulae.brew.sh/formula/postgresql@15) (e.g. `brew install redis rabbitmq postgresql@15`)
@@ -87,7 +88,7 @@ gooey.ai (dev)
 App ID: 228027632918921
 ```
 
-Create a [meta developer account](https://developers.facebook.com/docs/development/register/) & ask someone to add you to the test app [here](https://developers.facebook.com/apps/228027632918921/roles/roles/?business_id=549319917267066)
+Create a [meta developer account](https://developers.facebook.com/docs/development/register/) & send admin your **facebook ID** to add you to the test app [here](https://developers.facebook.com/apps/228027632918921/roles/roles/?business_id=549319917267066)
 
 1. start ngrok
 
@@ -107,6 +108,12 @@ ngrok http 8080
 5. Copy the temporary access token there and set env var `WHATSAPP_ACCESS_TOKEN = XXXX`
 
 
+**(Optional) Use the test script to send yourself messages** 
+
+```bash
+python manage.py runscript test_wa_msg_send --script-args 104696745926402 +918764022384
+```
+Replace `+918764022384` with your number and `104696745926402` with the test number ID
 
 ## Dangerous postgres commands
 
@@ -126,6 +133,7 @@ docker cp $cid:/app/$fname .
 echo $PWD/$fname
 ```
 
+**on local**
 ```bash
 # reset the database
 ./manage.py reset_db -c
@@ -137,6 +145,7 @@ pg_restore --no-privileges --no-owner -d $PGDATABASE $fname
 
 ### create & load fixtures
 
+**on server**
 ```bash
 # select a running container
 cid=$(docker ps  | grep gooey-api-prod | cut -d " " -f 1 | head -1)
@@ -148,6 +157,12 @@ docker cp $cid:/app/fixture.json .
 echo $PWD/fixture.json
 ```
 
+**on local**
+```bash
+# copy fixture.json from server to local
+rsync -P -a <username>@captain.us-1.gooey.ai:/home/<username>/fixture.json .
+```
+
 ```bash
 # reset the database
 ./manage.py reset_db -c
@@ -157,12 +172,16 @@ echo $PWD/fixture.json
 ./manage.py migrate
 # load the fixture
 ./manage.py loaddata fixture.json
+# create a superuser to access admin
+./manage.py createsuperuser
 ```
 
 ### copy one postgres db to another
 
-```
+**on server**
+```bash
 ./manage.py reset_db
 createdb -T template0 $PGDATABASE
 pg_dump $SOURCE_DATABASE | psql -q $PGDATABASE
 ```
+

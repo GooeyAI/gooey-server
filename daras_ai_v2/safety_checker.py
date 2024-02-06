@@ -23,8 +23,8 @@ def safety_checker_text(text_input: str):
     # run in a thread to avoid messing up threadlocals
     result, sr = (
         CompareLLMPage()
-        .example_doc_sr(settings.SAFTY_CHECKER_EXAMPLE_ID)
-        .submit_api_call(
+        .get_published_run(published_run_id=settings.SAFTY_CHECKER_EXAMPLE_ID)
+        .saved_run.submit_api_call(
             current_user=billing_account,
             request_body=dict(variables=dict(input=text_input)),
         )

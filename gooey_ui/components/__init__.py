@@ -1,7 +1,9 @@
 import base64
+import html as html_lib
 import math
 import textwrap
 import typing
+from datetime import datetime, timezone
 
 import numpy as np
 
@@ -28,8 +30,18 @@ def dummy(*args, **kwargs):
 spinner = dummy
 set_page_config = dummy
 form = dummy
-plotly_chart = dummy
 dataframe = dummy
+
+
+def countdown_timer(
+    end_time: datetime,
+    delay_text: str,
+) -> state.NestingCtx:
+    return _node(
+        "countdown-timer",
+        endTime=end_time.astimezone(timezone.utc).isoformat(),
+        delayText=delay_text,
+    )
 
 
 def nav_tabs():
@@ -71,9 +83,11 @@ def write(*objs: typing.Any, unsafe_allow_html=False, **props):
         )
 
 
-def markdown(body: str, *, unsafe_allow_html=False, **props):
+def markdown(body: str | None, *, unsafe_allow_html=False, **props):
     if body is None:
         return _node("markdown", body="", **props)
+    if not unsafe_allow_html:
+        body = html_lib.escape(body)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
     )
@@ -202,6 +216,7 @@ def image(
     src: str | np.ndarray,
     caption: str = None,
     alt: str = None,
+    href: str = None,
     **props,
 ):
     if isinstance(src, np.ndarray):
@@ -222,6 +237,7 @@ def image(
             src=src,
             caption=dedent(caption),
             alt=alt or caption,
+            href=href,
             **props,
         ),
     ).mount()
@@ -273,13 +289,14 @@ def text_area(
     **props,
 ) -> str:
     style = props.setdefault("style", {})
-    if key:
-        assert not value, "only one of value or key can be provided"
-    else:
+    # if key:
+    #     assert not value, "only one of value or key can be provided"
+    # else:
+    if not key:
         key = md5_values(
             "textarea", label, height, help, value, placeholder, label_visibility
         )
-    value = str(state.session_state.setdefault(key, value))
+    value = str(state.session_state.setdefault(key, value) or "")
     if label_visibility != "visible":
         label = None
     if disabled:
@@ -405,12 +422,20 @@ def button(
     key: str = None,
     help: str = None,
     *,
-    type: typing.Literal["primary", "secondary"] = "secondary",
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
     disabled: bool = False,
     **props,
 ) -> bool:
+    """
+    Example:
+        st.button("Primary", key="test0", type="primary")
+        st.button("Secondary", key="test1")
+        st.button("Tertiary", key="test3", type="tertiary")
+        st.button("Link Button", key="test3", type="link")
+    """
     if not key:
         key = md5_values("button", label, help, type, props)
+    className = f"btn-{type} " + props.pop("className", "")
     state.RenderTreeNode(
         name="gui-button",
         props=dict(
@@ -420,6 +445,7 @@ def button(
             label=dedent(label),
             help=help,
             disabled=disabled,
+            className=className,
             **props,
         ),
     ).mount()
@@ -453,6 +479,7 @@ def file_uploader(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     upload_meta: dict = None,
+    optional: bool = False,
 ):
     if label_visibility != "visible":
         label = None
@@ -466,6 +493,13 @@ def file_uploader(
             help,
             label_visibility,
         )
+    if optional:
+        if not checkbox(
+            label, value=bool(state.session_state.get(key)), disabled=disabled
+        ):
+            state.session_state.pop(key, None)
+            return None
+        label = None
     value = state.session_state.get(key)
     if not value:
         if accept_multiple_files:
@@ -501,60 +535,31 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     ).mount()
 
 
-def data_table(file_url: str):
-    return _node("data-table", fileUrl=file_url)
+def data_table(file_url_or_cells: str | list):
+    if isinstance(file_url_or_cells, str):
+        file_url = file_url_or_cells
+        return _node("data-table", fileUrl=file_url)
+    else:
+        cells = file_url_or_cells
+        return _node("data-table-raw", cells=cells)
 
 
 def table(df: "pd.DataFrame"):
-    state.RenderTreeNode(
-        name="table",
-        children=[
-            state.RenderTreeNode(
-                name="thead",
-                children=[
-                    state.RenderTreeNode(
-                        name="tr",
-                        children=[
-                            state.RenderTreeNode(
-                                name="th",
-                                children=[
-                                    state.RenderTreeNode(
-                                        name="markdown",
-                                        props=dict(body=dedent(col)),
-                                    ),
-                                ],
-                            )
-                            for col in df.columns
-                        ],
-                    ),
-                ],
-            ),
-            state.RenderTreeNode(
-                name="tbody",
-                children=[
-                    state.RenderTreeNode(
-                        name="tr",
-                        children=[
-                            state.RenderTreeNode(
-                                name="td",
-                                children=[
-                                    state.RenderTreeNode(
-                                        name="markdown",
-                                        props=dict(body=dedent(str(value))),
-                                    ),
-                                ],
-                            )
-                            for value in row
-                        ],
-                    )
-                    for row in df.itertuples(index=False)
-                ],
-            ),
-        ],
-    ).mount()
+    with tag("table", className="table table-striped table-sm"):
+        with tag("thead"):
+            with tag("tr"):
+                for col in df.columns:
+                    with tag("th", scope="col"):
+                        html(dedent(col))
+        with tag("tbody"):
+            for row in df.itertuples(index=False):
+                with tag("tr"):
+                    for value in row:
+                        with tag("td"):
+                            html(dedent(str(value)))
 
 
-def radio(
+def horizontal_radio(
     label: str,
     options: typing.Sequence[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
@@ -562,6 +567,44 @@ def radio(
     help: str = None,
     *,
     disabled: bool = False,
+    checked_by_default: bool = True,
+    label_visibility: LabelVisibility = "visible",
+) -> T | None:
+    if not options:
+        return None
+    options = list(options)
+    if not key:
+        key = md5_values("horizontal_radio", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if (key not in state.session_state or value not in options) and checked_by_default:
+        value = options[0]
+    state.session_state.setdefault(key, value)
+    if label_visibility != "visible":
+        label = None
+    markdown(label)
+    for option in options:
+        if button(
+            format_func(option),
+            key=f"tab-{key}-{option}",
+            type="primary",
+            className="replicate-nav " + ("active" if value == option else ""),
+            disabled=disabled,
+        ):
+            state.session_state[key] = value = option
+            state.experimental_rerun()
+    return value
+
+
+def radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    value: T = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
 ) -> T | None:
     if not options:
@@ -569,10 +612,10 @@ def radio(
     options = list(options)
     if not key:
         key = md5_values("radio", label, options, help, label_visibility)
-    value = state.session_state.get(key)
-    if key not in state.session_state or value not in options:
+    value = state.session_state.setdefault(key, value)
+    if value not in options and checked_by_default:
         value = options[0]
-    state.session_state.setdefault(key, value)
+        state.session_state[key] = value
     if label_visibility != "visible":
         label = None
     markdown(label)
@@ -617,6 +660,38 @@ def text_input(
         **props,
     )
     return value or ""
+
+
+def date_input(
+    label: str,
+    value: str | None = None,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    **props,
+) -> datetime | None:
+    value = _input_widget(
+        input_type="date",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        style=dict(
+            border="1px solid hsl(0, 0%, 80%)",
+            padding="0.375rem 0.75rem",
+            borderRadius="0.25rem",
+            margin="0 0.5rem 0 0.5rem",
+        ),
+        **props,
+    )
+    try:
+        return datetime.strptime(value, "%Y-%m-%d") if value else None
+    except ValueError:
+        return None
 
 
 def password_input(
@@ -772,13 +847,28 @@ def breadcrumbs(divider: str = "/", **props) -> state.NestingCtx:
 
 
 def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
-    className = "breadcrumb-item lead " + props.pop("className", "")
+    className = "breadcrumb-item " + props.pop("className", "")
     with tag("li", className=className, **props):
         if link_to:
             with tag("a", href=link_to):
                 html(inner_html)
         else:
             html(inner_html)
+
+
+def plotly_chart(figure_or_data, **kwargs):
+    data = (
+        figure_or_data.to_plotly_json()
+        if hasattr(figure_or_data, "to_plotly_json")
+        else figure_or_data
+    )
+    state.RenderTreeNode(
+        name="plotly-chart",
+        props=dict(
+            chart=data,
+            args=kwargs,
+        ),
+    ).mount()
 
 
 def dedent(text: str | None) -> str | None:
@@ -795,3 +885,29 @@ def js(src: str, **kwargs):
             args=kwargs,
         ),
     ).mount()
+
+
+def change_url(url: str, request):
+    """Change the url of the page, without reloading the page. Only for urls on the current domain due to browser security policies."""
+    # this is useful to store certain state inputs in the url to allow for sharing/returning to a state
+    old_url = furl(request.url).remove(origin=True).tostr()
+    url = furl(url).remove(origin=True).tostr()
+    if old_url == url:
+        return
+    # the request is likely processing which means it will overwrite the url we set once it is done
+    # so we set up a timer to keep setting the url until the request is done at which point we stop
+    js(
+        f"""
+        setTimeout(() => window.history.replaceState(null, '', '{url}'));
+        function change_url() {{
+            if (window.location.href.replace(window.location.origin, "") == '{old_url}') {{
+                clearInterval(window._change_url_timer);
+            }}
+            window.history.replaceState(null, '', '{url}');
+        }}
+        clearInterval(window._change_url_timer);
+        if (window.location.href.replace(window.location.origin, "") != '{url}') {{
+            window._change_url_timer = setInterval(change_url, 100);
+        }}
+        """,
+    )

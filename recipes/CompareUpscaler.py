@@ -8,12 +8,14 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.face_restoration import UpscalerModels, run_upscaler_model
 from daras_ai_v2.stable_diffusion import SD_IMG_MAX_SIZE
+from daras_ai_v2.safety_checker import safety_checker
 
-DEFAULT_COMPARE_UPSCALER_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/COMPARE%20IMAGE%20UPSCALERS.jpg"
+DEFAULT_COMPARE_UPSCALER_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2e8ee512-93fe-11ee-a083-02420a0001c8/Image%20upscaler.jpg.png"
 
 
 class CompareUpscalerPage(BasePage):
     title = "Compare AI Image Upscalers"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/64393e0c-88db-11ee-b428-02420a000168/AI%20Image%20Upscaler.png.png"
     workflow = Workflow.COMPARE_UPSCALER
     slug_versions = ["compare-ai-upscalers"]
 
@@ -74,6 +76,10 @@ class CompareUpscalerPage(BasePage):
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareUpscalerPage.RequestModel = self.RequestModel.parse_obj(state)
+
+        if not self.request.user.disable_safety_checker:
+            yield "Running safety checker..."
+            safety_checker(image=request.input_image)
 
         state["output_images"] = output_images = {}
 

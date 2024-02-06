@@ -2,7 +2,6 @@ import os
 import typing
 
 import gooey_ui as st
-
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, google_translate_language_selector
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -80,7 +79,8 @@ def document_uploader(
 
 
 def doc_search_settings(
-    asr_allowed: bool = True, keyword_instructions_allowed: bool = False
+    asr_allowed: bool = False,
+    keyword_instructions_allowed: bool = False,
 ):
     from daras_ai_v2.vector_search import DocSearchRequest
 
@@ -93,6 +93,26 @@ def doc_search_settings(
             key="citation_style",
             use_selectbox=True,
             allow_none=True,
+        )
+
+    st.text_area(
+        """
+###### 👁‍🗨 Summarization Instructions
+Prompt to transform the conversation history into a vector search query.  \\
+These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.
+        """,
+        key="query_instructions",
+        height=300,
+    )
+    if keyword_instructions_allowed:
+        st.text_area(
+            """
+###### 🔑 Keyword Extraction 
+Prompt to extract a query for hybrid BM25 search.  \\
+These instructions run after the Summarization Instructions above and can use its result via `{{ final_search_query }}`. In general, you shouldn't need to adjust these instructions.
+        """,
+            key="keyword_instructions",
+            height=300,
         )
 
     dense_weight_ = DocSearchRequest.__fields__["dense_weight"]
@@ -117,7 +137,7 @@ The maximum number of document search citations.
         label="""
 ###### Max Snippet Words
 
-After a document search, relevant snippets of your documents are returned as results. This setting adjusts the maximum number of words in each snippet. A high snippet size allows the LLM to access more information from your document results, at the cost of being verbose and potentially exhausting input tokens (which can cause a failure of the copilot to respond). Default: 300 
+After a document search, relevant snippets of your documents are returned as results. This setting adjusts the maximum number of words in each snippet. A high snippet size allows the LLM to access more information from your document results, at the cost of being verbose and potentially exhausting input tokens (which can cause a failure of the copilot to respond). Default: 300
 """,
         key="max_context_words",
         min_value=10,
@@ -135,33 +155,16 @@ Your knowledge base documents are split into overlapping snippets. This settings
         max_value=50,
     )
 
-    st.text_area(
-        """
-###### 👁‍🗨 Summarization Instructions
-Prompt to transform the conversation history into a vector search query.  
-These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.                
-        """,
-        key="query_instructions",
-        height=300,
-    )
-    if keyword_instructions_allowed:
-        st.text_area(
-            """
-###### 🔑 Keyword Extraction                 
-        """,
-            key="keyword_instructions",
-            height=300,
-        )
-
     if not asr_allowed:
         return
 
     st.write("---")
     st.write(
         """
-             ##### 🎤 Knowledge Base Speech Recognition
-             <font color="grey">If your knowledge base documents contain audio or video files, we'll transcribe and optionally translate them to English, given we've found most vectorDBs and LLMs perform best in English (even if their final answers are translated into another language). 
-             """
+        ##### 🎤 Knowledge Base Speech Recognition
+        <font color="grey">If your knowledge base documents contain audio or video files, we'll transcribe and optionally translate them to English, given we've found most vectorDBs and LLMs perform best in English (even if their final answers are translated into another language).</font>
+        """,
+        unsafe_allow_html=True,
     )
 
     enum_selector(

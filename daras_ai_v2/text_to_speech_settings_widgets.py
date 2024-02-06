@@ -5,6 +5,7 @@ from google.cloud import texttospeech
 
 import gooey_ui as st
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
 
 SESSION_ELEVENLABS_API_KEY = "__user__elevenlabs_api_key"
@@ -79,6 +80,7 @@ ELEVEN_LABS_MODELS = {
     "eleven_multilingual_v2": "Multilingual V2 - High quality speech in 29 languages",
     "eleven_turbo_v2": "English V2 - Very low latency text-to-speech",
     "eleven_monolingual_v1": "English V1 - Low latency text-to-speech",
+    "eleven_multilingual_v1": "Multilingual V1",
 }
 
 ELEVEN_LABS_SUPPORTED_LANGS = [
@@ -289,8 +291,7 @@ def text_to_speech_settings(page):
                     ):
                         st.caption(
                             """
-                            Note: Please purchase Gooey.AI credits to use ElevenLabs voices
-                            <a href="/account">here</a>.<br/>
+                            Note: Please purchase Gooey.AI credits to use ElevenLabs voices [here](/account).
                             Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
                             """
                         )
@@ -346,6 +347,26 @@ def text_to_speech_settings(page):
                     step=0.05,
                     key="elevenlabs_similarity_boost",
                 )
+
+            if st.session_state.get("elevenlabs_model") == "eleven_multilingual_v2":
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.slider(
+                        """
+                        ###### Style Exaggeration
+                        """,
+                        min_value=0,
+                        max_value=1.0,
+                        step=0.05,
+                        key="elevenlabs_style",
+                        value=0.0,
+                    )
+                with col2:
+                    st.checkbox(
+                        "Speaker Boost",
+                        key="elevenlabs_speaker_boost",
+                        value=True,
+                    )
 
             with st.expander(
                 "Eleven Labs Supported Languages",
@@ -403,7 +424,7 @@ def fetch_elevenlabs_voices(api_key: str) -> dict[str, str]:
         "https://api.elevenlabs.io/v1/voices",
         headers={"Accept": "application/json", "xi-api-key": api_key},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     print(r.json()["voices"])
     sorted_voices = sorted(
         r.json()["voices"],

@@ -9,21 +9,23 @@ from bots.models import Workflow
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.redis_cache import redis_cache_decorator
 
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
-DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/email%20ver%202.png"
+DEFAULT_SOCIAL_LOOKUP_EMAIL_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6729ea44-9457-11ee-bd77-02420a0001ce/Profile%20look%20up%20gpt%20email.jpg.png"
 
 
 class SocialLookupEmailPage(BasePage):
     title = "Profile Lookup + GPT3 for AI-Personalized Emails"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fbd475a-88d7-11ee-aac9-02420a00016b/personalized%20email.png.png"
     workflow = Workflow.SOCIAL_LOOKUP_EMAIL
     slug_versions = ["SocialLookupEmail", "email-writer-with-profile-lookup"]
 
     sane_defaults = {
-        "selected_model": LargeLanguageModels.text_davinci_003.name,
+        "selected_model": LargeLanguageModels.gpt_4.name,
     }
 
     class RequestModel(BaseModel):
@@ -239,7 +241,7 @@ def get_profile_for_email(email_address) -> dict | None:
         "https://api.apollo.io/v1/people/match",
         json={"api_key": settings.APOLLO_API_KEY, "email": email_address},
     )
-    r.raise_for_status()
+    raise_for_status(r)
 
     person = r.json().get("person")
     if not person:

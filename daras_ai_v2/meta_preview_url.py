@@ -1,12 +1,17 @@
 import mimetypes
 import os
-from time import time
+import typing
 
-import requests
 from furl import furl
 
 
-def meta_preview_url(file_url: str | None, fallback_img: str | None) -> str | None:
+def meta_preview_url(
+    file_url: str | None,
+    fallback_img: str = None,
+    size: typing.Literal[
+        "400x400", "1170x1560", "40x40", "72x72", "80x80", "96x96"
+    ] = "400x400",
+) -> str | None:
     if not file_url:
         return fallback_img
 
@@ -22,7 +27,6 @@ def meta_preview_url(file_url: str | None, fallback_img: str | None) -> str | No
         file_url = fallback_img
     elif content_type in ["image/png", "image/jpeg", "image/tiff", "image/webp"]:
         # sizes:  400x400,1170x1560,40x40,72x72,80x80,96x96
-        size = "400x400"
         f.path.segments = dir_segments + ["thumbs", f"{base}_{size}{ext}"]
 
     new_url = str(f)

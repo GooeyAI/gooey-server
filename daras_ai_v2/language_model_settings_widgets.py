@@ -1,10 +1,14 @@
 import gooey_ui as st
+from daras_ai_v2.azure_doc_extract import azure_form_recognizer_models
 
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.language_model import LargeLanguageModels
 
 
-def language_model_settings(show_selector=True):
+def language_model_settings(show_selector=True, show_document_model=False):
+    from recipes.VideoBots import VideoBotsPage
+
     st.write("##### 🔠 Language Model Settings")
 
     if show_selector:
@@ -14,6 +18,16 @@ def language_model_settings(show_selector=True):
             key="selected_model",
             use_selectbox=True,
         )
+        if show_document_model:
+            doc_model_descriptions = azure_form_recognizer_models()
+            st.selectbox(
+                f"###### {field_title_desc(VideoBotsPage.RequestModel, 'document_model')}",
+                key="document_model",
+                options=[None, *doc_model_descriptions],
+                format_func=lambda x: f"{doc_model_descriptions[x]} ({x})"
+                if x
+                else "———",
+            )
 
     st.checkbox("Avoid Repetition", key="avoid_repetition")
 

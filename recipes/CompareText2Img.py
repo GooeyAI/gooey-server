@@ -17,6 +17,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     scheduler_setting,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
     text2img,
@@ -25,9 +26,12 @@ from daras_ai_v2.stable_diffusion import (
     Schedulers,
 )
 
+DEFAULT_COMPARE_TEXT2IMG_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ae7b2940-93fc-11ee-8edc-02420a0001cc/Compare%20image%20generators.jpg.png"
+
 
 class CompareText2ImgPage(BasePage):
     title = "Compare AI Image Generators"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d127484e-88d9-11ee-b549-02420a000167/Compare%20AI%20Image%20generators.png.png"
     workflow = Workflow.COMPARE_TEXT2IMG
     slug_versions = [
         "CompareText2Img",
@@ -40,6 +44,8 @@ class CompareText2ImgPage(BasePage):
         "seed": 42,
         "sd_2_upscaling": False,
         "image_guidance_scale": 1.2,
+        "dall_e_3_quality": "standard",
+        "dall_e_3_style": "vivid",
     }
 
     class RequestModel(BaseModel):
@@ -51,6 +57,8 @@ class CompareText2ImgPage(BasePage):
 
         num_outputs: int | None
         quality: int | None
+        dall_e_3_quality: str | None
+        dall_e_3_style: str | None
 
         guidance_scale: float | None
         seed: int | None
@@ -68,6 +76,9 @@ class CompareText2ImgPage(BasePage):
         output_images: dict[
             typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
         ]
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_COMPARE_TEXT2IMG_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.FaceInpainting import FaceInpaintingPage
@@ -152,7 +163,7 @@ class CompareText2ImgPage(BasePage):
 
         negative_prompt_setting()
         output_resolution_setting()
-        num_outputs_setting()
+        num_outputs_setting(st.session_state.get("selected_models", []))
         sd_2_upscaling_setting()
         col1, col2 = st.columns(2)
         with col1:
@@ -168,6 +179,10 @@ class CompareText2ImgPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareText2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
 
+        if not self.request.user.disable_safety_checker:
+            yield "Running safety checker..."
+            safety_checker(text=request.text_prompt)
+
         state["output_images"] = output_images = {}
 
         for selected_model in request.selected_models:
@@ -178,6 +193,8 @@ class CompareText2ImgPage(BasePage):
                 prompt=request.text_prompt,
                 num_outputs=request.num_outputs,
                 num_inference_steps=request.quality,
+                dall_e_3_quality=request.dall_e_3_quality,
+                dall_e_3_style=request.dall_e_3_style,
                 width=request.output_width,
                 height=request.output_height,
                 guidance_scale=request.guidance_scale,

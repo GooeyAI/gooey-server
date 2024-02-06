@@ -3,6 +3,7 @@ import os.path
 import subprocess
 import tempfile
 from enum import Enum
+from time import sleep
 
 import langcodes
 import requests
@@ -12,18 +13,18 @@ from furl import furl
 
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
+from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.gdrive_downloader import (
     is_gdrive_url,
     gdrive_download,
     gdrive_metadata,
     url_to_gdrive_file_id,
 )
-from daras_ai_v2 import settings
-from daras_ai_v2 import google_utils
-from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.google_utils import get_google_auth_session
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
-from time import sleep
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -42,9 +43,15 @@ SEAMLESS_SUPPORTED = {"afr", "amh", "arb", "ary", "arz", "asm", "ast", "azj", "b
 AZURE_SUPPORTED = {"af-ZA", "am-ET", "ar-AE", "ar-BH", "ar-DZ", "ar-EG", "ar-IL", "ar-IQ", "ar-JO", "ar-KW", "ar-LB", "ar-LY", "ar-MA", "ar-OM", "ar-PS", "ar-QA", "ar-SA", "ar-SY", "ar-TN", "ar-YE", "az-AZ", "bg-BG", "bn-IN", "bs-BA", "ca-ES", "cs-CZ", "cy-GB", "da-DK", "de-AT", "de-CH", "de-DE", "el-GR", "en-AU", "en-CA", "en-GB", "en-GH", "en-HK", "en-IE", "en-IN", "en-KE", "en-NG", "en-NZ", "en-PH", "en-SG", "en-TZ", "en-US", "en-ZA", "es-AR", "es-BO", "es-CL", "es-CO", "es-CR", "es-CU", "es-DO", "es-EC", "es-ES", "es-GQ", "es-GT", "es-HN", "es-MX", "es-NI", "es-PA", "es-PE", "es-PR", "es-PY", "es-SV", "es-US", "es-UY", "es-VE", "et-EE", "eu-ES", "fa-IR", "fi-FI", "fil-PH", "fr-BE", "fr-CA", "fr-CH", "fr-FR", "ga-IE", "gl-ES", "gu-IN", "he-IL", "hi-IN", "hr-HR", "hu-HU", "hy-AM", "id-ID", "is-IS", "it-CH", "it-IT", "ja-JP", "jv-ID", "ka-GE", "kk-KZ", "km-KH", "kn-IN", "ko-KR", "lo-LA", "lt-LT", "lv-LV", "mk-MK", "ml-IN", "mn-MN", "mr-IN", "ms-MY", "mt-MT", "my-MM", "nb-NO", "ne-NP", "nl-BE", "nl-NL", "pa-IN", "pl-PL", "ps-AF", "pt-BR", "pt-PT", "ro-RO", "ru-RU", "si-LK", "sk-SK", "sl-SI", "so-SO", "sq-AL", "sr-RS", "sv-SE", "sw-KE", "sw-TZ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-IN", "uz-UZ", "vi-VN", "wuu-CN", "yue-CN", "zh-CN", "zh-CN-shandong", "zh-CN-sichuan", "zh-HK", "zh-TW", "zu-ZA"}  # fmt: skip
 MAX_POLLS = 100
 
+# https://deepgram.com/product/languages for the "general" model:
+# DEEPGRAM_SUPPORTED = {"nl","en","en-AU","en-US","en-GB","en-NZ","en-IN","fr","fr-CA","de","hi","hi-Latn","id","it","ja","ko","cmn-Hans-CN","cmn-Hant-TW","no","pl","pt","pt-PT","pt-BR","ru","es","es-419","sv","tr","uk"}  # fmt: skip
+# but we only have the Nova tier so these are our languages (https://developers.deepgram.com/docs/models-languages-overview):
+DEEPGRAM_SUPPORTED = {"en", "en-US", "en-AU", "en-GB", "en-NZ", "en-IN", "es", "es-419"}  # fmt: skip
+
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
+    whisper_large_v3 = "Whisper Large v3 (openai)"
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
     whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     nemo_english = "Conformer English (ai4bharat.org)"
@@ -55,8 +62,14 @@ class AsrModels(Enum):
     azure = "Azure Speech"
     seamless_m4t = "Seamless M4T (Facebook Research)"
 
+    def supports_auto_detect(self) -> bool:
+        return self not in {
+            self.azure,
+        }
+
 
 asr_model_ids = {
+    AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:37dfc0d6a7eb43ff84e230f74a24dab84e6bb7756c9b457dbdcceca3de7a4a04",
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
     AsrModels.whisper_hindi_large_v2: "vasista22/whisper-hindi-large-v2",
     AsrModels.whisper_telugu_large_v2: "vasista22/whisper-telugu-large-v2",
@@ -75,9 +88,10 @@ forced_asr_languages = {
 }
 
 asr_supported_languages = {
+    AsrModels.whisper_large_v3: WHISPER_SUPPORTED,
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
-    AsrModels.deepgram: WHISPER_SUPPORTED,
+    AsrModels.deepgram: DEEPGRAM_SUPPORTED,
     AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
 }
@@ -106,6 +120,8 @@ def google_translate_language_selector(
     ###### Google Translate (*optional*)
     """,
     key="google_translate_target",
+    allow_none=True,
+    **kwargs,
 ):
     """
     Streamlit widget for selecting a language for Google Translate.
@@ -115,12 +131,14 @@ def google_translate_language_selector(
     """
     languages = google_translate_languages()
     options = list(languages.keys())
-    options.insert(0, None)
-    st.selectbox(
+    if allow_none:
+        options.insert(0, None)
+    return st.selectbox(
         label=label,
         key=key,
         format_func=lambda k: languages[k] if k else "———",
         options=options,
+        **kwargs,
     )
 
 
@@ -145,6 +163,34 @@ def google_translate_languages() -> dict[str, str]:
     }
 
 
+@redis_cache_decorator
+def google_translate_input_languages() -> dict[str, str]:
+    """
+    Get list of supported languages for Google Translate.
+    :return: Dictionary of language codes and display names.
+    """
+    from google.cloud import translate
+
+    _, project = get_google_auth_session()
+    parent = f"projects/{project}/locations/global"
+    client = translate.TranslationServiceClient()
+    supported_languages = client.get_supported_languages(
+        parent=parent, display_language_code="en"
+    )
+    return {
+        lang.language_code: lang.display_name
+        for lang in supported_languages.languages
+        if lang.support_source
+    }
+
+
+def get_language_in_collection(langcode: str, languages):
+    for lang in languages:
+        if langcodes.get(lang).language == langcodes.get(langcode).language:
+            return langcode
+    return None
+
+
 def asr_language_selector(
     selected_model: AsrModels,
     label="##### Spoken Language",
@@ -156,7 +202,9 @@ def asr_language_selector(
         st.session_state[key] = forced_lang
         return forced_lang
 
-    options = [None, *asr_supported_languages.get(selected_model, [])]
+    options = list(asr_supported_languages.get(selected_model, []))
+    if selected_model and selected_model.supports_auto_detect():
+        options.insert(0, None)
 
     # handle non-canonical language codes
     old_val = st.session_state.get(key)
@@ -195,6 +243,19 @@ def run_google_translate(
     """
     from google.cloud import translate_v2 as translate
 
+    # convert to BCP-47 format (google handles consistent language codes but sometimes gets confused by a mix of iso2 and iso3 which we have)
+    if source_language:
+        source_language = langcodes.Language.get(source_language).to_tag()
+        source_language = get_language_in_collection(
+            source_language, google_translate_input_languages().keys()
+        )  # this will default to autodetect if language is not found as supported
+    target_language = langcodes.Language.get(target_language).to_tag()
+    target_language: str | None = get_language_in_collection(
+        target_language, google_translate_languages().keys()
+    )
+    if not target_language:
+        raise ValueError(f"Unsupported target language: {target_language!r}")
+
     # if the language supports transliteration, we should check if the script is Latin
     if source_language and source_language not in TRANSLITERATION_SUPPORTED:
         language_codes = [source_language] * len(texts)
@@ -225,19 +286,20 @@ def _translate_text(
     )
 
     # prevent incorrect API calls
-    if source_language == target_language or not text:
+    if not text or source_language == target_language or source_language == "und":
         return text
 
     if source_language == "wo-SN" or target_language == "wo-SN":
         return _MinT_translate_one_text(text, source_language, target_language)
 
     config = {
-        "source_language_code": source_language,
         "target_language_code": target_language,
         "contents": text,
         "mime_type": "text/plain",
         "transliteration_config": {"enable_transliteration": enable_transliteration},
     }
+    if source_language != "auto":
+        config["source_language_code"] = source_language
 
     # glossary does not work with transliteration
     if glossary_url and not enable_transliteration:
@@ -260,7 +322,7 @@ def _translate_text(
         f"https://translation.googleapis.com/v3/projects/{project}/locations/{location}:translateText",
         json=config,
     )
-    res.raise_for_status()
+    raise_for_status(res)
     data = res.json()
     try:
         result = data["glossaryTranslations"][0]["translatedText"]
@@ -278,7 +340,7 @@ def _MinT_translate_one_text(
         f"https://translate.wmcloud.org/api/translate/{source_language}/{target_language}",
         json={"text": text},
     )
-    res.raise_for_status()
+    raise_for_status(res)
 
     # e.g. {"model":"IndicTrans2_indec_en","sourcelanguage":"hi","targetlanguage":"en","translation":"hello","translationtime":0.8}
     tanslation = res.json()
@@ -327,6 +389,19 @@ def run_asr(
 
     if selected_model == AsrModels.azure:
         return azure_asr(audio_url, language)
+    elif selected_model == AsrModels.whisper_large_v3:
+        import replicate
+
+        config = {
+            "audio": audio_url,
+            "return_timestamps": output_format != AsrOutputFormat.text,
+        }
+        if language:
+            config["language"] = language
+        data = replicate.run(
+            asr_model_ids[AsrModels.whisper_large_v3],
+            input=config,
+        )
     elif selected_model == AsrModels.deepgram:
         r = requests.post(
             "https://api.deepgram.com/v1/listen",
@@ -344,7 +419,7 @@ def run_asr(
                 "url": audio_url,
             },
         )
-        r.raise_for_status()
+        raise_for_status(r)
         data = r.json()
         result = data["results"]["channels"][0]["alternatives"][0]
         chunk = None
@@ -532,19 +607,6 @@ def azure_asr(audio_url: str, language: str):
         },
         "locale": language or "en-US",
     }
-    if not language:
-        payload["properties"]["languageIdentification"] = {
-            "candidateLocales": [
-                "en-US",
-                "en-IN",
-                "hi-IN",
-                "te-IN",
-                "ta-IN",
-                "kn-IN",
-                "es-ES",
-                "de-DE",
-            ]
-        }
     r = requests.post(
         str(furl(settings.AZURE_SPEECH_ENDPOINT) / "speechtotext/v3.1/transcriptions"),
         headers={
@@ -553,7 +615,7 @@ def azure_asr(audio_url: str, language: str):
         },
         json=payload,
     )
-    r.raise_for_status()
+    raise_for_status(r)
     uri = r.json()["self"]
 
     # poll for results
@@ -565,7 +627,7 @@ def azure_asr(audio_url: str, language: str):
             },
         )
         if not r.ok or not r.json()["status"] == "Succeeded":
-            sleep(1)
+            sleep(5)
             continue
         r = requests.get(
             r.json()["links"]["files"],
@@ -573,7 +635,7 @@ def azure_asr(audio_url: str, language: str):
                 "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
             },
         )
-        r.raise_for_status()
+        raise_for_status(r)
         transcriptions = []
         for value in r.json()["values"]:
             if value["kind"] != "Transcription":
@@ -582,8 +644,9 @@ def azure_asr(audio_url: str, language: str):
                 value["links"]["contentUrl"],
                 headers={"Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY},
             )
-            r.raise_for_status()
-            transcriptions += [r.json()["combinedRecognizedPhrases"][0]["display"]]
+            raise_for_status(r)
+            combined_phrases = r.json().get("combinedRecognizedPhrases") or [{}]
+            transcriptions += [combined_phrases[0].get("display", "")]
         return "\n".join(transcriptions)
     assert False, "Max polls exceeded, Azure speech did not yield a response"
 
@@ -626,7 +689,7 @@ def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
 
 def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
     r = requests.get(audio_url)
-    r.raise_for_status()
+    raise_for_status(r)
 
     wavdata, size = audio_bytes_to_wav(r.content)
     if not wavdata:

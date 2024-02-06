@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from furl import furl
 from starlette.datastructures import FormData
 
-from app_users.models import AppUser
+from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import settings
 from daras_ai_v2.settings import templates
 
@@ -239,9 +239,13 @@ def _handle_invoice_paid(uid: str, invoice_data):
         "get",
         "/v1/invoices/{invoice}/lines".format(invoice=quote_plus(invoice_id)),
     )
-    amount = line_items.data[0].quantity
     user = AppUser.objects.get_or_create_from_uid(uid)[0]
-    user.add_balance(amount, invoice_id)
+    user.add_balance(
+        payment_provider=PaymentProvider.STRIPE,
+        invoice_id=invoice_id,
+        amount=line_items.data[0].quantity,
+        charged_amount=line_items.data[0].amount,
+    )
     if not user.is_paying:
         user.is_paying = True
         user.save(update_fields=["is_paying"])

@@ -23,8 +23,9 @@ from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
     render_output_with_refs,
-    apply_response_template,
     CitationStyles,
+    apply_response_formattings_prefix,
+    apply_response_formattings_suffix,
 )
 from daras_ai_v2.vector_search import (
     DocSearchRequest,
@@ -33,11 +34,12 @@ from daras_ai_v2.vector_search import (
     render_sources_widget,
 )
 
-DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/DOC%20SEARCH.gif"
+DEFAULT_DOC_SEARCH_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bcc7aa58-93fe-11ee-a083-02420a0001c8/Search%20your%20docs.jpg.png"
 
 
 class DocSearchPage(BasePage):
     title = "Search your Docs with GPT"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/cbbb4dc6-88d7-11ee-bf6c-02420a000166/Search%20your%20docs%20with%20gpt.png.png"
     workflow = Workflow.DOC_SEARCH
     slug_versions = ["doc-search"]
 
@@ -193,8 +195,11 @@ class DocSearchPage(BasePage):
         citation_style = (
             request.citation_style and CitationStyles[request.citation_style]
         ) or None
-        apply_response_template(
+        all_refs_list = apply_response_formattings_prefix(
             response.output_text, response.references, citation_style
+        )
+        apply_response_formattings_suffix(
+            all_refs_list, response.output_text, citation_style
         )
 
     def get_raw_price(self, state: dict) -> float:

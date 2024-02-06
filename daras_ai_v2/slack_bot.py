@@ -1,7 +1,6 @@
 import re
 import typing
 from string import Template
-from typing import TypedDict
 
 import requests
 from django.db import transaction
@@ -12,9 +11,11 @@ from sentry_sdk import capture_exception
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
-from daras_ai_v2.bots import BotInterface
+from daras_ai_v2.bots import BotInterface, SLACK_MAX_SIZE
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import fetch_parallel
 from daras_ai_v2.text_splitter import text_splitter
+from recipes.VideoBots import ReplyButton
 
 SLACK_CONFIRMATION_MSG = """
 Hi there! 👋
@@ -26,11 +27,10 @@ I'll respond to any text and audio messages in this channel while keeping track 
 I have been configured for $user_language and will respond to you in that language.
 """.strip()
 
-SLACK_MAX_SIZE = 3000
-
 
 class SlackBot(BotInterface):
     platform = Platform.SLACK
+    can_update_message = True
 
     _read_rcpt_ts: str | None = None
 
@@ -109,7 +109,7 @@ class SlackBot(BotInterface):
         ), f"Unsupported mime type {mime_type} for {url}"
         # download file from slack
         r = requests.get(url, headers={"Authorization": f"Bearer {self._access_token}"})
-        r.raise_for_status()
+        raise_for_status(r)
         # convert to wav
         data, _ = audio_bytes_to_wav(r.content)
         mime_type = "audio/wav"
@@ -131,15 +131,16 @@ class SlackBot(BotInterface):
         text: str | None = None,
         audio: str | None = None,
         video: str | None = None,
-        buttons: list | None = None,
+        buttons: list[ReplyButton] = None,
+        documents: list[str] = None,
         should_translate: bool = False,
+        update_msg_id: str | None = None,
     ) -> str | None:
-        if not text:
-            return None
-        if should_translate and self.language and self.language != "en":
+        if text and should_translate and self.language and self.language != "en":
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
+        text = text or "\u200b"  # handle empty text with zero-width space
 
         if self._read_rcpt_ts and self._read_rcpt_ts != self._msg_ts:
             delete_msg(
@@ -149,28 +150,66 @@ class SlackBot(BotInterface):
             )
             self._read_rcpt_ts = None
 
+        if not self.can_update_message:
+            update_msg_id = None
+        self._msg_ts, num_splits = self.send_msg_to(
+            text=text,
+            audio=audio,
+            video=video,
+            buttons=buttons,
+            channel=self.bot_id,
+            channel_is_personal=self.convo.slack_channel_is_personal,
+            username=self.convo.bot_integration.name,
+            token=self._access_token,
+            thread_ts=self._msg_ts,
+            update_msg_ts=update_msg_id,
+        )
+        if num_splits > 1:
+            self.can_update_message = False
+        return self._msg_ts
+
+    @classmethod
+    def send_msg_to(
+        cls,
+        *,
+        text: str | None = None,
+        audio: str = None,
+        video: str = None,
+        buttons: list[ReplyButton] = None,
+        documents: list[str] = None,
+        ## whatsapp specific
+        channel: str,
+        channel_is_personal: bool,
+        username: str,
+        token: str,
+        thread_ts: str = None,
+        update_msg_ts: str = None,
+    ) -> tuple[str | None, int]:
         splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
         for doc in splits[:-1]:
-            self._msg_ts = chat_post_message(
+            thread_ts = chat_post_message(
                 text=doc.text,
-                channel=self.bot_id,
-                channel_is_personal=self.convo.slack_channel_is_personal,
-                thread_ts=self._msg_ts,
-                username=self.convo.bot_integration.name,
-                token=self._access_token,
+                channel=channel,
+                channel_is_personal=channel_is_personal,
+                thread_ts=thread_ts,
+                update_msg_ts=update_msg_ts,
+                username=username,
+                token=token,
             )
-        self._msg_ts = chat_post_message(
+            update_msg_ts = None
+        thread_ts = chat_post_message(
             text=splits[-1].text,
             audio=audio,
             video=video,
-            channel=self.bot_id,
-            channel_is_personal=self.convo.slack_channel_is_personal,
-            thread_ts=self._msg_ts,
-            username=self.convo.bot_integration.name,
-            token=self._access_token,
             buttons=buttons or [],
+            channel=channel,
+            channel_is_personal=channel_is_personal,
+            thread_ts=thread_ts,
+            update_msg_ts=update_msg_ts,
+            username=username,
+            token=token,
         )
-        return self._msg_ts
+        return thread_ts, len(splits)
 
     def mark_read(self):
         text = self.convo.bot_integration.slack_read_receipt_msg.strip()
@@ -494,39 +533,64 @@ def chat_post_message(
     channel: str,
     thread_ts: str,
     token: str,
+    update_msg_ts: str = None,
     channel_is_personal: bool = False,
-    audio: str | None = None,
-    video: str | None = None,
+    audio: str = None,
+    video: str = None,
     username: str = "Video Bot",
-    buttons: list | None = None,
+    buttons: list[ReplyButton] = None,
 ) -> str | None:
     if buttons is None:
         buttons = []
     if channel_is_personal:
         # don't thread in personal channels
         thread_ts = None
-    res = requests.post(
-        "https://slack.com/api/chat.postMessage",
-        json={
-            "channel": channel,
-            "thread_ts": thread_ts,
-            "text": text,
-            "username": username,
-            "icon_emoji": ":robot_face:",
-            "blocks": [
-                {
-                    "type": "section",
-                    "text": {"type": "mrkdwn", "text": text},
-                },
-            ]
-            + create_file_block("Audio", token, audio)
-            + create_file_block("Video", token, video)
-            + create_button_block(buttons),
-        },
-        headers={
-            "Authorization": f"Bearer {token}",
-        },
-    )
+    if update_msg_ts:
+        res = requests.post(
+            "https://slack.com/api/chat.update",
+            json={
+                "channel": channel,
+                "ts": update_msg_ts,
+                "text": text,
+                "username": username,
+                "icon_emoji": ":robot_face:",
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {"type": "mrkdwn", "text": text},
+                    },
+                ]
+                + create_file_block("Audio", token, audio)
+                + create_file_block("Video", token, video)
+                + create_button_block(buttons),
+            },
+            headers={
+                "Authorization": f"Bearer {token}",
+            },
+        )
+    else:
+        res = requests.post(
+            "https://slack.com/api/chat.postMessage",
+            json={
+                "channel": channel,
+                "thread_ts": thread_ts,
+                "text": text,
+                "username": username,
+                "icon_emoji": ":robot_face:",
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {"type": "mrkdwn", "text": text},
+                    },
+                ]
+                + create_file_block("Audio", token, audio)
+                + create_file_block("Video", token, video)
+                + create_button_block(buttons),
+            },
+            headers={
+                "Authorization": f"Bearer {token}",
+            },
+        )
     data = parse_slack_response(res)
     return data.get("ts")
 
@@ -559,7 +623,7 @@ def create_file_block(
     ]
 
 
-def create_button_block(buttons: list[dict]) -> list[dict]:
+def create_button_block(buttons: list[ReplyButton]) -> list[dict]:
     if not buttons:
         return []
     return [
@@ -568,9 +632,9 @@ def create_button_block(buttons: list[dict]) -> list[dict]:
             "elements": [
                 {
                     "type": "button",
-                    "text": {"type": "plain_text", "text": button["reply"]["title"]},
-                    "value": button["reply"]["id"],
-                    "action_id": "button_" + button["reply"]["id"],
+                    "text": {"type": "plain_text", "text": button["title"]},
+                    "value": button["id"],
+                    "action_id": "button_" + button["id"],
                 }
                 for button in buttons
             ],
@@ -593,7 +657,7 @@ def send_confirmation_msg(bot: BotIntegration):
         str(bot.slack_channel_hook_url),
         json={"text": text},
     )
-    res.raise_for_status()
+    raise_for_status(res)
 
 
 def invite_bot_account_to_channel(channel: str, bot_user_id: str, token: str):
@@ -612,7 +676,7 @@ def invite_bot_account_to_channel(channel: str, bot_user_id: str, token: str):
 
 
 def parse_slack_response(res: Response):
-    res.raise_for_status()
+    raise_for_status(res)
     data = res.json()
     print(f'> {res.request.url.split("/")[-1]}: {data}')
     if data.get("ok"):

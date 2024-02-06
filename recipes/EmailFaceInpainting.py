@@ -9,6 +9,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import db, settings
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.stable_diffusion import InpaintingModels
@@ -17,9 +18,12 @@ from recipes.FaceInpainting import FaceInpaintingPage
 email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 twitter_handle_regex = r"(@)?[A-Za-z0-9_]{1,15}"
 
+DEFAULT_EMAIL_FACE_INPAINTING_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6937427a-9522-11ee-b6d3-02420a0001ea/Email%20photo.jpg.png"
+
 
 class EmailFaceInpaintingPage(FaceInpaintingPage):
     title = "AI Generated Photo from Email Profile Lookup"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ec0df5aa-9521-11ee-93d3-02420a0001e5/Email%20Profile%20Lookup.png.png"
     workflow = Workflow.EMAIL_FACE_INPAINTING
     slug_versions = ["EmailFaceInpainting", "ai-image-from-email-lookup"]
 
@@ -83,6 +87,9 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         diffusion_images: list[str]
         output_images: list[str]
         email_sent: bool = False
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_EMAIL_FACE_INPAINTING_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Find an email's public photo and then draw the face into an AI generated scene using your own prompt + the latest Stable Diffusion or DallE image generator."
@@ -359,7 +366,7 @@ def get_photo_for_email(email_address):
         f"https://api.seon.io/SeonRestService/email-api/v2.2/{email_address}",
         headers={"X-API-KEY": settings.SEON_API_KEY},
     )
-    r.raise_for_status()
+    raise_for_status(r)
 
     account_details = glom.glom(r.json(), "data.account_details", default={})
     for spec in [
@@ -392,7 +399,7 @@ def get_photo_for_twitter_handle(twitter_handle):
         f"https://api.twitter.com/2/users/by?usernames={twitter_handle}&user.fields=profile_image_url",
         headers={"Authorization": f"Bearer {settings.TWITTER_BEARER_TOKEN}"},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     error = glom.glom(r.json(), "errors.0.title", default=None)
     if error:
         if error == "Not Found Error":

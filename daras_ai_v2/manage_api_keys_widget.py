@@ -1,9 +1,6 @@
 import datetime
 
-
 import gooey_ui as st
-from firebase_admin import auth
-
 from app_users.models import AppUser
 from daras_ai_v2 import db
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -19,12 +16,12 @@ from daras_ai_v2.crypto import (
 def manage_api_keys(user: AppUser):
     st.write(
         """
-Your secret API keys are listed below. 
+Your secret API keys are listed below.
 Please note that we do not display your secret API keys again after you generate them.
 
-Do not share your API key with others, or expose it in the browser or other client-side code. 
+Do not share your API key with others, or expose it in the browser or other client-side code.
 
-In order to protect the security of your account, 
+In order to protect the security of your account,
 Gooey.AI may also automatically rotate any API key that we've found has leaked publicly.
         """
     )
@@ -74,10 +71,10 @@ def _generate_new_key_doc() -> dict:
 
     st.success(
         f"""
-<h5> API key generated </h5>
+##### API key generated
 
-Please save this secret key somewhere safe and accessible. 
-For security reasons, **you won't be able to view it again** through your account. 
+Please save this secret key somewhere safe and accessible.
+For security reasons, **you won't be able to view it again** through your account.
 If you lose this secret key, you'll need to generate a new one.
             """
     )

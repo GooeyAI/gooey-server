@@ -244,6 +244,17 @@ ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="sean@dara.network")
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
 SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 20)
 
+DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default="") + [
+    # tab names
+    "api",
+    "examples",
+    "history",
+    "saved",
+    "integrations",
+    # other
+    "docs",
+]
+
 SAFTY_CHECKER_EXAMPLE_ID = "3rcxqx0r"
 SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"
 
@@ -302,3 +313,8 @@ AZURE_OPENAI_KEY = config("AZURE_OPENAI_KEY", "")
 DEEPGRAM_API_KEY = config("DEEPGRAM_API_KEY", "")
 
 ELEVEN_LABS_API_KEY = config("ELEVEN_LABS_API_KEY", "")
+
+# Paypal
+PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
+PAYPAL_SECRET = config("PAYPAL_SECRET", "")
+PAYPAL_BASE = config("PAYPAL_BASE", "")

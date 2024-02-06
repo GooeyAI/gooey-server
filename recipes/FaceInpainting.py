@@ -21,11 +21,15 @@ from daras_ai_v2.img_model_settings_widgets import (
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.repositioning import repositioning_preview_img
+from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import InpaintingModels
+
+DEFAULT_FACE_INPAINTING_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a146bfc0-93ff-11ee-b86c-02420a0001c7/Face%20in%20painting.jpg.png"
 
 
 class FaceInpaintingPage(BasePage):
     title = "AI Image with a Face"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/10c2ce06-88da-11ee-b428-02420a000168/ai%20image%20with%20a%20face.png.png"
     workflow = Workflow.FACE_INPAINTING
     slug_versions = ["FaceInpainting", "face-in-ai-generated-photo"]
 
@@ -75,6 +79,9 @@ class FaceInpaintingPage(BasePage):
         face_mask: str
         diffusion_images: list[str]
         output_images: list[str]
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_FACE_INPAINTING_META_IMG
 
     def preview_description(self, state: dict) -> str:
         return "Upload & extract a face into an AI-generated photo using your text + the latest Stable Diffusion or DallE image generator."
@@ -244,6 +251,10 @@ class FaceInpaintingPage(BasePage):
         # loom_video("788dfdee763a4e329e28e749239f9810")
 
     def run(self, state: dict):
+        if not self.request.user.disable_safety_checker:
+            yield "Running safety checker..."
+            safety_checker(image=state["input_image"])
+
         yield "Extracting Face..."
 
         input_image_url = state["input_image"]

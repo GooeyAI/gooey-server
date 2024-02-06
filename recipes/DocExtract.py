@@ -26,6 +26,7 @@ from daras_ai_v2.azure_doc_extract import azure_doc_extract_pages
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import (
     apply_parallel,
@@ -40,7 +41,7 @@ from daras_ai_v2.settings import service_account_key_path
 from daras_ai_v2.vector_search import doc_url_to_metadata
 from recipes.DocSearch import render_documents
 
-DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/6c8f6876-538c-11ee-bea7-02420a000195/youtube%20bot%201.png.png"
+DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
 
 
 class Columns(IntegerChoices):
@@ -56,6 +57,7 @@ class Columns(IntegerChoices):
 
 class DocExtractPage(BasePage):
     title = "Youtube Transcripts + GPT extraction to Google Sheets"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.DOC_EXTRACT
     slug_versions = [
         "doc-extract",
@@ -289,7 +291,7 @@ def extract_info(url: str) -> list[dict | None]:
                     headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
                     timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
                 )
-                r.raise_for_status()
+                raise_for_status(r)
                 f_bytes = r.content
             inputpdf = PdfReader(io.BytesIO(f_bytes))
             return [
