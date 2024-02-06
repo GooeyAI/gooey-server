@@ -37,6 +37,7 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params_util import extract_query_params
+from daras_ai_v2.secrets_widget import secrets_widget
 from daras_ai_v2.settings import templates
 from daras_ai_v2.tabs_widget import MenuTabs
 from routers.api import request_form_files

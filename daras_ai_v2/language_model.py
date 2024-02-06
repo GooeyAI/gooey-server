@@ -24,13 +24,11 @@ from openai.types.chat import (
     ChatCompletionChunk,
 )
 
-from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.functions import LLMTools
-from daras_ai_v2.redis_cache import (
-    get_redis_cache,
-)
+from daras_ai_v2.google_utils import get_google_auth_session
+from daras_ai_v2.redis_cache import get_redis_cache
 from daras_ai_v2.text_splitter import (
     default_length_function,
     default_separators,
