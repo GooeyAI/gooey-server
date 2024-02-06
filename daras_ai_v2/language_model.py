@@ -680,7 +680,9 @@ def _stream_openai_chunked(
     record_cost_auto(
         model=used_model,
         sku=ModelSku.llm_prompt,
-        quantity=sum(default_length_function(entry["content"]) for entry in messages),
+        quantity=sum(
+            default_length_function(get_entry_text(entry)) for entry in messages
+        ),
     )
     record_cost_auto(
         model=used_model,
