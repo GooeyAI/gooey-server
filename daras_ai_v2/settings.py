@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "files",
     "url_shortener",
     "glossary_resources",
+    "usage_costs",
 ]
 
 MIDDLEWARE = [

@@ -4,7 +4,7 @@ import json
 import re
 import typing
 from enum import Enum
-from functools import partial
+from functools import partial, wraps
 
 import numpy as np
 import requests
@@ -112,11 +112,11 @@ llm_model_names = {
     LargeLanguageModels.gpt_4_32k: "openai-gpt-4-32k-prod-ca-1",
     LargeLanguageModels.gpt_3_5_turbo: (
         "openai-gpt-35-turbo-prod-ca-1",
-        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-0613",
     ),
     LargeLanguageModels.gpt_3_5_turbo_16k: (
         "openai-gpt-35-turbo-16k-prod-ca-1",
-        "gpt-3.5-turbo-16k",
+        "gpt-3.5-turbo-16k-0613",
     ),
     LargeLanguageModels.text_davinci_003: "text-davinci-003",
     LargeLanguageModels.text_davinci_002: "text-davinci-002",
@@ -377,6 +377,7 @@ def run_language_model(
             # we can't stream with tools or json yet
             stream=stream and not (tools or response_format_type),
         )
+
         if stream:
             return _stream_llm_outputs(entries, response_format_type)
         else:
@@ -559,10 +560,9 @@ def _run_openai_chat(
         presence_penalty = 0
     if isinstance(model, str):
         model = [model]
-    r = try_all(
+    r, used_model = try_all(
         *[
-            partial(
-                _get_openai_client(model_str).chat.completions.create,
+            _get_chat_completions_create(
                 model=model_str,
                 messages=messages,
                 max_tokens=max_tokens,
@@ -583,13 +583,39 @@ def _run_openai_chat(
         ],
     )
     if stream:
-        return _stream_openai_chunked(r)
+        return _stream_openai_chunked(r, used_model, messages)
     else:
+        from usage_costs.cost_utils import record_cost_auto
+        from usage_costs.models import ModelSku
+
+        record_cost_auto(
+            model=used_model,
+            sku=ModelSku.llm_prompt,
+            quantity=r.usage.prompt_tokens,
+        )
+        record_cost_auto(
+            model=used_model,
+            sku=ModelSku.llm_completion,
+            quantity=r.usage.completion_tokens,
+        )
         return [choice.message.dict() for choice in r.choices]
+
+
+def _get_chat_completions_create(model: str, **kwargs):
+    client = _get_openai_client(model)
+
+    @wraps(client.chat.completions.create)
+    def wrapper():
+        return client.chat.completions.create(model=model, **kwargs), model
+
+    return wrapper
 
 
 def _stream_openai_chunked(
     r: Stream[ChatCompletionChunk],
+    used_model: str,
+    messages: list[ConversationEntry],
+    *,
     start_chunk_size: int = 50,
     stop_chunk_size: int = 400,
     step_chunk_size: int = 150,
@@ -648,6 +674,22 @@ def _stream_openai_chunked(
         entry["content"] += entry["chunk"]
     yield ret
 
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    record_cost_auto(
+        model=used_model,
+        sku=ModelSku.llm_prompt,
+        quantity=sum(
+            default_length_function(get_entry_text(entry)) for entry in messages
+        ),
+    )
+    record_cost_auto(
+        model=used_model,
+        sku=ModelSku.llm_completion,
+        quantity=sum(default_length_function(entry["content"]) for entry in ret),
+    )
+
 
 @retry_if(openai_should_retry)
 def _run_openai_text(
@@ -671,6 +713,21 @@ def _run_openai_text(
         frequency_penalty=0.1 if avoid_repetition else 0,
         presence_penalty=0.25 if avoid_repetition else 0,
     )
+
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_prompt,
+        quantity=r.usage.prompt_tokens,
+    )
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_completion,
+        quantity=r.usage.completion_tokens,
+    )
+
     return [choice.text for choice in r.choices]
 
 
@@ -728,6 +785,8 @@ def _run_together_chat(
         range(num_outputs),
     )
     ret = []
+    prompt_tokens = 0
+    completion_tokens = 0
     for r in results:
         raise_for_status(r)
         data = r.json()
@@ -741,6 +800,21 @@ def _run_together_chat(
                 "content": output["choices"][0]["text"],
             }
         )
+        prompt_tokens += output.get("usage", {}).get("prompt_tokens", 0)
+        completion_tokens += output.get("usage", {}).get("completion_tokens", 0)
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_prompt,
+        quantity=prompt_tokens,
+    )
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_completion,
+        quantity=completion_tokens,
+    )
     return ret
 
 
@@ -791,13 +865,28 @@ def _run_palm_chat(
         },
     )
     raise_for_status(r)
+    out = r.json()
+
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    record_cost_auto(
+        model=model_id,
+        sku=ModelSku.llm_prompt,
+        quantity=out["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
+    )
+    record_cost_auto(
+        model=model_id,
+        sku=ModelSku.llm_completion,
+        quantity=out["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
+    )
 
     return [
         {
             "role": msg["author"],
             "content": msg["content"],
         }
-        for pred in r.json()["predictions"]
+        for pred in out["predictions"]
         for msg in pred["candidates"]
     ]
 
@@ -836,7 +925,23 @@ def _run_palm_text(
         },
     )
     raise_for_status(res)
-    return [prediction["content"] for prediction in res.json()["predictions"]]
+    out = res.json()
+
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    record_cost_auto(
+        model=model_id,
+        sku=ModelSku.llm_prompt,
+        quantity=out["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
+    )
+    record_cost_auto(
+        model=model_id,
+        sku=ModelSku.llm_completion,
+        quantity=out["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
+    )
+
+    return [prediction["content"] for prediction in out["predictions"]]
 
 
 def format_chatml_message(entry: ConversationEntry) -> str:
