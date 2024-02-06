@@ -65,7 +65,7 @@ def safe_preview(password: str) -> str:
 
 def get_random_doc_id() -> str:
     return get_random_string(
-        length=8, allowed_chars=string.ascii_lowercase + string.digits
+        length=12, allowed_chars=string.ascii_lowercase + string.digits
     )
 
 
