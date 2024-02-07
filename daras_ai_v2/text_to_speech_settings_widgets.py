@@ -141,13 +141,12 @@ BARK_ALLOWED_PROMPTS = {
 }
 
 
-def text_to_speech_settings(page, show_label=True):
-    if show_label:
-        st.write(
-            """
-            ##### 🗣️ Voice Settings
-            """
-        )
+def text_to_speech_settings(page):
+    st.write(
+        """
+        ##### 🗣️ Voice Settings
+        """
+    )
 
     col1, col2 = st.columns(2)
     with col1:

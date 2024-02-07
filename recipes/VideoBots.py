@@ -341,42 +341,64 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.session_state["__enable_audio"] = bool(
                 st.session_state.get("tts_provider")
             )
-        enable_audio = st.checkbox("##### 🗣️ Speech Responses", key="__enable_audio")
+        enable_audio = st.checkbox("##### 🗣️ Speak Responses", key="__enable_audio")
         if not enable_audio:
             st.session_state["tts_provider"] = None
+            enable_video = False
         else:
-            text_to_speech_settings(page=self, show_label=False)
-
-        if not "__enable_video" in st.session_state:
-            st.session_state["__enable_video"] = bool(
-                st.session_state.get("input_face")
-            )
-        if enable_audio:
-            st.write("---")
+            if not "__enable_video" in st.session_state:
+                st.session_state["__enable_video"] = bool(
+                    st.session_state.get("input_face")
+                )
             enable_video = st.checkbox(
                 "##### 🫦 Add Lipsync Video", key="__enable_video"
             )
-        else:
-            enable_video = False
         if not enable_video:
             st.session_state["input_face"] = None
-        else:
+
+        st.checkbox(
+            "##### 🔠 Translation",
+            value=bool(st.session_state.get("user_language")),
+            key="__enable_translation",
+        )
+
+        if st.checkbox(
+            "##### 🩻 Photo & Document Intelligence",
+            value=bool(
+                st.session_state.get("document_model"),
+            ),
+        ):
+            language_model_settings(show_only_document=True)
+
+    def validate_form_v2(self):
+        input_glossary = st.session_state.get("input_glossary_document", "")
+        output_glossary = st.session_state.get("output_glossary_document", "")
+        if input_glossary:
+            validate_glossary_document(input_glossary)
+        if output_glossary:
+            validate_glossary_document(output_glossary)
+
+    def render_usage_guide(self):
+        youtube_video("-j2su1r8pEg")
+
+    def render_settings(self):
+        if st.session_state.get("__enable_audio"):
+            text_to_speech_settings(page=self)
+
+        if st.session_state.get("__enable_video"):
             st.file_uploader(
                 """
-                #### 👩‍🦰 Input Face
+                ##### 👩‍🦰 Input Face
                 Upload a video/image that contains faces to use
                 *Recommended - mp4 / mov / png / jpg / gif*
                 """,
                 key="input_face",
             )
             lipsync_settings()
-            st.write("---")
 
-        if st.checkbox(
-            "##### 🔠 Translation", value=bool(st.session_state.get("user_language"))
-        ):
+        if st.session_state.get("__enable_translation"):
             google_translate_language_selector(
-                f"{field_desc(self.RequestModel, 'user_language')}",
+                f"##### {field_title_desc(self.RequestModel, 'user_language')}",
                 key="user_language",
             )
             enable_glossary = st.checkbox(
@@ -404,26 +426,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             else:
                 st.session_state["input_glossary_document"] = None
                 st.session_state["output_glossary_document"] = None
-            st.write("---")
 
-        if st.checkbox(
-            "##### 🩻 Photo & Document Intelligence"
-           , value=bool(st.session_state.get("document_model"),)
-        ):
-            language_model_settings(show_only_document=True)
-
-    def validate_form_v2(self):
-        input_glossary = st.session_state.get("input_glossary_document", "")
-        output_glossary = st.session_state.get("output_glossary_document", "")
-        if input_glossary:
-            validate_glossary_document(input_glossary)
-        if output_glossary:
-            validate_glossary_document(output_glossary)
-
-    def render_usage_guide(self):
-        youtube_video("-j2su1r8pEg")
-
-    def render_settings(self):
         if st.session_state.get("documents") or st.session_state.get(
             "__documents_files"
         ):
