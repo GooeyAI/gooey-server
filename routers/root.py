@@ -330,6 +330,9 @@ Authorization: Bearer GOOEY_API_KEY
 
     manage_api_keys(page.request.user)
 
+    st.write("###### 🗄️ Third-party Keys")
+    secrets_widget(page.request.user)
+
 
 @app.post("/")
 @app.post("/{page_slug}/")

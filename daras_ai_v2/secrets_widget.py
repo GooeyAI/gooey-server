@@ -65,7 +65,7 @@ class SecretsWidget:
 
             with provider_col:
                 align_items_center(provider_col)
-                st.write(f"**{provider.label}**")
+                st.write(provider.label)
 
             with action_col:
                 align_items_center(action_col)
