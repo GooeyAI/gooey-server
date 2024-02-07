@@ -1,6 +1,7 @@
 from django.db import models
 
 from bots.custom_fields import CustomURLField
+from daras_ai_v2.stable_diffusion import InpaintingModels
 
 max_digits = 15
 decimal_places = 10
@@ -55,10 +56,15 @@ class ModelProvider(models.IntegerChoices):
 def get_model_choices():
     from daras_ai_v2.language_model import LargeLanguageModels
     from recipes.DeforumSD import AnimationModels
+    from daras_ai_v2.stable_diffusion import Text2ImgModels, Img2ImgModels
 
-    return [(api.name, api.value) for api in LargeLanguageModels] + [
-        (model.name, model.label) for model in AnimationModels
-    ]
+    return (
+        [(api.name, api.value) for api in LargeLanguageModels]
+        + [(model.name, model.label) for model in AnimationModels]
+        + [(model.name, model.value) for model in Text2ImgModels]
+        + [(model.name, model.value) for model in Img2ImgModels]
+        + [(model.name, model.value) for model in InpaintingModels]
+    )
 
 
 class ModelSku(models.IntegerChoices):
