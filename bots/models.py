@@ -935,10 +935,7 @@ class MessageQuerySet(models.QuerySet):
                     else None
                 ),  # only show first feedback as per Sean's request
                 "Analysis JSON": message.analysis_result,
-                "Response Time": (
-                    message.response_time
-                    and round(message.response_time.total_seconds(), 1)
-                ),
+                "Run Time": message.saved_run.run_time if message.saved_run else 0, # user messages have no run/run_time
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -950,7 +947,7 @@ class MessageQuerySet(models.QuerySet):
                 "Sent",
                 "Feedback",
                 "Analysis JSON",
-                "Response Time",
+                "Run Time",
             ],
         )
         return df
