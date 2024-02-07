@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.contrib import admin
 
 from bots.admin_links import open_in_new_tab, change_obj_url
@@ -21,6 +19,7 @@ class UsageCostAdmin(admin.ModelAdmin, CostQtyMixin):
         "display_dollar_amount",
         "view_pricing",
         "view_saved_run",
+        "view_parent_published_run",
         "notes",
         "created_at",
     ]
@@ -40,6 +39,11 @@ class UsageCostAdmin(admin.ModelAdmin, CostQtyMixin):
     @admin.display(description="Amount", ordering="dollar_amount")
     def display_dollar_amount(self, obj):
         return f"${obj.dollar_amount.normalize()}"
+
+    @admin.display(description="Published Run")
+    def view_parent_published_run(self, obj):
+        pr = obj.saved_run.parent_published_run()
+        return pr and change_obj_url(pr)
 
     @admin.display(description="Saved Run", ordering="saved_run")
     def view_saved_run(self, obj):

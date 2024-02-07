@@ -2,6 +2,7 @@ import base64
 import datetime
 import os
 import typing
+from time import time
 
 import requests
 from furl import furl
@@ -138,6 +139,7 @@ def get_celery():
         _app = Celery()
         _app.conf.broker_url = settings.GPU_CELERY_BROKER_URL
         _app.conf.result_backend = settings.GPU_CELERY_RESULT_BACKEND
+        _app.conf.result_extended = True
 
     return _app
 
@@ -149,8 +151,16 @@ def call_celery_task(
     inputs: dict,
     queue_prefix: str = "gooey-gpu",
 ):
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
     queue = os.path.join(queue_prefix, pipeline["model_id"].strip()).strip("/")
     result = get_celery().send_task(
         task_name, kwargs=dict(pipeline=pipeline, inputs=inputs), queue=queue
     )
-    return result.get(disable_sync_subtasks=False)
+    s = time()
+    ret = result.get(disable_sync_subtasks=False)
+    record_cost_auto(
+        model=queue, sku=ModelSku.gpu_ms, quantity=int((time() - s) * 1000)
+    )
+    return ret

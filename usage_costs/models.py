@@ -40,6 +40,7 @@ class UsageCost(models.Model):
 
 class ModelCategory(models.IntegerChoices):
     LLM = 1, "LLM"
+    SELF_HOSTED = 2, "Self-Hosted"
 
 
 class ModelProvider(models.IntegerChoices):
@@ -48,16 +49,23 @@ class ModelProvider(models.IntegerChoices):
     together_ai = 3, "TogetherAI"
     azure_openai = 4, "Azure OpenAI"
 
+    aks = 5, "Azure Kubernetes Service"
+
 
 def get_model_choices():
     from daras_ai_v2.language_model import LargeLanguageModels
+    from recipes.DeforumSD import AnimationModels
 
-    return [(api.name, api.value) for api in LargeLanguageModels]
+    return [(api.name, api.value) for api in LargeLanguageModels] + [
+        (model.name, model.label) for model in AnimationModels
+    ]
 
 
 class ModelSku(models.IntegerChoices):
     llm_prompt = 1, "LLM Prompt"
     llm_completion = 2, "LLM Completion"
+
+    gpu_ms = 3, "GPU Milliseconds"
 
 
 class ModelPricing(models.Model):
@@ -75,7 +83,7 @@ class ModelPricing(models.Model):
         help_text="The cost per unit.",
     )
     unit_quantity = models.PositiveIntegerField(
-        help_text="The quantity of the unit. (e.g. 1000 tokens)"
+        help_text="The quantity of the unit. (e.g. 1000 tokens)", default=1
     )
 
     category = models.IntegerField(
