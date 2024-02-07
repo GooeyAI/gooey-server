@@ -439,8 +439,6 @@ class VideoBotsStatsPage(BasePage):
                 )
             )
             .annotate(Average_runtime=Avg("saved_run__run_time"))
-            .annotate(Average_response_time=Avg("response_time"))
-            .annotate(Average_analysis_time=Avg("analysis_run__run_time"))
             .annotate(Unique_feedback_givers=Count("feedbacks", distinct=True))
             .values(
                 "date",
@@ -448,9 +446,7 @@ class VideoBotsStatsPage(BasePage):
                 "Convos",
                 "Senders",
                 "Unique_feedback_givers",
-                "Average_response_time",
                 "Average_runtime",
-                "Average_analysis_time",
             )
         )
 
@@ -504,9 +500,7 @@ class VideoBotsStatsPage(BasePage):
                 "Convos",
                 "Senders",
                 "Unique_feedback_givers",
-                "Average_response_time",
                 "Average_runtime",
-                "Average_analysis_time",
             ],
         )
         df = df.merge(
@@ -546,11 +540,6 @@ class VideoBotsStatsPage(BasePage):
         ) * 100
         df["Msgs_per_convo"] = df["Messages_Sent"] / df["Convos"]
         df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
-        try:
-            df["Average_response_time"] = df["Average_response_time"].dt.total_seconds()
-        except AttributeError:
-            pass
-        df["Average_response_time"] = df["Average_response_time"] * factor
         df.fillna(0, inplace=True)
         df = df.round(0).astype("int32", errors="ignore")
         return df
@@ -700,28 +689,12 @@ class VideoBotsStatsPage(BasePage):
         fig = go.Figure(
             data=[
                 go.Scatter(
-                    name="Average Response Time",
-                    mode="lines+markers",
-                    x=list(df["date"]),
-                    y=list(df["Average_response_time"]),
-                    text=list(df["Average_response_time"]),
-                    hovertemplate="Average Response Time: %{y:.0f}<extra></extra>",
-                ),
-                go.Scatter(
                     name="Average Run Time",
                     mode="lines+markers",
                     x=list(df["date"]),
                     y=list(df["Average_runtime"]),
                     text=list(df["Average_runtime"]),
                     hovertemplate="Average Runtime: %{y:.0f}<extra></extra>",
-                ),
-                go.Scatter(
-                    name="Average Analysis Time",
-                    mode="lines+markers",
-                    x=list(df["date"]),
-                    y=list(df["Average_analysis_time"]),
-                    text=list(df["Average_analysis_time"]),
-                    hovertemplate="Average Analysis Time: %{y:.0f}<extra></extra>",
                 ),
             ],
             layout=dict(
