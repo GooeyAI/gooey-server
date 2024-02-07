@@ -154,7 +154,7 @@ def call_celery_task(
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
-    queue = os.path.join(queue_prefix, pipeline["model_id"].strip()).strip("/")
+    queue = build_queue_name(queue_prefix, pipeline["model_id"])
     result = get_celery().send_task(
         task_name, kwargs=dict(pipeline=pipeline, inputs=inputs), queue=queue
     )
@@ -164,3 +164,7 @@ def call_celery_task(
         model=queue, sku=ModelSku.gpu_ms, quantity=int((time() - s) * 1000)
     )
     return ret
+
+
+def build_queue_name(queue_prefix: str, model_id: str) -> str:
+    return os.path.join(queue_prefix, model_id.strip()).strip("/")
