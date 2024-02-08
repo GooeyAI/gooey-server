@@ -293,9 +293,7 @@ def text_area(
     #     assert not value, "only one of value or key can be provided"
     # else:
     if not key:
-        key = md5_values(
-            "textarea", label, height, help, value, placeholder, label_visibility
-        )
+        key = md5_values("textarea", label, height, help, placeholder, label_visibility)
     value = str(state.session_state.setdefault(key, value) or "")
     if label_visibility != "visible":
         label = None
