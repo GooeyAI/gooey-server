@@ -5,6 +5,8 @@ from furl import furl
 from googleapiclient import discovery
 from googleapiclient.http import MediaIoBaseDownload
 
+from daras_ai_v2.functional import flatmap_parallel
+
 
 def is_gdrive_url(f: furl) -> bool:
     return f.host in ["drive.google.com", "docs.google.com"]
@@ -25,34 +27,33 @@ def url_to_gdrive_file_id(f: furl) -> str:
     return file_id
 
 
-def gdrive_list_urls_of_files_in_folder(f: furl, max_depth=10) -> list[str]:
+def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str]:
     if max_depth <= 0:
         return []
+    assert f.host == "drive.google.com", f"Bad google drive folder url: {f}"
     # get drive folder id from url (e.g. https://drive.google.com/drive/folders/1Xijcsj7oBvDn1OWx4UmNAT8POVKG4W73?usp=drive_link)
     folder_id = f.path.segments[-1]
     service = discovery.build("drive", "v3")
-    if f.host == "drive.google.com":
-        request = service.files().list(
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True,
-            q=f"'{folder_id}' in parents",
-            fields="files(mimeType,webViewLink)",
-        )
-    else:
-        raise ValueError(f"Can't list files from non google folder url: {str(f)!r}")
+    request = service.files().list(
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+        q=f"'{folder_id}' in parents",
+        fields="files(mimeType,webViewLink)",
+    )
     response = request.execute()
     files = response.get("files", [])
-    urls = []
-    for file in files:
-        mime_type = file.get("mimeType")
-        url = file.get("webViewLink")
-        if mime_type == "application/vnd.google-apps.folder":
-            urls += gdrive_list_urls_of_files_in_folder(
-                furl(url), max_depth=max_depth - 1
+    urls = flatmap_parallel(
+        lambda file: (
+            gdrive_list_urls_of_files_in_folder(furl(url), max_depth=max_depth - 1)
+            if (
+                (url := file.get("webViewLink"))
+                and file.get("mimeType") == "application/vnd.google-apps.folder"
             )
-        elif url:
-            urls.append(url)
-    return urls
+            else [url]
+        ),
+        files,
+    )
+    return filter(None, urls)
 
 
 def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:

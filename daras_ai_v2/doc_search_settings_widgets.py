@@ -1,10 +1,14 @@
 import os
 import typing
 
+from furl import furl
+from sentry_sdk import capture_exception
+
 import gooey_ui as st
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, google_translate_language_selector
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
 from daras_ai_v2.search_ref import CitationStyles
 
 _user_media_url_prefix = os.path.join(
@@ -76,18 +80,22 @@ def document_uploader(
             accept_multiple_files=accept_multiple_files,
         )
     documents = st.session_state.get(key, [])
-    for document in documents:
-        if not document.startswith("https://drive.google.com/drive/folders"):
-            continue
-        from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
-        from furl import furl
-
-        folder_content_urls = gdrive_list_urls_of_files_in_folder(furl(document))
-        documents.remove(document)
-        documents.extend(folder_content_urls)
+    try:
+        documents = list(_expand_gdrive_folders(documents))
+    except Exception as e:
+        capture_exception(e)
+        st.error(f"Error expanding gdrive folders: {e}")
     st.session_state[key] = documents
     st.session_state[custom_key] = "\n".join(documents)
     return documents
+
+
+def _expand_gdrive_folders(documents: list[str]) -> list[str]:
+    for url in documents:
+        if url.startswith("https://drive.google.com/drive/folders"):
+            yield from gdrive_list_urls_of_files_in_folder(furl(url))
+        else:
+            yield url
 
 
 def doc_search_settings(
