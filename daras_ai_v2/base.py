@@ -189,7 +189,7 @@ class BasePage:
 
     def refresh_state(self):
         _, run_id, uid = extract_query_params(gooey_get_query_params())
-        channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
+        channel = self.realtime_channel_name(run_id, uid)
         output = realtime_pull([channel])[0]
         if output:
             st.session_state.update(output)
@@ -197,7 +197,7 @@ class BasePage:
     def render(self):
         self.setup_render()
 
-        if self.get_run_state() == RecipeRunState.running:
+        if self.get_run_state(st.session_state) == RecipeRunState.running:
             self.refresh_state()
         else:
             realtime_clear_subs()
@@ -923,7 +923,7 @@ class BasePage:
     ) -> tuple[SavedRun, PublishedRun | None]:
         if run_id and uid:
             sr = cls.run_doc_sr(run_id, uid)
-            pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
+            pr = sr.parent_published_run()
         else:
             pr = cls.get_published_run(published_run_id=example_id or "")
             sr = pr.saved_run
@@ -940,9 +940,7 @@ class BasePage:
     ) -> PublishedRun | None:
         if run_id and uid:
             sr = cls.get_sr_from_query_params(example_id, run_id, uid)
-            return (
-                sr and sr.parent_version and sr.parent_version.published_run
-            ) or None
+            return sr.parent_published_run()
         elif example_id:
             return cls.get_published_run(published_run_id=example_id)
         else:
@@ -1309,12 +1307,13 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
         return submitted
 
-    def get_run_state(self) -> RecipeRunState:
-        if st.session_state.get(StateKeys.run_status):
+    @classmethod
+    def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
+        if state.get(StateKeys.run_status):
             return RecipeRunState.running
-        elif st.session_state.get(StateKeys.error_msg):
+        elif state.get(StateKeys.error_msg):
             return RecipeRunState.failed
-        elif st.session_state.get(StateKeys.run_time):
+        elif state.get(StateKeys.run_time):
             return RecipeRunState.completed
         else:
             # when user is at a recipe root, and not running anything
@@ -1333,7 +1332,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
         self._render_before_output()
 
-        run_state = self.get_run_state()
+        run_state = self.get_run_state(st.session_state)
         match run_state:
             case RecipeRunState.completed:
                 self._render_completed_output()
@@ -1460,12 +1459,15 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             run_id=run_id,
             uid=uid,
             state=st.session_state,
-            channel=f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}",
+            channel=self.realtime_channel_name(run_id, uid),
             query_params=self.clean_query_params(
                 example_id=example_id, run_id=run_id, uid=uid
             ),
             is_api_call=is_api_call,
         )
+
+    def realtime_channel_name(self, run_id, uid):
+        return f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
 
     def generate_credit_error_message(self, example_id, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"

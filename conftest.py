@@ -47,8 +47,9 @@ def _mock_gui_runner(
 def threadpool_subtest(subtests, max_workers: int = 8):
     ts = []
 
-    def submit(fn, *args, **kwargs):
-        msg = "--".join(map(str, [*args, *kwargs.values()]))
+    def submit(fn, *args, msg=None, **kwargs):
+        if not msg:
+            msg = "--".join(map(str, [*args, *kwargs.values()]))
 
         @wraps(fn)
         def runner(*args, **kwargs):
