@@ -95,4 +95,4 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]
-force-exclude = "migrations"
+--force-exclude = "migrations|node_modules|\\.git|\\.venv|\\.env|\\.pytest_cache|\\.vscode|\\.github|\\.to"
