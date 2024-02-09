@@ -585,20 +585,9 @@ def _run_openai_chat(
     if stream:
         return _stream_openai_chunked(r, used_model, messages)
     else:
-        from usage_costs.cost_utils import record_cost_auto
-        from usage_costs.models import ModelSku
-
-        record_cost_auto(
-            model=used_model,
-            sku=ModelSku.llm_prompt,
-            quantity=r.usage.prompt_tokens,
-        )
-        record_cost_auto(
-            model=used_model,
-            sku=ModelSku.llm_completion,
-            quantity=r.usage.completion_tokens,
-        )
-        return [choice.message.dict() for choice in r.choices]
+        ret = [choice.message.dict() for choice in r.choices]
+        record_openai_llm_usage(used_model, messages, ret)
+        return ret
 
 
 def _get_chat_completions_create(model: str, **kwargs):
@@ -674,6 +663,12 @@ def _stream_openai_chunked(
         entry["content"] += entry["chunk"]
     yield ret
 
+    record_openai_llm_usage(used_model, messages, ret)
+
+
+def record_openai_llm_usage(
+    used_model: str, messages: list[ConversationEntry], choices: list[ConversationEntry]
+):
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
@@ -687,7 +682,7 @@ def _stream_openai_chunked(
     record_cost_auto(
         model=used_model,
         sku=ModelSku.llm_completion,
-        quantity=sum(default_length_function(entry["content"]) for entry in ret),
+        quantity=sum(default_length_function(entry["content"]) for entry in choices),
     )
 
 
