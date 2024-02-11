@@ -141,24 +141,33 @@ BARK_ALLOWED_PROMPTS = {
 }
 
 
-def text_to_speech_settings(page):
-    st.write(
-        """
-        ##### 🗣️ Voice Settings
-        """
-    )
-
-    col1, col2 = st.columns(2)
-    with col1:
-        tts_provider = enum_selector(
-            TextToSpeechProviders,
-            "###### Speech Provider",
-            key="tts_provider",
+def text_to_speech_settings(
+    page, include_title=True, include_selector=True, include_settings=True
+):
+    if include_title:
+        st.write(
+            """
+            ##### 🗣️ Voice Settings
+            """
         )
 
+    col1, col2 = st.columns(2)
+    if include_selector:
+        with col1:
+            tts_provider = enum_selector(
+                TextToSpeechProviders,
+                "###### Speech Provider",
+                key="tts_provider",
+            )
+    else:
+        tts_provider = st.session_state.get("tts_provider")
+
+    if not include_settings:
+        return
+    col = col2 if include_selector else st.div()
     match tts_provider:
         case TextToSpeechProviders.BARK.name:
-            with col2:
+            with col:
                 st.selectbox(
                     label="""
                     ###### Bark History Prompt
@@ -169,7 +178,7 @@ def text_to_speech_settings(page):
                 )
 
         case TextToSpeechProviders.GOOGLE_TTS.name:
-            with col2:
+            with col:
                 voices = google_tts_voices()
                 st.selectbox(
                     label="""
@@ -208,7 +217,7 @@ def text_to_speech_settings(page):
                 )
 
         case TextToSpeechProviders.UBERDUCK.name:
-            with col2:
+            with col:
                 st.selectbox(
                     label="""
                     ###### Voice name (Uberduck)
@@ -232,7 +241,7 @@ def text_to_speech_settings(page):
                 )
 
         case TextToSpeechProviders.ELEVEN_LABS.name:
-            with col2:
+            with col:
                 if not st.session_state.get("elevenlabs_api_key"):
                     st.session_state["elevenlabs_api_key"] = page.request.session.get(
                         SESSION_ELEVENLABS_API_KEY

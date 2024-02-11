@@ -346,6 +346,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.session_state["tts_provider"] = None
             enable_video = False
         else:
+            text_to_speech_settings(
+                page=self, include_title=False, include_settings=False
+            )
+            st.write("---")
             if not "__enable_video" in st.session_state:
                 st.session_state["__enable_video"] = bool(
                     st.session_state.get("input_face")
@@ -355,12 +359,27 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )
         if not enable_video:
             st.session_state["input_face"] = None
+        else:
+            st.file_uploader(
+                """
+                ###### 👩‍🦰 Input Face
+                Upload a video/image that contains faces to use
+                *Recommended - mp4 / mov / png / jpg / gif*
+                """,
+                key="input_face",
+            )
+            st.write("---")
 
-        st.checkbox(
+        if st.checkbox(
             "##### 🔠 Translation",
             value=bool(st.session_state.get("user_language")),
             key="__enable_translation",
-        )
+        ):
+            google_translate_language_selector(
+                f"{field_desc(self.RequestModel, 'user_language')}",
+                key="user_language",
+            )
+            st.write("---")
 
         if st.checkbox(
             "##### 🩻 Photo & Document Intelligence",
@@ -383,24 +402,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def render_settings(self):
         if st.session_state.get("__enable_audio"):
-            text_to_speech_settings(page=self)
+            text_to_speech_settings(page=self, include_selector=False)
 
         if st.session_state.get("__enable_video"):
-            st.file_uploader(
-                """
-                ##### 👩‍🦰 Input Face
-                Upload a video/image that contains faces to use
-                *Recommended - mp4 / mov / png / jpg / gif*
-                """,
-                key="input_face",
-            )
             lipsync_settings()
 
         if st.session_state.get("__enable_translation"):
-            google_translate_language_selector(
-                f"##### {field_title_desc(self.RequestModel, 'user_language')}",
-                key="user_language",
-            )
+            st.markdown("##### 🔠 Translation Settings")
             enable_glossary = st.checkbox(
                 "📖 Add Glossary",
                 value=bool(
