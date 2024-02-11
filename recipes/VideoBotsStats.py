@@ -291,15 +291,16 @@ class VideoBotsStatsPage(BasePage):
             start_date = bi.created_at
             end_date = timezone.now()
         else:
-            start_of_year_date = timezone.now().replace(month=1, day=1)
+            fifteen_days_ago = timezone.now() - timedelta(days=15)
+            fifteen_days_ago = fifteen_days_ago.replace(hour=0, minute=0, second=0)
             st.session_state.setdefault(
                 "start_date",
                 self.request.query_params.get(
-                    "start_date", start_of_year_date.strftime("%Y-%m-%d")
+                    "start_date", fifteen_days_ago.strftime("%Y-%m-%d")
                 ),
             )
             start_date: datetime = (
-                st.date_input("Start date", key="start_date") or start_of_year_date
+                st.date_input("Start date", key="start_date") or fifteen_days_ago
             )
             st.session_state.setdefault(
                 "end_date",
@@ -311,7 +312,7 @@ class VideoBotsStatsPage(BasePage):
                 st.date_input("End date", key="end_date") or timezone.now()
             )
             st.session_state.setdefault(
-                "view", self.request.query_params.get("view", "Weekly")
+                "view", self.request.query_params.get("view", "Daily")
             )
         st.write("---")
         view = st.horizontal_radio(
