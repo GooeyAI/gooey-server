@@ -27,3 +27,5 @@ stages:
         dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
         tags: |
           $(tag)
+    - script: |
+        docker run $(tag) poetry run pytest
