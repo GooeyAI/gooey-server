@@ -264,10 +264,14 @@ class SavedRunAdmin(admin.ModelAdmin):
         "view_parent_published_run",
         "run_time",
         "price",
+        "is_api_call",
         "created_at",
         "updated_at",
     ]
-    list_filter = ["workflow"]
+    list_filter = [
+        "workflow",
+        "is_api_call",
+    ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
     autocomplete_fields = ["parent_version"]
 
@@ -281,6 +285,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "run_time",
+        "is_api_call",
     ]
 
     actions = [export_to_csv, export_to_excel]
