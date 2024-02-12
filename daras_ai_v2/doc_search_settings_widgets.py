@@ -78,11 +78,12 @@ def document_uploader(
         )
     st.checkbox("Submit Links in Bulk", key=f"__custom_checkbox_{key}")
     documents = st.session_state.get(key, [])
-    try:
-        documents = list(_expand_gdrive_folders(documents))
-    except Exception as e:
-        capture_exception(e)
-        st.error(f"Error expanding gdrive folders: {e}")
+    if accept_multiple_files:
+        try:
+            documents = list(_expand_gdrive_folders(documents))
+        except Exception as e:
+            capture_exception(e)
+            st.error(f"Error expanding gdrive folders: {e}")
     st.session_state[key] = documents
     st.session_state[custom_key] = "\n".join(documents)
     return documents
