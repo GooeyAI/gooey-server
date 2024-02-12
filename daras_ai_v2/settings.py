@@ -162,6 +162,8 @@ from django.conf.locale.en import formats as es_formats
 
 es_formats.DATETIME_FORMAT = DATETIME_FORMAT
 
+SHORT_DATETIME_FORMAT = "%b %d, %Y %-I:%M %p"
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 

@@ -198,8 +198,7 @@ class FaceInpaintingPage(BasePage):
         if output_images:
             st.write("#### Output Image")
             for url in output_images:
-                st.image(url)
-                self.render_buttons(url)
+                st.image(url, show_download_button=True)
         else:
             st.div()
 

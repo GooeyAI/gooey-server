@@ -700,8 +700,8 @@ class ConversationQuerySet(models.QuerySet):
                     .replace(tzinfo=None)
                 )
                 row |= {
-                    "Last Sent": last_time.strftime("%b %d, %Y %I:%M %p"),
-                    "First Sent": first_time.strftime("%b %d, %Y %I:%M %p"),
+                    "Last Sent": last_time.strftime(settings.SHORT_DATETIME_FORMAT),
+                    "First Sent": first_time.strftime(settings.SHORT_DATETIME_FORMAT),
                     "A7": not convo.d7(),
                     "A30": not convo.d30(),
                     "R1": last_time - first_time < datetime.timedelta(days=1),
@@ -926,7 +926,7 @@ class MessageQuerySet(models.QuerySet):
                 "Message (EN)": message.content,
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%b %d, %Y %I:%M %p"),
+                .strftime(settings.SHORT_DATETIME_FORMAT),
                 "Feedback": (
                     message.feedbacks.first().get_display_text()
                     if message.feedbacks.first()
@@ -968,7 +968,7 @@ class MessageQuerySet(models.QuerySet):
                 "Answer (EN)": message.content,
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%b %d, %Y %I:%M %p"),
+                .strftime(settings.SHORT_DATETIME_FORMAT),
                 "Analysis JSON": message.analysis_result,
             }
             rows.append(row)
@@ -1153,16 +1153,16 @@ class FeedbackQuerySet(models.QuerySet):
                 "Question Sent": feedback.message.get_previous_by_created_at()
                 .created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%b %d, %Y %I:%M %p"),
+                .strftime(settings.SHORT_DATETIME_FORMAT),
                 "Answer (EN)": feedback.message.content,
                 "Answer Sent": feedback.message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%b %d, %Y %I:%M %p"),
+                .strftime(settings.SHORT_DATETIME_FORMAT),
                 "Rating": Feedback.Rating(feedback.rating).label,
                 "Feedback (EN)": feedback.text_english,
                 "Feedback Sent": feedback.created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%b %d, %Y %I:%M %p"),
+                .strftime(settings.SHORT_DATETIME_FORMAT),
                 "Question Answered": feedback.message.question_answered,
             }
             rows.append(row)

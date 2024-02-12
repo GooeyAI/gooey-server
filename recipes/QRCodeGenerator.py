@@ -436,7 +436,7 @@ Here is the final output:
         if max_count:
             output_images = output_images[:max_count]
         for img in output_images:
-            st.image(img)
+            st.image(img, show_download_button=True)
             qr_code_data = (
                 state.get(QrSources.qr_code_data.name)
                 or state.get(QrSources.qr_code_input_image.name)
@@ -458,7 +458,6 @@ Here is the final output:
                 st.caption(f"{shortened_url} → {qr_code_data} (Views: {clicks})")
             else:
                 st.caption(f"{shortened_url} → {qr_code_data}")
-            self.render_buttons(img)
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: QRCodeGeneratorPage.RequestModel = self.RequestModel.parse_obj(state)

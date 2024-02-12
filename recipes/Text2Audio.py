@@ -128,7 +128,7 @@ class Text2AudioPage(BasePage):
             )
 
     def render_output(self):
-        _render_output(self, st.session_state)
+        _render_output(st.session_state)
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
@@ -141,10 +141,11 @@ class Text2AudioPage(BasePage):
         return "Generate AI Music with text instruction prompts. AudiLDM is capable of generating realistic audio samples by process any text input. Learn more [here](https://huggingface.co/cvssp/audioldm-m-full)."
 
 
-def _render_output(self, state):
+def _render_output(state):
     selected_models = state.get("selected_models", [])
     for key in selected_models:
         output: dict = state.get("output_audios", {}).get(key, [])
         for audio in output:
-            st.audio(audio, caption=Text2AudioModels[key].value)
-            self.render_buttons(audio)
+            st.audio(
+                audio, caption=Text2AudioModels[key].value, show_download_button=True
+            )

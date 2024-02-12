@@ -1348,11 +1348,11 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         # render outputs
         self.render_output()
 
-        if run_state != "waiting":
+        if run_state != RecipeRunState.running:
             self._render_after_output()
 
     def _render_completed_output(self):
-        run_time = st.session_state.get(StateKeys.run_time, 0)
+        pass
 
     def _render_failed_output(self):
         err_msg = st.session_state.get(StateKeys.error_msg)
@@ -1368,12 +1368,10 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         if not estimated_run_time:
             return
         if created_at := st.session_state.get("created_at"):
-            if isinstance(created_at, datetime.datetime):
-                start_time = created_at
-            else:
-                start_time = datetime.datetime.fromisoformat(created_at)
+            if isinstance(created_at, str):
+                created_at = datetime.datetime.fromisoformat(created_at)
             with st.countdown_timer(
-                end_time=start_time + datetime.timedelta(seconds=estimated_run_time),
+                end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
                 delay_text="Sorry for the wait. Your run is taking longer than we expected.",
             ):
                 if self.is_current_user_owner() and self.request.user.email:
@@ -1514,6 +1512,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.session_state.pop(field_name, None)
 
     def _render_after_output(self):
+        self._render_report_button()
+
         if "seed" in self.RequestModel.schema_json():
             randomize = st.button(
                 '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
@@ -1521,27 +1521,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             if randomize:
                 st.session_state[StateKeys.pressed_randomize] = True
                 st.experimental_rerun()
-        caption = ""
-        caption += f'\\\nGenerated in <span style="color: black;">{st.session_state.get(StateKeys.run_time, 0):.2f}s</span>'
-        if "seed" in self.RequestModel.schema_json():
-            seed = st.session_state.get("seed")
-            caption += f' with seed <span style="color: black;">{seed}</span> '
-        created_at = st.session_state.get(
-            StateKeys.created_at, datetime.datetime.today()
-        )
-        if not isinstance(created_at, datetime.datetime):
-            created_at = datetime.datetime.fromisoformat(created_at)
-        format_created_at = created_at.strftime("%d %b %Y %-I:%M%p")
-        caption += f' at <span style="color: black;">{format_created_at}</span>'
-        st.caption(caption, unsafe_allow_html=True)
 
-    def render_buttons(self, url: str):
-        st.download_button(
-            label='<i class="fa-regular fa-download"></i> Download',
-            url=url,
-            type="secondary",
-        )
-        self._render_report_button()
+        render_output_caption()
 
     def state_to_doc(self, state: dict):
         ret = {
@@ -1916,6 +1897,26 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return bool(
             self.request and self.request.user and self.run_user == self.request.user
         )
+
+
+def render_output_caption():
+    caption = ""
+
+    run_time = st.session_state.get(StateKeys.run_time, 0)
+    if run_time:
+        caption += f'Generated in <span style="color: black;">{run_time :.2f}s</span>'
+
+    if seed := st.session_state.get("seed"):
+        caption += f' with seed <span style="color: black;">{seed}</span> '
+
+    created_at = st.session_state.get(StateKeys.created_at, datetime.datetime.today())
+    if created_at:
+        if isinstance(created_at, str):
+            created_at = datetime.datetime.fromisoformat(created_at)
+        format_created_at = created_at.strftime(settings.SHORT_DATETIME_FORMAT)
+        caption += f' at <span style="color: black;">{format_created_at}</span>'
+
+    st.caption(caption, unsafe_allow_html=True)
 
 
 def get_example_request_body(

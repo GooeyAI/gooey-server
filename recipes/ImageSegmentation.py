@@ -342,8 +342,7 @@ class ImageSegmentationPage(BasePage):
         with col1:
             input_image = state.get("input_image")
             if input_image:
-                st.image(input_image, caption="Input Photo")
-                self.render_buttons(input_image)
+                st.image(input_image, caption="Input Photo", show_download_button=True)
             else:
                 st.div()
 

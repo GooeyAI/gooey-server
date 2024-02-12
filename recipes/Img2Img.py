@@ -127,12 +127,12 @@ class Img2ImgPage(BasePage):
         youtube_video("narcZNyuNAg")
 
     def render_output(self):
-        text_prompt = st.session_state.get("text_prompt", "")
         output_images = st.session_state.get("output_images", [])
+        if not output_images:
+            return
         st.write("#### Output Image")
         for img in output_images:
-            st.image(img)
-            self.render_buttons(img)
+            st.image(img, show_download_button=True)
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
