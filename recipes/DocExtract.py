@@ -424,7 +424,11 @@ def process_source(
                 params = dict(pages=str(page_num))
             else:
                 params = None
-            transcript = str(azure_doc_extract_pages(content_url, params=params)[0])
+            pages = azure_doc_extract_pages(content_url, params=params)
+            if pages and pages[0]:
+                transcript = str(pages[0])
+            else:
+                transcript = ""
         else:
             raise NotImplementedError(
                 f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"

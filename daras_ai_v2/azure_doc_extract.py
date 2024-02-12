@@ -67,6 +67,8 @@ def azure_form_recognizer(url: str, model_id: str, params: dict = None):
 
 
 def extract_records(result: dict, page_num: int) -> list[dict]:
+    if not result:
+        return []
     table_polys = extract_tables(result, page_num)
     records = []
     for para in result["paragraphs"]:
