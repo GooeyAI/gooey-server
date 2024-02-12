@@ -26,10 +26,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages, normalize_slug, page_slug_map
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
-from daras_ai_v2.base import (
-    RedirectException,
-    get_example_request_body,
-)
+from daras_ai_v2.base import RedirectException
 from daras_ai_v2.bots import request_json
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
@@ -299,9 +296,7 @@ Authorization: Bearer GOOEY_API_KEY
 
     page = workflow.page_cls(request=request)
     state = page.get_root_published_run().saved_run.to_dict()
-    request_body = get_example_request_body(
-        page.RequestModel, state, include_all=include_all
-    )
+    request_body = page.get_example_request_body(state, include_all=include_all)
     response_body = page.get_example_response_body(
         state, as_async=as_async, include_all=include_all
     )
