@@ -243,7 +243,7 @@ class BasePage:
 
                 if tbreadcrumbs:
                     with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                        render_breadcrumbs(tbreadcrumbs)
+                        render_breadcrumbs(tbreadcrumbs, current_run.is_api_call)
 
                 author = self.run_user or current_run.get_creator()
                 if not is_root_example:
@@ -996,9 +996,7 @@ class BasePage:
             workflow=cls.workflow,
             published_run_id="",
             defaults={
-                "saved_run": lambda: cls.run_doc_sr(
-                    run_id="", uid="", create=True, parent=None, parent_version=None
-                ),
+                "saved_run": lambda: cls.run_doc_sr(run_id="", uid="", create=True),
                 "created_by": None,
                 "last_edited_by": None,
                 "title": cls.title,
@@ -1022,15 +1020,11 @@ class BasePage:
         run_id: str,
         uid: str,
         create: bool = False,
-        parent: SavedRun | None = None,
-        parent_version: PublishedRunVersion | None = None,
+        defaults: dict = None,
     ) -> SavedRun:
         config = dict(workflow=cls.workflow, uid=uid, run_id=run_id)
         if create:
-            return SavedRun.objects.get_or_create(
-                **config,
-                defaults=dict(parent=parent, parent_version=parent_version),
-            )[0]
+            return SavedRun.objects.get_or_create(**config, defaults=defaults)[0]
         else:
             return SavedRun.objects.get(**config)
 
@@ -1408,7 +1402,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             and not self.request.user.is_anonymous
         )
 
-    def create_new_run(self):
+    def create_new_run(self, is_api_call: bool = False):
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
@@ -1443,8 +1437,11 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             run_id,
             uid,
             create=True,
-            parent=parent,
-            parent_version=parent_version,
+            defaults=dict(
+                parent=parent,
+                parent_version=parent_version,
+                is_api_call=is_api_call,
+            ),
         ).set(self.state_to_doc(st.session_state))
 
         return None, run_id, uid

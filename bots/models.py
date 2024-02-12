@@ -254,6 +254,8 @@ class SavedRun(models.Model):
     page_title = models.TextField(default="", blank=True, help_text="(Deprecated)")
     page_notes = models.TextField(default="", blank=True, help_text="(Deprecated)")
 
+    is_api_call = models.BooleanField(default=False)
+
     objects = SavedRunQuerySet.as_manager()
 
     class Meta:

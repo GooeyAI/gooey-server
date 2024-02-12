@@ -32,6 +32,7 @@ def gui_runner(
 ):
     page = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
     sr = page.run_doc_sr(run_id, uid)
+    sr.is_api_call = is_api_call
 
     st.set_session_state(state)
     run_time = 0
