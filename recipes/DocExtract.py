@@ -390,11 +390,14 @@ def process_source(
     )
 
     content_url = existing_values[Columns.content_url.value]
+    is_pdf = "application/pdf" in doc_meta.mime_type
+    is_yt = is_yt_url(webpage_url)
+    is_video = "video/" in doc_meta.mime_type or "audio/" in doc_meta.mime_type
     if not content_url:
         yield "Downloading"
-        if is_yt_url(webpage_url):
+        if is_yt:
             content_url, _ = download_youtube_to_wav(webpage_url)
-        elif "video/" in doc_meta.mime_type or "audio/" in doc_meta.mime_type:
+        elif is_video:
             f = furl(webpage_url)
             if is_gdrive_url(f):
                 f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
@@ -402,7 +405,7 @@ def process_source(
                     doc_meta.name, f_bytes, content_type=doc_meta.mime_type
                 )
             content_url, _ = audio_url_to_wav(webpage_url)
-        elif "application/pdf" in doc_meta.mime_type:
+        elif is_pdf:
             content_url = entry.get("content_url") or webpage_url
         else:
             raise NotImplementedError(
@@ -410,17 +413,12 @@ def process_source(
             )
         update_cell(spreadsheet_id, row, Columns.content_url.value, content_url)
 
-    final_col_name = "snippet"
     transcript = existing_values[Columns.transcript.value]
     if not transcript:
-        if (
-            is_yt_url(webpage_url)
-            or "video/" in doc_meta.mime_type
-            or "audio/" in doc_meta.mime_type
-        ):
+        if is_yt or is_video:
             yield "Transcribing"
             transcript = run_asr(content_url, request.selected_asr_model)
-        elif "application/pdf" in doc_meta.mime_type:
+        elif is_pdf:
             yield "Extracting PDF"
             if page_num := entry.get("page_num"):
                 params = dict(pages=str(page_num))
@@ -432,6 +430,11 @@ def process_source(
                 f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"
             )
         update_cell(spreadsheet_id, row, Columns.transcript.value, transcript)
+
+    if is_pdf:
+        final_col_name = "sections"
+    else:
+        final_col_name = "snippet"
     final_value = transcript
 
     if request.google_translate_target:
@@ -445,7 +448,6 @@ def process_source(
                 glossary_url=request.glossary_document,
             )[0]
             update_cell(spreadsheet_id, row, Columns.translation.value, translation)
-            final_col_name = "sections"
         final_value = translation
     else:
         translation = transcript
@@ -468,7 +470,7 @@ def process_source(
                 )
             )
             update_cell(spreadsheet_id, row, Columns.summary.value, summary)
-        if final_col_name == "snippet":
+        if final_col_name != "sections":
             final_value = f"content={final_value}\ncontent={summary}"
             final_col_name = "sections"
         else:
