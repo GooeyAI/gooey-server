@@ -429,11 +429,9 @@ def pages_to_split_refs(
                 "title": (
                     doc_meta.name + (f", page {doc.end + 1}" if len(pages) > 1 else "")
                 ),
-                "url": (
-                    furl(f_url)
-                    .set(fragment_args={"page": doc.end + 1} if len(pages) > 1 else {})
-                    .url
-                ),
+                "url": add_page_number_to_pdf(
+                    f_url, (doc.end + 1 if len(pages) > 1 else f_url)
+                ).url,
                 "snippet": doc.text,
                 **doc.kwargs,
                 "score": -1,
@@ -443,6 +441,10 @@ def pages_to_split_refs(
             )
         ]
     return refs
+
+
+def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
+    return furl(url).set(fragment_args={"page": page_num} if page_num else {})
 
 
 sections_re = re.compile(r"(\s*[\r\n\f\v]|^)(\w+)\=", re.MULTILINE)
