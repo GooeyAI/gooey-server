@@ -48,12 +48,13 @@ DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspo
 class Columns(IntegerChoices):
     webpage_url = 1, "url"
     title = 2, "title"
-    description = 3, "Description"
-    content_url = 4, "Content"
-    transcript = 5, "Transcript"
-    translation = 6, "Translation"
-    summary = 7, "Summarized"
-    status = 8, "Status"
+    final_output = 3, "snippet/sections"
+    description = 4, "Description"
+    content_url = 5, "Content URL"
+    transcript = 6, "Transcript"
+    translation = 7, "Translation"
+    summary = 8, "Summarized"
+    status = 9, "Status"
 
 
 class DocExtractPage(BasePage):
@@ -409,8 +410,7 @@ def process_source(
             )
         update_cell(spreadsheet_id, row, Columns.content_url.value, content_url)
 
-    usable_out_col = (Columns.transcript.value, "snippet")
-
+    final_col_name = "snippet"
     transcript = existing_values[Columns.transcript.value]
     if not transcript:
         if (
@@ -427,12 +427,12 @@ def process_source(
             else:
                 params = None
             transcript = str(azure_doc_extract_pages(content_url, params=params)[0])
-            usable_out_col = (Columns.transcript.value, "sections")
         else:
             raise NotImplementedError(
                 f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"
             )
         update_cell(spreadsheet_id, row, Columns.transcript.value, transcript)
+    final_value = transcript
 
     if request.google_translate_target:
         translation = existing_values[Columns.translation.value]
@@ -445,30 +445,39 @@ def process_source(
                 glossary_url=request.glossary_document,
             )[0]
             update_cell(spreadsheet_id, row, Columns.translation.value, translation)
-        usable_out_col = (Columns.translation.value, "snippet")
+            final_col_name = "sections"
+        final_value = translation
     else:
         translation = transcript
         update_cell(spreadsheet_id, row, Columns.translation.value, "")
 
     summary = existing_values[Columns.summary.value]
-    if not summary and request.task_instructions:
-        yield "Summarizing"
-        prompt = request.task_instructions.strip() + "\n\n" + translation
-        summary = "\n---\n".join(
-            run_language_model(
-                model=request.selected_model,
-                quality=request.quality,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                prompt=prompt,
-                max_tokens=request.max_tokens,
-                avoid_repetition=request.avoid_repetition,
+    if request.task_instructions:
+        if not summary:
+            yield "Summarizing"
+            prompt = request.task_instructions.strip() + "\n\n" + translation
+            summary = "\n---\n".join(
+                run_language_model(
+                    model=request.selected_model,
+                    quality=request.quality,
+                    num_outputs=request.num_outputs,
+                    temperature=request.sampling_temperature,
+                    prompt=prompt,
+                    max_tokens=request.max_tokens,
+                    avoid_repetition=request.avoid_repetition,
+                )
             )
-        )
-        update_cell(spreadsheet_id, row, Columns.summary.value, summary)
+            update_cell(spreadsheet_id, row, Columns.summary.value, summary)
+        if final_col_name == "snippet":
+            final_value = f"content={final_value}\ncontent={summary}"
+            final_col_name = "sections"
+        else:
+            final_value = f"{final_value}\ncontent={summary}"
+    else:
+        update_cell(spreadsheet_id, row, Columns.summary.value, "")
 
-    if usable_out_col:
-        update_cell(spreadsheet_id, 1, *usable_out_col)
+    update_cell(spreadsheet_id, 1, Columns.final_output.value, final_col_name)
+    update_cell(spreadsheet_id, row, Columns.final_output.value, final_value)
 
 
 def google_api_should_retry(e: Exception) -> bool:
