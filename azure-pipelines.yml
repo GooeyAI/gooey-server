@@ -9,17 +9,27 @@ resources:
 - repo: self
 
 variables:
+  repository: 'myDockerImage'
+  dockerfilePath: '$(Build.SourcesDirectory)/app/Dockerfile'
   tag: '$(Build.BuildId)'
 
 stages:
-- stage: Build
-  displayName: Build image
+- stage: Test
   jobs:
-  - job: Build
-    displayName: Build
+  - job: Test
     pool:
       vmImage: ubuntu-latest
     steps:
+    - task: Cache@2
+      displayName: Cache task
+      inputs:
+        key: 'docker | "$(Agent.OS)" | cache'
+        path: $(Pipeline.Workspace)/docker
+        cacheHitVar: CACHE_RESTORED                #Variable to set to 'true' when the cache is restored
+    - script: |
+        docker load -i $(Pipeline.Workspace)/docker/cache.tar
+      displayName: Docker restore
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))    
     - task: Docker@2
       displayName: Build an image
       inputs:
@@ -27,5 +37,11 @@ stages:
         dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
         tags: |
           $(tag)
+    - script: |
+        mkdir -p $(Pipeline.Workspace)/docker
+        docker save -o $(Pipeline.Workspace)/docker/cache.tar $(repository):$(tag)
+      displayName: Docker save
+      condition: and(not(canceled()), not(failed()), ne(variables.CACHE_RESTORED, 'true'))
+  
     - script: |
         docker run $(tag) poetry run pytest
