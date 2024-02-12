@@ -113,7 +113,14 @@ def meta_title_for_page(
 ) -> str:
     match tab:
         case MenuTabs.examples:
-            ret = f"Examples: {metadata.meta_title}"
+            label = MenuTabs.display_labels[tab]
+            ret = f"{label}: {metadata.meta_title}"
+        case MenuTabs.run_as_api | MenuTabs.integrations:
+            label = MenuTabs.display_labels[tab]
+            return f"{label} for {meta_title_for_page(page=page, metadata=metadata, sr=sr, pr=pr, tab=MenuTabs.run)}"
+        case MenuTabs.history | MenuTabs.saved:
+            label = MenuTabs.display_labels[tab]
+            ret = f"{label} for {metadata.short_title}"
         case _ if pr and pr.saved_run == sr and pr.is_root():
             # for root page
             ret = metadata.meta_title
