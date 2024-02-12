@@ -243,7 +243,12 @@ class BasePage:
 
                 if tbreadcrumbs:
                     with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                        render_breadcrumbs(tbreadcrumbs, current_run.is_api_call)
+                        render_breadcrumbs(
+                            tbreadcrumbs,
+                            is_api_call=(
+                                current_run.is_api_call and self.tab == MenuTabs.run
+                            ),
+                        )
 
                 author = self.run_user or current_run.get_creator()
                 if not is_root_example:

@@ -22,6 +22,14 @@ class MenuTabs:
     }
     paths_reverse = {v: k for k, v in paths.items()}
 
+    display_labels = {
+        examples: "Examples",
+        history: "History",
+        saved: "Saved Runs",
+        run_as_api: "API",
+        integrations: "Integrations",
+    }
+
 
 def page_tabs(*, tabs, key=None):
     selected_menu = option_menu(

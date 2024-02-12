@@ -31,7 +31,7 @@ class TitleBreadCrumbs(typing.NamedTuple):
         return bool(self.root_title or self.published_title)
 
 
-def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, is_api_call: bool = False):
+def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = False):
     st.html(
         """
         <style>
@@ -92,61 +92,42 @@ def get_title_breadcrumbs(
     root_breadcrumb = TitleUrl(metadata.short_title, page_cls.app_url())
 
     match tab:
-        case MenuTabs.run if is_root:
+        case MenuTabs.examples | MenuTabs.history | MenuTabs.saved:
+            label = MenuTabs.display_labels[tab]
+            return TitleBreadCrumbs(
+                f"{label}: {metadata.short_title}",
+                root_title=root_breadcrumb,
+                published_title=None,
+            )
+        case MenuTabs.run_as_api | MenuTabs.integrations:
+            label = MenuTabs.display_labels[tab]
+            tbreadcrumbs_on_run = get_title_breadcrumbs(page_cls=page_cls, sr=sr, pr=pr)
+            return TitleBreadCrumbs(
+                f"{label}: {tbreadcrumbs_on_run.h1_title}",
+                root_title=tbreadcrumbs_on_run.root_title or root_breadcrumb,
+                published_title=tbreadcrumbs_on_run.published_title,
+            )
+        case _ if is_root:
             return TitleBreadCrumbs(page_cls.get_recipe_title(), None, None)
-        case MenuTabs.run if is_example:
+        case _ if is_example:
             assert pr is not None
             return TitleBreadCrumbs(
                 pr.title or prompt_title or recipe_title,
                 root_title=root_breadcrumb,
                 published_title=None,
             )
-        case MenuTabs.run if is_run:
-            return TitleBreadCrumbs(
-                prompt_title or f"Run: {recipe_title}",
-                root_title=root_breadcrumb,
-                published_title=TitleUrl(
+        case _ if is_run:
+            if pr and not pr.is_root():
+                published_title = TitleUrl(
                     pr.title or f"Fork: {pr.published_run_id}",
                     pr.get_app_url(),
                 )
-                if pr and not pr.is_root()
-                else None,
-            )
-        case MenuTabs.examples:
+            else:
+                published_title = None
             return TitleBreadCrumbs(
-                f"Examples: {metadata.short_title}",
+                prompt_title or f"Run: {recipe_title}",
                 root_title=root_breadcrumb,
-                published_title=None,
-            )
-        case MenuTabs.run_as_api:
-            tbreadcrumbs_on_run = get_title_breadcrumbs(
-                page_cls=page_cls, sr=sr, pr=pr, tab=MenuTabs.run
-            )
-            return TitleBreadCrumbs(
-                f"API: {tbreadcrumbs_on_run.h1_title}",
-                root_title=tbreadcrumbs_on_run.root_title or root_breadcrumb,
-                published_title=tbreadcrumbs_on_run.published_title,
-            )
-        case MenuTabs.integrations:
-            tbreadcrumbs_on_run = get_title_breadcrumbs(
-                page_cls=page_cls, sr=sr, pr=pr, tab=MenuTabs.run
-            )
-            return TitleBreadCrumbs(
-                f"Integrations: {tbreadcrumbs_on_run.h1_title}",
-                root_title=tbreadcrumbs_on_run.root_title or root_breadcrumb,
-                published_title=tbreadcrumbs_on_run.published_title,
-            )
-        case MenuTabs.history:
-            return TitleBreadCrumbs(
-                f"History: {metadata.short_title}",
-                root_title=root_breadcrumb,
-                published_title=None,
-            )
-        case MenuTabs.saved:
-            return TitleBreadCrumbs(
-                f"Saved Runs: {metadata.short_title}",
-                root_title=root_breadcrumb,
-                published_title=None,
+                published_title=published_title,
             )
         case _:
             raise ValueError(f"Unknown tab: {tab}")

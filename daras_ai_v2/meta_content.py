@@ -111,27 +111,20 @@ def meta_title_for_page(
     pr: PublishedRun | None,
     tab: str,
 ) -> str:
-    suffix = f" {sep} Gooey.AI"
-
     match tab:
         case MenuTabs.examples:
-            return f"Examples: {metadata.meta_title}" + suffix
-        case MenuTabs.run_as_api:
-            return "API: " + meta_title_for_page(
-                page=page, metadata=metadata, sr=sr, pr=pr, tab=MenuTabs.run
-            )
-        case MenuTabs.integrations:
-            return "Integrations: " + meta_title_for_page(
-                page=page, metadata=metadata, sr=sr, pr=pr, tab=MenuTabs.run
-            )
-        case MenuTabs.history:
-            return f"History for {metadata.short_title}" + suffix
-        case MenuTabs.saved:
-            return f"Saved Runs for {metadata.short_title}" + suffix
-        case MenuTabs.run if pr and pr.saved_run == sr and pr.is_root():
+            label = MenuTabs.display_labels[tab]
+            ret = f"{label}: {metadata.meta_title}"
+        case MenuTabs.run_as_api | MenuTabs.integrations:
+            label = MenuTabs.display_labels[tab]
+            return f"{label} for {meta_title_for_page(page=page, metadata=metadata, sr=sr, pr=pr, tab=MenuTabs.run)}"
+        case MenuTabs.history | MenuTabs.saved:
+            label = MenuTabs.display_labels[tab]
+            ret = f"{label} for {metadata.short_title}"
+        case _ if pr and pr.saved_run == sr and pr.is_root():
             # for root page
-            return metadata.meta_title + suffix
-        case MenuTabs.run:
+            ret = metadata.meta_title
+        case _:
             # non-root runs and examples
             parts = []
 
@@ -148,9 +141,9 @@ def meta_title_for_page(
                 part += f" by {user.display_name}"
             parts.append(part)
 
-            return sep.join(parts) + suffix
-        case _:
-            raise ValueError(f"Unknown tab: {tab}")
+            ret = sep.join(parts)
+
+    return f"{ret} {sep} Gooey.AI"
 
 
 def meta_description_for_page(
