@@ -79,9 +79,9 @@ class GoogleGPTPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -111,7 +111,7 @@ class GoogleGPTPage(BasePage):
         final_search_query: str | None
 
     def render_form_v2(self):
-        st.text_area("##### Google Search Query", key="search_query")
+        st.text_area("#### Google Search Query", key="search_query")
         st.text_input("Search on a specific site *(optional)*", key="site_filter")
         prompt_vars_widget("task_instructions", "query_instructions")
 

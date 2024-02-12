@@ -98,9 +98,9 @@ class SEOSummaryPage(BasePage):
 
         enable_html: bool | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         sampling_temperature: float | None
         max_tokens: int | None
         num_outputs: int | None
@@ -160,7 +160,7 @@ SearchSEO > Page Parsing > GPT3
         )
 
     def render_form_v2(self):
-        st.write("### Inputs")
+        st.write("#### Inputs")
         st.text_input("Google Search Query", key="search_query")
         st.text_input("Website Name", key="title")
         st.text_input("Website URL", key="company_url")
@@ -192,7 +192,7 @@ SearchSEO > Page Parsing > GPT3
     def render_output(self):
         output_content = st.session_state.get("output_content")
         if output_content:
-            st.write("### Generated Content")
+            st.write("#### Generated Content")
             for idx, text in enumerate(output_content):
                 if st.session_state.get("enable_html"):
                     scrollable_html(text)

@@ -83,7 +83,7 @@ def model_selector(
         selected_model = enum_selector(
             models_enum,
             label="""
-            ### 🤖 Choose your preferred AI Model
+            #### 🤖 Choose your preferred AI Model
             """,
             key="selected_model",
             use_selectbox=True,

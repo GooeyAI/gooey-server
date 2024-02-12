@@ -254,13 +254,15 @@ class SavedRun(models.Model):
     page_title = models.TextField(default="", blank=True, help_text="(Deprecated)")
     page_notes = models.TextField(default="", blank=True, help_text="(Deprecated)")
 
+    is_api_call = models.BooleanField(default=False)
+
     objects = SavedRunQuerySet.as_manager()
 
     class Meta:
         ordering = ["-updated_at"]
         unique_together = [
             ["workflow", "example_id"],
-            ["workflow", "run_id", "uid"],
+            ["run_id", "uid"],
         ]
         constraints = [
             models.CheckConstraint(
@@ -273,6 +275,7 @@ class SavedRun(models.Model):
             models.Index(fields=["-created_at"]),
             models.Index(fields=["-updated_at"]),
             models.Index(fields=["workflow"]),
+            models.Index(fields=["run_id", "uid"]),
             models.Index(fields=["workflow", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "hidden"]),
@@ -699,8 +702,8 @@ class ConversationQuerySet(models.QuerySet):
                     .replace(tzinfo=None)
                 )
                 row |= {
-                    "Last Sent": last_time.strftime("%b %d, %Y %I:%M %p"),
-                    "First Sent": first_time.strftime("%b %d, %Y %I:%M %p"),
+                    "Last Sent": last_time.strftime(settings.SHORT_DATETIME_FORMAT),
+                    "First Sent": first_time.strftime(settings.SHORT_DATETIME_FORMAT),
                     "A7": not convo.d7(),
                     "A30": not convo.d30(),
                     "R1": last_time - first_time < datetime.timedelta(days=1),
@@ -717,7 +720,26 @@ class ConversationQuerySet(models.QuerySet):
                 "Bot": str(convo.bot_integration),
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=[
+                "Name",
+                "Messages",
+                "Correct Answers",
+                "Thumbs up",
+                "Thumbs down",
+                "Last Sent",
+                "First Sent",
+                "A7",
+                "A30",
+                "R1",
+                "R7",
+                "R30",
+                "Delta Hours",
+                "Created At",
+                "Bot",
+            ],
+        )
         return df
 
 
@@ -906,14 +928,31 @@ class MessageQuerySet(models.QuerySet):
                 "Message (EN)": message.content,
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%b %d, %Y %I:%M %p"),
-                "Feedback": message.feedbacks.first().get_display_text()
-                if message.feedbacks.first()
-                else None,  # only show first feedback as per Sean's request
+                .strftime(settings.SHORT_DATETIME_FORMAT),
+                "Feedback": (
+                    message.feedbacks.first().get_display_text()
+                    if message.feedbacks.first()
+                    else None
+                ),  # only show first feedback as per Sean's request
                 "Analysis JSON": message.analysis_result,
+                "Response Time": (
+                    message.response_time
+                    and round(message.response_time.total_seconds(), 1)
+                ),
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=[
+                "Name",
+                "Role",
+                "Message (EN)",
+                "Sent",
+                "Feedback",
+                "Analysis JSON",
+                "Response Time",
+            ],
+        )
         return df
 
     def to_df_analysis_format(
@@ -921,21 +960,24 @@ class MessageQuerySet(models.QuerySet):
     ) -> "pd.DataFrame":
         import pandas as pd
 
-        qs = self.filter(role=CHATML_ROLE_USER).prefetch_related("feedbacks")
+        qs = self.filter(role=CHATML_ROLE_ASSISSTANT).prefetch_related("feedbacks")
         rows = []
         for message in qs[:row_limit]:
             message: Message
             row = {
                 "Name": message.conversation.get_display_name(),
-                "Question (EN)": message.content,
-                "Answer (EN)": message.get_next_by_created_at().content,
+                "Question (EN)": message.get_previous_by_created_at().content,
+                "Answer (EN)": message.content,
                 "Sent": message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%b %d, %Y %I:%M %p"),
+                .strftime(settings.SHORT_DATETIME_FORMAT),
                 "Analysis JSON": message.analysis_result,
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=["Name", "Question (EN)", "Answer (EN)", "Sent", "Analysis JSON"],
+        )
         return df
 
     def as_llm_context(self, limit: int = 100) -> list["ConversationEntry"]:
@@ -1015,6 +1057,12 @@ class Message(models.Model):
         blank=True,
         default="",
         help_text="Subject of given question (DEPRECATED)",
+    )
+
+    response_time = models.DurationField(
+        default=None,
+        null=True,
+        help_text="The time it took for the bot to respond to the corresponding user message",
     )
 
     _analysis_started = False
@@ -1107,20 +1155,33 @@ class FeedbackQuerySet(models.QuerySet):
                 "Question Sent": feedback.message.get_previous_by_created_at()
                 .created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%b %d, %Y %I:%M %p"),
+                .strftime(settings.SHORT_DATETIME_FORMAT),
                 "Answer (EN)": feedback.message.content,
                 "Answer Sent": feedback.message.created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%b %d, %Y %I:%M %p"),
+                .strftime(settings.SHORT_DATETIME_FORMAT),
                 "Rating": Feedback.Rating(feedback.rating).label,
                 "Feedback (EN)": feedback.text_english,
                 "Feedback Sent": feedback.created_at.astimezone(tz)
                 .replace(tzinfo=None)
-                .strftime("%b %d, %Y %I:%M %p"),
+                .strftime(settings.SHORT_DATETIME_FORMAT),
                 "Question Answered": feedback.message.question_answered,
             }
             rows.append(row)
-        df = pd.DataFrame.from_records(rows)
+        df = pd.DataFrame.from_records(
+            rows,
+            columns=[
+                "Name",
+                "Question (EN)",
+                "Question Sent",
+                "Answer (EN)",
+                "Answer Sent",
+                "Rating",
+                "Feedback (EN)",
+                "Feedback Sent",
+                "Question Answered",
+            ],
+        )
         return df
 
 

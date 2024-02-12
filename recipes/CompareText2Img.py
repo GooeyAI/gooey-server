@@ -64,9 +64,9 @@ class CompareText2ImgPage(BasePage):
         seed: int | None
         sd_2_upscaling: bool | None
 
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in Text2ImgModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in Text2ImgModels)]] | None
+        )
         scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
 
         edit_instruction: str | None
@@ -96,7 +96,7 @@ class CompareText2ImgPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### 👩‍💻 Prompt
+            #### 👩‍💻 Prompt
             Describe the scene that you'd like to generate.
             """,
             key="text_prompt",
@@ -246,7 +246,9 @@ class CompareText2ImgPage(BasePage):
         for key in selected_models:
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
-                st.image(img, caption=Text2ImgModels[key].value)
+                st.image(
+                    img, caption=Text2ImgModels[key].value, show_download_button=True
+                )
 
     def preview_description(self, state: dict) -> str:
         return "Create multiple AI photos from one prompt using Stable Diffusion (1.5 -> 2.1, Open/Midjourney), DallE, and other models.  Find out which AI Image generator works best for your text prompt on comparing OpenAI, Stability.AI etc."

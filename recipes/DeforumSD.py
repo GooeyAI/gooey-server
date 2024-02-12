@@ -423,8 +423,8 @@ Choose fps for the video.
     def render_output(self):
         output_video = st.session_state.get("output_video")
         if output_video:
-            st.write("Output Video")
-            st.video(output_video, autoplay=True)
+            st.write("#### Output Video")
+            st.video(output_video, autoplay=True, show_download_button=True)
 
     def estimate_run_duration(self):
         # in seconds

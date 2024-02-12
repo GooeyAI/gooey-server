@@ -28,7 +28,7 @@ def prompt_vars_widget(*keys: str, variables_key: str = "variables"):
     if not (template_vars or err):
         return
 
-    st.write("##### ⌥ Variables")
+    st.write("#### ⌥ Variables")
     old_state = st.session_state.get(variables_key, {})
     new_state = {}
     for name in sorted(template_vars):

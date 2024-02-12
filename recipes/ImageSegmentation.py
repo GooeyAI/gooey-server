@@ -49,9 +49,9 @@ class ImageSegmentationPage(BasePage):
     class RequestModel(BaseModel):
         input_image: str
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in ImageSegmentationModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None
+        )
         mask_threshold: float | None
 
         rect_persepective_transform: bool | None
@@ -86,7 +86,7 @@ class ImageSegmentationPage(BasePage):
     def render_form_v2(self):
         st.file_uploader(
             """
-            ### Input Photo
+            #### Input Photo
             Give us a photo of anything
             """,
             key="input_image",
@@ -342,7 +342,7 @@ class ImageSegmentationPage(BasePage):
         with col1:
             input_image = state.get("input_image")
             if input_image:
-                st.image(input_image, caption="Input Photo")
+                st.image(input_image, caption="Input Photo", show_download_button=True)
             else:
                 st.div()
 

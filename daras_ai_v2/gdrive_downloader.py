@@ -5,6 +5,8 @@ from furl import furl
 from googleapiclient import discovery
 from googleapiclient.http import MediaIoBaseDownload
 
+from daras_ai_v2.functional import flatmap_parallel
+
 
 def is_gdrive_url(f: furl) -> bool:
     return f.host in ["drive.google.com", "docs.google.com"]
@@ -23,6 +25,35 @@ def url_to_gdrive_file_id(f: furl) -> str:
         except (IndexError, ValueError):
             raise ValueError(f"Bad google drive link: {str(f)!r}")
     return file_id
+
+
+def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str]:
+    if max_depth <= 0:
+        return []
+    assert f.host == "drive.google.com", f"Bad google drive folder url: {f}"
+    # get drive folder id from url (e.g. https://drive.google.com/drive/folders/1Xijcsj7oBvDn1OWx4UmNAT8POVKG4W73?usp=drive_link)
+    folder_id = f.path.segments[-1]
+    service = discovery.build("drive", "v3")
+    request = service.files().list(
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+        q=f"'{folder_id}' in parents",
+        fields="files(mimeType,webViewLink)",
+    )
+    response = request.execute()
+    files = response.get("files", [])
+    urls = flatmap_parallel(
+        lambda file: (
+            gdrive_list_urls_of_files_in_folder(furl(url), max_depth=max_depth - 1)
+            if (
+                (url := file.get("webViewLink"))
+                and file.get("mimeType") == "application/vnd.google-apps.folder"
+            )
+            else [url]
+        ),
+        files,
+    )
+    return filter(None, urls)
 
 
 def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:

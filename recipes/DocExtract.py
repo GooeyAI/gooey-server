@@ -77,9 +77,9 @@ class DocExtractPage(BasePage):
 
         task_instructions: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -94,11 +94,11 @@ class DocExtractPage(BasePage):
 
     def render_form_v2(self):
         document_uploader(
-            "##### 🤖 Youtube URLS",
+            "#### 🤖 Youtube URLS",
             accept=("audio/*", "application/pdf", "video/*"),
         )
         st.text_input(
-            "##### 📊 Google Sheets URL",
+            "#### 📊 Google Sheets URL",
             key="sheet_url",
         )
 

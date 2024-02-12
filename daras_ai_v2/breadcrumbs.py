@@ -31,7 +31,7 @@ class TitleBreadCrumbs(typing.NamedTuple):
         return bool(self.root_title or self.published_title)
 
 
-def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs):
+def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, is_api_call: bool = False):
     st.html(
         """
         <style>
@@ -67,6 +67,9 @@ def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs):
                 breadcrumbs.published_title.title,
                 link_to=breadcrumbs.published_title.url,
             )
+
+        if is_api_call:
+            st.caption("(API)")
 
 
 def get_title_breadcrumbs(

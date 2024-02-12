@@ -88,18 +88,18 @@ class QRCodeGeneratorPage(BasePage):
         text_prompt: str
         negative_prompt: str | None
         image_prompt: str | None
-        image_prompt_controlnet_models: list[
-            typing.Literal[tuple(e.name for e in ControlNetModels)], ...
-        ] | None
+        image_prompt_controlnet_models: (
+            list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
+        )
         image_prompt_strength: float | None
         image_prompt_scale: float | None
         image_prompt_pos_x: float | None
         image_prompt_pos_y: float | None
 
         selected_model: typing.Literal[tuple(e.name for e in Text2ImgModels)] | None
-        selected_controlnet_model: list[
-            typing.Literal[tuple(e.name for e in ControlNetModels)], ...
-        ] | None
+        selected_controlnet_model: (
+            list[typing.Literal[tuple(e.name for e in ControlNetModels)], ...] | None
+        )
 
         output_width: int | None
         output_height: int | None
@@ -144,7 +144,7 @@ class QRCodeGeneratorPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ##### 👩‍💻 Prompt
+            #### 👩‍💻 Prompt
             Describe the subject/scene of the QR Code.
             Choose clear prompts and distinguishable visuals to ensure optimal readability.
             """,
@@ -208,7 +208,7 @@ class QRCodeGeneratorPage(BasePage):
 
         st.file_uploader(
             """
-            ##### 🏞️ Reference Image *[optional]*
+            #### 🏞️ Reference Image *[optional]*
             This image will be used as inspiration to blend with the QR Code.
             """,
             key="image_prompt",
@@ -436,7 +436,7 @@ Here is the final output:
         if max_count:
             output_images = output_images[:max_count]
         for img in output_images:
-            st.image(img)
+            st.image(img, show_download_button=True)
             qr_code_data = (
                 state.get(QrSources.qr_code_data.name)
                 or state.get(QrSources.qr_code_input_image.name)
@@ -566,20 +566,9 @@ def vcard_form(*, key: str) -> VCARD:
             st.error("No contact info found for that email")
         else:
             vcard = imported_vcard
-            # clear inputs
-            st.js(
-                # language=js
-                """
-                const form = document.getElementById("gooey-form");
-                if (!form) return;
-                Object.entries(fields).forEach(([k, v]) => {
-                    const field = form["__vcard_data__" + k];
-                    if (!field) return;
-                    field.value = v;
-                });
-                """,
-                fields=vcard.dict(),
-            )
+            # update inputs
+            for k, v in vcard.dict().items():
+                st.session_state[f"__vcard_data__{k}"] = v
 
     vcard.format_name = st.text_input(
         "Name*",

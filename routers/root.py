@@ -31,6 +31,7 @@ from daras_ai_v2.base import (
     RedirectException,
     get_example_request_body,
 )
+from daras_ai_v2.bots import request_json
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -163,6 +164,11 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
 async def logout(request: Request):
     request.session.pop(FIREBASE_SESSION_COOKIE, None)
     return RedirectResponse(request.query_params.get("next", DEFAULT_LOGOUT_REDIRECT))
+
+
+@app.post("/__/file-upload/url/meta")
+async def file_upload(request: Request, body_json: dict = Depends(request_json)):
+    return dict(name=(body_json["url"]), type="url/undefined", size=None)
 
 
 @app.post("/__/file-upload/")

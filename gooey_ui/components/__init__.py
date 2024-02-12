@@ -217,6 +217,7 @@ def image(
     caption: str = None,
     alt: str = None,
     href: str = None,
+    show_download_button: bool = False,
     **props,
 ):
     if isinstance(src, np.ndarray):
@@ -241,9 +242,18 @@ def image(
             **props,
         ),
     ).mount()
+    if show_download_button:
+        download_button(
+            label='<i class="fa-regular fa-download"></i> Download', url=src
+        )
 
 
-def video(src: str, caption: str = None, autoplay: bool = False):
+def video(
+    src: str,
+    caption: str = None,
+    autoplay: bool = False,
+    show_download_button: bool = False,
+):
     autoplay_props = {}
     if autoplay:
         autoplay_props = {
@@ -266,15 +276,23 @@ def video(src: str, caption: str = None, autoplay: bool = False):
         name="video",
         props=dict(src=src, caption=dedent(caption), **autoplay_props),
     ).mount()
+    if show_download_button:
+        download_button(
+            label='<i class="fa-regular fa-download"></i> Download', url=src
+        )
 
 
-def audio(src: str, caption: str = None):
+def audio(src: str, caption: str = None, show_download_button: bool = False):
     if not src:
         return
     state.RenderTreeNode(
         name="audio",
         props=dict(src=src, caption=dedent(caption)),
     ).mount()
+    if show_download_button:
+        download_button(
+            label='<i class="fa-regular fa-download"></i> Download', url=src
+        )
 
 
 def text_area(
@@ -293,9 +311,7 @@ def text_area(
     #     assert not value, "only one of value or key can be provided"
     # else:
     if not key:
-        key = md5_values(
-            "textarea", label, height, help, value, placeholder, label_visibility
-        )
+        key = md5_values("textarea", label, height, help, placeholder, label_visibility)
     value = str(state.session_state.setdefault(key, value) or "")
     if label_visibility != "visible":
         label = None
@@ -417,6 +433,28 @@ def selectbox(
     return value
 
 
+def download_button(
+    label: str,
+    url: str,
+    key: str = None,
+    help: str = None,
+    *,
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
+    disabled: bool = False,
+    **props,
+) -> bool:
+    return button(
+        component="download-button",
+        url=url,
+        label=label,
+        key=key,
+        help=help,
+        type=type,
+        disabled=disabled,
+        **props,
+    )
+
+
 def button(
     label: str,
     key: str = None,
@@ -424,6 +462,7 @@ def button(
     *,
     type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
     disabled: bool = False,
+    component: typing.Literal["download-button", "gui-button"] = "gui-button",
     **props,
 ) -> bool:
     """
@@ -437,7 +476,7 @@ def button(
         key = md5_values("button", label, help, type, props)
     className = f"btn-{type} " + props.pop("className", "")
     state.RenderTreeNode(
-        name="gui-button",
+        name=component,
         props=dict(
             type="submit",
             value="yes",

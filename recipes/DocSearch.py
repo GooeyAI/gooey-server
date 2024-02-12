@@ -61,9 +61,9 @@ class DocSearchPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -82,8 +82,8 @@ class DocSearchPage(BasePage):
         final_search_query: str | None
 
     def render_form_v2(self):
-        st.text_area("##### Search Query", key="search_query")
-        document_uploader("##### Documents")
+        st.text_area("#### Search Query", key="search_query")
+        document_uploader("#### Documents")
         prompt_vars_widget("task_instructions", "query_instructions")
 
     def validate_form_v2(self):
@@ -111,7 +111,7 @@ class DocSearchPage(BasePage):
 
     def render_example(self, state: dict):
         render_documents(state)
-        st.write("**Search Query**")
+        st.html("**Search Query**")
         st.write("```properties\n" + state.get("search_query", "") + "\n```")
         render_output_with_refs(state, 200)
 

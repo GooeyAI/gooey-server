@@ -115,7 +115,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            #### Prompt
             Describe the scene that you'd like to generate around the face. 
             """,
             key="text_prompt",
@@ -130,7 +130,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         source = st.radio(
             """
-            ### Photo Source
+            #### Photo Source
             From where we should get the photo?""",
             options=["Email Address", "Twitter Handle"],
             key="__photo_source",

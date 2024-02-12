@@ -82,14 +82,14 @@ class AsrPage(BasePage):
 
     def render_form_v2(self):
         document_uploader(
-            "##### Audio Files",
+            "#### Audio Files",
             accept=("audio/*", "video/*", "application/octet-stream"),
         )
         col1, col2 = st.columns(2, responsive=False)
         with col1:
             selected_model = enum_selector(
                 AsrModels,
-                label="##### ASR Model",
+                label="#### ASR Model",
                 key="selected_model",
                 use_selectbox=True,
             )

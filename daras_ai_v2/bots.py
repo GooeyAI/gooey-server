@@ -1,9 +1,11 @@
 import mimetypes
 import traceback
 import typing
+from datetime import datetime
 from urllib.parse import parse_qs
 
 from django.db import transaction
+from django.utils import timezone
 from fastapi import HTTPException, Request
 from furl import furl
 from sentry_sdk import capture_exception
@@ -188,6 +190,7 @@ def _on_msg(bot: BotInterface):
     speech_run = None
     input_images = None
     input_documents = None
+    recieved_time: datetime = timezone.now()
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
@@ -272,6 +275,7 @@ def _on_msg(bot: BotInterface):
             input_documents=input_documents,
             input_text=input_text,
             speech_run=speech_run,
+            recieved_time=recieved_time,
         )
 
 
@@ -310,6 +314,7 @@ def _process_and_send_msg(
     input_images: list[str] | None,
     input_documents: list[str] | None,
     input_text: str,
+    recieved_time: datetime,
     speech_run: str | None,
 ):
     # get latest messages for context (upto 100)
@@ -428,6 +433,7 @@ def _process_and_send_msg(
         platform_msg_id=sent_msg_id or update_msg_id,
         response=VideoBotsPage.ResponseModel.parse_obj(state),
         url=page.app_url(run_id=run_id, uid=uid),
+        received_time=recieved_time,
     )
 
 
@@ -440,6 +446,7 @@ def _save_msgs(
     platform_msg_id: str | None,
     response: VideoBotsPage.ResponseModel,
     url: str,
+    received_time: datetime,
 ):
     # create messages for future context
     user_msg = Message(
@@ -448,11 +455,14 @@ def _save_msgs(
         role=CHATML_ROLE_USER,
         content=response.raw_input_text,
         display_content=input_text,
-        saved_run=SavedRun.objects.get_or_create(
-            workflow=Workflow.ASR, **furl(speech_run).query.params
-        )[0]
-        if speech_run
-        else None,
+        saved_run=(
+            SavedRun.objects.get_or_create(
+                workflow=Workflow.ASR, **furl(speech_run).query.params
+            )[0]
+            if speech_run
+            else None
+        ),
+        response_time=timezone.now() - received_time,
     )
     attachments = []
     for f_url in (input_images or []) + (input_documents or []):
@@ -469,6 +479,7 @@ def _save_msgs(
         saved_run=SavedRun.objects.get_or_create(
             workflow=Workflow.VIDEO_BOTS, **furl(url).query.params
         )[0],
+        response_time=timezone.now() - received_time,
     )
     # save the messages & attachments
     with transaction.atomic():
@@ -498,13 +509,25 @@ def _handle_interactive_msg(bot: BotInterface):
                 return
             if button_id == ButtonIds.feedback_thumbs_up:
                 rating = Feedback.Rating.RATING_THUMBS_UP
-                bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
-                response_text = FEEDBACK_THUMBS_UP_MSG
+                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
+                # response_text = FEEDBACK_THUMBS_UP_MSG
             else:
                 rating = Feedback.Rating.RATING_THUMBS_DOWN
-                bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
-                response_text = FEEDBACK_THUMBS_DOWN_MSG
+                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
+                # response_text = FEEDBACK_THUMBS_DOWN_MSG
+            response_text = FEEDBACK_CONFIRMED_MSG.format(
+                bot_name=str(bot.convo.bot_integration.name)
+            )
             bot.convo.save()
+            # save the feedback
+            Feedback.objects.create(message=context_msg, rating=rating)
+            # send a confirmation msg + post click buttons
+            bot.send_msg(
+                text=response_text,
+                # buttons=_feedback_post_click_buttons(),
+                should_translate=True,
+            )
+
         # handle skip
         case ButtonIds.action_skip:
             bot.send_msg(text=TAPPED_SKIP_MSG, should_translate=True)
@@ -512,6 +535,7 @@ def _handle_interactive_msg(bot: BotInterface):
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
             return
+
         # not sure what button was pressed, ignore
         case _:
             bot_name = str(bot.convo.bot_integration.name)
@@ -523,14 +547,6 @@ def _handle_interactive_msg(bot: BotInterface):
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
             return
-    # save the feedback
-    Feedback.objects.create(message=context_msg, rating=rating)
-    # send a confirmation msg + post click buttons
-    bot.send_msg(
-        text=response_text,
-        buttons=_feedback_post_click_buttons(),
-        should_translate=True,
-    )
 
 
 def _handle_audio_msg(billing_account_user, bot: BotInterface):
