@@ -48,6 +48,10 @@ class AsrPage(BasePage):
         raw_output_text: list[str] | None
         output_text: list[str | AsrOutputJson]
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["selected_model", "language", "google_translate_target"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_ASR_META_IMG
 

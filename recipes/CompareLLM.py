@@ -59,6 +59,10 @@ class CompareLLMPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Which language model works best your prompt? Compare your text generations across multiple large language models (LLMs) like OpenAI's evolving and latest ChatGPT engines and others like Curie, Ada, Babbage."
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["input_prompt", "selected_models"]
+
     def render_form_v2(self):
         st.text_area(
             """

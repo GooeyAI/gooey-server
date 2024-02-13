@@ -80,6 +80,10 @@ class DocSummaryPage(BasePage):
         prompt_tree: PromptTree | None
         final_prompt: str
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["task_instructions", "merge_instructions"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_DOC_SUMMARY_META_IMG
 
