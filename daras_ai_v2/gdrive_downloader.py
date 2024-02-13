@@ -2,8 +2,6 @@ import io
 import mimetypes
 
 from furl import furl
-from googleapiclient import discovery
-from googleapiclient.http import MediaIoBaseDownload
 
 from daras_ai_v2.functional import flatmap_parallel
 
@@ -28,6 +26,8 @@ def url_to_gdrive_file_id(f: furl) -> str:
 
 
 def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str]:
+    from googleapiclient import discovery
+
     if max_depth <= 0:
         return []
     assert f.host == "drive.google.com", f"Bad google drive folder url: {f}"
@@ -57,6 +57,9 @@ def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str
 
 
 def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
+    from googleapiclient import discovery
+    from googleapiclient.http import MediaIoBaseDownload
+
     # get drive file id
     file_id = url_to_gdrive_file_id(f)
     # get metadata
@@ -114,6 +117,8 @@ def docs_export_mimetype(f: furl) -> tuple[str, str]:
 
 
 def gdrive_metadata(file_id: str) -> dict:
+    from googleapiclient import discovery
+
     service = discovery.build("drive", "v3")
     metadata = (
         service.files()

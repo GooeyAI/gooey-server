@@ -1,7 +1,6 @@
 from enum import Enum
 
 import requests
-from google.cloud import texttospeech
 
 import gooey_ui as st
 from daras_ai_v2 import settings
@@ -383,7 +382,9 @@ def text_to_speech_settings(page):
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def google_tts_voices() -> dict[str, str]:
-    voices: list[texttospeech.Voice] = (
+    from google.cloud import texttospeech
+
+    voices: list[texttospeech.Voice] = list(
         texttospeech.TextToSpeechClient().list_voices().voices
     )
     voices.sort(key=_voice_sort_key)
@@ -397,7 +398,7 @@ def _pretty_voice(voice) -> str:
 _lang_code_sort = ["en-US", "en-IN", "en-GB", "en-AU"]
 
 
-def _voice_sort_key(voice: texttospeech.Voice):
+def _voice_sort_key(voice: "texttospeech.Voice"):
     try:
         lang_index = _lang_code_sort.index(voice.language_codes[0])
     except ValueError:
