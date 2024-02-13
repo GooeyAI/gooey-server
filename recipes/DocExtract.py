@@ -390,9 +390,11 @@ def process_source(
     )
 
     content_url = existing_values[Columns.content_url.value]
-    is_pdf = "application/pdf" in doc_meta.mime_type
     is_yt = is_yt_url(webpage_url)
-    is_video = "video/" in doc_meta.mime_type or "audio/" in doc_meta.mime_type
+    is_pdf = doc_meta and "application/pdf" in doc_meta.mime_type
+    is_video = doc_meta and (
+        "video/" in doc_meta.mime_type or "audio/" in doc_meta.mime_type
+    )
     if not content_url:
         yield "Downloading"
         if is_yt:
