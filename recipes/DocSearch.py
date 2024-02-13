@@ -81,6 +81,10 @@ class DocSearchPage(BasePage):
         final_prompt: str
         final_search_query: str | None
 
+    @classmethod
+    def get_example_preferred_fields(self, state: dict) -> list[str]:
+        return ["documents"]
+
     def render_form_v2(self):
         st.text_area("#### Search Query", key="search_query")
         document_uploader("#### Documents")

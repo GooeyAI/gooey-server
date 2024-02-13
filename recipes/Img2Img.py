@@ -72,6 +72,10 @@ class Img2ImgPage(BasePage):
     class ResponseModel(BaseModel):
         output_images: list[str]
 
+    @classmethod
+    def get_example_preferred_fields(self, state: dict) -> list[str]:
+        return ["text_prompt"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_IMG2IMG_META_IMG
 

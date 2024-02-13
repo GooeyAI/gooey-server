@@ -77,6 +77,10 @@ class CompareText2ImgPage(BasePage):
             typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
         ]
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["selected_models"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COMPARE_TEXT2IMG_META_IMG
 
