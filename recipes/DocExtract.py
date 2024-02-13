@@ -487,9 +487,12 @@ def process_source(
 
 
 def google_api_should_retry(e: Exception) -> bool:
-    return isinstance(e, HttpError) and (
-        e.resp.status in (408, 429) or e.resp.status > 500
-    )
+    from googleapiclient.errors import HttpError
+
+    return (
+        isinstance(e, HttpError)
+        and (e.resp.status in (408, 429) or e.resp.status > 500)
+    ) or isinstance(e, TimeoutError)
 
 
 @retry_if(google_api_should_retry)
