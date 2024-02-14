@@ -11,7 +11,6 @@ import typing
 import numpy as np
 import requests
 from furl import furl
-from googleapiclient.errors import HttpError
 from loguru import logger
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
@@ -24,16 +23,23 @@ from daras_ai.image_input import (
     get_mimetype_from_response,
 )
 from daras_ai_v2 import settings
-from daras_ai_v2.asr import AsrModels, run_asr, run_google_translate
+from daras_ai_v2.asr import (
+    AsrModels,
+    run_asr,
+    run_google_translate,
+    download_youtube_to_wav,
+)
 from daras_ai_v2.azure_doc_extract import (
     table_arr_to_prompt_chunked,
+    azure_form_recognizer,
+    extract_records,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )
 from daras_ai_v2.exceptions import raise_for_status, call_cmd, UserError
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
-from daras_ai_v2.functional import flatmap_parallel, map_parallel
+from daras_ai_v2.functional import flatmap_parallel, flatapply_parallel, map_parallel
 from daras_ai_v2.gdrive_downloader import (
     gdrive_download,
     is_gdrive_url,
@@ -90,20 +96,19 @@ def get_top_k_references(
     """
     yield "Fetching latest knowledge docs..."
     input_docs = request.documents or []
-    doc_metas = map_parallel(doc_url_to_metadata, input_docs)
+    file_metas = map_parallel(doc_url_to_file_metadata, input_docs)
 
-    yield "Creating knowledge embeddings..."
-    embeds: list[tuple[SearchReference, np.ndarray]] = flatmap_parallel(
-        lambda f_url, doc_meta: get_embeds_for_doc(
-            f_url=f_url,
-            doc_meta=doc_meta,
+    embeds: list[tuple[SearchReference, np.ndarray]] = yield from flatapply_parallel(
+        lambda args: get_embeds_for_doc(
+            f_url=args[0],
+            doc_meta=DocMetadata.from_file_metadata(args[1]),
             max_context_words=request.max_context_words,
             scroll_jump=request.scroll_jump,
             selected_asr_model=request.selected_asr_model,
             google_translate_target=request.google_translate_target,
         ),
-        input_docs,
-        doc_metas,
+        [args for d in file_metas for args in d.items()],
+        message="Creating knowledge embeddings...",
     )
     dense_query_embeds = openai_embedding_create([request.search_query])[0]
 
@@ -237,20 +242,20 @@ class DocMetadata(typing.NamedTuple):
         return cls(meta.name, meta.etag, meta.mime_type)
 
 
-def doc_url_to_metadata(f_url: str) -> DocMetadata:
-    """
-    Fetches the metadata for a document url
+def doc_url_to_file_metadata(f_url: str) -> dict[str, FileMetadata]:
+    from googleapiclient.errors import HttpError
 
-    Args:
-        f_url: document url
-
-    Returns:
-        document metadata
-    """
-    return DocMetadata.from_file_metadata(doc_url_to_file_metadata(f_url))
-
-
-def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
+    if is_yt_url(f_url):
+        entries = yt_dlp_get_video_entries(f_url)
+        return {
+            entry["webpage_url"]: FileMetadata(
+                name=entry.get("title", "YouTube Video"),
+                etag=entry.get("filesize_approx") or entry.get("upload_date"),
+                mime_type="audio/wav",  # we will later convert & save as wav
+                total_bytes=entry.get("filesize_approx", 0),
+            )
+            for entry in entries
+        }
     f = furl(f_url.strip("/"))
     if is_gdrive_url(f):
         # extract filename from google drive metadata
@@ -300,9 +305,26 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
     # guess mimetype from name as a fallback
     if not mime_type:
         mime_type = mimetypes.guess_type(name)[0]
-    return FileMetadata(
-        name=name, etag=etag, mime_type=mime_type, total_bytes=total_bytes
-    )
+    return {
+        f_url: FileMetadata(
+            name=name, etag=etag, mime_type=mime_type, total_bytes=total_bytes
+        )
+    }
+
+
+def yt_dlp_get_video_entries(url: str) -> list[dict]:
+    data = yt_dlp_extract_info(url)
+    entries = data.get("entries", [data])
+    return [e for e in entries if e]
+
+
+def yt_dlp_extract_info(url: str) -> dict:
+    import yt_dlp
+
+    # https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/options.py
+    params = dict(ignoreerrors=True, check_formats=False)
+    with yt_dlp.YoutubeDL(params) as ydl:
+        return ydl.extract_info(url, download=False)
 
 
 @redis_cache_decorator
@@ -515,6 +537,8 @@ def doc_url_to_text_pages(
 
 
 def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
+    if is_yt_url(f_url):
+        return download_youtube_to_wav(f_url), ".wav"
     f = furl(f_url)
     if is_gdrive_url(f):
         # download from google drive
@@ -524,7 +548,6 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
         r = requests.get(
             f_url,
             headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-            timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
         )
         raise_for_status(r)
     except requests.RequestException as e:
@@ -559,19 +582,20 @@ def bytes_to_text_pages_or_df(
     # convert document to text pages
     match ext:
         case ".pdf":
-            pages = pdf_to_text_pages(io.BytesIO(f_bytes))
+            pages = pdf_to_text_pages(f_url, f_name, f_bytes, mime_type)
         case ".docx" | ".md" | ".html" | ".rtf" | ".epub" | ".odt":
             pages = [pandoc_to_text(f_name + ext, f_bytes)]
         case ".txt":
             pages = [f_bytes.decode()]
         case ".wav" | ".ogg" | ".mp3" | ".aac":
-            if not selected_asr_model:
-                raise ValueError(
-                    "For transcribing audio/video, please choose an ASR model from the settings!"
-                )
-            if is_gdrive_url(furl(f_url)):
+            if is_gdrive_url(furl(f_url)) or is_yt_url(f_url):
                 f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
-            pages = [run_asr(f_url, selected_model=selected_asr_model, language="en")]
+            transcript = run_asr(
+                f_url,
+                selected_model=(selected_asr_model or AsrModels.whisper_large_v2.name),
+                language="en",
+            )
+            pages = [transcript]
         case _:
             df = bytes_to_df(f_name=f_name, f_bytes=f_bytes, ext=ext)
             assert (
@@ -580,6 +604,10 @@ def bytes_to_text_pages_or_df(
             return df
 
     return pages
+
+
+def is_yt_url(url: str) -> bool:
+    return "youtube.com" in url or "youtu.be" in url
 
 
 def bytes_to_df(
@@ -607,10 +635,20 @@ def bytes_to_df(
     return df.fillna("")
 
 
-def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
-    import pdftotext
-
-    return list(pdftotext.PDF(f))
+def pdf_to_text_pages(
+    f_url: str,
+    f_name: str,
+    f_bytes: bytes,
+    mime_type: str,
+) -> list[str]:
+    if is_gdrive_url(furl(f_url)):
+        f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
+    result = azure_form_recognizer(f_url, "prebuilt-layout")
+    return [
+        record["content"].strip()
+        for page in result["pages"]
+        for record in extract_records(result, page["pageNumber"])
+    ]
 
 
 def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:

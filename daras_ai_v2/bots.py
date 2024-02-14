@@ -466,7 +466,7 @@ def _save_msgs(
     )
     attachments = []
     for f_url in (input_images or []) + (input_documents or []):
-        metadata = doc_url_to_file_metadata(f_url)
+        metadata = doc_url_to_file_metadata(f_url)[f_url]
         attachments.append(
             MessageAttachment(message=user_msg, url=f_url, metadata=metadata)
         )

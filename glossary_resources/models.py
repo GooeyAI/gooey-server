@@ -12,7 +12,6 @@ from daras_ai_v2.glossary import (
 )
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.vector_search import (
-    doc_url_to_metadata,
     doc_url_to_file_metadata,
 )
 from daras_ai_v2.vector_search import (
@@ -25,7 +24,7 @@ from files.models import FileMetadata
 
 class GlossaryResourceQuerySet(models.QuerySet):
     def get_or_create_from_url(self, url: str) -> tuple["GlossaryResource", bool]:
-        metadata = doc_url_to_file_metadata(url)
+        metadata = doc_url_to_file_metadata(url)[url]
         try:
             return (
                 GlossaryResource.objects.get(

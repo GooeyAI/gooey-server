@@ -12,10 +12,10 @@ def validate_glossary_document(document: str):
     from daras_ai_v2.vector_search import (
         download_content_bytes,
         bytes_to_df,
-        doc_url_to_metadata,
+        doc_url_to_file_metadata,
     )
 
-    metadata = doc_url_to_metadata(document)
+    metadata = doc_url_to_file_metadata(document)[document]
     f_bytes, ext = download_content_bytes(f_url=document, mime_type=metadata.name)
     df = bytes_to_df(f_name=metadata.name, f_bytes=f_bytes, ext=ext)
 

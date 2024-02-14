@@ -20,7 +20,11 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.pt import PromptTree
 from daras_ai_v2.text_splitter import text_splitter
-from daras_ai_v2.vector_search import doc_url_to_text_pages, doc_url_to_metadata
+from daras_ai_v2.vector_search import (
+    doc_url_to_text_pages,
+    doc_url_to_file_metadata,
+    DocMetadata,
+)
 from recipes.DocSearch import (
     DocSearchPage,
     render_documents,
@@ -164,7 +168,9 @@ Prompt for merging several outputs together
 
         full_text = ""
         for f_url in request.documents:
-            doc_meta = doc_url_to_metadata(f_url)
+            doc_meta = DocMetadata.from_file_metadata(
+                doc_url_to_file_metadata(f_url)[f_url]
+            )
             pages = doc_url_to_text_pages(
                 f_url=f_url,
                 doc_meta=doc_meta,

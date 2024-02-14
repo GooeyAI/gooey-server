@@ -3,7 +3,6 @@ import os.path
 import tempfile
 from enum import Enum
 
-import langcodes
 import requests
 import typing_extensions
 from django.db.models import F
@@ -239,6 +238,8 @@ def google_translate_source_languages() -> dict[str, str]:
 
 
 def get_language_in_collection(langcode: str, languages):
+    import langcodes
+
     for lang in languages:
         if langcodes.get(lang).language == langcodes.get(langcode).language:
             return langcode
@@ -439,12 +440,13 @@ def run_asr(
     import google.cloud.speech_v2 as cloud_speech
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding
+    from daras_ai_v2.vector_search import is_yt_url
+    import langcodes
 
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
-    is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
-    if is_youtube_url:
-        audio_url, size = download_youtube_to_wav(audio_url)
+    if is_yt_url(audio_url):
+        audio_url, size = download_youtube_to_wav_url(audio_url)
     elif is_gdrive_url(furl(audio_url)):
         meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
         anybytes, ext = gdrive_download(
@@ -672,12 +674,18 @@ def _get_or_create_recognizer(
 FFMPEG_WAV_ARGS = ["-vn", "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000"]
 
 
-def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
+def download_youtube_to_wav_url(youtube_url: str) -> tuple[str, int]:
     """
     Convert a youtube video to wav audio file.
     Returns:
         str: url of the wav audio file.
     """
+    wavdata = download_youtube_to_wav(youtube_url)
+    # upload the wav file
+    return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
+
+
+def download_youtube_to_wav(youtube_url: str) -> bytes:
     with tempfile.TemporaryDirectory() as tmpdir:
         infile = os.path.join(tmpdir, "infile")
         outfile = os.path.join(tmpdir, "outfile.wav")
@@ -696,8 +704,7 @@ def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
         # read wav file into memory
         with open(outfile, "rb") as f:
             wavdata = f.read()
-    # upload the wav file
-    return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
+    return wavdata
 
 
 def audio_url_to_wav(audio_url: str) -> tuple[str, int]:

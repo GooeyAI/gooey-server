@@ -16,8 +16,8 @@ from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.vector_search import (
-    doc_url_to_metadata,
     download_content_bytes,
+    doc_url_to_file_metadata,
 )
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
@@ -688,7 +688,7 @@ def get_columns(files: list[str]) -> list[str]:
 def read_df_any(f_url: str) -> "pd.DataFrame":
     import pandas as pd
 
-    doc_meta = doc_url_to_metadata(f_url)
+    doc_meta = doc_url_to_file_metadata(f_url)[f_url]
     f_bytes, ext = download_content_bytes(f_url=f_url, mime_type=doc_meta.mime_type)
 
     f = io.BytesIO(f_bytes)
