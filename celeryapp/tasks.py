@@ -123,7 +123,8 @@ def low_balance_email(sr: SavedRun):
         last_positive_transaction = timezone.now() - datetime.timedelta(days=8)
     if (
         user.is_paying
-        and user.balance < 500
+        and user.balance < settings.EMAIL_CREDITS_THRESHOLD
+        and settings.ALLOW_SENDING_CREDIT_EMAILS
         and (
             user.low_balance_email_sent_at == None
             or user.low_balance_email_sent_at
