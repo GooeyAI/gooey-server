@@ -26,9 +26,9 @@ UBERDUCK_VOICES = {
 
 
 class TextToSpeechProviders(Enum):
-    GOOGLE_TTS = "Google Cloud Text-to-Speech"
+    GOOGLE_TTS = "Google Text-to-Speech"
     ELEVEN_LABS = "Eleven Labs"
-    UBERDUCK = "uberduck.ai"
+    UBERDUCK = "Uberduck.ai"
     BARK = "Bark (suno-ai)"
 
 
@@ -162,11 +162,12 @@ def text_to_speech_settings(
     else:
         tts_provider = st.session_state.get("tts_provider")
 
-    if not include_settings:
-        return
     col = col2 if include_selector else st.div()
     match tts_provider:
         case TextToSpeechProviders.BARK.name:
+            if not include_settings:
+                return
+
             with col:
                 st.selectbox(
                     label="""
@@ -178,19 +179,23 @@ def text_to_speech_settings(
                 )
 
         case TextToSpeechProviders.GOOGLE_TTS.name:
-            with col:
-                voices = google_tts_voices()
-                st.selectbox(
-                    label="""
-                    ###### Voice name (Google TTS)
-                    """,
-                    key="google_voice_name",
-                    format_func=voices.__getitem__,
-                    options=voices.keys(),
-                )
-                st.caption(
-                    "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*"
-                )
+            with col2:
+                if include_selector:
+                    voices = google_tts_voices()
+                    st.selectbox(
+                        label="""
+                        ###### Voice name (Google TTS)
+                        """,
+                        key="google_voice_name",
+                        format_func=voices.__getitem__,
+                        options=voices.keys(),
+                    )
+                    st.caption(
+                        "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*"
+                    )
+
+            if not include_settings:
+                return
 
             col1, col2 = st.columns(2)
             with col1:
@@ -217,18 +222,21 @@ def text_to_speech_settings(
                 )
 
         case TextToSpeechProviders.UBERDUCK.name:
-            with col:
-                st.selectbox(
-                    label="""
-                    ###### Voice name (Uberduck)
-                    """,
-                    key="uberduck_voice_name",
-                    format_func=lambda option: f"{option}",
-                    options=UBERDUCK_VOICES.keys(),
-                )
+            with col2:
+                if include_selector:
+                    st.selectbox(
+                        label="""
+                        ###### Voice name (Uberduck)
+                        """,
+                        key="uberduck_voice_name",
+                        format_func=lambda option: f"{option}",
+                        options=UBERDUCK_VOICES.keys(),
+                    )
 
-            col1, col2 = st.columns(2)
-            with col1:
+            if not include_settings:
+                return
+
+            with col:
                 st.slider(
                     """
                     ###### Speaking rate
@@ -241,6 +249,20 @@ def text_to_speech_settings(
                 )
 
         case TextToSpeechProviders.ELEVEN_LABS.name:
+            if include_selector:
+                with col2:
+                    st.selectbox(
+                        """
+                        ###### Voice Name (ElevenLabs)
+                        """,
+                        key="elevenlabs_voice_name",
+                        format_func=str,
+                        options=ELEVEN_LABS_VOICES.keys(),
+                    )
+
+            if not include_settings:
+                return
+
             with col:
                 if not st.session_state.get("elevenlabs_api_key"):
                     st.session_state["elevenlabs_api_key"] = page.request.session.get(
@@ -248,9 +270,10 @@ def text_to_speech_settings(
                     )
 
                 elevenlabs_use_custom_key = st.checkbox(
-                    "Use custom API key + Voice ID",
+                    "Use custom ElevenLabs API key + Voice ID",
                     value=bool(st.session_state.get("elevenlabs_api_key")),
                 )
+
                 if elevenlabs_use_custom_key:
                     st.session_state["elevenlabs_voice_name"] = None
                     elevenlabs_api_key = st.text_input(
@@ -307,14 +330,6 @@ def text_to_speech_settings(
 
                     st.session_state.update(
                         elevenlabs_api_key=None, elevenlabs_voice_id=None
-                    )
-                    st.selectbox(
-                        """
-                        ###### Voice Name (ElevenLabs)
-                        """,
-                        key="elevenlabs_voice_name",
-                        format_func=str,
-                        options=ELEVEN_LABS_VOICES.keys(),
                     )
 
                 page.request.session[SESSION_ELEVENLABS_API_KEY] = st.session_state.get(
