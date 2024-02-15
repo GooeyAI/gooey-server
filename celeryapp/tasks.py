@@ -16,6 +16,7 @@ from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
 from gooey_ui.state import set_query_params
+from gooeysite.bg_db_conn import db_middleware, next_db_safe
 
 
 @app.task
@@ -40,6 +41,7 @@ def gui_runner(
     error_msg = None
     set_query_params(query_params or {})
 
+    @db_middleware
     def save(done=False):
         if done:
             # clear run status
@@ -81,7 +83,7 @@ def gui_runner(
             start_time = time()
             try:
                 # advance the generator (to further progress of run())
-                yield_val = next(gen)
+                yield_val = next_db_safe(gen)
                 # increment total time taken after every iteration
                 run_time += time() - start_time
                 continue
