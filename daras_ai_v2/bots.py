@@ -26,7 +26,7 @@ from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooey_ui.pubsub import realtime_subscribe
-from gooeysite.bg_db_conn import db_middleware
+from gooeysite.bg_db_conn import db_middleware, get_celery_result_db_safe
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
 
@@ -392,7 +392,7 @@ def _process_and_send_msg(
                     break  # we're done streaming, abort
 
     # wait for the celery task to finish
-    result.get(disable_sync_subtasks=False)
+    get_celery_result_db_safe(result)
     # get the final state from db
     state = page.run_doc_sr(run_id, uid).to_dict()
     # check for errors

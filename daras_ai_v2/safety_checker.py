@@ -2,6 +2,7 @@ from app_users.models import AppUser
 from daras_ai_v2.azure_image_moderation import is_image_nsfw
 from daras_ai_v2.functional import flatten
 from daras_ai_v2 import settings
+from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.CompareLLM import CompareLLMPage
 
 
@@ -31,7 +32,7 @@ def safety_checker_text(text_input: str):
     )
 
     # wait for checker
-    result.get(disable_sync_subtasks=False)
+    get_celery_result_db_safe(result)
     sr.refresh_from_db()
     # if checker failed, raise error
     if sr.error_msg:

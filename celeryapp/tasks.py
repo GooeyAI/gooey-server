@@ -16,10 +16,7 @@ from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
 from gooey_ui.state import set_query_params
-from gooeysite.bg_db_conn import db_middleware
-
-# workaround for - https://code.djangoproject.com/ticket/24810
-next_db_safe = db_middleware(next)
+from gooeysite.bg_db_conn import db_middleware, next_db_safe
 
 
 @app.task
