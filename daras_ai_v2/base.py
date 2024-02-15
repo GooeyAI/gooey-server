@@ -1257,6 +1257,13 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
     ) -> typing.Iterator[str | None]:
         raise NotImplementedError
 
+    def _render_dropdown_options(self, options: list[str], key: str):
+        return st.selectbox(
+            "",
+            options,
+            key=key,
+        )
+
     def _render_report_button(self):
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         # only logged in users can report a run (but not examples/default runs)
@@ -1524,6 +1531,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 st.session_state[StateKeys.pressed_randomize] = True
                 st.experimental_rerun()
 
+        self._render_dropdown_options(["Report"], key="--options-dropdown")
         render_output_caption()
 
     def state_to_doc(self, state: dict):
