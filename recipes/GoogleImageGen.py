@@ -206,8 +206,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         out_imgs = st.session_state.get("output_images")
         if out_imgs:
             for img in out_imgs:
-                st.image(img, caption="#### Generated Image")
-                self.render_buttons(img)
+                st.image(img, caption="#### Generated Image", show_download_button=True)
         else:
             st.div()
 

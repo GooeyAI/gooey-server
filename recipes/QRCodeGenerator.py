@@ -436,7 +436,7 @@ Here is the final output:
         if max_count:
             output_images = output_images[:max_count]
         for img in output_images:
-            st.image(img)
+            st.image(img, show_download_button=True)
             qr_code_data = (
                 state.get(QrSources.qr_code_data.name)
                 or state.get(QrSources.qr_code_input_image.name)
@@ -567,20 +567,9 @@ def vcard_form(*, key: str) -> VCARD:
             st.error("No contact info found for that email")
         else:
             vcard = imported_vcard
-            # clear inputs
-            st.js(
-                # language=js
-                """
-                const form = document.getElementById("gooey-form");
-                if (!form) return;
-                Object.entries(fields).forEach(([k, v]) => {
-                    const field = form["__vcard_data__" + k];
-                    if (!field) return;
-                    field.value = v;
-                });
-                """,
-                fields=vcard.dict(),
-            )
+            # update inputs
+            for k, v in vcard.dict().items():
+                st.session_state[f"__vcard_data__{k}"] = v
 
     vcard.format_name = st.text_input(
         "Name*",

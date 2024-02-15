@@ -137,3 +137,6 @@ class VisitorClickInfoAdmin(admin.ModelAdmin):
     ordering = ["-created_at"]
     autocomplete_fields = ["shortened_url"]
     actions = [export_to_csv, export_to_excel]
+    readonly_fields = [
+        "created_at",
+    ]

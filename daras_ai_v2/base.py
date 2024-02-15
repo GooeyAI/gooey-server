@@ -189,7 +189,7 @@ class BasePage:
 
     def refresh_state(self):
         _, run_id, uid = extract_query_params(gooey_get_query_params())
-        channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
+        channel = self.realtime_channel_name(run_id, uid)
         output = realtime_pull([channel])[0]
         if output:
             st.session_state.update(output)
@@ -197,7 +197,7 @@ class BasePage:
     def render(self):
         self.setup_render()
 
-        if self.get_run_state() == RecipeRunState.running:
+        if self.get_run_state(st.session_state) == RecipeRunState.running:
             self.refresh_state()
         else:
             realtime_clear_subs()
@@ -243,7 +243,12 @@ class BasePage:
 
                 if tbreadcrumbs:
                     with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                        render_breadcrumbs(tbreadcrumbs)
+                        render_breadcrumbs(
+                            tbreadcrumbs,
+                            is_api_call=(
+                                current_run.is_api_call and self.tab == MenuTabs.run
+                            ),
+                        )
 
                 author = self.run_user or current_run.get_creator()
                 if not is_root_example:
@@ -923,7 +928,7 @@ class BasePage:
     ) -> tuple[SavedRun, PublishedRun | None]:
         if run_id and uid:
             sr = cls.run_doc_sr(run_id, uid)
-            pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
+            pr = sr.parent_published_run()
         else:
             pr = cls.get_published_run(published_run_id=example_id or "")
             sr = pr.saved_run
@@ -940,9 +945,7 @@ class BasePage:
     ) -> PublishedRun | None:
         if run_id and uid:
             sr = cls.get_sr_from_query_params(example_id, run_id, uid)
-            return (
-                sr and sr.parent_version and sr.parent_version.published_run
-            ) or None
+            return sr.parent_published_run()
         elif example_id:
             return cls.get_published_run(published_run_id=example_id)
         else:
@@ -998,9 +1001,7 @@ class BasePage:
             workflow=cls.workflow,
             published_run_id="",
             defaults={
-                "saved_run": lambda: cls.run_doc_sr(
-                    run_id="", uid="", create=True, parent=None, parent_version=None
-                ),
+                "saved_run": lambda: cls.run_doc_sr(run_id="", uid="", create=True),
                 "created_by": None,
                 "last_edited_by": None,
                 "title": cls.title,
@@ -1024,15 +1025,11 @@ class BasePage:
         run_id: str,
         uid: str,
         create: bool = False,
-        parent: SavedRun | None = None,
-        parent_version: PublishedRunVersion | None = None,
+        defaults: dict = None,
     ) -> SavedRun:
         config = dict(workflow=cls.workflow, uid=uid, run_id=run_id)
         if create:
-            return SavedRun.objects.get_or_create(
-                **config,
-                defaults=dict(parent=parent, parent_version=parent_version),
-            )[0]
+            return SavedRun.objects.get_or_create(**config, defaults=defaults)[0]
         else:
             return SavedRun.objects.get(**config)
 
@@ -1311,12 +1308,13 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
         return submitted
 
-    def get_run_state(self) -> RecipeRunState:
-        if st.session_state.get(StateKeys.run_status):
+    @classmethod
+    def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
+        if state.get(StateKeys.run_status):
             return RecipeRunState.running
-        elif st.session_state.get(StateKeys.error_msg):
+        elif state.get(StateKeys.error_msg):
             return RecipeRunState.failed
-        elif st.session_state.get(StateKeys.run_time):
+        elif state.get(StateKeys.run_time):
             return RecipeRunState.completed
         else:
             # when user is at a recipe root, and not running anything
@@ -1335,7 +1333,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
         self._render_before_output()
 
-        run_state = self.get_run_state()
+        run_state = self.get_run_state(st.session_state)
         match run_state:
             case RecipeRunState.completed:
                 self._render_completed_output()
@@ -1349,11 +1347,15 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         # render outputs
         self.render_output()
 
-        if run_state != "waiting":
+        if run_state != RecipeRunState.running:
             self._render_after_output()
 
     def _render_completed_output(self):
+<<<<<<< HEAD
         run_time = st.session_state.get(StateKeys.run_time, 0)
+=======
+        pass
+>>>>>>> master
 
     def _render_failed_output(self):
         err_msg = st.session_state.get(StateKeys.error_msg)
@@ -1369,12 +1371,10 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         if not estimated_run_time:
             return
         if created_at := st.session_state.get("created_at"):
-            if isinstance(created_at, datetime.datetime):
-                start_time = created_at
-            else:
-                start_time = datetime.datetime.fromisoformat(created_at)
+            if isinstance(created_at, str):
+                created_at = datetime.datetime.fromisoformat(created_at)
             with st.countdown_timer(
-                end_time=start_time + datetime.timedelta(seconds=estimated_run_time),
+                end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
                 delay_text="Sorry for the wait. Your run is taking longer than we expected.",
             ):
                 if self.is_current_user_owner() and self.request.user.email:
@@ -1411,7 +1411,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             and not self.request.user.is_anonymous
         )
 
-    def create_new_run(self):
+    def create_new_run(self, is_api_call: bool = False):
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
@@ -1446,8 +1446,11 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             run_id,
             uid,
             create=True,
-            parent=parent,
-            parent_version=parent_version,
+            defaults=dict(
+                parent=parent,
+                parent_version=parent_version,
+                is_api_call=is_api_call,
+            ),
         ).set(self.state_to_doc(st.session_state))
 
         return None, run_id, uid
@@ -1461,12 +1464,15 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             run_id=run_id,
             uid=uid,
             state=st.session_state,
-            channel=f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}",
+            channel=self.realtime_channel_name(run_id, uid),
             query_params=self.clean_query_params(
                 example_id=example_id, run_id=run_id, uid=uid
             ),
             is_api_call=is_api_call,
         )
+
+    def realtime_channel_name(self, run_id, uid):
+        return f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
 
     def generate_credit_error_message(self, example_id, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"
@@ -1512,6 +1518,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.session_state.pop(field_name, None)
 
     def _render_after_output(self):
+<<<<<<< HEAD
         if "seed" in self.RequestModel.schema_json():
             randomize = st.button(
                 '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
@@ -1540,6 +1547,19 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             type="secondary",
         )
         self._render_report_button()
+=======
+        self._render_report_button()
+
+        if "seed" in self.RequestModel.schema_json():
+            randomize = st.button(
+                '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
+            )
+            if randomize:
+                st.session_state[StateKeys.pressed_randomize] = True
+                st.experimental_rerun()
+
+        render_output_caption()
+>>>>>>> master
 
     def state_to_doc(self, state: dict):
         ret = {
@@ -1914,6 +1934,26 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return bool(
             self.request and self.request.user and self.run_user == self.request.user
         )
+
+
+def render_output_caption():
+    caption = ""
+
+    run_time = st.session_state.get(StateKeys.run_time, 0)
+    if run_time:
+        caption += f'Generated in <span style="color: black;">{run_time :.2f}s</span>'
+
+    if seed := st.session_state.get("seed"):
+        caption += f' with seed <span style="color: black;">{seed}</span> '
+
+    created_at = st.session_state.get(StateKeys.created_at, datetime.datetime.today())
+    if created_at:
+        if isinstance(created_at, str):
+            created_at = datetime.datetime.fromisoformat(created_at)
+        format_created_at = created_at.strftime(settings.SHORT_DATETIME_FORMAT)
+        caption += f' at <span style="color: black;">{format_created_at}</span>'
+
+    st.caption(caption, unsafe_allow_html=True)
 
 
 def get_example_request_body(

@@ -112,7 +112,9 @@ def safe_filename(filename: str) -> str:
     return out
 
 
-def truncate_filename(text: str, maxlen: int = 100, sep: str = "...") -> str:
+def truncate_filename(
+    text: str | bytes, maxlen: int = 100, sep: str | bytes = "..."
+) -> str | bytes:
     if len(text) <= maxlen:
         return text
     assert len(sep) <= maxlen

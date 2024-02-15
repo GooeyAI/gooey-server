@@ -31,7 +31,7 @@ class TitleBreadCrumbs(typing.NamedTuple):
         return bool(self.root_title or self.published_title)
 
 
-def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs):
+def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs, *, is_api_call: bool = False):
     st.html(
         """
         <style>
@@ -68,6 +68,9 @@ def render_breadcrumbs(breadcrumbs: TitleBreadCrumbs):
                 link_to=breadcrumbs.published_title.url,
             )
 
+        if is_api_call:
+            st.caption("(API)")
+
 
 def get_title_breadcrumbs(
     page_cls: typing.Union["BasePage", typing.Type["BasePage"]],
@@ -89,11 +92,20 @@ def get_title_breadcrumbs(
     root_breadcrumb = TitleUrl(metadata.short_title, page_cls.app_url())
 
     match tab:
-        case MenuTabs.examples:
+        case MenuTabs.examples | MenuTabs.history | MenuTabs.saved:
+            label = MenuTabs.display_labels[tab]
             return TitleBreadCrumbs(
-                f"Examples: {metadata.short_title}",
+                f"{label}: {metadata.short_title}",
                 root_title=root_breadcrumb,
                 published_title=None,
+            )
+        case MenuTabs.run_as_api | MenuTabs.integrations:
+            label = MenuTabs.display_labels[tab]
+            tbreadcrumbs_on_run = get_title_breadcrumbs(page_cls=page_cls, sr=sr, pr=pr)
+            return TitleBreadCrumbs(
+                f"{label}: {tbreadcrumbs_on_run.h1_title}",
+                root_title=tbreadcrumbs_on_run.root_title or root_breadcrumb,
+                published_title=tbreadcrumbs_on_run.published_title,
             )
         case _ if is_root:
             return TitleBreadCrumbs(page_cls.get_recipe_title(), None, None)
@@ -118,4 +130,4 @@ def get_title_breadcrumbs(
                 published_title=published_title,
             )
         case _:
-            raise AssertionError("Invalid tab or run")
+            raise ValueError(f"Unknown tab: {tab}")

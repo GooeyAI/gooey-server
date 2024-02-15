@@ -1,9 +1,11 @@
 import mimetypes
 import traceback
 import typing
+from datetime import datetime
 from urllib.parse import parse_qs
 
 from django.db import transaction
+from django.utils import timezone
 from fastapi import HTTPException, Request
 from furl import furl
 from sentry_sdk import capture_exception
@@ -20,11 +22,13 @@ from bots.models import (
     MessageAttachment,
 )
 from daras_ai_v2.asr import AsrModels, run_google_translate
-from daras_ai_v2.base import BasePage
+from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
+from gooey_ui.pubsub import realtime_subscribe
 from gooeysite.bg_db_conn import db_middleware
 from recipes.VideoBots import VideoBotsPage, ReplyButton
+from routers.api import submit_api_call
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
@@ -47,7 +51,7 @@ Working on your answer…
 """.strip()
 
 ERROR_MSG = """
-`{0!r}`
+`{}`
 
 ⚠️ Sorry, I ran into an error while processing your request. Please try again, or type "Reset" to start over.
 """.strip()
@@ -59,6 +63,8 @@ FEEDBACK_CONFIRMED_MSG = (
 )
 
 TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
+
+SLACK_MAX_SIZE = 3000
 
 
 async def request_json(request: Request):
@@ -80,32 +86,12 @@ class BotInterface:
     input_type: str
     language: str
     show_feedback_buttons: bool = False
+    streaming_enabled: bool = False
+    can_update_message: bool = False
     convo: Conversation
     recieved_msg_id: str = None
     input_glossary: str | None = None
     output_glossary: str | None = None
-
-    def send_msg_or_default(
-        self,
-        *,
-        text: str | None = None,
-        audio: str = None,
-        video: str = None,
-        buttons: list[ReplyButton] = None,
-        documents: list[str] = None,
-        should_translate: bool = False,
-        default: str = DEFAULT_RESPONSE,
-    ):
-        if not (text or audio or video or documents):
-            text = default
-        return self.send_msg(
-            text=text,
-            audio=audio,
-            video=video,
-            buttons=buttons,
-            documents=documents,
-            should_translate=should_translate,
-        )
 
     def send_msg(
         self,
@@ -116,6 +102,7 @@ class BotInterface:
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
         should_translate: bool = False,
+        update_msg_id: str = None,
     ) -> str | None:
         raise NotImplementedError
 
@@ -166,6 +153,7 @@ class BotInterface:
         self.billing_account_uid = bi.billing_account_uid
         self.language = bi.user_language
         self.show_feedback_buttons = bi.show_feedback_buttons
+        self.streaming_enabled = bi.streaming_enabled
 
     def get_interactive_msg_info(self) -> tuple[str, str]:
         raise NotImplementedError("This bot does not support interactive messages.")
@@ -202,6 +190,7 @@ def _on_msg(bot: BotInterface):
     speech_run = None
     input_images = None
     input_documents = None
+    recieved_time: datetime = timezone.now()
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
@@ -286,6 +275,7 @@ def _on_msg(bot: BotInterface):
             input_documents=input_documents,
             input_text=input_text,
             speech_run=speech_run,
+            recieved_time=recieved_time,
         )
 
 
@@ -324,40 +314,114 @@ def _process_and_send_msg(
     input_images: list[str] | None,
     input_documents: list[str] | None,
     input_text: str,
+    recieved_time: datetime,
     speech_run: str | None,
 ):
-    try:
-        # # mock testing
-        # msgs_to_save, response_audio, response_text, response_video = _echo(
-        #     bot, input_text
-        # )
-        # make API call to gooey bots to get the response
-        response, url = _process_msg(
-            page_cls=bot.page_cls,
-            api_user=billing_account_user,
-            query_params=bot.query_params,
-            convo=bot.convo,
-            input_text=input_text,
-            user_language=bot.language,
-            speech_run=speech_run,
-            input_images=input_images,
-            input_documents=input_documents,
-        )
-    except HTTPException as e:
-        traceback.print_exc()
-        capture_exception(e)
-        # send error msg as repsonse
-        bot.send_msg(text=ERROR_MSG.format(e))
+    # get latest messages for context (upto 100)
+    saved_msgs = bot.convo.messages.all().as_llm_context()
+
+    # # mock testing
+    # result = _mock_api_output(input_text)
+    page, result, run_id, uid = submit_api_call(
+        page_cls=bot.page_cls,
+        user=billing_account_user,
+        request_body={
+            "input_prompt": input_text,
+            "input_images": input_images,
+            "input_documents": input_documents,
+            "messages": saved_msgs,
+            "user_language": bot.language,
+        },
+        query_params=bot.query_params,
+    )
+
+    if bot.show_feedback_buttons:
+        buttons = _feedback_start_buttons()
+    else:
+        buttons = None
+
+    update_msg_id = None  # this is the message id to update during streaming
+    sent_msg_id = None  # this is the message id to record in the db
+    last_idx = 0  # this is the last index of the text sent to the user
+    if bot.streaming_enabled:
+        # subscribe to the realtime channel for updates
+        channel = page.realtime_channel_name(run_id, uid)
+        with realtime_subscribe(channel) as realtime_gen:
+            for state in realtime_gen:
+                run_state = page.get_run_state(state)
+                run_status = state.get(StateKeys.run_status) or ""
+                # check for errors
+                if run_state == RecipeRunState.failed:
+                    err_msg = state.get(StateKeys.error_msg)
+                    bot.send_msg(text=ERROR_MSG.format(err_msg))
+                    return  # abort
+                if run_state != RecipeRunState.running:
+                    break  # we're done running, abort
+                text = state.get("output_text") and state.get("output_text")[0]
+                if not text:
+                    # if no text, send the run status
+                    if bot.can_update_message:
+                        update_msg_id = bot.send_msg(
+                            text=run_status, update_msg_id=update_msg_id
+                        )
+                    continue  # no text, wait for the next update
+                streaming_done = not run_status.lower().startswith("streaming")
+                # send the response to the user
+                if bot.can_update_message:
+                    update_msg_id = bot.send_msg(
+                        text=text.strip() + "...",
+                        update_msg_id=update_msg_id,
+                        buttons=buttons if streaming_done else None,
+                    )
+                    last_idx = len(text)
+                else:
+                    next_chunk = text[last_idx:]
+                    last_idx = len(text)
+                    if not next_chunk:
+                        continue  # no chunk, wait for the next update
+                    update_msg_id = bot.send_msg(
+                        text=next_chunk,
+                        buttons=buttons if streaming_done else None,
+                    )
+                if streaming_done and not bot.can_update_message:
+                    # if we send the buttons, this is the ID we need to record in the db for lookups later when the button is pressed
+                    sent_msg_id = update_msg_id
+                    # don't show buttons again
+                    buttons = None
+                if streaming_done:
+                    break  # we're done streaming, abort
+
+    # wait for the celery task to finish
+    result.get(disable_sync_subtasks=False)
+    # get the final state from db
+    state = page.run_doc_sr(run_id, uid).to_dict()
+    # check for errors
+    err_msg = state.get(StateKeys.error_msg)
+    if err_msg:
+        bot.send_msg(text=ERROR_MSG.format(err_msg))
         return
 
-    # send the response to the user
-    msg_id = bot.send_msg_or_default(
-        text=response.output_text and response.output_text[0],
-        audio=response.output_audio and response.output_audio[0],
-        video=response.output_video and response.output_video[0],
-        documents=response.output_documents or [],
-        buttons=_feedback_start_buttons() if bot.show_feedback_buttons else None,
-    )
+    text = (state.get("output_text") and state.get("output_text")[0]) or ""
+    audio = state.get("output_audio") and state.get("output_audio")[0]
+    video = state.get("output_video") and state.get("output_video")[0]
+    documents = state.get("output_documents") or []
+    # check for empty response
+    if not (text or audio or video or documents or buttons):
+        bot.send_msg(text=DEFAULT_RESPONSE)
+        return
+    # if in-place updates are enabled, update the message, otherwise send the remaining text
+    if not bot.can_update_message:
+        text = text[last_idx:]
+    # send the response to the user if there is any remaining
+    if text or audio or video or documents or buttons:
+        update_msg_id = bot.send_msg(
+            text=text,
+            audio=audio,
+            video=video,
+            documents=documents,
+            buttons=buttons,
+            update_msg_id=update_msg_id,
+        )
 
     # save msgs to db
     _save_msgs(
@@ -366,9 +430,10 @@ def _process_and_send_msg(
         input_documents=input_documents,
         input_text=input_text,
         speech_run=speech_run,
-        platform_msg_id=msg_id,
-        response=response,
-        url=url,
+        platform_msg_id=sent_msg_id or update_msg_id,
+        response=VideoBotsPage.ResponseModel.parse_obj(state),
+        url=page.app_url(run_id=run_id, uid=uid),
+        received_time=recieved_time,
     )
 
 
@@ -381,6 +446,7 @@ def _save_msgs(
     platform_msg_id: str | None,
     response: VideoBotsPage.ResponseModel,
     url: str,
+    received_time: datetime,
 ):
     # create messages for future context
     user_msg = Message(
@@ -396,6 +462,10 @@ def _save_msgs(
             if speech_run
             else None
         ),
+<<<<<<< HEAD
+=======
+        response_time=timezone.now() - received_time,
+>>>>>>> master
     )
     attachments = []
     for f_url in (input_images or []) + (input_documents or []):
@@ -412,6 +482,7 @@ def _save_msgs(
         saved_run=SavedRun.objects.get_or_create(
             workflow=Workflow.VIDEO_BOTS, **furl(url).query.params
         )[0],
+        response_time=timezone.now() - received_time,
     )
     # save the messages & attachments
     with transaction.atomic():
@@ -420,45 +491,6 @@ def _save_msgs(
             attachment.metadata.save()
             attachment.save()
         assistant_msg.save()
-
-
-def _process_msg(
-    *,
-    page_cls,
-    api_user: AppUser,
-    query_params: dict,
-    convo: Conversation,
-    input_images: list[str] | None,
-    input_documents: list[str] | None,
-    input_text: str,
-    user_language: str,
-    speech_run: str | None,
-) -> tuple[VideoBotsPage.ResponseModel, str]:
-    from routers.api import call_api
-
-    # get latest messages for context (upto 100)
-    saved_msgs = convo.messages.all().as_llm_context()
-
-    # # mock testing
-    # result = _mock_api_output(input_text)
-
-    # call the api with provided input
-    result = call_api(
-        page_cls=page_cls,
-        user=api_user,
-        request_body={
-            "input_prompt": input_text,
-            "input_images": input_images,
-            "input_documents": input_documents,
-            "messages": saved_msgs,
-            "user_language": user_language,
-        },
-        query_params=query_params,
-    )
-    # parse result
-    response = page_cls.ResponseModel.parse_obj(result["output"])
-    url = result.get("url", "")
-    return response, url
 
 
 def _handle_interactive_msg(bot: BotInterface):
@@ -480,13 +512,25 @@ def _handle_interactive_msg(bot: BotInterface):
                 return
             if button_id == ButtonIds.feedback_thumbs_up:
                 rating = Feedback.Rating.RATING_THUMBS_UP
-                bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
-                response_text = FEEDBACK_THUMBS_UP_MSG
+                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
+                # response_text = FEEDBACK_THUMBS_UP_MSG
             else:
                 rating = Feedback.Rating.RATING_THUMBS_DOWN
-                bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
-                response_text = FEEDBACK_THUMBS_DOWN_MSG
+                # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_DOWN
+                # response_text = FEEDBACK_THUMBS_DOWN_MSG
+            response_text = FEEDBACK_CONFIRMED_MSG.format(
+                bot_name=str(bot.convo.bot_integration.name)
+            )
             bot.convo.save()
+            # save the feedback
+            Feedback.objects.create(message=context_msg, rating=rating)
+            # send a confirmation msg + post click buttons
+            bot.send_msg(
+                text=response_text,
+                # buttons=_feedback_post_click_buttons(),
+                should_translate=True,
+            )
+
         # handle skip
         case ButtonIds.action_skip:
             bot.send_msg(text=TAPPED_SKIP_MSG, should_translate=True)
@@ -494,6 +538,7 @@ def _handle_interactive_msg(bot: BotInterface):
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
             return
+
         # not sure what button was pressed, ignore
         case _:
             bot_name = str(bot.convo.bot_integration.name)
@@ -505,14 +550,6 @@ def _handle_interactive_msg(bot: BotInterface):
             bot.convo.state = ConvoState.INITIAL
             bot.convo.save()
             return
-    # save the feedback
-    Feedback.objects.create(message=context_msg, rating=rating)
-    # send a confirmation msg + post click buttons
-    bot.send_msg(
-        text=response_text,
-        buttons=_feedback_post_click_buttons(),
-        should_translate=True,
-    )
 
 
 def _handle_audio_msg(billing_account_user, bot: BotInterface):

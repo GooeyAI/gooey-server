@@ -131,13 +131,8 @@ class TextToSpeechPage(BasePage):
         # loom_video("2d853b7442874b9cbbf3f27b98594add")
 
     def render_output(self):
-        text_prompt = st.session_state.get("text_prompt", "")
         audio_url = st.session_state.get("audio_url")
-        if audio_url:
-            st.audio(audio_url)
-            self.render_buttons(audio_url)
-        else:
-            st.div()
+        st.audio(audio_url, show_download_button=True)
 
     def _get_elevenlabs_price(self, state: dict):
         _, is_user_provided_key = self._get_elevenlabs_api_key(state)

@@ -146,5 +146,6 @@ def _render_output(self, state):
     for key in selected_models:
         output: dict = state.get("output_audios", {}).get(key, [])
         for audio in output:
-            st.audio(audio, caption=Text2AudioModels[key].value)
-            self.render_buttons(audio)
+            st.audio(
+                audio, caption=Text2AudioModels[key].value, show_download_button=True
+            )

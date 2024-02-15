@@ -12,6 +12,7 @@ import numpy as np
 import requests
 from furl import furl
 from googleapiclient.errors import HttpError
+from loguru import logger
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
 
@@ -32,7 +33,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
-from daras_ai_v2.functional import flatmap_parallel
+from daras_ai_v2.functional import flatmap_parallel, map_parallel
 from daras_ai_v2.gdrive_downloader import (
     gdrive_download,
     is_gdrive_url,
@@ -87,23 +88,26 @@ def get_top_k_references(
     Returns:
         the top k documents
     """
-    yield "Getting embeddings..."
+    yield "Fetching latest knowledge docs..."
     input_docs = request.documents or []
+    doc_metas = map_parallel(doc_url_to_metadata, input_docs)
+
+    yield "Creating knowledge embeddings..."
     embeds: list[tuple[SearchReference, np.ndarray]] = flatmap_parallel(
-        lambda f_url: doc_url_to_embeds(
+        lambda f_url, doc_meta: get_embeds_for_doc(
             f_url=f_url,
+            doc_meta=doc_meta,
             max_context_words=request.max_context_words,
             scroll_jump=request.scroll_jump,
             selected_asr_model=request.selected_asr_model,
             google_translate_target=request.google_translate_target,
         ),
         input_docs,
-        max_workers=10,
+        doc_metas,
     )
-
     dense_query_embeds = openai_embedding_create([request.search_query])[0]
 
-    yield "Searching documents..."
+    yield "Searching knowledge base..."
 
     dense_weight = request.dense_weight
     if dense_weight is None:  # for backwards compatibility
@@ -129,12 +133,21 @@ def get_top_k_references(
         dense_ranks = np.zeros(len(embeds))
 
     if sparse_weight:
+        yield "Considering results..."
         # get sparse scores
-        tokenized_corpus = [
-            bm25_tokenizer(ref["title"]) + bm25_tokenizer(ref["snippet"])
-            for ref, _ in embeds
-        ]
-        bm25 = BM25Okapi(tokenized_corpus, k1=2, b=0.3)
+        bm25_corpus = flatmap_parallel(
+            lambda f_url, doc_meta: get_bm25_embeds_for_doc(
+                f_url=f_url,
+                doc_meta=doc_meta,
+                max_context_words=request.max_context_words,
+                scroll_jump=request.scroll_jump,
+                selected_asr_model=request.selected_asr_model,
+                google_translate_target=request.google_translate_target,
+            ),
+            input_docs,
+            doc_metas,
+        )
+        bm25 = BM25Okapi(bm25_corpus, k1=2, b=0.3)
         if request.keyword_query and isinstance(request.keyword_query, list):
             sparse_query_tokenized = [item.lower() for item in request.keyword_query]
         else:
@@ -150,6 +163,13 @@ def get_top_k_references(
     else:
         sparse_ranks = np.zeros(len(embeds))
 
+    # just in case sparse and dense ranks are different lengths, truncate to the shorter one
+    if len(sparse_ranks) != len(dense_ranks):
+        logger.warning(
+            f"sparse and dense ranks are different lengths, truncating... {len(sparse_ranks)=} {len(dense_ranks)=} {len(embeds)=}"
+        )
+        sparse_ranks = sparse_ranks[: len(dense_ranks)]
+        dense_ranks = dense_ranks[: len(sparse_ranks)]
     # RRF formula: 1 / (k + rank)
     k = 60
     rrf_scores = (
@@ -159,11 +179,7 @@ def get_top_k_references(
     # Final ranking
     max_references = min(request.max_references, len(rrf_scores))
     top_k = np.argpartition(rrf_scores, -max_references)[-max_references:]
-    final_ranks = sorted(
-        top_k,
-        key=lambda idx: rrf_scores[idx],
-        reverse=True,
-    )
+    final_ranks = sorted(top_k, key=rrf_scores.__getitem__, reverse=True)
 
     references = [embeds[idx][0] | {"score": rrf_scores[idx]} for idx in final_ranks]
 
@@ -208,38 +224,6 @@ Snippet: """
 """\
 '''
         for idx, ref in enumerate(references)
-    )
-
-
-def doc_url_to_embeds(
-    *,
-    f_url: str,
-    max_context_words: int,
-    scroll_jump: int,
-    selected_asr_model: str = None,
-    google_translate_target: str = None,
-) -> list[tuple[SearchReference, np.ndarray]]:
-    """
-    Get document embeddings for a given document url.
-
-    Args:
-        f_url: document url
-        max_context_words: max number of words to include in each chunk
-        scroll_jump: number of words to scroll by
-        google_translate_target: target language for google translate
-        selected_asr_model: selected ASR model (used for audio files)
-
-    Returns:
-        list of (SearchReference, embeddings vector) tuples
-    """
-    doc_meta = doc_url_to_metadata(f_url)
-    return get_embeds_for_doc(
-        f_url=f_url,
-        doc_meta=doc_meta,
-        max_context_words=max_context_words,
-        scroll_jump=scroll_jump,
-        selected_asr_model=selected_asr_model,
-        google_translate_target=google_translate_target,
     )
 
 
@@ -322,6 +306,35 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
 
 
 @redis_cache_decorator
+def get_bm25_embeds_for_doc(
+    *,
+    f_url: str,
+    doc_meta: DocMetadata,
+    max_context_words: int,
+    scroll_jump: int,
+    google_translate_target: str = None,
+    selected_asr_model: str = None,
+):
+    pages = doc_url_to_text_pages(
+        f_url=f_url,
+        doc_meta=doc_meta,
+        selected_asr_model=selected_asr_model,
+        google_translate_target=google_translate_target,
+    )
+    refs = pages_to_split_refs(
+        pages=pages,
+        f_url=f_url,
+        doc_meta=doc_meta,
+        max_context_words=max_context_words,
+        scroll_jump=scroll_jump,
+    )
+    tokenized_corpus = [
+        bm25_tokenizer(ref["title"]) + bm25_tokenizer(ref["snippet"]) for ref in refs
+    ]
+    return tokenized_corpus
+
+
+@redis_cache_decorator
 def get_embeds_for_doc(
     *,
     f_url: str,
@@ -345,18 +358,44 @@ def get_embeds_for_doc(
     Returns:
         list of (metadata, embeddings) tuples
     """
-    import pandas as pd
-
     pages = doc_url_to_text_pages(
         f_url=f_url,
         doc_meta=doc_meta,
         selected_asr_model=selected_asr_model,
         google_translate_target=google_translate_target,
     )
+    refs = pages_to_split_refs(
+        pages=pages,
+        f_url=f_url,
+        doc_meta=doc_meta,
+        max_context_words=max_context_words,
+        scroll_jump=scroll_jump,
+    )
+    texts = [m["title"] + " | " + m["snippet"] for m in refs]
+    # get doc embeds in batches
+    batch_size = 16  # azure openai limits
+    embeds = flatmap_parallel(
+        openai_embedding_create,
+        [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)],
+        max_workers=2,
+    )
+    return list(zip(refs, embeds))
+
+
+def pages_to_split_refs(
+    *,
+    pages,
+    f_url: str,
+    doc_meta: DocMetadata,
+    max_context_words: int,
+    scroll_jump: int,
+) -> list[SearchReference]:
+    import pandas as pd
+
     chunk_size = int(max_context_words * 2)
     chunk_overlap = int(max_context_words * 2 / scroll_jump)
     if isinstance(pages, pd.DataFrame):
-        metas = []
+        refs = []
         # treat each row as a separate document
         for idx, row in pages.iterrows():
             row = dict(row)
@@ -372,7 +411,7 @@ def get_embeds_for_doc(
                 )
             else:
                 continue
-            metas += [
+            refs += [
                 {
                     "title": doc_meta.name,
                     "url": f_url,
@@ -385,16 +424,14 @@ def get_embeds_for_doc(
             ]
     else:
         # split the text into chunks
-        metas = [
+        refs = [
             {
                 "title": (
                     doc_meta.name + (f", page {doc.end + 1}" if len(pages) > 1 else "")
                 ),
-                "url": (
-                    furl(f_url)
-                    .set(fragment_args={"page": doc.end + 1} if len(pages) > 1 else {})
-                    .url
-                ),
+                "url": add_page_number_to_pdf(
+                    f_url, (doc.end + 1 if len(pages) > 1 else f_url)
+                ).url,
                 "snippet": doc.text,
                 **doc.kwargs,
                 "score": -1,
@@ -403,15 +440,11 @@ def get_embeds_for_doc(
                 pages, chunk_size=chunk_size, chunk_overlap=chunk_overlap
             )
         ]
-    # get doc embeds in batches
-    batch_size = 16  # azure openai limits
-    texts = [m["title"] + " | " + m["snippet"] for m in metas]
-    embeds = flatmap_parallel(
-        openai_embedding_create,
-        [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)],
-        max_workers=5,
-    )
-    return list(zip(metas, embeds))
+    return refs
+
+
+def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
+    return furl(url).set(fragment_args={"page": page_num} if page_num else {})
 
 
 sections_re = re.compile(r"(\s*[\r\n\f\v]|^)(\w+)\=", re.MULTILINE)

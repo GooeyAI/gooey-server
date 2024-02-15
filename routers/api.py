@@ -352,7 +352,7 @@ def submit_api_call(
             },
         )
     # create a new run
-    example_id, run_id, uid = self.create_new_run()
+    example_id, run_id, uid = self.create_new_run(is_api_call=True)
     # submit the task
     result = self.call_runner_task(example_id, run_id, uid, is_api_call=True)
     return self, result, run_id, uid
@@ -367,7 +367,7 @@ def build_api_response(
     run_async: bool,
     created_at: str,
 ):
-    web_url = str(furl(self.app_url(run_id=run_id, uid=uid)))
+    web_url = self.app_url(run_id=run_id, uid=uid)
     if run_async:
         status_url = str(
             furl(settings.API_BASE_URL, query_params=dict(run_id=run_id))

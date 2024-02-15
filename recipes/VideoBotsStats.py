@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from daras_ai_v2.base import BasePage, MenuTabs
 import gooey_ui as st
 from furl import furl
@@ -31,7 +33,7 @@ from django.db.models.functions import (
     TruncYear,
     Concat,
 )
-from django.db.models import Count
+from django.db.models import Count, Avg
 
 ID_COLUMNS = [
     "conversation__fb_page_id",
@@ -119,6 +121,7 @@ class VideoBotsStatsPage(BasePage):
         if int(bid) not in allowed_bids:
             bid = allowed_bids[0]
         bi = BotIntegration.objects.get(id=bid)
+        has_analysis_run = bi.analysis_run is not None
         run_title, run_url = self.parse_run_info(bi)
 
         self.show_title_breadcrumb_share(run_title, run_url, bi)
@@ -136,7 +139,7 @@ class VideoBotsStatsPage(BasePage):
                 view,
                 factor,
                 trunc_fn,
-            ) = self.render_date_view_inputs()
+            ) = self.render_date_view_inputs(bi)
 
         df = self.calculate_stats_binned_by_time(
             bi, start_date, end_date, factor, trunc_fn
@@ -153,18 +156,26 @@ class VideoBotsStatsPage(BasePage):
         st.session_state.setdefault("details", self.request.query_params.get("details"))
         details = st.horizontal_radio(
             "### Details",
-            options=[
-                "All Conversations",
-                "All Messages",
-                "Feedback Positive",
-                "Feedback Negative",
-                "Answered Successfully",
-                "Answered Unsuccessfully",
-            ],
+            options=(
+                [
+                    "Conversations",
+                    "Messages",
+                    "Feedback Positive",
+                    "Feedback Negative",
+                ]
+                + (
+                    [
+                        "Answered Successfully",
+                        "Answered Unsuccessfully",
+                    ]
+                    if has_analysis_run
+                    else []
+                )
+            ),
             key="details",
         )
 
-        if details == "All Conversations":
+        if details == "Conversations":
             options = [
                 "Messages",
                 "Correct Answers",
@@ -210,7 +221,15 @@ class VideoBotsStatsPage(BasePage):
             sort_by = st.session_state["sort_by"]
 
         df = self.get_tabular_data(
-            bi, run_url, conversations, messages, details, sort_by, rows=500
+            bi,
+            run_url,
+            conversations,
+            messages,
+            details,
+            sort_by,
+            rows=500,
+            start_date=start_date,
+            end_date=end_date,
         )
 
         if not df.empty:
@@ -233,7 +252,14 @@ class VideoBotsStatsPage(BasePage):
             st.html("<br/>")
             if st.checkbox("Export"):
                 df = self.get_tabular_data(
-                    bi, run_url, conversations, messages, details, sort_by
+                    bi,
+                    run_url,
+                    conversations,
+                    messages,
+                    details,
+                    sort_by,
+                    start_date=start_date,
+                    end_date=end_date,
                 )
                 csv = df.to_csv()
                 b64 = base64.b64encode(csv.encode()).decode()
@@ -260,27 +286,35 @@ class VideoBotsStatsPage(BasePage):
         ).tostr()
         st.change_url(new_url, self.request)
 
-    def render_date_view_inputs(self):
-        start_of_year_date = datetime.now().replace(month=1, day=1)
-        st.session_state.setdefault(
-            "start_date",
-            self.request.query_params.get(
-                "start_date", start_of_year_date.strftime("%Y-%m-%d")
-            ),
-        )
-        start_date: datetime = (
-            st.date_input("Start date", key="start_date") or start_of_year_date
-        )
-        st.session_state.setdefault(
-            "end_date",
-            self.request.query_params.get(
-                "end_date", datetime.now().strftime("%Y-%m-%d")
-            ),
-        )
-        end_date: datetime = st.date_input("End date", key="end_date") or datetime.now()
-        st.session_state.setdefault(
-            "view", self.request.query_params.get("view", "Weekly")
-        )
+    def render_date_view_inputs(self, bi):
+        if st.checkbox("Show All"):
+            start_date = bi.created_at
+            end_date = timezone.now()
+        else:
+            fifteen_days_ago = timezone.now() - timedelta(days=15)
+            fifteen_days_ago = fifteen_days_ago.replace(hour=0, minute=0, second=0)
+            st.session_state.setdefault(
+                "start_date",
+                self.request.query_params.get(
+                    "start_date", fifteen_days_ago.strftime("%Y-%m-%d")
+                ),
+            )
+            start_date: datetime = (
+                st.date_input("Start date", key="start_date") or fifteen_days_ago
+            )
+            st.session_state.setdefault(
+                "end_date",
+                self.request.query_params.get(
+                    "end_date", timezone.now().strftime("%Y-%m-%d")
+                ),
+            )
+            end_date: datetime = (
+                st.date_input("End date", key="end_date") or timezone.now()
+            )
+            st.session_state.setdefault(
+                "view", self.request.query_params.get("view", "Daily")
+            )
+        st.write("---")
         view = st.horizontal_radio(
             "### View",
             options=["Daily", "Weekly", "Monthly"],
@@ -307,15 +341,12 @@ class VideoBotsStatsPage(BasePage):
 
     def parse_run_info(self, bi):
         saved_run = bi.get_active_saved_run()
-        run_title = (
-            bi.published_run.title
-            if bi.published_run
-            else (
-                saved_run.page_title
-                if saved_run and saved_run.page_title
-                else "This Copilot Run" if saved_run else "No Run Connected"
-            )
-        )
+        if bi.published_run:
+            run_title = bi.published_run.title
+        elif saved_run:
+            run_title = "This Copilot Run"
+        else:
+            run_title = "No Run Connected"
         run_url = furl(saved_run.get_app_url()).tostr() if saved_run else ""
         return run_title, run_url
 
@@ -331,7 +362,7 @@ class VideoBotsStatsPage(BasePage):
         num_active_users_last_7_days = (
             user_messages.filter(
                 conversation__in=users,
-                created_at__gte=datetime.now() - timedelta(days=7),
+                created_at__gte=timezone.now() - timedelta(days=7),
             )
             .distinct(
                 *ID_COLUMNS,
@@ -341,7 +372,7 @@ class VideoBotsStatsPage(BasePage):
         num_active_users_last_30_days = (
             user_messages.filter(
                 conversation__in=users,
-                created_at__gte=datetime.now() - timedelta(days=30),
+                created_at__gte=timezone.now() - timedelta(days=30),
             )
             .distinct(
                 *ID_COLUMNS,
@@ -393,7 +424,7 @@ class VideoBotsStatsPage(BasePage):
                 created_at__date__gte=start_date,
                 created_at__date__lte=end_date,
                 conversation__bot_integration=bi,
-                role=CHATML_ROLE_USER,
+                role=CHATML_ROLE_ASSISTANT,
             )
             .order_by()
             .annotate(date=trunc_fn("created_at"))
@@ -408,6 +439,7 @@ class VideoBotsStatsPage(BasePage):
                     distinct=True,
                 )
             )
+            .annotate(Average_runtime=Avg("saved_run__run_time"))
             .annotate(Unique_feedback_givers=Count("feedbacks", distinct=True))
             .values(
                 "date",
@@ -415,6 +447,7 @@ class VideoBotsStatsPage(BasePage):
                 "Convos",
                 "Senders",
                 "Unique_feedback_givers",
+                "Average_runtime",
             )
         )
 
@@ -446,6 +479,20 @@ class VideoBotsStatsPage(BasePage):
             .values("date", "Neg_feedback")
         )
 
+        successfully_answered = (
+            Message.objects.filter(
+                conversation__bot_integration=bi,
+                analysis_result__contains={"Answered": True},
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
+            )
+            .order_by()
+            .annotate(date=trunc_fn("created_at"))
+            .values("date")
+            .annotate(Successfully_Answered=Count("id"))
+            .values("date", "Successfully_Answered")
+        )
+
         df = pd.DataFrame(
             messages_received,
             columns=[
@@ -454,6 +501,7 @@ class VideoBotsStatsPage(BasePage):
                 "Convos",
                 "Senders",
                 "Unique_feedback_givers",
+                "Average_runtime",
             ],
         )
         df = df.merge(
@@ -468,12 +516,29 @@ class VideoBotsStatsPage(BasePage):
             left_on="date",
             right_on="date",
         )
+        df = df.merge(
+            pd.DataFrame(
+                successfully_answered, columns=["date", "Successfully_Answered"]
+            ),
+            how="outer",
+            left_on="date",
+            right_on="date",
+        )
         df["Messages_Sent"] = df["Messages_Sent"] * factor
         df["Convos"] = df["Convos"] * factor
         df["Senders"] = df["Senders"] * factor
         df["Unique_feedback_givers"] = df["Unique_feedback_givers"] * factor
         df["Pos_feedback"] = df["Pos_feedback"] * factor
         df["Neg_feedback"] = df["Neg_feedback"] * factor
+        df["Percentage_positive_feedback"] = (
+            df["Pos_feedback"] / df["Messages_Sent"]
+        ) * 100
+        df["Percentage_negative_feedback"] = (
+            df["Neg_feedback"] / df["Messages_Sent"]
+        ) * 100
+        df["Percentage_successfully_answered"] = (
+            df["Successfully_Answered"] / df["Messages_Sent"]
+        ) * 100
         df["Msgs_per_convo"] = df["Messages_Sent"] / df["Convos"]
         df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
         df.fillna(0, inplace=True)
@@ -621,14 +686,105 @@ class VideoBotsStatsPage(BasePage):
                 ],
             )
         st.plotly_chart(fig)
+        st.write("---")
+        fig = go.Figure(
+            data=[
+                go.Scatter(
+                    name="Average Run Time",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Average_runtime"]),
+                    text=list(df["Average_runtime"]),
+                    hovertemplate="Average Runtime: %{y:.0f}<extra></extra>",
+                ),
+            ],
+            layout=dict(
+                margin=dict(l=0, r=0, t=28, b=0),
+                yaxis=dict(
+                    title="Seconds",
+                ),
+                title=dict(
+                    text=f"{view} Performance Metrics",
+                ),
+                height=300,
+                template="plotly_white",
+            ),
+        )
+        st.plotly_chart(fig)
+        st.write("---")
+        fig = go.Figure(
+            data=[
+                go.Scatter(
+                    name="Positive Feedback",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Percentage_positive_feedback"]),
+                    text=list(df["Percentage_positive_feedback"]),
+                    hovertemplate="Positive Feedback: %{y:.0f}%<extra></extra>",
+                ),
+                go.Scatter(
+                    name="Negative Feedback",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Percentage_negative_feedback"]),
+                    text=list(df["Percentage_negative_feedback"]),
+                    hovertemplate="Negative Feedback: %{y:.0f}%<extra></extra>",
+                ),
+                go.Scatter(
+                    name="Successfully Answered",
+                    mode="lines+markers",
+                    x=list(df["date"]),
+                    y=list(df["Percentage_successfully_answered"]),
+                    text=list(df["Percentage_successfully_answered"]),
+                    hovertemplate="Successfully Answered: %{y:.0f}%<extra></extra>",
+                ),
+            ],
+            layout=dict(
+                margin=dict(l=0, r=0, t=28, b=0),
+                yaxis=dict(
+                    title="Percentage",
+                    range=[0, 100],
+                    tickvals=[
+                        *range(
+                            0,
+                            101,
+                            10,
+                        )
+                    ],
+                ),
+                title=dict(
+                    text=f"{view} Feedback Distribution",
+                ),
+                height=300,
+                template="plotly_white",
+            ),
+        )
+        st.plotly_chart(fig)
 
     def get_tabular_data(
-        self, bi, run_url, conversations, messages, details, sort_by, rows=10000
+        self,
+        bi,
+        run_url,
+        conversations,
+        messages,
+        details,
+        sort_by,
+        rows=10000,
+        start_date=None,
+        end_date=None,
     ):
         df = pd.DataFrame()
-        if details == "All Conversations":
+        if details == "Conversations":
+            if start_date and end_date:
+                conversations = conversations.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = conversations.to_df_format(row_limit=rows)
-        elif details == "All Messages":
+        elif details == "Messages":
+            if start_date and end_date:
+                messages = messages.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = messages.order_by("-created_at", "conversation__id").to_df_format(
                 row_limit=rows
             )
@@ -639,6 +795,10 @@ class VideoBotsStatsPage(BasePage):
                 message__conversation__bot_integration=bi,
                 rating=Feedback.Rating.RATING_THUMBS_UP,
             )  # type: ignore
+            if start_date and end_date:
+                pos_feedbacks = pos_feedbacks.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = pos_feedbacks.to_df_format(row_limit=rows)
             df["Run URL"] = run_url
             df["Bot"] = bi.name
@@ -646,7 +806,13 @@ class VideoBotsStatsPage(BasePage):
             neg_feedbacks: FeedbackQuerySet = Feedback.objects.filter(
                 message__conversation__bot_integration=bi,
                 rating=Feedback.Rating.RATING_THUMBS_DOWN,
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
             )  # type: ignore
+            if start_date and end_date:
+                neg_feedbacks = neg_feedbacks.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = neg_feedbacks.to_df_format(row_limit=rows)
             df["Run URL"] = run_url
             df["Bot"] = bi.name
@@ -654,7 +820,13 @@ class VideoBotsStatsPage(BasePage):
             successful_messages: MessageQuerySet = Message.objects.filter(
                 conversation__bot_integration=bi,
                 analysis_result__contains={"Answered": True},
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
             )  # type: ignore
+            if start_date and end_date:
+                successful_messages = successful_messages.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = successful_messages.to_df_analysis_format(row_limit=rows)
             df["Run URL"] = run_url
             df["Bot"] = bi.name
@@ -662,12 +834,18 @@ class VideoBotsStatsPage(BasePage):
             unsuccessful_messages: MessageQuerySet = Message.objects.filter(
                 conversation__bot_integration=bi,
                 analysis_result__contains={"Answered": False},
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date,
             )  # type: ignore
+            if start_date and end_date:
+                unsuccessful_messages = unsuccessful_messages.filter(
+                    created_at__date__gte=start_date, created_at__date__lte=end_date
+                )
             df = unsuccessful_messages.to_df_analysis_format(row_limit=rows)
             df["Run URL"] = run_url
             df["Bot"] = bi.name
 
-        if sort_by:
+        if sort_by and sort_by in df.columns:
             df.sort_values(by=[sort_by], ascending=False, inplace=True)
 
         return df

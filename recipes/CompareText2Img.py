@@ -246,8 +246,14 @@ class CompareText2ImgPage(BasePage):
         for key in selected_models:
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
+<<<<<<< HEAD
                 st.image(img, caption=Text2ImgModels[key].value)
                 self.render_buttons(img)
+=======
+                st.image(
+                    img, caption=Text2ImgModels[key].value, show_download_button=True
+                )
+>>>>>>> master
 
     def preview_description(self, state: dict) -> str:
         return "Create multiple AI photos from one prompt using Stable Diffusion (1.5 -> 2.1, Open/Midjourney), DallE, and other models.  Find out which AI Image generator works best for your text prompt on comparing OpenAI, Stability.AI etc."
