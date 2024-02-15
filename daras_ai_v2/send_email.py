@@ -46,19 +46,19 @@ def send_reported_run_email(
 def send_low_balance_email(
     *,
     user: AppUser,
-    credits_consumed: int,
+    total_credits_consumed: int,
 ):
     recipeints = "support@gooey.ai, devs@gooey.ai"
     html_body = templates.get_template("low_balance_email.html").render(
         user=user,
         url="https://gooey.ai/account",
-        credits_consumed=credits_consumed,
+        total_credits_consumed=total_credits_consumed,
     )
     send_email_via_postmark(
         from_address=settings.SUPPORT_EMAIL,
         to_address=user.email or recipeints,
         bcc=recipeints,
-        subject="Your Gooey.AI credit balance is low ",
+        subject="Your Gooey.AI credit balance is low",
         html_body=html_body,
     )
 

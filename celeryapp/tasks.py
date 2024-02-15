@@ -1,12 +1,13 @@
 import traceback
 import typing
+import datetime
 from time import time
 from types import SimpleNamespace
 
 import sentry_sdk
 
 import gooey_ui as st
-from app_users.models import AppUser
+from app_users.models import AppUser, AppUserTransaction
 from bots.models import SavedRun
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
@@ -16,6 +17,9 @@ from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
 from gooey_ui.state import set_query_params
+from daras_ai_v2.send_email import send_low_balance_email
+from django.db.models import Sum
+from django.utils import timezone
 
 
 @app.task
@@ -101,8 +105,35 @@ def gui_runner(
                 save()
     finally:
         save(done=True)
+        low_balance_email(sr)
         if not is_api_call:
             send_email_on_completion(page, sr)
+
+
+def low_balance_email(sr: SavedRun):
+    user = AppUser.objects.get(uid=sr.uid)
+    if (
+        user.is_paying
+        and user.balance < 500
+        and (
+            user.low_balance_email_sent_at == None
+            or user.low_balance_email_sent_at
+            < timezone.now() - datetime.timedelta(days=7)
+        )
+    ):
+        total_credits_consumed = (
+            -1
+            * AppUserTransaction.objects.filter(
+                user=user,
+                created_at__gte=timezone.now() - datetime.timedelta(days=7),
+            ).aggregate(Sum("amount"))["amount__sum"]
+        )
+        send_low_balance_email(
+            user=user,
+            total_credits_consumed=total_credits_consumed,
+        )
+        user.low_balance_email_sent_at = timezone.now()
+        user.save()
 
 
 def send_email_on_completion(page: BasePage, sr: SavedRun):
