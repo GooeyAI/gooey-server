@@ -291,15 +291,16 @@ class VideoBotsStatsPage(BasePage):
             start_date = bi.created_at
             end_date = timezone.now()
         else:
-            start_of_year_date = timezone.now().replace(month=1, day=1)
+            fifteen_days_ago = timezone.now() - timedelta(days=15)
+            fifteen_days_ago = fifteen_days_ago.replace(hour=0, minute=0, second=0)
             st.session_state.setdefault(
                 "start_date",
                 self.request.query_params.get(
-                    "start_date", start_of_year_date.strftime("%Y-%m-%d")
+                    "start_date", fifteen_days_ago.strftime("%Y-%m-%d")
                 ),
             )
             start_date: datetime = (
-                st.date_input("Start date", key="start_date") or start_of_year_date
+                st.date_input("Start date", key="start_date") or fifteen_days_ago
             )
             st.session_state.setdefault(
                 "end_date",
@@ -311,7 +312,7 @@ class VideoBotsStatsPage(BasePage):
                 st.date_input("End date", key="end_date") or timezone.now()
             )
             st.session_state.setdefault(
-                "view", self.request.query_params.get("view", "Weekly")
+                "view", self.request.query_params.get("view", "Daily")
             )
         st.write("---")
         view = st.horizontal_radio(
@@ -439,8 +440,6 @@ class VideoBotsStatsPage(BasePage):
                 )
             )
             .annotate(Average_runtime=Avg("saved_run__run_time"))
-            .annotate(Average_response_time=Avg("response_time"))
-            .annotate(Average_analysis_time=Avg("analysis_run__run_time"))
             .annotate(Unique_feedback_givers=Count("feedbacks", distinct=True))
             .values(
                 "date",
@@ -448,9 +447,7 @@ class VideoBotsStatsPage(BasePage):
                 "Convos",
                 "Senders",
                 "Unique_feedback_givers",
-                "Average_response_time",
                 "Average_runtime",
-                "Average_analysis_time",
             )
         )
 
@@ -504,9 +501,7 @@ class VideoBotsStatsPage(BasePage):
                 "Convos",
                 "Senders",
                 "Unique_feedback_givers",
-                "Average_response_time",
                 "Average_runtime",
-                "Average_analysis_time",
             ],
         )
         df = df.merge(
@@ -546,11 +541,6 @@ class VideoBotsStatsPage(BasePage):
         ) * 100
         df["Msgs_per_convo"] = df["Messages_Sent"] / df["Convos"]
         df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
-        try:
-            df["Average_response_time"] = df["Average_response_time"].dt.total_seconds()
-        except AttributeError:
-            pass
-        df["Average_response_time"] = df["Average_response_time"] * factor
         df.fillna(0, inplace=True)
         df = df.round(0).astype("int32", errors="ignore")
         return df
@@ -700,28 +690,12 @@ class VideoBotsStatsPage(BasePage):
         fig = go.Figure(
             data=[
                 go.Scatter(
-                    name="Average Response Time",
-                    mode="lines+markers",
-                    x=list(df["date"]),
-                    y=list(df["Average_response_time"]),
-                    text=list(df["Average_response_time"]),
-                    hovertemplate="Average Response Time: %{y:.0f}<extra></extra>",
-                ),
-                go.Scatter(
                     name="Average Run Time",
                     mode="lines+markers",
                     x=list(df["date"]),
                     y=list(df["Average_runtime"]),
                     text=list(df["Average_runtime"]),
                     hovertemplate="Average Runtime: %{y:.0f}<extra></extra>",
-                ),
-                go.Scatter(
-                    name="Average Analysis Time",
-                    mode="lines+markers",
-                    x=list(df["date"]),
-                    y=list(df["Average_analysis_time"]),
-                    text=list(df["Average_analysis_time"]),
-                    hovertemplate="Average Analysis Time: %{y:.0f}<extra></extra>",
                 ),
             ],
             layout=dict(
