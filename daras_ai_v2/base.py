@@ -17,6 +17,7 @@ import requests
 import sentry_sdk
 from django.utils import timezone
 from django.utils.text import slugify
+from django.db.models import Sum
 from fastapi import HTTPException
 from firebase_admin import auth
 from furl import furl
@@ -57,7 +58,7 @@ from daras_ai_v2.query_params import (
 from daras_ai_v2.query_params_util import (
     extract_query_params,
 )
-from daras_ai_v2.send_email import send_reported_run_email
+from daras_ai_v2.send_email import send_reported_run_email, send_low_balance_email
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import (
     render_js_dynamic_dates,
@@ -1387,6 +1388,28 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
     def on_submit(self):
         example_id, run_id, uid = self.create_new_run()
+        if (
+            self.request.user.is_paying
+            and self.request.user.balance < 500
+            # and (
+            #     self.request.user.low_balance_email_sent_at == None
+            #     or self.request.user.low_balance_email_sent_at
+            #     < timezone.now() - datetime.timedelta(days=7)
+            # )
+        ):
+            credits_consumed = (
+                -1
+                * AppUserTransaction.objects.filter(
+                    user=self.request.user,
+                    created_at__gte=timezone.now() - datetime.timedelta(days=7),
+                ).aggregate(Sum("amount"))["amount__sum"]
+            )
+            send_low_balance_email(
+                user=self.request.user, credits_consumed=credits_consumed
+            )
+            app_user = AppUser.objects.get(uid=uid)
+            app_user.low_balance_email_sent_at = timezone.now()
+            app_user.save()
         if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
             st.session_state[StateKeys.run_status] = None
             st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(

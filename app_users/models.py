@@ -89,6 +89,8 @@ class AppUser(models.Model):
     stripe_customer_id = models.CharField(max_length=255, default="", blank=True)
     is_paying = models.BooleanField("paid", default=False)
 
+    low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(
         "created", editable=False, blank=True, default=timezone.now
     )

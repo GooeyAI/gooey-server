@@ -1,0 +1,16 @@
+<p>
+    Hey {{ user.display_name }}!
+</p>
+
+<p>
+    This is a friendly reminder that your Gooey.AI balance is now just {{ user.balance }}. Your account has consumed {{ credits_consumed }} credits in the last 7 days. 
+    <br><br>
+    To buy more credits, please visit <a href="{{ url }}">https://gooey.ai/account</a>.
+    <br><br>
+    As always, email us at sales@gooey.ai if you have any questions too. 
+    <br><br>
+    Thanks again for your business,
+    <br>
+    Sean and the Gooey.AI team
+</p>
+{{  "{{{ pm:unsubscribe }}}" }}
