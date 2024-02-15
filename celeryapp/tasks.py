@@ -112,6 +112,15 @@ def gui_runner(
 
 def low_balance_email(sr: SavedRun):
     user = AppUser.objects.get(uid=sr.uid)
+    last_positive_transaction = (
+        AppUserTransaction.objects.filter(user=user, amount__gt=0)
+        .order_by("-created_at")
+        .first()
+    )
+    if last_positive_transaction:
+        last_positive_transaction = last_positive_transaction.created_at
+    else:
+        last_positive_transaction = timezone.now() - datetime.timedelta(days=8)
     if (
         user.is_paying
         and user.balance < 500
@@ -119,6 +128,7 @@ def low_balance_email(sr: SavedRun):
             user.low_balance_email_sent_at == None
             or user.low_balance_email_sent_at
             < timezone.now() - datetime.timedelta(days=7)
+            or last_positive_transaction > user.low_balance_email_sent_at
         )
     ):
         total_credits_consumed = (
@@ -126,6 +136,7 @@ def low_balance_email(sr: SavedRun):
             * AppUserTransaction.objects.filter(
                 user=user,
                 created_at__gte=timezone.now() - datetime.timedelta(days=7),
+                amount__lt=0,
             ).aggregate(Sum("amount"))["amount__sum"]
         )
         send_low_balance_email(
