@@ -523,7 +523,7 @@ Here is the final output:
         #     state["output_images"] = [attempt]
         #     break
         # raise RuntimeError(
-        #     'Doh! That didn\'t work. Sometimes the AI produces bad QR codes. Please press "Regenerate" to try again.'
+        #     'Doh! That didn\'t work. Sometimes the AI produces bad QR codes. Please press "Remix" to try again.'
         # )
 
     def preview_description(self, state: dict) -> str:

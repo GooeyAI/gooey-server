@@ -36,8 +36,8 @@ def prompting101():
     st.markdown(
         """
         You can keep editing your prompt until you have your desired output. Consider AI generators as a collaborative tool. 
-        ##### What is the difference between Submit and Regenerate? 
+        ##### What is the difference between Submit and Remix? 
         Each AI generation has a unique Seed number. A random seed is created when you initiate the first run on clicking the Submit button. The seed is maintained as you continue editing the image with different setting options on each subsequent Submit click.\n
-        However, by clicking the Regenerate button, the AI will generate a new Seed and a completely new/different set of outputs.
+        However, by clicking the Remix button, the AI will generate a new Seed and a completely new/different set of outputs.
         """
     )

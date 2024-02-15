@@ -1518,7 +1518,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         if "seed" in self.RequestModel.schema_json():
             randomize = st.button(
-                '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
+                '<i class="fa-solid fa-recycle"></i> Remix', type="tertiary"
             )
             if randomize:
                 st.session_state[StateKeys.pressed_randomize] = True
