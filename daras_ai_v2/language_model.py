@@ -381,23 +381,7 @@ def run_language_model(
         if stream:
             return _stream_llm_outputs(entries, response_format_type)
         else:
-<<<<<<< HEAD
-            out_content = [
-                # return messages back as either chatml or json messages
-                (
-                    format_chatml_message(entry)
-                    if is_chatml
-                    else (entry.get("content") or "").strip()
-                )
-                for entry in result
-            ]
-        if tools:
-            return out_content, [(entry.get("tool_calls") or []) for entry in result]
-        else:
-            return out_content
-=======
             return _parse_entries(entries, is_chatml, response_format_type, tools)
->>>>>>> master
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
@@ -593,10 +577,7 @@ def _run_openai_chat(
                     if response_format_type
                     else NOT_GIVEN
                 ),
-<<<<<<< HEAD
-=======
                 stream=stream,
->>>>>>> master
             )
             for model_str in model
         ],

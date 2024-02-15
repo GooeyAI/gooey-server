@@ -462,10 +462,7 @@ def _save_msgs(
             if speech_run
             else None
         ),
-<<<<<<< HEAD
-=======
         response_time=timezone.now() - received_time,
->>>>>>> master
     )
     attachments = []
     for f_url in (input_images or []) + (input_documents or []):
