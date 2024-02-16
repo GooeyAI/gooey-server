@@ -975,11 +975,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     unsafe_allow_html=True,
                 )
 
-            st.write("---")
-            st.text_input(
-                "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
-            )
-            show_landbot_widget()
+            # st.write("---")
+            # st.text_input(
+            #     "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
+            # )
+            # show_landbot_widget()
 
     def messenger_bot_integration(self):
         from routers.facebook_api import ig_connect_url, fb_connect_url
@@ -1028,15 +1028,21 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         st.button("🔄 Refresh")
 
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )  # type: ignore
+
         integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
             billing_account_uid=self.request.user.uid
         ).order_by("platform", "-created_at")
+
+        if self.is_current_user_admin():
+            integrations |= BotIntegration.objects.filter(
+                published_run=published_run
+            ).order_by("platform", "-created_at")
         if not integrations:
             return
 
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )
         for bi in integrations:
             is_connected = (bi.saved_run == current_run) or (
                 (
