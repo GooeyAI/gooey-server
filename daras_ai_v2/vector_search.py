@@ -31,7 +31,7 @@ from daras_ai_v2.azure_doc_extract import (
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import raise_for_status, call_cmd, UserError
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import flatmap_parallel, map_parallel
 from daras_ai_v2.gdrive_downloader import (
@@ -258,7 +258,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             meta = gdrive_metadata(url_to_gdrive_file_id(f))
         except HttpError as e:
             if e.status_code == 404:
-                raise FileNotFoundError(
+                raise UserError(
                     f"Could not download the google doc at {f_url} "
                     f"Please make sure to make the document public for viewing."
                 ) from e
@@ -630,17 +630,9 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
         tempfile.NamedTemporaryFile("r") as outfile,
     ):
         infile.write(f_bytes)
-        args = [
-            "pandoc",
-            "--standalone",
-            infile.name,
-            "--to",
-            to,
-            "--output",
-            outfile.name,
-        ]
-        print("\t$ " + " ".join(args))
-        subprocess.check_call(args)
+        call_cmd(
+            "pandoc", "--standalone", infile.name, "--to", to, "--output", outfile.name
+        )
         return outfile.read()
 
 

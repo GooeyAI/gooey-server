@@ -32,6 +32,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
 )
 from daras_ai_v2.enum_selector_widget import enum_multiselect
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input, validate_glossary_document
@@ -807,7 +808,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         )
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
-            raise ValueError("Input Script is too long! Please reduce the script size.")
+            raise UserError("Input Script is too long! Please reduce the script size.")
 
         yield f"Summarizing with {model.value}..."
         if is_chat_model:

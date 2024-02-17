@@ -13,7 +13,6 @@ from random import Random
 from time import sleep
 from types import SimpleNamespace
 
-import requests
 import sentry_sdk
 from django.utils import timezone
 from django.utils.text import slugify
@@ -1947,27 +1946,6 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
-
-
-def err_msg_for_exc(e):
-    if isinstance(e, requests.HTTPError):
-        response: requests.Response = e.response
-        try:
-            err_body = response.json()
-        except requests.JSONDecodeError:
-            err_str = response.text
-        else:
-            format_exc = err_body.get("format_exc")
-            if format_exc:
-                print("⚡️ " + format_exc)
-            err_type = err_body.get("type")
-            err_str = err_body.get("str")
-            if err_type and err_str:
-                return f"(GPU) {err_type}: {err_str}"
-            err_str = str(err_body)
-        return f"(HTTP {response.status_code}) {html.escape(err_str[:1000])}"
-    else:
-        return f"{type(e).__name__}: {e}"
 
 
 def force_redirect(url: str):

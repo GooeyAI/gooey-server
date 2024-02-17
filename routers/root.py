@@ -34,6 +34,7 @@ from daras_ai_v2.base import (
 from daras_ai_v2.bots import request_json
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
+from daras_ai_v2.exceptions import ffmpeg
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
@@ -188,16 +189,7 @@ def file_upload(request: Request, form_data: FormData = Depends(request_form_fil
             infile.flush()
             if not check_wav_audio_format(infile.name):
                 with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
-                    args = [
-                        "ffmpeg",
-                        "-y",
-                        "-i",
-                        infile.name,
-                        *FFMPEG_WAV_ARGS,
-                        outfile.name,
-                    ]
-                    print("\t$ " + " ".join(args))
-                    subprocess.check_call(args)
+                    ffmpeg("-i", infile.name, *FFMPEG_WAV_ARGS, outfile.name)
 
                     filename += ".wav"
                     content_type = "audio/wav"

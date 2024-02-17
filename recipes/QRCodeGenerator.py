@@ -20,7 +20,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.descriptions import prompting101
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.img_model_settings_widgets import (
     output_resolution_setting,
     img_model_settings,
@@ -687,7 +687,7 @@ def generate_and_upload_qr_code(
         if isinstance(qr_code_data, str):
             qr_code_data = qr_code_data.strip()
         if not qr_code_data:
-            raise ValueError("Please provide QR Code URL, text content, or an image")
+            raise UserError("Please provide QR Code URL, text content, or an image")
         using_shortened_url = request.use_url_shortener and is_url(qr_code_data)
         if using_shortened_url:
             qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(

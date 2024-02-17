@@ -1,11 +1,11 @@
-from logging import getLogger
+import json
+import subprocess
 
 import requests
+from loguru import logger
 from requests import HTTPError
 
 from daras_ai.image_input import truncate_filename
-
-logger = getLogger(__name__)
 
 
 def raise_for_status(resp: requests.Response):
@@ -36,3 +36,47 @@ def raise_for_status(resp: requests.Response):
 
 def _response_preview(resp: requests.Response) -> bytes:
     return truncate_filename(resp.content, 500, sep=b"...")
+
+
+class UserError(Exception):
+    def __init__(self, message: str, sentry_level: str = "info"):
+        self.message = message
+        self.sentry_level = sentry_level
+        super().__init__(message)
+
+
+FFMPEG_ERR_MSG = (
+    "Unsupported File Format\n\n"
+    "We encountered an issue processing your file as it appears to be in a format not supported by our system or may be corrupted. "
+    "You can find a list of supported formats at [FFmpeg Formats](https://ffmpeg.org/general.html#File-Formats)."
+)
+
+
+def ffmpeg(*args) -> str:
+    return call_cmd("ffmpeg", "-hide_banner", "-y", *args, err_msg=FFMPEG_ERR_MSG)
+
+
+def ffprobe(filename: str) -> dict:
+    text = call_cmd(
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_streams",
+        filename,
+        err_msg=FFMPEG_ERR_MSG,
+    )
+    return json.loads(text)
+
+
+def call_cmd(*args, err_msg: str = "") -> str:
+    logger.info("$ " + " ".join(map(str, args)))
+    try:
+        return subprocess.check_output(args, stderr=subprocess.STDOUT, text=True)
+    except subprocess.CalledProcessError as e:
+        err_msg = err_msg or f"{str(args[0]).capitalize()} Error"
+        try:
+            raise subprocess.SubprocessError(e.output) from e
+        except subprocess.SubprocessError as e:
+            raise UserError(err_msg) from e
