@@ -20,7 +20,9 @@ def is_image_nsfw(image_url: str, cache: bool = False) -> bool:
         headers=get_auth_headers(),
         json={"DataRepresentation": "URL", "Value": image_url},
     )
-    if r.status_code == 400 and b"Image Size Error" in r.content:
+    if r.status_code == 400 and (
+        b"Image Size Error" in r.content or b"Image Error" in r.content
+    ):
         return False
     raise_for_status(r)
     return r.json().get("IsImageAdultClassified", False)
