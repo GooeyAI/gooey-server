@@ -621,12 +621,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
-            assert (
-                self.is_current_user_paying() or self.is_current_user_admin()
-            ), """
+        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name and not (
+            self.is_current_user_paying() or self.is_current_user_admin()
+        ):
+            raise UserError(
+                """
                 Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
                 """
+            )
 
         user_input = request.input_prompt.strip()
         if not (user_input or request.input_images or request.input_documents):
