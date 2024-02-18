@@ -5,8 +5,6 @@ import requests
 from loguru import logger
 from requests import HTTPError
 
-from daras_ai.image_input import truncate_filename
-
 
 def raise_for_status(resp: requests.Response):
     """Raises :class:`HTTPError`, if one occurred."""
@@ -35,6 +33,8 @@ def raise_for_status(resp: requests.Response):
 
 
 def _response_preview(resp: requests.Response) -> bytes:
+    from daras_ai.image_input import truncate_filename
+
     return truncate_filename(resp.content, 500, sep=b"...")
 
 
