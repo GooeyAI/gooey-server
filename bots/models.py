@@ -826,6 +826,7 @@ class Conversation(models.Model):
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
+    reset_at = models.DateTimeField(null=True, blank=True, default=None)
 
     objects = ConversationQuerySet.as_manager()
 
@@ -935,7 +936,9 @@ class MessageQuerySet(models.QuerySet):
                     else None
                 ),  # only show first feedback as per Sean's request
                 "Analysis JSON": message.analysis_result,
-                "Run Time": message.saved_run.run_time if message.saved_run else 0, # user messages have no run/run_time
+                "Run Time": (
+                    message.saved_run.run_time if message.saved_run else 0
+                ),  # user messages have no run/run_time
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
@@ -977,7 +980,11 @@ class MessageQuerySet(models.QuerySet):
         )
         return df
 
-    def as_llm_context(self, limit: int = 100) -> list["ConversationEntry"]:
+    def as_llm_context(
+        self, limit: int = 50, reset_at: datetime.datetime = None
+    ) -> list["ConversationEntry"]:
+        if reset_at:
+            self = self.filter(created_at__gt=reset_at)
         msgs = self.order_by("-created_at").prefetch_related("attachments")[:limit]
         entries = [None] * len(msgs)
         for i, msg in enumerate(reversed(msgs)):
