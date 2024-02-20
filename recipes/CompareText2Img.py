@@ -268,4 +268,4 @@ class CompareText2ImgPage(BasePage):
                     total += 15
                 case _:
                     total += 2
-        return total
+        return total * state.get("num_outputs", 1)
