@@ -204,9 +204,6 @@ class SmartGPTPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "SmartGPT is a cutting-edge AI technology that can be used to generate natural language responses to any given input. We have combined the power of [CoT](https://arxiv.org/abs/2305.02897), [Reflexion](https://arxiv.org/abs/2303.11366) & [DERA](https://arxiv.org/abs/2303.17071) into one pipeline so that you can use ChatGPT to its full potential! Input your prompt + a reflection/research prompt + a resolver prompt to use SmartGPT for enhanced text generation, natural language and incredible question-answer results."
 
-    def get_raw_price(self, state: dict) -> float:
-        return self.price * state.get("num_outputs", 1)
-
 
 def answers_as_prompt(texts: list[str], sep="\n\n") -> str:
     return sep.join(

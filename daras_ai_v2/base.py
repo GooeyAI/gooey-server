@@ -1838,7 +1838,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return max(1, math.ceil(self.get_raw_price(state)))
 
     def get_raw_price(self, state: dict) -> float:
-        return self.price
+        return self.price * state.get("num_outputs", 1)
 
     def get_example_response_body(
         self,

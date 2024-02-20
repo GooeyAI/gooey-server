@@ -140,9 +140,6 @@ class Text2AudioPage(BasePage):
     def preview_description(self, state: dict) -> str:
         return "Generate AI Music with text instruction prompts. AudiLDM is capable of generating realistic audio samples by process any text input. Learn more [here](https://huggingface.co/cvssp/audioldm-m-full)."
 
-    def get_raw_price(self, state: dict) -> float:
-        return super().get_raw_price(state) * state.get("num_outputs", 1)
-
 
 def _render_output(state):
     selected_models = state.get("selected_models", [])

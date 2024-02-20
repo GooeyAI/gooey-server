@@ -279,6 +279,3 @@ class GoogleGPTPage(BasePage):
             max_tokens=request.max_tokens,
             avoid_repetition=request.avoid_repetition,
         )
-
-    def get_raw_price(self, state: dict) -> float:
-        return self.price * state.get("num_outputs", 1)
