@@ -209,9 +209,10 @@ class DocSearchPage(BasePage):
     def get_raw_price(self, state: dict) -> float:
         name = state.get("selected_model")
         try:
-            return llm_price[LargeLanguageModels[name]] * 2
+            unit_price = llm_price[LargeLanguageModels[name]] * 2
         except KeyError:
-            return 10
+            unit_price = 10
+        return unit_price * state.get("num_outputs", 1)
 
 
 def render_documents(state, label="**Documents**", *, key="documents"):

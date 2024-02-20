@@ -206,6 +206,8 @@ class Img2ImgPage(BasePage):
         selected_model = state.get("selected_model")
         match selected_model:
             case Img2ImgModels.dall_e.name:
-                return 20
+                unit_price = 20
             case _:
-                return 5
+                unit_price = 5
+
+        return unit_price * state.get("num_outputs", 1)
