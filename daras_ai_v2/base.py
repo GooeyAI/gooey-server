@@ -320,7 +320,7 @@ class BasePage:
 
         copy_to_clipboard_button(
             f'<i class="fa-regular fa-link"></i>{button_text}',
-            value=self._get_current_app_url(),
+            value=self.get_tab_url(self.tab),
             type="secondary",
             className="mb-0 ms-lg-2",
         )
