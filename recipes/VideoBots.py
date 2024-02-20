@@ -601,11 +601,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     "raw_tts_text", state.get("raw_output_text", [])
                 )
                 tts_state = {"text_prompt": "".join(output_text_list)}
-                return super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
+                total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
                     tts_state
                 )
             case _:
-                return super().get_raw_price(state)
+                total = super().get_raw_price(state)
+
+        return total * state.get("num_outputs", 1)
 
     def additional_notes(self):
         tts_provider = st.session_state.get("tts_provider")
