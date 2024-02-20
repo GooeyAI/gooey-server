@@ -181,6 +181,9 @@ Prompt for merging several outputs together
             case _:
                 raise NotImplementedError(f"{chain_type} not implemented")
 
+    def get_raw_price(self, state: dict) -> float:
+        return self.price * state.get("num_outputs", 1)
+
 
 MAP_REDUCE_PROMPT = """
 {documents}

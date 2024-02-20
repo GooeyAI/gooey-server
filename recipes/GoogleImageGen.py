@@ -238,3 +238,6 @@ The result is a fantastic, one of kind image that's relevant to your search (and
 
     def preview_description(self, state: dict) -> str:
         return "Enter a Google Image Search query + your Img2Img text prompt describing how to alter the result to create a unique, relevant ai generated images for any search query."
+
+    def get_raw_price(self, state: dict) -> float:
+        return super().get_raw_price(state) * state.get("num_outputs", 1)
