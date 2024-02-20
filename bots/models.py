@@ -935,7 +935,9 @@ class MessageQuerySet(models.QuerySet):
                     else None
                 ),  # only show first feedback as per Sean's request
                 "Analysis JSON": message.analysis_result,
-                "Run Time": message.saved_run.run_time if message.saved_run else 0, # user messages have no run/run_time
+                "Run Time": (
+                    message.saved_run.run_time if message.saved_run else 0
+                ),  # user messages have no run/run_time
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
