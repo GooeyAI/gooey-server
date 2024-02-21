@@ -1,9 +1,7 @@
-import json
 import os.path
-import subprocess
+import os.path
 import tempfile
 from enum import Enum
-from time import sleep
 
 import langcodes
 import requests
@@ -14,6 +12,7 @@ from furl import furl
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
 from daras_ai_v2 import settings
+from daras_ai_v2.azure_asr import azure_asr
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
@@ -77,7 +76,6 @@ AZURE_SUPPORTED = {"af-ZA", "am-ET", "ar-AE", "ar-BH", "ar-DZ", "ar-EG", "ar-IL"
                    "so-SO", "sq-AL", "sr-RS", "sv-SE", "sw-KE", "sw-TZ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA",
                    "ur-IN", "uz-UZ", "vi-VN", "wuu-CN", "yue-CN", "zh-CN", "zh-CN-shandong", "zh-CN-sichuan", "zh-HK",
                    "zh-TW", "zu-ZA"}  # fmt: skip
-MAX_POLLS = 100
 
 # https://deepgram.com/product/languages for the "general" model:
 # DEEPGRAM_SUPPORTED = {"nl","en","en-AU","en-US","en-GB","en-NZ","en-IN","fr","fr-CA","de","hi","hi-Latn","id","it","ja","ko","cmn-Hans-CN","cmn-Hant-TW","no","pl","pt","pt-PT","pt-BR","ru","es","es-419","sv","tr","uk"}  # fmt: skip
@@ -165,7 +163,7 @@ def google_translate_language_selector(
         label: the label to display
         key: the key to save the selected language to in the session state
     """
-    languages = google_translate_languages()
+    languages = google_translate_target_languages()
     options = list(languages.keys())
     if allow_none:
         options.insert(0, None)
@@ -178,8 +176,8 @@ def google_translate_language_selector(
     )
 
 
-@redis_cache_decorator
-def google_translate_languages() -> dict[str, str]:
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def google_translate_target_languages() -> dict[str, str]:
     """
     Get list of supported languages for Google Translate.
     :return: Dictionary of language codes and display names.
@@ -199,8 +197,8 @@ def google_translate_languages() -> dict[str, str]:
     }
 
 
-@redis_cache_decorator
-def google_translate_input_languages() -> dict[str, str]:
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def google_translate_source_languages() -> dict[str, str]:
     """
     Get list of supported languages for Google Translate.
     :return: Dictionary of language codes and display names.
@@ -283,11 +281,11 @@ def run_google_translate(
     if source_language:
         source_language = langcodes.Language.get(source_language).to_tag()
         source_language = get_language_in_collection(
-            source_language, google_translate_input_languages().keys()
+            source_language, google_translate_source_languages().keys()
         )  # this will default to autodetect if language is not found as supported
     target_language = langcodes.Language.get(target_language).to_tag()
     target_language: str | None = get_language_in_collection(
-        target_language, google_translate_languages().keys()
+        target_language, google_translate_target_languages().keys()
     )
     if not target_language:
         raise ValueError(f"Unsupported target language: {target_language!r}")
@@ -646,64 +644,6 @@ def _get_or_create_recognizer(
         # no language provided => use default implicit recognizer
         recognizer = f"projects/{project}/locations/{location}/recognizers/_"
     return recognizer
-
-
-def azure_asr(audio_url: str, language: str):
-    # transcription from audio url only supported via rest api or cli
-    # Start by initializing a request
-    payload = {
-        "contentUrls": [
-            audio_url,
-        ],
-        "displayName": "Gooey Transcription",
-        "model": None,
-        "properties": {
-            "wordLevelTimestampsEnabled": False,
-        },
-        "locale": language or "en-US",
-    }
-    r = requests.post(
-        str(furl(settings.AZURE_SPEECH_ENDPOINT) / "speechtotext/v3.1/transcriptions"),
-        headers={
-            "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
-            "Content-Type": "application/json",
-        },
-        json=payload,
-    )
-    raise_for_status(r)
-    uri = r.json()["self"]
-
-    # poll for results
-    for _ in range(MAX_POLLS):
-        r = requests.get(
-            uri,
-            headers={
-                "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
-            },
-        )
-        if not r.ok or not r.json()["status"] == "Succeeded":
-            sleep(5)
-            continue
-        r = requests.get(
-            r.json()["links"]["files"],
-            headers={
-                "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
-            },
-        )
-        raise_for_status(r)
-        transcriptions = []
-        for value in r.json()["values"]:
-            if value["kind"] != "Transcription":
-                continue
-            r = requests.get(
-                value["links"]["contentUrl"],
-                headers={"Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY},
-            )
-            raise_for_status(r)
-            combined_phrases = r.json().get("combinedRecognizedPhrases") or [{}]
-            transcriptions += [combined_phrases[0].get("display", "")]
-        return "\n".join(transcriptions)
-    assert False, "Max polls exceeded, Azure speech did not yield a response"
 
 
 # 16kHz, 16-bit, mono

@@ -293,6 +293,8 @@ REDIS_URL = config("REDIS_URL", "redis://localhost:6379")
 REDIS_CACHE_URL = config("REDIS_CACHE_URL", "redis://localhost:6379")
 TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
 
+REDIS_MODELS_CACHE_EXPIRY = 60 * 60 * 24 * 7
+
 GPU_CELERY_BROKER_URL = config("GPU_CELERY_BROKER_URL", "amqp://localhost:5674")
 GPU_CELERY_RESULT_BACKEND = config(
     "GPU_CELERY_RESULT_BACKEND", "redis://localhost:6374"

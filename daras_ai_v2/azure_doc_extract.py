@@ -26,7 +26,7 @@ def azure_doc_extract_pages(
     ]
 
 
-@redis_cache_decorator
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def azure_form_recognizer_models() -> dict[str, str]:
     r = requests.get(
         str(
@@ -40,7 +40,7 @@ def azure_form_recognizer_models() -> dict[str, str]:
     return {value["modelId"]: value["description"] for value in r.json()["value"]}
 
 
-@redis_cache_decorator
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def azure_form_recognizer(url: str, model_id: str, params: dict = None):
     r = requests.post(
         str(
