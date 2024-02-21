@@ -569,8 +569,9 @@ def _handle_audio_msg(billing_account_user, bot: BotInterface):
             selected_model = AsrModels.whisper_telugu_large_v2.name
         case "bho":
             selected_model = AsrModels.vakyansh_bhojpuri.name
-        case "en":
-            selected_model = AsrModels.usm.name
+        # case "en":
+        #     selected_model = AsrModels.usm.name
+        #     language = "am-et"
         case _:
             selected_model = AsrModels.whisper_large_v2.name
 
