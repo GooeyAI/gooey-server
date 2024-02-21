@@ -9,6 +9,7 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.safety_checker import safety_checker
@@ -481,4 +482,4 @@ Choose fps for the video.
         except RuntimeError as e:
             msg = "\n\n".join(e.args).lower()
             if "key frame string not correctly formatted" in msg:
-                raise st.UserError(str(e)) from e
+                raise UserError(str(e)) from e
