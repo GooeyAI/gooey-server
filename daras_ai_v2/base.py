@@ -1914,10 +1914,14 @@ def render_output_caption():
     if created_at:
         if isinstance(created_at, str):
             created_at = datetime.datetime.fromisoformat(created_at)
-        format_created_at = created_at.strftime(settings.SHORT_DATETIME_FORMAT)
-        caption += f' at <span style="color: black;">{format_created_at}</span>'
+        caption += " at&nbsp;"
 
-    st.caption(caption, unsafe_allow_html=True)
+    with st.div(className="d-flex"):
+        st.caption(caption, unsafe_allow_html=True)
+        js_dynamic_date(
+            created_at,
+            date_options={"month": "short", "day": "numeric", "year": "numeric"},
+        )
 
 
 def get_example_request_body(
