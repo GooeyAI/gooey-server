@@ -519,6 +519,40 @@ class BotIntegration(models.Model):
         help_text="Bot's WhatsApp phone number id (mandatory)",
     )
 
+    wa_business_access_token = models.TextField(
+        blank=True,
+        default=None,
+        null=True,
+        help_text="Bot's WhatsApp Business access token (mandatory) -- has these scopes: ['whatsapp_business_management', 'whatsapp_business_messaging', 'public_profile']",
+    )
+    wa_business_waba_id = models.TextField(
+        blank=True,
+        default=None,
+        null=True,
+        help_text="Bot's WhatsApp Business API WABA id (mandatory) -- this is the one seen on https://business.facebook.com/settings/whatsapp-business-accounts/",
+    )
+    wa_business_user_id = models.TextField(
+        blank=True,
+        default=None,
+        null=True,
+        help_text="Bot's WhatsApp Business API user id (mandatory)",
+    )
+    wa_business_name = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's WhatsApp Business API name (only for display)",
+    )
+    wa_business_account_name = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's WhatsApp Business API account name (only for display)",
+    )
+    wa_business_message_template_namespace = models.TextField(
+        blank=True,
+        default="",
+        help_text="Bot's WhatsApp Business API message template namespace",
+    )
+
     slack_team_id = models.CharField(
         max_length=256,
         blank=True,
@@ -935,7 +969,9 @@ class MessageQuerySet(models.QuerySet):
                     else None
                 ),  # only show first feedback as per Sean's request
                 "Analysis JSON": message.analysis_result,
-                "Run Time": message.saved_run.run_time if message.saved_run else 0, # user messages have no run/run_time
+                "Run Time": (
+                    message.saved_run.run_time if message.saved_run else 0
+                ),  # user messages have no run/run_time
             }
             rows.append(row)
         df = pd.DataFrame.from_records(
