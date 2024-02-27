@@ -735,7 +735,7 @@ def extract_qr_code_data(img: np.ndarray) -> str:
     return info
 
 
-class InvalidQRCode(AssertionError):
+class InvalidQRCode(UserError):
     pass
 
 
