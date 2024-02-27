@@ -80,6 +80,10 @@ class TextToSpeechPage(BasePage):
     def fallback_preivew_image(self) -> str | None:
         return DEFAULT_TTS_META_IMG
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["tts_provider"]
+
     def preview_description(self, state: dict) -> str:
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
 

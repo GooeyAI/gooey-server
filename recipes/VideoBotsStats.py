@@ -31,6 +31,14 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
 )
 from recipes.VideoBots import VideoBotsPage
+from django.db.models.functions import (
+    TruncMonth,
+    TruncDay,
+    TruncWeek,
+    TruncYear,
+    Concat,
+)
+from django.db.models import Count, Avg, Q
 
 ID_COLUMNS = [
     "conversation__fb_page_id",
@@ -542,6 +550,7 @@ class VideoBotsStatsPage(BasePage):
         df["Msgs_per_user"] = df["Messages_Sent"] / df["Senders"]
         df.fillna(0, inplace=True)
         df = df.round(0).astype("int32", errors="ignore")
+        df = df.sort_values(by=["date"], ascending=True).reset_index()
         return df
 
     def plot_graphs(self, view, df):
@@ -809,8 +818,6 @@ class VideoBotsStatsPage(BasePage):
             neg_feedbacks: FeedbackQuerySet = Feedback.objects.filter(
                 message__conversation__bot_integration=bi,
                 rating=Feedback.Rating.RATING_THUMBS_DOWN,
-                created_at__date__gte=start_date,
-                created_at__date__lte=end_date,
             )  # type: ignore
             if start_date and end_date:
                 neg_feedbacks = neg_feedbacks.filter(
@@ -821,10 +828,9 @@ class VideoBotsStatsPage(BasePage):
             df["Bot"] = bi.name
         elif details == "Answered Successfully":
             successful_messages: MessageQuerySet = Message.objects.filter(
+                Q(analysis_result__contains={"Answered": True})
+                | Q(analysis_result__contains={"assistant": {"answer": "Found"}}),
                 conversation__bot_integration=bi,
-                analysis_result__contains={"Answered": True},
-                created_at__date__gte=start_date,
-                created_at__date__lte=end_date,
             )  # type: ignore
             if start_date and end_date:
                 successful_messages = successful_messages.filter(
@@ -835,10 +841,9 @@ class VideoBotsStatsPage(BasePage):
             df["Bot"] = bi.name
         elif details == "Answered Unsuccessfully":
             unsuccessful_messages: MessageQuerySet = Message.objects.filter(
+                Q(analysis_result__contains={"Answered": False})
+                | Q(analysis_result__contains={"assistant": {"answer": "Missing"}}),
                 conversation__bot_integration=bi,
-                analysis_result__contains={"Answered": False},
-                created_at__date__gte=start_date,
-                created_at__date__lte=end_date,
             )  # type: ignore
             if start_date and end_date:
                 unsuccessful_messages = unsuccessful_messages.filter(

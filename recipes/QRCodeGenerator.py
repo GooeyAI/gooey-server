@@ -141,6 +141,15 @@ class QRCodeGeneratorPage(BasePage):
             EmailFaceInpaintingPage,
         ]
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        if state.get("qr_code_file"):
+            return ["qr_code_file"]
+        elif state.get("qr_code_input_image"):
+            return ["qr_code_input_image"]
+        else:
+            return ["qr_code_data"]
+
     def render_form_v2(self):
         st.text_area(
             """
@@ -735,7 +744,7 @@ def extract_qr_code_data(img: np.ndarray) -> str:
     return info
 
 
-class InvalidQRCode(AssertionError):
+class InvalidQRCode(UserError):
     pass
 
 

@@ -294,16 +294,25 @@ class SavedRunAdmin(admin.ModelAdmin):
         django.db.models.JSONField: {"widget": JSONEditorWidget},
     }
 
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related(
+                "parent_version",
+                "parent_version__published_run",
+                "parent_version__published_run__saved_run",
+            )
+        )
+
     def lookup_allowed(self, key, value):
         if key in ["parent_version__published_run__id__exact"]:
             return True
         return super().lookup_allowed(key, value)
 
     def view_user(self, saved_run: SavedRun):
-        return change_obj_url(
-            AppUser.objects.get(uid=saved_run.uid),
-            label=f"{saved_run.uid}",
-        )
+        user = AppUser.objects.get(uid=saved_run.uid)
+        return change_obj_url(user)
 
     view_user.short_description = "View User"
 

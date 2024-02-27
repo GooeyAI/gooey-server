@@ -4,7 +4,7 @@ import os
 import os.path
 import typing
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -601,11 +601,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     "raw_tts_text", state.get("raw_output_text", [])
                 )
                 tts_state = {"text_prompt": "".join(output_text_list)}
-                return super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
+                total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
                     tts_state
                 )
             case _:
-                return super().get_raw_price(state)
+                total = super().get_raw_price(state)
+
+        return total * state.get("num_outputs", 1)
 
     def additional_notes(self):
         tts_provider = st.session_state.get("tts_provider")
@@ -975,11 +977,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     unsafe_allow_html=True,
                 )
 
-            st.write("---")
-            st.text_input(
-                "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
-            )
-            show_landbot_widget()
+            # st.write("---")
+            # st.text_input(
+            #     "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
+            # )
+            # show_landbot_widget()
 
     def messenger_bot_integration(self):
         from routers.facebook_api import ig_connect_url, fb_connect_url
@@ -1028,15 +1030,28 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         st.button("🔄 Refresh")
 
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )  # type: ignore
+
+        integrations_q = Q(billing_account_uid=self.request.user.uid)
+
+        # show admins all the bots connected to the current run
+        if self.is_current_user_admin():
+            integrations_q |= Q(saved_run=current_run)
+            if published_run:
+                integrations_q |= Q(
+                    saved_run__example_id=published_run.published_run_id
+                )
+                integrations_q |= Q(published_run=published_run)
+
         integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
-            billing_account_uid=self.request.user.uid
+            integrations_q
         ).order_by("platform", "-created_at")
+
         if not integrations:
             return
 
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )
         for bi in integrations:
             is_connected = (bi.saved_run == current_run) or (
                 (
