@@ -209,7 +209,11 @@ class AppUser(models.Model):
         if not self.uid:
             return None
         if self.stripe_customer_id:
-            return stripe.Customer.retrieve(self.stripe_customer_id)
+            try:
+                return stripe.Customer.retrieve(self.stripe_customer_id)
+            except stripe.error.InvalidRequestError as e:
+                if e.http_status != 404:
+                    raise
         try:
             customer = stripe.Customer.search(
                 query=f'metadata["uid"]:"{self.uid}"'
