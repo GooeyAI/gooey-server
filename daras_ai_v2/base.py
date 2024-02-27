@@ -1874,11 +1874,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             run_id=run_id,
             uid=self.request.user and self.request.user.uid,
         )
-        output = extract_model_fields(
-            self.ResponseModel,
-            state,
-            include_all=include_all,
-        )
+        output = extract_model_fields(self.ResponseModel, state, include_all=True)
         if as_async:
             return dict(
                 run_id=run_id,
