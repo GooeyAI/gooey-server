@@ -4,7 +4,7 @@ import os
 import os.path
 import typing
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -1029,14 +1029,21 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             *extract_query_params(gooey_get_query_params())
         )  # type: ignore
 
+        integrations_q = Q(billing_account_uid=self.request.user.uid)
+
+        # show admins all the bots connected to the current run
+        if self.is_current_user_admin():
+            integrations_q |= Q(saved_run=current_run)
+            if published_run:
+                integrations_q |= Q(
+                    saved_run__example_id=published_run.published_run_id
+                )
+                integrations_q |= Q(published_run=published_run)
+
         integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
-            billing_account_uid=self.request.user.uid
+            integrations_q
         ).order_by("platform", "-created_at")
 
-        if self.is_current_user_admin():
-            integrations |= BotIntegration.objects.filter(
-                published_run=published_run
-            ).order_by("platform", "-created_at")
         if not integrations:
             return
 
