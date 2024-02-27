@@ -33,7 +33,7 @@ from django.db.models.functions import (
     TruncYear,
     Concat,
 )
-from django.db.models import Count, Avg
+from django.db.models import Count, Avg, Q
 
 ID_COLUMNS = [
     "conversation__fb_page_id",
@@ -817,13 +817,10 @@ class VideoBotsStatsPage(BasePage):
             df["Bot"] = bi.name
         elif details == "Answered Successfully":
             successful_messages: MessageQuerySet = Message.objects.filter(
+                Q(analysis_result__contains={"Answered": True})
+                | Q(analysis_result__contains={"assistant": {"answer": "Found"}}),
                 conversation__bot_integration=bi,
-                analysis_result__contains={"Answered": True},
             )  # type: ignore
-            successful_messages |= Message.objects.filter(
-                conversation__bot_integration=bi,
-                analysis_result__contains={"assistant": {"answer": "Found"}},
-            )
             if start_date and end_date:
                 successful_messages = successful_messages.filter(
                     created_at__date__gte=start_date, created_at__date__lte=end_date
@@ -833,13 +830,10 @@ class VideoBotsStatsPage(BasePage):
             df["Bot"] = bi.name
         elif details == "Answered Unsuccessfully":
             unsuccessful_messages: MessageQuerySet = Message.objects.filter(
+                Q(analysis_result__contains={"Answered": False})
+                | Q(analysis_result__contains={"assistant": {"answer": "Missing"}}),
                 conversation__bot_integration=bi,
-                analysis_result__contains={"Answered": False},
             )  # type: ignore
-            unsuccessful_messages |= Message.objects.filter(
-                conversation__bot_integration=bi,
-                analysis_result__contains={"assistant": {"answer": "Missing"}},
-            )
             if start_date and end_date:
                 unsuccessful_messages = unsuccessful_messages.filter(
                     created_at__date__gte=start_date, created_at__date__lte=end_date
