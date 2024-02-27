@@ -1,7 +1,7 @@
 import base64
 from datetime import datetime, timedelta
 
-from django.db.models import Count, Avg
+from django.db.models import Count, Avg, Q
 from django.db.models.functions import (
     TruncMonth,
     TruncDay,
@@ -31,14 +31,6 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
 )
 from recipes.VideoBots import VideoBotsPage
-from django.db.models.functions import (
-    TruncMonth,
-    TruncDay,
-    TruncWeek,
-    TruncYear,
-    Concat,
-)
-from django.db.models import Count, Avg, Q
 
 ID_COLUMNS = [
     "conversation__fb_page_id",
