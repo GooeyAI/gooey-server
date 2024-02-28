@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+import datetime
 import html
 import traceback
 import typing
@@ -7,9 +7,12 @@ from types import SimpleNamespace
 
 import requests
 import sentry_sdk
+from django.db.models import Sum
+from django.utils import timezone
+from fastapi import HTTPException
 
 import gooey_ui as st
-from app_users.models import AppUser
+from app_users.models import AppUser, AppUserTransaction
 from bots.models import SavedRun
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
@@ -17,6 +20,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.base import StateKeys, BasePage
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.send_email import send_email_via_postmark
+from daras_ai_v2.send_email import send_low_balance_email
 from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
 from gooey_ui.state import set_query_params
@@ -126,6 +130,7 @@ def gui_runner(
         save(done=True)
         if not is_api_call:
             send_email_on_completion(page, sr)
+        run_low_balance_email_check(uid)
 
 
 def err_msg_for_exc(e: Exception):
@@ -151,6 +156,43 @@ def err_msg_for_exc(e: Exception):
         return e.message
     else:
         return f"{type(e).__name__}: {e}"
+
+
+def run_low_balance_email_check(uid: str):
+    # don't send email if feature is disabled
+    if not settings.LOW_BALANCE_EMAIL_ENABLED:
+        return
+    user = AppUser.objects.get(uid=uid)
+    # don't send email if user is not paying or has enough balance
+    if not user.is_paying or user.balance > settings.LOW_BALANCE_EMAIL_CREDITS:
+        return
+    last_purchase = (
+        AppUserTransaction.objects.filter(user=user, amount__gt=0)
+        .order_by("-created_at")
+        .first()
+    )
+    email_date_cutoff = timezone.now() - datetime.timedelta(
+        days=settings.LOW_BALANCE_EMAIL_DAYS
+    )
+    # send email if user has not been sent email in last X days or last purchase was after last email sent
+    if (
+        # user has not been sent any email
+        not user.low_balance_email_sent_at
+        # user was sent email before X days
+        or (user.low_balance_email_sent_at < email_date_cutoff)
+        # user has made a purchase after last email sent
+        or (last_purchase and last_purchase.created_at > user.low_balance_email_sent_at)
+    ):
+        # calculate total credits consumed in last X days
+        total_credits_consumed = abs(
+            AppUserTransaction.objects.filter(
+                user=user, amount__lt=0, created_at__gte=email_date_cutoff
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+        send_low_balance_email(user=user, total_credits_consumed=total_credits_consumed)
+        user.low_balance_email_sent_at = timezone.now()
+        user.save(update_fields=["low_balance_email_sent_at"])
 
 
 def send_email_on_completion(page: BasePage, sr: SavedRun):
