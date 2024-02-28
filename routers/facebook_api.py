@@ -93,8 +93,20 @@ def fb_connect_whatsapp_redirect(request: Request):
                     "pin": settings.WHATSAPP_2FA_PIN,
                 },
             )
-            print(r.json())
             r.raise_for_status()
+
+        # subscript our app to weebhooks for WABA
+        r = requests.post(
+            f"https://graph.facebook.com/v19.0/{waba_id}/subscribed_apps?access_token={user_access_token}",
+            json={
+                "override_callback_uri": (
+                    furl(settings.APP_BASE_URL)
+                    / router.url_path_for(fb_webhook.__name__)
+                ).tostr(),
+                "verify_token": settings.FB_WEBHOOK_TOKEN,
+            },
+        )
+        r.raise_for_status()
 
     return HTMLResponse(
         f"Sucessfully Connected to whatsapp! You may now close this page."
