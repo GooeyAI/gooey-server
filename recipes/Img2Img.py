@@ -72,6 +72,10 @@ class Img2ImgPage(BasePage):
     class ResponseModel(BaseModel):
         output_images: list[str]
 
+    @classmethod
+    def get_example_preferred_fields(self, state: dict) -> list[str]:
+        return ["text_prompt"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_IMG2IMG_META_IMG
 
@@ -202,6 +206,8 @@ class Img2ImgPage(BasePage):
         selected_model = state.get("selected_model")
         match selected_model:
             case Img2ImgModels.dall_e.name:
-                return 20
+                unit_price = 20
             case _:
-                return 5
+                unit_price = 5
+
+        return unit_price * state.get("num_outputs", 1)

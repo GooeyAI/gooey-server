@@ -88,6 +88,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         output_images: list[str]
         email_sent: bool = False
 
+    @classmethod
+    def get_example_preferred_fields(self, state: dict) -> list[str]:
+        return ["email_address"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_EMAIL_FACE_INPAINTING_META_IMG
 
