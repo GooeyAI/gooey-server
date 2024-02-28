@@ -265,6 +265,10 @@ class AppUserTransaction(models.Model):
 
     class Meta:
         verbose_name = "Transaction"
+        indexes = [
+            models.Index(fields=["user", "amount", "-created_at"]),
+            models.Index(fields=["-created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.invoice_id} ({self.amount})"

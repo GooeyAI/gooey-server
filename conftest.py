@@ -9,6 +9,7 @@ from pytest_subtests import subtests
 from auth import auth_backend
 from celeryapp import app
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.send_email import pytest_outbox
 
 
 @pytest.fixture(scope="session")
@@ -66,6 +67,11 @@ def threadpool_subtest(subtests, max_workers: int = 8):
             t.start()
         for t in ts[s]:
             t.join()
+
+
+@pytest.fixture(autouse=True)
+def clear_pytest_outbox():
+    pytest_outbox.clear()
 
 
 # class DummyDatabaseBlocker(pytest_django.plugin._DatabaseBlocker):

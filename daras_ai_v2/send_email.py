@@ -1,4 +1,5 @@
 import smtplib
+import sys
 import typing
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
@@ -12,6 +13,7 @@ from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.settings import templates
 from gooey_ui import UploadedFile
+from routers.billing import account_url
 
 
 def send_reported_run_email(
@@ -51,8 +53,9 @@ def send_low_balance_email(
     recipeints = "support@gooey.ai, devs@gooey.ai"
     html_body = templates.get_template("low_balance_email.html").render(
         user=user,
-        url="https://gooey.ai/account",
+        url=account_url,
         total_credits_consumed=total_credits_consumed,
+        settings=settings,
     )
     send_email_via_postmark(
         from_address=settings.SUPPORT_EMAIL,
@@ -61,6 +64,10 @@ def send_low_balance_email(
         subject="Your Gooey.AI credit balance is low",
         html_body=html_body,
     )
+
+
+is_running_pytest = "pytest" in sys.modules
+pytest_outbox = []
 
 
 def send_email_via_postmark(
@@ -76,6 +83,21 @@ def send_email_via_postmark(
         "outbound", "gooey-ai-workflows", "announcements"
     ] = "outbound",
 ):
+    if is_running_pytest:
+        pytest_outbox.append(
+            dict(
+                from_address=from_address,
+                to_address=to_address,
+                cc=cc,
+                bcc=bcc,
+                subject=subject,
+                html_body=html_body,
+                text_body=text_body,
+                message_stream=message_stream,
+            ),
+        )
+        return
+
     r = requests.post(
         "https://api.postmarkapp.com/email",
         headers={
