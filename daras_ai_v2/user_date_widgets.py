@@ -23,7 +23,6 @@ def js_dynamic_date(
 
 def render_js_dynamic_dates():
     default_date_options = {
-        "weekday": "short",
         "day": "numeric",
         "month": "short",
     }

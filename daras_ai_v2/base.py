@@ -1922,23 +1922,23 @@ def render_output_caption():
 
     run_time = st.session_state.get(StateKeys.run_time, 0)
     if run_time:
-        caption += f'Generated in <span style="color: black;">{run_time :.2f}s</span>'
+        caption += f'Generated in <span style="color: black;">{run_time :.1f}s</span>'
 
     if seed := st.session_state.get("seed"):
         caption += f' with seed <span style="color: black;">{seed}</span> '
 
     created_at = st.session_state.get(StateKeys.created_at, datetime.datetime.today())
+    ended_at = created_at
     if created_at:
         if isinstance(created_at, str):
             created_at = datetime.datetime.fromisoformat(created_at)
-        caption += " at&nbsp;"
+        caption += " on&nbsp;"
+        time_change = datetime.timedelta(seconds=run_time)
+        ended_at = created_at + time_change
 
     with st.div(className="d-flex"):
         st.caption(caption, unsafe_allow_html=True)
-        js_dynamic_date(
-            created_at,
-            date_options={"month": "short", "day": "numeric", "year": "numeric"},
-        )
+        js_dynamic_date(created_at, date_options={"month": "short", "day": "numeric"})
 
 
 def extract_model_fields(
