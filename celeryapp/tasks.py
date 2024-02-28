@@ -40,6 +40,7 @@ def gui_runner(
     is_api_call: bool = False,
 ):
     page = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
+    page.setup_sentry()
     sr = page.run_doc_sr(run_id, uid)
     sr.is_api_call = is_api_call
 
