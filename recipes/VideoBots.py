@@ -632,6 +632,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 """
             )
 
+        state.update(
+            dict(final_prompt=[], output_text=[], output_audio=[], output_video=[])
+        )
+
         user_input = request.input_prompt.strip()
         if not (user_input or request.input_images or request.input_documents):
             return
@@ -895,9 +899,6 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 yield f"Completed with {finish_reason=}"  # avoid changing this message since it's used to detect end of stream
             else:
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
-
-        state["output_audio"] = []
-        state["output_video"] = []
 
         if not request.tts_provider:
             return
