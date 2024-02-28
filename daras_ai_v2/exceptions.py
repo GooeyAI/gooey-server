@@ -45,6 +45,10 @@ class UserError(Exception):
         super().__init__(message)
 
 
+class GPUError(UserError):
+    pass
+
+
 FFMPEG_ERR_MSG = (
     "Unsupported File Format\n\n"
     "We encountered an issue processing your file as it appears to be in a format not supported by our system or may be corrupted. "
