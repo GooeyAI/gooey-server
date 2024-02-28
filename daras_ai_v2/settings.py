@@ -35,7 +35,7 @@ else:
 HASHIDS_SALT = config("HASHIDS_SALT", default="")
 
 ALLOWED_HOSTS = ["*"]
-INTERNAL_IPS = ["127.0.0.1"]
+INTERNAL_IPS = ["127.0.0.1", "localhost"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Application definition
@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "bots",
     "django_extensions",
+    # "debug_toolbar",
     # the order matters, since we want to override the admin templates
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
@@ -67,6 +68,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 
 ROOT_URLCONF = "gooeysite.urls"
@@ -295,6 +297,8 @@ REDIS_URL = config("REDIS_URL", "redis://localhost:6379")
 # redis configured as cache backend
 REDIS_CACHE_URL = config("REDIS_CACHE_URL", "redis://localhost:6379")
 TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
+
+REDIS_MODELS_CACHE_EXPIRY = 60 * 60 * 24 * 7
 
 GPU_CELERY_BROKER_URL = config("GPU_CELERY_BROKER_URL", "amqp://localhost:5674")
 GPU_CELERY_RESULT_BACKEND = config(

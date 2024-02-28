@@ -1,5 +1,11 @@
 {% extends 'base.html' %}
 
+{% block head %}
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Your API keys, profile, and billing details.">
+<link rel="canonical" href="{{ canonical_url }}">
+{% endblock %}
+
 {% block content %}
     <script src="https://js.stripe.com/v3/" async defer></script>
     <script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater"

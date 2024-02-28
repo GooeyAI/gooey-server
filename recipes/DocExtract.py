@@ -27,7 +27,7 @@ from daras_ai_v2.azure_doc_extract import azure_doc_extract_pages
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import raise_for_status, call_cmd
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import (
     apply_parallel,
@@ -277,8 +277,11 @@ def extract_info(url: str) -> list[dict | None]:
         params = dict(ignoreerrors=True, check_formats=False)
         with yt_dlp.YoutubeDL(params) as ydl:
             data = ydl.extract_info(url, download=False)
-        entries = data.get("entries", [data])
-        return [e for e in entries if e]
+        if data:
+            entries = data.get("entries", [data])
+            return [e for e in entries if e]
+        else:
+            return [{"webpage_url": url, "title": "Youtube Video"}]
     else:
         # assume it's a direct link
         doc_meta = doc_url_to_metadata(url)
@@ -326,13 +329,7 @@ def extract_info(url: str) -> list[dict | None]:
 def get_pdf_num_pages(f_bytes: bytes) -> int:
     with tempfile.NamedTemporaryFile() as infile:
         infile.write(f_bytes)
-        args = ["pdfinfo", infile.name]
-        print("\t$ " + " ".join(args))
-        try:
-            output = subprocess.check_output(args, stderr=subprocess.STDOUT, text=True)
-        except subprocess.CalledProcessError as e:
-            raise ValueError(f"PDF Error: {e.output}")
-        output = output.lower()
+        output = call_cmd("pdfinfo", infile.name).lower()
         for line in output.splitlines():
             if not line.startswith("pages:"):
                 continue

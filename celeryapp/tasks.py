@@ -1,9 +1,12 @@
+from fastapi import HTTPException
+import html
 import traceback
 import typing
 import datetime
 from time import time
 from types import SimpleNamespace
 
+import requests
 import sentry_sdk
 
 import gooey_ui as st
@@ -12,11 +15,13 @@ from bots.models import SavedRun
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
-from daras_ai_v2.base import StateKeys, err_msg_for_exc, BasePage
+from daras_ai_v2.base import StateKeys, BasePage
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.send_email import send_email_via_postmark
 from daras_ai_v2.settings import templates
 from gooey_ui.pubsub import realtime_push
 from gooey_ui.state import set_query_params
+from gooeysite.bg_db_conn import db_middleware, next_db_safe
 from daras_ai_v2.send_email import send_low_balance_email
 from django.db.models import Sum
 from django.utils import timezone
@@ -44,6 +49,7 @@ def gui_runner(
     error_msg = None
     set_query_params(query_params or {})
 
+    @db_middleware
     def save(done=False):
         if done:
             # clear run status
@@ -85,7 +91,7 @@ def gui_runner(
             start_time = time()
             try:
                 # advance the generator (to further progress of run())
-                yield_val = next(gen)
+                yield_val = next_db_safe(gen)
                 # increment total time taken after every iteration
                 run_time += time() - start_time
                 continue
@@ -97,8 +103,25 @@ def gui_runner(
             # render errors nicely
             except Exception as e:
                 run_time += time() - start_time
-                traceback.print_exc()
-                sentry_sdk.capture_exception(e)
+
+                if isinstance(e, HTTPException) and e.status_code == 402:
+                    error_msg = page.generate_credit_error_message(
+                        example_id=query_params.get("example_id"),
+                        run_id=run_id,
+                        uid=uid,
+                    )
+                    try:
+                        raise UserError(error_msg) from e
+                    except UserError as e:
+                        sentry_sdk.capture_exception(e, level=e.sentry_level)
+                        break
+
+                if isinstance(e, UserError):
+                    sentry_level = e.sentry_level
+                else:
+                    sentry_level = "error"
+                    traceback.print_exc()
+                sentry_sdk.capture_exception(e, level=sentry_level)
                 error_msg = err_msg_for_exc(e)
                 break
             finally:
@@ -108,6 +131,31 @@ def gui_runner(
         low_balance_email(sr)
         if not is_api_call:
             send_email_on_completion(page, sr)
+
+
+def err_msg_for_exc(e: Exception):
+    if isinstance(e, requests.HTTPError):
+        response: requests.Response = e.response
+        try:
+            err_body = response.json()
+        except requests.JSONDecodeError:
+            err_str = response.text
+        else:
+            format_exc = err_body.get("format_exc")
+            if format_exc:
+                print("⚡️ " + format_exc)
+            err_type = err_body.get("type")
+            err_str = err_body.get("str")
+            if err_type and err_str:
+                return f"(GPU) {err_type}: {err_str}"
+            err_str = str(err_body)
+        return f"(HTTP {response.status_code}) {html.escape(err_str[:1000])}"
+    elif isinstance(e, HTTPException):
+        return f"(HTTP {e.status_code}) {e.detail})"
+    elif isinstance(e, UserError):
+        return e.message
+    else:
+        return f"{type(e).__name__}: {e}"
 
 
 def low_balance_email(sr: SavedRun):

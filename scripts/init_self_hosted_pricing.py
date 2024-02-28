@@ -31,7 +31,7 @@ def run():
                 add_model(model_ids[m], m.name)
             except KeyError:
                 pass
-    add_model("gooey-gpu/wav2lip_gan.pth", "wav2lip")
+    add_model("wav2lip_gan.pth", "wav2lip")
 
 
 def add_model(model_id, model_name):

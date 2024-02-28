@@ -4,7 +4,7 @@ import os
 import os.path
 import typing
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -32,6 +32,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
 )
 from daras_ai_v2.enum_selector_widget import enum_multiselect
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input, validate_glossary_document
@@ -600,11 +601,13 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     "raw_tts_text", state.get("raw_output_text", [])
                 )
                 tts_state = {"text_prompt": "".join(output_text_list)}
-                return super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
+                total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
                     tts_state
                 )
             case _:
-                return super().get_raw_price(state)
+                total = super().get_raw_price(state)
+
+        return total * state.get("num_outputs", 1)
 
     def additional_notes(self):
         tts_provider = st.session_state.get("tts_provider")
@@ -620,12 +623,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
-            assert (
-                self.is_current_user_paying() or self.is_current_user_admin()
-            ), """
+        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name and not (
+            self.is_current_user_paying() or self.is_current_user_admin()
+        ):
+            raise UserError(
+                """
                 Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
                 """
+            )
 
         user_input = request.input_prompt.strip()
         if not (user_input or request.input_images or request.input_documents):
@@ -807,7 +812,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         )
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
-            raise ValueError("Input Script is too long! Please reduce the script size.")
+            raise UserError("Input Script is too long! Please reduce the script size.")
 
         yield f"Summarizing with {model.value}..."
         if is_chat_model:
@@ -972,11 +977,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     unsafe_allow_html=True,
                 )
 
-            st.write("---")
-            st.text_input(
-                "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
-            )
-            show_landbot_widget()
+            # st.write("---")
+            # st.text_input(
+            #     "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
+            # )
+            # show_landbot_widget()
 
     def messenger_bot_integration(self):
         from routers.facebook_api import ig_connect_url, fb_connect_url
@@ -1025,15 +1030,28 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         st.button("🔄 Refresh")
 
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )  # type: ignore
+
+        integrations_q = Q(billing_account_uid=self.request.user.uid)
+
+        # show admins all the bots connected to the current run
+        if self.is_current_user_admin():
+            integrations_q |= Q(saved_run=current_run)
+            if published_run:
+                integrations_q |= Q(
+                    saved_run__example_id=published_run.published_run_id
+                )
+                integrations_q |= Q(published_run=published_run)
+
         integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
-            billing_account_uid=self.request.user.uid
+            integrations_q
         ).order_by("platform", "-created_at")
+
         if not integrations:
             return
 
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )
         for bi in integrations:
             is_connected = (bi.saved_run == current_run) or (
                 (

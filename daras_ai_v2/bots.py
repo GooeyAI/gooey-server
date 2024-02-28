@@ -26,7 +26,7 @@ from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooey_ui.pubsub import realtime_subscribe
-from gooeysite.bg_db_conn import db_middleware
+from gooeysite.bg_db_conn import db_middleware, get_celery_result_db_safe
 from recipes.VideoBots import VideoBotsPage, ReplyButton
 from routers.api import submit_api_call
 
@@ -254,8 +254,8 @@ def _on_msg(bot: BotInterface):
             return
     # handle reset keyword
     if input_text.lower() == RESET_KEYWORD:
-        # clear saved messages
-        bot.convo.messages.all().delete()
+        # record the reset time so we don't send context
+        bot.convo.reset_at = timezone.now()
         # reset convo state
         bot.convo.state = ConvoState.INITIAL
         bot.convo.save()
@@ -317,8 +317,8 @@ def _process_and_send_msg(
     recieved_time: datetime,
     speech_run: str | None,
 ):
-    # get latest messages for context (upto 100)
-    saved_msgs = bot.convo.messages.all().as_llm_context()
+    # get latest messages for context
+    saved_msgs = bot.convo.messages.all().as_llm_context(reset_at=bot.convo.reset_at)
 
     # # mock testing
     # result = _mock_api_output(input_text)
@@ -392,7 +392,7 @@ def _process_and_send_msg(
                     break  # we're done streaming, abort
 
     # wait for the celery task to finish
-    result.get(disable_sync_subtasks=False)
+    get_celery_result_db_safe(result)
     # get the final state from db
     state = page.run_doc_sr(run_id, uid).to_dict()
     # check for errors
@@ -569,8 +569,12 @@ def _handle_audio_msg(billing_account_user, bot: BotInterface):
             selected_model = AsrModels.whisper_telugu_large_v2.name
         case "bho":
             selected_model = AsrModels.vakyansh_bhojpuri.name
-        case "en":
-            selected_model = AsrModels.usm.name
+        case "sw":
+            selected_model = AsrModels.seamless_m4t.name
+            language = "swh"
+        # case "en":
+        #     selected_model = AsrModels.usm.name
+        #     language = "am-et"
         case _:
             selected_model = AsrModels.whisper_large_v2.name
 
