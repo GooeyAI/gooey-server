@@ -340,27 +340,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
         st.markdown("#### Capabilities")
-        if not "__enable_audio" in st.session_state:
-            st.session_state["__enable_audio"] = bool(
-                st.session_state.get("tts_provider")
-            )
-        enable_audio = st.checkbox("##### 🗣️ Speak Responses", key="__enable_audio")
-        if not enable_audio:
-            st.session_state["tts_provider"] = None
-            enable_video = False
-        else:
+        if st.checkbox(
+            "##### 🗣️ Speak Responses",
+            value=bool(st.session_state.get("tts_provider")),
+        ):
             text_to_speech_provider_selector(self)
             st.write("---")
-            if not "__enable_video" in st.session_state:
-                st.session_state["__enable_video"] = bool(
-                    st.session_state.get("input_face")
-                )
             enable_video = st.checkbox(
-                "##### 🫦 Add Lipsync Video", key="__enable_video"
+                "##### 🫦 Add Lipsync Video",
+                value=bool(st.session_state.get("input_face")),
             )
-        if not enable_video:
-            st.session_state["input_face"] = None
         else:
+            st.session_state["tts_provider"] = None
+            enable_video = False
+        if enable_video:
             st.file_uploader(
                 """
                 ###### 👩‍🦰 Input Face
@@ -370,11 +363,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 key="input_face",
             )
             st.write("---")
+        else:
+            st.session_state["input_face"] = None
 
         if st.checkbox(
             "##### 🔠 Translation",
             value=bool(st.session_state.get("user_language")),
-            key="__enable_translation",
         ):
             google_translate_language_selector(
                 f"{field_desc(self.RequestModel, 'user_language')}",
@@ -414,10 +408,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if tts_provider:
             text_to_speech_settings(self, tts_provider)
 
-        if st.session_state.get("__enable_video"):
+        input_face = st.session_state.get("__enable_video")
+        if input_face:
             lipsync_settings()
 
-        if st.session_state.get("__enable_translation"):
+        if st.session_state.get("user_language"):
             st.markdown("##### 🔠 Translation Settings")
             enable_glossary = st.checkbox(
                 "📖 Add Glossary",
@@ -445,9 +440,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.session_state["input_glossary_document"] = None
                 st.session_state["output_glossary_document"] = None
 
-        if st.session_state.get("documents") or st.session_state.get(
-            "__documents_files"
-        ):
+        if st.session_state.get("documents"):
             st.text_area(
                 """
             ##### 👩‍🏫 Document Search Results Instructions
