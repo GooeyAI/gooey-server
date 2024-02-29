@@ -45,7 +45,7 @@ def _mock_gui_runner(
 
 
 @pytest.fixture
-def threadpool_subtest(subtests, max_workers: int = 64):
+def threadpool_subtest(subtests, max_workers: int = 128):
     ts = []
 
     def submit(fn, *args, msg=None, **kwargs):
