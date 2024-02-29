@@ -41,6 +41,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "view_transactions",
         "open_in_firebase",
         "open_in_stripe",
+        "low_balance_email_sent_at",
     ]
 
     @admin.display(description="User Runs")

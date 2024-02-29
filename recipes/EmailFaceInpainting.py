@@ -88,6 +88,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         output_images: list[str]
         email_sent: bool = False
 
+    @classmethod
+    def get_example_preferred_fields(self, state: dict) -> list[str]:
+        return ["email_address"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_EMAIL_FACE_INPAINTING_META_IMG
 
@@ -115,7 +119,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            #### Prompt
             Describe the scene that you'd like to generate around the face. 
             """,
             key="text_prompt",
@@ -130,7 +134,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         source = st.radio(
             """
-            ### Photo Source
+            #### Photo Source
             From where we should get the photo?""",
             options=["Email Address", "Twitter Handle"],
             key="__photo_source",

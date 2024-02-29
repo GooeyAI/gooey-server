@@ -60,9 +60,9 @@ class DocSummaryPage(BasePage):
         task_instructions: str | None
         merge_instructions: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -80,12 +80,16 @@ class DocSummaryPage(BasePage):
         prompt_tree: PromptTree | None
         final_prompt: str
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["task_instructions", "merge_instructions"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_DOC_SUMMARY_META_IMG
 
     def render_form_v2(self):
-        document_uploader("##### 📎 Documents")
-        st.text_area("##### 👩‍💻 Instructions", key="task_instructions", height=150)
+        document_uploader("#### 📎 Documents")
+        st.text_area("#### 👩‍💻 Instructions", key="task_instructions", height=150)
 
     def render_settings(self):
         st.text_area(

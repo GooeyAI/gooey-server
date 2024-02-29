@@ -161,6 +161,8 @@ def format_citations(
 def format_footnotes(
     all_refs: dict[int, SearchReference], formatted: str, citation_style: CitationStyles
 ) -> str:
+    if not all_refs:
+        return formatted
     match citation_style:
         case CitationStyles.number_markdown:
             formatted += "\n\n"

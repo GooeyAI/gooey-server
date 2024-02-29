@@ -40,9 +40,9 @@ class SocialLookupEmailPage(BasePage):
         domain: str | None
         key_words: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         sampling_temperature: float | None
         max_tokens: int | None
 
@@ -120,7 +120,7 @@ class SocialLookupEmailPage(BasePage):
     def render_form_v2(self):
         st.text_input(
             """
-            ### Email Address
+            #### Email Address
             Give us an email address and we'll try to get determine the profile data associated with it
             """,
             key="email_address",
@@ -132,7 +132,7 @@ class SocialLookupEmailPage(BasePage):
 
         st.text_area(
             """
-            ### Email Body
+            #### Email Body
             """,
             key="input_email_body",
             height=200,
@@ -198,7 +198,7 @@ class SocialLookupEmailPage(BasePage):
     def render_output(self):
         st.text_area(
             """
-            ### Email Body Output 
+            #### Email Body Output 
             """,
             disabled=True,
             value=st.session_state.get("output_email_body", ""),

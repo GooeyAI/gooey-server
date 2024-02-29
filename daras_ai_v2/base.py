@@ -13,7 +13,6 @@ from random import Random
 from time import sleep
 from types import SimpleNamespace
 
-import requests
 import sentry_sdk
 from django.utils import timezone
 from django.utils.text import slugify
@@ -180,24 +179,52 @@ class BasePage:
             tab_name=MenuTabs.paths[tab],
         )
 
-    def setup_render(self):
+    def setup_sentry(self, event_processor: typing.Callable = None):
+        def add_user_to_event(event, hint):
+            user = self.request and self.request.user
+            if not user:
+                return event
+            event["user"] = {
+                "id": user.id,
+                "name": user.display_name,
+                "email": user.email,
+                "data": {
+                    field: getattr(user, field)
+                    for field in [
+                        "uid",
+                        "phone_number",
+                        "photo_url",
+                        "balance",
+                        "is_paying",
+                        "is_anonymous",
+                        "is_disabled",
+                        "disable_safety_checker",
+                        "created_at",
+                    ]
+                },
+            }
+            return event
+
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
+            scope.add_event_processor(add_user_to_event)
+            if event_processor:
+                scope.add_event_processor(event_processor)
 
     def refresh_state(self):
         _, run_id, uid = extract_query_params(gooey_get_query_params())
-        channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
+        channel = self.realtime_channel_name(run_id, uid)
         output = realtime_pull([channel])[0]
         if output:
             st.session_state.update(output)
 
     def render(self):
-        self.setup_render()
+        self.setup_sentry()
 
-        if self.get_run_state() == RecipeRunState.running:
+        if self.get_run_state(st.session_state) == RecipeRunState.running:
             self.refresh_state()
         else:
             realtime_clear_subs()
@@ -243,7 +270,12 @@ class BasePage:
 
                 if tbreadcrumbs:
                     with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                        render_breadcrumbs(tbreadcrumbs)
+                        render_breadcrumbs(
+                            tbreadcrumbs,
+                            is_api_call=(
+                                current_run.is_api_call and self.tab == MenuTabs.run
+                            ),
+                        )
 
                 author = self.run_user or current_run.get_creator()
                 if not is_root_example:
@@ -316,7 +348,7 @@ class BasePage:
 
         copy_to_clipboard_button(
             f'<i class="fa-regular fa-link"></i>{button_text}',
-            value=self._get_current_app_url(),
+            value=self.get_tab_url(self.tab),
             type="secondary",
             className="mb-0 ms-lg-2",
         )
@@ -996,9 +1028,7 @@ class BasePage:
             workflow=cls.workflow,
             published_run_id="",
             defaults={
-                "saved_run": lambda: cls.run_doc_sr(
-                    run_id="", uid="", create=True, parent=None, parent_version=None
-                ),
+                "saved_run": lambda: cls.run_doc_sr(run_id="", uid="", create=True),
                 "created_by": None,
                 "last_edited_by": None,
                 "title": cls.title,
@@ -1022,15 +1052,11 @@ class BasePage:
         run_id: str,
         uid: str,
         create: bool = False,
-        parent: SavedRun | None = None,
-        parent_version: PublishedRunVersion | None = None,
+        defaults: dict = None,
     ) -> SavedRun:
         config = dict(workflow=cls.workflow, uid=uid, run_id=run_id)
         if create:
-            return SavedRun.objects.get_or_create(
-                **config,
-                defaults=dict(parent=parent, parent_version=parent_version),
-            )[0]
+            return SavedRun.objects.get_or_create(**config, defaults=defaults)[0]
         else:
             return SavedRun.objects.get(**config)
 
@@ -1264,7 +1290,9 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         if not (self.request.user and run_id and uid):
             return
 
-        reported = st.button("❗Report")
+        reported = st.button(
+            '<i class="fa-regular fa-flag"></i> Report', type="tertiary"
+        )
         if not reported:
             return
 
@@ -1306,12 +1334,13 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
         return submitted
 
-    def get_run_state(self) -> RecipeRunState:
-        if st.session_state.get(StateKeys.run_status):
+    @classmethod
+    def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
+        if state.get(StateKeys.run_status):
             return RecipeRunState.running
-        elif st.session_state.get(StateKeys.error_msg):
+        elif state.get(StateKeys.error_msg):
             return RecipeRunState.failed
-        elif st.session_state.get(StateKeys.run_time):
+        elif state.get(StateKeys.run_time):
             return RecipeRunState.completed
         else:
             # when user is at a recipe root, and not running anything
@@ -1330,7 +1359,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
         self._render_before_output()
 
-        run_state = self.get_run_state()
+        run_state = self.get_run_state(st.session_state)
         match run_state:
             case RecipeRunState.completed:
                 self._render_completed_output()
@@ -1344,12 +1373,11 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         # render outputs
         self.render_output()
 
-        if run_state != "waiting":
+        if run_state != RecipeRunState.running:
             self._render_after_output()
 
     def _render_completed_output(self):
-        run_time = st.session_state.get(StateKeys.run_time, 0)
-        st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
+        pass
 
     def _render_failed_output(self):
         err_msg = st.session_state.get(StateKeys.error_msg)
@@ -1365,12 +1393,10 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         if not estimated_run_time:
             return
         if created_at := st.session_state.get("created_at"):
-            if isinstance(created_at, datetime.datetime):
-                start_time = created_at
-            else:
-                start_time = datetime.datetime.fromisoformat(created_at)
+            if isinstance(created_at, str):
+                created_at = datetime.datetime.fromisoformat(created_at)
             with st.countdown_timer(
-                end_time=start_time + datetime.timedelta(seconds=estimated_run_time),
+                end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
                 delay_text="Sorry for the wait. Your run is taking longer than we expected.",
             ):
                 if self.is_current_user_owner() and self.request.user.email:
@@ -1407,7 +1433,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             and not self.request.user.is_anonymous
         )
 
-    def create_new_run(self):
+    def create_new_run(self, is_api_call: bool = False):
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
@@ -1442,8 +1468,11 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             run_id,
             uid,
             create=True,
-            parent=parent,
-            parent_version=parent_version,
+            defaults=dict(
+                parent=parent,
+                parent_version=parent_version,
+                is_api_call=is_api_call,
+            ),
         ).set(self.state_to_doc(st.session_state))
 
         return None, run_id, uid
@@ -1457,12 +1486,15 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             run_id=run_id,
             uid=uid,
             state=st.session_state,
-            channel=f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}",
+            channel=self.realtime_channel_name(run_id, uid),
             query_params=self.clean_query_params(
                 example_id=example_id, run_id=run_id, uid=uid
             ),
             is_api_call=is_api_call,
         )
+
+    def realtime_channel_name(self, run_id, uid):
+        return f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
 
     def generate_credit_error_message(self, example_id, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"
@@ -1508,22 +1540,17 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.session_state.pop(field_name, None)
 
     def _render_after_output(self):
-        col1, col2, col3 = st.columns([1, 1, 1], responsive=False)
-        col2.node.props[
-            "className"
-        ] += " d-flex justify-content-center align-items-center"
-        col3.node.props["className"] += " d-flex justify-content-end align-items-center"
+        self._render_report_button()
+
         if "seed" in self.RequestModel.schema_json():
-            seed = st.session_state.get("seed")
-            with col1:
-                st.caption(f"*Seed\\\n`{seed}`*")
-            with col2:
-                randomize = st.button("♻️ Regenerate")
-                if randomize:
-                    st.session_state[StateKeys.pressed_randomize] = True
-                    st.experimental_rerun()
-        with col3:
-            self._render_report_button()
+            randomize = st.button(
+                '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
+            )
+            if randomize:
+                st.session_state[StateKeys.pressed_randomize] = True
+                st.experimental_rerun()
+
+        render_output_caption()
 
     def state_to_doc(self, state: dict):
         ret = {
@@ -1791,8 +1818,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         as_async = st.checkbox("##### Run Async")
         as_form_data = st.checkbox("##### Upload Files via Form Data")
 
-        request_body = get_example_request_body(
-            self.RequestModel, st.session_state, include_all=include_all
+        request_body = self.get_example_request_body(
+            st.session_state, include_all=include_all
         )
         response_body = self.get_example_response_body(
             st.session_state, as_async=as_async, include_all=include_all
@@ -1838,7 +1865,27 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return max(1, math.ceil(self.get_raw_price(state)))
 
     def get_raw_price(self, state: dict) -> float:
-        return self.price
+        return self.price * state.get("num_outputs", 1)
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        """
+        Fields that are not required, but are preferred to be shown in the example.
+        """
+        return []
+
+    @classmethod
+    def get_example_request_body(
+        cls,
+        state: dict,
+        include_all: bool = False,
+    ) -> dict:
+        return extract_model_fields(
+            cls.RequestModel,
+            state,
+            include_all=include_all,
+            preferred_fields=cls.get_example_preferred_fields(state),
+        )
 
     def get_example_response_body(
         self,
@@ -1854,6 +1901,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             run_id=run_id,
             uid=self.request.user and self.request.user.uid,
         )
+        output = extract_model_fields(self.ResponseModel, state, include_all=True)
         if as_async:
             return dict(
                 run_id=run_id,
@@ -1861,18 +1909,14 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 created_at=created_at,
                 run_time_sec=st.session_state.get(StateKeys.run_time, 0),
                 status="completed",
-                output=get_example_request_body(
-                    self.ResponseModel, state, include_all=include_all
-                ),
+                output=output,
             )
         else:
             return dict(
                 id=run_id,
                 url=web_url,
                 created_at=created_at,
-                output=get_example_request_body(
-                    self.ResponseModel, state, include_all=include_all
-                ),
+                output=output,
             )
 
     def additional_notes(self) -> str | None:
@@ -1900,15 +1944,41 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
 
-def get_example_request_body(
-    request_model: typing.Type[BaseModel],
+def render_output_caption():
+    caption = ""
+
+    run_time = st.session_state.get(StateKeys.run_time, 0)
+    if run_time:
+        caption += f'Generated in <span style="color: black;">{run_time :.2f}s</span>'
+
+    if seed := st.session_state.get("seed"):
+        caption += f' with seed <span style="color: black;">{seed}</span> '
+
+    created_at = st.session_state.get(StateKeys.created_at, datetime.datetime.today())
+    if created_at:
+        if isinstance(created_at, str):
+            created_at = datetime.datetime.fromisoformat(created_at)
+        format_created_at = created_at.strftime(settings.SHORT_DATETIME_FORMAT)
+        caption += f' at <span style="color: black;">{format_created_at}</span>'
+
+    st.caption(caption, unsafe_allow_html=True)
+
+
+def extract_model_fields(
+    model: typing.Type[BaseModel],
     state: dict,
     include_all: bool = False,
+    preferred_fields: list[str] = None,
 ) -> dict:
+    """Only returns required fields unless include_all is set to True."""
     return {
         field_name: state.get(field_name)
-        for field_name, field in request_model.__fields__.items()
-        if include_all or field.required
+        for field_name, field in model.__fields__.items()
+        if (
+            include_all
+            or field.required
+            or (preferred_fields and field_name in preferred_fields)
+        )
     }
 
 
@@ -1926,27 +1996,6 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
-
-
-def err_msg_for_exc(e):
-    if isinstance(e, requests.HTTPError):
-        response: requests.Response = e.response
-        try:
-            err_body = response.json()
-        except requests.JSONDecodeError:
-            err_str = response.text
-        else:
-            format_exc = err_body.get("format_exc")
-            if format_exc:
-                print("⚡️ " + format_exc)
-            err_type = err_body.get("type")
-            err_str = err_body.get("str")
-            if err_type and err_str:
-                return f"(GPU) {err_type}: {err_str}"
-            err_str = str(err_body)
-        return f"(HTTP {response.status_code}) {html.escape(err_str[:1000])}"
-    else:
-        return f"{type(e).__name__}: {e}"
 
 
 def force_redirect(url: str):

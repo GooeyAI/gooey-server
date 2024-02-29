@@ -11,6 +11,7 @@ from PIL import Image, ImageOps
 from furl import furl
 
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import UserError
 
 
 def resize_img_pad(img_bytes: bytes, size: tuple[int, int]) -> bytes:
@@ -90,7 +91,7 @@ def bytes_to_cv2_img(img_bytes: bytes, greyscale=False) -> np.ndarray:
         flags = cv2.IMREAD_COLOR
     img_cv2 = cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), flags=flags)
     if not img_exists(img_cv2):
-        raise ValueError("Bad Image")
+        raise UserError("Bad Image")
     return img_cv2
 
 
@@ -112,7 +113,9 @@ def safe_filename(filename: str) -> str:
     return out
 
 
-def truncate_filename(text: str, maxlen: int = 100, sep: str = "...") -> str:
+def truncate_filename(
+    text: str | bytes, maxlen: int = 100, sep: str | bytes = "..."
+) -> str | bytes:
     if len(text) <= maxlen:
         return text
     assert len(sep) <= maxlen

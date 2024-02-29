@@ -1,3 +1,4 @@
+from conftest import flaky
 from daras_ai_v2.asr import run_google_translate
 
 
@@ -48,6 +49,7 @@ def test_run_google_translate(threadpool_subtest):
         threadpool_subtest(_test_run_google_translate_one, text, expected)
 
 
+@flaky
 def _test_run_google_translate_one(
     text: str, expected: str, glossary_url=None, target_lang="en"
 ):

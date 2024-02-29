@@ -105,7 +105,7 @@ class FaceInpaintingPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            #### Prompt
             Describe the character that you'd like to generate. 
             """,
             key="text_prompt",
@@ -114,7 +114,7 @@ class FaceInpaintingPage(BasePage):
 
         st.file_uploader(
             """
-            ### Face Photo
+            #### Face Photo
             Give us a photo of yourself, or anyone else
             """,
             key="input_image",
@@ -196,11 +196,9 @@ class FaceInpaintingPage(BasePage):
         output_images = st.session_state.get("output_images")
 
         if output_images:
+            st.write("#### Output Image")
             for url in output_images:
-                st.image(
-                    url,
-                    caption="```" + text_prompt.replace("\n", "") + "```",
-                )
+                st.image(url, show_download_button=True)
         else:
             st.div()
 
@@ -338,6 +336,8 @@ class FaceInpaintingPage(BasePage):
         selected_model = state.get("selected_model")
         match selected_model:
             case InpaintingModels.dall_e.name:
-                return 20
+                unit_price = 20
             case _:
-                return 5
+                unit_price = 5
+
+        return unit_price * state.get("num_outputs", 1)

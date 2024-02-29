@@ -19,6 +19,7 @@ from daras_ai_v2.vector_search import (
     doc_url_to_metadata,
     download_content_bytes,
 )
+from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
 
 DEFAULT_BULK_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d80fd4d8-93fa-11ee-bc13-02420a0001cc/Bulk%20Runner.jpg.png"
@@ -301,7 +302,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                     result, sr = sr.submit_api_call(
                         current_user=self.request.user, request_body=request_body
                     )
-                    result.get(disable_sync_subtasks=False)
+                    get_celery_result_db_safe(result)
                     sr.refresh_from_db()
 
                     run_time = datetime.timedelta(
@@ -366,7 +367,7 @@ To understand what each field represents, check out our [API docs](https://api.g
             result, sr = sr.submit_api_call(
                 current_user=self.request.user, request_body=request_body
             )
-            result.get(disable_sync_subtasks=False)
+            get_celery_result_db_safe(result)
             sr.refresh_from_db()
             response.eval_runs.append(sr.get_app_url())
 

@@ -1,4 +1,4 @@
-from daras_ai_v2.asr import google_translate_languages
+from daras_ai_v2.asr import google_translate_target_languages
 
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 
@@ -125,7 +125,8 @@ def get_langcodes_from_df(df: "pd.DataFrame") -> list[str]:
     import langcodes
 
     supported = {
-        langcodes.Language.get(code).language for code in google_translate_languages()
+        langcodes.Language.get(code).language
+        for code in google_translate_target_languages()
     }
     ret = []
     for col in df.columns:

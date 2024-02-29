@@ -4,7 +4,7 @@ import os
 import os.path
 import typing
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -32,6 +32,8 @@ from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
 )
 from daras_ai_v2.enum_selector_widget import enum_multiselect
+from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc, field_desc
 from daras_ai_v2.functions import LLMTools
@@ -630,11 +632,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     "raw_tts_text", state.get("raw_output_text", [])
                 )
                 tts_state = {"text_prompt": "".join(output_text_list)}
-                return super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
+                total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
                     tts_state
                 )
             case _:
-                return super().get_raw_price(state)
+                total = super().get_raw_price(state)
+
+        return total * state.get("num_outputs", 1)
 
     def additional_notes(self):
         tts_provider = st.session_state.get("tts_provider")
@@ -650,12 +654,18 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
-            assert (
-                self.is_current_user_paying() or self.is_current_user_admin()
-            ), """
+        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name and not (
+            self.is_current_user_paying() or self.is_current_user_admin()
+        ):
+            raise UserError(
+                """
                 Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
                 """
+            )
+
+        state.update(
+            dict(final_prompt=[], output_text=[], output_audio=[], output_video=[])
+        )
 
         user_input = request.input_prompt.strip()
         if not (user_input or request.input_images or request.input_documents):
@@ -743,7 +753,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
-                yield "Generating search query..."
+                yield "Creating search query..."
                 state["final_search_query"] = generate_final_search_query(
                     request=request,
                     instructions=query_instructions,
@@ -757,7 +767,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
-                yield "Extracting keywords..."
+                yield "Finding keywords..."
                 k_request = request.copy()
                 # other models dont support JSON mode
                 k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
@@ -837,9 +847,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
-            raise ValueError("Input Script is too long! Please reduce the script size.")
+            raise UserError("Input Script is too long! Please reduce the script size.")
 
-        yield f"Running {model.value}..."
+        yield f"Summarizing with {model.value}..."
         if is_chat_model:
             chunks = run_language_model(
                 model=request.selected_model,
@@ -872,15 +882,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         citation_style = (
             request.citation_style and CitationStyles[request.citation_style]
         ) or None
-        all_refs_list = []
-        for i, output_text in enumerate(chunks):
+        for i, entries in enumerate(chunks):
+            if not entries:
+                continue
+            output_text = [entry["content"] for entry in entries]
             if request.tools:
-                output_text, tool_call_choices = output_text
+                # output_text, tool_call_choices = output_text
                 state["output_documents"] = output_documents = []
-                for tool_calls in tool_call_choices:
-                    for call in tool_calls:
-                        result = yield from exec_tool_call(call)
-                        output_documents.append(result)
+                for call in entries[0].get("tool_calls") or []:
+                    result = yield from exec_tool_call(call)
+                    output_documents.append(result)
 
             # save model response
             state["raw_output_text"] = [
@@ -906,15 +917,19 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 all_refs_list = apply_response_formattings_prefix(
                     output_text, references, citation_style
                 )
-            state["output_text"] = output_text
-            yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
+            else:
+                all_refs_list = None
 
-        if all_refs_list:
-            apply_response_formattings_suffix(
-                all_refs_list, state["output_text"], citation_style
-            )
-        state["output_audio"] = []
-        state["output_video"] = []
+            state["output_text"] = output_text
+            if all(entry.get("finish_reason") for entry in entries):
+                if all_refs_list:
+                    apply_response_formattings_suffix(
+                        all_refs_list, state["output_text"], citation_style
+                    )
+                finish_reason = entries[0]["finish_reason"]
+                yield f"Completed with {finish_reason=}"  # avoid changing this message since it's used to detect end of stream
+            else:
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
         if not request.tts_provider:
             return
@@ -994,11 +1009,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     unsafe_allow_html=True,
                 )
 
-            st.write("---")
-            st.text_input(
-                "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
-            )
-            show_landbot_widget()
+            # st.write("---")
+            # st.text_input(
+            #     "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
+            # )
+            # show_landbot_widget()
 
     def messenger_bot_integration(self):
         from routers.facebook_api import ig_connect_url, fb_connect_url
@@ -1047,15 +1062,28 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         st.button("🔄 Refresh")
 
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )  # type: ignore
+
+        integrations_q = Q(billing_account_uid=self.request.user.uid)
+
+        # show admins all the bots connected to the current run
+        if self.is_current_user_admin():
+            integrations_q |= Q(saved_run=current_run)
+            if published_run:
+                integrations_q |= Q(
+                    saved_run__example_id=published_run.published_run_id
+                )
+                integrations_q |= Q(published_run=published_run)
+
         integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
-            billing_account_uid=self.request.user.uid
+            integrations_q
         ).order_by("platform", "-created_at")
+
         if not integrations:
             return
 
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )
         for bi in integrations:
             is_connected = (bi.saved_run == current_run) or (
                 (
@@ -1072,14 +1100,27 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             col1, col2, col3, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()
+                if bi.published_run:
+                    url = self.app_url(
+                        example_id=bi.published_run.published_run_id,
+                        tab_name=MenuTabs.paths[MenuTabs.integrations],
+                    )
+                elif bi.saved_run:
+                    url = self.app_url(
+                        run_id=bi.saved_run.run_id,
+                        uid=bi.saved_run.uid,
+                        example_id=bi.saved_run.example_id,
+                        tab_name=MenuTabs.paths[MenuTabs.integrations],
+                    )
+                else:
+                    url = None
+                if url:
+                    href = f'<a href="{url}">{bi}</a>'
+                else:
+                    href = f"<span>{bi}</span>"
                 with st.div(className="mt-2"):
                     st.markdown(
-                        (
-                            f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                            f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
-                            if bi.saved_run
-                            else f"<span>{bi}</span>"
-                        ),
+                        f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;{href}',
                         unsafe_allow_html=True,
                     )
             with col2:
@@ -1114,7 +1155,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     st.session_state.get("user_language") or bi.user_language
                 )
                 bi.saved_run = current_run
-                bi.published_run = published_run
+                if published_run and published_run.saved_run_id == current_run.id:
+                    bi.published_run = published_run
+                else:
+                    bi.published_run = None
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg
 
@@ -1153,6 +1197,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             value=bi.name,
             key=f"_bi_name_{bi.id}",
         )
+        st.caption("Enable streaming messages to Slack in real-time.")
 
 
 def show_landbot_widget():

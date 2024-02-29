@@ -89,6 +89,8 @@ class AppUser(models.Model):
     stripe_customer_id = models.CharField(max_length=255, default="", blank=True)
     is_paying = models.BooleanField("paid", default=False)
 
+    low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(
         "created", editable=False, blank=True, default=timezone.now
     )
@@ -207,7 +209,11 @@ class AppUser(models.Model):
         if not self.uid:
             return None
         if self.stripe_customer_id:
-            return stripe.Customer.retrieve(self.stripe_customer_id)
+            try:
+                return stripe.Customer.retrieve(self.stripe_customer_id)
+            except stripe.error.InvalidRequestError as e:
+                if e.http_status != 404:
+                    raise
         try:
             customer = stripe.Customer.search(
                 query=f'metadata["uid"]:"{self.uid}"'
@@ -263,6 +269,10 @@ class AppUserTransaction(models.Model):
 
     class Meta:
         verbose_name = "Transaction"
+        indexes = [
+            models.Index(fields=["user", "amount", "-created_at"]),
+            models.Index(fields=["-created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.invoice_id} ({self.amount})"

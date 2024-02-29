@@ -1,6 +1,5 @@
 import datetime
 import os.path
-import subprocess
 import tempfile
 import typing
 from time import time
@@ -27,12 +26,11 @@ from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages, normalize_slug, page_slug_map
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
-from daras_ai_v2.base import (
-    RedirectException,
-    get_example_request_body,
-)
+from daras_ai_v2.base import RedirectException
+from daras_ai_v2.bots import request_json
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
+from daras_ai_v2.exceptions import ffmpeg, UserError
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
@@ -165,6 +163,11 @@ async def logout(request: Request):
     return RedirectResponse(request.query_params.get("next", DEFAULT_LOGOUT_REDIRECT))
 
 
+@app.post("/__/file-upload/url/meta")
+async def file_upload(request: Request, body_json: dict = Depends(request_json)):
+    return dict(name=(body_json["url"]), type="url/undefined", size=None)
+
+
 @app.post("/__/file-upload/")
 def file_upload(request: Request, form_data: FormData = Depends(request_form_files)):
     from wand.image import Image
@@ -180,22 +183,16 @@ def file_upload(request: Request, form_data: FormData = Depends(request_form_fil
         ) as infile:
             infile.write(data)
             infile.flush()
-            if not check_wav_audio_format(infile.name):
-                with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
-                    args = [
-                        "ffmpeg",
-                        "-y",
-                        "-i",
-                        infile.name,
-                        *FFMPEG_WAV_ARGS,
-                        outfile.name,
-                    ]
-                    print("\t$ " + " ".join(args))
-                    subprocess.check_call(args)
+            try:
+                if not check_wav_audio_format(infile.name):
+                    with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
+                        ffmpeg("-i", infile.name, *FFMPEG_WAV_ARGS, outfile.name)
 
-                    filename += ".wav"
-                    content_type = "audio/wav"
-                    data = outfile.read()
+                        filename += ".wav"
+                        content_type = "audio/wav"
+                        data = outfile.read()
+            except UserError as e:
+                return Response(content=str(e), status_code=400)
 
     if content_type.startswith("image/"):
         with Image(blob=data) as img:
@@ -299,9 +296,7 @@ Authorization: Bearer GOOEY_API_KEY
 
     page = workflow.page_cls(request=request)
     state = page.get_root_published_run().saved_run.to_dict()
-    request_body = get_example_request_body(
-        page.RequestModel, state, include_all=include_all
-    )
+    request_body = page.get_example_request_body(state, include_all=include_all)
     response_body = page.get_example_response_body(
         state, as_async=as_async, include_all=include_all
     )

@@ -108,6 +108,12 @@ ngrok http 8080
 5. Copy the temporary access token there and set env var `WHATSAPP_ACCESS_TOKEN = XXXX`
 
 
+**(Optional) Use the test script to send yourself messages** 
+
+```bash
+python manage.py runscript test_wa_msg_send --script-args 104696745926402 +918764022384
+```
+Replace `+918764022384` with your number and `104696745926402` with the test number ID
 
 ## Dangerous postgres commands
 
@@ -145,6 +151,9 @@ pg_restore --no-privileges --no-owner -d $PGDATABASE $fname
 cid=$(docker ps  | grep gooey-api-prod | cut -d " " -f 1 | head -1)
 # exec the script to create the fixture
 docker exec -it $cid poetry run ./manage.py runscript create_fixture
+```
+
+```bash
 # copy the fixture outside container
 docker cp $cid:/app/fixture.json .
 # print the absolute path
@@ -178,3 +187,4 @@ rsync -P -a <username>@captain.us-1.gooey.ai:/home/<username>/fixture.json .
 createdb -T template0 $PGDATABASE
 pg_dump $SOURCE_DATABASE | psql -q $PGDATABASE
 ```
+

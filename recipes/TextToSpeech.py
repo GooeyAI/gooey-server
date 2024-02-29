@@ -12,7 +12,7 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, storage_blob_for
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -53,9 +53,9 @@ class TextToSpeechPage(BasePage):
     class RequestModel(BaseModel):
         text_prompt: str
 
-        tts_provider: typing.Literal[
-            tuple(e.name for e in TextToSpeechProviders)
-        ] | None
+        tts_provider: (
+            typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+        )
 
         uberduck_voice_name: str | None
         uberduck_speaking_rate: float | None
@@ -81,6 +81,10 @@ class TextToSpeechPage(BasePage):
     def fallback_preivew_image(self) -> str | None:
         return DEFAULT_TTS_META_IMG
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["tts_provider"]
+
     def preview_description(self, state: dict) -> str:
         return "Input your text, pick a voice & a Text-to-Speech AI engine to create audio. Compare the best voice generators from Google, UberDuck.ai & more to add automated voices to your podcast, YouTube videos, website, or app."
 
@@ -100,7 +104,7 @@ class TextToSpeechPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            #### Prompt
             Enter text you want to convert to speech
             """,
             key="text_prompt",
@@ -131,12 +135,8 @@ class TextToSpeechPage(BasePage):
         # loom_video("2d853b7442874b9cbbf3f27b98594add")
 
     def render_output(self):
-        text_prompt = st.session_state.get("text_prompt", "")
         audio_url = st.session_state.get("audio_url")
-        if audio_url:
-            st.audio(audio_url)
-        else:
-            st.div()
+        st.audio(audio_url, show_download_button=True)
 
     def _get_elevenlabs_price(self, state: dict):
         _, is_user_provided_key = self._get_elevenlabs_api_key(state)
@@ -258,13 +258,16 @@ class TextToSpeechPage(BasePage):
 
             case TextToSpeechProviders.ELEVEN_LABS:
                 xi_api_key, is_custom_key = self._get_elevenlabs_api_key(state)
-                assert (
+                if not (
                     is_custom_key
                     or self.is_current_user_paying()
                     or self.is_current_user_admin()
-                ), """
-                    Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
-                    """
+                ):
+                    raise UserError(
+                        """
+                        Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
+                        """
+                    )
 
                 voice_model = self._get_elevenlabs_voice_model(state)
                 voice_id = self._get_elevenlabs_voice_id(state)

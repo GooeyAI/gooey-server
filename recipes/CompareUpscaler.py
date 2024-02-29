@@ -24,9 +24,9 @@ class CompareUpscalerPage(BasePage):
 
         scale: int
 
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in UpscalerModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in UpscalerModels)]] | None
+        )
 
     class ResponseModel(BaseModel):
         output_images: dict[typing.Literal[tuple(e.name for e in UpscalerModels)], str]
@@ -34,7 +34,7 @@ class CompareUpscalerPage(BasePage):
     def render_form_v2(self):
         st.file_uploader(
             """
-            ### Input Image
+            #### Input Image
             """,
             key="input_image",
             upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
@@ -107,7 +107,7 @@ class CompareUpscalerPage(BasePage):
             img: dict = state.get("output_images", {}).get(key)
             if not img:
                 continue
-            st.image(img, caption=UpscalerModels[key].value)
+            st.image(img, caption=UpscalerModels[key].value, show_download_button=True)
 
     def get_raw_price(self, state: dict) -> int:
         selected_models = state.get("selected_models", [])

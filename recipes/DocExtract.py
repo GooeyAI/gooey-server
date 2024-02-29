@@ -1,5 +1,6 @@
-import io
 import random
+import subprocess
+import tempfile
 import threading
 import typing
 
@@ -26,7 +27,7 @@ from daras_ai_v2.azure_doc_extract import azure_doc_extract_pages
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import raise_for_status, call_cmd
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import (
     apply_parallel,
@@ -38,21 +39,22 @@ from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.settings import service_account_key_path
-from daras_ai_v2.vector_search import doc_url_to_metadata
+from daras_ai_v2.vector_search import doc_url_to_metadata, add_page_number_to_pdf
 from recipes.DocSearch import render_documents
 
 DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
 
 
 class Columns(IntegerChoices):
-    webpage_url = 1, "Source"
-    title = 2, "Title"
-    description = 3, "Description"
-    content_url = 4, "Content"
-    transcript = 5, "Transcript"
-    translation = 6, "Translation"
-    summary = 7, "Summarized"
-    status = 8, "Status"
+    webpage_url = 1, "url"
+    title = 2, "title"
+    final_output = 3, "snippet/sections"
+    description = 4, "Description"
+    content_url = 5, "Content URL"
+    transcript = 6, "Transcript"
+    translation = 7, "Translation"
+    summary = 8, "Summarized"
+    status = 9, "Status"
 
 
 class DocExtractPage(BasePage):
@@ -77,9 +79,9 @@ class DocExtractPage(BasePage):
 
         task_instructions: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -94,11 +96,11 @@ class DocExtractPage(BasePage):
 
     def render_form_v2(self):
         document_uploader(
-            "##### 🤖 Youtube URLS",
+            "#### 🤖 Youtube URLS",
             accept=("audio/*", "application/pdf", "video/*"),
         )
         st.text_input(
-            "##### 📊 Google Sheets URL",
+            "#### 📊 Google Sheets URL",
             key="sheet_url",
         )
 
@@ -148,7 +150,10 @@ class DocExtractPage(BasePage):
         request: DocExtractPage.RequestModel = self.RequestModel.parse_obj(state)
 
         entries = yield from flatapply_parallel(
-            extract_info, request.documents, message="Extracting metadata..."
+            extract_info,
+            request.documents,
+            message="Extracting metadata...",
+            max_workers=50,
         )
 
         yield "Preparing sheet..."
@@ -265,8 +270,6 @@ def col_i2a(col: int) -> str:
 
 
 def extract_info(url: str) -> list[dict | None]:
-    from pypdf import PdfReader
-
     if is_yt_url(url):
         import yt_dlp
 
@@ -274,8 +277,11 @@ def extract_info(url: str) -> list[dict | None]:
         params = dict(ignoreerrors=True, check_formats=False)
         with yt_dlp.YoutubeDL(params) as ydl:
             data = ydl.extract_info(url, download=False)
-        entries = data.get("entries", [data])
-        return [e for e in entries if e]
+        if data:
+            entries = data.get("entries", [data])
+            return [e for e in entries if e]
+        else:
+            return [{"webpage_url": url, "title": "Youtube Video"}]
     else:
         # assume it's a direct link
         doc_meta = doc_url_to_metadata(url)
@@ -285,6 +291,9 @@ def extract_info(url: str) -> list[dict | None]:
             f = furl(url)
             if is_gdrive_url(f):
                 f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
+                content_url = upload_file_from_bytes(
+                    doc_meta.name, f_bytes, content_type=doc_meta.mime_type
+                )
             else:
                 r = requests.get(
                     url,
@@ -293,18 +302,41 @@ def extract_info(url: str) -> list[dict | None]:
                 )
                 raise_for_status(r)
                 f_bytes = r.content
-            inputpdf = PdfReader(io.BytesIO(f_bytes))
+                content_url = url
+            num_pages = get_pdf_num_pages(f_bytes)
             return [
                 {
-                    "webpage_url": f.copy().set(fragment_args={"page": i + 1}).url,
-                    "pdf_page": page,
-                    "title": (doc_meta.name + f", page {i + 1}"),
+                    "webpage_url": add_page_number_to_pdf(f, page_num).url,
+                    "title": f"{doc_meta.name}, page {page_num}",
                     "doc_meta": doc_meta,
+                    # "pdf_page": page,
+                    "content_url": add_page_number_to_pdf(content_url, page_num).url,
+                    "page_num": page_num,
                 }
-                for i, page in enumerate(inputpdf.pages)
+                for i in range(num_pages)
+                if (page_num := i + 1)
+            ]
+        else:
+            return [
+                {
+                    "webpage_url": url,
+                    "title": doc_meta.name,
+                    "doc_meta": doc_meta,
+                },
             ]
 
-        return [{"webpage_url": url, "title": doc_meta.name, "doc_meta": doc_meta}]
+
+def get_pdf_num_pages(f_bytes: bytes) -> int:
+    with tempfile.NamedTemporaryFile() as infile:
+        infile.write(f_bytes)
+        output = call_cmd("pdfinfo", infile.name).lower()
+        for line in output.splitlines():
+            if not line.startswith("pages:"):
+                continue
+            try:
+                return int(line.split("pages:")[-1])
+            except ValueError:
+                raise ValueError(f"Unexpected PDF Info: {line}")
 
 
 def process_entry(
@@ -338,8 +370,6 @@ def process_source(
     row: int,
     entry: dict,
 ) -> typing.Iterator[str | None]:
-    from pypdf import PdfWriter
-
     webpage_url = entry["webpage_url"]
     doc_meta = entry.get("doc_meta")
 
@@ -357,11 +387,16 @@ def process_source(
     )
 
     content_url = existing_values[Columns.content_url.value]
+    is_yt = is_yt_url(webpage_url)
+    is_pdf = doc_meta and "application/pdf" in doc_meta.mime_type
+    is_video = doc_meta and (
+        "video/" in doc_meta.mime_type or "audio/" in doc_meta.mime_type
+    )
     if not content_url:
         yield "Downloading"
-        if is_yt_url(webpage_url):
+        if is_yt:
             content_url, _ = download_youtube_to_wav(webpage_url)
-        elif "video/" in doc_meta.mime_type or "audio/" in doc_meta.mime_type:
+        elif is_video:
             f = furl(webpage_url)
             if is_gdrive_url(f):
                 f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
@@ -369,15 +404,8 @@ def process_source(
                     doc_meta.name, f_bytes, content_type=doc_meta.mime_type
                 )
             content_url, _ = audio_url_to_wav(webpage_url)
-        elif "application/pdf" in doc_meta.mime_type:
-            page = entry["pdf_page"]
-            outputpdf = PdfWriter()
-            outputpdf.add_page(page)
-            with io.BytesIO() as outf:
-                outputpdf.write(outf)
-                content_url = upload_file_from_bytes(
-                    entry["title"], outf.getvalue(), content_type="application/pdf"
-                )
+        elif is_pdf:
+            content_url = entry.get("content_url") or webpage_url
         else:
             raise NotImplementedError(
                 f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"
@@ -386,21 +414,31 @@ def process_source(
 
     transcript = existing_values[Columns.transcript.value]
     if not transcript:
-        if (
-            is_yt_url(webpage_url)
-            or "video/" in doc_meta.mime_type
-            or "audio/" in doc_meta.mime_type
-        ):
+        if is_yt or is_video:
             yield "Transcribing"
             transcript = run_asr(content_url, request.selected_asr_model)
-        elif "application/pdf" in doc_meta.mime_type:
+        elif is_pdf:
             yield "Extracting PDF"
-            transcript = str(azure_doc_extract_pages(content_url)[0])
+            if page_num := entry.get("page_num"):
+                params = dict(pages=str(page_num))
+            else:
+                params = None
+            pages = azure_doc_extract_pages(content_url, params=params)
+            if pages and pages[0]:
+                transcript = str(pages[0])
+            else:
+                transcript = ""
         else:
             raise NotImplementedError(
                 f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"
             )
         update_cell(spreadsheet_id, row, Columns.transcript.value, transcript)
+
+    if is_pdf:
+        final_col_name = "sections"
+    else:
+        final_col_name = "snippet"
+    final_value = transcript
 
     if request.google_translate_target:
         translation = existing_values[Columns.translation.value]
@@ -413,32 +451,47 @@ def process_source(
                 glossary_url=request.glossary_document,
             )[0]
             update_cell(spreadsheet_id, row, Columns.translation.value, translation)
+        final_value = translation
     else:
         translation = transcript
         update_cell(spreadsheet_id, row, Columns.translation.value, "")
 
     summary = existing_values[Columns.summary.value]
-    if not summary and request.task_instructions:
-        yield "Summarizing"
-        prompt = request.task_instructions.strip() + "\n\n" + translation
-        summary = "\n---\n".join(
-            run_language_model(
-                model=request.selected_model,
-                quality=request.quality,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                prompt=prompt,
-                max_tokens=request.max_tokens,
-                avoid_repetition=request.avoid_repetition,
+    if request.task_instructions:
+        if not summary:
+            yield "Summarizing"
+            prompt = request.task_instructions.strip() + "\n\n" + translation
+            summary = "\n---\n".join(
+                run_language_model(
+                    model=request.selected_model,
+                    quality=request.quality,
+                    num_outputs=request.num_outputs,
+                    temperature=request.sampling_temperature,
+                    prompt=prompt,
+                    max_tokens=request.max_tokens,
+                    avoid_repetition=request.avoid_repetition,
+                )
             )
-        )
-        update_cell(spreadsheet_id, row, Columns.summary.value, summary)
+            update_cell(spreadsheet_id, row, Columns.summary.value, summary)
+        if final_col_name != "sections":
+            final_value = f"content={final_value}\ncontent={summary}"
+            final_col_name = "sections"
+        else:
+            final_value = f"{final_value}\ncontent={summary}"
+    else:
+        update_cell(spreadsheet_id, row, Columns.summary.value, "")
+
+    update_cell(spreadsheet_id, 1, Columns.final_output.value, final_col_name)
+    update_cell(spreadsheet_id, row, Columns.final_output.value, final_value)
 
 
 def google_api_should_retry(e: Exception) -> bool:
-    return isinstance(e, HttpError) and (
-        e.resp.status in (408, 429) or e.resp.status > 500
-    )
+    from googleapiclient.errors import HttpError
+
+    return (
+        isinstance(e, HttpError)
+        and (e.resp.status in (408, 429) or e.resp.status > 500)
+    ) or isinstance(e, TimeoutError)
 
 
 @retry_if(google_api_should_retry)

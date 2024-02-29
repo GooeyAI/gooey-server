@@ -48,6 +48,10 @@ class AsrPage(BasePage):
         raw_output_text: list[str] | None
         output_text: list[str | AsrOutputJson]
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["selected_model", "language", "google_translate_target"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_ASR_META_IMG
 
@@ -82,14 +86,14 @@ class AsrPage(BasePage):
 
     def render_form_v2(self):
         document_uploader(
-            "##### Audio Files",
+            "#### Audio Files",
             accept=("audio/*", "video/*", "application/octet-stream"),
         )
         col1, col2 = st.columns(2, responsive=False)
         with col1:
             selected_model = enum_selector(
                 AsrModels,
-                label="##### ASR Model",
+                label="#### ASR Model",
                 key="selected_model",
                 use_selectbox=True,
             )

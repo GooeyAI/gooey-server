@@ -31,7 +31,7 @@ from daras_ai_v2.azure_doc_extract import (
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import raise_for_status, call_cmd, UserError
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import flatmap_parallel, map_parallel
 from daras_ai_v2.gdrive_downloader import (
@@ -88,11 +88,11 @@ def get_top_k_references(
     Returns:
         the top k documents
     """
-    yield "Checking docs..."
+    yield "Fetching latest knowledge docs..."
     input_docs = request.documents or []
     doc_metas = map_parallel(doc_url_to_metadata, input_docs)
 
-    yield "Getting embeddings..."
+    yield "Creating knowledge embeddings..."
     embeds: list[tuple[SearchReference, np.ndarray]] = flatmap_parallel(
         lambda f_url, doc_meta: get_embeds_for_doc(
             f_url=f_url,
@@ -107,7 +107,7 @@ def get_top_k_references(
     )
     dense_query_embeds = openai_embedding_create([request.search_query])[0]
 
-    yield "Searching documents..."
+    yield "Searching knowledge base..."
 
     dense_weight = request.dense_weight
     if dense_weight is None:  # for backwards compatibility
@@ -133,7 +133,7 @@ def get_top_k_references(
         dense_ranks = np.zeros(len(embeds))
 
     if sparse_weight:
-        yield "Getting sparse scores..."
+        yield "Considering results..."
         # get sparse scores
         bm25_corpus = flatmap_parallel(
             lambda f_url, doc_meta: get_bm25_embeds_for_doc(
@@ -258,7 +258,7 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
             meta = gdrive_metadata(url_to_gdrive_file_id(f))
         except HttpError as e:
             if e.status_code == 404:
-                raise FileNotFoundError(
+                raise UserError(
                     f"Could not download the google doc at {f_url} "
                     f"Please make sure to make the document public for viewing."
                 ) from e
@@ -429,11 +429,9 @@ def pages_to_split_refs(
                 "title": (
                     doc_meta.name + (f", page {doc.end + 1}" if len(pages) > 1 else "")
                 ),
-                "url": (
-                    furl(f_url)
-                    .set(fragment_args={"page": doc.end + 1} if len(pages) > 1 else {})
-                    .url
-                ),
+                "url": add_page_number_to_pdf(
+                    f_url, (doc.end + 1 if len(pages) > 1 else f_url)
+                ).url,
                 "snippet": doc.text,
                 **doc.kwargs,
                 "score": -1,
@@ -443,6 +441,10 @@ def pages_to_split_refs(
             )
         ]
     return refs
+
+
+def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
+    return furl(url).set(fragment_args={"page": page_num} if page_num else {})
 
 
 sections_re = re.compile(r"(\s*[\r\n\f\v]|^)(\w+)\=", re.MULTILINE)
@@ -628,17 +630,9 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
         tempfile.NamedTemporaryFile("r") as outfile,
     ):
         infile.write(f_bytes)
-        args = [
-            "pandoc",
-            "--standalone",
-            infile.name,
-            "--to",
-            to,
-            "--output",
-            outfile.name,
-        ]
-        print("\t$ " + " ".join(args))
-        subprocess.check_call(args)
+        call_cmd(
+            "pandoc", "--standalone", infile.name, "--to", to, "--output", outfile.name
+        )
         return outfile.read()
 
 

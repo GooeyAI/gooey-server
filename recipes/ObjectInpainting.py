@@ -95,7 +95,7 @@ class ObjectInpaintingPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            #### Prompt
             Describe the scene that you'd like to generate. 
             """,
             key="text_prompt",
@@ -104,7 +104,7 @@ class ObjectInpaintingPage(BasePage):
 
         st.file_uploader(
             """
-            ### Object Photo
+            #### Object Photo
             Give us a photo of anything
             """,
             key="input_image",
@@ -201,7 +201,7 @@ class ObjectInpaintingPage(BasePage):
 
         if output_images:
             for url in output_images:
-                st.image(url, caption=f"{text_prompt}")
+                st.image(url, caption=f"{text_prompt}", show_download_button=True)
         else:
             st.div()
 
@@ -314,6 +314,8 @@ class ObjectInpaintingPage(BasePage):
         selected_model = state.get("selected_model")
         match selected_model:
             case InpaintingModels.dall_e.name:
-                return 20
+                unit_price = 20
             case _:
-                return 5
+                unit_price = 5
+
+        return unit_price * state.get("num_outputs", 1)

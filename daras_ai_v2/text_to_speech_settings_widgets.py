@@ -4,6 +4,7 @@ import requests
 from google.cloud import texttospeech
 
 import gooey_ui as st
+from daras_ai_v2 import settings
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
@@ -404,7 +405,7 @@ def text_to_speech_settings(
                 )
 
 
-@redis_cache_decorator
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def google_tts_voices() -> dict[str, str]:
     voices: list[texttospeech.Voice] = (
         texttospeech.TextToSpeechClient().list_voices().voices

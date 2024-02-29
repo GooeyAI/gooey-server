@@ -1,4 +1,5 @@
 import json
+from json import JSONDecodeError
 
 from celery import shared_task
 from django.db.models import QuerySet
@@ -19,6 +20,7 @@ from daras_ai_v2.slack_bot import (
     SlackBot,
 )
 from daras_ai_v2.vector_search import references_as_prompt
+from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.VideoBots import ReplyButton
 
 
@@ -57,15 +59,22 @@ def msg_analysis(msg_id: int):
     Message.objects.filter(id=msg_id).update(analysis_run=sr)
 
     # wait for the result
-    result.get(disable_sync_subtasks=False)
+    get_celery_result_db_safe(result)
     sr.refresh_from_db()
     # if failed, raise error
     if sr.error_msg:
         raise RuntimeError(sr.error_msg)
 
     # save the result as json
+    output_text = flatten(sr.state["output_text"].values())[0]
+    try:
+        analysis_result = json.loads(output_text)
+    except JSONDecodeError:
+        analysis_result = {
+            "error": "Failed to parse the analysis result. Please check your script.",
+        }
     Message.objects.filter(id=msg_id).update(
-        analysis_result=json.loads(flatten(sr.state["output_text"].values())[0]),
+        analysis_result=analysis_result,
     )
 
 
@@ -128,7 +137,7 @@ def send_broadcast_msg(
                     channel_is_personal=convo.slack_channel_is_personal,
                     username=bi.name,
                     token=bi.slack_access_token,
-                )
+                )[0]
             case _:
                 raise NotImplementedError(
                     f"Platform {bi.platform} doesn't support broadcasts yet"

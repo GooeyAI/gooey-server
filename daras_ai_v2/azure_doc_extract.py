@@ -16,15 +16,17 @@ from daras_ai_v2.text_splitter import default_length_function
 auth_headers = {"Ocp-Apim-Subscription-Key": settings.AZURE_FORM_RECOGNIZER_KEY}
 
 
-def azure_doc_extract_pages(pdf_url: str, model_id: str = "prebuilt-layout"):
-    result = azure_form_recognizer(pdf_url, model_id)
+def azure_doc_extract_pages(
+    pdf_url: str, model_id: str = "prebuilt-layout", params: dict = None
+):
+    result = azure_form_recognizer(pdf_url, model_id, params)
     return [
         records_to_text(extract_records(result, page["pageNumber"]))
         for page in result["pages"]
     ]
 
 
-@redis_cache_decorator
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def azure_form_recognizer_models() -> dict[str, str]:
     r = requests.get(
         str(
@@ -38,14 +40,14 @@ def azure_form_recognizer_models() -> dict[str, str]:
     return {value["modelId"]: value["description"] for value in r.json()["value"]}
 
 
-@redis_cache_decorator
-def azure_form_recognizer(url: str, model_id: str):
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def azure_form_recognizer(url: str, model_id: str, params: dict = None):
     r = requests.post(
         str(
             furl(settings.AZURE_FORM_RECOGNIZER_ENDPOINT)
             / f"formrecognizer/documentModels/{model_id}:analyze"
         ),
-        params={"api-version": "2023-07-31"},
+        params={"api-version": "2023-07-31"} | (params or {}),
         headers=auth_headers,
         json={"urlSource": url},
     )
@@ -67,7 +69,7 @@ def azure_form_recognizer(url: str, model_id: str):
 def extract_records(result: dict, page_num: int) -> list[dict]:
     table_polys = extract_tables(result, page_num)
     records = []
-    for para in result["paragraphs"]:
+    for para in result.get("paragraphs", []):
         try:
             if para["boundingRegions"][0]["pageNumber"] != page_num:
                 continue

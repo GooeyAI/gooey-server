@@ -61,9 +61,9 @@ class DocSearchPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -81,9 +81,13 @@ class DocSearchPage(BasePage):
         final_prompt: str
         final_search_query: str | None
 
+    @classmethod
+    def get_example_preferred_fields(self, state: dict) -> list[str]:
+        return ["documents"]
+
     def render_form_v2(self):
-        st.text_area("##### Search Query", key="search_query")
-        document_uploader("##### Documents")
+        st.text_area("#### Search Query", key="search_query")
+        document_uploader("#### Documents")
         prompt_vars_widget("task_instructions", "query_instructions")
 
     def validate_form_v2(self):
@@ -111,7 +115,7 @@ class DocSearchPage(BasePage):
 
     def render_example(self, state: dict):
         render_documents(state)
-        st.write("**Search Query**")
+        st.html("**Search Query**")
         st.write("```properties\n" + state.get("search_query", "") + "\n```")
         render_output_with_refs(state, 200)
 
@@ -205,9 +209,10 @@ class DocSearchPage(BasePage):
     def get_raw_price(self, state: dict) -> float:
         name = state.get("selected_model")
         try:
-            return llm_price[LargeLanguageModels[name]] * 2
+            unit_price = llm_price[LargeLanguageModels[name]] * 2
         except KeyError:
-            return 10
+            unit_price = 10
+        return unit_price * state.get("num_outputs", 1)
 
 
 def render_documents(state, label="**Documents**", *, key="documents"):

@@ -6,10 +6,7 @@ from starlette.testclient import TestClient
 from auth.auth_backend import force_authentication
 from bots.models import SavedRun, Workflow
 from daras_ai_v2.all_pages import all_test_pages
-from daras_ai_v2.base import (
-    BasePage,
-    get_example_request_body,
-)
+from daras_ai_v2.base import BasePage
 from server import app
 
 MAX_WORKERS = 20
@@ -27,7 +24,7 @@ def _test_api_sync(page_cls: typing.Type[BasePage]):
     state = page_cls.recipe_doc_sr().state
     r = client.post(
         f"/v2/{page_cls.slug_versions[0]}/",
-        json=get_example_request_body(page_cls.RequestModel, state),
+        json=page_cls.get_example_request_body(state),
         headers={"Authorization": f"Token None"},
         allow_redirects=False,
     )
@@ -45,7 +42,7 @@ def _test_api_async(page_cls: typing.Type[BasePage]):
 
     r = client.post(
         f"/v3/{page_cls.slug_versions[0]}/async/",
-        json=get_example_request_body(page_cls.RequestModel, state),
+        json=page_cls.get_example_request_body(state),
         headers={"Authorization": f"Token None"},
         allow_redirects=False,
     )
@@ -73,7 +70,7 @@ def test_apis_examples(mock_gui_runner, force_authentication, threadpool_subtest
             hidden=False,
             example_id__isnull=False,
         ):
-            threadpool_subtest(_test_apis_examples, sr)
+            threadpool_subtest(_test_apis_examples, sr, msg=sr.get_app_url())
 
 
 def _test_apis_examples(sr: SavedRun):
@@ -81,7 +78,7 @@ def _test_apis_examples(sr: SavedRun):
     page_cls = Workflow(sr.workflow).page_cls
     r = client.post(
         f"/v2/{page_cls.slug_versions[0]}/?example_id={sr.example_id}",
-        json=get_example_request_body(page_cls.RequestModel, state),
+        json=page_cls.get_example_request_body(state),
         headers={"Authorization": f"Token None"},
         allow_redirects=False,
     )

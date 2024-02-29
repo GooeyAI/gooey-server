@@ -46,9 +46,11 @@ class Img2ImgPage(BasePage):
         text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
-        selected_controlnet_model: list[
-            typing.Literal[tuple(e.name for e in ControlNetModels)]
-        ] | typing.Literal[tuple(e.name for e in ControlNetModels)] | None
+        selected_controlnet_model: (
+            list[typing.Literal[tuple(e.name for e in ControlNetModels)]]
+            | typing.Literal[tuple(e.name for e in ControlNetModels)]
+            | None
+        )
         negative_prompt: str | None
 
         num_outputs: int | None
@@ -70,6 +72,10 @@ class Img2ImgPage(BasePage):
     class ResponseModel(BaseModel):
         output_images: list[str]
 
+    @classmethod
+    def get_example_preferred_fields(self, state: dict) -> list[str]:
+        return ["text_prompt"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_IMG2IMG_META_IMG
 
@@ -89,7 +95,7 @@ class Img2ImgPage(BasePage):
     def render_form_v2(self):
         st.file_uploader(
             """
-            ### Input Image
+            #### Input Image
             """,
             key="input_image",
             upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
@@ -98,7 +104,7 @@ class Img2ImgPage(BasePage):
         if st.session_state.get("selected_model") != InpaintingModels.dall_e.name:
             st.text_area(
                 """
-                ### Prompt
+                #### Prompt
                 Describe your edits 
                 """,
                 key="text_prompt",
@@ -125,11 +131,12 @@ class Img2ImgPage(BasePage):
         youtube_video("narcZNyuNAg")
 
     def render_output(self):
-        text_prompt = st.session_state.get("text_prompt", "")
         output_images = st.session_state.get("output_images", [])
-
+        if not output_images:
+            return
+        st.write("#### Output Image")
         for img in output_images:
-            st.image(img, caption="```" + text_prompt.replace("\n", "") + "```")
+            st.image(img, show_download_button=True)
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
@@ -199,6 +206,8 @@ class Img2ImgPage(BasePage):
         selected_model = state.get("selected_model")
         match selected_model:
             case Img2ImgModels.dall_e.name:
-                return 20
+                unit_price = 20
             case _:
-                return 5
+                unit_price = 5
+
+        return unit_price * state.get("num_outputs", 1)

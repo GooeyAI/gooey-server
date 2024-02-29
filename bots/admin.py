@@ -5,7 +5,7 @@ import django.db.models
 from django import forms
 from django.conf import settings
 from django.contrib import admin
-from django.db.models import Max, Count, F
+from django.db.models import Max, Count, F, Sum
 from django.template import loader
 from django.utils import dateformat
 from django.utils.safestring import mark_safe
@@ -28,8 +28,6 @@ from bots.models import (
     WorkflowMetadata,
 )
 from bots.tasks import create_personal_channels_for_all_members
-from daras_ai.image_input import truncate_text_words
-from daras_ai_v2.base import BasePage
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
@@ -168,6 +166,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
             "Settings",
             {
                 "fields": [
+                    "streaming_enabled",
                     "show_feedback_buttons",
                     "analysis_run",
                     "view_analysis_results",
@@ -265,10 +264,14 @@ class SavedRunAdmin(admin.ModelAdmin):
         "view_parent_published_run",
         "run_time",
         "price",
+        "is_api_call",
         "created_at",
         "updated_at",
     ]
-    list_filter = ["workflow"]
+    list_filter = [
+        "workflow",
+        "is_api_call",
+    ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
     autocomplete_fields = ["parent_version"]
 
@@ -277,10 +280,12 @@ class SavedRunAdmin(admin.ModelAdmin):
         "parent",
         "view_bots",
         "price",
+        "view_usage_cost",
         "transaction",
         "created_at",
         "updated_at",
         "run_time",
+        "is_api_call",
     ]
 
     actions = [export_to_csv, export_to_excel]
@@ -289,16 +294,25 @@ class SavedRunAdmin(admin.ModelAdmin):
         django.db.models.JSONField: {"widget": JSONEditorWidget},
     }
 
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related(
+                "parent_version",
+                "parent_version__published_run",
+                "parent_version__published_run__saved_run",
+            )
+        )
+
     def lookup_allowed(self, key, value):
         if key in ["parent_version__published_run__id__exact"]:
             return True
         return super().lookup_allowed(key, value)
 
     def view_user(self, saved_run: SavedRun):
-        return change_obj_url(
-            AppUser.objects.get(uid=saved_run.uid),
-            label=f"{saved_run.uid}",
-        )
+        user = AppUser.objects.get(uid=saved_run.uid)
+        return change_obj_url(user)
 
     view_user.short_description = "View User"
 
@@ -311,6 +325,15 @@ class SavedRunAdmin(admin.ModelAdmin):
     def view_parent_published_run(self, saved_run: SavedRun):
         pr = saved_run.parent_published_run()
         return pr and change_obj_url(pr)
+
+    @admin.display(description="Usage Costs")
+    def view_usage_cost(self, saved_run: SavedRun):
+        total_cost = saved_run.usage_costs.aggregate(total_cost=Sum("dollar_amount"))[
+            "total_cost"
+        ]
+        return list_related_html_url(
+            saved_run.usage_costs, extra_label=f"${total_cost.normalize()}"
+        )
 
 
 @admin.register(PublishedRunVersion)
@@ -491,6 +514,7 @@ class MessageAdmin(admin.ModelAdmin):
         "prev_msg_content",
         "prev_msg_display_content",
         "prev_msg_saved_run",
+        "response_time",
     ]
     ordering = ["created_at"]
     actions = [export_to_csv, export_to_excel]
@@ -550,6 +574,7 @@ class MessageAdmin(admin.ModelAdmin):
                 "Analysis",
                 {
                     "fields": [
+                        "response_time",
                         "analysis_result",
                         "analysis_run",
                         "question_answered",

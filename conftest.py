@@ -9,6 +9,22 @@ from pytest_subtests import subtests
 from auth import auth_backend
 from celeryapp import app
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.send_email import pytest_outbox
+
+
+def flaky(fn):
+    max_tries = 5
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        for i in range(max_tries):
+            try:
+                return fn(*args, **kwargs)
+            except Exception:
+                if i == max_tries - 1:
+                    raise
+
+    return wrapper
 
 
 @pytest.fixture(scope="session")
@@ -44,11 +60,12 @@ def _mock_gui_runner(
 
 
 @pytest.fixture
-def threadpool_subtest(subtests, max_workers: int = 8):
+def threadpool_subtest(subtests, max_workers: int = 128):
     ts = []
 
-    def submit(fn, *args, **kwargs):
-        msg = "--".join(map(str, [*args, *kwargs.values()]))
+    def submit(fn, *args, msg=None, **kwargs):
+        if not msg:
+            msg = "--".join(map(str, [*args, *kwargs.values()]))
 
         @wraps(fn)
         def runner(*args, **kwargs):
@@ -65,6 +82,11 @@ def threadpool_subtest(subtests, max_workers: int = 8):
             t.start()
         for t in ts[s]:
             t.join()
+
+
+@pytest.fixture(autouse=True)
+def clear_pytest_outbox():
+    pytest_outbox.clear()
 
 
 # class DummyDatabaseBlocker(pytest_django.plugin._DatabaseBlocker):

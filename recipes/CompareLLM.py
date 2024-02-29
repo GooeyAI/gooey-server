@@ -36,9 +36,9 @@ class CompareLLMPage(BasePage):
 
     class RequestModel(BaseModel):
         input_prompt: str | None
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
+        )
 
         avoid_repetition: bool | None
         num_outputs: int | None
@@ -58,6 +58,10 @@ class CompareLLMPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return "Which language model works best your prompt? Compare your text generations across multiple large language models (LLMs) like OpenAI's evolving and latest ChatGPT engines and others like Curie, Ada, Babbage."
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["input_prompt", "selected_models"]
 
     def render_form_v2(self):
         st.text_area(
@@ -106,8 +110,8 @@ class CompareLLMPage(BasePage):
                 avoid_repetition=request.avoid_repetition,
                 stream=True,
             )
-            for i, item in enumerate(ret):
-                output_text[selected_model] = item
+            for i, entries in enumerate(ret):
+                output_text[selected_model] = [e["content"] for e in entries]
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
