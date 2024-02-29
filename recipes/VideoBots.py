@@ -645,10 +645,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         tts_provider = st.session_state.get("tts_provider")
         match tts_provider:
             case TextToSpeechProviders.ELEVEN_LABS.name:
-                return f"""
-                    - *Base cost = {super().get_raw_price(st.session_state)} credits*
-                    - *Additional {TextToSpeechPage().additional_notes()}*
-                """
+                return (
+                    f" \\\n"
+                    f"*Base cost = {super().get_raw_price(st.session_state)} credits*"
+                    f" | "
+                    f"*Additional {TextToSpeechPage().get_cost_note()}*"
+                )
             case _:
                 return ""
 
