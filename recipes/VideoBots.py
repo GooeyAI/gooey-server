@@ -943,6 +943,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             unconnected_q = Q(saved_run=None) | Q(published_run=None)
             unconnected_q &= Q(billing_account_uid=self.request.user.uid)
             for bi in BotIntegration.objects.filter(unconnected_q):
+                bi.streaming_enabled = True
                 bi.user_language = (
                     st.session_state.get("user_language") or bi.user_language
                 )
