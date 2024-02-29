@@ -149,6 +149,7 @@ def text_to_speech_provider_selector(page):
             TextToSpeechProviders,
             "###### Speech Provider",
             key="tts_provider",
+            use_selectbox=True,
         )
     with col2:
         match tts_provider:
