@@ -313,9 +313,10 @@ class TextToSpeechPage(BasePage):
 
     def _get_elevenlabs_voice_id(self, state: dict[str, str]):
         if state.get("elevenlabs_voice_id"):
-            assert state.get(
-                "elevenlabs_api_key"
-            ), "ElevenLabs API key is required to use a custom voice_id"
+            if not state.get("elevenlabs_api_key"):
+                raise UserError(
+                    "ElevenLabs API key is required to use a custom voice_id"
+                )
             return state["elevenlabs_voice_id"]
         else:
             # default to first in the mapping
