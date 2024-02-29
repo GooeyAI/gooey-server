@@ -2,6 +2,7 @@ import random
 import threading
 import typing
 
+import pydantic
 import requests
 from aifail import retry_if
 from django.db.models import IntegerChoices
@@ -73,14 +74,14 @@ class DocExtractPage(BasePage):
     price = 500
 
     class RequestModel(BaseModel):
-        documents: list[str]
+        documents: list[pydantic.AnyHttpUrl]
 
-        sheet_url: str | None
+        sheet_url: pydantic.AnyHttpUrl | None
 
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         # language: str | None
         google_translate_target: str | None
-        glossary_document: str | None
+        glossary_document: pydantic.AnyHttpUrl | None
 
         task_instructions: str | None
 

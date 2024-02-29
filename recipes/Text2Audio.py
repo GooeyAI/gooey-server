@@ -1,6 +1,7 @@
 import typing
 from enum import Enum
 
+import pydantic
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -55,7 +56,8 @@ class Text2AudioPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_audios: dict[
-            typing.Literal[tuple(e.name for e in Text2AudioModels)], list[str]
+            typing.Literal[tuple(e.name for e in Text2AudioModels)],
+            list[pydantic.AnyHttpUrl],
         ]
 
     def preview_image(self, state: dict) -> str | None:
