@@ -6,23 +6,7 @@ from daras_ai_v2.field_render import field_title_desc, field_desc
 from daras_ai_v2.language_model import LargeLanguageModels
 
 
-def language_model_settings(
-    show_selector=True, show_document_model=False, show_only_document=False
-):
-    from recipes.VideoBots import VideoBotsPage
-
-    if show_only_document:
-        doc_model_descriptions = azure_form_recognizer_models()
-        st.selectbox(
-            f"{field_desc(VideoBotsPage.RequestModel, 'document_model')}",
-            key="document_model",
-            options=[None, *doc_model_descriptions],
-            format_func=lambda x: (
-                f"{doc_model_descriptions[x]} ({x})" if x else "———"
-            ),
-        )
-        return
-
+def language_model_settings(show_selector=True):
     st.write("##### 🔠 Language Model Settings")
 
     if show_selector:
@@ -32,16 +16,6 @@ def language_model_settings(
             key="selected_model",
             use_selectbox=True,
         )
-        if show_document_model:
-            doc_model_descriptions = azure_form_recognizer_models()
-            st.selectbox(
-                f"###### {field_title_desc(VideoBotsPage.RequestModel, 'document_model')}",
-                key="document_model",
-                options=[None, *doc_model_descriptions],
-                format_func=lambda x: (
-                    f"{doc_model_descriptions[x]} ({x})" if x else "———"
-                ),
-            )
 
     st.checkbox("Avoid Repetition", key="avoid_repetition")
 

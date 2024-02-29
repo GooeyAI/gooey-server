@@ -20,6 +20,7 @@ from daras_ai_v2.asr import (
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
+    azure_form_recognizer_models,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.bot_integration_widgets import (
@@ -32,9 +33,8 @@ from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
 )
 from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.exceptions import UserError
-from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title_desc, field_desc
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input, validate_glossary_document
@@ -389,7 +389,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.session_state.get("document_model"),
             ),
         ):
-            language_model_settings(show_only_document=True)
+            doc_model_descriptions = azure_form_recognizer_models()
+            st.selectbox(
+                f"{field_desc(self.RequestModel, 'document_model')}",
+                key="document_model",
+                options=[None, *doc_model_descriptions],
+                format_func=lambda x: (
+                    f"{doc_model_descriptions[x]} ({x})" if x else "———"
+                ),
+            )
 
     def validate_form_v2(self):
         input_glossary = st.session_state.get("input_glossary_document", "")
