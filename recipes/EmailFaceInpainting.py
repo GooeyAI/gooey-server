@@ -359,12 +359,9 @@ class TwitterError(Exception):
 
 
 def get_photo_for_email(email_address):
-    doc_ref = db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
-
-    doc = db.get_or_create_doc(doc_ref).to_dict()
-    photo_url = doc.get("photo_url")
-    if photo_url:
-        return photo_url
+    saved_photo = get_stored_photo_for_email(email_address)
+    if saved_photo:
+        return saved_photo
 
     r = requests.get(
         f"https://api.seon.io/SeonRestService/email-api/v2.2/{email_address}",
@@ -372,7 +369,23 @@ def get_photo_for_email(email_address):
     )
     raise_for_status(r)
 
-    account_details = glom.glom(r.json(), "data.account_details", default={})
+    return update_stored_photo_for_email(email_address, r.json())
+
+
+def get_stored_photo_for_email(email_address):
+    doc_ref = db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
+
+    doc = db.get_or_create_doc(doc_ref).to_dict()
+    photo_url = doc.get("photo_url")
+    if photo_url:
+        return photo_url
+
+    return None
+
+
+def update_stored_photo_for_email(email_address, profile):
+    doc_ref = db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
+    account_details = glom.glom(profile, "data.account_details", default={})
     for spec in [
         "linkedin.photo",
         "facebook.photo",
@@ -390,6 +403,7 @@ def get_photo_for_email(email_address):
         doc_ref.set({"photo_url": photo_url})
 
         return photo_url
+    return None
 
 
 def get_photo_for_twitter_handle(twitter_handle):
