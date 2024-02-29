@@ -1,5 +1,6 @@
 import typing
 
+import pydantic
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -74,7 +75,8 @@ class CompareText2ImgPage(BasePage):
 
     class ResponseModel(BaseModel):
         output_images: dict[
-            typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
+            typing.Literal[tuple(e.name for e in Text2ImgModels)],
+            list[pydantic.AnyHttpUrl],
         ]
 
     @classmethod

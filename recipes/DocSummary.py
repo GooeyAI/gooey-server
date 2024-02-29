@@ -1,6 +1,7 @@
 import typing
 from enum import Enum
 
+import pydantic
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -57,7 +58,7 @@ class DocSummaryPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        documents: list[str]
+        documents: list[pydantic.AnyHttpUrl]
 
         task_instructions: str | None
         merge_instructions: str | None

@@ -1,6 +1,7 @@
 import typing
 from functools import partial
 
+import pydantic
 import requests
 from pydantic import BaseModel
 
@@ -44,7 +45,7 @@ class FaceInpaintingPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_image: str
+        input_image: pydantic.AnyHttpUrl
         text_prompt: str
 
         face_scale: float | None
@@ -75,10 +76,10 @@ class FaceInpaintingPage(BasePage):
             }
 
     class ResponseModel(BaseModel):
-        resized_image: str
-        face_mask: str
-        diffusion_images: list[str]
-        output_images: list[str]
+        resized_image: pydantic.AnyHttpUrl
+        face_mask: pydantic.AnyHttpUrl
+        diffusion_images: list[pydantic.AnyHttpUrl]
+        output_images: list[pydantic.AnyHttpUrl]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_FACE_INPAINTING_META_IMG

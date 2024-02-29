@@ -1,5 +1,6 @@
 import typing
 
+import pydantic
 import requests
 from pydantic import BaseModel
 
@@ -42,7 +43,7 @@ class Img2ImgPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_image: str
+        input_image: pydantic.AnyHttpUrl
         text_prompt: str | None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None
@@ -70,7 +71,7 @@ class Img2ImgPage(BasePage):
         image_guidance_scale: float | None
 
     class ResponseModel(BaseModel):
-        output_images: list[str]
+        output_images: list[pydantic.AnyHttpUrl]
 
     @classmethod
     def get_example_preferred_fields(self, state: dict) -> list[str]:

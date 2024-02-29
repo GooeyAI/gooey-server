@@ -1,6 +1,7 @@
 import re
 import typing
 
+import pydantic
 import requests
 from pydantic import BaseModel
 
@@ -80,11 +81,11 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
             }
 
     class ResponseModel(BaseModel):
-        input_image: str
-        resized_image: str
-        face_mask: str
-        diffusion_images: list[str]
-        output_images: list[str]
+        input_image: pydantic.AnyHttpUrl
+        resized_image: pydantic.AnyHttpUrl
+        face_mask: pydantic.AnyHttpUrl
+        diffusion_images: list[pydantic.AnyHttpUrl]
+        output_images: list[pydantic.AnyHttpUrl]
         email_sent: bool = False
 
     @classmethod

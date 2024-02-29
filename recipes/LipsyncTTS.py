@@ -1,5 +1,6 @@
 import typing
 
+import pydantic
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -38,7 +39,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     class ResponseModel(BaseModel):
         audio_url: str | None
 
-        output_video: str
+        output_video: pydantic.AnyHttpUrl
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
