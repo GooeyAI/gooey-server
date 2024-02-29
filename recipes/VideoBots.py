@@ -72,6 +72,7 @@ from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
+    text_to_speech_provider_selector,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
 from recipes.DocSearch import (
@@ -348,9 +349,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.session_state["tts_provider"] = None
             enable_video = False
         else:
-            text_to_speech_settings(
-                page=self, include_title=False, include_settings=False
-            )
+            text_to_speech_provider_selector(self)
             st.write("---")
             if not "__enable_video" in st.session_state:
                 st.session_state["__enable_video"] = bool(
@@ -411,8 +410,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         youtube_video("-j2su1r8pEg")
 
     def render_settings(self):
-        if st.session_state.get("__enable_audio"):
-            text_to_speech_settings(page=self, include_selector=False)
+        tts_provider = st.session_state.get("tts_provider")
+        if tts_provider:
+            text_to_speech_settings(self, tts_provider)
 
         if st.session_state.get("__enable_video"):
             lipsync_settings()
