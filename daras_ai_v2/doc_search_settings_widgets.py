@@ -7,6 +7,7 @@ from sentry_sdk import capture_exception
 import gooey_ui as st
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, google_translate_language_selector
+from daras_ai_v2.prompt_vars import prompt_vars_widget
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
 from daras_ai_v2.search_ref import CitationStyles
@@ -123,6 +124,9 @@ These instructions run before the workflow performs a search of the knowledge ba
         key="query_instructions",
         height=300,
     )
+    prompt_vars_widget(
+        "query_instructions",
+    )
     if keyword_instructions_allowed:
         st.text_area(
             """
@@ -132,6 +136,9 @@ These instructions run after the Summarization Instructions above and can use it
         """,
             key="keyword_instructions",
             height=300,
+        )
+        prompt_vars_widget(
+            "keyword_instructions",
         )
 
     dense_weight_ = DocSearchRequest.__fields__["dense_weight"]

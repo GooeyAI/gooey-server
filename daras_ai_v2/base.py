@@ -1326,7 +1326,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         self.render_form_v2()
         with st.expander("⚙️ Settings"):
             self.render_settings()
-            st.write("---")
         submitted = self.render_submit_button()
         with st.div(style={"textAlign": "right"}):
             st.caption(
