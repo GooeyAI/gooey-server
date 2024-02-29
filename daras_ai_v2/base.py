@@ -179,12 +179,14 @@ class BasePage:
             tab_name=MenuTabs.paths[tab],
         )
 
-    def setup_sentry(self):
+    def setup_sentry(self, event_processor: typing.Callable = None):
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
+            if event_processor:
+                scope.add_event_processor(event_processor)
 
     def refresh_state(self):
         _, run_id, uid = extract_query_params(gooey_get_query_params())
