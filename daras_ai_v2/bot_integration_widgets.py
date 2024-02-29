@@ -32,6 +32,7 @@ def general_integration_settings(bi: BotIntegration):
         value=bi.streaming_enabled,
         key=f"_bi_streaming_enabled_{bi.id}",
     )
+    st.caption("Responses will be streamed to the user in real-time if enabled.")
     bi.show_feedback_buttons = st.checkbox(
         "**👍🏾 👎🏽 Show Feedback Buttons**",
         value=bi.show_feedback_buttons,
@@ -91,6 +92,35 @@ This will also help better understand incoming audio messages by automatically c
             st.error(str(e))
 
 
+def slack_specific_settings(bi: BotIntegration, default_name: str):
+    if st.session_state.get(f"_bi_reset_{bi.id}"):
+        st.session_state[f"_bi_name_{bi.id}"] = default_name
+        st.session_state[f"_bi_slack_read_receipt_msg_{bi.id}"] = (
+            BotIntegration._meta.get_field("slack_read_receipt_msg").default
+        )
+
+    bi.slack_read_receipt_msg = st.text_input(
+        """
+            ##### ✅ Read Receipt
+            This message is sent immediately after recieving a user message and replaced with the copilot's response once it's ready.
+            (leave blank to disable)
+            """,
+        placeholder=bi.slack_read_receipt_msg,
+        value=bi.slack_read_receipt_msg,
+        key=f"_bi_slack_read_receipt_msg_{bi.id}",
+    )
+    bi.name = st.text_input(
+        """
+            ##### 🪪 Channel Specific Bot Name
+            This is the name the bot will post as in this specific channel (to be displayed in Slack)
+            """,
+        placeholder=bi.name,
+        value=bi.name,
+        key=f"_bi_name_{bi.id}",
+    )
+    st.caption("Enable streaming messages to Slack in real-time.")
+
+
 def broadcast_input(bi: BotIntegration):
     from bots.tasks import send_broadcast_msgs_chunked
     from recipes.VideoBots import VideoBotsPage
@@ -105,9 +135,9 @@ def broadcast_input(bi: BotIntegration):
     )
     text = st.text_area(
         f"""
-        ##### Broadcast Message
+        #### Broadcast Message 📢
         Broadcast a message to all users of this integration using this bot account.  \\
-        You can also do this via the [API]({api_docs_url}).
+        You can also do this via the [API]({api_docs_url}) which allows filtering by phone number and more!
         """,
         key=key + ":text",
         placeholder="Type your message here...",
@@ -136,7 +166,7 @@ def broadcast_input(bi: BotIntegration):
 
     should_confirm_key = key + ":should_confirm"
     confirmed_send_btn = key + ":confirmed_send"
-    if st.button("📢 Send Broadcast", style=dict(height="3.2rem"), key=key + ":send"):
+    if st.button("📤 Send Broadcast", style=dict(height="3.2rem"), key=key + ":send"):
         st.session_state[should_confirm_key] = True
     if not st.session_state.get(should_confirm_key):
         return
@@ -164,22 +194,21 @@ def broadcast_input(bi: BotIntegration):
         st.button("✅ Yes, Send", key=confirmed_send_btn)
 
 
-def render_bot_test_link(bi: BotIntegration):
+def get_bot_test_link(bi: BotIntegration) -> str | None:
     if bi.wa_phone_number:
-        test_link = (
+        return (
             furl("https://wa.me/", query_params={"text": "Hi"})
             / bi.wa_phone_number.as_e164
-        )
+        ).tostr()
     elif bi.slack_team_id:
-        test_link = (
+        return (
             furl("https://app.slack.com/client")
             / bi.slack_team_id
             / bi.slack_channel_id
-        )
+        ).tostr()
+    elif bi.ig_username:
+        return (furl("http://instagram.com/") / bi.ig_username).tostr()
+    elif bi.fb_page_name:
+        return (furl("https://www.facebook.com/") / bi.fb_page_name).tostr()
     else:
-        return
-    st.html(
-        f"""
-        <a class="btn btn-theme btn-tertiary d-inline-block" target="blank" href="{test_link}">📱 Test</a>
-        """
-    )
+        return None

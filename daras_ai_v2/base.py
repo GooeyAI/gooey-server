@@ -159,8 +159,10 @@ class BasePage:
             query_params |= dict(example_id=example_id)
         return query_params
 
-    def api_url(self, example_id=None, run_id=None, uid=None) -> furl:
-        query_params = {}
+    def api_url(
+        self, example_id=None, run_id=None, uid=None, query_params=None
+    ) -> furl:
+        query_params = query_params or {}
         if run_id and uid:
             query_params = dict(run_id=run_id, uid=uid)
         elif example_id:
@@ -171,13 +173,14 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
-    def get_tab_url(self, tab: str) -> str:
+    def get_tab_url(self, tab: str, query_params: dict = {}) -> str:
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         return self.app_url(
             example_id=example_id,
             run_id=run_id,
             uid=uid,
             tab_name=MenuTabs.paths[tab],
+            query_params=query_params,
         )
 
     def setup_render(self):
@@ -258,11 +261,7 @@ class BasePage:
                     )
 
             with st.div(className="d-flex align-items-center"):
-                can_user_edit_run = self.is_current_user_admin() or (
-                    self.request
-                    and self.request.user
-                    and current_run.uid == self.request.user.uid
-                )
+                can_user_edit_run = self.can_user_edit_run(current_run)
                 has_unpublished_changes = (
                     published_run
                     and published_run.saved_run != current_run
@@ -301,6 +300,14 @@ class BasePage:
                 st.write(published_run.notes)
             elif is_root_example:
                 st.write(self.preview_description(current_run.to_dict()))
+
+    def can_user_edit_run(self, current_run: SavedRun | None = None) -> bool:
+        current_run = current_run or self.get_current_sr()
+        return self.is_current_user_admin() or bool(
+            self.request
+            and self.request.user
+            and current_run.uid == self.request.user.uid
+        )
 
     def _render_title(self, title: str):
         st.write(f"# {title}")
@@ -1580,12 +1587,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         grid_layout(3, published_runs, _render)
 
-    def ensure_authentication(self):
+    def ensure_authentication(self, next_url: str | None = None):
         if not self.request.user or self.request.user.is_anonymous:
-            redirect_url = furl(
-                "/login", query_params={"next": furl(self.request.url).set(origin=None)}
-            )
-            raise RedirectException(str(redirect_url))
+            raise RedirectException(self.get_auth_url(next_url))
+
+    def get_auth_url(self, next_url: str | None = None) -> str:
+        return furl(
+            "/login",
+            query_params={"next": furl(next_url or self.request.url).set(origin=None)},
+        ).tostr()
 
     def _history_tab(self):
         assert self.request, "request must be set to render history tab"

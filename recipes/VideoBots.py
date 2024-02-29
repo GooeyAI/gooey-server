@@ -4,7 +4,7 @@ import os
 import os.path
 import typing
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -24,8 +24,9 @@ from daras_ai_v2.azure_doc_extract import (
 from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.bot_integration_widgets import (
     general_integration_settings,
+    slack_specific_settings,
     broadcast_input,
-    render_bot_test_link,
+    get_bot_test_link,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
     doc_search_settings,
@@ -81,16 +82,13 @@ from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f454d64a-9457-11ee-b6d5-02420a0001cb/Copilot.jpg.png"
-
-# BOT_SCRIPT_RE = re.compile(
-#     # start of line
-#     r"^"
-#     # name of bot / user
-#     r"([\w\ \t]{3,30})"
-#     # colon
-#     r"\:\ ",
-#     flags=re.M,
-# )
+INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
+INSTAGRAM_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3e7ebbb6-d6c8-11ee-a182-02420a000125/image.png"
+FACEBOOK_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/4243ce22-d6db-11ee-8e6a-02420a000126/facebook.png"
+SLACK_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ee8c5b1c-d6c8-11ee-b278-02420a000126/image.png"
+WHATSAPP_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1e49ad50-d6c9-11ee-99c3-02420a000123/Digital_Inline_Green.png"
+LANDBOT_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3705ed24-d6db-11ee-a22a-02420a000125/landbot.png"
+GRAYCOLOR = "#00000073"
 
 SAFETY_BUFFER = 100
 
@@ -923,192 +921,28 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         super().render_selected_tab(selected_tab)
 
         if selected_tab == MenuTabs.integrations:
+            # not signed in case
             if not self.request.user or self.request.user.is_anonymous:
-                st.write(
-                    "**Please Login to connect this workflow to Your Website, Instagram, Whatsapp & More**"
+                self.integration_welcome_screen()
+                return
+
+            # signed in but not on a run the user can edit
+            if not self.can_user_edit_run():
+                self.integration_welcome_screen(
+                    title="Create your Saved Copilot",
+                    get_started_text="🏃🏽‍♂️ Run & Save this Copilot",
                 )
                 return
 
-            self.messenger_bot_integration()
+            current_run, published_run = self.get_runs_from_query_params(
+                *extract_query_params(gooey_get_query_params())
+            )  # type: ignore
 
-            st.markdown(
-                """
-                ### How to Integrate Chatbots
-                """
-            )
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write(
-                    """
-                    #### Part 1:
-                    [Interactive Chatbots for your Content - Part 1: Make your Chatbot - How to use Gooey.AI Workflows ](https://youtu.be/-j2su1r8pEg)
-                    """
-                )
-                st.markdown(
-                    """
-                    <div style="position: relative; padding-bottom: 56.25%; height: 0; width:100%">
-                            <iframe src="https://www.youtube.com/embed/-j2su1r8pEg" title="YouTube video player" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                    </iframe>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with col2:
-                st.write(
-                    """
-
-                    #### Part 2:
-                    [Interactive Chatbots for your Content - Part 2: Make your Chatbot - How to use Gooey.AI Workflows ](https://youtu.be/h817RolPjq4)
-                    """
-                )
-                st.markdown(
-                    """
-                    <div style="position: relative; padding-bottom: 56.25%; height: 0;">
-                            <iframe src="https://www.youtube.com/embed/h817RolPjq4" title="YouTube video player" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                    </iframe>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-            st.write("---")
-            st.text_input(
-                "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
-            )
-            show_landbot_widget()
-
-    def messenger_bot_integration(self):
-        from routers.facebook_api import ig_connect_url, fb_connect_url, wa_connect_url
-        from routers.slack_api import slack_connect_url
-        from recipes.VideoBotsStats import VideoBotsStatsPage
-
-        st.markdown(
-            # language=html
-            f"""
-            <h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>
-
-            Your can connect your FB Messenger account and Slack Workspace here directly.<br>
-            If you ping us at support@gooey.ai, we'll add your other accounts too!
-
-            <!--
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
-                <img height="20" src="https://www.instagram.com/favicon.ico">️
-                &nbsp;
-                Add Your Instagram Page
-                </a>
-            </div>
-            -->
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
-                <img height="20" src="https://www.facebook.com/favicon.ico">️
-                &nbsp;
-                Add Your Facebook Page
-                </a>
-            </div>
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{slack_connect_url}">
-                <img height="20" src="https://www.slack.com/favicon.ico">
-                &nbsp;
-                Add Your Slack Workspace
-                </a>
-                <a target="_blank" href="https://gooey.ai/docs/guides/copilot/deploy-to-slack" class="streamlit-like-btn" aria-label="docs">
-                <img height="20" width="0" src="https://www.slack.com/favicon.ico">   <!-- for vertical alignment -->
-                ℹ️
-                </a>
-            </div>
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{wa_connect_url}">
-                <i class="fa-brands fa-whatsapp" style="color: lightgreen; font-size: 20px"></i>
-                &nbsp;
-                Add Your Whatsapp Number
-                </a>
-            </div>
-            <p>To connect a phone number, make sure it is not reserved for some other use on Whatsapp or <a href="https://business.facebook.com/wa/manage/phone-numbers/">connected to a different Whatsapp account</a>. If your business needs exceed the capacity of a free Whatsapp account and/or you don't want to manage the Whatsapp business yourself, contact us for a quote on a managed Whatsapp number through Gooey.</p>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.write("---")
-
-        st.button("🔄 Refresh")
-
-        integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
-            billing_account_uid=self.request.user.uid
-        ).order_by("platform", "-created_at")
-        if not integrations:
-            return
-
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )
-        for bi in integrations:
-            is_connected = (bi.saved_run == current_run) or (
-                (
-                    bi.saved_run
-                    and published_run
-                    and bi.saved_run.example_id == published_run.published_run_id
-                )
-                or (
-                    bi.published_run
-                    and published_run
-                    and bi.published_run == published_run
-                )
-            )
-            col1, col2, col3, *_ = st.columns([1, 1, 2])
-            with col1:
-                favicon = Platform(bi.platform).get_favicon()
-                if bi.published_run:
-                    url = self.app_url(
-                        example_id=bi.published_run.published_run_id,
-                        tab_name=MenuTabs.paths[MenuTabs.integrations],
-                    )
-                elif bi.saved_run:
-                    url = self.app_url(
-                        run_id=bi.saved_run.run_id,
-                        uid=bi.saved_run.uid,
-                        example_id=bi.saved_run.example_id,
-                        tab_name=MenuTabs.paths[MenuTabs.integrations],
-                    )
-                else:
-                    url = None
-                if url:
-                    href = f'<a href="{url}">{bi}</a>'
-                else:
-                    href = f"<span>{bi}</span>"
-                with st.div(className="mt-2"):
-                    st.markdown(
-                        f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;{href}',
-                        unsafe_allow_html=True,
-                    )
-            with col2:
-                pressed_connect = st.button(
-                    "🔌💔️ Disconnect" if is_connected else "🖇️ Connect",
-                    key=f"btn_connect_{bi.id}",
-                    type="tertiary",
-                )
-                render_bot_test_link(bi)
-                stats_url = furl(VideoBotsStatsPage.app_url(), args={"bi_id": bi.id})
-                st.html(
-                    f"""
-                    <a class="btn btn-theme btn-tertiary d-inline-block" target="blank" href="{stats_url}">📊 Analytics</a>
-                    """
-                )
-            if is_connected:
-                with col3, st.expander(f"📨 {bi.get_platform_display()} Settings"):
-                    if bi.platform == Platform.SLACK:
-                        self.slack_specific_settings(bi)
-                    general_integration_settings(bi)
-                    if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
-                        st.write("---")
-                        broadcast_input(bi)
-            if not pressed_connect:
-                continue
-            if is_connected:
-                bi.saved_run = None
-                bi.published_run = None
-            else:
-                # set bot language from state
+            # automatically connect to all the user's unconnected integrations
+            # TODO: fix
+            unconnected_q = Q(saved_run=None) | Q(published_run=None)
+            unconnected_q &= Q(billing_account_uid=self.request.user.uid)
+            for bi in BotIntegration.objects.filter(unconnected_q):
                 bi.user_language = (
                     st.session_state.get("user_language") or bi.user_language
                 )
@@ -1121,41 +955,294 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     from daras_ai_v2.slack_bot import send_confirmation_msg
 
                     send_confirmation_msg(bi)
-            bi.save()
-            st.experimental_rerun()
+                bi.save()
 
-        st.write("---")
+            integrations_q = Q(saved_run=current_run)
+            if published_run and published_run.saved_run_id == current_run.id:
+                integrations_q |= Q(published_run=published_run)
+                if published_run.published_run_id:
+                    integrations_q |= Q(
+                        saved_run__example_id=published_run.published_run_id
+                    )
+            if not self.is_current_user_admin():
+                integrations_q &= Q(billing_account_uid=self.request.user.uid)
 
-    def slack_specific_settings(self, bi: BotIntegration):
-        if st.session_state.get(f"_bi_reset_{bi.id}"):
-            pr = self.get_current_published_run()
-            st.session_state[f"_bi_name_{bi.id}"] = (
-                pr and pr.title
-            ) or self.get_recipe_title()
-            st.session_state[f"_bi_slack_read_receipt_msg_{bi.id}"] = (
-                BotIntegration._meta.get_field("slack_read_receipt_msg").default
+            integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
+                integrations_q
+            ).order_by("platform", "-created_at")
+
+            # signed in, can edit, but no connected botintegrations on this run
+            if integrations.count() == 0:
+                self.integration_connect_screen()
+                return
+
+            # signed in, can edit, and has connected botintegrations on this run
+            self.integration_test_config_screen(
+                integrations, current_run, published_run
             )
 
-        bi.slack_read_receipt_msg = st.text_input(
-            """
-            ##### ✅ Read Receipt
-            This message is sent immediately after recieving a user message and replaced with the copilot's response once it's ready.
-            (leave blank to disable)
-            """,
-            placeholder=bi.slack_read_receipt_msg,
-            value=bi.slack_read_receipt_msg,
-            key=f"_bi_slack_read_receipt_msg_{bi.id}",
+    def integration_welcome_screen(
+        self, title="Connect your Copilot", get_started_text="🏃🏽‍♂️ Get Started"
+    ):
+        with st.center():
+            st.markdown(f"## {title}")
+
+        col1, col2, col3 = st.columns(
+            3,
+            column_props=dict(
+                style={
+                    "display": "flex",
+                    "flex-direction": "column",
+                    "align-items": "center",
+                    "text-align": "center",
+                    "max-width": "300px",
+                }
+            ),
+            style={"justify-content": "center"},
         )
-        bi.name = st.text_input(
-            """
-            ##### 🪪 Channel Specific Bot Name
-            This is the name the bot will post as in this specific channel (to be displayed in Slack)
-            """,
-            placeholder=bi.name,
-            value=bi.name,
-            key=f"_bi_name_{bi.id}",
+        with col1:
+            st.html("🏃‍♀️", style={"fontSize": "4rem"})
+            st.markdown(
+                """
+                1. Fork & Save your Run
+                """
+            )
+            st.caption("Make changes, Submit & Save your perfect workflow")
+        with col2:
+            st.image(INTEGRATION_IMG, alt="Integrations", style={"height": "5rem"})
+            st.markdown("2. Connect to Slack, Whatsapp or your App")
+            st.caption("Or Facebook, Instagram and the web. Wherever your users chat.")
+        with col3:
+            st.html("📈", style={"fontSize": "4rem"})
+            st.markdown("3. Test, Analyze & Iterate")
+            st.caption("Analyze your usage. Update your Saved Run to test changes.")
+
+        st.newline()
+        with st.center():
+            st.anchor(
+                get_started_text,
+                href=self.get_auth_url(self.app_url(query_params={})),
+                type="primary",
+            )
+
+    def integration_connect_screen(
+        self, title="Connect your Copilot", status: str | None = None
+    ):
+        from routers.facebook_api import ig_connect_url, fb_connect_url, wa_connect_url
+        from routers.slack_api import slack_connect_url
+
+        show_landbot = self.request.query_params.get("show-landbot") == "true"
+
+        with st.center():
+            st.markdown(
+                f"""
+                ## {title}
+                {status or f'Run Saved ✅ ~ <ins>Connect</ins> ~ <span style="color: {GRAYCOLOR}">Test & Configure</span>'}
+                """,
+                unsafe_allow_html=True,
+            )
+
+            LINKSTYLE = 'class="btn btn-theme btn-secondary" style="margin: 0; display: flex; justify-content: center; align-items: center; padding: 8px; border: 1px solid black; min-width: 164px; width: 200px; aspect-ratio: 5 / 2; overflow: hidden; border-radius: 10px" draggable="false"'
+            IMGSTYLE = 'style="width: 100%" draggable="false"'
+            ROWSTYLE = 'style="display: flex; align-items: center; gap: 1em; margin-bottom: 1rem" draggable="false"'
+            DESCRIPTIONSTYLE = f'style="color: {GRAYCOLOR}; text-align: left"'
+            st.markdown(
+                # language=html
+                f"""
+                <div>
+                <div {ROWSTYLE}>
+                    <a target="_blank" href="{wa_connect_url}" {LINKSTYLE} aria-label="Connect your Whatsapp number">
+                        <img src="{WHATSAPP_IMG}" {IMGSTYLE} alt="Whatsapp">
+                    </a>
+                    <div {DESCRIPTIONSTYLE}>Bring your own WhatsApp number to connect. Need a new one? Email <a href="mailto:sales@gooey.ai">sales@gooey.ai</a>.</div>
+                </div>
+                <div {ROWSTYLE}>
+                    <a target="_blank" href="{slack_connect_url}" {LINKSTYLE} aria-label="Connect your Slack Workspace">
+                        <img src="{SLACK_IMG}" {IMGSTYLE} alt="Slack">
+                    </a>
+                    <div {DESCRIPTIONSTYLE}>Connect to a Slack Channel. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-slack">Help Guide</a>.</div>
+                </div>
+                <div {ROWSTYLE}>
+                    <a target="_blank" href="{fb_connect_url}" {LINKSTYLE} aria-label="Connect your Facebook Page">
+                        <img src="{FACEBOOK_IMG}" {IMGSTYLE} alt="Facebook Messenger">
+                    </a>
+                    <div {DESCRIPTIONSTYLE}>Connect to a Facebook Page you own. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-facebook">Help Guide</a>.</div>
+                </div>
+                <div {ROWSTYLE}>
+                    <a target="_blank" href="{ig_connect_url}" {LINKSTYLE} aria-label="Connect your Instagram Page">
+                        <img src="{INSTAGRAM_IMG}" {IMGSTYLE} alt="Instagram">
+                    </a>
+                    <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
+                </div>
+                <div {ROWSTYLE}>
+                    <a href="{self.get_tab_url(MenuTabs.integrations, query_params={} if show_landbot else {'show-landbot': 'true'})}" {LINKSTYLE} aria-label="Connect your Landbot URL">
+                        <img src="{LANDBOT_IMG}" {IMGSTYLE} alt="Landbot">
+                    </a>
+                    <div {DESCRIPTIONSTYLE}>Connect to any <a href="https://landbot.io">Landbot</a> integration option.</div>
+                </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if show_landbot:
+                st.text_input(
+                    "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
+                )
+                show_landbot_widget()
+
+            st.newline()
+            st.write(
+                f"Or use [our API]({self.get_tab_url(MenuTabs.run_as_api)}) to integrate with your own app. Contact us at support@gooey.ai with questions."
+            )
+
+    def integration_test_config_screen(
+        self, integrations: QuerySet[BotIntegration], current_run, published_run
+    ):
+        from daras_ai_v2.base import RedirectException, get_title_breadcrumbs
+        from recipes.VideoBotsStats import VideoBotsStatsPage
+        from recipes.BulkRunner import BulkRunnerPage
+        from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
+
+        run_title = get_title_breadcrumbs(
+            VideoBotsPage, current_run, published_run
+        ).h1_title
+
+        bid = self.request.query_params.get("bi_id")
+        if bid is not None:
+            st.session_state.setdefault("bi_id", int(bid))
+
+        add_integration = self.get_tab_url(
+            MenuTabs.integrations, query_params={"add-integration": "true"}
         )
-        st.caption("Enable streaming messages to Slack in real-time.")
+        if self.request.query_params.get("add-integration") == "true":
+            cancel = self.get_tab_url(MenuTabs.integrations)
+            self.integration_connect_screen(
+                "Configure your Copilot: Add a New Integration",
+                f'Run Saved ✅ ~ <ins>Connected</ins> ✅ ~ <a href="{cancel}">Test & Configure</a> ✅',
+            )
+            with st.center():
+                if st.button("Return to Test & Configure"):
+                    raise RedirectException(cancel)
+            return
+
+        with st.center():
+            st.markdown(
+                f"""
+                ## Configure your Copilot
+                Run Saved ✅ ~ <a href="{add_integration}">Connected</a> ✅ ~ <ins>Test & Configure</ins> ✅
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with st.center(direction="row"):
+            bid = st.horizontal_radio(
+                "",
+                [i.id for i in integrations] + [None],
+                lambda i: (
+                    f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> Add'
+                    if not i
+                    else {
+                        i.id: f'<img align="left" width="24" height="24" src="{Platform(i.platform).get_favicon()}"> {Platform(i.platform).label}'
+                        for i in integrations
+                    }[i]
+                ),
+                key="bi_id",
+                button_props={"style": {"width": "140px"}},
+            )
+            if bid is None:
+                raise RedirectException(add_integration)
+            bi = integrations.get(id=bid)
+            icon = f'<img src="{Platform(bi.platform).get_favicon()}" style="height: 20px; width: 20px; margin-right: 10px">'
+
+        st.newline()
+        with st.center():
+            with st.div(style={"width": "100%", "text-align": "left"}):
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    st.write(f"{icon} {bi}", unsafe_allow_html=True)
+                with col2:
+                    copy_to_clipboard_button(
+                        "Copy Link",
+                        value=self.get_tab_url(
+                            MenuTabs.integrations, query_params={"bi_id": bi.id}
+                        ),
+                        type="link",
+                    )
+
+                st.newline()
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    st.write("#### Test 📱")
+                    st.caption(f"Send a test {Platform(bi.platform).label} message.")
+                with col2:
+                    test_link = get_bot_test_link(bi)
+                    if test_link:
+                        st.anchor(
+                            f"{icon} Message {bi.get_display_name()}",
+                            test_link,
+                            unsafe_allow_html=True,
+                            style={"width": "100%"},
+                        )
+                    else:
+                        st.write("Message quicklink not available.")
+
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    st.write("#### Understand your Users 📊")
+                    st.caption(
+                        f"Configure your {Platform(bi.platform).label} integration."
+                    )
+                with col2:
+                    stats_url = furl(
+                        VideoBotsStatsPage.app_url(), args={"bi_id": bi.id}
+                    ).tostr()
+                    st.anchor(
+                        "View Analytics",
+                        stats_url,
+                        style={"width": "100%"},
+                    )
+
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    st.write("#### Evaluate ⚖️")
+                    st.caption(f"Run automated tests against sample user messages.")
+                with col2:
+                    st.anchor(
+                        "Run Bulk Tests",
+                        BulkRunnerPage.app_url(),
+                        style={"width": "100%"},
+                    )
+
+                # st.write("#### Automated Analysis 🧠")
+                # st.caption(
+                #     "Add a Gooey.AI LLM prompt to automatically analyse and categorize user messages. [Example](https://gooey.ai/compare-large-language-models/how-farmerchat-turns-conversations-to-structured-data/?example_id=lbjnoem7) and [Guide](https://gooey.ai/docs/guides/copilot/conversation-analysis)."
+                # )
+
+                st.newline()
+                st.write("#### Configure Settings 🛠️")
+                if bi.platform == Platform.SLACK:
+                    slack_specific_settings(bi, run_title)
+                general_integration_settings(bi)
+
+                if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
+                    st.newline()
+                    st.newline()
+                    broadcast_input(bi)
+
+                st.newline()
+                st.newline()
+                st.write("#### Danger Zone 🚨")
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    if st.button(
+                        "🔌💔️ Disconnect", key="btn_disconnect", style={"width": "100%"}
+                    ):
+                        bi.saved_run = None
+                        bi.published_run = None
+                with col2:
+                    st.caption(
+                        f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}"
+                    )
 
 
 def show_landbot_widget():
@@ -1198,38 +1285,6 @@ if (typeof Landbot === "undefined") {
         """,
         **{"data-landbot-config-url": config_url},
     )
-
-
-# def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
-#     # run regex to find scripted messages in script text
-#     script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
-#     # extract system message from script
-#     system_message = bot_script
-#     if script_matches:
-#         system_message = system_message[: script_matches[0].start()]
-#     system_message = system_message.strip()
-#     # extract pre-scripted messages from script
-#     scripted_msgs: list[ConversationEntry] = []
-#     for idx in range(len(script_matches)):
-#         match = script_matches[idx]
-#         try:
-#             next_match = script_matches[idx + 1]
-#         except IndexError:
-#             next_match_start = None
-#         else:
-#             next_match_start = next_match.start()
-#         if (len(script_matches) - idx) % 2 == 0:
-#             role = CHATML_ROLE_USER
-#         else:
-#             role = CHATML_ROLE_ASSISTANT
-#         scripted_msgs.append(
-#             {
-#                 "role": role,
-#                 "display_name": match.group(1).strip(),
-#                 "content": bot_script[match.end() : next_match_start].strip(),
-#             }
-#         )
-#     return system_message, scripted_msgs
 
 
 def chat_list_view():
