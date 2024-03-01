@@ -1021,7 +1021,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             else:
                 bi.published_run = None
             if bi.platform == Platform.SLACK:
-
+                bi.slack_create_personal_channels = False
                 send_confirmation_msg(bi)
             bi.save()
 
