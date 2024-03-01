@@ -33,7 +33,9 @@ def fb_connect_redirect(request: Request):
         )
     user_access_token = _get_access_token_from_code(code)
 
-    db.get_user_doc_ref(request.user.uid).update({"fb_access_token": user_access_token})
+    db.get_user_doc_ref(request.user.uid).set(
+        {"fb_access_token": user_access_token}, merge=True
+    )
 
     fb_pages = get_currently_connected_fb_pages(user_access_token)
     if not fb_pages:

@@ -20,6 +20,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     ELEVEN_LABS_MODELS,
     text_to_speech_settings,
     TextToSpeechProviders,
+    text_to_speech_provider_selector,
 )
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
@@ -108,6 +109,7 @@ class TextToSpeechPage(BasePage):
             """,
             key="text_prompt",
         )
+        text_to_speech_provider_selector(self)
 
     def fields_to_save(self):
         fields = super().fields_to_save()
@@ -116,10 +118,11 @@ class TextToSpeechPage(BasePage):
         return fields
 
     def validate_form_v2(self):
-        assert st.session_state["text_prompt"], "Text input cannot be empty"
+        assert st.session_state.get("text_prompt"), "Text input cannot be empty"
+        assert st.session_state.get("tts_provider"), "Please select a TTS provider"
 
     def render_settings(self):
-        text_to_speech_settings(page=self)
+        text_to_speech_settings(self, st.session_state.get("tts_provider"))
 
     def get_raw_price(self, state: dict):
         tts_provider = self._get_tts_provider(state)
@@ -311,9 +314,10 @@ class TextToSpeechPage(BasePage):
 
     def _get_elevenlabs_voice_id(self, state: dict[str, str]):
         if state.get("elevenlabs_voice_id"):
-            assert state.get(
-                "elevenlabs_api_key"
-            ), "ElevenLabs API key is required to use a custom voice_id"
+            if not state.get("elevenlabs_api_key"):
+                raise UserError(
+                    "ElevenLabs API key is required to use a custom voice_id"
+                )
             return state["elevenlabs_voice_id"]
         else:
             # default to first in the mapping

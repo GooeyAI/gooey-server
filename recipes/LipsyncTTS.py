@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
+from daras_ai_v2.text_to_speech_settings_widgets import text_to_speech_provider_selector
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
 from daras_ai_v2.safety_checker import safety_checker
@@ -86,6 +87,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             """,
             key="text_prompt",
         )
+        text_to_speech_provider_selector(self)
 
     def validate_form_v2(self):
         assert st.session_state.get(
