@@ -11,6 +11,7 @@ from PIL import Image, ImageOps
 from furl import furl
 
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import UserError
 
 
 def resize_img_pad(img_bytes: bytes, size: tuple[int, int]) -> bytes:
@@ -90,7 +91,7 @@ def bytes_to_cv2_img(img_bytes: bytes, greyscale=False) -> np.ndarray:
         flags = cv2.IMREAD_COLOR
     img_cv2 = cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), flags=flags)
     if not img_exists(img_cv2):
-        raise ValueError("Bad Image")
+        raise UserError("Bad Image")
     return img_cv2
 
 

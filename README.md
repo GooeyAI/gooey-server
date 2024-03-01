@@ -151,6 +151,9 @@ pg_restore --no-privileges --no-owner -d $PGDATABASE $fname
 cid=$(docker ps  | grep gooey-api-prod | cut -d " " -f 1 | head -1)
 # exec the script to create the fixture
 docker exec -it $cid poetry run ./manage.py runscript create_fixture
+```
+
+```bash
 # copy the fixture outside container
 docker cp $cid:/app/fixture.json .
 # print the absolute path

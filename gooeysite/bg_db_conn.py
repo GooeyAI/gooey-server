@@ -31,5 +31,7 @@ next_db_safe = db_middleware(next)
 
 
 @db_middleware
-def get_celery_result_db_safe(result: "celery.result.AsyncResult") -> typing.Any:
-    return result.get(disable_sync_subtasks=False)
+def get_celery_result_db_safe(
+    result: "celery.result.AsyncResult", **kwargs
+) -> typing.Any:
+    return result.get(disable_sync_subtasks=False, **kwargs)

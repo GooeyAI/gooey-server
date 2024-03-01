@@ -9,7 +9,7 @@ from furl import furl
 
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import raise_for_status, GPUError
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 
 
@@ -160,7 +160,11 @@ def call_celery_task(
         task_name, kwargs=dict(pipeline=pipeline, inputs=inputs), queue=queue
     )
     s = time()
-    ret = get_celery_result_db_safe(result)
+    ret = get_celery_result_db_safe(result, propagate=False)
+    try:
+        result.maybe_throw()
+    except Exception as e:
+        raise GPUError(f"Error in GPU Task {queue}:{task_name} - {e}") from e
     record_cost_auto(
         model=queue, sku=ModelSku.gpu_ms, quantity=int((time() - s) * 1000)
     )

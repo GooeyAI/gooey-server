@@ -1,3 +1,9 @@
+import typing
+
+if typing.TYPE_CHECKING:
+    from google.cloud import firestore
+
+
 FIREBASE_SESSION_COOKIE = "firebase_session"
 ANONYMOUS_USER_COOKIE = "anonymous_user"
 

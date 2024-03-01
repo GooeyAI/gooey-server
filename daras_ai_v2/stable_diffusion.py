@@ -13,12 +13,15 @@ from daras_ai.image_input import (
     resize_img_fit,
     get_downscale_factor,
 )
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import (
+    raise_for_status,
+)
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import (
     b64_img_decode,
     call_sd_multi,
 )
+from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 
 SD_IMG_MAX_SIZE = (768, 768)
 
@@ -283,27 +286,29 @@ def text2img(
 
             client = OpenAI()
             width, height = _get_dall_e_3_img_size(width, height)
-            response = client.images.generate(
-                model=text2img_model_ids[Text2ImgModels[selected_model]],
-                n=1,  # num_outputs, not supported yet
-                prompt=prompt,
-                response_format="b64_json",
-                quality=dall_e_3_quality,
-                style=dall_e_3_style,
-                size=f"{width}x{height}",
-            )
+            with capture_openai_content_policy_violation():
+                response = client.images.generate(
+                    model=text2img_model_ids[Text2ImgModels[selected_model]],
+                    n=1,  # num_outputs, not supported yet
+                    prompt=prompt,
+                    response_format="b64_json",
+                    quality=dall_e_3_quality,
+                    style=dall_e_3_style,
+                    size=f"{width}x{height}",
+                )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case Text2ImgModels.dall_e.name:
             from openai import OpenAI
 
             edge = _get_dall_e_img_size(width, height)
             client = OpenAI()
-            response = client.images.generate(
-                n=num_outputs,
-                prompt=prompt,
-                size=f"{edge}x{edge}",
-                response_format="b64_json",
-            )
+            with capture_openai_content_policy_violation():
+                response = client.images.generate(
+                    n=num_outputs,
+                    prompt=prompt,
+                    size=f"{edge}x{edge}",
+                    response_format="b64_json",
+                )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
@@ -379,12 +384,13 @@ def img2img(
             image = resize_img_pad(init_image_bytes, (edge, edge))
 
             client = OpenAI()
-            response = client.images.create_variation(
-                image=image,
-                n=num_outputs,
-                size=f"{edge}x{edge}",
-                response_format="b64_json",
-            )
+            with capture_openai_content_policy_violation():
+                response = client.images.create_variation(
+                    image=image,
+                    n=num_outputs,
+                    size=f"{edge}x{edge}",
+                    response_format="b64_json",
+                )
 
             out_imgs = [
                 resize_img_fit(b64_img_decode(part.b64_json), (width, height))
@@ -503,13 +509,14 @@ def inpainting(
             image = rgb_img_to_rgba(edit_image_bytes, mask_bytes)
 
             client = OpenAI()
-            response = client.images.edit(
-                prompt=prompt,
-                image=image,
-                n=num_outputs,
-                size=f"{edge}x{edge}",
-                response_format="b64_json",
-            )
+            with capture_openai_content_policy_violation():
+                response = client.images.edit(
+                    prompt=prompt,
+                    image=image,
+                    n=num_outputs,
+                    size=f"{edge}x{edge}",
+                    response_format="b64_json",
+                )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
 
         case InpaintingModels.sd_2.name | InpaintingModels.runway_ml.name:

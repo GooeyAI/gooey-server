@@ -416,7 +416,7 @@ def multiselect(
 
 def selectbox(
     label: str,
-    options: typing.Sequence[T],
+    options: typing.Iterable[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
     key: str = None,
     help: str = None,

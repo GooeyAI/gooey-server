@@ -20,7 +20,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.descriptions import prompting101
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.img_model_settings_widgets import (
     output_resolution_setting,
     img_model_settings,
@@ -140,6 +140,15 @@ class QRCodeGeneratorPage(BasePage):
             FaceInpaintingPage,
             EmailFaceInpaintingPage,
         ]
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        if state.get("qr_code_file"):
+            return ["qr_code_file"]
+        elif state.get("qr_code_input_image"):
+            return ["qr_code_input_image"]
+        else:
+            return ["qr_code_data"]
 
     def render_form_v2(self):
         st.text_area(
@@ -687,7 +696,7 @@ def generate_and_upload_qr_code(
         if isinstance(qr_code_data, str):
             qr_code_data = qr_code_data.strip()
         if not qr_code_data:
-            raise ValueError("Please provide QR Code URL, text content, or an image")
+            raise UserError("Please provide QR Code URL, text content, or an image")
         using_shortened_url = request.use_url_shortener and is_url(qr_code_data)
         if using_shortened_url:
             qr_code_data = ShortenedURL.objects.get_or_create_for_workflow(
@@ -735,7 +744,7 @@ def extract_qr_code_data(img: np.ndarray) -> str:
     return info
 
 
-class InvalidQRCode(AssertionError):
+class InvalidQRCode(UserError):
     pass
 
 

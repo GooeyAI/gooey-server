@@ -1,4 +1,5 @@
 import json
+from json import JSONDecodeError
 
 from celery import shared_task
 from django.db.models import QuerySet
@@ -65,8 +66,15 @@ def msg_analysis(msg_id: int):
         raise RuntimeError(sr.error_msg)
 
     # save the result as json
+    output_text = flatten(sr.state["output_text"].values())[0]
+    try:
+        analysis_result = json.loads(output_text)
+    except JSONDecodeError:
+        analysis_result = {
+            "error": "Failed to parse the analysis result. Please check your script.",
+        }
     Message.objects.filter(id=msg_id).update(
-        analysis_result=json.loads(flatten(sr.state["output_text"].values())[0]),
+        analysis_result=analysis_result,
     )
 
 

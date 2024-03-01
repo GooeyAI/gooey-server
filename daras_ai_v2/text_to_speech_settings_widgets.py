@@ -4,6 +4,7 @@ import requests
 from google.cloud import texttospeech
 
 import gooey_ui as st
+from daras_ai_v2 import settings
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
@@ -26,9 +27,9 @@ UBERDUCK_VOICES = {
 
 
 class TextToSpeechProviders(Enum):
-    GOOGLE_TTS = "Google Cloud Text-to-Speech"
+    GOOGLE_TTS = "Google Text-to-Speech"
     ELEVEN_LABS = "Eleven Labs"
-    UBERDUCK = "uberduck.ai"
+    UBERDUCK = "Uberduck.ai"
     BARK = "Bark (suno-ai)"
 
 
@@ -141,246 +142,253 @@ BARK_ALLOWED_PROMPTS = {
 }
 
 
-def text_to_speech_settings(page):
-    st.write(
-        """
-        ##### 🗣️ Voice Settings
-        """
-    )
-
+def text_to_speech_provider_selector(page):
     col1, col2 = st.columns(2)
     with col1:
         tts_provider = enum_selector(
             TextToSpeechProviders,
             "###### Speech Provider",
             key="tts_provider",
+            use_selectbox=True,
         )
+    with col2:
+        match tts_provider:
+            case TextToSpeechProviders.BARK.name:
+                bark_selector()
+            case TextToSpeechProviders.GOOGLE_TTS.name:
+                google_tts_selector()
+            case TextToSpeechProviders.UBERDUCK.name:
+                uberduck_selector()
+            case TextToSpeechProviders.ELEVEN_LABS.name:
+                elevenlabs_selector(page)
+    return tts_provider
 
+
+def text_to_speech_settings(page, tts_provider):
     match tts_provider:
         case TextToSpeechProviders.BARK.name:
-            with col2:
-                st.selectbox(
-                    label="""
-                    ###### Bark History Prompt
-                    """,
-                    key="bark_history_prompt",
-                    format_func=BARK_ALLOWED_PROMPTS.__getitem__,
-                    options=BARK_ALLOWED_PROMPTS.keys(),
-                )
-
+            pass
         case TextToSpeechProviders.GOOGLE_TTS.name:
-            with col2:
-                voices = google_tts_voices()
-                st.selectbox(
-                    label="""
-                    ###### Voice name (Google TTS)
-                    """,
-                    key="google_voice_name",
-                    format_func=voices.__getitem__,
-                    options=voices.keys(),
-                )
-                st.caption(
-                    "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*"
-                )
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.slider(
-                    """
-                    ###### Speaking rate
-                    *`1.0` is the normal native speed of the speaker*
-                    """,
-                    min_value=0.3,
-                    max_value=4.0,
-                    step=0.1,
-                    key="google_speaking_rate",
-                )
-            with col2:
-                st.slider(
-                    """
-                    ###### Pitch
-                    *Increase/Decrease semitones from the original pitch*
-                    """,
-                    min_value=-20.0,
-                    max_value=20.0,
-                    step=0.25,
-                    key="google_pitch",
-                )
-
+            google_tts_settings()
         case TextToSpeechProviders.UBERDUCK.name:
-            with col2:
-                st.selectbox(
-                    label="""
-                    ###### Voice name (Uberduck)
-                    """,
-                    key="uberduck_voice_name",
-                    format_func=lambda option: f"{option}",
-                    options=UBERDUCK_VOICES.keys(),
-                )
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.slider(
-                    """
-                    ###### Speaking rate
-                    *`1.0` is the normal native speed of the speaker*
-                    """,
-                    min_value=0.5,
-                    max_value=3.0,
-                    step=0.25,
-                    key="uberduck_speaking_rate",
-                )
-
+            uberduck_settings()
         case TextToSpeechProviders.ELEVEN_LABS.name:
-            with col2:
-                if not st.session_state.get("elevenlabs_api_key"):
-                    st.session_state["elevenlabs_api_key"] = page.request.session.get(
-                        SESSION_ELEVENLABS_API_KEY
-                    )
-
-                elevenlabs_use_custom_key = st.checkbox(
-                    "Use custom API key + Voice ID",
-                    value=bool(st.session_state.get("elevenlabs_api_key")),
-                )
-                if elevenlabs_use_custom_key:
-                    st.session_state["elevenlabs_voice_name"] = None
-                    elevenlabs_api_key = st.text_input(
-                        """
-                        ###### Your ElevenLabs API key
-                        *Read <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">this</a>
-                        to know how to obtain an API key from
-                        ElevenLabs.*
-                        """,
-                        key="elevenlabs_api_key",
-                    )
-
-                    selected_voice_id = st.session_state.get("elevenlabs_voice_id")
-                    elevenlabs_voices = (
-                        {selected_voice_id: selected_voice_id}
-                        if selected_voice_id
-                        else {}
-                    )
-
-                    if elevenlabs_api_key:
-                        try:
-                            elevenlabs_voices = fetch_elevenlabs_voices(
-                                elevenlabs_api_key
-                            )
-                        except requests.exceptions.HTTPError as e:
-                            st.error(
-                                f"Invalid ElevenLabs API key. Failed to fetch voices: {e}"
-                            )
-
-                    st.selectbox(
-                        """
-                        ###### Voice ID (ElevenLabs)
-                        """,
-                        key="elevenlabs_voice_id",
-                        options=elevenlabs_voices.keys(),
-                        format_func=elevenlabs_voices.__getitem__,
-                    )
-                else:
-                    st.session_state["elevenlabs_api_key"] = None
-                    st.session_state["elevenlabs_voice_id"] = None
-                    if not (
-                        page
-                        and (
-                            page.is_current_user_paying()
-                            or page.is_current_user_admin()
-                        )
-                    ):
-                        st.caption(
-                            """
-                            Note: Please purchase Gooey.AI credits to use ElevenLabs voices [here](/account).
-                            Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
-                            """
-                        )
-
-                    st.session_state.update(
-                        elevenlabs_api_key=None, elevenlabs_voice_id=None
-                    )
-                    st.selectbox(
-                        """
-                        ###### Voice Name (ElevenLabs)
-                        """,
-                        key="elevenlabs_voice_name",
-                        format_func=str,
-                        options=ELEVEN_LABS_VOICES.keys(),
-                    )
-
-                page.request.session[SESSION_ELEVENLABS_API_KEY] = st.session_state.get(
-                    "elevenlabs_api_key"
-                )
-
-                st.selectbox(
-                    """
-                    ###### Voice Model
-                    """,
-                    key="elevenlabs_model",
-                    format_func=ELEVEN_LABS_MODELS.__getitem__,
-                    options=ELEVEN_LABS_MODELS.keys(),
-                )
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.slider(
-                    """
-                    ###### Stability
-                    *A lower stability provides a broader emotional range.
-                    A value lower than 0.3 can lead to too much instability.
-                    [Read more](https://docs.elevenlabs.io/speech-synthesis/voice-settings#stability).*
-                    """,
-                    min_value=0,
-                    max_value=1.0,
-                    step=0.05,
-                    key="elevenlabs_stability",
-                )
-            with col2:
-                st.slider(
-                    """
-                    ###### Similarity Boost
-                    *Dictates how hard the model should try to replicate the original voice.
-                    [Read more](https://docs.elevenlabs.io/speech-synthesis/voice-settings#similarity).*
-                    """,
-                    min_value=0,
-                    max_value=1.0,
-                    step=0.05,
-                    key="elevenlabs_similarity_boost",
-                )
-
-            if st.session_state.get("elevenlabs_model") == "eleven_multilingual_v2":
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.slider(
-                        """
-                        ###### Style Exaggeration
-                        """,
-                        min_value=0,
-                        max_value=1.0,
-                        step=0.05,
-                        key="elevenlabs_style",
-                        value=0.0,
-                    )
-                with col2:
-                    st.checkbox(
-                        "Speaker Boost",
-                        key="elevenlabs_speaker_boost",
-                        value=True,
-                    )
-
-            with st.expander(
-                "Eleven Labs Supported Languages",
-                style={"fontSize": "0.9rem", "textDecoration": "underline"},
-            ):
-                st.caption(
-                    "With Multilingual V2 voice model", style={"fontSize": "0.8rem"}
-                )
-                st.caption(
-                    ", ".join(ELEVEN_LABS_SUPPORTED_LANGS), style={"fontSize": "0.8rem"}
-                )
+            elevenlabs_settings()
 
 
-@redis_cache_decorator
+def bark_selector():
+    st.selectbox(
+        label="""
+        ###### Bark History Prompt
+        """,
+        key="bark_history_prompt",
+        format_func=BARK_ALLOWED_PROMPTS.__getitem__,
+        options=BARK_ALLOWED_PROMPTS.keys(),
+    )
+
+
+def google_tts_selector():
+    voices = google_tts_voices()
+    st.selectbox(
+        label="""
+        ###### Voice name (Google TTS)
+        """,
+        key="google_voice_name",
+        format_func=voices.__getitem__,
+        options=voices.keys(),
+    )
+    st.caption(
+        "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*"
+    )
+
+
+def google_tts_settings():
+    st.write(f"##### 🗣️ {TextToSpeechProviders.GOOGLE_TTS.value} Settings")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.slider(
+            """
+            ###### Speaking rate
+            *`1.0` is the normal native speed of the speaker*
+            """,
+            min_value=0.3,
+            max_value=4.0,
+            step=0.1,
+            key="google_speaking_rate",
+        )
+    with col2:
+        st.slider(
+            """
+            ###### Pitch
+            *Increase/Decrease semitones from the original pitch*
+            """,
+            min_value=-20.0,
+            max_value=20.0,
+            step=0.25,
+            key="google_pitch",
+        )
+
+
+def uberduck_selector():
+    st.selectbox(
+        label="""
+        ###### Voice name (Uberduck)
+        """,
+        key="uberduck_voice_name",
+        format_func=lambda option: f"{option}",
+        options=UBERDUCK_VOICES.keys(),
+    )
+
+
+def uberduck_settings():
+    st.write(f"##### 🗣️ {TextToSpeechProviders.UBERDUCK.value} Settings")
+    st.slider(
+        """
+        ###### Speaking rate
+        *`1.0` is the normal native speed of the speaker*
+        """,
+        min_value=0.5,
+        max_value=3.0,
+        step=0.25,
+        key="uberduck_speaking_rate",
+    )
+
+
+def elevenlabs_selector(page):
+    if not st.session_state.get("elevenlabs_api_key"):
+        st.session_state["elevenlabs_api_key"] = page.request.session.get(
+            SESSION_ELEVENLABS_API_KEY
+        )
+
+    elevenlabs_use_custom_key = st.checkbox(
+        "Use custom API key + Voice ID",
+        value=bool(st.session_state.get("elevenlabs_api_key")),
+    )
+    if elevenlabs_use_custom_key:
+        st.session_state["elevenlabs_voice_name"] = None
+        elevenlabs_api_key = st.text_input(
+            """
+            ###### Your ElevenLabs API key
+            *Read <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">this</a>
+            to know how to obtain an API key from
+            ElevenLabs.*
+            """,
+            key="elevenlabs_api_key",
+        )
+
+        selected_voice_id = st.session_state.get("elevenlabs_voice_id")
+        elevenlabs_voices = (
+            {selected_voice_id: selected_voice_id} if selected_voice_id else {}
+        )
+
+        if elevenlabs_api_key:
+            try:
+                elevenlabs_voices = fetch_elevenlabs_voices(elevenlabs_api_key)
+            except requests.exceptions.HTTPError as e:
+                st.error(f"Invalid ElevenLabs API key. Failed to fetch voices: {e}")
+
+        st.selectbox(
+            """
+            ###### Voice ID (ElevenLabs)
+            """,
+            key="elevenlabs_voice_id",
+            options=elevenlabs_voices.keys(),
+            format_func=elevenlabs_voices.__getitem__,
+        )
+    else:
+        st.session_state["elevenlabs_api_key"] = None
+        st.session_state["elevenlabs_voice_id"] = None
+        if not (
+            page and (page.is_current_user_paying() or page.is_current_user_admin())
+        ):
+            st.caption(
+                """
+                Note: Please purchase Gooey.AI credits to use ElevenLabs voices [here](/account).
+                Alternatively, you can use your own ElevenLabs API key by selecting the checkbox above.
+                """
+            )
+
+        st.session_state.update(elevenlabs_api_key=None, elevenlabs_voice_id=None)
+        st.selectbox(
+            """
+            ###### Voice Name (ElevenLabs)
+            """,
+            key="elevenlabs_voice_name",
+            format_func=str,
+            options=ELEVEN_LABS_VOICES.keys(),
+        )
+
+    page.request.session[SESSION_ELEVENLABS_API_KEY] = st.session_state.get(
+        "elevenlabs_api_key"
+    )
+
+    st.selectbox(
+        """
+        ###### Voice Model
+        """,
+        key="elevenlabs_model",
+        format_func=ELEVEN_LABS_MODELS.__getitem__,
+        options=ELEVEN_LABS_MODELS.keys(),
+    )
+
+
+def elevenlabs_settings():
+    col1, col2 = st.columns(2)
+    with col1:
+        st.slider(
+            """
+            ###### Stability
+            *A lower stability provides a broader emotional range.
+            A value lower than 0.3 can lead to too much instability.
+            [Read more](https://docs.elevenlabs.io/speech-synthesis/voice-settings#stability).*
+            """,
+            min_value=0,
+            max_value=1.0,
+            step=0.05,
+            key="elevenlabs_stability",
+        )
+    with col2:
+        st.slider(
+            """
+            ###### Similarity Boost
+            *Dictates how hard the model should try to replicate the original voice.
+            [Read more](https://docs.elevenlabs.io/speech-synthesis/voice-settings#similarity).*
+            """,
+            min_value=0,
+            max_value=1.0,
+            step=0.05,
+            key="elevenlabs_similarity_boost",
+        )
+
+    if st.session_state.get("elevenlabs_model") == "eleven_multilingual_v2":
+        col1, col2 = st.columns(2)
+        with col1:
+            st.slider(
+                """
+                ###### Style Exaggeration
+                """,
+                min_value=0,
+                max_value=1.0,
+                step=0.05,
+                key="elevenlabs_style",
+                value=0.0,
+            )
+        with col2:
+            st.checkbox(
+                "Speaker Boost",
+                key="elevenlabs_speaker_boost",
+                value=True,
+            )
+
+    with st.expander(
+        "Eleven Labs Supported Languages",
+        style={"fontSize": "0.9rem", "textDecoration": "underline"},
+    ):
+        st.caption("With Multilingual V2 voice model", style={"fontSize": "0.8rem"})
+        st.caption(", ".join(ELEVEN_LABS_SUPPORTED_LANGS), style={"fontSize": "0.8rem"})
+
+
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def google_tts_voices() -> dict[str, str]:
     voices: list[texttospeech.Voice] = (
         texttospeech.TextToSpeechClient().list_voices().voices

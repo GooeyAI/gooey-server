@@ -13,7 +13,6 @@ from random import Random
 from time import sleep
 from types import SimpleNamespace
 
-import requests
 import sentry_sdk
 from django.utils import timezone
 from django.utils.text import slugify
@@ -183,12 +182,40 @@ class BasePage:
             query_params=query_params,
         )
 
-    def setup_render(self):
+    def setup_sentry(self, event_processor: typing.Callable = None):
+        def add_user_to_event(event, hint):
+            user = self.request and self.request.user
+            if not user:
+                return event
+            event["user"] = {
+                "id": user.id,
+                "name": user.display_name,
+                "email": user.email,
+                "data": {
+                    field: getattr(user, field)
+                    for field in [
+                        "uid",
+                        "phone_number",
+                        "photo_url",
+                        "balance",
+                        "is_paying",
+                        "is_anonymous",
+                        "is_disabled",
+                        "disable_safety_checker",
+                        "created_at",
+                    ]
+                },
+            }
+            return event
+
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
+            scope.add_event_processor(add_user_to_event)
+            if event_processor:
+                scope.add_event_processor(event_processor)
 
     def refresh_state(self):
         _, run_id, uid = extract_query_params(gooey_get_query_params())
@@ -198,7 +225,7 @@ class BasePage:
             st.session_state.update(output)
 
     def render(self):
-        self.setup_render()
+        self.setup_sentry()
 
         if self.get_run_state(st.session_state) == RecipeRunState.running:
             self.refresh_state()
@@ -343,7 +370,7 @@ class BasePage:
 
         copy_to_clipboard_button(
             f'<i class="fa-regular fa-link"></i>{button_text}',
-            value=self._get_current_app_url(),
+            value=self.get_tab_url(self.tab),
             type="secondary",
             className="mb-0 ms-lg-2",
         )
@@ -1324,7 +1351,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         self.render_form_v2()
         with st.expander("⚙️ Settings"):
             self.render_settings()
-            st.write("---")
         submitted = self.render_submit_button()
         with st.div(style={"textAlign": "right"}):
             st.caption(
@@ -1820,8 +1846,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         as_async = st.checkbox("##### Run Async")
         as_form_data = st.checkbox("##### Upload Files via Form Data")
 
-        request_body = get_example_request_body(
-            self.RequestModel, st.session_state, include_all=include_all
+        request_body = self.get_example_request_body(
+            st.session_state, include_all=include_all
         )
         response_body = self.get_example_response_body(
             st.session_state, as_async=as_async, include_all=include_all
@@ -1867,7 +1893,27 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return max(1, math.ceil(self.get_raw_price(state)))
 
     def get_raw_price(self, state: dict) -> float:
-        return self.price
+        return self.price * state.get("num_outputs", 1)
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        """
+        Fields that are not required, but are preferred to be shown in the example.
+        """
+        return []
+
+    @classmethod
+    def get_example_request_body(
+        cls,
+        state: dict,
+        include_all: bool = False,
+    ) -> dict:
+        return extract_model_fields(
+            cls.RequestModel,
+            state,
+            include_all=include_all,
+            preferred_fields=cls.get_example_preferred_fields(state),
+        )
 
     def get_example_response_body(
         self,
@@ -1883,6 +1929,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             run_id=run_id,
             uid=self.request.user and self.request.user.uid,
         )
+        output = extract_model_fields(self.ResponseModel, state, include_all=True)
         if as_async:
             return dict(
                 run_id=run_id,
@@ -1890,18 +1937,14 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 created_at=created_at,
                 run_time_sec=st.session_state.get(StateKeys.run_time, 0),
                 status="completed",
-                output=get_example_request_body(
-                    self.ResponseModel, state, include_all=include_all
-                ),
+                output=output,
             )
         else:
             return dict(
                 id=run_id,
                 url=web_url,
                 created_at=created_at,
-                output=get_example_request_body(
-                    self.ResponseModel, state, include_all=include_all
-                ),
+                output=output,
             )
 
     def additional_notes(self) -> str | None:
@@ -1949,15 +1992,21 @@ def render_output_caption():
     st.caption(caption, unsafe_allow_html=True)
 
 
-def get_example_request_body(
-    request_model: typing.Type[BaseModel],
+def extract_model_fields(
+    model: typing.Type[BaseModel],
     state: dict,
     include_all: bool = False,
+    preferred_fields: list[str] = None,
 ) -> dict:
+    """Only returns required fields unless include_all is set to True."""
     return {
         field_name: state.get(field_name)
-        for field_name, field in request_model.__fields__.items()
-        if include_all or field.required
+        for field_name, field in model.__fields__.items()
+        if (
+            include_all
+            or field.required
+            or (preferred_fields and field_name in preferred_fields)
+        )
     }
 
 
@@ -1975,27 +2024,6 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
-
-
-def err_msg_for_exc(e):
-    if isinstance(e, requests.HTTPError):
-        response: requests.Response = e.response
-        try:
-            err_body = response.json()
-        except requests.JSONDecodeError:
-            err_str = response.text
-        else:
-            format_exc = err_body.get("format_exc")
-            if format_exc:
-                print("⚡️ " + format_exc)
-            err_type = err_body.get("type")
-            err_str = err_body.get("str")
-            if err_type and err_str:
-                return f"(GPU) {err_type}: {err_str}"
-            err_str = str(err_body)
-        return f"(HTTP {response.status_code}) {html.escape(err_str[:1000])}"
-    else:
-        return f"{type(e).__name__}: {e}"
 
 
 def force_redirect(url: str):
