@@ -125,7 +125,7 @@ def fb_connect_redirect(request: Request):
         return RedirectResponse(str(redirect_url))
 
     on_completion = request.query_params.get("state")
-    retry_button = f'<a href="{ig_connect_url(on_completion)}">Retry</a>'
+    retry_button = f'<a href="{fb_connect_url(on_completion)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:

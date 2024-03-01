@@ -1144,12 +1144,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     </a>
                     <div {DESCRIPTIONSTYLE}>Connect to a Facebook Page you own. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-facebook">Help Guide</a>.</div>
                 </div>
-                <div {ROWSTYLE}>
+                <!--<div {ROWSTYLE}>
                     <a href="{ig_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Instagram Page">
                         <img src="{INSTAGRAM_IMG}" {IMGSTYLE} alt="Instagram">
                     </a>
                     <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
-                </div>
+                </div>-->
                 </div>
                 """,
                 unsafe_allow_html=True,
