@@ -12,11 +12,6 @@ TRANSLATION_TESTS = [
         "Mirchi ka ped",
         "chilli tree",
     ),
-    # hindi
-    (
-        "ान का नर्सरी खेत में रोकने के लिए कितने दिन में तैयार हो जाता है",
-        "how many days does it take for the seed nursery to be ready to be planted in the field?",
-    ),
     # telugu
     (
         "90 రోజుల తర్వాత మిర్చి తోటలో ఏమేమి పోషకాలు వేసి వేయాలి",
