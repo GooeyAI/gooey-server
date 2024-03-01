@@ -314,7 +314,7 @@ def run_google_translate(
         target_language, google_translate_target_languages().keys()
     )
     if not target_language:
-        raise ValueError(f"Unsupported target language: {target_language!r}")
+        raise UserError(f"Unsupported target language: {target_language!r}")
 
     # if the language supports transliteration, we should check if the script is Latin
     if source_language and source_language not in TRANSLITERATION_SUPPORTED:

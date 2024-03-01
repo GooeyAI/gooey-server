@@ -24,7 +24,7 @@ from openai.types.chat import (
 )
 
 from daras_ai_v2.asr import get_google_auth_session
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.redis_cache import (
@@ -479,7 +479,7 @@ def _run_text_model(
                 temperature=temperature,
             )
         case _:
-            raise ValueError(f"Unsupported text api: {api}")
+            raise UserError(f"Unsupported text api: {api}")
 
 
 def _run_chat_model(
@@ -522,7 +522,7 @@ def _run_chat_model(
             )
         case LLMApis.together:
             if tools:
-                raise ValueError("Only OpenAI chat models support Tools")
+                raise UserError("Only OpenAI chat models support Tools")
             return _run_together_chat(
                 model=model,
                 messages=messages,
@@ -532,7 +532,7 @@ def _run_chat_model(
                 repetition_penalty=1.15 if avoid_repetition else 1,
             )
         case _:
-            raise ValueError(f"Unsupported chat api: {api}")
+            raise UserError(f"Unsupported chat api: {api}")
 
 
 @retry_if(openai_should_retry)

@@ -2,6 +2,7 @@ import io
 
 from furl import furl
 
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.functional import flatmap_parallel
 
 
@@ -20,7 +21,7 @@ def url_to_gdrive_file_id(f: furl) -> str:
         try:
             file_id = f.path.segments[f.path.segments.index("d") + 1]
         except (IndexError, ValueError):
-            raise ValueError(f"Bad google drive link: {str(f)!r}")
+            raise UserError(f"Bad google drive link: {str(f)!r}")
     return file_id
 
 
