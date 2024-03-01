@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libboost-dev \
     libmagickwand-dev \
     libgl1-mesa-glx \
+    libnss3 \
 	&& rm -rf /var/lib/apt/lists/*
 RUN wget -qO- 'https://poppler.freedesktop.org/poppler-24.02.0.tar.xz' | tar -xJ \
     && cd poppler-24.02.0 \
