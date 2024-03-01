@@ -3,8 +3,8 @@ import string
 from daras_ai_v2.crypto import get_random_string
 from daras_ai_v2.vcard import VCARD, vard_img, vard_line, vard_escape
 
-random_img1 = "https://picsum.photos/768"
-random_img2 = "https://picsum.photos/1024"
+random_img1 = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a679a410-9456-11ee-bd77-02420a0001ce/QR%20Code.jpg.png"
+random_img2 = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
 
 
 def test_to_vcf_str():
