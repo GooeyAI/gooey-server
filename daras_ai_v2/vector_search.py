@@ -597,6 +597,7 @@ def bytes_to_text_pages_or_df(
     mime_type: str,
     selected_asr_model: str | None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
+    ext_mime_type = mimetypes.guess_type("file" + ext)[0]
     # convert document to text pages
     match ext:
         case ".pdf":
@@ -605,7 +606,12 @@ def bytes_to_text_pages_or_df(
             pages = [pandoc_to_text(f_name + ext, f_bytes)]
         case ".txt":
             pages = [f_bytes.decode()]
-        case ".wav" | ".ogg" | ".mp3" | ".aac":
+        case _ if (
+            ext_mime_type
+            and (
+                ext_mime_type.startswith("audio/") or ext_mime_type.startswith("video/")
+            )
+        ):
             if is_gdrive_url(furl(f_url)) or is_yt_url(f_url):
                 f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
             transcript = run_asr(

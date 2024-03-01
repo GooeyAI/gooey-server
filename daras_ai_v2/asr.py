@@ -19,7 +19,7 @@ from daras_ai_v2.exceptions import (
     call_cmd,
     ffprobe,
 )
-from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.functional import map_parallel, flatten
 from daras_ai_v2.gdrive_downloader import (
     is_gdrive_url,
     gdrive_download,
@@ -317,7 +317,10 @@ def run_google_translate(
         language_codes = [source_language] * len(texts)
     else:
         translate_client = translate.Client()
-        detections = translate_client.detect_language(texts)
+        detections = flatten(
+            translate_client.detect_language(texts[i : i + 50])
+            for i in range(0, len(texts), 50)
+        )
         language_codes = [detection["language"] for detection in detections]
 
     return map_parallel(
