@@ -1166,7 +1166,6 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.markdown(
                 f"""
                 #### Configure your Copilot
-                Run Saved ✅ ~ <a href="{add_integration}">Connected</a> ✅ ~ <ins>Test & Configure</ins> ✅
                 """,
                 unsafe_allow_html=True,
             )
