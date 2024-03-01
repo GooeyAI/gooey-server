@@ -921,50 +921,66 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         super().render_selected_tab(selected_tab)
 
         if selected_tab == MenuTabs.integrations:
+            st.newline()
+
             # not signed in case
             if not self.request.user or self.request.user.is_anonymous:
                 self.integration_welcome_screen()
-                return
-
-            # signed in but not on a run the user can edit
-            if not self.can_user_edit_run():
-                self.integration_welcome_screen(
-                    title="Create your Saved Copilot",
-                    get_started_text="🏃🏽‍♂️ Run & Save this Copilot",
-                )
+                st.newline()
+                with st.center():
+                    st.anchor(
+                        "Get Started",
+                        href=self.get_auth_url(self.app_url(query_params={})),
+                        type="primary",
+                    )
                 return
 
             current_run, published_run = self.get_runs_from_query_params(
                 *extract_query_params(gooey_get_query_params())
             )  # type: ignore
 
-            # automatically connect to all the user's unconnected integrations
-            # TODO: fix
-            unconnected_q = Q(saved_run=None) | Q(published_run=None)
-            unconnected_q &= Q(billing_account_uid=self.request.user.uid)
-            for bi in BotIntegration.objects.filter(unconnected_q):
-                bi.streaming_enabled = True
-                bi.user_language = (
-                    st.session_state.get("user_language") or bi.user_language
+            # signed in but not on a run the user can edit (admins will never see this)
+            if not self.can_user_edit_run(current_run):
+                self.integration_welcome_screen(
+                    title="Create your Saved Copilot",
                 )
-                bi.saved_run = current_run
-                if published_run and published_run.saved_run_id == current_run.id:
-                    bi.published_run = published_run
-                else:
-                    bi.published_run = None
-                if bi.platform == Platform.SLACK:
-                    from daras_ai_v2.slack_bot import send_confirmation_msg
-
-                    send_confirmation_msg(bi)
-                bi.save()
-
-            integrations_q = Q(saved_run=current_run)
-            if published_run and published_run.saved_run_id == current_run.id:
-                integrations_q |= Q(published_run=published_run)
-                if published_run.published_run_id:
-                    integrations_q |= Q(
-                        saved_run__example_id=published_run.published_run_id
+                st.newline()
+                with st.center():
+                    st.anchor(
+                        "Run & Save this Copilot",
+                        href=self.get_auth_url(self.app_url(query_params={})),
+                        type="primary",
                     )
+                return
+
+            # signed, has submitted run, but not published (admins will never see this)
+            # note: this means we no longer allow botintegrations on non-published runs which is a breaking change requested by Sean
+            if not self.can_user_edit_published_run(published_run):
+                self.integration_welcome_screen(
+                    title="Save your Published Copilot",
+                )
+                st.newline()
+                with st.center():
+                    self._render_published_run_buttons(
+                        current_run=current_run,
+                        published_run=published_run,
+                        redirect_to=self.get_tab_url(MenuTabs.integrations),
+                    )
+                return
+
+            # if we come from an integration redirect, we connect the integrations
+            if "connect_ids" in self.request.query_params:
+                self.integrations_on_connect(
+                    self.request.query_params.getlist("connect_ids"),
+                    current_run,
+                    published_run,
+                )
+
+            # see which integrations are available to the user for the current published run
+            assert published_run, "At this point, published_run should be available"
+            integrations_q = Q(published_run=published_run) | Q(
+                saved_run__example_id=published_run.published_run_id
+            )
             if not self.is_current_user_admin():
                 integrations_q &= Q(billing_account_uid=self.request.user.uid)
 
@@ -982,11 +998,39 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 integrations, current_run, published_run
             )
 
-    def integration_welcome_screen(
-        self, title="Connect your Copilot", get_started_text="🏃🏽‍♂️ Get Started"
-    ):
+    def integrations_on_connect(self, ids: list[int], current_run, published_run):
+        from app_users.models import AppUser
+        from daras_ai_v2.base import RedirectException
+        from daras_ai_v2.slack_bot import send_confirmation_msg
+
+        for bid in self.request.query_params.getlist("connect_ids"):
+            bi = BotIntegration.objects.filter(id=bid).first()
+            if not bi:
+                continue
+            if bi.saved_run is not None:
+
+                st.write(
+                    f"{bi.name} is already connected to a different run by {AppUser.objects.filter(uid=bi.billing_account_uid)}. Please disconnect it first."
+                )
+                continue
+
+            bi.streaming_enabled = True
+            bi.user_language = st.session_state.get("user_language") or bi.user_language
+            bi.saved_run = current_run
+            if published_run and published_run.saved_run_id == current_run.id:
+                bi.published_run = published_run
+            else:
+                bi.published_run = None
+            if bi.platform == Platform.SLACK:
+
+                send_confirmation_msg(bi)
+            bi.save()
+
+        raise RedirectException(self.get_tab_url(MenuTabs.integrations))
+
+    def integration_welcome_screen(self, title="Connect your Copilot"):
         with st.center():
-            st.markdown(f"## {title}")
+            st.markdown(f"#### {title}")
 
         col1, col2, col3 = st.columns(
             3,
@@ -1018,14 +1062,6 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.markdown("3. Test, Analyze & Iterate")
             st.caption("Analyze your usage. Update your Saved Run to test changes.")
 
-        st.newline()
-        with st.center():
-            st.anchor(
-                get_started_text,
-                href=self.get_auth_url(self.app_url(query_params={})),
-                type="primary",
-            )
-
     def integration_connect_screen(
         self, title="Connect your Copilot", status: str | None = None
     ):
@@ -1033,18 +1069,19 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         from routers.slack_api import slack_connect_url
 
         show_landbot = self.request.query_params.get("show-landbot") == "true"
+        on_connect = self.get_tab_url(MenuTabs.integrations)
 
         with st.center():
             st.markdown(
                 f"""
-                ## {title}
+                #### {title}
                 {status or f'Run Saved ✅ ~ <ins>Connect</ins> ~ <span style="color: {GRAYCOLOR}">Test & Configure</span>'}
                 """,
                 unsafe_allow_html=True,
             )
 
             LINKSTYLE = 'class="btn btn-theme btn-secondary" style="margin: 0; display: flex; justify-content: center; align-items: center; padding: 8px; border: 1px solid black; min-width: 164px; width: 200px; aspect-ratio: 5 / 2; overflow: hidden; border-radius: 10px" draggable="false"'
-            IMGSTYLE = 'style="width: 100%" draggable="false"'
+            IMGSTYLE = 'style="width: 80%" draggable="false"'
             ROWSTYLE = 'style="display: flex; align-items: center; gap: 1em; margin-bottom: 1rem" draggable="false"'
             DESCRIPTIONSTYLE = f'style="color: {GRAYCOLOR}; text-align: left"'
             st.markdown(
@@ -1052,25 +1089,25 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 f"""
                 <div>
                 <div {ROWSTYLE}>
-                    <a target="_blank" href="{wa_connect_url}" {LINKSTYLE} aria-label="Connect your Whatsapp number">
+                    <a href="{wa_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Whatsapp number">
                         <img src="{WHATSAPP_IMG}" {IMGSTYLE} alt="Whatsapp">
                     </a>
                     <div {DESCRIPTIONSTYLE}>Bring your own WhatsApp number to connect. Need a new one? Email <a href="mailto:sales@gooey.ai">sales@gooey.ai</a>.</div>
                 </div>
                 <div {ROWSTYLE}>
-                    <a target="_blank" href="{slack_connect_url}" {LINKSTYLE} aria-label="Connect your Slack Workspace">
+                    <a href="{slack_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Slack Workspace">
                         <img src="{SLACK_IMG}" {IMGSTYLE} alt="Slack">
                     </a>
                     <div {DESCRIPTIONSTYLE}>Connect to a Slack Channel. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-slack">Help Guide</a>.</div>
                 </div>
                 <div {ROWSTYLE}>
-                    <a target="_blank" href="{fb_connect_url}" {LINKSTYLE} aria-label="Connect your Facebook Page">
+                    <a href="{fb_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Facebook Page">
                         <img src="{FACEBOOK_IMG}" {IMGSTYLE} alt="Facebook Messenger">
                     </a>
                     <div {DESCRIPTIONSTYLE}>Connect to a Facebook Page you own. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-facebook">Help Guide</a>.</div>
                 </div>
                 <div {ROWSTYLE}>
-                    <a target="_blank" href="{ig_connect_url}" {LINKSTYLE} aria-label="Connect your Instagram Page">
+                    <a href="{ig_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Instagram Page">
                         <img src="{INSTAGRAM_IMG}" {IMGSTYLE} alt="Instagram">
                     </a>
                     <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
@@ -1129,121 +1166,133 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         with st.center():
             st.markdown(
                 f"""
-                ## Configure your Copilot
+                #### Configure your Copilot
                 Run Saved ✅ ~ <a href="{add_integration}">Connected</a> ✅ ~ <ins>Test & Configure</ins> ✅
                 """,
                 unsafe_allow_html=True,
             )
 
-        with st.center(direction="row"):
-            bid = st.horizontal_radio(
-                "",
-                [i.id for i in integrations] + [None],
-                lambda i: (
-                    f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> Add'
-                    if not i
-                    else {
-                        i.id: f'<img align="left" width="24" height="24" src="{Platform(i.platform).get_favicon()}"> {Platform(i.platform).label}'
+        if integrations.count() > 1:
+            with st.center(direction="row"):
+                bid = st.horizontal_radio(
+                    "",
+                    [i.id for i in integrations],
+                    lambda i: {
+                        i.id: f'<img align="left" width="24" height="24" style="margin-right: 10px" src="{Platform(i.platform).get_favicon()}"> {i.name}'
                         for i in integrations
-                    }[i]
-                ),
-                key="bi_id",
-                button_props={"style": {"width": "140px"}},
-            )
-            if bid is None:
-                raise RedirectException(add_integration)
-            bi = integrations.get(id=bid)
-            icon = f'<img src="{Platform(bi.platform).get_favicon()}" style="height: 20px; width: 20px; margin-right: 10px">'
+                    }[i],
+                    key="bi_id",
+                    button_props={"style": {"width": "156px", "overflow": "hidden"}},
+                )
+                bi = integrations.get(id=bid)
+                icon = f'<img src="{Platform(bi.platform).get_favicon()}" style="height: 20px; width: 20px;">'
+                st.change_url(
+                    self.get_tab_url(
+                        MenuTabs.integrations, query_params={"bi_id": bi.id}
+                    ),
+                    self.request,
+                )
+        else:
+            bi = integrations[0]
+            icon = f'<img src="{Platform(bi.platform).get_favicon()}" style="height: 20px; width: 20px;">'
 
         st.newline()
         with st.center():
             with st.div(style={"width": "100%", "text-align": "left"}):
+                test_link = get_bot_test_link(bi)
                 col1, col2 = st.columns(2, style={"align-items": "center"})
                 with col1:
+                    st.write("###### Connected To")
                     st.write(f"{icon} {bi}", unsafe_allow_html=True)
                 with col2:
-                    copy_to_clipboard_button(
-                        "Copy Link",
-                        value=self.get_tab_url(
-                            MenuTabs.integrations, query_params={"bi_id": bi.id}
-                        ),
-                        type="link",
-                    )
-
-                st.newline()
-                col1, col2 = st.columns(2, style={"align-items": "center"})
-                with col1:
-                    st.write("#### Test 📱")
-                    st.caption(f"Send a test {Platform(bi.platform).label} message.")
-                with col2:
-                    test_link = get_bot_test_link(bi)
                     if test_link:
-                        st.anchor(
-                            f"{icon} Message {bi.get_display_name()}",
-                            test_link,
-                            unsafe_allow_html=True,
-                            style={"width": "100%"},
+                        copy_to_clipboard_button(
+                            f"Copy {Platform(bi.platform).label} Link",
+                            value=test_link,
+                            type="secondary",
                         )
                     else:
                         st.write("Message quicklink not available.")
 
                 col1, col2 = st.columns(2, style={"align-items": "center"})
                 with col1:
-                    st.write("#### Understand your Users 📊")
-                    st.caption(
-                        f"Configure your {Platform(bi.platform).label} integration."
-                    )
+                    st.write("###### Test")
+                    st.caption(f"Send a test {Platform(bi.platform).label} message.")
+                with col2:
+                    if test_link:
+                        st.anchor(
+                            f"{icon} Message {bi.get_display_name()}",
+                            test_link,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.write("Message quicklink not available.")
+
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    st.write("###### Understand your Users")
+                    st.caption(f"See real-time analytics.")
                 with col2:
                     stats_url = furl(
                         VideoBotsStatsPage.app_url(), args={"bi_id": bi.id}
                     ).tostr()
                     st.anchor(
-                        "View Analytics",
+                        "📊 View Analytics",
                         stats_url,
-                        style={"width": "100%"},
                     )
 
-                col1, col2 = st.columns(2, style={"align-items": "center"})
-                with col1:
-                    st.write("#### Evaluate ⚖️")
-                    st.caption(f"Run automated tests against sample user messages.")
-                with col2:
-                    st.anchor(
-                        "Run Bulk Tests",
-                        BulkRunnerPage.app_url(),
-                        style={"width": "100%"},
-                    )
+                # ==== future changes ====
+                # col1, col2 = st.columns(2, style={"align-items": "center"})
+                # with col1:
+                #     st.write("###### Evaluate ⚖️")
+                #     st.caption(f"Run automated tests against sample user messages.")
+                # with col2:
+                #     st.anchor(
+                #         "Run Bulk Tests",
+                #         BulkRunnerPage.app_url(),
+                #     )
 
                 # st.write("#### Automated Analysis 🧠")
                 # st.caption(
                 #     "Add a Gooey.AI LLM prompt to automatically analyse and categorize user messages. [Example](https://gooey.ai/compare-large-language-models/how-farmerchat-turns-conversations-to-structured-data/?example_id=lbjnoem7) and [Guide](https://gooey.ai/docs/guides/copilot/conversation-analysis)."
                 # )
 
-                st.newline()
-                st.write("#### Configure Settings 🛠️")
-                if bi.platform == Platform.SLACK:
-                    slack_specific_settings(bi, run_title)
-                general_integration_settings(bi)
+                with st.expander("Configure Settings 🛠️"):
+                    if bi.platform == Platform.SLACK:
+                        slack_specific_settings(bi, run_title)
+                    general_integration_settings(bi)
 
-                if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
-                    st.newline()
-                    st.newline()
-                    broadcast_input(bi)
+                    if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
+                        st.newline()
+                        st.newline()
+                        broadcast_input(bi)
 
-                st.newline()
-                st.newline()
-                st.write("#### Danger Zone 🚨")
                 col1, col2 = st.columns(2, style={"align-items": "center"})
                 with col1:
+                    st.write("###### Disconnect")
+                    st.caption(
+                        f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}."
+                    )
+                with col2:
                     if st.button(
-                        "🔌💔️ Disconnect", key="btn_disconnect", style={"width": "100%"}
+                        "💔️ Disconnect",
+                        key="btn_disconnect",
                     ):
                         bi.saved_run = None
                         bi.published_run = None
+                        bi.save()
+                        st.experimental_rerun()
+
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    st.write("###### Add Integration")
+                    st.caption(f"Add another connection for {run_title}.")
                 with col2:
-                    st.caption(
-                        f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}"
-                    )
+                    if st.button(
+                        f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
+                        key="btn_connect",
+                    ):
+                        raise RedirectException(add_integration)
 
 
 def show_landbot_widget():

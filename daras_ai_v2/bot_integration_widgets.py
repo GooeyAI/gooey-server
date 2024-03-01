@@ -135,7 +135,7 @@ def broadcast_input(bi: BotIntegration):
     )
     text = st.text_area(
         f"""
-        #### Broadcast Message 📢
+        ###### Broadcast Message 📢
         Broadcast a message to all users of this integration using this bot account.  \\
         You can also do this via the [API]({api_docs_url}) which allows filtering by phone number and more!
         """,

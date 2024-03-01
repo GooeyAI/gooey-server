@@ -23,43 +23,47 @@ from daras_ai_v2.slack_bot import (
     fetch_user_info,
     parse_slack_response,
 )
+from routers.facebook_api import return_to_app_url
 
 router = APIRouter()
 
-slack_connect_url = furl(
-    "https://slack.com/oauth/v2/authorize",
-    query_params=dict(
-        client_id=settings.SLACK_CLIENT_ID,
-        scope=",".join(
-            [
-                "channels:history",
-                "channels:read",
-                "chat:write",
-                "chat:write.customize",
-                "files:read",
-                "files:write",
-                "groups:history",
-                "groups:read",
-                "groups:write",
-                "groups:write.invites",
-                "groups:write.topic",
-                "incoming-webhook",
-                "remote_files:read",
-                "remote_files:share",
-                "remote_files:write",
-                "users:read",
-            ]
+
+def slack_connect_url(on_completion: str | None = None):
+    return furl(
+        "https://slack.com/oauth/v2/authorize",
+        query_params=dict(
+            client_id=settings.SLACK_CLIENT_ID,
+            scope=",".join(
+                [
+                    "channels:history",
+                    "channels:read",
+                    "chat:write",
+                    "chat:write.customize",
+                    "files:read",
+                    "files:write",
+                    "groups:history",
+                    "groups:read",
+                    "groups:write",
+                    "groups:write.invites",
+                    "groups:write.topic",
+                    "incoming-webhook",
+                    "remote_files:read",
+                    "remote_files:share",
+                    "remote_files:write",
+                    "users:read",
+                ]
+            ),
+            user_scope=",".join(
+                [
+                    "channels:write",
+                    "channels:write.invites",
+                    "groups:write",
+                    "groups:write.invites",
+                ]
+            ),
+            state=on_completion,
         ),
-        user_scope=",".join(
-            [
-                "channels:write",
-                "channels:write.invites",
-                "groups:write",
-                "groups:write.invites",
-            ]
-        ),
-    ),
-)
+    )
 
 
 @router.get("/__/slack/redirect/")
@@ -68,7 +72,8 @@ def slack_connect_redirect(request: Request):
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
-    retry_button = f'<a href="{slack_connect_url}">Retry</a>'
+    on_completion = request.query_params.get("state")
+    retry_button = f'<a href="{slack_connect_url(on_completion)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -134,7 +139,7 @@ def slack_connect_redirect(request: Request):
     if bi.slack_create_personal_channels:
         create_personal_channels_for_all_members.delay(bi.id)
 
-    return HTMLResponse(
+    return return_to_app_url([bi], on_completion) or HTMLResponse(
         f"Sucessfully Connected to {slack_team_name} workspace on #{slack_channel_name}! You may now close this page."
     )
 

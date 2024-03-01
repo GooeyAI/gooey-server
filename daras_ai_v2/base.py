@@ -296,7 +296,11 @@ class BasePage:
             if tbreadcrumbs.has_breadcrumbs() or self.run_user:
                 # only render title here if the above row was not empty
                 self._render_title(tbreadcrumbs.h1_title)
-            if published_run and published_run.notes:
+            if (
+                published_run
+                and published_run.notes
+                and MenuTabs.integrations != self.tab
+            ):
                 st.write(published_run.notes)
             elif is_root_example:
                 st.write(self.preview_description(current_run.to_dict()))
@@ -307,6 +311,17 @@ class BasePage:
             self.request
             and self.request.user
             and current_run.uid == self.request.user.uid
+        )
+
+    def can_user_edit_published_run(
+        self, published_run: PublishedRun | None = None
+    ) -> bool:
+        published_run = published_run or self.get_current_published_run()
+        return self.is_current_user_admin() or bool(
+            published_run
+            and self.request
+            and self.request.user
+            and published_run.created_by == self.request.user
         )
 
     def _render_title(self, title: str):
@@ -338,6 +353,7 @@ class BasePage:
         *,
         current_run: SavedRun,
         published_run: PublishedRun,
+        redirect_to: str | None = None,
     ):
         is_update_mode = (
             self.is_current_user_admin()
@@ -395,6 +411,7 @@ class BasePage:
                         published_run=published_run,
                         modal=publish_modal,
                         is_update_mode=is_update_mode,
+                        redirect_to=redirect_to,
                     )
 
     def _render_publish_modal(
@@ -404,6 +421,7 @@ class BasePage:
         published_run: PublishedRun,
         modal: Modal,
         is_update_mode: bool = False,
+        redirect_to: str | None = None,
     ):
         if published_run.is_root() and self.is_current_user_admin():
             with st.div(className="text-danger"):
@@ -507,7 +525,7 @@ class BasePage:
                 notes=published_run_notes.strip(),
                 visibility=published_run_visibility,
             )
-        force_redirect(published_run.get_app_url())
+        force_redirect(redirect_to or published_run.get_app_url())
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
