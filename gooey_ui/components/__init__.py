@@ -443,7 +443,7 @@ def download_button(
     disabled: bool = False,
     **props,
 ) -> bool:
-    url = url.split("#t=0.001")[0]
+    url = furl(url).remove(fragment=True).url
     return button(
         component="download-button",
         url=url,
