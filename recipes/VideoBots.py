@@ -1267,6 +1267,17 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
                 col1, col2 = st.columns(2, style={"align-items": "center"})
                 with col1:
+                    st.write("###### Add Integration")
+                    st.caption(f"Add another connection for {run_title}.")
+                with col2:
+                    if st.button(
+                        f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
+                        key="btn_connect",
+                    ):
+                        raise RedirectException(add_integration)
+
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
                     st.write("###### Disconnect")
                     st.caption(
                         f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}."
@@ -1280,17 +1291,6 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                         bi.published_run = None
                         bi.save()
                         st.experimental_rerun()
-
-                col1, col2 = st.columns(2, style={"align-items": "center"})
-                with col1:
-                    st.write("###### Add Integration")
-                    st.caption(f"Add another connection for {run_title}.")
-                with col2:
-                    if st.button(
-                        f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
-                        key="btn_connect",
-                    ):
-                        raise RedirectException(add_integration)
 
 
 def show_landbot_widget():
