@@ -971,7 +971,6 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             # if we come from an integration redirect, we connect the integrations
             if "connect_ids" in self.request.query_params:
                 self.integrations_on_connect(
-                    self.request.query_params.getlist("connect_ids"),
                     current_run,
                     published_run,
                 )
@@ -998,7 +997,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 integrations, current_run, published_run
             )
 
-    def integrations_on_connect(self, ids: list[int], current_run, published_run):
+    def integrations_on_connect(self, current_run, published_run):
         from app_users.models import AppUser
         from daras_ai_v2.base import RedirectException
         from daras_ai_v2.slack_bot import send_confirmation_msg
