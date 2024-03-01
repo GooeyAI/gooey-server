@@ -1107,7 +1107,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         from routers.facebook_api import ig_connect_url, fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
 
-        show_landbot = self.request.query_params.get("show-landbot") == "true"
         on_connect = self.get_tab_url(MenuTabs.integrations)
 
         with st.center():
@@ -1119,7 +1118,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 unsafe_allow_html=True,
             )
 
-            LINKSTYLE = 'class="btn btn-theme btn-secondary" style="margin: 0; display: flex; justify-content: center; align-items: center; padding: 8px; border: 1px solid black; min-width: 164px; width: 200px; aspect-ratio: 5 / 2; overflow: hidden; border-radius: 10px" draggable="false"'
+            LINKSTYLE = 'class="btn btn-theme btn-secondary" style="margin: 0; display: flex; justify-content: center; align-items: center; padding: 8px; border: 1px solid black; min-width: 120px; width: 160px; aspect-ratio: 5 / 2; overflow: hidden; border-radius: 10px" draggable="false"'
             IMGSTYLE = 'style="width: 80%" draggable="false"'
             ROWSTYLE = 'style="display: flex; align-items: center; gap: 1em; margin-bottom: 1rem" draggable="false"'
             DESCRIPTIONSTYLE = f'style="color: {GRAYCOLOR}; text-align: left"'
@@ -1151,25 +1150,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     </a>
                     <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
                 </div>
-                <div {ROWSTYLE}>
-                    <a href="{self.get_tab_url(MenuTabs.integrations, query_params={} if show_landbot else {'show-landbot': 'true'})}" {LINKSTYLE} aria-label="Connect your Landbot URL">
-                        <img src="{LANDBOT_IMG}" {IMGSTYLE} alt="Landbot">
-                    </a>
-                    <div {DESCRIPTIONSTYLE}>Connect to any <a href="https://landbot.io">Landbot</a> integration option.</div>
-                </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
-            if show_landbot:
-                st.text_input(
-                    "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
-                )
-                show_landbot_widget()
 
             st.newline()
             st.write(
-                f"Or use [our API]({self.get_tab_url(MenuTabs.run_as_api)}) to integrate with your own app. Contact us at support@gooey.ai with questions."
+                f"Or use [our API]({self.get_tab_url(MenuTabs.run_as_api)}) to integrate with your own app."
             )
 
     def integration_test_config_screen(
@@ -1177,7 +1165,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     ):
         from daras_ai_v2.base import RedirectException, get_title_breadcrumbs
         from recipes.VideoBotsStats import VideoBotsStatsPage
-        from recipes.BulkRunner import BulkRunnerPage
+
+        # from recipes.BulkRunner import BulkRunnerPage
         from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
         run_title = get_title_breadcrumbs(
@@ -1305,6 +1294,23 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         st.newline()
                         broadcast_input(bi)
 
+                    st.write("---")
+                    col1, col2 = st.columns(2, style={"align-items": "center"})
+                    with col1:
+                        st.write("###### Disconnect")
+                        st.caption(
+                            f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}."
+                        )
+                    with col2:
+                        if st.button(
+                            "💔️ Disconnect",
+                            key="btn_disconnect",
+                        ):
+                            bi.saved_run = None
+                            bi.published_run = None
+                            bi.save()
+                            st.experimental_rerun()
+
                 col1, col2 = st.columns(2, style={"align-items": "center"})
                 with col1:
                     st.write("###### Add Integration")
@@ -1315,64 +1321,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         key="btn_connect",
                     ):
                         raise RedirectException(add_integration)
-
-                col1, col2 = st.columns(2, style={"align-items": "center"})
-                with col1:
-                    st.write("###### Disconnect")
-                    st.caption(
-                        f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}."
-                    )
-                with col2:
-                    if st.button(
-                        "💔️ Disconnect",
-                        key="btn_disconnect",
-                    ):
-                        bi.saved_run = None
-                        bi.published_run = None
-                        bi.save()
-                        st.experimental_rerun()
-
-
-def show_landbot_widget():
-    landbot_url = st.session_state.get("landbot_url")
-    if not landbot_url:
-        st.html("", **{"data-landbot-config-url": ""})
-        return
-
-    f = furl(landbot_url)
-    config_path = os.path.join(f.host, *f.path.segments[:2])
-    config_url = f"https://storage.googleapis.com/{config_path}/index.json"
-
-    st.html(
-        # language=HTML
-        """
-<script>
-function updateLandbotWidget() {
-    if (window.myLandbot) {
-        try {
-            window.myLandbot.destroy();
-        } catch (e) {}
-    }
-    const configUrl = document.querySelector("[data-landbot-config-url]")?.getAttribute("data-landbot-config-url");
-    if (configUrl) {
-        window.myLandbot = new Landbot.Livechat({ configUrl });
-    }
-}
-if (typeof Landbot === "undefined") {
-    const script = document.createElement("script");
-    script.src = "https://cdn.landbot.io/landbot-3/landbot-3.0.0.js";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-        window.waitUntilHydrated.then(updateLandbotWidget);
-        window.addEventListener("hydrated", updateLandbotWidget);
-    };
-    document.body.appendChild(script);
-}
-</script>
-        """,
-        **{"data-landbot-config-url": config_url},
-    )
 
 
 def chat_list_view():
