@@ -443,6 +443,7 @@ def download_button(
     disabled: bool = False,
     **props,
 ) -> bool:
+    url = url[:-8]
     return button(
         component="download-button",
         url=url,
