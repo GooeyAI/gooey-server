@@ -297,6 +297,7 @@ def run_google_translate(
         list[str]: Translated text.
     """
     from google.cloud import translate_v2 as translate
+    import langcodes
 
     # convert to BCP-47 format (google handles consistent language codes but sometimes gets confused by a mix of iso2 and iso3 which we have)
     if source_language:

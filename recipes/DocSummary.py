@@ -172,9 +172,7 @@ Prompt for merging several outputs together
 
         full_text = ""
         for f_url in request.documents:
-            doc_meta = DocMetadata.from_file_metadata(
-                doc_url_to_file_metadata(f_url)[f_url]
-            )
+            doc_meta = DocMetadata.from_file_metadata(doc_url_to_file_metadata(f_url))
             pages = doc_url_to_text_pages(
                 f_url=f_url,
                 doc_meta=doc_meta,

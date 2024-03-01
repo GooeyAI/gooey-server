@@ -9,7 +9,7 @@ from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
-from bots.models import BotIntegration, Platform
+from bots.models import BotIntegration, Platform, PublishedRun, PublishedRunVisibility
 from bots.models import Workflow
 from daras_ai.image_input import (
     truncate_text_words,
@@ -75,6 +75,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_provider_selector,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
+from recipes.DocExtract import DocExtractPage
 from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
@@ -162,6 +163,10 @@ class VideoBotsPage(BasePage):
         input_prompt: str
         input_images: list[str] | None
         input_documents: list[str] | None
+        doc_extract_url: str | None = Field(
+            title="📚 Document Extract Workflow",
+            description="Select a workflow to extract text from documents and images.",
+        )
 
         # conversation history/context
         messages: list[ConversationEntry] | None
@@ -468,6 +473,23 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             enum_cls=LLMTools,
             label="##### " + field_title_desc(self.RequestModel, "tools"),
             key="tools",
+        )
+
+        options = {
+            DocExtractPage.get_root_published_run().get_app_url(): "Default",
+        } | {
+            pr.get_app_url(): pr.title
+            for pr in PublishedRun.objects.filter(
+                workflow=Workflow.DOC_EXTRACT,
+                is_approved_example=True,
+                visibility=PublishedRunVisibility.PUBLIC,
+            ).exclude(published_run_id="")
+        }
+        st.selectbox(
+            "##### Select Doc Extract Workflow",
+            key="doc_extract_url",
+            options=options,
+            format_func=lambda x: options[x],
         )
 
     def fields_to_save(self) -> [str]:

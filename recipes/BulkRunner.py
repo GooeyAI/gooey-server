@@ -688,7 +688,7 @@ def get_columns(files: list[str]) -> list[str]:
 def read_df_any(f_url: str) -> "pd.DataFrame":
     import pandas as pd
 
-    doc_meta = doc_url_to_file_metadata(f_url)[f_url]
+    doc_meta = doc_url_to_file_metadata(f_url)
     f_bytes, ext = download_content_bytes(f_url=f_url, mime_type=doc_meta.mime_type)
 
     f = io.BytesIO(f_bytes)

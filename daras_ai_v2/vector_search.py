@@ -4,7 +4,6 @@ import io
 import mimetypes
 import random
 import re
-import subprocess
 import tempfile
 import typing
 
@@ -39,7 +38,9 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.exceptions import raise_for_status, call_cmd, UserError
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
-from daras_ai_v2.functional import flatmap_parallel, flatapply_parallel, map_parallel
+from daras_ai_v2.functional import (
+    flatmap_parallel,
+)
 from daras_ai_v2.gdrive_downloader import (
     gdrive_download,
     is_gdrive_url,
@@ -68,8 +69,7 @@ class DocSearchRequest(BaseModel):
     max_context_words: int | None
     scroll_jump: int | None
 
-    selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-    google_translate_target: str | None
+    doc_extract_url: str | None
 
     dense_weight: float | None = Field(
         ge=0.0,
@@ -94,21 +94,33 @@ def get_top_k_references(
     Returns:
         the top k documents
     """
+    from recipes.BulkRunner import url_to_runs
+
     yield "Fetching latest knowledge docs..."
     input_docs = request.documents or []
-    file_metas = map_parallel(doc_url_to_file_metadata, input_docs)
 
-    embeds: list[tuple[SearchReference, np.ndarray]] = yield from flatapply_parallel(
-        lambda args: get_embeds_for_doc(
-            f_url=args[0],
-            doc_meta=DocMetadata.from_file_metadata(args[1]),
+    if request.doc_extract_url:
+        page_cls, sr, pr = url_to_runs(request.doc_extract_url)
+        selected_asr_model = sr.state.get("selected_asr_model")
+        google_translate_target = sr.state.get("google_translate_target")
+    else:
+        selected_asr_model = google_translate_target = None
+
+    file_url_metas = flatmap_parallel(doc_or_yt_url_to_metadatas, input_docs)
+    file_urls, file_metas = zip(*file_url_metas)
+
+    yield "Creating knowledge embeddings..."
+    embeds: list[tuple[SearchReference, np.ndarray]] = flatmap_parallel(
+        lambda f_url, file_meta: get_embeds_for_doc(
+            f_url=f_url,
+            doc_meta=DocMetadata.from_file_metadata(file_meta),
             max_context_words=request.max_context_words,
             scroll_jump=request.scroll_jump,
-            selected_asr_model=request.selected_asr_model,
-            google_translate_target=request.google_translate_target,
+            selected_asr_model=selected_asr_model,
+            google_translate_target=google_translate_target,
         ),
-        [args for d in file_metas for args in d.items()],
-        message="Creating knowledge embeddings...",
+        file_urls,
+        file_metas,
     )
     dense_query_embeds = openai_embedding_create([request.search_query])[0]
 
@@ -141,16 +153,16 @@ def get_top_k_references(
         yield "Considering results..."
         # get sparse scores
         bm25_corpus = flatmap_parallel(
-            lambda f_url, doc_meta: get_bm25_embeds_for_doc(
+            lambda f_url, file_meta: get_bm25_embeds_for_doc(
                 f_url=f_url,
-                doc_meta=doc_meta,
+                doc_meta=DocMetadata.from_file_metadata(file_meta),
                 max_context_words=request.max_context_words,
                 scroll_jump=request.scroll_jump,
-                selected_asr_model=request.selected_asr_model,
-                google_translate_target=request.google_translate_target,
+                selected_asr_model=selected_asr_model,
+                google_translate_target=google_translate_target,
             ),
-            input_docs,
-            doc_metas,
+            file_urls,
+            file_metas,
         )
         bm25 = BM25Okapi(bm25_corpus, k1=2, b=0.3)
         if request.keyword_query and isinstance(request.keyword_query, list):
@@ -242,20 +254,28 @@ class DocMetadata(typing.NamedTuple):
         return cls(meta.name, meta.etag, meta.mime_type)
 
 
-def doc_url_to_file_metadata(f_url: str) -> dict[str, FileMetadata]:
-    from googleapiclient.errors import HttpError
-
+def doc_or_yt_url_to_metadatas(f_url: str) -> list[tuple[str, FileMetadata]]:
     if is_yt_url(f_url):
         entries = yt_dlp_get_video_entries(f_url)
-        return {
-            entry["webpage_url"]: FileMetadata(
-                name=entry.get("title", "YouTube Video"),
-                etag=entry.get("filesize_approx") or entry.get("upload_date"),
-                mime_type="audio/wav",  # we will later convert & save as wav
-                total_bytes=entry.get("filesize_approx", 0),
+        return [
+            (
+                entry["webpage_url"],
+                FileMetadata(
+                    name=entry.get("title", "YouTube Video"),
+                    etag=entry.get("filesize_approx") or entry.get("upload_date"),
+                    mime_type="audio/wav",  # we will later convert & save as wav
+                    total_bytes=entry.get("filesize_approx", 0),
+                ),
             )
             for entry in entries
-        }
+        ]
+    else:
+        return [(f_url, doc_url_to_file_metadata(f_url))]
+
+
+def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
+    from googleapiclient.errors import HttpError
+
     f = furl(f_url.strip("/"))
     if is_gdrive_url(f):
         # extract filename from google drive metadata
@@ -305,11 +325,9 @@ def doc_url_to_file_metadata(f_url: str) -> dict[str, FileMetadata]:
     # guess mimetype from name as a fallback
     if not mime_type:
         mime_type = mimetypes.guess_type(name)[0]
-    return {
-        f_url: FileMetadata(
-            name=name, etag=etag, mime_type=mime_type, total_bytes=total_bytes
-        )
-    }
+    return FileMetadata(
+        name=name, etag=etag, mime_type=mime_type, total_bytes=total_bytes
+    )
 
 
 def yt_dlp_get_video_entries(url: str) -> list[dict]:

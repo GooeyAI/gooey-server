@@ -288,7 +288,7 @@ def extract_info(url: str) -> list[dict | None]:
             return [{"webpage_url": url, "title": "Youtube Video"}]
 
     # assume it's a direct link
-    doc_meta = doc_url_to_file_metadata(url)[url]
+    doc_meta = doc_url_to_file_metadata(url)
     assert doc_meta.mime_type, f"Could not determine mime type for {url}"
 
     if "application/pdf" in doc_meta.mime_type:

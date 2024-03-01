@@ -24,7 +24,7 @@ from files.models import FileMetadata
 
 class GlossaryResourceQuerySet(models.QuerySet):
     def get_or_create_from_url(self, url: str) -> tuple["GlossaryResource", bool]:
-        metadata = doc_url_to_file_metadata(url)[url]
+        metadata = doc_url_to_file_metadata(url)
         try:
             return (
                 GlossaryResource.objects.get(
