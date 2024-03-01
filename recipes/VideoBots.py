@@ -1008,11 +1008,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             if not bi:
                 continue
             if bi.saved_run is not None:
-
-                st.write(
-                    f"{bi.name} is already connected to a different run by {AppUser.objects.filter(uid=bi.billing_account_uid)}. Please disconnect it first."
-                )
-                continue
+                with st.center():
+                    st.write(
+                        f"⚠️ {bi.get_display_name()} is already connected to a different published run by {AppUser.objects.filter(uid=bi.billing_account_uid).first().display_name}. Please disconnect it first."
+                    )
+                return
 
             bi.streaming_enabled = True
             bi.user_language = st.session_state.get("user_language") or bi.user_language
