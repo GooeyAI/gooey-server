@@ -6,6 +6,7 @@ import replicate
 import requests
 
 from daras_ai.image_input import upload_file_from_bytes
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_gpu_server_b64, GpuEndpoints
 from daras_ai_v2.stable_diffusion import sd_upscale
 
@@ -48,7 +49,7 @@ def run_upscaler_model(
             img_bytes = _real_esrgan(image, scale, face_enhance=True)
             img = upload_file_from_bytes(filename, img_bytes)
         case _:
-            raise ValueError(f"Unkown upscaler: {selected_model}")
+            raise UserError(f"Unkown upscaler: {selected_model}")
 
     return img
 

@@ -6,6 +6,7 @@ import jinja2
 from typing_extensions import TypedDict
 
 import gooey_ui
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.scrollable_html_widget import scrollable_html
 
 
@@ -152,7 +153,7 @@ def format_citations(
             case None:
                 cites = ""
             case _:
-                raise ValueError(f"Unknown citation style: {citation_style}")
+                raise UserError(f"Unknown citation style: {citation_style}")
         formatted += " ".join(filter(None, [snippet, cites]))
         all_refs.update(ref_map)
     return all_refs, formatted
