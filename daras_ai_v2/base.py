@@ -1389,6 +1389,15 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
+        with st.div(className="d-flex"):
+            st.caption("Started&nbsp;", unsafe_allow_html=True)
+            if seed := st.session_state.get("seed"):
+                st.caption(
+                    f'with seed <span style="color: black;">{seed}</span>&nbsp;',
+                    unsafe_allow_html=True,
+                )
+            st.caption("on&nbsp;", unsafe_allow_html=True)
+            js_dynamic_date(datetime.datetime.now())
         estimated_run_time = self.estimate_run_duration()
         if not estimated_run_time:
             return
