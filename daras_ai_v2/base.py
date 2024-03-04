@@ -1389,15 +1389,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
-        with st.div(className="d-flex"):
-            st.caption("Started&nbsp;", unsafe_allow_html=True)
-            if seed := st.session_state.get("seed"):
-                st.caption(
-                    f'with seed <span style="color: black;">{seed}</span>&nbsp;',
-                    unsafe_allow_html=True,
-                )
-            st.caption("on&nbsp;", unsafe_allow_html=True)
-            js_dynamic_date(datetime.datetime.now())
+        self.started_at_text()
         estimated_run_time = self.estimate_run_duration()
         if not estimated_run_time:
             return
@@ -1416,6 +1408,17 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
                     f"""In the meantime, check out [🚀 Examples]({self.get_tab_url(MenuTabs.examples)})
                       for inspiration."""
                 )
+
+    def started_at_text(self):
+        with st.div(className="d-flex"):
+            st.caption("Started&nbsp;", unsafe_allow_html=True)
+            if seed := st.session_state.get("seed"):
+                st.caption(
+                    f'with seed <span style="color: black;">{seed}</span>&nbsp;',
+                    unsafe_allow_html=True,
+                )
+            st.caption("on&nbsp;", unsafe_allow_html=True)
+            js_dynamic_date(timezone.now())
 
     def estimate_run_duration(self) -> int | None:
         pass
@@ -1684,10 +1687,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.write(f"#### {tb.h1_title}")
 
         updated_at = saved_run.updated_at
-        if updated_at and isinstance(updated_at, datetime.datetime):
+        if (
+            updated_at
+            and isinstance(updated_at, datetime.datetime)
+            and not saved_run.run_status
+        ):
             js_dynamic_date(updated_at)
 
         if saved_run.run_status:
+            self.started_at_text()
             html_spinner(saved_run.run_status)
         elif saved_run.error_msg:
             st.error(saved_run.error_msg, unsafe_allow_html=True)
