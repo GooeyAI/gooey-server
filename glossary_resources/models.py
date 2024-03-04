@@ -60,8 +60,8 @@ class GlossaryResourceQuerySet(models.QuerySet):
 
 @redis_cache_decorator
 def create_glossary_cached(url: str, doc_meta: DocMetadata) -> "GlossaryResource":
-    f_bytes, ext = download_content_bytes(f_url=url, mime_type=doc_meta.name)
-    df = bytes_to_df(f_name=doc_meta.name, f_bytes=f_bytes, ext=ext)
+    f_bytes, mime_type = download_content_bytes(f_url=url, mime_type=doc_meta.mime_type)
+    df = bytes_to_df(f_name=doc_meta.name, f_bytes=f_bytes, mime_type=mime_type)
     if is_user_uploaded_url(url):
         glossary_url = url
     else:

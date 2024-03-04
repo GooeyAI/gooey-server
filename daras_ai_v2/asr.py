@@ -251,6 +251,8 @@ def asr_language_selector(
     label="##### Spoken Language",
     key="language",
 ):
+    import langcodes
+
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
     if forced_lang:
@@ -396,6 +398,8 @@ _session = None
 def _MinT_translate_one_text(
     text: str, source_language: str, target_language: str
 ) -> str:
+    import langcodes
+
     source_language = langcodes.Language.get(source_language).language
     target_language = langcodes.Language.get(target_language).language
     res = requests.post(
@@ -453,7 +457,7 @@ def run_asr(
         audio_url, size = download_youtube_to_wav_url(audio_url)
     elif is_gdrive_url(furl(audio_url)):
         meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
-        anybytes, ext = gdrive_download(
+        anybytes, _ = gdrive_download(
             furl(audio_url), meta.get("mimeType", "audio/wav")
         )
         wavbytes, size = audio_bytes_to_wav(anybytes)

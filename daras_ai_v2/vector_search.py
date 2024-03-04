@@ -537,15 +537,16 @@ def doc_url_to_text_pages(
     Returns:
         list of text pages
     """
-    f_bytes, ext = download_content_bytes(f_url=f_url, mime_type=doc_meta.mime_type)
+    f_bytes, mime_type = download_content_bytes(
+        f_url=f_url, mime_type=doc_meta.mime_type
+    )
     if not f_bytes:
         return []
     pages = bytes_to_text_pages_or_df(
         f_url=f_url,
         f_name=doc_meta.name,
         f_bytes=f_bytes,
-        ext=ext,
-        mime_type=doc_meta.mime_type,
+        mime_type=mime_type,
         selected_asr_model=selected_asr_model,
     )
     # optionally, translate text
@@ -556,7 +557,7 @@ def doc_url_to_text_pages(
 
 def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
     if is_yt_url(f_url):
-        return download_youtube_to_wav(f_url), ".wav"
+        return download_youtube_to_wav(f_url), "audio/wav"
     f = furl(f_url)
     if is_gdrive_url(f):
         # download from google drive
@@ -584,8 +585,8 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
                 f_bytes = codec.decode(f_bytes)[0].encode()
             except UnicodeDecodeError:
                 pass
-    ext = guess_ext_from_response(r)
-    return f_bytes, ext
+    mime_type = get_mimetype_from_response(r)
+    return f_bytes, mime_type
 
 
 def bytes_to_text_pages_or_df(
@@ -593,25 +594,29 @@ def bytes_to_text_pages_or_df(
     f_url: str,
     f_name: str,
     f_bytes: bytes,
-    ext: str,
     mime_type: str,
     selected_asr_model: str | None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
-    ext_mime_type = mimetypes.guess_type("file" + ext)[0]
     # convert document to text pages
-    match ext:
-        case ".pdf":
+    match mime_type:
+        case "application/pdf":
             pages = pdf_to_text_pages(f_url, f_name, f_bytes, mime_type)
-        case ".docx" | ".md" | ".html" | ".rtf" | ".epub" | ".odt":
-            pages = [pandoc_to_text(f_name + ext, f_bytes)]
-        case ".txt":
+
+        case "text/plain":
             pages = [f_bytes.decode()]
+
         case _ if (
-            ext_mime_type
-            and (
-                ext_mime_type.startswith("audio/") or ext_mime_type.startswith("video/")
-            )
+            "word" in mime_type
+            or "markdown" in mime_type
+            or "html" in mime_type
+            or "rtf" in mime_type
+            or "epub" in mime_type
+            or "opendocument" in mime_type
         ):
+            ext = mimetypes.guess_extension(mime_type) or ""
+            pages = [pandoc_to_text(f_name + ext, f_bytes)]
+
+        case _ if mime_type.startswith("audio/") or mime_type.startswith("video/"):
             if is_gdrive_url(furl(f_url)) or is_yt_url(f_url):
                 f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
             transcript = run_asr(
@@ -620,8 +625,9 @@ def bytes_to_text_pages_or_df(
                 language="en",
             )
             pages = [transcript]
+
         case _:
-            df = bytes_to_df(f_name=f_name, f_bytes=f_bytes, ext=ext)
+            df = bytes_to_df(f_name=f_name, f_bytes=f_bytes, mime_type=mime_type)
             assert (
                 "snippet" in df.columns or "sections" in df.columns
             ), f'uploaded spreadsheet must contain a "snippet" or "sections" column - {f_name !r}'
@@ -638,25 +644,36 @@ def bytes_to_df(
     *,
     f_name: str,
     f_bytes: bytes,
-    ext: str,
+    mime_type: str,
 ) -> "pd.DataFrame":
+    df = bytes_to_df_raw(f_name=f_name, f_bytes=f_bytes, mime_type=mime_type, dtype=str)
+    return df.fillna("")
+
+
+def bytes_to_df_raw(
+    *,
+    f_name: str,
+    f_bytes: bytes,
+    mime_type: str,
+    dtype=None,
+):
     import pandas as pd
 
     f = io.BytesIO(f_bytes)
-    match ext:
-        case ".csv":
-            df = pd.read_csv(f, dtype=str)
-        case ".tsv":
-            df = pd.read_csv(f, sep="\t", dtype=str)
-        case ".xls" | ".xlsx":
-            df = pd.read_excel(f, dtype=str)
-        case ".json":
-            df = pd.read_json(f, dtype=str)
-        case ".xml":
-            df = pd.read_xml(f, dtype=str)
+    match mime_type:
+        case "text/csv":
+            df = pd.read_csv(f, dtype=dtype)
+        case "text/tab-separated-values":
+            df = pd.read_csv(f, sep="\t", dtype=dtype)
+        case "application/json":
+            df = pd.read_json(f, dtype=dtype)
+        case "application/xml":
+            df = pd.read_xml(f, dtype=dtype)
+        case _ if "excel" in mime_type or "spreadsheet" in mime_type:
+            df = pd.read_excel(f, dtype=dtype)
         case _:
-            raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
-    return df.fillna("")
+            raise UserError(f"Unsupported document {mime_type=} ({f_name})")
+    return df
 
 
 def pdf_to_text_pages(

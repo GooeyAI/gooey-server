@@ -70,10 +70,9 @@ def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
             fileId=file_id,
             supportsAllDrives=True,
         )
-        ext = mimetypes.guess_extension(mime_type)
     # export google docs to appropriate type
     else:
-        mime_type, ext = docs_export_mimetype(f)
+        mime_type, _ = docs_export_mimetype(f)
         request = service.files().export_media(
             fileId=file_id,
             mimeType=mime_type,
@@ -86,7 +85,7 @@ def gdrive_download(f: furl, mime_type: str) -> tuple[bytes, str]:
         _, done = downloader.next_chunk()
         # print(f"Download {int(status.progress() * 100)}%")
     f_bytes = file.getvalue()
-    return f_bytes, ext
+    return f_bytes, mime_type
 
 
 def docs_export_mimetype(f: furl) -> tuple[str, str]:

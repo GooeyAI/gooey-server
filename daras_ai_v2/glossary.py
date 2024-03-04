@@ -16,8 +16,10 @@ def validate_glossary_document(document: str):
     )
 
     metadata = doc_url_to_file_metadata(document)
-    f_bytes, ext = download_content_bytes(f_url=document, mime_type=metadata.name)
-    df = bytes_to_df(f_name=metadata.name, f_bytes=f_bytes, ext=ext)
+    f_bytes, mime_type = download_content_bytes(
+        f_url=document, mime_type=metadata.mime_type
+    )
+    df = bytes_to_df(f_name=metadata.name, f_bytes=f_bytes, mime_type=mime_type)
 
     if len(df.columns) < 2:
         raise AssertionError(

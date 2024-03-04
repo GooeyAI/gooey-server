@@ -1,5 +1,4 @@
 import datetime
-import io
 import typing
 import uuid
 
@@ -18,6 +17,7 @@ from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.vector_search import (
     download_content_bytes,
     doc_url_to_file_metadata,
+    bytes_to_df_raw,
 )
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
@@ -686,26 +686,11 @@ def get_columns(files: list[str]) -> list[str]:
 
 
 def read_df_any(f_url: str) -> "pd.DataFrame":
-    import pandas as pd
-
     doc_meta = doc_url_to_file_metadata(f_url)
-    f_bytes, ext = download_content_bytes(f_url=f_url, mime_type=doc_meta.mime_type)
-
-    f = io.BytesIO(f_bytes)
-    match ext:
-        case ".csv":
-            df = pd.read_csv(f)
-        case ".tsv":
-            df = pd.read_csv(f, sep="\t")
-        case ".xls" | ".xlsx":
-            df = pd.read_excel(f)
-        case ".json":
-            df = pd.read_json(f)
-        case ".xml":
-            df = pd.read_xml(f)
-        case _:
-            raise ValueError(f"Unsupported file type: {f_url}")
-
+    f_bytes, mime_type = download_content_bytes(
+        f_url=f_url, mime_type=doc_meta.mime_type
+    )
+    df = bytes_to_df_raw(f_name=doc_meta.name, f_bytes=f_bytes, mime_type=mime_type)
     return df.dropna(how="all", axis=1).dropna(how="all", axis=0).fillna("")
 
 
