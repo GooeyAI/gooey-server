@@ -11,7 +11,7 @@ def validate_glossary_document(document: str):
     import langcodes
     from daras_ai_v2.vector_search import (
         download_content_bytes,
-        bytes_to_df,
+        bytes_to_str_df,
         doc_url_to_file_metadata,
     )
 
@@ -19,7 +19,7 @@ def validate_glossary_document(document: str):
     f_bytes, mime_type = download_content_bytes(
         f_url=document, mime_type=metadata.mime_type
     )
-    df = bytes_to_df(f_name=metadata.name, f_bytes=f_bytes, mime_type=mime_type)
+    df = bytes_to_str_df(f_name=metadata.name, f_bytes=f_bytes, mime_type=mime_type)
 
     if len(df.columns) < 2:
         raise AssertionError(

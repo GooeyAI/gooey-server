@@ -331,6 +331,7 @@ def run_google_translate(
         ),
         texts,
         language_codes,
+        max_workers=8,
     )
 
 

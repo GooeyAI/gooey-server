@@ -18,7 +18,6 @@ import gooey_ui as gui
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
-    guess_ext_from_response,
     get_mimetype_from_response,
 )
 from daras_ai_v2 import settings
@@ -32,6 +31,8 @@ from daras_ai_v2.azure_doc_extract import (
     table_arr_to_prompt_chunked,
     azure_form_recognizer,
     extract_records,
+    records_to_text,
+    THEAD,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
@@ -57,6 +58,9 @@ from daras_ai_v2.search_ref import (
 )
 from daras_ai_v2.text_splitter import text_splitter, puncts, Document
 from files.models import FileMetadata
+
+if typing.TYPE_CHECKING:
+    import pandas as pd
 
 
 class DocSearchRequest(BaseModel):
@@ -122,6 +126,8 @@ def get_top_k_references(
         file_urls,
         file_metas,
     )
+    if not embeds:
+        return []
     dense_query_embeds = openai_embedding_create([request.search_query])[0]
 
     yield "Searching knowledge base..."
@@ -342,7 +348,13 @@ def yt_dlp_extract_info(url: str) -> dict:
     # https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/options.py
     params = dict(ignoreerrors=True, check_formats=False)
     with yt_dlp.YoutubeDL(params) as ydl:
-        return ydl.extract_info(url, download=False)
+        data = ydl.extract_info(url, download=False)
+        if not data:
+            raise UserError(
+                f"Could not download the youtube video at {url!r}. "
+                f"Please make sure the video is public and the url is correct."
+            )
+        return data
 
 
 @redis_cache_decorator
@@ -542,17 +554,14 @@ def doc_url_to_text_pages(
     )
     if not f_bytes:
         return []
-    pages = bytes_to_text_pages_or_df(
+    return bytes_to_text_pages_or_df(
         f_url=f_url,
         f_name=doc_meta.name,
         f_bytes=f_bytes,
         mime_type=mime_type,
         selected_asr_model=selected_asr_model,
+        google_translate_target=google_translate_target,
     )
-    # optionally, translate text
-    if google_translate_target and isinstance(pages, list):
-        pages = run_google_translate(pages, google_translate_target)
-    return pages
 
 
 def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
@@ -596,51 +605,54 @@ def bytes_to_text_pages_or_df(
     f_bytes: bytes,
     mime_type: str,
     selected_asr_model: str | None,
+    google_translate_target: str | None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
-    # convert document to text pages
-    match mime_type:
-        case "application/pdf":
-            pages = pdf_to_text_pages(f_url, f_name, f_bytes, mime_type)
+    import pandas as pd
 
-        case "text/plain":
-            pages = [f_bytes.decode()]
+    if mime_type.startswith("audio/") or mime_type.startswith("video/"):
+        if is_gdrive_url(furl(f_url)) or is_yt_url(f_url):
+            f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
+        transcript = run_asr(
+            f_url,
+            selected_model=(selected_asr_model or AsrModels.whisper_large_v2.name),
+            language=google_translate_target or "en",
+        )
+        return [transcript]
 
-        case _ if (
-            "word" in mime_type
-            or "markdown" in mime_type
-            or "html" in mime_type
-            or "rtf" in mime_type
-            or "epub" in mime_type
-            or "opendocument" in mime_type
-        ):
+    try:
+        if mime_type == "application/pdf":
+            df = pdf_to_df(f_url, f_name, f_bytes, mime_type)
+        else:
+            df = bytes_to_str_df(f_name=f_name, f_bytes=f_bytes, mime_type=mime_type)
+    except UserError:
+        # $ pandoc --list-input-formats
+        if mime_type == "text/plain":
+            text = f_bytes.decode()
+        else:
             ext = mimetypes.guess_extension(mime_type) or ""
-            pages = [pandoc_to_text(f_name + ext, f_bytes)]
+            text = pandoc_to_text(f_name + ext, f_bytes)
+        if google_translate_target:
+            text = run_google_translate([text], google_translate_target)
+        return text
 
-        case _ if mime_type.startswith("audio/") or mime_type.startswith("video/"):
-            if is_gdrive_url(furl(f_url)) or is_yt_url(f_url):
-                f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
-            transcript = run_asr(
-                f_url,
-                selected_model=(selected_asr_model or AsrModels.whisper_large_v2.name),
-                language="en",
-            )
-            pages = [transcript]
-
-        case _:
-            df = bytes_to_df(f_name=f_name, f_bytes=f_bytes, mime_type=mime_type)
-            assert (
-                "snippet" in df.columns or "sections" in df.columns
-            ), f'uploaded spreadsheet must contain a "snippet" or "sections" column - {f_name !r}'
-            return df
-
-    return pages
+    if "sections" in df.columns:
+        col = "sections"
+    elif "snippet" in df.columns:
+        col = "snippet"
+    else:
+        col = "sections"
+        df.columns = [THEAD + col + THEAD for col in df.columns]
+        df = pd.DataFrame(["csv=" + df.to_csv(index=False)], columns=[col])
+    if google_translate_target:
+        df[col] = run_google_translate(df[col].tolist(), google_translate_target)
+    return df
 
 
 def is_yt_url(url: str) -> bool:
     return "youtube.com" in url or "youtu.be" in url
 
 
-def bytes_to_df(
+def bytes_to_str_df(
     *,
     f_name: str,
     f_bytes: bytes,
@@ -676,20 +688,27 @@ def bytes_to_df_raw(
     return df
 
 
-def pdf_to_text_pages(
+def pdf_to_df(
     f_url: str,
     f_name: str,
     f_bytes: bytes,
     mime_type: str,
-) -> list[str]:
+) -> "pd.DataFrame":
     if is_gdrive_url(furl(f_url)):
         f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
     result = azure_form_recognizer(f_url, "prebuilt-layout")
-    return [
-        record["content"].strip()
-        for page in result["pages"]
-        for record in extract_records(result, page["pageNumber"])
-    ]
+    return pd.DataFrame(
+        [
+            [
+                add_page_number_to_pdf(f_url, page_num).url,
+                f"{f_name}, page {page_num}",
+                records_to_text(extract_records(result, page_num)),
+            ]
+            for page in result["pages"]
+            if (page_num := page["pageNumber"])
+        ],
+        columns=["url", "title", "sections"],
+    )
 
 
 def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
