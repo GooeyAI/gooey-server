@@ -20,6 +20,7 @@ from daras_ai_v2.asr import (
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
+    azure_form_recognizer_models,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.bot_integration_widgets import (
@@ -32,8 +33,9 @@ from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
 )
 from daras_ai_v2.enum_selector_widget import enum_multiselect
+from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
-from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.field_render import field_title_desc, field_desc
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input, validate_glossary_document
 from daras_ai_v2.language_model import (
@@ -70,6 +72,7 @@ from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
+    text_to_speech_provider_selector,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
 from recipes.DocSearch import (
@@ -313,26 +316,81 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_form_v2(self):
         st.text_area(
             """
-            #### 📝 Prompt
-            High-level system instructions.
+            #### 📝 Instructions
             """,
             key="bot_script",
             height=300,
         )
+        prompt_vars_widget(
+            "bot_script",
+        )
+
+        enum_selector(
+            LargeLanguageModels,
+            label="#### 🧠 Language Model",
+            key="selected_model",
+            use_selectbox=True,
+        )
 
         document_uploader(
             """
-#### 📄 Documents (*optional*)
-Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
-"""
+            #### 📄 Knowledge
+            Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
+            """
         )
 
-        prompt_vars_widget(
-            "bot_script",
-            "task_instructions",
-            "query_instructions",
-            "keyword_instructions",
-        )
+        st.markdown("#### Capabilities")
+        if st.checkbox(
+            "##### 🗣️ Speak Responses",
+            value=bool(st.session_state.get("tts_provider")),
+        ):
+            text_to_speech_provider_selector(self)
+            st.write("---")
+            enable_video = st.checkbox(
+                "##### 🫦 Add Lipsync Video",
+                value=bool(st.session_state.get("input_face")),
+            )
+        else:
+            st.session_state["tts_provider"] = None
+            enable_video = False
+        if enable_video:
+            st.file_uploader(
+                """
+                ###### 👩‍🦰 Input Face
+                Upload a video/image that contains faces to use
+                *Recommended - mp4 / mov / png / jpg / gif*
+                """,
+                key="input_face",
+            )
+            st.write("---")
+        else:
+            st.session_state["input_face"] = None
+
+        if st.checkbox(
+            "##### 🔠 Translation",
+            value=bool(st.session_state.get("user_language")),
+        ):
+            google_translate_language_selector(
+                f"{field_desc(self.RequestModel, 'user_language')}",
+                key="user_language",
+            )
+            st.write("---")
+
+        if st.checkbox(
+            "##### 🩻 Photo & Document Intelligence",
+            value=bool(
+                st.session_state.get("document_model"),
+            ),
+        ):
+            doc_model_descriptions = azure_form_recognizer_models()
+            st.selectbox(
+                f"{field_desc(self.RequestModel, 'document_model')}",
+                key="document_model",
+                options=[None, *doc_model_descriptions],
+                format_func=lambda x: (
+                    f"{doc_model_descriptions[x]} ({x})" if x else "———"
+                ),
+            )
 
     def validate_form_v2(self):
         input_glossary = st.session_state.get("input_glossary_document", "")
@@ -346,9 +404,43 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         youtube_video("-j2su1r8pEg")
 
     def render_settings(self):
-        if st.session_state.get("documents") or st.session_state.get(
-            "__documents_files"
-        ):
+        tts_provider = st.session_state.get("tts_provider")
+        if tts_provider:
+            text_to_speech_settings(self, tts_provider)
+
+        input_face = st.session_state.get("__enable_video")
+        if input_face:
+            lipsync_settings()
+
+        if st.session_state.get("user_language"):
+            st.markdown("##### 🔠 Translation Settings")
+            enable_glossary = st.checkbox(
+                "📖 Add Glossary",
+                value=bool(
+                    st.session_state.get("input_glossary_document")
+                    or st.session_state.get("output_glossary_document")
+                ),
+            )
+            if enable_glossary:
+                st.caption(
+                    """
+                    Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+                    If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
+                    """
+                )
+                glossary_input(
+                    f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
+                    key="input_glossary_document",
+                )
+                glossary_input(
+                    f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
+                    key="output_glossary_document",
+                )
+            else:
+                st.session_state["input_glossary_document"] = None
+                st.session_state["output_glossary_document"] = None
+
+        if st.session_state.get("documents"):
             st.text_area(
                 """
             ##### 👩‍🏫 Document Search Results Instructions
@@ -356,6 +448,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             """,
                 key="task_instructions",
                 height=300,
+            )
+            prompt_vars_widget(
+                "task_instructions",
             )
 
             st.write("---")
@@ -367,71 +462,8 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             doc_search_settings(keyword_instructions_allowed=True)
             st.write("---")
 
-        language_model_settings(show_document_model=True)
+        language_model_settings(show_selector=False)
 
-        st.write("---")
-        google_translate_language_selector(
-            f"##### {field_title_desc(self.RequestModel, 'user_language')}",
-            key="user_language",
-        )
-        enable_glossary = st.checkbox(
-            "📖 Customize with Glossary",
-            value=bool(
-                st.session_state.get("input_glossary_document")
-                or st.session_state.get("output_glossary_document")
-            ),
-        )
-        st.markdown(
-            """
-            Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
-            """
-        )
-        if enable_glossary:
-            glossary_input(
-                f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
-                key="input_glossary_document",
-            )
-            glossary_input(
-                f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
-                key="output_glossary_document",
-            )
-        else:
-            st.session_state["input_glossary_document"] = None
-            st.session_state["output_glossary_document"] = None
-        st.write("---")
-
-        if not "__enable_audio" in st.session_state:
-            st.session_state["__enable_audio"] = bool(
-                st.session_state.get("tts_provider")
-            )
-        enable_audio = st.checkbox("Enable Audio Output?", key="__enable_audio")
-        if not enable_audio:
-            st.write("---")
-            st.session_state["tts_provider"] = None
-        else:
-            text_to_speech_settings(page=self)
-
-        st.write("---")
-        if not "__enable_video" in st.session_state:
-            st.session_state["__enable_video"] = bool(
-                st.session_state.get("input_face")
-            )
-        enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
-        if not enable_video:
-            st.session_state["input_face"] = None
-        else:
-            st.file_uploader(
-                """
-                #### 👩‍🦰 Input Face
-                Upload a video/image that contains faces to use
-                *Recommended - mp4 / mov / png / jpg / gif*
-                """,
-                key="input_face",
-            )
-            lipsync_settings()
-
-        st.write("---")
         enum_multiselect(
             enum_cls=LLMTools,
             label="##### " + field_title_desc(self.RequestModel, "tools"),
@@ -613,10 +645,12 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         tts_provider = st.session_state.get("tts_provider")
         match tts_provider:
             case TextToSpeechProviders.ELEVEN_LABS.name:
-                return f"""
-                    - *Base cost = {super().get_raw_price(st.session_state)} credits*
-                    - *Additional {TextToSpeechPage().additional_notes()}*
-                """
+                return (
+                    f" \\\n"
+                    f"*Base cost = {super().get_raw_price(st.session_state)} credits*"
+                    f" | "
+                    f"*Additional {TextToSpeechPage().get_cost_note()}*"
+                )
             case _:
                 return ""
 
@@ -631,6 +665,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
                 """
             )
+
+        state.update(
+            dict(final_prompt=[], output_text=[], output_audio=[], output_video=[])
+        )
 
         user_input = request.input_prompt.strip()
         if not (user_input or request.input_images or request.input_documents):
@@ -895,9 +933,6 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 yield f"Completed with {finish_reason=}"  # avoid changing this message since it's used to detect end of stream
             else:
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
-
-        state["output_audio"] = []
-        state["output_video"] = []
 
         if not request.tts_provider:
             return

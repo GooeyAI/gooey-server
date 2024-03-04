@@ -121,9 +121,7 @@ def account(request: Request):
         "user_credits": request.user.balance,
         "subscription": get_user_subscription(request.user),
         "is_admin": is_admin,
-        "canonical_url": str(
-            furl(settings.APP_BASE_URL) / router.url_path_for(account.__name__)
-        ),
+        "canonical_url": account_url,
     }
 
     return templates.TemplateResponse("account.html", context)

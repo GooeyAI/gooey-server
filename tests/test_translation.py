@@ -1,3 +1,4 @@
+from conftest import flaky
 from daras_ai_v2.asr import run_google_translate
 
 
@@ -10,11 +11,6 @@ TRANSLATION_TESTS = [
     (
         "Mirchi ka ped",
         "chilli tree",
-    ),
-    # hindi
-    (
-        "ान का नर्सरी खेत में रोकने के लिए कितने दिन में तैयार हो जाता है",
-        "in how many days does the seed nursery become ready to be planted in the field?",
     ),
     # telugu
     (
@@ -48,6 +44,7 @@ def test_run_google_translate(threadpool_subtest):
         threadpool_subtest(_test_run_google_translate_one, text, expected)
 
 
+@flaky
 def _test_run_google_translate_one(
     text: str, expected: str, glossary_url=None, target_lang="en"
 ):

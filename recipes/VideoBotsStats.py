@@ -91,7 +91,7 @@ class VideoBotsStatsPage(BasePage):
         st.markdown(f"# 📊 {bi.name} Analytics")
 
     def render(self):
-        self.setup_render()
+        self.setup_sentry()
 
         if not self.request.user or self.request.user.is_anonymous:
             st.write("**Please Login to view stats for your bot integrations**")
