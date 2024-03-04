@@ -54,6 +54,7 @@ from daras_ai_v2.language_model import (
     get_entry_text,
     format_chat_entry,
     SUPERSCRIPT,
+    llm_price,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -633,11 +634,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     "raw_tts_text", state.get("raw_output_text", [])
                 )
                 tts_state = {"text_prompt": "".join(output_text_list)}
-                total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
-                    tts_state
-                )
+                total = 3 + TextToSpeechPage().get_raw_price(tts_state)
             case _:
-                total = super().get_raw_price(state)
+                total = 3
+        total += llm_price[LargeLanguageModels[state["selected_model"]]]
 
         return total * state.get("num_outputs", 1)
 
