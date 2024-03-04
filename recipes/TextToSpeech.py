@@ -162,7 +162,7 @@ class TextToSpeechPage(BasePage):
             if is_user_provided_key:
                 return "*Eleven Labs ≈ No additional credit charge given we'll use your API key*"
             else:
-                return "*Eleven Labs ≈ 4 credits per 10 words*"
+                return "*4 credits per 10 words*"
         else:
             return ""
 

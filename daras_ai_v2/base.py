@@ -1195,7 +1195,7 @@ class BasePage:
                 st.caption(
                     f"""
 Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}
-{self.additional_notes() or ""}
+{self.additional_notes(st.session_state) or ""}
                     """,
                     unsafe_allow_html=True,
                 )
@@ -1919,7 +1919,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 output=output,
             )
 
-    def additional_notes(self) -> str | None:
+    def additional_notes(self, state: dict) -> str | None:
         pass
 
     def get_cost_note(self) -> str | None:

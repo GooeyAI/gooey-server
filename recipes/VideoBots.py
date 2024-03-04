@@ -634,25 +634,21 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     "raw_tts_text", state.get("raw_output_text", [])
                 )
                 tts_state = {"text_prompt": "".join(output_text_list)}
-                total = 3 + TextToSpeechPage().get_raw_price(tts_state)
+                total = 4 + TextToSpeechPage().get_raw_price(tts_state)
             case _:
-                total = 3
+                total = 4
         total += llm_price[LargeLanguageModels[state["selected_model"]]]
 
         return total * state.get("num_outputs", 1)
 
-    def additional_notes(self):
+    def additional_notes(self, state: dict):
+        llm_cost = llm_price[LargeLanguageModels[state["selected_model"]]]
+        notes = f" \\\n*Breakdown: {llm_cost} ({state['selected_model']}) + 1 (Lipsync) + 3/run*"
         tts_provider = st.session_state.get("tts_provider")
         match tts_provider:
             case TextToSpeechProviders.ELEVEN_LABS.name:
-                return (
-                    f" \\\n"
-                    f"*Base cost = {super().get_raw_price(st.session_state)} credits*"
-                    f" | "
-                    f"*Additional {TextToSpeechPage().get_cost_note()}*"
-                )
-            case _:
-                return ""
+                notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
+        return notes
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
