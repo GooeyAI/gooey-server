@@ -476,6 +476,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
 
         options = {
+            None: "---",
             DocExtractPage.get_root_published_run().get_app_url(): "Default",
         } | {
             pr.get_app_url(): pr.title
