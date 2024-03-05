@@ -4,8 +4,6 @@ import pickle
 import typing
 from functools import wraps, lru_cache
 
-import redis
-
 from daras_ai_v2 import settings
 
 LOCK_TIMEOUT_SEC = 10 * 60
@@ -13,6 +11,8 @@ LOCK_TIMEOUT_SEC = 10 * 60
 
 @lru_cache
 def get_redis_cache():
+    import redis
+
     return redis.Redis.from_url(settings.REDIS_CACHE_URL)
 
 
@@ -23,6 +23,8 @@ def redis_cache_decorator(fn: F = None, ex=None) -> F:
     def decorator(fn: F) -> F:
         @wraps(fn)
         def wrapper(*args, **kwargs):
+            import redis
+
             # hash the args and kwargs so they are not too long
             args_hash = hashlib.sha256(f"{args}{kwargs}".encode()).hexdigest()
             # create a readable cache key

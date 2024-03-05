@@ -1,12 +1,14 @@
 import ast
 
 import parse
-from glom import glom
+
 
 input_spec_parse_pattern = "{" * 5 + "}" * 5
 
 
 def daras_ai_format_str(format_str, variables):
+    from glom import glom
+
     input_spec_results: list[parse.Result] = list(
         parse.findall(input_spec_parse_pattern, format_str)
     )
