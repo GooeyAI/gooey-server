@@ -99,28 +99,11 @@ def _expand_gdrive_folders(documents: list[str]) -> list[str]:
             yield url
 
 
-def doc_search_settings(
-    asr_allowed: bool = False,
-    keyword_instructions_allowed: bool = False,
-):
-    from daras_ai_v2.vector_search import DocSearchRequest
-
-    st.write("##### 🔎 Document Search Settings")
-
-    if "citation_style" in st.session_state:
-        enum_selector(
-            CitationStyles,
-            label="###### Citation Style",
-            key="citation_style",
-            use_selectbox=True,
-            allow_none=True,
-        )
-
+def conversation_summarization_instructions():
     st.text_area(
         """
-###### 👁‍🗨 Summarization Instructions
-Prompt to transform the conversation history into a vector search query.  \\
-These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.
+###### 👁‍🗨 Conversation Summarization
+These instructions run before the knowledge base is search and should reduce the conversation into a search query most relevant to the user's last message.
         """,
         key="query_instructions",
         height=300,
@@ -128,19 +111,50 @@ These instructions run before the workflow performs a search of the knowledge ba
     prompt_vars_widget(
         "query_instructions",
     )
-    if keyword_instructions_allowed:
-        st.text_area(
-            """
-###### 🔑 Keyword Extraction 
-Prompt to extract a query for hybrid BM25 search.  \\
-These instructions run after the Summarization Instructions above and can use its result via `{{ final_search_query }}`. In general, you shouldn't need to adjust these instructions.
+
+
+def keyword_extraction_instructions():
+    st.text_area(
+        """
+        ###### 🔑 Keyword Extraction 
+        Instructions to create a query for keyword/hybrid BM25 search. Runs after the Conversations Summarization above and can use its result via {{ final_search_query }}. 
         """,
-            key="keyword_instructions",
-            height=300,
-        )
-        prompt_vars_widget(
-            "keyword_instructions",
-        )
+        key="keyword_instructions",
+        height=300,
+    )
+    prompt_vars_widget(
+        "keyword_instructions",
+    )
+
+
+def doc_extract_selector():
+    from recipes.DocExtract import DocExtractPage
+    from bots.models import PublishedRun, Workflow, PublishedRunVisibility
+
+    options = {
+        None: "---",
+        DocExtractPage.get_root_published_run().get_app_url(): "Default",
+    } | {
+        pr.get_app_url(): pr.title
+        for pr in PublishedRun.objects.filter(
+            workflow=Workflow.DOC_EXTRACT,
+            is_approved_example=True,
+            visibility=PublishedRunVisibility.PUBLIC,
+        ).exclude(published_run_id="")
+    }
+    st.selectbox(
+        """
+        ###### Create Synthetic Data
+        To improve answer quality, pick a synthetic data maker workflow to scan & OCR any  images in your documents or transcribe & translate any videos. It also can synthesize a helpful FAQ. Adds ~2 minutes of one-time processing per file.
+        """,
+        key="doc_extract_url",
+        options=options,
+        format_func=lambda x: options[x],
+    )
+
+
+def doc_search_advanced_settings(asr_allowed=False):
+    from daras_ai_v2.vector_search import DocSearchRequest
 
     dense_weight_ = DocSearchRequest.__fields__["dense_weight"]
     st.slider(
@@ -202,3 +216,26 @@ Your knowledge base documents are split into overlapping snippets. This settings
         use_selectbox=True,
     )
     google_translate_language_selector()
+
+
+def doc_search_settings(
+    asr_allowed: bool = False,
+    keyword_instructions_allowed: bool = False,
+):
+    st.write("##### 🔎 Document Search Settings")
+
+    if "citation_style" in st.session_state:
+        enum_selector(
+            CitationStyles,
+            label="###### Citation Style",
+            key="citation_style",
+            use_selectbox=True,
+            allow_none=True,
+        )
+
+    conversation_summarization_instructions()
+
+    if keyword_instructions_allowed:
+        keyword_extraction_instructions()
+
+    doc_search_advanced_settings(asr_allowed=asr_allowed)
