@@ -1,0 +1,34 @@
+version: '3.3'
+services:
+  postgres:
+    image: postgres:15.2
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    command: postgres -c 'max_connections=10000'
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  pytest:
+    image: "us-central1-docker.pkg.dev/dara-c1b52/cloudbuild-pytest/gooey-server:$COMMIT_SHA"
+    depends_on:
+      - redis
+      - postgres
+    command:
+      - poetry
+      - run
+      - ./scripts/run-tests.sh
+    volumes:
+      - /workspace/.env:/app/.env
+      - /workspace/serviceAccountKey.json:/app/serviceAccountKey.json
+    network_mode: "host" # Use the host network
+
+volumes:
+  postgres-data:

@@ -40,7 +40,17 @@ def gui_runner(
     is_api_call: bool = False,
 ):
     page = page_cls(request=SimpleNamespace(user=AppUser.objects.get(id=user_id)))
-    page.setup_sentry()
+
+    def event_processor(event, hint):
+        event["request"] = {
+            "method": "POST",
+            "url": page.app_url(query_params=query_params),
+            "data": state,
+        }
+        return event
+
+    page.setup_sentry(event_processor=event_processor)
+
     sr = page.run_doc_sr(run_id, uid)
     sr.is_api_call = is_api_call
 

@@ -143,6 +143,7 @@ class AsrPage(BasePage):
                 output_format=request.output_format,
             ),
             request.documents,
+            max_workers=4,
         )
 
         # Run Translation

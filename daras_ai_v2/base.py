@@ -179,12 +179,40 @@ class BasePage:
             tab_name=MenuTabs.paths[tab],
         )
 
-    def setup_sentry(self):
+    def setup_sentry(self, event_processor: typing.Callable = None):
+        def add_user_to_event(event, hint):
+            user = self.request and self.request.user
+            if not user:
+                return event
+            event["user"] = {
+                "id": user.id,
+                "name": user.display_name,
+                "email": user.email,
+                "data": {
+                    field: getattr(user, field)
+                    for field in [
+                        "uid",
+                        "phone_number",
+                        "photo_url",
+                        "balance",
+                        "is_paying",
+                        "is_anonymous",
+                        "is_disabled",
+                        "disable_safety_checker",
+                        "created_at",
+                    ]
+                },
+            }
+            return event
+
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
+            scope.add_event_processor(add_user_to_event)
+            if event_processor:
+                scope.add_event_processor(event_processor)
 
     def refresh_state(self):
         _, run_id, uid = extract_query_params(gooey_get_query_params())
@@ -1298,7 +1326,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         self.render_form_v2()
         with st.expander("⚙️ Settings"):
             self.render_settings()
-            st.write("---")
         submitted = self.render_submit_button()
         with st.div(style={"textAlign": "right"}):
             st.caption(

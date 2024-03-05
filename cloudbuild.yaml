@@ -1,70 +1,23 @@
 steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    entrypoint: 'bash'
-    args: ['-c', 'docker pull gcr.io/$PROJECT_ID/[IMAGE_NAME]:latest || exit 0']
-  - name: gcr.io/cloud-builders/docker
+  - name: 'gcr.io/kaniko-project/executor:latest'
     args:
-      - build
-      - '-t'
-      - '$_IMAGE_NAME:$COMMIT_SHA'
-      - '--cache-from'
-      - 'gcr.io/$PROJECT_ID/[IMAGE_NAME]:latest'
-      - .
-      - '-f'
-      - $_DOCKERFILE_NAME
-    dir: $_DOCKERFILE_DIR
-    id: Build
-  - name: gcr.io/cloud-builders/gke-deploy
-    args:
-      - prepare
-      - '--filename=$_K8S_YAML_PATH'
-      - '--image=$_IMAGE_NAME:$COMMIT_SHA'
-      - '--app=$_K8S_APP_NAME'
-      - '--version=$COMMIT_SHA'
-      - '--namespace=$_K8S_NAMESPACE'
-      - '--label=$_K8S_LABELS'
-      - '--annotation=$_K8S_ANNOTATIONS,gcb-build-id=$BUILD_ID'
-      - '--create-application-cr'
-      - >-
-        --links="Build
-        details=https://console.cloud.google.com/cloud-build/builds/$BUILD_ID?project=$PROJECT_ID"
-      - '--output=output'
-    id: Prepare deploy
-  - name: gcr.io/cloud-builders/gsutil
+      - '--destination=us-central1-docker.pkg.dev/dara-c1b52/cloudbuild-pytest/gooey-server:$COMMIT_SHA'
+      - '--cache=true'
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     args:
       - '-c'
-      - |-
-        if [ "$_OUTPUT_BUCKET_PATH" != "" ]
-        then
-          gsutil cp -r output/suggested gs://$_OUTPUT_BUCKET_PATH/config/$_K8S_APP_NAME/$BUILD_ID/suggested
-          gsutil cp -r output/expanded gs://$_OUTPUT_BUCKET_PATH/config/$_K8S_APP_NAME/$BUILD_ID/expanded
-        fi
-    id: Save configs
-    entrypoint: sh
-  - name: gcr.io/cloud-builders/gke-deploy
+      - |
+        gcloud secrets versions access latest --secret="gooey-server-pytest-secrets" > /workspace/.env
+        gcloud secrets versions access latest --secret="gooey-server-pytest-service-account-key" > /workspace/serviceAccountKey.json
+    entrypoint: bash
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: docker-compose
     args:
-      - apply
-      - '--filename=output/expanded'
-      - '--cluster=$_GKE_CLUSTER'
-      - '--location=$_GKE_LOCATION'
-      - '--namespace=$_K8S_NAMESPACE'
-    id: Apply deploy
-images:
-  - '$_IMAGE_NAME:$COMMIT_SHA'
+      - 'up'
+      - '--exit-code-from=pytest'
+      - '--abort-on-container-exit'
+    env:
+      - 'COMMIT_SHA=$COMMIT_SHA'
 options:
-  substitutionOption: ALLOW_LOOSE
-substitutions:
-  _K8S_YAML_PATH: k8s/
-  _K8S_LABELS: ''
-  _IMAGE_NAME: gcr.io/dara-c1b52/github.com/dara-network/ddgai
-  _GKE_CLUSTER: gooey-cluster-us-1
-  _OUTPUT_BUCKET_PATH: dara-c1b52_cloudbuild/deploy
-  _K8S_NAMESPACE: default
-  _K8S_ANNOTATIONS: gcb-trigger-id=55dd6852-1610-461f-95da-19e8660e03d5
-  _DOCKERFILE_NAME: Dockerfile
-  _K8S_APP_NAME: gooey-streamlit
-  _GKE_LOCATION: us-central1
-  _DOCKERFILE_DIR: ''
-tags:
-  - gcp-cloud-build-deploy
-  - $_K8S_APP_NAME
+  pool:
+    name: projects/dara-c1b52/locations/us-central1/workerPools/gooey
