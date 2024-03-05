@@ -373,7 +373,6 @@ def get_bm25_embeds_for_doc(
         f_url=f_url,
         doc_meta=doc_meta,
         selected_asr_model=selected_asr_model,
-        google_translate_target=google_translate_target,
     )
     refs = pages_to_split_refs(
         pages=pages,
@@ -382,10 +381,22 @@ def get_bm25_embeds_for_doc(
         max_context_words=max_context_words,
         scroll_jump=scroll_jump,
     )
+    translate_split_refs(refs, google_translate_target)
     tokenized_corpus = [
         bm25_tokenizer(ref["title"]) + bm25_tokenizer(ref["snippet"]) for ref in refs
     ]
     return tokenized_corpus
+
+
+def translate_split_refs(
+    refs: list[SearchReference], google_translate_target: str | None
+):
+    if not google_translate_target:
+        return
+    snippets = [ref["snippet"] for ref in refs]
+    translated_snippets = run_google_translate(snippets, google_translate_target)
+    for ref, translated_snippet in zip(refs, translated_snippets):
+        ref["snippet"] = translated_snippet
 
 
 @redis_cache_decorator
@@ -416,7 +427,6 @@ def get_embeds_for_doc(
         f_url=f_url,
         doc_meta=doc_meta,
         selected_asr_model=selected_asr_model,
-        google_translate_target=google_translate_target,
     )
     refs = pages_to_split_refs(
         pages=pages,
@@ -425,6 +435,7 @@ def get_embeds_for_doc(
         max_context_words=max_context_words,
         scroll_jump=scroll_jump,
     )
+    translate_split_refs(refs, google_translate_target)
     texts = [m["title"] + " | " + m["snippet"] for m in refs]
     # get doc embeds in batches
     batch_size = 16  # azure openai limits
@@ -536,20 +547,10 @@ def doc_url_to_text_pages(
     *,
     f_url: str,
     doc_meta: DocMetadata,
-    google_translate_target: str | None,
     selected_asr_model: str | None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
     """
     Download document from url and convert to text pages.
-
-    Args:
-        f_url: url of document
-        doc_meta: document metadata
-        google_translate_target: target language for google translate
-        selected_asr_model: selected ASR model (used for audio files)
-
-    Returns:
-        list of text pages
     """
     f_bytes, mime_type = download_content_bytes(
         f_url=f_url, mime_type=doc_meta.mime_type
@@ -562,7 +563,6 @@ def doc_url_to_text_pages(
         f_bytes=f_bytes,
         mime_type=mime_type,
         selected_asr_model=selected_asr_model,
-        google_translate_target=google_translate_target,
     )
 
 
@@ -607,7 +607,6 @@ def bytes_to_text_pages_or_df(
     f_bytes: bytes,
     mime_type: str,
     selected_asr_model: str | None,
-    google_translate_target: str | None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
     if mime_type.startswith("audio/") or mime_type.startswith("video/"):
         if is_gdrive_url(furl(f_url)) or is_yt_url(f_url):
@@ -615,7 +614,6 @@ def bytes_to_text_pages_or_df(
         transcript = run_asr(
             f_url,
             selected_model=(selected_asr_model or AsrModels.whisper_large_v2.name),
-            language=google_translate_target or "en",
         )
         return [transcript]
 
@@ -625,7 +623,6 @@ def bytes_to_text_pages_or_df(
             f_name=f_name,
             f_bytes=f_bytes,
             mime_type=mime_type,
-            google_translate_target=google_translate_target,
         )
     except UnsupportedDocumentError:
         pass
@@ -635,11 +632,7 @@ def bytes_to_text_pages_or_df(
     else:
         ext = mimetypes.guess_extension(mime_type) or ""
         text = pandoc_to_text(f_name + ext, f_bytes)
-
-    if google_translate_target:
-        return run_google_translate([text], google_translate_target)
-    else:
-        return [text]
+    return [text]
 
 
 def any_bytes_to_sections_df_for_splitting(
@@ -648,7 +641,6 @@ def any_bytes_to_sections_df_for_splitting(
     f_name: str,
     f_bytes: bytes,
     mime_type: str,
-    google_translate_target: str | None,
 ):
     if mime_type == "application/pdf":
         df = pdf_to_df(f_url, f_name, f_bytes, mime_type)
@@ -657,18 +649,11 @@ def any_bytes_to_sections_df_for_splitting(
             f_name=f_name, f_bytes=f_bytes, mime_type=mime_type
         )
 
-    if "sections" in df.columns:
-        col = "sections"
-    elif "snippet" in df.columns:
-        col = "snippet"
+    if "sections" in df.columns or "snippet" in df.columns:
+        return df
     else:
-        col = "sections"
         df.columns = [THEAD + col + THEAD for col in df.columns]
-        df = pd.DataFrame(["csv=" + df.to_csv(index=False)], columns=[col])
-
-    if google_translate_target:
-        df[col] = run_google_translate(df[col].tolist(), google_translate_target)
-    return df
+        return pd.DataFrame(["csv=" + df.to_csv(index=False)], columns=["sections"])
 
 
 def is_yt_url(url: str) -> bool:

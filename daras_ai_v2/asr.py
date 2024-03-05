@@ -30,6 +30,8 @@ from daras_ai_v2.google_asr import gcp_asr_v1
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
 
+TRANSLATE_DETECT_BATCH_SIZE = 8
+
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
 TRANSLITERATION_SUPPORTED = {"ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"}
@@ -320,8 +322,8 @@ def run_google_translate(
     else:
         translate_client = translate.Client()
         detections = flatten(
-            translate_client.detect_language(texts[i : i + 50])
-            for i in range(0, len(texts), 50)
+            translate_client.detect_language(texts[i : i + TRANSLATE_DETECT_BATCH_SIZE])
+            for i in range(0, len(texts), TRANSLATE_DETECT_BATCH_SIZE)
         )
         language_codes = [detection["language"] for detection in detections]
 
@@ -331,7 +333,7 @@ def run_google_translate(
         ),
         texts,
         language_codes,
-        max_workers=8,
+        max_workers=TRANSLATE_DETECT_BATCH_SIZE,
     )
 
 
