@@ -28,7 +28,7 @@ def enum_multiselect(
 
     if checkboxes:
         if label:
-            st.write(label)
+            st.caption(label)
         selected = set(st.session_state.get(key, []))
 
         def render(e):
