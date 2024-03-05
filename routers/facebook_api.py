@@ -87,6 +87,8 @@ def fb_webhook(
     background_tasks: BackgroundTasks,
     data: dict = Depends(request_json),
 ):
+    import glom
+
     print("fb_webhook:", data)
     object_name = data.get("object")
     for entry in data.get("entry", []):
