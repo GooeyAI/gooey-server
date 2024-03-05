@@ -518,12 +518,15 @@ def anchor(
     type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
     disabled: bool = False,
     unsafe_allow_html: bool = False,
+    new_tab: bool = False,
     **props,
 ):
     className = f"btn btn-theme btn-{type} " + props.pop("className", "")
     style = props.pop("style", {})
     if disabled:
         style["pointerEvents"] = "none"
+    if new_tab:
+        props["target"] = "_blank"
     with tag("a", href=href, className=className, style=style, **props):
         markdown(dedent(label), unsafe_allow_html=unsafe_allow_html)
 

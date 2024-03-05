@@ -1130,7 +1130,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     <a href="{wa_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Whatsapp number">
                         <img src="{WHATSAPP_IMG}" {IMGSTYLE} alt="Whatsapp">
                     </a>
-                    <div {DESCRIPTIONSTYLE}>Bring your own WhatsApp number to connect. Need a new one? Email <a href="mailto:sales@gooey.ai">sales@gooey.ai</a>.</div>
+                    <div {DESCRIPTIONSTYLE}>Bring your own <a href="https://business.facebook.com/wa/manage/phone-numbers">WhatsApp number</a> to connect. Need a new one? Email <a href="mailto:sales@gooey.ai">sales@gooey.ai</a>.</div>
                 </div>
                 <div {ROWSTYLE}>
                     <a href="{slack_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Slack Workspace">
@@ -1321,6 +1321,30 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         key="btn_connect",
                     ):
                         raise RedirectException(add_integration)
+
+                if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
+                    col1, col2 = st.columns(2, style={"align-items": "center"})
+                    with col1:
+                        st.write("###### Whatsapp Business Management")
+                        st.caption(
+                            f"Only touch if you know what you're doing. Changing phonenumber(s) will break the Gooey integration."
+                        )
+                    with col2:
+                        st.anchor(
+                            "Business Settings",
+                            f"https://business.facebook.com/settings/whatsapp-business-accounts/{bi.wa_business_waba_id}",
+                            new_tab=True,
+                        )
+                        st.anchor(
+                            "WhatsApp Manager",
+                            f"https://business.facebook.com/wa/manage/home/?waba_id={bi.wa_business_waba_id}",
+                            new_tab=True,
+                        )
+                        st.anchor(
+                            "Phone Numbers",
+                            "https://business.facebook.com/wa/manage/phone-numbers",
+                            new_tab=True,
+                        )
 
 
 def chat_list_view():
