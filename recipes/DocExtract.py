@@ -1,6 +1,4 @@
 import random
-import subprocess
-import tempfile
 import threading
 import typing
 
@@ -22,11 +20,13 @@ from daras_ai_v2.asr import (
     run_google_translate,
     audio_url_to_wav,
 )
-from daras_ai_v2.azure_doc_extract import azure_doc_extract_pages
+from daras_ai_v2.azure_doc_extract import (
+    azure_doc_extract_page_num,
+)
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import raise_for_status, call_cmd
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import (
     apply_parallel,
@@ -42,6 +42,7 @@ from daras_ai_v2.vector_search import (
     add_page_number_to_pdf,
     yt_dlp_get_video_entries,
     doc_url_to_file_metadata,
+    get_pdf_num_pages,
 )
 from recipes.DocSearch import render_documents
 
@@ -330,19 +331,6 @@ def extract_info(url: str) -> list[dict | None]:
         ]
 
 
-def get_pdf_num_pages(f_bytes: bytes) -> int:
-    with tempfile.NamedTemporaryFile() as infile:
-        infile.write(f_bytes)
-        output = call_cmd("pdfinfo", infile.name).lower()
-        for line in output.splitlines():
-            if not line.startswith("pages:"):
-                continue
-            try:
-                return int(line.split("pages:")[-1])
-            except ValueError:
-                raise ValueError(f"Unexpected PDF Info: {line}")
-
-
 def process_entry(
     spreadsheet_id: str,
     row: int,
@@ -423,15 +411,7 @@ def process_source(
             transcript = run_asr(content_url, request.selected_asr_model)
         elif is_pdf:
             yield "Extracting PDF"
-            if page_num := entry.get("page_num"):
-                params = dict(pages=str(page_num))
-            else:
-                params = None
-            pages = azure_doc_extract_pages(content_url, params=params)
-            if pages and pages[0]:
-                transcript = str(pages[0])
-            else:
-                transcript = ""
+            transcript = azure_doc_extract_page_num(content_url, entry.get("page_num"))
         else:
             raise NotImplementedError(
                 f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"

@@ -29,10 +29,8 @@ from daras_ai_v2.asr import (
 )
 from daras_ai_v2.azure_doc_extract import (
     table_arr_to_prompt_chunked,
-    azure_form_recognizer,
-    extract_records,
-    records_to_text,
     THEAD,
+    azure_doc_extract_page_num,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
@@ -41,6 +39,7 @@ from daras_ai_v2.exceptions import raise_for_status, call_cmd, UserError
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import (
     flatmap_parallel,
+    map_parallel,
 )
 from daras_ai_v2.gdrive_downloader import (
     gdrive_download,
@@ -58,9 +57,6 @@ from daras_ai_v2.search_ref import (
 )
 from daras_ai_v2.text_splitter import text_splitter, puncts, Document
 from files.models import FileMetadata
-
-if typing.TYPE_CHECKING:
-    import pandas as pd
 
 
 class DocSearchRequest(BaseModel):
@@ -557,7 +553,7 @@ def doc_url_to_text_pages(
     )
     if not f_bytes:
         return []
-    return bytes_to_text_pages_or_df(
+    return any_bytes_to_text_pages_or_df(
         f_url=f_url,
         f_name=doc_meta.name,
         f_bytes=f_bytes,
@@ -600,7 +596,7 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
     return f_bytes, mime_type
 
 
-def bytes_to_text_pages_or_df(
+def any_bytes_to_text_pages_or_df(
     *,
     f_url: str,
     f_name: str,
@@ -618,11 +614,14 @@ def bytes_to_text_pages_or_df(
         return [transcript]
 
     try:
-        return any_bytes_to_sections_df_for_splitting(
+        return pdf_or_tabular_bytes_to_text_pages_or_df(
             f_url=f_url,
             f_name=f_name,
             f_bytes=f_bytes,
             mime_type=mime_type,
+            # for now, only use form recognizer if asr model is selected.
+            # We should later change the doc extract settings to include the form recognizer option
+            use_form_reco=bool(selected_asr_model),
         )
     except UnsupportedDocumentError:
         pass
@@ -635,15 +634,21 @@ def bytes_to_text_pages_or_df(
     return [text]
 
 
-def any_bytes_to_sections_df_for_splitting(
+def pdf_or_tabular_bytes_to_text_pages_or_df(
     *,
     f_url: str,
     f_name: str,
     f_bytes: bytes,
     mime_type: str,
+    use_form_reco: bool,
 ):
+    import pandas as pd
+
     if mime_type == "application/pdf":
-        df = pdf_to_df(f_url, f_name, f_bytes, mime_type)
+        if use_form_reco:
+            df = pdf_to_form_reco_df(f_url, f_name, f_bytes, mime_type)
+        else:
+            return pdf_to_text_pages(f=io.BytesIO(f_bytes))
     else:
         df = tabular_bytes_to_str_df(
             f_name=f_name, f_bytes=f_bytes, mime_type=mime_type
@@ -704,7 +709,13 @@ class UnsupportedDocumentError(UserError):
     pass
 
 
-def pdf_to_df(
+def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
+    import pdftotext
+
+    return list(pdftotext.PDF(f))
+
+
+def pdf_to_form_reco_df(
     f_url: str,
     f_name: str,
     f_bytes: bytes,
@@ -714,19 +725,32 @@ def pdf_to_df(
 
     if is_gdrive_url(furl(f_url)):
         f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
-    result = azure_form_recognizer(f_url, "prebuilt-layout")
+    num_pages = get_pdf_num_pages(f_bytes)
     return pd.DataFrame(
-        [
-            [
+        map_parallel(
+            lambda page_num: (
                 add_page_number_to_pdf(f_url, page_num).url,
                 f"{f_name}, page {page_num}",
-                records_to_text(extract_records(result, page_num)),
-            ]
-            for page in result["pages"]
-            if (page_num := page["pageNumber"])
-        ],
+                azure_doc_extract_page_num(f_url, page_num),
+            ),
+            range(1, num_pages + 1),
+            max_workers=4,
+        ),
         columns=["url", "title", "sections"],
     )
+
+
+def get_pdf_num_pages(f_bytes: bytes) -> int:
+    with tempfile.NamedTemporaryFile() as infile:
+        infile.write(f_bytes)
+        output = call_cmd("pdfinfo", infile.name).lower()
+        for line in output.splitlines():
+            if not line.startswith("pages:"):
+                continue
+            try:
+                return int(line.split("pages:")[-1])
+            except ValueError:
+                raise ValueError(f"Unexpected PDF Info: {line}")
 
 
 def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
