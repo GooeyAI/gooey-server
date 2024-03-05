@@ -453,13 +453,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.write("---")
 
         advanced = """
-            ##### Advanced Settings
+            #### Advanced Settings
             In general, you should not need to adjust these.
         """
         if st.session_state.get("documents"):
+            st.write("#### 📄 Knowledge Base")
             st.text_area(
                 """
-            ##### 📄 Knowledge Base
             ###### 👩‍🏫 Search Instructions
             How should the LLM interpret the results from your knowledge base?
             """,
