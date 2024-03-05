@@ -634,8 +634,9 @@ def bytes_to_text_pages_or_df(
             ext = mimetypes.guess_extension(mime_type) or ""
             text = pandoc_to_text(f_name + ext, f_bytes)
         if google_translate_target:
-            text = run_google_translate([text], google_translate_target)
-        return text
+            return run_google_translate([text], google_translate_target)
+        else:
+            return [text]
 
     if "sections" in df.columns:
         col = "sections"
