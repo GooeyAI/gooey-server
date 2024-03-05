@@ -609,8 +609,6 @@ def bytes_to_text_pages_or_df(
     selected_asr_model: str | None,
     google_translate_target: str | None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
-    import pandas as pd
-
     if mime_type.startswith("audio/") or mime_type.startswith("video/"):
         if is_gdrive_url(furl(f_url)) or is_yt_url(f_url):
             f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
@@ -622,21 +620,42 @@ def bytes_to_text_pages_or_df(
         return [transcript]
 
     try:
-        if mime_type == "application/pdf":
-            df = pdf_to_df(f_url, f_name, f_bytes, mime_type)
-        else:
-            df = bytes_to_str_df(f_name=f_name, f_bytes=f_bytes, mime_type=mime_type)
-    except UserError:
-        # $ pandoc --list-input-formats
-        if mime_type == "text/plain":
-            text = f_bytes.decode()
-        else:
-            ext = mimetypes.guess_extension(mime_type) or ""
-            text = pandoc_to_text(f_name + ext, f_bytes)
-        if google_translate_target:
-            return run_google_translate([text], google_translate_target)
-        else:
-            return [text]
+        return any_bytes_to_sections_df_for_splitting(
+            f_url=f_url,
+            f_name=f_name,
+            f_bytes=f_bytes,
+            mime_type=mime_type,
+            google_translate_target=google_translate_target,
+        )
+    except UnsupportedDocumentError:
+        pass
+
+    if mime_type == "text/plain":
+        text = f_bytes.decode()
+    else:
+        ext = mimetypes.guess_extension(mime_type) or ""
+        text = pandoc_to_text(f_name + ext, f_bytes)
+
+    if google_translate_target:
+        return run_google_translate([text], google_translate_target)
+    else:
+        return [text]
+
+
+def any_bytes_to_sections_df_for_splitting(
+    *,
+    f_url: str,
+    f_name: str,
+    f_bytes: bytes,
+    mime_type: str,
+    google_translate_target: str | None,
+):
+    if mime_type == "application/pdf":
+        df = pdf_to_df(f_url, f_name, f_bytes, mime_type)
+    else:
+        df = tabular_bytes_to_str_df(
+            f_name=f_name, f_bytes=f_bytes, mime_type=mime_type
+        )
 
     if "sections" in df.columns:
         col = "sections"
@@ -646,6 +665,7 @@ def bytes_to_text_pages_or_df(
         col = "sections"
         df.columns = [THEAD + col + THEAD for col in df.columns]
         df = pd.DataFrame(["csv=" + df.to_csv(index=False)], columns=[col])
+
     if google_translate_target:
         df[col] = run_google_translate(df[col].tolist(), google_translate_target)
     return df
@@ -655,17 +675,19 @@ def is_yt_url(url: str) -> bool:
     return "youtube.com" in url or "youtu.be" in url
 
 
-def bytes_to_str_df(
+def tabular_bytes_to_str_df(
     *,
     f_name: str,
     f_bytes: bytes,
     mime_type: str,
 ) -> "pd.DataFrame":
-    df = bytes_to_df_raw(f_name=f_name, f_bytes=f_bytes, mime_type=mime_type, dtype=str)
+    df = tabular_bytes_to_any_df(
+        f_name=f_name, f_bytes=f_bytes, mime_type=mime_type, dtype=str
+    )
     return df.fillna("")
 
 
-def bytes_to_df_raw(
+def tabular_bytes_to_any_df(
     *,
     f_name: str,
     f_bytes: bytes,
@@ -687,8 +709,14 @@ def bytes_to_df_raw(
         case _ if "excel" in mime_type or "spreadsheet" in mime_type:
             df = pd.read_excel(f, dtype=dtype)
         case _:
-            raise UserError(f"Unsupported document {mime_type=} ({f_name})")
+            raise UnsupportedDocumentError(
+                f"Unsupported document {mime_type=} ({f_name})"
+            )
     return df
+
+
+class UnsupportedDocumentError(UserError):
+    pass
 
 
 def pdf_to_df(

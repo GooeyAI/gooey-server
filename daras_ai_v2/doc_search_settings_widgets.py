@@ -7,13 +7,24 @@ from sentry_sdk import capture_exception
 import gooey_ui as st
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import AsrModels, google_translate_language_selector
-from daras_ai_v2.prompt_vars import prompt_vars_widget
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
+from daras_ai_v2.prompt_vars import prompt_vars_widget
 from daras_ai_v2.search_ref import CitationStyles
 
 _user_media_url_prefix = os.path.join(
     "storage.googleapis.com", settings.GS_BUCKET_NAME, settings.GS_MEDIA_PATH
+)
+
+SUPPORTED_SPREADSHEET_TYPES = (
+    ".csv",
+    ".xlsx",
+    ".xls",
+    ".gsheet",
+    ".ods",
+    ".tsv",
+    ".json",
+    ".xml",
 )
 
 
@@ -24,17 +35,7 @@ def is_user_uploaded_url(url: str) -> bool:
 def document_uploader(
     label: str,
     key: str = "documents",
-    accept: typing.Iterable[str] = (
-        ".pdf",
-        ".txt",
-        ".docx",
-        ".md",
-        ".html",
-        ".wav",
-        ".ogg",
-        ".mp3",
-        ".aac",
-    ),
+    accept: typing.Iterable[str] = None,
     accept_multiple_files=True,
 ) -> list[str] | str:
     st.write(label, className="gui-input")

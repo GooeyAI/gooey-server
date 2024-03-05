@@ -10,14 +10,17 @@ from bots.models import Workflow, PublishedRun, PublishedRunVisibility, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
-from daras_ai_v2.doc_search_settings_widgets import document_uploader
+from daras_ai_v2.doc_search_settings_widgets import (
+    document_uploader,
+    SUPPORTED_SPREADSHEET_TYPES,
+)
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.vector_search import (
     download_content_bytes,
     doc_url_to_file_metadata,
-    bytes_to_df_raw,
+    tabular_bytes_to_any_df,
 )
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
@@ -93,7 +96,7 @@ List of URLs to the evaluation runs that you requested.
 
         files = document_uploader(
             f"---\n##### {field_title_desc(self.RequestModel, 'documents')}",
-            accept=(".csv", ".xlsx", ".xls", ".json", ".tsv", ".xml"),
+            accept=SUPPORTED_SPREADSHEET_TYPES,
         )
 
         required_input_fields = {}
@@ -690,7 +693,9 @@ def read_df_any(f_url: str) -> "pd.DataFrame":
     f_bytes, mime_type = download_content_bytes(
         f_url=f_url, mime_type=doc_meta.mime_type
     )
-    df = bytes_to_df_raw(f_name=doc_meta.name, f_bytes=f_bytes, mime_type=mime_type)
+    df = tabular_bytes_to_any_df(
+        f_name=doc_meta.name, f_bytes=f_bytes, mime_type=mime_type
+    )
     return df.dropna(how="all", axis=1).dropna(how="all", axis=0).fillna("")
 
 
