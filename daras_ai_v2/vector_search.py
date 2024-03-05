@@ -268,8 +268,10 @@ def doc_or_yt_url_to_metadatas(f_url: str) -> list[tuple[str, FileMetadata]]:
                 entry["webpage_url"],
                 FileMetadata(
                     name=entry.get("title", "YouTube Video"),
+                    # youtube doesn't provide etag, so we use filesize_approx or upload_date
                     etag=entry.get("filesize_approx") or entry.get("upload_date"),
-                    mime_type="audio/wav",  # we will later convert & save as wav
+                    # we will later convert & save as wav
+                    mime_type="audio/wav",
                     total_bytes=entry.get("filesize_approx", 0),
                 ),
             )
@@ -694,6 +696,8 @@ def pdf_to_df(
     f_bytes: bytes,
     mime_type: str,
 ) -> "pd.DataFrame":
+    import pandas as pd
+
     if is_gdrive_url(furl(f_url)):
         f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
     result = azure_form_recognizer(f_url, "prebuilt-layout")
