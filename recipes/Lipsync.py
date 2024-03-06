@@ -85,7 +85,7 @@ class LipsyncPage(BasePage):
         output_video = state.get("output_video")
         if output_video:
             st.write("#### Output Video")
-            st.video(output_video, autoplay=True, show_download_button=True)
+            st.video(output_video, autoplay=True, show_download_button=False)
         else:
             st.div()
 

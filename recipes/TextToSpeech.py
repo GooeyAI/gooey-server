@@ -138,7 +138,7 @@ class TextToSpeechPage(BasePage):
 
     def render_output(self):
         audio_url = st.session_state.get("audio_url")
-        st.audio(audio_url, show_download_button=True)
+        st.audio(audio_url, show_download_button=False)
 
     def _get_elevenlabs_price(self, state: dict):
         _, is_user_provided_key = self._get_elevenlabs_api_key(state)

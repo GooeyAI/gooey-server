@@ -147,5 +147,5 @@ def _render_output(state):
         output: dict = state.get("output_audios", {}).get(key, [])
         for audio in output:
             st.audio(
-                audio, caption=Text2AudioModels[key].value, show_download_button=True
+                audio, caption=Text2AudioModels[key].value, show_download_button=False
             )

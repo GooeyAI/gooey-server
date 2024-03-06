@@ -251,7 +251,7 @@ class CompareText2ImgPage(BasePage):
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
                 st.image(
-                    img, caption=Text2ImgModels[key].value, show_download_button=True
+                    img, caption=Text2ImgModels[key].value, show_download_button=False
                 )
 
     def preview_description(self, state: dict) -> str:

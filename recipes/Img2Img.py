@@ -136,7 +136,7 @@ class Img2ImgPage(BasePage):
             return
         st.write("#### Output Image")
         for img in output_images:
-            st.image(img, show_download_button=True)
+            st.image(img, show_download_button=False)
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)

@@ -342,7 +342,7 @@ class ImageSegmentationPage(BasePage):
         with col1:
             input_image = state.get("input_image")
             if input_image:
-                st.image(input_image, caption="Input Photo", show_download_button=True)
+                st.image(input_image, caption="Input Photo", show_download_button=False)
             else:
                 st.div()
 

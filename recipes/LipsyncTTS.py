@@ -135,7 +135,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
                 output_video,
                 caption="#### Output Video",
                 autoplay=True,
-                show_download_button=True,
+                show_download_button=False,
             )
         else:
             st.div()

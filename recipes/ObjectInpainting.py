@@ -201,7 +201,7 @@ class ObjectInpaintingPage(BasePage):
 
         if output_images:
             for url in output_images:
-                st.image(url, caption=f"{text_prompt}", show_download_button=True)
+                st.image(url, caption=f"{text_prompt}", show_download_button=False)
         else:
             st.div()
 

@@ -445,7 +445,7 @@ Here is the final output:
         if max_count:
             output_images = output_images[:max_count]
         for img in output_images:
-            st.image(img, show_download_button=True)
+            st.image(img, show_download_button=False)
             qr_code_data = (
                 state.get(QrSources.qr_code_data.name)
                 or state.get(QrSources.qr_code_input_image.name)
