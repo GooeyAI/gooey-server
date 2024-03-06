@@ -521,21 +521,18 @@ class BotIntegration(models.Model):
 
     wa_business_access_token = models.TextField(
         blank=True,
-        default=None,
-        null=True,
-        help_text="Bot's WhatsApp Business access token (mandatory) -- has these scopes: ['whatsapp_business_management', 'whatsapp_business_messaging', 'public_profile']",
+        default="",
+        help_text="Bot's WhatsApp Business access token (mandatory if custom number) -- has these scopes: ['whatsapp_business_management', 'whatsapp_business_messaging', 'public_profile']",
     )
     wa_business_waba_id = models.TextField(
         blank=True,
-        default=None,
-        null=True,
-        help_text="Bot's WhatsApp Business API WABA id (mandatory) -- this is the one seen on https://business.facebook.com/settings/whatsapp-business-accounts/",
+        default="",
+        help_text="Bot's WhatsApp Business API WABA id (only for display) -- this is the one seen on https://business.facebook.com/settings/whatsapp-business-accounts/",
     )
     wa_business_user_id = models.TextField(
         blank=True,
-        default=None,
-        null=True,
-        help_text="Bot's WhatsApp Business API user id (mandatory)",
+        default="",
+        help_text="Bot's WhatsApp Business API user id (only for display)",
     )
     wa_business_name = models.TextField(
         blank=True,
