@@ -18,7 +18,6 @@ from aifail import (
 from django.conf import settings
 from jinja2.lexer import whitespace_re
 from loguru import logger
-from openai import Stream
 from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionChunk,
@@ -601,7 +600,7 @@ def _get_chat_completions_create(model: str, **kwargs):
 
 
 def _stream_openai_chunked(
-    r: Stream[ChatCompletionChunk],
+    r: typing.Iterable[ChatCompletionChunk],
     used_model: str,
     messages: list[ConversationEntry],
     *,

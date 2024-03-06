@@ -4,14 +4,12 @@ import io
 import mimetypes
 import random
 import re
-import subprocess
 import tempfile
 import typing
 
 import numpy as np
 import requests
 from furl import furl
-from googleapiclient.errors import HttpError
 from loguru import logger
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
@@ -20,20 +18,29 @@ import gooey_ui as gui
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
-    guess_ext_from_response,
     get_mimetype_from_response,
 )
 from daras_ai_v2 import settings
-from daras_ai_v2.asr import AsrModels, run_asr, run_google_translate
+from daras_ai_v2.asr import (
+    AsrModels,
+    run_asr,
+    run_google_translate,
+    download_youtube_to_wav,
+)
 from daras_ai_v2.azure_doc_extract import (
     table_arr_to_prompt_chunked,
+    THEAD,
+    azure_doc_extract_page_num,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )
 from daras_ai_v2.exceptions import raise_for_status, call_cmd, UserError
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
-from daras_ai_v2.functional import flatmap_parallel, map_parallel
+from daras_ai_v2.functional import (
+    flatmap_parallel,
+    map_parallel,
+)
 from daras_ai_v2.gdrive_downloader import (
     gdrive_download,
     is_gdrive_url,
@@ -62,8 +69,7 @@ class DocSearchRequest(BaseModel):
     max_context_words: int | None
     scroll_jump: int | None
 
-    selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
-    google_translate_target: str | None
+    doc_extract_url: str | None
 
     dense_weight: float | None = Field(
         ge=0.0,
@@ -88,23 +94,36 @@ def get_top_k_references(
     Returns:
         the top k documents
     """
+    from recipes.BulkRunner import url_to_runs
+
     yield "Fetching latest knowledge docs..."
     input_docs = request.documents or []
-    doc_metas = map_parallel(doc_url_to_metadata, input_docs)
+
+    if request.doc_extract_url:
+        page_cls, sr, pr = url_to_runs(request.doc_extract_url)
+        selected_asr_model = sr.state.get("selected_asr_model")
+        google_translate_target = sr.state.get("google_translate_target")
+    else:
+        selected_asr_model = google_translate_target = None
+
+    file_url_metas = flatmap_parallel(doc_or_yt_url_to_metadatas, input_docs)
+    file_urls, file_metas = zip(*file_url_metas)
 
     yield "Creating knowledge embeddings..."
     embeds: list[tuple[SearchReference, np.ndarray]] = flatmap_parallel(
-        lambda f_url, doc_meta: get_embeds_for_doc(
+        lambda f_url, file_meta: get_embeds_for_doc(
             f_url=f_url,
-            doc_meta=doc_meta,
+            doc_meta=DocMetadata.from_file_metadata(file_meta),
             max_context_words=request.max_context_words,
             scroll_jump=request.scroll_jump,
-            selected_asr_model=request.selected_asr_model,
-            google_translate_target=request.google_translate_target,
+            selected_asr_model=selected_asr_model,
+            google_translate_target=google_translate_target,
         ),
-        input_docs,
-        doc_metas,
+        file_urls,
+        file_metas,
     )
+    if not embeds:
+        return []
     dense_query_embeds = openai_embedding_create([request.search_query])[0]
 
     yield "Searching knowledge base..."
@@ -136,16 +155,16 @@ def get_top_k_references(
         yield "Considering results..."
         # get sparse scores
         bm25_corpus = flatmap_parallel(
-            lambda f_url, doc_meta: get_bm25_embeds_for_doc(
+            lambda f_url, file_meta: get_bm25_embeds_for_doc(
                 f_url=f_url,
-                doc_meta=doc_meta,
+                doc_meta=DocMetadata.from_file_metadata(file_meta),
                 max_context_words=request.max_context_words,
                 scroll_jump=request.scroll_jump,
-                selected_asr_model=request.selected_asr_model,
-                google_translate_target=request.google_translate_target,
+                selected_asr_model=selected_asr_model,
+                google_translate_target=google_translate_target,
             ),
-            input_docs,
-            doc_metas,
+            file_urls,
+            file_metas,
         )
         bm25 = BM25Okapi(bm25_corpus, k1=2, b=0.3)
         if request.keyword_query and isinstance(request.keyword_query, list):
@@ -237,20 +256,30 @@ class DocMetadata(typing.NamedTuple):
         return cls(meta.name, meta.etag, meta.mime_type)
 
 
-def doc_url_to_metadata(f_url: str) -> DocMetadata:
-    """
-    Fetches the metadata for a document url
-
-    Args:
-        f_url: document url
-
-    Returns:
-        document metadata
-    """
-    return DocMetadata.from_file_metadata(doc_url_to_file_metadata(f_url))
+def doc_or_yt_url_to_metadatas(f_url: str) -> list[tuple[str, FileMetadata]]:
+    if is_yt_url(f_url):
+        entries = yt_dlp_get_video_entries(f_url)
+        return [
+            (
+                entry["webpage_url"],
+                FileMetadata(
+                    name=entry.get("title", "YouTube Video"),
+                    # youtube doesn't provide etag, so we use filesize_approx or upload_date
+                    etag=entry.get("filesize_approx") or entry.get("upload_date"),
+                    # we will later convert & save as wav
+                    mime_type="audio/wav",
+                    total_bytes=entry.get("filesize_approx", 0),
+                ),
+            )
+            for entry in entries
+        ]
+    else:
+        return [(f_url, doc_url_to_file_metadata(f_url))]
 
 
 def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
+    from googleapiclient.errors import HttpError
+
     f = furl(f_url.strip("/"))
     if is_gdrive_url(f):
         # extract filename from google drive metadata
@@ -305,6 +334,27 @@ def doc_url_to_file_metadata(f_url: str) -> FileMetadata:
     )
 
 
+def yt_dlp_get_video_entries(url: str) -> list[dict]:
+    data = yt_dlp_extract_info(url)
+    entries = data.get("entries", [data])
+    return [e for e in entries if e]
+
+
+def yt_dlp_extract_info(url: str) -> dict:
+    import yt_dlp
+
+    # https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/options.py
+    params = dict(ignoreerrors=True, check_formats=False)
+    with yt_dlp.YoutubeDL(params) as ydl:
+        data = ydl.extract_info(url, download=False)
+        if not data:
+            raise UserError(
+                f"Could not download the youtube video at {url!r}. "
+                f"Please make sure the video is public and the url is correct."
+            )
+        return data
+
+
 @redis_cache_decorator
 def get_bm25_embeds_for_doc(
     *,
@@ -319,7 +369,6 @@ def get_bm25_embeds_for_doc(
         f_url=f_url,
         doc_meta=doc_meta,
         selected_asr_model=selected_asr_model,
-        google_translate_target=google_translate_target,
     )
     refs = pages_to_split_refs(
         pages=pages,
@@ -328,10 +377,22 @@ def get_bm25_embeds_for_doc(
         max_context_words=max_context_words,
         scroll_jump=scroll_jump,
     )
+    translate_split_refs(refs, google_translate_target)
     tokenized_corpus = [
         bm25_tokenizer(ref["title"]) + bm25_tokenizer(ref["snippet"]) for ref in refs
     ]
     return tokenized_corpus
+
+
+def translate_split_refs(
+    refs: list[SearchReference], google_translate_target: str | None
+):
+    if not google_translate_target:
+        return
+    snippets = [ref["snippet"] for ref in refs]
+    translated_snippets = run_google_translate(snippets, google_translate_target)
+    for ref, translated_snippet in zip(refs, translated_snippets):
+        ref["snippet"] = translated_snippet
 
 
 @redis_cache_decorator
@@ -362,7 +423,6 @@ def get_embeds_for_doc(
         f_url=f_url,
         doc_meta=doc_meta,
         selected_asr_model=selected_asr_model,
-        google_translate_target=google_translate_target,
     )
     refs = pages_to_split_refs(
         pages=pages,
@@ -371,6 +431,7 @@ def get_embeds_for_doc(
         max_context_words=max_context_words,
         scroll_jump=scroll_jump,
     )
+    translate_split_refs(refs, google_translate_target)
     texts = [m["title"] + " | " + m["snippet"] for m in refs]
     # get doc embeds in batches
     batch_size = 16  # azure openai limits
@@ -482,39 +543,28 @@ def doc_url_to_text_pages(
     *,
     f_url: str,
     doc_meta: DocMetadata,
-    google_translate_target: str | None,
     selected_asr_model: str | None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
     """
     Download document from url and convert to text pages.
-
-    Args:
-        f_url: url of document
-        doc_meta: document metadata
-        google_translate_target: target language for google translate
-        selected_asr_model: selected ASR model (used for audio files)
-
-    Returns:
-        list of text pages
     """
-    f_bytes, ext = download_content_bytes(f_url=f_url, mime_type=doc_meta.mime_type)
+    f_bytes, mime_type = download_content_bytes(
+        f_url=f_url, mime_type=doc_meta.mime_type
+    )
     if not f_bytes:
         return []
-    pages = bytes_to_text_pages_or_df(
+    return any_bytes_to_text_pages_or_df(
         f_url=f_url,
         f_name=doc_meta.name,
         f_bytes=f_bytes,
-        ext=ext,
-        mime_type=doc_meta.mime_type,
+        mime_type=mime_type,
         selected_asr_model=selected_asr_model,
     )
-    # optionally, translate text
-    if google_translate_target and isinstance(pages, list):
-        pages = run_google_translate(pages, google_translate_target)
-    return pages
 
 
 def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
+    if is_yt_url(f_url):
+        return download_youtube_to_wav(f_url), "audio/wav"
     f = furl(f_url)
     if is_gdrive_url(f):
         # download from google drive
@@ -524,7 +574,6 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
         r = requests.get(
             f_url,
             headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-            timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
         )
         raise_for_status(r)
     except requests.RequestException as e:
@@ -543,74 +592,165 @@ def download_content_bytes(*, f_url: str, mime_type: str) -> tuple[bytes, str]:
                 f_bytes = codec.decode(f_bytes)[0].encode()
             except UnicodeDecodeError:
                 pass
-    ext = guess_ext_from_response(r)
-    return f_bytes, ext
+    mime_type = get_mimetype_from_response(r)
+    return f_bytes, mime_type
 
 
-def bytes_to_text_pages_or_df(
+def any_bytes_to_text_pages_or_df(
     *,
     f_url: str,
     f_name: str,
     f_bytes: bytes,
-    ext: str,
     mime_type: str,
     selected_asr_model: str | None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
-    # convert document to text pages
-    match ext:
-        case ".pdf":
-            pages = pdf_to_text_pages(io.BytesIO(f_bytes))
-        case ".docx" | ".md" | ".html" | ".rtf" | ".epub" | ".odt":
-            pages = [pandoc_to_text(f_name + ext, f_bytes)]
-        case ".txt":
-            pages = [f_bytes.decode()]
-        case ".wav" | ".ogg" | ".mp3" | ".aac":
-            if not selected_asr_model:
-                raise ValueError(
-                    "For transcribing audio/video, please choose an ASR model from the settings!"
-                )
-            if is_gdrive_url(furl(f_url)):
-                f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
-            pages = [run_asr(f_url, selected_model=selected_asr_model, language="en")]
-        case _:
-            df = bytes_to_df(f_name=f_name, f_bytes=f_bytes, ext=ext)
-            assert (
-                "snippet" in df.columns or "sections" in df.columns
-            ), f'uploaded spreadsheet must contain a "snippet" or "sections" column - {f_name !r}'
-            return df
+    if mime_type.startswith("audio/") or mime_type.startswith("video/"):
+        if is_gdrive_url(furl(f_url)) or is_yt_url(f_url):
+            f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
+        transcript = run_asr(
+            f_url,
+            selected_model=(selected_asr_model or AsrModels.whisper_large_v2.name),
+        )
+        return [transcript]
 
-    return pages
+    try:
+        return pdf_or_tabular_bytes_to_text_pages_or_df(
+            f_url=f_url,
+            f_name=f_name,
+            f_bytes=f_bytes,
+            mime_type=mime_type,
+            # for now, only use form recognizer if asr model is selected.
+            # We should later change the doc extract settings to include the form recognizer option
+            use_form_reco=bool(selected_asr_model),
+        )
+    except UnsupportedDocumentError:
+        pass
+
+    if mime_type == "text/plain":
+        text = f_bytes.decode()
+    else:
+        ext = mimetypes.guess_extension(mime_type) or ""
+        text = pandoc_to_text(f_name + ext, f_bytes)
+    return [text]
 
 
-def bytes_to_df(
+def pdf_or_tabular_bytes_to_text_pages_or_df(
+    *,
+    f_url: str,
+    f_name: str,
+    f_bytes: bytes,
+    mime_type: str,
+    use_form_reco: bool,
+):
+    import pandas as pd
+
+    if mime_type == "application/pdf":
+        if use_form_reco:
+            df = pdf_to_form_reco_df(f_url, f_name, f_bytes, mime_type)
+        else:
+            return pdf_to_text_pages(f=io.BytesIO(f_bytes))
+    else:
+        df = tabular_bytes_to_str_df(
+            f_name=f_name, f_bytes=f_bytes, mime_type=mime_type
+        )
+
+    if "sections" in df.columns or "snippet" in df.columns:
+        return df
+    else:
+        df.columns = [THEAD + col + THEAD for col in df.columns]
+        return pd.DataFrame(["csv=" + df.to_csv(index=False)], columns=["sections"])
+
+
+def is_yt_url(url: str) -> bool:
+    return "youtube.com" in url or "youtu.be" in url
+
+
+def tabular_bytes_to_str_df(
     *,
     f_name: str,
     f_bytes: bytes,
-    ext: str,
+    mime_type: str,
 ) -> "pd.DataFrame":
+    df = tabular_bytes_to_any_df(
+        f_name=f_name, f_bytes=f_bytes, mime_type=mime_type, dtype=str
+    )
+    return df.fillna("")
+
+
+def tabular_bytes_to_any_df(
+    *,
+    f_name: str,
+    f_bytes: bytes,
+    mime_type: str,
+    dtype=None,
+):
     import pandas as pd
 
     f = io.BytesIO(f_bytes)
-    match ext:
-        case ".csv":
-            df = pd.read_csv(f, dtype=str)
-        case ".tsv":
-            df = pd.read_csv(f, sep="\t", dtype=str)
-        case ".xls" | ".xlsx":
-            df = pd.read_excel(f, dtype=str)
-        case ".json":
-            df = pd.read_json(f, dtype=str)
-        case ".xml":
-            df = pd.read_xml(f, dtype=str)
+    match mime_type:
+        case "text/csv":
+            df = pd.read_csv(f, dtype=dtype)
+        case "text/tab-separated-values":
+            df = pd.read_csv(f, sep="\t", dtype=dtype)
+        case "application/json":
+            df = pd.read_json(f, dtype=dtype)
+        case "application/xml":
+            df = pd.read_xml(f, dtype=dtype)
+        case _ if "excel" in mime_type or "spreadsheet" in mime_type:
+            df = pd.read_excel(f, dtype=dtype)
         case _:
-            raise ValueError(f"Unsupported document format {ext!r} ({f_name})")
-    return df.fillna("")
+            raise UnsupportedDocumentError(
+                f"Unsupported document {mime_type=} ({f_name})"
+            )
+    return df
+
+
+class UnsupportedDocumentError(UserError):
+    pass
 
 
 def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
     import pdftotext
 
     return list(pdftotext.PDF(f))
+
+
+def pdf_to_form_reco_df(
+    f_url: str,
+    f_name: str,
+    f_bytes: bytes,
+    mime_type: str,
+) -> "pd.DataFrame":
+    import pandas as pd
+
+    if is_gdrive_url(furl(f_url)):
+        f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
+    num_pages = get_pdf_num_pages(f_bytes)
+    return pd.DataFrame(
+        map_parallel(
+            lambda page_num: (
+                add_page_number_to_pdf(f_url, page_num).url,
+                f"{f_name}, page {page_num}",
+                azure_doc_extract_page_num(f_url, page_num),
+            ),
+            range(1, num_pages + 1),
+            max_workers=4,
+        ),
+        columns=["url", "title", "sections"],
+    )
+
+
+def get_pdf_num_pages(f_bytes: bytes) -> int:
+    with tempfile.NamedTemporaryFile() as infile:
+        infile.write(f_bytes)
+        output = call_cmd("pdfinfo", infile.name).lower()
+        for line in output.splitlines():
+            if not line.startswith("pages:"):
+                continue
+            try:
+                return int(line.split("pages:")[-1])
+            except ValueError:
+                raise ValueError(f"Unexpected PDF Info: {line}")
 
 
 def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:

@@ -1,6 +1,4 @@
 import random
-import subprocess
-import tempfile
 import threading
 import typing
 
@@ -8,7 +6,6 @@ import requests
 from aifail import retry_if
 from django.db.models import IntegerChoices
 from furl import furl
-from googleapiclient.errors import HttpError
 from pydantic import BaseModel
 
 import gooey_ui as st
@@ -19,15 +16,17 @@ from daras_ai_v2.asr import (
     google_translate_language_selector,
     AsrModels,
     run_asr,
-    download_youtube_to_wav,
+    download_youtube_to_wav_url,
     run_google_translate,
     audio_url_to_wav,
 )
-from daras_ai_v2.azure_doc_extract import azure_doc_extract_pages
+from daras_ai_v2.azure_doc_extract import (
+    azure_doc_extract_page_num,
+)
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import document_uploader
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import raise_for_status, call_cmd
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import (
     apply_parallel,
@@ -39,7 +38,12 @@ from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.settings import service_account_key_path
-from daras_ai_v2.vector_search import doc_url_to_metadata, add_page_number_to_pdf
+from daras_ai_v2.vector_search import (
+    add_page_number_to_pdf,
+    yt_dlp_get_video_entries,
+    doc_url_to_file_metadata,
+    get_pdf_num_pages,
+)
 from recipes.DocSearch import render_documents
 
 DEFAULT_YOUTUBE_BOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc8ffac-93fb-11ee-89fb-02420a0001cb/Youtube%20transcripts.jpg.png"
@@ -58,12 +62,13 @@ class Columns(IntegerChoices):
 
 
 class DocExtractPage(BasePage):
-    title = "Youtube Transcripts + GPT extraction to Google Sheets"
+    title = "Synthetic Data Maker for Videos & PDFs"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aeb83ee8-889e-11ee-93dc-02420a000143/Youtube%20transcripts%20GPT%20extractions.png.png"
     workflow = Workflow.DOC_EXTRACT
     slug_versions = [
         "doc-extract",
         "youtube-bot",
+        "doc-extract",
     ]
     price = 500
 
@@ -96,7 +101,7 @@ class DocExtractPage(BasePage):
 
     def render_form_v2(self):
         document_uploader(
-            "#### 🤖 Youtube URLS",
+            "#### 🤖 Youtube/PDF/Drive URLs",
             accept=("audio/*", "application/pdf", "video/*"),
         )
         st.text_input(
@@ -105,7 +110,7 @@ class DocExtractPage(BasePage):
         )
 
     def validate_form_v2(self):
-        assert st.session_state.get("documents"), "Please enter Youtube video URL/URLs"
+        assert st.session_state.get("documents"), "Please enter Youtube/PDF/Drive URLs"
         assert st.session_state.get("sheet_url"), "Please enter a Google Sheet URL"
 
     def preview_description(self, state: dict) -> str:
@@ -271,7 +276,7 @@ def col_i2a(col: int) -> str:
 
 def extract_info(url: str) -> list[dict | None]:
     if is_yt_url(url):
-        import yt_dlp
+        return yt_dlp_get_video_entries(url)
 
         # https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/options.py
         params = dict(ignoreerrors=True, check_formats=False)
@@ -282,61 +287,48 @@ def extract_info(url: str) -> list[dict | None]:
             return [e for e in entries if e]
         else:
             return [{"webpage_url": url, "title": "Youtube Video"}]
-    else:
-        # assume it's a direct link
-        doc_meta = doc_url_to_metadata(url)
-        assert doc_meta.mime_type, f"Could not determine mime type for {url}"
 
-        if "application/pdf" in doc_meta.mime_type:
-            f = furl(url)
-            if is_gdrive_url(f):
-                f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
-                content_url = upload_file_from_bytes(
-                    doc_meta.name, f_bytes, content_type=doc_meta.mime_type
-                )
-            else:
-                r = requests.get(
-                    url,
-                    headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
-                    timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
-                )
-                raise_for_status(r)
-                f_bytes = r.content
-                content_url = url
-            num_pages = get_pdf_num_pages(f_bytes)
-            return [
-                {
-                    "webpage_url": add_page_number_to_pdf(f, page_num).url,
-                    "title": f"{doc_meta.name}, page {page_num}",
-                    "doc_meta": doc_meta,
-                    # "pdf_page": page,
-                    "content_url": add_page_number_to_pdf(content_url, page_num).url,
-                    "page_num": page_num,
-                }
-                for i in range(num_pages)
-                if (page_num := i + 1)
-            ]
+    # assume it's a direct link
+    doc_meta = doc_url_to_file_metadata(url)
+    assert doc_meta.mime_type, f"Could not determine mime type for {url}"
+
+    if "application/pdf" in doc_meta.mime_type:
+        f = furl(url)
+        if is_gdrive_url(f):
+            f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
+            content_url = upload_file_from_bytes(
+                doc_meta.name, f_bytes, content_type=doc_meta.mime_type
+            )
         else:
-            return [
-                {
-                    "webpage_url": url,
-                    "title": doc_meta.name,
-                    "doc_meta": doc_meta,
-                },
-            ]
-
-
-def get_pdf_num_pages(f_bytes: bytes) -> int:
-    with tempfile.NamedTemporaryFile() as infile:
-        infile.write(f_bytes)
-        output = call_cmd("pdfinfo", infile.name).lower()
-        for line in output.splitlines():
-            if not line.startswith("pages:"):
-                continue
-            try:
-                return int(line.split("pages:")[-1])
-            except ValueError:
-                raise ValueError(f"Unexpected PDF Info: {line}")
+            r = requests.get(
+                url,
+                headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
+                timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC,
+            )
+            raise_for_status(r)
+            f_bytes = r.content
+            content_url = url
+        num_pages = get_pdf_num_pages(f_bytes)
+        return [
+            {
+                "webpage_url": add_page_number_to_pdf(f, page_num).url,
+                "title": f"{doc_meta.name}, page {page_num}",
+                "doc_meta": doc_meta,
+                # "pdf_page": page,
+                "content_url": add_page_number_to_pdf(content_url, page_num).url,
+                "page_num": page_num,
+            }
+            for i in range(num_pages)
+            if (page_num := i + 1)
+        ]
+    else:
+        return [
+            {
+                "webpage_url": url,
+                "title": doc_meta.name,
+                "doc_meta": doc_meta,
+            },
+        ]
 
 
 def process_entry(
@@ -395,7 +387,7 @@ def process_source(
     if not content_url:
         yield "Downloading"
         if is_yt:
-            content_url, _ = download_youtube_to_wav(webpage_url)
+            content_url, _ = download_youtube_to_wav_url(webpage_url)
         elif is_video:
             f = furl(webpage_url)
             if is_gdrive_url(f):
@@ -419,15 +411,7 @@ def process_source(
             transcript = run_asr(content_url, request.selected_asr_model)
         elif is_pdf:
             yield "Extracting PDF"
-            if page_num := entry.get("page_num"):
-                params = dict(pages=str(page_num))
-            else:
-                params = None
-            pages = azure_doc_extract_pages(content_url, params=params)
-            if pages and pages[0]:
-                transcript = str(pages[0])
-            else:
-                transcript = ""
+            transcript = azure_doc_extract_page_num(content_url, entry.get("page_num"))
         else:
             raise NotImplementedError(
                 f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"

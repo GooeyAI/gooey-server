@@ -3,7 +3,6 @@ import os.path
 import tempfile
 from enum import Enum
 
-import langcodes
 import requests
 import typing_extensions
 from django.db.models import F
@@ -20,7 +19,7 @@ from daras_ai_v2.exceptions import (
     call_cmd,
     ffprobe,
 )
-from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.functional import map_parallel, flatten
 from daras_ai_v2.gdrive_downloader import (
     is_gdrive_url,
     gdrive_download,
@@ -30,6 +29,8 @@ from daras_ai_v2.gdrive_downloader import (
 from daras_ai_v2.google_asr import gcp_asr_v1
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
+
+TRANSLATE_DETECT_BATCH_SIZE = 8
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -239,6 +240,8 @@ def google_translate_source_languages() -> dict[str, str]:
 
 
 def get_language_in_collection(langcode: str, languages):
+    import langcodes
+
     for lang in languages:
         if langcodes.get(lang).language == langcodes.get(langcode).language:
             return langcode
@@ -250,6 +253,8 @@ def asr_language_selector(
     label="##### Spoken Language",
     key="language",
 ):
+    import langcodes
+
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
     if forced_lang:
@@ -296,6 +301,7 @@ def run_google_translate(
         list[str]: Translated text.
     """
     from google.cloud import translate_v2 as translate
+    import langcodes
 
     # convert to BCP-47 format (google handles consistent language codes but sometimes gets confused by a mix of iso2 and iso3 which we have)
     if source_language:
@@ -315,7 +321,10 @@ def run_google_translate(
         language_codes = [source_language] * len(texts)
     else:
         translate_client = translate.Client()
-        detections = translate_client.detect_language(texts)
+        detections = flatten(
+            translate_client.detect_language(texts[i : i + TRANSLATE_DETECT_BATCH_SIZE])
+            for i in range(0, len(texts), TRANSLATE_DETECT_BATCH_SIZE)
+        )
         language_codes = [detection["language"] for detection in detections]
 
     return map_parallel(
@@ -324,6 +333,7 @@ def run_google_translate(
         ),
         texts,
         language_codes,
+        max_workers=TRANSLATE_DETECT_BATCH_SIZE,
     )
 
 
@@ -391,6 +401,8 @@ _session = None
 def _MinT_translate_one_text(
     text: str, source_language: str, target_language: str
 ) -> str:
+    import langcodes
+
     source_language = langcodes.Language.get(source_language).language
     target_language = langcodes.Language.get(target_language).language
     res = requests.post(
@@ -439,15 +451,16 @@ def run_asr(
     import google.cloud.speech_v2 as cloud_speech
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding
+    from daras_ai_v2.vector_search import is_yt_url
+    import langcodes
 
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
-    is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
-    if is_youtube_url:
-        audio_url, size = download_youtube_to_wav(audio_url)
+    if is_yt_url(audio_url):
+        audio_url, size = download_youtube_to_wav_url(audio_url)
     elif is_gdrive_url(furl(audio_url)):
         meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
-        anybytes, ext = gdrive_download(
+        anybytes, _ = gdrive_download(
             furl(audio_url), meta.get("mimeType", "audio/wav")
         )
         wavbytes, size = audio_bytes_to_wav(anybytes)
@@ -672,12 +685,18 @@ def _get_or_create_recognizer(
 FFMPEG_WAV_ARGS = ["-vn", "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000"]
 
 
-def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
+def download_youtube_to_wav_url(youtube_url: str) -> tuple[str, int]:
     """
     Convert a youtube video to wav audio file.
     Returns:
         str: url of the wav audio file.
     """
+    wavdata = download_youtube_to_wav(youtube_url)
+    # upload the wav file
+    return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
+
+
+def download_youtube_to_wav(youtube_url: str) -> bytes:
     with tempfile.TemporaryDirectory() as tmpdir:
         infile = os.path.join(tmpdir, "infile")
         outfile = os.path.join(tmpdir, "outfile.wav")
@@ -696,8 +715,7 @@ def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
         # read wav file into memory
         with open(outfile, "rb") as f:
             wavdata = f.read()
-    # upload the wav file
-    return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
+    return wavdata
 
 
 def audio_url_to_wav(audio_url: str) -> tuple[str, int]:

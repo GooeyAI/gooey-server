@@ -1,11 +1,19 @@
-from django.utils import timezone
+import base64
+from datetime import datetime, timedelta
 
-from daras_ai_v2.base import BasePage, MenuTabs
-import gooey_ui as st
+from django.db.models import Count, Avg, Q
+from django.db.models.functions import (
+    TruncMonth,
+    TruncDay,
+    TruncWeek,
+    TruncYear,
+    Concat,
+)
+from django.utils import timezone
 from furl import furl
 
+import gooey_ui as st
 from app_users.models import AppUser
-
 from bots.models import (
     Workflow,
     Platform,
@@ -17,23 +25,12 @@ from bots.models import (
     FeedbackQuerySet,
     MessageQuerySet,
 )
-from datetime import datetime, timedelta
-import pandas as pd
-import plotly.graph_objects as go
-import base64
+from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
 )
 from recipes.VideoBots import VideoBotsPage
-from django.db.models.functions import (
-    TruncMonth,
-    TruncDay,
-    TruncWeek,
-    TruncYear,
-    Concat,
-)
-from django.db.models import Count, Avg, Q
 
 ID_COLUMNS = [
     "conversation__fb_page_id",
@@ -419,6 +416,8 @@ class VideoBotsStatsPage(BasePage):
     def calculate_stats_binned_by_time(
         self, bi, start_date, end_date, factor, trunc_fn
     ):
+        import pandas as pd
+
         messages_received = (
             Message.objects.filter(
                 created_at__date__gte=start_date,
@@ -547,6 +546,8 @@ class VideoBotsStatsPage(BasePage):
         return df
 
     def plot_graphs(self, view, df):
+        import plotly.graph_objects as go
+
         fig = go.Figure(
             data=[
                 go.Bar(
@@ -774,6 +775,8 @@ class VideoBotsStatsPage(BasePage):
         start_date=None,
         end_date=None,
     ):
+        import pandas as pd
+
         df = pd.DataFrame()
         if details == "Conversations":
             if start_date and end_date:
