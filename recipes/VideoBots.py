@@ -1284,6 +1284,41 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 #     "Add a Gooey.AI LLM prompt to automatically analyse and categorize user messages. [Example](https://gooey.ai/compare-large-language-models/how-farmerchat-turns-conversations-to-structured-data/?example_id=lbjnoem7) and [Guide](https://gooey.ai/docs/guides/copilot/conversation-analysis)."
                 # )
 
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    st.write("###### Add Integration")
+                    st.caption(f"Add another connection for {run_title}.")
+                with col2:
+                    if st.button(
+                        f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
+                        key="btn_connect",
+                    ):
+                        raise RedirectException(add_integration)
+
+                if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
+                    col1, col2 = st.columns(2, style={"align-items": "center"})
+                    with col1:
+                        st.write("###### WhatsApp Business Management")
+                        st.caption(
+                            f"Access your WhatsApp account on Meta to approve message templates, etc."
+                        )
+                    with col2:
+                        st.anchor(
+                            "Business Settings",
+                            f"https://business.facebook.com/settings/whatsapp-business-accounts/{bi.wa_business_waba_id}",
+                            new_tab=True,
+                        )
+                        st.anchor(
+                            "WhatsApp Manager",
+                            f"https://business.facebook.com/wa/manage/home/?waba_id={bi.wa_business_waba_id}",
+                            new_tab=True,
+                        )
+                        st.anchor(
+                            "Phone Numbers",
+                            "https://business.facebook.com/wa/manage/phone-numbers",
+                            new_tab=True,
+                        )
+
                 with st.expander("Configure Settings 🛠️"):
                     if bi.platform == Platform.SLACK:
                         slack_specific_settings(bi, run_title)
@@ -1310,41 +1345,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                             bi.published_run = None
                             bi.save()
                             st.experimental_rerun()
-
-                col1, col2 = st.columns(2, style={"align-items": "center"})
-                with col1:
-                    st.write("###### Add Integration")
-                    st.caption(f"Add another connection for {run_title}.")
-                with col2:
-                    if st.button(
-                        f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
-                        key="btn_connect",
-                    ):
-                        raise RedirectException(add_integration)
-
-                if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
-                    col1, col2 = st.columns(2, style={"align-items": "center"})
-                    with col1:
-                        st.write("###### Whatsapp Business Management")
-                        st.caption(
-                            f"Only touch if you know what you're doing. Changing phonenumber(s) will break the Gooey integration."
-                        )
-                    with col2:
-                        st.anchor(
-                            "Business Settings",
-                            f"https://business.facebook.com/settings/whatsapp-business-accounts/{bi.wa_business_waba_id}",
-                            new_tab=True,
-                        )
-                        st.anchor(
-                            "WhatsApp Manager",
-                            f"https://business.facebook.com/wa/manage/home/?waba_id={bi.wa_business_waba_id}",
-                            new_tab=True,
-                        )
-                        st.anchor(
-                            "Phone Numbers",
-                            "https://business.facebook.com/wa/manage/phone-numbers",
-                            new_tab=True,
-                        )
 
 
 def chat_list_view():
