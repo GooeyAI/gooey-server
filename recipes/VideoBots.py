@@ -1234,7 +1234,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 with col2:
                     if test_link:
                         copy_to_clipboard_button(
-                            f"Copy {Platform(bi.platform).label} Link",
+                            f'<i class="fa-regular fa-link"></i> Copy {Platform(bi.platform).label} Link',
                             value=test_link,
                             type="secondary",
                         )
