@@ -51,8 +51,10 @@ def send_low_balance_email(
     total_credits_consumed: int,
 ):
     recipeints = "support@gooey.ai, devs@gooey.ai"
+    name = user.display_name or (user.email or recipeints).split("@")[0]
     html_body = templates.get_template("low_balance_email.html").render(
         user=user,
+        name=name,
         url=account_url,
         total_credits_consumed=total_credits_consumed,
         settings=settings,
