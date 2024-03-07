@@ -664,13 +664,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 total = 4 + TextToSpeechPage().get_raw_price(tts_state)
             case _:
                 total = 4
-        total += llm_price[LargeLanguageModels[state["selected_model"]]]
-
+        total += state.get("prompt_tokens", 1)
+        print("this is state", state.get("prompt_tokens", 1))
         return total * state.get("num_outputs", 1)
 
     def additional_notes(self, state: dict):
         llm_cost = llm_price[LargeLanguageModels[state["selected_model"]]]
-        notes = f" \\\n*Breakdown: {llm_cost} ({state['selected_model']}) + 1 (Lipsync) + 3/run*"
+        notes = f" \\\n*Breakdown: {state.get("prompt_tokens", 1)} ({state['selected_model']}) + 1 (Lipsync) + 3/run*"
         tts_provider = st.session_state.get("tts_provider")
         match tts_provider:
             case TextToSpeechProviders.ELEVEN_LABS.name:
@@ -890,10 +890,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 tools=request.tools,
                 stream=True,
             )
-            # print everything in chunks
-            for i, entries in enumerate(chunks):
-                print(entries)
-                print("here are the tokens", chunks["prompt_tokens"])
         else:
             prompt = "\n".join(
                 format_chatml_message(entry) for entry in prompt_messages
@@ -915,6 +911,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         for i, entries in enumerate(chunks):
             if not entries:
                 continue
+            for entry in entries:
+                state["prompt_tokens"] = entry["prompt_tokens"]
             output_text = [entry["content"] for entry in entries]
             if request.tools:
                 # output_text, tool_call_choices = output_text
