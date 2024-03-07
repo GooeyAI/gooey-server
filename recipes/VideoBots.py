@@ -1113,7 +1113,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.markdown(
                 f"""
                 #### {title}
-                {status or f'Run Saved ✅ ~ <ins>Connect</ins> ~ <span style="color: {GRAYCOLOR}">Test & Configure</span>'}
+                {status or f'Run Saved ✅ • <b>Connect</b> • <span style="color: {GRAYCOLOR}">Test & Configure</span>'}
                 """,
                 unsafe_allow_html=True,
             )
@@ -1184,7 +1184,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             cancel = self.get_tab_url(MenuTabs.integrations)
             self.integration_connect_screen(
                 "Configure your Copilot: Add a New Integration",
-                f'Run Saved ✅ ~ <ins>Connected</ins> ✅ ~ <a href="{cancel}">Test & Configure</a> ✅',
+                f'Run Saved ✅ • <b>Connected</b> ✅ • <a href="{cancel}">Test & Configure</a> ✅',
             )
             with st.center():
                 if st.button("Return to Test & Configure"):
