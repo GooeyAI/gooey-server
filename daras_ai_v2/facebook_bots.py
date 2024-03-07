@@ -11,9 +11,9 @@ from daras_ai_v2.text_splitter import text_splitter
 
 WA_MSG_MAX_SIZE = 1024
 
-WHATSAPP_AUTH_HEADER = {
-    "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
-}
+
+def get_wa_auth_header(access_token: str | None = None):
+    return {"Authorization": f"Bearer {access_token or settings.WHATSAPP_ACCESS_TOKEN}"}
 
 
 class WhatsappBot(BotInterface):
@@ -29,6 +29,7 @@ class WhatsappBot(BotInterface):
         self.input_type = message["type"]
 
         bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
+        self.access_token = bi.wa_business_access_token
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
             wa_phone_number="+" + self.user_id,
@@ -54,7 +55,7 @@ class WhatsappBot(BotInterface):
             except KeyError:
                 return None
         # download file from whatsapp
-        data, mime_type = retrieve_wa_media_by_id(media_id)
+        data, mime_type = retrieve_wa_media_by_id(media_id, self.access_token)
         data, _ = audio_bytes_to_wav(data)
         mime_type = "audio/wav"
         # upload file to firebase
@@ -80,7 +81,7 @@ class WhatsappBot(BotInterface):
 
     def _download_wa_media(self, media_id: str) -> str:
         # download file from whatsapp
-        data, mime_type = retrieve_wa_media_by_id(media_id)
+        data, mime_type = retrieve_wa_media_by_id(media_id, self.access_token)
         # upload file to firebase
         return upload_file_from_bytes(
             filename=self.nice_filename(mime_type),
@@ -116,10 +117,13 @@ class WhatsappBot(BotInterface):
             video=video,
             documents=documents,
             buttons=buttons,
+            access_token=self.access_token,
         )
 
     def mark_read(self):
-        wa_mark_read(self.bot_id, self.input_message["id"])
+        wa_mark_read(
+            self.bot_id, self.input_message["id"], access_token=self.access_token
+        )
 
     @classmethod
     def send_msg_to(
@@ -133,6 +137,7 @@ class WhatsappBot(BotInterface):
         ## whatsapp specific
         bot_number: str,
         user_number: str,
+        access_token: str | None = None,
     ) -> str | None:
         # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
 
@@ -158,6 +163,7 @@ class WhatsappBot(BotInterface):
                     }
                     for doc in splits[:-1]
                 ],
+                access_token=access_token,
             )
 
         messages = []
@@ -239,21 +245,24 @@ class WhatsappBot(BotInterface):
             bot_number=bot_number,
             user_number=user_number,
             messages=messages,
+            access_token=access_token,
         )
 
 
-def retrieve_wa_media_by_id(media_id: str) -> (bytes, str):
+def retrieve_wa_media_by_id(
+    media_id: str, access_token: str | None = None
+) -> (bytes, str):
     # get media info
     r1 = requests.get(
         f"https://graph.facebook.com/v16.0/{media_id}/",
-        headers=WHATSAPP_AUTH_HEADER,
+        headers=get_wa_auth_header(access_token),
     )
     raise_for_status(r1)
     media_info = r1.json()
     # download media
     r2 = requests.get(
         media_info["url"],
-        headers=WHATSAPP_AUTH_HEADER,
+        headers=get_wa_auth_header(access_token),
     )
     raise_for_status(r2)
     content = r2.content
@@ -280,13 +289,15 @@ def _build_msg_buttons(buttons: list[ReplyButton], msg: dict) -> dict:
     }
 
 
-def send_wa_msgs_raw(*, bot_number, user_number, messages: list) -> str | None:
+def send_wa_msgs_raw(
+    *, bot_number, user_number, messages: list, access_token: str | None = None
+) -> str | None:
     msg_id = None
     for msg in messages:
         print(f"send_wa_msgs_raw: {msg=}")
         r = requests.post(
             f"https://graph.facebook.com/v16.0/{bot_number}/messages",
-            headers=WHATSAPP_AUTH_HEADER,
+            headers=get_wa_auth_header(access_token),
             json={
                 "messaging_product": "whatsapp",
                 "to": user_number,
@@ -304,11 +315,11 @@ def send_wa_msgs_raw(*, bot_number, user_number, messages: list) -> str | None:
     return msg_id
 
 
-def wa_mark_read(bot_number: str, message_id: str):
+def wa_mark_read(bot_number: str, message_id: str, access_token: str | None = None):
     # send read receipt
     r = requests.post(
         f"https://graph.facebook.com/v16.0/{bot_number}/messages",
-        headers=WHATSAPP_AUTH_HEADER,
+        headers=get_wa_auth_header(access_token),
         json={
             "messaging_product": "whatsapp",
             "status": "read",
