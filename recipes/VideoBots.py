@@ -9,7 +9,7 @@ from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
-from bots.models import BotIntegration, Platform, PublishedRun, PublishedRunVisibility
+from bots.models import BotIntegration, Platform
 from bots.models import Workflow
 from daras_ai.image_input import (
     truncate_text_words,
@@ -29,8 +29,12 @@ from daras_ai_v2.bot_integration_widgets import (
     render_bot_test_link,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
-    doc_search_settings,
+    query_instructions_widget,
+    keyword_instructions_widget,
+    doc_search_advanced_settings,
+    doc_extract_selector,
     document_uploader,
+    citation_style_selector,
 )
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -75,7 +79,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_provider_selector,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
-from recipes.DocExtract import DocExtractPage
 from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
@@ -227,7 +230,7 @@ class VideoBotsPage(BasePage):
 
         user_language: str | None = Field(
             title="🔠 User Language",
-            description="If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.",
+            description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
         input_glossary_document: str | None = Field(
@@ -340,13 +343,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         document_uploader(
             """
             #### 📄 Knowledge
-            Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
+            Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
             """,
         )
 
         st.markdown("#### Capabilities")
         if st.checkbox(
-            "##### 🗣️ Speak Responses",
+            "##### 🗣️ Text to Speech & Lipsync",
             value=bool(st.session_state.get("tts_provider")),
         ):
             text_to_speech_provider_selector(self)
@@ -362,8 +365,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.file_uploader(
                 """
                 ###### 👩‍🦰 Input Face
-                Upload a video/image that contains faces to use
-                *Recommended - mp4 / mov / png / jpg / gif*
+                Upload a video or image (with a human face) to lipsync responses. mp4, mov, png, jpg or gif preferred.
                 """,
                 key="input_face",
             )
@@ -380,6 +382,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 key="user_language",
             )
             st.write("---")
+        else:
+            st.session_state["user_language"] = None
 
         if st.checkbox(
             "##### 🩻 Photo & Document Intelligence",
@@ -412,10 +416,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         tts_provider = st.session_state.get("tts_provider")
         if tts_provider:
             text_to_speech_settings(self, tts_provider)
+            st.write("---")
 
-        input_face = st.session_state.get("__enable_video")
+        input_face = st.session_state.get("input_face")
         if input_face:
             lipsync_settings()
+            st.write("---")
 
         if st.session_state.get("user_language"):
             st.markdown("##### 🔠 Translation Settings")
@@ -444,12 +450,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             else:
                 st.session_state["input_glossary_document"] = None
                 st.session_state["output_glossary_document"] = None
+            st.write("---")
 
-        if st.session_state.get("documents"):
+        documents = st.session_state.get("documents")
+        if documents:
+            st.write("#### 📄 Knowledge Base")
             st.text_area(
                 """
-            ##### 👩‍🏫 Document Search Results Instructions
-            Guidelines to interpret the results of the knowledge base query.
+            ###### 👩‍🏫 Search Instructions
+            How should the LLM interpret the results from your knowledge base?
             """,
                 key="task_instructions",
                 height=300,
@@ -458,39 +467,34 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 "task_instructions",
             )
 
-            st.write("---")
+            citation_style_selector()
             st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
-            st.caption(
-                "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
-            )
+
+            doc_extract_selector()
+
             st.write("---")
-            doc_search_settings(keyword_instructions_allowed=True)
+
+        st.markdown(
+            """
+            #### Advanced Settings
+            In general, you should not need to adjust these.
+            """
+        )
+
+        if documents:
+            query_instructions_widget()
+            keyword_instructions_widget()
+            doc_search_advanced_settings()
             st.write("---")
 
         language_model_settings(show_selector=False)
+
+        st.write("---")
 
         enum_multiselect(
             enum_cls=LLMTools,
             label="##### " + field_title_desc(self.RequestModel, "tools"),
             key="tools",
-        )
-
-        options = {
-            None: "---",
-            DocExtractPage.get_root_published_run().get_app_url(): "Default",
-        } | {
-            pr.get_app_url(): pr.title
-            for pr in PublishedRun.objects.filter(
-                workflow=Workflow.DOC_EXTRACT,
-                is_approved_example=True,
-                visibility=PublishedRunVisibility.PUBLIC,
-            ).exclude(published_run_id="")
-        }
-        st.selectbox(
-            "##### Select Doc Extract Workflow",
-            key="doc_extract_url",
-            options=options,
-            format_func=lambda x: options[x],
         )
 
     def fields_to_save(self) -> [str]:
