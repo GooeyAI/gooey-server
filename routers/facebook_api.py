@@ -99,10 +99,10 @@ def fb_connect_whatsapp_redirect(request: Request):
         r = requests.post(
             f"https://graph.facebook.com/v19.0/{waba_id}/subscribed_apps?access_token={user_access_token}",
             json={
-                "override_callback_uri": (
+                "override_callback_uri": str(
                     furl(settings.APP_BASE_URL)
                     / router.url_path_for(fb_webhook.__name__)
-                ).tostr(),
+                ),
                 "verify_token": settings.FB_WEBHOOK_TOKEN,
             },
         )
