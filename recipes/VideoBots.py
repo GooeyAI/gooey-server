@@ -665,12 +665,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             case _:
                 total = 4
         total += state.get("prompt_tokens", 1)
-        print("this is state", state.get("prompt_tokens", 1))
         return total * state.get("num_outputs", 1)
 
     def additional_notes(self, state: dict):
-        llm_cost = llm_price[LargeLanguageModels[state["selected_model"]]]
-        notes = f" \\\n*Breakdown: {state.get("prompt_tokens", 1)} ({state['selected_model']}) + 1 (Lipsync) + 3/run*"
+        notes = f" \\\n*Breakdown: {state.get('prompt_tokens', 1)} ({state['selected_model']}) + 1 (Lipsync) + 3/run*"
         tts_provider = st.session_state.get("tts_provider")
         match tts_provider:
             case TextToSpeechProviders.ELEVEN_LABS.name:
@@ -913,6 +911,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 continue
             for entry in entries:
                 state["prompt_tokens"] = entry["prompt_tokens"]
+                state["completion_tokens"] = entry["completion_tokens"]
+            print("set completion_tokens", state.get("completion_tokens", 1))
             output_text = [entry["content"] for entry in entries]
             if request.tools:
                 # output_text, tool_call_choices = output_text
