@@ -9,7 +9,10 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.doc_search_settings_widgets import document_uploader
+from daras_ai_v2.doc_search_settings_widgets import (
+    document_uploader,
+    SUPPORTED_SPREADSHEET_TYPES,
+)
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
@@ -185,7 +188,7 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
     def render_form_v2(self):
         files = document_uploader(
             f"##### {field_title_desc(self.RequestModel, 'documents')}",
-            accept=(".csv", ".xlsx", ".xls", ".json", ".tsv", ".xml"),
+            accept=SUPPORTED_SPREADSHEET_TYPES,
         )
         st.session_state[NROWS_CACHE_KEY] = get_nrows(files)
         if not files:

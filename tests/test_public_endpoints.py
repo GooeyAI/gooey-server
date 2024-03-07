@@ -3,7 +3,7 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from bots.models import PublishedRun, Workflow
-from daras_ai_v2.all_pages import all_api_pages
+from daras_ai_v2.all_pages import all_api_pages, all_hidden_pages
 from daras_ai_v2.tabs_widget import MenuTabs
 from routers import facebook_api
 from routers.slack_api import slack_connect_redirect_shortcuts, slack_connect_redirect
@@ -43,7 +43,7 @@ def _test_get_path(path):
 
 @pytest.mark.django_db
 def test_all_slugs(threadpool_subtest):
-    for page_cls in all_api_pages:
+    for page_cls in all_api_pages + all_hidden_pages:
         for slug in page_cls.slug_versions:
             for tab in MenuTabs.paths.values():
                 url = f"/{slug}/{tab}"
