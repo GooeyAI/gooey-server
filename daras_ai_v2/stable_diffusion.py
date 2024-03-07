@@ -15,6 +15,7 @@ from daras_ai.image_input import (
 )
 from daras_ai_v2.exceptions import (
     raise_for_status,
+    UserError,
 )
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import (
@@ -547,7 +548,7 @@ def inpainting(
                 out_imgs.append(r.content)
 
         case _:
-            raise ValueError(f"Invalid model {selected_model}")
+            raise UserError(f"Invalid inpainting model {selected_model}")
 
     out_imgs = _recomposite_inpainting_outputs(out_imgs, edit_image_bytes, mask_bytes)
 

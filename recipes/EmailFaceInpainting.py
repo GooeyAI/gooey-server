@@ -1,7 +1,6 @@
 import re
 import typing
 
-import glom
 import requests
 from pydantic import BaseModel
 
@@ -359,6 +358,8 @@ class TwitterError(Exception):
 
 
 def get_photo_for_email(email_address):
+    import glom
+
     doc_ref = db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
 
     doc = db.get_or_create_doc(doc_ref).to_dict()
@@ -393,6 +394,8 @@ def get_photo_for_email(email_address):
 
 
 def get_photo_for_twitter_handle(twitter_handle):
+    import glom
+
     doc_ref = db.get_doc_ref(twitter_handle, collection_id="twitter_photo_cache")
 
     doc = db.get_or_create_doc(doc_ref).to_dict()

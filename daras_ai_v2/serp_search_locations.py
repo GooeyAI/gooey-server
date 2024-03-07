@@ -7,7 +7,7 @@ from daras_ai_v2.field_render import field_title_desc
 
 
 def serp_search_settings():
-    st.write("#### Web Search Tools\n(via [serper.dev](https://serper.dev/))")
+    st.write("##### Web Search Tools\n(via [serper.dev](https://serper.dev/))")
 
     col1, col2 = st.columns(2)
     with col1:

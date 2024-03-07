@@ -1,19 +1,18 @@
-import datetime
+import json
 import json
 import time
 import typing
 
 import requests
-import gooey_ui as st
-from google.cloud import texttospeech
 from pydantic import BaseModel
 
+import gooey_ui as st
 from bots.models import Workflow
-from daras_ai.image_input import upload_file_from_bytes, storage_blob_for
+from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status, UserError
-from daras_ai_v2.gpu_server import GpuEndpoints, call_celery_task_outfile
+from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.text_to_speech_settings_widgets import (
     UBERDUCK_VOICES,
@@ -223,6 +222,8 @@ class TextToSpeechPage(BasePage):
                         time.sleep(0.1)
 
             case TextToSpeechProviders.GOOGLE_TTS:
+                from google.cloud import texttospeech
+
                 voice_name = (
                     state["google_voice_name"]
                     if "google_voice_name" in state
