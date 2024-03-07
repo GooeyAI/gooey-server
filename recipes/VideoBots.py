@@ -1046,7 +1046,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # show_landbot_widget()
 
     def messenger_bot_integration(self):
-        from routers.facebook_api import ig_connect_url, fb_connect_url
+        from routers.facebook_api import ig_connect_url, fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
         from recipes.VideoBotsStats import VideoBotsStatsPage
 
@@ -1085,6 +1085,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 ℹ️
                 </a>
             </div>
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{wa_connect_url}">
+                <i class="fa-brands fa-whatsapp" style="color: lightgreen; font-size: 20px"></i>
+                &nbsp;
+                Add Your Whatsapp Number
+                </a>
+            </div>
+            <p>To connect a phone number, make sure it is not reserved for some other use on Whatsapp or <a href="https://business.facebook.com/wa/manage/phone-numbers/">connected to a different Whatsapp account</a>. If your business needs exceed the capacity of a free Whatsapp account and/or you don't want to manage the Whatsapp business yourself, contact us for a quote on a managed Whatsapp number through Gooey.</p>
             """,
             unsafe_allow_html=True,
         )

@@ -125,6 +125,7 @@ def send_broadcast_msg(
                     documents=documents,
                     bot_number=bi.wa_phone_number_id,
                     user_number=convo.wa_phone_number.as_e164,
+                    access_token=bi.wa_business_access_token,
                 )
             case Platform.SLACK:
                 msg_id = SlackBot.send_msg_to(
