@@ -376,6 +376,9 @@ def run_language_model(
             # we can't stream with tools or json yet
             stream=stream and not (tools or response_format_type),
         )
+        # print everything in entries
+        for entry in entries:
+            print(entry)
 
         if stream:
             return _stream_llm_outputs(entries, response_format_type)
@@ -521,6 +524,7 @@ def _run_chat_model(
                 temperature=temperature,
             )
         case LLMApis.together:
+            print("in together")
             if tools:
                 raise UserError("Only OpenAI chat models support Tools")
             return _run_together_chat(
@@ -788,14 +792,16 @@ def _run_together_chat(
         error = output.get("error")
         if error:
             raise ValueError(error)
+        prompt_tokens += output.get("usage", {}).get("prompt_tokens", 0)
+        completion_tokens += output.get("usage", {}).get("completion_tokens", 0)
         ret.append(
             {
                 "role": CHATML_ROLE_ASSISTANT,
                 "content": output["choices"][0]["text"],
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
             }
         )
-        prompt_tokens += output.get("usage", {}).get("prompt_tokens", 0)
-        completion_tokens += output.get("usage", {}).get("completion_tokens", 0)
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 

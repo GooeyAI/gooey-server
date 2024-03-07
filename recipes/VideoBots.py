@@ -890,6 +890,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 tools=request.tools,
                 stream=True,
             )
+            # print everything in chunks
+            for i, entries in enumerate(chunks):
+                print(entries)
+                print("here are the tokens", chunks["prompt_tokens"])
         else:
             prompt = "\n".join(
                 format_chatml_message(entry) for entry in prompt_messages
