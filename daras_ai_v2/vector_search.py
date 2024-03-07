@@ -1,12 +1,14 @@
 import codecs
 import csv
+import hashlib
 import io
 import mimetypes
 import random
 import re
-import subprocess
 import tempfile
 import typing
+import uuid
+from functools import partial
 
 import numpy as np
 import requests
@@ -15,6 +17,7 @@ from googleapiclient.errors import HttpError
 from loguru import logger
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
+from vespa.application import Vespa
 
 import gooey_ui as gui
 from daras_ai.image_input import (
@@ -33,7 +36,11 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.exceptions import raise_for_status, call_cmd, UserError
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
-from daras_ai_v2.functional import flatmap_parallel, map_parallel
+from daras_ai_v2.functional import (
+    flatmap_parallel,
+    map_parallel,
+    flatmap_parallel_ascompleted,
+)
 from daras_ai_v2.gdrive_downloader import (
     gdrive_download,
     is_gdrive_url,
@@ -93,108 +100,80 @@ def get_top_k_references(
     doc_metas = map_parallel(doc_url_to_metadata, input_docs)
 
     yield "Creating knowledge embeddings..."
-    embeds: list[tuple[SearchReference, np.ndarray]] = flatmap_parallel(
-        lambda f_url, doc_meta: get_embeds_for_doc(
-            f_url=f_url,
-            doc_meta=doc_meta,
-            max_context_words=request.max_context_words,
-            scroll_jump=request.scroll_jump,
-            selected_asr_model=request.selected_asr_model,
-            google_translate_target=request.google_translate_target,
+    embedding_result = map_parallel(
+        partial(
+            get_or_create_documents,
+            max_context_words=request.max_context_words or 1000,
+            scroll_jump=request.scroll_jump or 5,
         ),
         input_docs,
         doc_metas,
     )
-    dense_query_embeds = openai_embedding_create([request.search_query])[0]
 
-    yield "Searching knowledge base..."
+    doc_tags = list([doc_tag for _, doc_tag in embedding_result])
+    doc_ids = [doc_id for doc_id_list, _ in embedding_result for doc_id in doc_id_list]
+    yield f"Knowledge base has {len(doc_tags)} documents and {len(doc_ids)} chunks"
 
-    dense_weight = request.dense_weight
-    if dense_weight is None:  # for backwards compatibility
-        dense_weight = 1
-    sparse_weight = 1 - dense_weight
-
-    if dense_weight:
-        from scipy.stats import rankdata
-
-        # get dense scores above cutoff based on cosine similarity
-        cutoff = 0.7
-        custom_weights = np.array(
-            [float(ref.get("weight") or "1") for ref, _ in embeds]
-        )
-
-        dense_scores = np.dot(
-            [doc_embeds for _, doc_embeds in embeds], dense_query_embeds
-        )
-        dense_scores *= custom_weights
-        dense_scores[dense_scores < cutoff] = 0.0
-        dense_ranks = rankdata(-dense_scores, method="max")
-    else:
-        dense_ranks = np.zeros(len(embeds))
-
-    if sparse_weight:
-        yield "Considering results..."
-        # get sparse scores
-        bm25_corpus = flatmap_parallel(
-            lambda f_url, doc_meta: get_bm25_embeds_for_doc(
-                f_url=f_url,
-                doc_meta=doc_meta,
-                max_context_words=request.max_context_words,
-                scroll_jump=request.scroll_jump,
-                selected_asr_model=request.selected_asr_model,
-                google_translate_target=request.google_translate_target,
+    if doc_tags:
+        yield "Searching knowledge base"
+        search_results = query_vespa(
+            request.search_query,
+            doc_tags=doc_tags,
+            limit=request.max_references or 100,
+            semantic_weight=(
+                request.dense_weight if request.dense_weight is not None else 1.0
             ),
-            input_docs,
-            doc_metas,
         )
-        bm25 = BM25Okapi(bm25_corpus, k1=2, b=0.3)
-        if request.keyword_query and isinstance(request.keyword_query, list):
-            sparse_query_tokenized = [item.lower() for item in request.keyword_query]
-        else:
-            sparse_query_tokenized = bm25_tokenizer(
-                request.keyword_query or request.search_query
-            )
-        if sparse_query_tokenized:
-            sparse_scores = np.array(bm25.get_scores(sparse_query_tokenized))
-            # sparse_scores *= custom_weights
-            sparse_ranks = rankdata(-sparse_scores, method="max")
-        else:
-            sparse_ranks = np.zeros(len(embeds))
+        result = search_results_to_refs(search_results)
+        logger.info(f"Found {len(result)} relevant documents")
+        yield f"Found {len(result)} relevant documents"
+        return result
     else:
-        sparse_ranks = np.zeros(len(embeds))
+        yield "No documents found - skipping search"
+        return []
 
-    # just in case sparse and dense ranks are different lengths, truncate to the shorter one
-    if len(sparse_ranks) != len(dense_ranks):
-        logger.warning(
-            f"sparse and dense ranks are different lengths, truncating... {len(sparse_ranks)=} {len(dense_ranks)=} {len(embeds)=}"
+
+def search_results_to_refs(search_result: dict) -> list[SearchReference]:
+    return [
+        SearchReference(
+            url=hit["fields"]["url"],
+            title=hit["fields"]["title"],
+            snippet=hit["fields"]["snippet"],
+            score=hit["relevance"],
         )
-        sparse_ranks = sparse_ranks[: len(dense_ranks)]
-        dense_ranks = dense_ranks[: len(sparse_ranks)]
-    # RRF formula: 1 / (k + rank)
-    k = 60
-    rrf_scores = (
-        sparse_weight / (k + sparse_ranks) + dense_weight / (k + dense_ranks)
-    ) * k
+        for hit in search_result["root"].get("children", [])
+    ]
 
-    # Final ranking
-    max_references = min(request.max_references, len(rrf_scores))
-    top_k = np.argpartition(rrf_scores, -max_references)[-max_references:]
-    final_ranks = sorted(top_k, key=rrf_scores.__getitem__, reverse=True)
 
-    references = [embeds[idx][0] | {"score": rrf_scores[idx]} for idx in final_ranks]
+def query_vespa(
+    search_query: str, doc_tags: list[str], limit: int, semantic_weight: float = 1.0
+) -> dict:
+    query_embedding = openai_embedding_create([search_query])[0]
+    assert query_embedding is not None
+    vespa_doc_tags = ", ".join([f"'{tag}'" for tag in doc_tags])
+    query = f"select * from {settings.VESPA_SCHEMA} where doc_tag in ({vespa_doc_tags}) and (userQuery() or ({{targetHits: {limit}}}nearestNeighbor(embedding, q))) limit {limit}"
+    logger.info(f"Vespa query: {'-'*80}\n{query}\n{'-'*80}")
+    if semantic_weight == 1.0:
+        ranking = "semantic"
+    elif semantic_weight == 0.0:
+        ranking = "bm25"
+    else:
+        ranking = "fusion"
+    response = get_vespa_app().query(
+        yql=query,
+        query=search_query,
+        ranking=ranking,
+        body={
+            "ranking.features.query(q)": query_embedding.tolist(),
+            "ranking.features.query(semanticWeight)": semantic_weight,
+        },
+    )
+    assert response.is_successful()
+    return response.get_json()
 
-    # merge duplicate references
-    uniques = {}
-    for ref in references:
-        key = ref["url"]
-        try:
-            existing = uniques[key]
-        except KeyError:
-            uniques[key] = ref
-        else:
-            existing["snippet"] += "\n\n...\n\n" + ref["snippet"]
-            existing["score"] = (existing["score"] + ref["score"]) / 2
-    return list(uniques.values())
+
+def get_vespa_app():
+    return Vespa(url=settings.VESPA_URL)
 
 
 bm25_split_re = re.compile(rf"[{puncts},|\s]")
@@ -334,16 +313,15 @@ def get_bm25_embeds_for_doc(
     return tokenized_corpus
 
 
-@redis_cache_decorator
 def get_embeds_for_doc(
     *,
     f_url: str,
     doc_meta: DocMetadata,
     max_context_words: int,
     scroll_jump: int,
-    google_translate_target: str = None,
-    selected_asr_model: str = None,
-) -> list[tuple[SearchReference, np.ndarray]]:
+    google_translate_target: str | None = None,
+    selected_asr_model: str | None = None,
+) -> typing.Iterator[tuple[SearchReference, np.ndarray]]:
     """
     Get document embeddings for a given document url.
 
@@ -374,12 +352,12 @@ def get_embeds_for_doc(
     texts = [m["title"] + " | " + m["snippet"] for m in refs]
     # get doc embeds in batches
     batch_size = 16  # azure openai limits
-    embeds = flatmap_parallel(
+    return flatmap_parallel_ascompleted(
         openai_embedding_create,
+        [refs[i : i + batch_size] for i in range(0, len(refs), batch_size)],
         [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)],
         max_workers=2,
     )
-    return list(zip(refs, embeds))
 
 
 def pages_to_split_refs(
@@ -654,3 +632,91 @@ def render_sources_widget(refs: list[SearchReference]):
             height=200,
             disabled=True,
         )
+
+
+@redis_cache_decorator
+def get_or_create_documents(
+    f_url: str,
+    doc_meta: DocMetadata,
+    *,
+    max_context_words: int,
+    scroll_jump: int,
+    google_translate_target: str | None = None,
+    selected_asr_model: str | None = None,
+) -> tuple[list[str], str]:
+    """
+    Return Vespa document ids for a given document url.
+    """
+    uniqueness_args = {
+        "f_url": f_url,
+        "doc_meta": doc_meta,
+        "max_context_words": max_context_words,
+        "scroll_jump": scroll_jump,
+        "google_translate_target": google_translate_target,
+        "selected_asr_model": selected_asr_model,
+    }
+    doc_tag = hashlib.sha256(
+        str({hash(k): hash(v) for k, v in uniqueness_args.items()}).encode("utf-8")
+    ).hexdigest()
+
+    # TODO: attempt a get from the database first
+    # then, if not found, create embeddings and store in the database
+    document_ids = []
+    vespa = get_vespa_app()
+    for ref, embedding in get_embeds_for_doc(
+        f_url=f_url,
+        doc_meta=doc_meta,
+        max_context_words=max_context_words,
+        scroll_jump=scroll_jump,
+        google_translate_target=google_translate_target,
+        selected_asr_model=selected_asr_model,
+    ):
+        document_id = str(uuid.uuid4())
+        vespa.feed_data_point(
+            schema=settings.VESPA_SCHEMA,
+            data_id=document_id,
+            fields=format_embedding_row(
+                document_id,
+                ref=ref,
+                embedding=embedding,
+                doc_tag=doc_tag,
+            ),
+            operation_type="feed",
+        )
+        document_ids.append(document_id)
+    return document_ids, doc_tag
+
+
+def format_embedding_row(
+    id: str,
+    ref: SearchReference,
+    embedding: np.ndarray,
+    doc_tag: str,
+):
+    return {
+        "id": id,
+        "url": ref["url"],
+        "title": ref["title"],
+        "snippet": ref["snippet"].replace("\f", ""),  # 0xC is illegal in Vespa
+        "embedding": embedding.tolist(),
+        "doc_tag": doc_tag,
+    }
+
+    # TODO: get/store it in the database
+    # try:
+    #     embeddings = Embeddings.objects.get(
+    #         url=url,
+    #         etag=meta.etag,
+    #         mime_type=meta.mime_type,
+    #     )
+    # except Embeddings.DoesNotExist:
+    #     # create embeddings now!
+    #     embedding_values = get_embeds_for_doc(url, meta)
+    #     embedding = Embeddings.create_embeddings(
+    #         url=url,
+    #         etag=meta.etag,
+    #         mime_type=meta.mime_type,
+    #         embeddings=embedding_values,
+    #     )
+
+    # return embeddings.document_ids

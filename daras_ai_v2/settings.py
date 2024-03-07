@@ -329,3 +329,6 @@ ELEVEN_LABS_API_KEY = config("ELEVEN_LABS_API_KEY", "")
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
 PAYPAL_SECRET = config("PAYPAL_SECRET", "")
 PAYPAL_BASE = config("PAYPAL_BASE", "")
+
+VESPA_URL = config("VESPA_URL", "http://localhost:8085")
+VESPA_SCHEMA = config("VESPA_SCHEMA", "gooey")
