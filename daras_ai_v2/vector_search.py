@@ -57,6 +57,7 @@ from daras_ai_v2.search_ref import (
 )
 from daras_ai_v2.text_splitter import text_splitter, puncts, Document
 from files.models import FileMetadata
+from bots.models import EmbeddingsReference
 
 
 class DocSearchRequest(BaseModel):
@@ -100,9 +101,9 @@ def get_top_k_references(
     doc_metas = map_parallel(doc_url_to_metadata, input_docs)
 
     yield "Creating knowledge embeddings..."
-    embedding_result = map_parallel(
+    embedding_refs = map_parallel(
         partial(
-            get_or_create_documents,
+            get_or_create_embeddings,
             max_context_words=request.max_context_words or 1000,
             scroll_jump=request.scroll_jump or 5,
         ),
@@ -110,9 +111,11 @@ def get_top_k_references(
         doc_metas,
     )
 
-    doc_tags = list([doc_tag for _, doc_tag in embedding_result])
-    doc_ids = [doc_id for doc_id_list, _ in embedding_result for doc_id in doc_id_list]
-    yield f"Knowledge base has {len(doc_tags)} documents and {len(doc_ids)} chunks"
+    doc_tags = list([embedding_ref.doc_tag for embedding_ref in embedding_refs])
+    chunk_count = sum(
+        [len(embedding_ref.document_ids) for embedding_ref in embedding_refs]
+    )
+    yield f"Knowledge base has {len(doc_tags)} documents and {chunk_count} chunks"
 
     if doc_tags:
         yield "Searching knowledge base"
@@ -635,7 +638,7 @@ def render_sources_widget(refs: list[SearchReference]):
 
 
 @redis_cache_decorator
-def get_or_create_documents(
+def get_or_create_embeddings(
     f_url: str,
     doc_meta: DocMetadata,
     *,
@@ -643,9 +646,10 @@ def get_or_create_documents(
     scroll_jump: int,
     google_translate_target: str | None = None,
     selected_asr_model: str | None = None,
-) -> tuple[list[str], str]:
+) -> EmbeddingsReference:
     """
-    Return Vespa document ids for a given document url.
+    Return Vespa document ids and document tags
+    for a given document url + metadata.
     """
     uniqueness_args = {
         "f_url": f_url,
@@ -659,8 +663,42 @@ def get_or_create_documents(
         str({hash(k): hash(v) for k, v in uniqueness_args.items()}).encode("utf-8")
     ).hexdigest()
 
-    # TODO: attempt a get from the database first
-    # then, if not found, create embeddings and store in the database
+    try:
+        embedding_ref = EmbeddingsReference.objects.get(
+            url=f_url,
+            doc_tag=doc_tag,
+        )
+    except EmbeddingsReference.DoesNotExist:
+        document_ids = create_embeddings_in_search_db(
+            f_url=f_url,
+            doc_meta=doc_meta,
+            doc_tag=doc_tag,
+            max_context_words=max_context_words,
+            scroll_jump=scroll_jump,
+            google_translate_target=google_translate_target,
+            selected_asr_model=selected_asr_model,
+        )
+        embedding_ref = EmbeddingsReference(
+            url=f_url,
+            doc_tag=doc_tag,
+            document_ids=document_ids,
+        )
+        embedding_ref.full_clean()
+        embedding_ref.save()
+
+    return embedding_ref
+
+
+def create_embeddings_in_search_db(
+    *,
+    f_url: str,
+    doc_meta: DocMetadata,
+    max_context_words: int,
+    scroll_jump: int,
+    doc_tag: str,
+    google_translate_target: str | None = None,
+    selected_asr_model: str | None = None,
+):
     document_ids = []
     vespa = get_vespa_app()
     for ref, embedding in get_embeds_for_doc(
@@ -684,7 +722,8 @@ def get_or_create_documents(
             operation_type="feed",
         )
         document_ids.append(document_id)
-    return document_ids, doc_tag
+
+    return document_ids
 
 
 def format_embedding_row(
@@ -701,22 +740,3 @@ def format_embedding_row(
         "embedding": embedding.tolist(),
         "doc_tag": doc_tag,
     }
-
-    # TODO: get/store it in the database
-    # try:
-    #     embeddings = Embeddings.objects.get(
-    #         url=url,
-    #         etag=meta.etag,
-    #         mime_type=meta.mime_type,
-    #     )
-    # except Embeddings.DoesNotExist:
-    #     # create embeddings now!
-    #     embedding_values = get_embeds_for_doc(url, meta)
-    #     embedding = Embeddings.create_embeddings(
-    #         url=url,
-    #         etag=meta.etag,
-    #         mime_type=meta.mime_type,
-    #         embeddings=embedding_values,
-    #     )
-
-    # return embeddings.document_ids

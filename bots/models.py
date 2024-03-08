@@ -9,6 +9,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
+from django.db.models.fields.json import JSONField
 from django.utils.text import Truncator, slugify
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
@@ -1491,3 +1492,22 @@ class PublishedRunVersion(models.Model):
 
     def __str__(self):
         return f"{self.published_run} - {self.version_id}"
+
+
+class EmbeddingsReference(models.Model):
+    # a pointer to embeddings
+    url = models.URLField(
+        help_text="The URL of the original resource (e.g. a document)"
+    )
+    doc_tag = models.TextField()
+    document_ids = JSONField(
+        help_text="The document ids that this embedding reference points to",
+    )
+
+    class Meta:
+        unique_together = ["url", "doc_tag"]
+        indexes = [
+            models.Index(fields=["url"]),
+            models.Index(fields=["doc_tag"]),
+            models.Index(fields=["url", "doc_tag"]),
+        ]
