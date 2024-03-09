@@ -1,3 +1,6 @@
+import subprocess
+import tempfile
+
 from vespa.application import ApplicationPackage
 from vespa.package import (
     Schema,
@@ -125,8 +128,15 @@ package.query_profile_type.add_fields(
 
 
 def run():
-    vespa_docker = VespaDocker(port=8085)
-    vespa_docker.deploy(
-        package,
-        debug=settings.DEBUG,
-    )
+    if settings.DEBUG:
+        vespa_docker = VespaDocker(port=8085)
+        vespa_docker.deploy(
+            package,
+            debug=settings.DEBUG,
+        )
+    else:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            package.to_files(temp_dir)
+            subprocess.check_call(
+                ["vespa", "deploy", "-t", settings.VESPA_URL, temp_dir]
+            )
