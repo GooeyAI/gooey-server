@@ -60,5 +60,4 @@ HEALTHCHECK CMD \
     || bash -c 'poetry run celery -A celeryapp inspect ping -d celery@$HOSTNAME' \
     || exit 1
 
-RUN ./scripts/install_vespa_cli.sh
 CMD poetry run ./scripts/run-prod.sh

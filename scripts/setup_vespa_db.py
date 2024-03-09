@@ -136,7 +136,19 @@ def run():
         )
     else:
         with tempfile.TemporaryDirectory() as temp_dir:
-            package.to_files(temp_dir)
+            app_zipfile = str(Path(temp_dir) / "app.zip")
+            package.to_zipfile(app_zipfile)
             subprocess.check_call(
-                ["vespa", "deploy", "-t", settings.VESPA_URL, temp_dir]
+                [
+                    "wget",
+                    "--method",
+                    "POST",
+                    "--body-file",
+                    app_zipfile,
+                    "--header",
+                    "Content-Type: application/zip",
+                    "--output-document",
+                    str(Path(temp_dir) / "response.txt"),
+                    f"{settings.VESPA_CONFIG_SERVER_URL}/application/v2/tenant/default/prepareandactivate",
+                ]
             )
