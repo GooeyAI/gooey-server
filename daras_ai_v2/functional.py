@@ -38,7 +38,8 @@ def apply_parallel(
         it = as_completed(fs)
         for i in range(length):
             yield f"[{i + 1}/{length}] {message}"
-            ret[i] = next(it).result()
+            fut = next(it)
+            ret[fs.index(fut)] = fut.result()
         return ret
 
 

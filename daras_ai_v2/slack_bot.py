@@ -4,7 +4,7 @@ from string import Template
 
 import requests
 from django.db import transaction
-from langcodes import Language
+
 from requests import Response
 from sentry_sdk import capture_exception
 
@@ -643,8 +643,10 @@ def create_button_block(buttons: list[ReplyButton]) -> list[dict]:
 
 
 def send_confirmation_msg(bot: BotIntegration):
+    import langcodes
+
     substitutions = vars(bot).copy()  # convert to dict for string substitution
-    substitutions["user_language"] = Language.get(
+    substitutions["user_language"] = langcodes.Language.get(
         bot.user_language,
     ).display_name()
     text = run_google_translate(

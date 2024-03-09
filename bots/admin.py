@@ -34,6 +34,36 @@ from gooeysite.custom_filters import (
 )
 from gooeysite.custom_widgets import JSONEditorWidget
 
+fb_fields = [
+    "fb_page_id",
+    "fb_page_name",
+    "fb_page_access_token",
+]
+ig_fields = [
+    "ig_account_id",
+    "ig_username",
+]
+wa_fields = [
+    "wa_phone_number",
+    "wa_phone_number_id",
+    "wa_business_access_token",
+    "wa_business_waba_id",
+    "wa_business_user_id",
+    "wa_business_name",
+    "wa_business_account_name",
+    "wa_business_message_template_namespace",
+]
+slack_fields = [
+    "slack_team_id",
+    "slack_team_name",
+    "slack_channel_id",
+    "slack_channel_name",
+    "slack_channel_hook_url",
+    "slack_access_token",
+    "slack_read_receipt_msg",
+    "slack_create_personal_channels",
+]
+
 
 class BotIntegrationAdminForm(forms.ModelForm):
     class Meta:
@@ -42,11 +72,13 @@ class BotIntegrationAdminForm(forms.ModelForm):
         widgets = {
             "platform": forms.Select(
                 attrs={
-                    "--hideshow-fields": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username,wa_phone_number,wa_phone_number_id,slack_team_id,slack_team_name,slack_channel_id,slack_channel_name,slack_channel_hook_url,slack_access_token,slack_read_receipt_msg,slack_create_personal_channels",
-                    "--show-on-1": "fb_page_id,fb_page_name,fb_page_access_token",
-                    "--show-on-2": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username",
-                    "--show-on-3": "wa_phone_number,wa_phone_number_id",
-                    "--show-on-4": "slack_team_id,slack_team_name,slack_channel_id,slack_channel_name,slack_channel_hook_url,slack_access_token,slack_read_receipt_msg,slack_create_personal_channels",
+                    "--hideshow-fields": ",".join(
+                        fb_fields + ig_fields + wa_fields + slack_fields
+                    ),
+                    "--show-on-1": ",".join(fb_fields),
+                    "--show-on-2": ",".join(fb_fields + ig_fields),
+                    "--show-on-3": ",".join(wa_fields),
+                    "--show-on-4": ",".join(slack_fields),
                 },
             ),
         }
@@ -133,21 +165,10 @@ class BotIntegrationAdmin(admin.ModelAdmin):
             {
                 "fields": [
                     "platform",
-                    "fb_page_id",
-                    "fb_page_name",
-                    "fb_page_access_token",
-                    "ig_account_id",
-                    "ig_username",
-                    "wa_phone_number",
-                    "wa_phone_number_id",
-                    "slack_team_id",
-                    "slack_team_name",
-                    "slack_channel_id",
-                    "slack_channel_name",
-                    "slack_channel_hook_url",
-                    "slack_access_token",
-                    "slack_read_receipt_msg",
-                    "slack_create_personal_channels",
+                    *fb_fields,
+                    *ig_fields,
+                    *wa_fields,
+                    *slack_fields,
                 ]
             },
         ),

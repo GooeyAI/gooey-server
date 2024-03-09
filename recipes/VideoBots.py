@@ -29,8 +29,12 @@ from daras_ai_v2.bot_integration_widgets import (
     render_bot_test_link,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
-    doc_search_settings,
+    query_instructions_widget,
+    keyword_instructions_widget,
+    doc_search_advanced_settings,
+    doc_extract_selector,
     document_uploader,
+    citation_style_selector,
 )
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
@@ -162,6 +166,10 @@ class VideoBotsPage(BasePage):
         input_prompt: str
         input_images: list[str] | None
         input_documents: list[str] | None
+        doc_extract_url: str | None = Field(
+            title="📚 Document Extract Workflow",
+            description="Select a workflow to extract text from documents and images.",
+        )
 
         # conversation history/context
         messages: list[ConversationEntry] | None
@@ -222,7 +230,7 @@ class VideoBotsPage(BasePage):
 
         user_language: str | None = Field(
             title="🔠 User Language",
-            description="If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.",
+            description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
         input_glossary_document: str | None = Field(
@@ -335,13 +343,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         document_uploader(
             """
             #### 📄 Knowledge
-            Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
-            """
+            Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
+            """,
         )
 
         st.markdown("#### Capabilities")
         if st.checkbox(
-            "##### 🗣️ Speak Responses",
+            "##### 🗣️ Text to Speech & Lipsync",
             value=bool(st.session_state.get("tts_provider")),
         ):
             text_to_speech_provider_selector(self)
@@ -357,8 +365,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.file_uploader(
                 """
                 ###### 👩‍🦰 Input Face
-                Upload a video/image that contains faces to use
-                *Recommended - mp4 / mov / png / jpg / gif*
+                Upload a video or image (with a human face) to lipsync responses. mp4, mov, png, jpg or gif preferred.
                 """,
                 key="input_face",
             )
@@ -375,6 +382,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 key="user_language",
             )
             st.write("---")
+        else:
+            st.session_state["user_language"] = None
 
         if st.checkbox(
             "##### 🩻 Photo & Document Intelligence",
@@ -407,10 +416,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         tts_provider = st.session_state.get("tts_provider")
         if tts_provider:
             text_to_speech_settings(self, tts_provider)
+            st.write("---")
 
-        input_face = st.session_state.get("__enable_video")
+        input_face = st.session_state.get("input_face")
         if input_face:
             lipsync_settings()
+            st.write("---")
 
         if st.session_state.get("user_language"):
             st.markdown("##### 🔠 Translation Settings")
@@ -439,12 +450,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             else:
                 st.session_state["input_glossary_document"] = None
                 st.session_state["output_glossary_document"] = None
+            st.write("---")
 
-        if st.session_state.get("documents"):
+        documents = st.session_state.get("documents")
+        if documents:
+            st.write("#### 📄 Knowledge Base")
             st.text_area(
                 """
-            ##### 👩‍🏫 Document Search Results Instructions
-            Guidelines to interpret the results of the knowledge base query.
+            ###### 👩‍🏫 Search Instructions
+            How should the LLM interpret the results from your knowledge base?
             """,
                 key="task_instructions",
                 height=300,
@@ -453,16 +467,29 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 "task_instructions",
             )
 
-            st.write("---")
+            citation_style_selector()
             st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
-            st.caption(
-                "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
-            )
+
+            doc_extract_selector()
+
             st.write("---")
-            doc_search_settings(keyword_instructions_allowed=True)
+
+        st.markdown(
+            """
+            #### Advanced Settings
+            In general, you should not need to adjust these.
+            """
+        )
+
+        if documents:
+            query_instructions_widget()
+            keyword_instructions_widget()
+            doc_search_advanced_settings()
             st.write("---")
 
         language_model_settings(show_selector=False)
+
+        st.write("---")
 
         enum_multiselect(
             enum_cls=LLMTools,
@@ -1019,7 +1046,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # show_landbot_widget()
 
     def messenger_bot_integration(self):
-        from routers.facebook_api import ig_connect_url, fb_connect_url
+        from routers.facebook_api import ig_connect_url, fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
         from recipes.VideoBotsStats import VideoBotsStatsPage
 
@@ -1058,6 +1085,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 ℹ️
                 </a>
             </div>
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{wa_connect_url}">
+                <i class="fa-brands fa-whatsapp" style="color: lightgreen; font-size: 20px"></i>
+                &nbsp;
+                Add Your Whatsapp Number
+                </a>
+            </div>
+            <p>To connect a phone number, make sure it is not reserved for some other use on Whatsapp or <a href="https://business.facebook.com/wa/manage/phone-numbers/">connected to a different Whatsapp account</a>. If your business needs exceed the capacity of a free Whatsapp account and/or you don't want to manage the Whatsapp business yourself, contact us for a quote on a managed Whatsapp number through Gooey.</p>
             """,
             unsafe_allow_html=True,
         )

@@ -12,12 +12,11 @@ from daras_ai_v2.glossary import (
 )
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.vector_search import (
-    doc_url_to_metadata,
     doc_url_to_file_metadata,
 )
 from daras_ai_v2.vector_search import (
     download_content_bytes,
-    bytes_to_df,
+    tabular_bytes_to_str_df,
     DocMetadata,
 )
 from files.models import FileMetadata
@@ -61,8 +60,10 @@ class GlossaryResourceQuerySet(models.QuerySet):
 
 @redis_cache_decorator
 def create_glossary_cached(url: str, doc_meta: DocMetadata) -> "GlossaryResource":
-    f_bytes, ext = download_content_bytes(f_url=url, mime_type=doc_meta.name)
-    df = bytes_to_df(f_name=doc_meta.name, f_bytes=f_bytes, ext=ext)
+    f_bytes, mime_type = download_content_bytes(f_url=url, mime_type=doc_meta.mime_type)
+    df = tabular_bytes_to_str_df(
+        f_name=doc_meta.name, f_bytes=f_bytes, mime_type=mime_type
+    )
     if is_user_uploaded_url(url):
         glossary_url = url
     else:
