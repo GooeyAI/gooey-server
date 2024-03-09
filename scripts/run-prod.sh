@@ -6,6 +6,7 @@ if [ "$RUN_JUPYTER" ]; then
   pip install jupyterlab
   jupyter lab --allow-root --ip 0.0.0.0 --port 8000
 elif [ "$RUN_DJANGO" ]; then
+  ./manage.py runscript setup_vespa_db
   ./manage.py migrate
   ./manage.py collectstatic
   SENTRY_ENVIRONMENT="django" gunicorn gooeysite.wsgi --bind 0.0.0.0:8000 --threads "${MAX_THREADS:-1}"
