@@ -537,7 +537,6 @@ def split_sections(
                 header += f"{role}={content}\n"
 
 
-@redis_cache_decorator
 def doc_url_to_text_pages(
     *,
     f_url: str,
