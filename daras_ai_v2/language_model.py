@@ -266,9 +266,9 @@ def np_dumps(a: np.ndarray) -> bytes:
 def _run_openai_embedding(
     *,
     input: list[str],
-    model: str = (
-        "openai-text-embedding-ada-002-prod-ca-1",
-        "text-embedding-ada-002",
+    model: tuple[str] | str = (
+        "openai-text-embedding-3-small-prod-ca-1",
+        "text-embedding-3-small",
     ),
 ) -> np.ndarray:
     logger.info(f"{model=}, {len(input)=}")
