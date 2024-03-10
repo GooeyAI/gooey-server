@@ -1,5 +1,6 @@
 import subprocess
 import tempfile
+from pathlib import Path
 
 from vespa.application import ApplicationPackage
 from vespa.package import (
