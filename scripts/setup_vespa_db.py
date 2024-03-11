@@ -1,5 +1,6 @@
 import requests
 from furl import furl
+from loguru import logger
 from vespa.application import ApplicationPackage
 from vespa.deployment import VespaDocker
 from vespa.package import (
@@ -83,7 +84,7 @@ package = ApplicationPackage(
                     inherits="bm25",
                     inputs=[
                         ("query(q)", "tensor<float>(x[1536])"),
-                        ("query(semanticWeight)", "float"),
+                        ("query(semanticWeight)", "double"),
                     ],
                     first_phase="closeness(field, embedding)",
                     global_phase=GlobalPhaseRanking(
@@ -101,7 +102,7 @@ package = ApplicationPackage(
                     inherits="bm25",
                     inputs=[
                         ("query(q)", "tensor<float>(x[1536])"),
-                        ("query(semanticWeight)", "float"),
+                        ("query(semanticWeight)", "double"),
                     ],
                     first_phase="closeness(field, embedding)",
                     global_phase=GlobalPhaseRanking(
@@ -143,3 +144,4 @@ def run():
             headers={"Content-Type": "application/zip"},
         )
         raise_for_status(r)
+        logger.debug(r.text)
