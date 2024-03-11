@@ -14,10 +14,10 @@ import requests
 from furl import furl
 from loguru import logger
 from pydantic import BaseModel, Field
-from rank_bm25 import BM25Okapi
 from vespa.application import Vespa
 
 import gooey_ui as gui
+from bots.models import EmbeddingsReference
 from daras_ai.image_input import (
     upload_file_from_bytes,
     safe_filename,
@@ -61,7 +61,6 @@ from daras_ai_v2.search_ref import (
 )
 from daras_ai_v2.text_splitter import text_splitter, puncts, Document
 from files.models import FileMetadata
-from bots.models import EmbeddingsReference
 
 
 class DocSearchRequest(BaseModel):

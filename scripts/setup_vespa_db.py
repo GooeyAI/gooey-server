@@ -1,8 +1,7 @@
-import subprocess
-import tempfile
-from pathlib import Path
-
+import requests
+from furl import furl
 from vespa.application import ApplicationPackage
+from vespa.deployment import VespaDocker
 from vespa.package import (
     Schema,
     Document,
@@ -14,10 +13,9 @@ from vespa.package import (
     GlobalPhaseRanking,
     QueryTypeField,
 )
-from vespa.deployment import VespaDocker
 
 from daras_ai_v2 import settings
-
+from daras_ai_v2.exceptions import raise_for_status
 
 package = ApplicationPackage(
     "gooey",
@@ -136,20 +134,12 @@ def run():
             debug=settings.DEBUG,
         )
     else:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            app_zipfile = str(Path(temp_dir) / "app.zip")
-            package.to_zipfile(app_zipfile)
-            subprocess.check_call(
-                [
-                    "wget",
-                    "--method",
-                    "POST",
-                    "--body-file",
-                    app_zipfile,
-                    "--header",
-                    "Content-Type: application/zip",
-                    "--output-document",
-                    str(Path(temp_dir) / "response.txt"),
-                    f"{settings.VESPA_CONFIG_SERVER_URL}/application/v2/tenant/default/prepareandactivate",
-                ]
-            )
+        r = requests.post(
+            str(
+                furl(settings.VESPA_CONFIG_SERVER_URL)
+                / "application/v2/tenant/default/prepareandactivate"
+            ),
+            files={"applicationZipFile": package.to_zip()},
+            headers={"Content-Type": "application/zip"},
+        )
+        raise_for_status(r)
