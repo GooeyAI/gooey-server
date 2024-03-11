@@ -14,7 +14,6 @@ import requests
 from furl import furl
 from loguru import logger
 from pydantic import BaseModel, Field
-from vespa.application import Vespa
 
 import gooey_ui as gui
 from bots.models import EmbeddingsReference
@@ -201,6 +200,8 @@ def query_vespa(
 
 
 def get_vespa_app():
+    from vespa.application import Vespa
+
     return Vespa(url=settings.VESPA_URL)
 
 

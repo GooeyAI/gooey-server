@@ -2,7 +2,6 @@ import requests
 from furl import furl
 from loguru import logger
 from vespa.application import ApplicationPackage
-from vespa.deployment import VespaDocker
 from vespa.package import (
     Schema,
     Document,
@@ -128,20 +127,13 @@ package.query_profile_type.add_fields(
 
 
 def run():
-    if settings.DEBUG:
-        vespa_docker = VespaDocker(port=8085)
-        vespa_docker.deploy(
-            package,
-            debug=settings.DEBUG,
-        )
-    else:
-        r = requests.post(
-            str(
-                furl(settings.VESPA_CONFIG_SERVER_URL)
-                / "application/v2/tenant/default/prepareandactivate"
-            ),
-            files={"applicationZipFile": package.to_zip()},
-            headers={"Content-Type": "application/zip"},
-        )
-        raise_for_status(r)
-        logger.debug(r.text)
+    r = requests.post(
+        str(
+            furl(settings.VESPA_CONFIG_SERVER_URL)
+            / "application/v2/tenant/default/prepareandactivate"
+        ),
+        files={"applicationZipFile": package.to_zip()},
+        headers={"Content-Type": "application/zip"},
+    )
+    raise_for_status(r)
+    logger.debug(r.text)
