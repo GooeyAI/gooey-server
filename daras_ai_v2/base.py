@@ -179,6 +179,9 @@ class BasePage:
             tab_name=MenuTabs.paths[tab],
         )
 
+    def get_dynamic_meta_title(self) -> str | None:
+        return None
+
     def setup_sentry(self, event_processor: typing.Callable = None):
         def add_user_to_event(event, hint):
             user = self.request and self.request.user
