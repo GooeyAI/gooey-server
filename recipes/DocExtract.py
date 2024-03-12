@@ -289,15 +289,15 @@ def extract_info(url: str) -> list[dict | None]:
             return [{"webpage_url": url, "title": "Youtube Video"}]
 
     # assume it's a direct link
-    doc_meta = doc_url_to_file_metadata(url)
-    assert doc_meta.mime_type, f"Could not determine mime type for {url}"
+    file_meta = doc_url_to_file_metadata(url)
+    assert file_meta.mime_type, f"Could not determine mime type for {url}"
 
-    if "application/pdf" in doc_meta.mime_type:
+    if "application/pdf" in file_meta.mime_type:
         f = furl(url)
         if is_gdrive_url(f):
-            f_bytes, _ = gdrive_download(f, doc_meta.mime_type)
+            f_bytes, _ = gdrive_download(f, file_meta.mime_type)
             content_url = upload_file_from_bytes(
-                doc_meta.name, f_bytes, content_type=doc_meta.mime_type
+                file_meta.name, f_bytes, content_type=file_meta.mime_type
             )
         else:
             r = requests.get(
@@ -312,8 +312,8 @@ def extract_info(url: str) -> list[dict | None]:
         return [
             {
                 "webpage_url": add_page_number_to_pdf(f, page_num).url,
-                "title": f"{doc_meta.name}, page {page_num}",
-                "doc_meta": doc_meta,
+                "title": f"{file_meta.name}, page {page_num}",
+                "doc_meta": file_meta,
                 # "pdf_page": page,
                 "content_url": add_page_number_to_pdf(content_url, page_num).url,
                 "page_num": page_num,
@@ -325,8 +325,8 @@ def extract_info(url: str) -> list[dict | None]:
         return [
             {
                 "webpage_url": url,
-                "title": doc_meta.name,
-                "doc_meta": doc_meta,
+                "title": file_meta.name,
+                "doc_meta": file_meta,
             },
         ]
 

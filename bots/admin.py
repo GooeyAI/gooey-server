@@ -768,7 +768,7 @@ class FeedbackAdmin(admin.ModelAdmin):
 
 
 @admin.register(WorkflowMetadata)
-class WorkflowMetadata(admin.ModelAdmin):
+class WorkflowMetadataAdmin(admin.ModelAdmin):
     list_display = [
         "workflow",
         "short_title",

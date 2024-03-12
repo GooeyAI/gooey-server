@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "url_shortener",
     "glossary_resources",
     "usage_costs",
+    "embeddings",
 ]
 
 MIDDLEWARE = [

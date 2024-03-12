@@ -49,17 +49,19 @@ can do this by stopping and starting Honcho.
 
 ## To run vespa (used for vector search)
 
-1. Install OrbStack or Docker Desktop
+You need to install OrbStack or Docker Desktop for this to work.
+
+1. Create a persistent volume for Vespa:
+```bash
+docker volume create vespa
+```
 2. Run the container:
 ```bash
-docker run -it --rm --name vespa --hostname vespa-container --publish 8085:8080 --publish 19071:19071 vespaengine
-```
-Alternatively, if you prefer python:
-```angular2html
-from vespa.deployment import VespaDocker
-
-vespa_docker = VespaDocker(port=8085)
-vespa_docker.deploy(package, debug=settings.DEBUG)
+docker run \
+  --hostname vespa-container \
+  -p 8085:8080 -p 19071:19071 \
+  --volume vespa:/opt/vespa/var \
+  -it --rm --name vespa vespaengine/vespa
 ```
 3. Run the setup script
 ```bash

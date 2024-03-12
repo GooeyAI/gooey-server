@@ -23,7 +23,6 @@ from daras_ai_v2.text_splitter import text_splitter
 from daras_ai_v2.vector_search import (
     doc_url_to_text_pages,
     doc_url_to_file_metadata,
-    DocMetadata,
 )
 from recipes.DocSearch import (
     DocSearchPage,
@@ -172,10 +171,9 @@ Prompt for merging several outputs together
 
         full_text = ""
         for f_url in request.documents:
-            doc_meta = DocMetadata.from_file_metadata(doc_url_to_file_metadata(f_url))
             pages = doc_url_to_text_pages(
                 f_url=f_url,
-                doc_meta=doc_meta,
+                file_meta=doc_url_to_file_metadata(f_url),
                 selected_asr_model=request.selected_asr_model,
             )
             full_text += "\n\n".join(pages)

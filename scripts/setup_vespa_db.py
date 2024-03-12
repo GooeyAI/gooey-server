@@ -16,6 +16,9 @@ from vespa.package import (
 
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.vector_search import EMBEDDING_SIZE
+
+EMBEDDING_TYPE = f"tensor<float>(x[{EMBEDDING_SIZE}])"
 
 package = ApplicationPackage(
     "gooey",
@@ -31,7 +34,11 @@ package = ApplicationPackage(
                         attribute=["fast-search"],
                         rank="filter",
                     ),
-                    Field(name="url", type="string", indexing=["attribute", "summary"]),
+                    Field(
+                        name="url",
+                        type="string",
+                        indexing=["attribute", "summary"],
+                    ),
                     Field(
                         name="title",
                         type="string",
@@ -46,14 +53,22 @@ package = ApplicationPackage(
                     ),
                     Field(
                         name="embedding",
-                        type="tensor<float>(x[1536])",
+                        type=EMBEDDING_TYPE,
                         indexing=["index", "attribute"],
                         ann=HNSW(distance_metric="dotproduct"),
                     ),
                     Field(
-                        name="doc_tag",
+                        name="file_id",
                         type="string",
-                        indexing=["index", "attribute", "summary"],
+                        indexing=["attribute", "summary"],
+                        attribute=["fast-search"],
+                        rank="filter",
+                    ),
+                    Field(
+                        name="created_at",
+                        type="long",
+                        indexing=["attribute"],
+                        attribute=["fast-access"],
                     ),
                 ]
             ),
@@ -62,7 +77,7 @@ package = ApplicationPackage(
                 RankProfile(
                     name="bm25",
                     inputs=[
-                        ("query(q)", "tensor<float>(x[1536])"),
+                        ("query(q)", EMBEDDING_TYPE),
                     ],
                     functions=[
                         Function(
@@ -74,7 +89,7 @@ package = ApplicationPackage(
                 RankProfile(
                     name="semantic",
                     inputs=[
-                        ("query(q)", "tensor<float>(x[1536])"),
+                        ("query(q)", EMBEDDING_TYPE),
                     ],
                     first_phase="closeness(field, embedding)",
                 ),
@@ -82,7 +97,7 @@ package = ApplicationPackage(
                     name="fusion",
                     inherits="bm25",
                     inputs=[
-                        ("query(q)", "tensor<float>(x[1536])"),
+                        ("query(q)", EMBEDDING_TYPE),
                         ("query(semanticWeight)", "double"),
                     ],
                     first_phase="closeness(field, embedding)",
@@ -100,7 +115,7 @@ package = ApplicationPackage(
                     name="fusion2",  # with bm25 first
                     inherits="bm25",
                     inputs=[
-                        ("query(q)", "tensor<float>(x[1536])"),
+                        ("query(q)", ("tensor<float>(x[%s])" % EMBEDDING_TYPE)),
                         ("query(semanticWeight)", "double"),
                     ],
                     first_phase="closeness(field, embedding)",
@@ -121,7 +136,7 @@ package = ApplicationPackage(
 package.query_profile_type.add_fields(
     QueryTypeField(
         name="ranking.features.query(q)",
-        type="tensor<float>(x[1536])",
+        type=EMBEDDING_TYPE,
     ),
 )
 
