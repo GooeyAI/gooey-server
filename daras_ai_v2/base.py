@@ -1696,7 +1696,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         with st.div(className="d-flex align-items-center justify-content-between"):
             with st.div():
-                updated_at = published_run.updated_at
+                updated_at = published_run.saved_run.updated_at
                 if updated_at and isinstance(updated_at, datetime.datetime):
                     st.caption("Loading...", **render_local_dt_attrs(updated_at))
 
@@ -1732,7 +1732,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         with st.div(className="d-flex align-items-center justify-content-between"):
             with st.div():
-                updated_at = published_run.updated_at
+                updated_at = published_run.saved_run.updated_at
                 if updated_at and isinstance(updated_at, datetime.datetime):
                     st.caption("Loading...", **render_local_dt_attrs(updated_at))
 
