@@ -115,7 +115,7 @@ package = ApplicationPackage(
                     name="fusion2",  # with bm25 first
                     inherits="bm25",
                     inputs=[
-                        ("query(q)", ("tensor<float>(x[%s])" % EMBEDDING_TYPE)),
+                        ("query(q)", EMBEDDING_TYPE),
                         ("query(semanticWeight)", "double"),
                     ],
                     first_phase="closeness(field, embedding)",
