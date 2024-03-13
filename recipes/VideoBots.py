@@ -1236,7 +1236,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         for i in integrations
                     }[i],
                     key="bi_id",
-                    button_props={"style": {"width": "156px", "overflow": "hidden"}},
                 )
                 bi = integrations.get(id=bid)
                 icon = f'<img src="{Platform(bi.platform).get_favicon()}" style="height: 20px; width: 20px;">'
