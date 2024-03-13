@@ -318,7 +318,8 @@ class VideoBotsStatsPage(BasePage):
             st.session_state.setdefault(
                 "end_date",
                 self.request.query_params.get(
-                    "end_date", timezone.now().strftime("%Y-%m-%d")
+                    "end_date",
+                    (timezone.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
                 ),
             )
             end_date: datetime = (
