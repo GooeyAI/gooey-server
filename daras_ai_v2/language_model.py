@@ -1,12 +1,10 @@
-import hashlib
-import io
+import json
 import json
 import re
 import typing
 from enum import Enum
-from functools import partial, wraps
+from functools import wraps
 
-import numpy as np
 import requests
 import typing_extensions
 from aifail import (
@@ -16,7 +14,6 @@ from aifail import (
     try_all,
 )
 from django.conf import settings
-from jinja2.lexer import whitespace_re
 from loguru import logger
 from openai.types.chat import (
     ChatCompletionContentPartParam,
@@ -27,9 +24,6 @@ from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.functions import LLMTools
-from daras_ai_v2.redis_cache import (
-    get_redis_cache,
-)
 from daras_ai_v2.text_splitter import (
     default_length_function,
     default_separators,
@@ -218,86 +212,6 @@ def calc_gpt_tokens(
         )
     )
     return default_length_function(combined)
-
-
-def openai_embedding_create(texts: list[str]) -> list[np.ndarray | None]:
-    # replace newlines, which can negatively affect performance.
-    texts = [whitespace_re.sub(" ", text) for text in texts]
-    # get the redis cache
-    redis_cache = get_redis_cache()
-    # load the embeddings from the cache
-    ret = [
-        np_loads(data) if (data := redis_cache.get(_embed_cache_key(text))) else None
-        for text in texts
-    ]
-    # list of embeddings that need to be created
-    misses = [i for i, c in enumerate(ret) if c is None]
-    if misses:
-        # create the embeddings in bulk
-        embeddings = _run_openai_embedding(input=[texts[i] for i in misses])
-        for i, embedding in zip(misses, embeddings):
-            # save the embedding to the cache
-            text = texts[i]
-            redis_cache.set(_embed_cache_key(text), np_dumps(embedding))
-            # fill in missing values
-            ret[i] = embedding
-    return ret
-
-
-def _embed_cache_key(text: str) -> str:
-    return "gooey/openai_ada2_embeddings_npy/v1/" + _sha256(text)
-
-
-def _sha256(text):
-    return hashlib.sha256(text.encode()).hexdigest()
-
-
-def np_loads(data: bytes) -> np.ndarray:
-    return np.load(io.BytesIO(data))
-
-
-def np_dumps(a: np.ndarray) -> bytes:
-    f = io.BytesIO()
-    np.save(f, a)
-    return f.getvalue()
-
-
-@retry_if(openai_should_retry)
-def _run_openai_embedding(
-    *,
-    input: list[str],
-    model: str = (
-        "openai-text-embedding-ada-002-prod-ca-1",
-        "text-embedding-ada-002",
-    ),
-) -> np.ndarray:
-    logger.info(f"{model=}, {len(input)=}")
-
-    if isinstance(model, str):
-        model = [model]
-    res = try_all(
-        *[
-            partial(
-                _get_openai_client(model_str).embeddings.create,
-                model=model_str,
-                input=input,
-            )
-            for model_str in model
-        ],
-    )
-    ret = np.array([data.embedding for data in res.data])
-
-    # see - https://community.openai.com/t/text-embedding-ada-002-embeddings-sometime-return-nan/279664/5
-    if np.isnan(ret).any():
-        raise RuntimeError("NaNs detected in embedding")
-        # raise openai.error.APIError("NaNs detected in embedding")  # this lets us retry
-    expected = (len(input), 1536)
-    if ret.shape != expected:
-        raise RuntimeError(
-            f"Unexpected shape for embedding: {ret.shape} (expected {expected})"
-        )
-
-    return ret
 
 
 class ConversationEntry(typing_extensions.TypedDict):
@@ -590,7 +504,7 @@ def _run_openai_chat(
 
 
 def _get_chat_completions_create(model: str, **kwargs):
-    client = _get_openai_client(model)
+    client = get_openai_client(model)
 
     @wraps(client.chat.completions.create)
     def wrapper():
@@ -698,7 +612,7 @@ def _run_openai_text(
     avoid_repetition: bool,
     quality: float,
 ):
-    r = _get_openai_client(model).completions.create(
+    r = get_openai_client(model).completions.create(
         model=model,
         prompt=prompt,
         max_tokens=max_tokens,
@@ -727,7 +641,7 @@ def _run_openai_text(
     return [choice.text for choice in r.choices]
 
 
-def _get_openai_client(model: str):
+def get_openai_client(model: str):
     import openai
 
     if model.startswith(AZURE_OPENAI_MODEL_PREFIX):

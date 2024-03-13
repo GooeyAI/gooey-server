@@ -25,13 +25,14 @@ $ poetry run honcho start
 The processes that it starts are defined in [`Procfile`](Procfile).
 Currently they are these:
 
-| Service          | Port |
-| -------          | ---- |
-| API + GUI Server | 8080 |
-| Admin site       | 8000 |
-| Usage dashboard  | 8501 |
-| Celery           | -    |
-| UI               | 3000 |
+| Service          | Port    |
+|------------------|---------|
+| API + GUI Server | `8080`  |
+| Admin site       | `8000`  |
+| Usage dashboard  | `8501`  |
+| Celery           | -       |
+| UI               | `3000`  |
+| Vespa            | `8085`  |
 
 This default startup assumes that Redis, RabbitMQ, and PostgreSQL are installed and running
 as background services on ports 6379, 5672, and 5432 respectively. 
@@ -45,6 +46,27 @@ can do this by stopping and starting Honcho.
 ## To run any recipe 
 
 * Save `serviceAccountKey.json` to project root
+
+## To run vespa (used for vector search)
+
+You need to install OrbStack or Docker Desktop for this to work.
+
+1. Create a persistent volume for Vespa:
+```bash
+docker volume create vespa
+```
+2. Run the container:
+```bash
+docker run \
+  --hostname vespa-container \
+  -p 8085:8080 -p 19071:19071 \
+  --volume vespa:/opt/vespa/var \
+  -it --rm --name vespa vespaengine/vespa
+```
+3. Run the setup script
+```bash
+./manage.py runscript setup_vespa_db
+```
 
 ## To connect to our GPU cluster 
 
@@ -187,4 +209,3 @@ rsync -P -a <username>@captain.us-1.gooey.ai:/home/<username>/fixture.json .
 createdb -T template0 $PGDATABASE
 pg_dump $SOURCE_DATABASE | psql -q $PGDATABASE
 ```
-

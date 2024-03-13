@@ -36,6 +36,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     document_uploader,
     citation_style_selector,
 )
+from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
@@ -221,6 +222,8 @@ class VideoBotsPage(BasePage):
         max_references: int | None
         max_context_words: int | None
         scroll_jump: int | None
+
+        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
         dense_weight: float | None = DocSearchRequest.__fields__[
             "dense_weight"
         ].field_info
