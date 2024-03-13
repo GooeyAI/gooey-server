@@ -177,7 +177,6 @@ Prompt for merging several outputs together
                 f_url=f_url,
                 doc_meta=doc_meta,
                 selected_asr_model=request.selected_asr_model,
-                google_translate_target=request.google_translate_target,
             )
             full_text += "\n\n".join(pages)
 
