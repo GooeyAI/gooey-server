@@ -1,4 +1,3 @@
-import glom
 import requests
 from fastapi import APIRouter, Depends
 from fastapi.responses import RedirectResponse
@@ -102,10 +101,10 @@ def fb_connect_whatsapp_redirect(request: Request):
         r = requests.post(
             f"https://graph.facebook.com/v19.0/{waba_id}/subscribed_apps?access_token={user_access_token}",
             json={
-                "override_callback_uri": (
+                "override_callback_uri": str(
                     furl(settings.APP_BASE_URL)
                     / router.url_path_for(fb_webhook.__name__)
-                ).tostr(),
+                ),
                 "verify_token": settings.FB_WEBHOOK_TOKEN,
             },
         )
@@ -190,6 +189,8 @@ def fb_webhook(
     background_tasks: BackgroundTasks,
     data: dict = Depends(request_json),
 ):
+    import glom
+
     print("fb_webhook:", data)
     object_name = data.get("object")
     for entry in data.get("entry", []):

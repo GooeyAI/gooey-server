@@ -104,9 +104,13 @@ class AppUser(models.Model):
         return f"{self.display_name} ({self.email or self.phone_number or self.uid})"
 
     def first_name(self):
-        if not self.display_name:
-            return ""
-        return self.display_name.split(" ")[0]
+        if self.display_name:
+            return self.display_name.split(" ")[0]
+        if self.email:
+            return self.email.split("@")[0]
+        if self.phone_number:
+            return str(self.phone_number)
+        return "Anon"
 
     @db_middleware
     @transaction.atomic

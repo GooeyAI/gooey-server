@@ -6,14 +6,24 @@ from sentry_sdk import capture_exception
 
 import gooey_ui as st
 from daras_ai_v2 import settings
-from daras_ai_v2.asr import AsrModels, google_translate_language_selector
-from daras_ai_v2.prompt_vars import prompt_vars_widget
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
+from daras_ai_v2.prompt_vars import prompt_vars_widget
 from daras_ai_v2.search_ref import CitationStyles
 
 _user_media_url_prefix = os.path.join(
     "storage.googleapis.com", settings.GS_BUCKET_NAME, settings.GS_MEDIA_PATH
+)
+
+SUPPORTED_SPREADSHEET_TYPES = (
+    ".csv",
+    ".xlsx",
+    ".xls",
+    ".gsheet",
+    ".ods",
+    ".tsv",
+    ".json",
+    ".xml",
 )
 
 
@@ -24,17 +34,7 @@ def is_user_uploaded_url(url: str) -> bool:
 def document_uploader(
     label: str,
     key: str = "documents",
-    accept: typing.Iterable[str] = (
-        ".pdf",
-        ".txt",
-        ".docx",
-        ".md",
-        ".html",
-        ".wav",
-        ".ogg",
-        ".mp3",
-        ".aac",
-    ),
+    accept: typing.Iterable[str] = None,
     accept_multiple_files=True,
 ) -> list[str] | str:
     st.write(label, className="gui-input")
@@ -98,28 +98,21 @@ def _expand_gdrive_folders(documents: list[str]) -> list[str]:
             yield url
 
 
-def doc_search_settings(
-    asr_allowed: bool = False,
-    keyword_instructions_allowed: bool = False,
-):
-    from daras_ai_v2.vector_search import DocSearchRequest
+def citation_style_selector():
+    enum_selector(
+        CitationStyles,
+        label="###### Citation Style",
+        key="citation_style",
+        use_selectbox=True,
+        allow_none=True,
+    )
 
-    st.write("##### 🔎 Document Search Settings")
 
-    if "citation_style" in st.session_state:
-        enum_selector(
-            CitationStyles,
-            label="###### Citation Style",
-            key="citation_style",
-            use_selectbox=True,
-            allow_none=True,
-        )
-
+def query_instructions_widget():
     st.text_area(
         """
-###### 👁‍🗨 Summarization Instructions
-Prompt to transform the conversation history into a vector search query.  \\
-These instructions run before the workflow performs a search of the knowledge base documents and should summarize the conversation into a VectorDB query most relevant to the user's last message. In general, you shouldn't need to adjust these instructions.
+###### 👁‍🗨 Conversation Summarization
+These instructions run before the knowledge base is search and should reduce the conversation into a search query most relevant to the user's last message.
         """,
         key="query_instructions",
         height=300,
@@ -127,19 +120,50 @@ These instructions run before the workflow performs a search of the knowledge ba
     prompt_vars_widget(
         "query_instructions",
     )
-    if keyword_instructions_allowed:
-        st.text_area(
-            """
-###### 🔑 Keyword Extraction 
-Prompt to extract a query for hybrid BM25 search.  \\
-These instructions run after the Summarization Instructions above and can use its result via `{{ final_search_query }}`. In general, you shouldn't need to adjust these instructions.
+
+
+def keyword_instructions_widget():
+    st.text_area(
+        """
+        ###### 🔑 Keyword Extraction 
+        Instructions to create a query for keyword/hybrid BM25 search. Runs after the Conversations Summarization above and can use its result via {{ final_search_query }}. 
         """,
-            key="keyword_instructions",
-            height=300,
-        )
-        prompt_vars_widget(
-            "keyword_instructions",
-        )
+        key="keyword_instructions",
+        height=300,
+    )
+    prompt_vars_widget(
+        "keyword_instructions",
+    )
+
+
+def doc_extract_selector():
+    from recipes.DocExtract import DocExtractPage
+    from bots.models import PublishedRun, Workflow, PublishedRunVisibility
+
+    options = {
+        None: "---",
+        DocExtractPage.get_root_published_run().get_app_url(): "Default",
+    } | {
+        pr.get_app_url(): pr.title
+        for pr in PublishedRun.objects.filter(
+            workflow=Workflow.DOC_EXTRACT,
+            is_approved_example=True,
+            visibility=PublishedRunVisibility.PUBLIC,
+        ).exclude(published_run_id="")
+    }
+    st.selectbox(
+        """
+        ###### Create Synthetic Data
+        To improve answer quality, pick a synthetic data maker workflow to scan & OCR any  images in your documents or transcribe & translate any videos. It also can synthesize a helpful FAQ. Adds ~2 minutes of one-time processing per file.
+        """,
+        key="doc_extract_url",
+        options=options,
+        format_func=lambda x: options[x],
+    )
+
+
+def doc_search_advanced_settings():
+    from daras_ai_v2.vector_search import DocSearchRequest
 
     dense_weight_ = DocSearchRequest.__fields__["dense_weight"]
     st.slider(
@@ -180,24 +204,3 @@ Your knowledge base documents are split into overlapping snippets. This settings
         min_value=1,
         max_value=50,
     )
-
-    if not asr_allowed:
-        return
-
-    st.write("---")
-    st.write(
-        """
-        ##### 🎤 Knowledge Base Speech Recognition
-        <font color="grey">If your knowledge base documents contain audio or video files, we'll transcribe and optionally translate them to English, given we've found most vectorDBs and LLMs perform best in English (even if their final answers are translated into another language).</font>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    enum_selector(
-        AsrModels,
-        label="###### ASR Model",
-        key="selected_asr_model",
-        allow_none=True,
-        use_selectbox=True,
-    )
-    google_translate_language_selector()

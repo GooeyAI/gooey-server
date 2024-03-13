@@ -1,6 +1,9 @@
 from daras_ai_v2.asr import google_translate_target_languages
 
-from daras_ai_v2.doc_search_settings_widgets import document_uploader
+from daras_ai_v2.doc_search_settings_widgets import (
+    document_uploader,
+    SUPPORTED_SPREADSHEET_TYPES,
+)
 
 
 def validate_glossary_document(document: str):
@@ -11,13 +14,17 @@ def validate_glossary_document(document: str):
     import langcodes
     from daras_ai_v2.vector_search import (
         download_content_bytes,
-        bytes_to_df,
-        doc_url_to_metadata,
+        tabular_bytes_to_str_df,
+        doc_url_to_file_metadata,
     )
 
-    metadata = doc_url_to_metadata(document)
-    f_bytes, ext = download_content_bytes(f_url=document, mime_type=metadata.name)
-    df = bytes_to_df(f_name=metadata.name, f_bytes=f_bytes, ext=ext)
+    metadata = doc_url_to_file_metadata(document)
+    f_bytes, mime_type = download_content_bytes(
+        f_url=document, mime_type=metadata.mime_type
+    )
+    df = tabular_bytes_to_str_df(
+        f_name=metadata.name, f_bytes=f_bytes, mime_type=mime_type
+    )
 
     if len(df.columns) < 2:
         raise AssertionError(
@@ -40,7 +47,7 @@ def glossary_input(
     return document_uploader(
         label=label,
         key=key,
-        accept=[".csv", ".xlsx", ".xls", ".gsheet", ".ods", ".tsv"],
+        accept=SUPPORTED_SPREADSHEET_TYPES,
         accept_multiple_files=False,
     )  # type: ignore
 

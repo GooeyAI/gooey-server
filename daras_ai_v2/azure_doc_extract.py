@@ -16,9 +16,21 @@ from daras_ai_v2.text_splitter import default_length_function
 auth_headers = {"Ocp-Apim-Subscription-Key": settings.AZURE_FORM_RECOGNIZER_KEY}
 
 
+def azure_doc_extract_page_num(pdf_url: str, page_num: int) -> str:
+    if page_num:
+        params = dict(pages=str(page_num))
+    else:
+        params = None
+    pages = azure_doc_extract_pages(pdf_url, params=params)
+    if pages and pages[0]:
+        return str(pages[0])
+    else:
+        return ""
+
+
 def azure_doc_extract_pages(
     pdf_url: str, model_id: str = "prebuilt-layout", params: dict = None
-):
+) -> list[str]:
     result = azure_form_recognizer(pdf_url, model_id, params)
     return [
         records_to_text(extract_records(result, page["pageNumber"]))

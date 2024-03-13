@@ -463,6 +463,7 @@ def download_button(
     disabled: bool = False,
     **props,
 ) -> bool:
+    url = furl(url).remove(fragment=True).url
     return button(
         component="download-button",
         url=url,
