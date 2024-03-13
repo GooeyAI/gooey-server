@@ -1965,20 +1965,20 @@ def render_output_caption():
     if seed := st.session_state.get("seed"):
         caption += f' with seed <span style="color: black;">{seed}</span> '
 
-    created_at = st.session_state.get(StateKeys.created_at, datetime.datetime.today())
-    if created_at:
-        if isinstance(created_at, str):
-            created_at = datetime.datetime.fromisoformat(created_at)
+    updated_at = st.session_state.get(StateKeys.updated_at, datetime.datetime.today())
+    if updated_at:
+        if isinstance(updated_at, str):
+            updated_at = datetime.datetime.fromisoformat(updated_at)
         caption += " on&nbsp;"
 
     with st.div(className="d-flex"):
         st.caption(caption, unsafe_allow_html=True)
-        if created_at:
+        if updated_at:
             st.caption(
                 "...",
                 className="text-black",
                 **render_local_dt_attrs(
-                    created_at,
+                    updated_at,
                     date_options={"month": "short", "day": "numeric"},
                 ),
             )
