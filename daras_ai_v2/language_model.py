@@ -799,13 +799,13 @@ def _run_gemini_pro(
                     "parts": [{"text": "OK"}],
                 },
             )
-    msgs = _call_gemini_api(
+    msg = _call_gemini_api(
         model_id=model_id,
         contents=contents,
         max_output_tokens=max_output_tokens,
         temperature=temperature,
     )
-    return [{"role": CHATML_ROLE_ASSISTANT, "content": msg} for msg in msgs]
+    return [{"role": CHATML_ROLE_ASSISTANT, "content": msg}]
 
 
 def _run_gemini_pro_vision(
@@ -834,13 +834,15 @@ def _run_gemini_pro_vision(
             ],
         }
     ]
-    return _call_gemini_api(
-        model_id=model_id,
-        contents=contents,
-        max_output_tokens=max_output_tokens,
-        temperature=temperature,
-        stop=stop,
-    )
+    return [
+        _call_gemini_api(
+            model_id=model_id,
+            contents=contents,
+            max_output_tokens=max_output_tokens,
+            temperature=temperature,
+            stop=stop,
+        )
+    ]
 
 
 @retry_if(vertex_ai_should_retry)
@@ -851,7 +853,7 @@ def _call_gemini_api(
     max_output_tokens: int,
     temperature: float,
     stop: list[str] = None,
-) -> list[str]:
+) -> str:
     session, project = get_google_auth_session()
     r = session.post(
         f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{project}/locations/{settings.GCP_REGION}/publishers/google/models/{model_id}:streamGenerateContent",
@@ -865,13 +867,30 @@ def _call_gemini_api(
         },
     )
     raise_for_status(r)
-    return [
-        "".join(
-            msg["content"]["parts"][0]["text"]
-            for item in r.json()
-            for msg in item["candidates"]
-        )
-    ]
+    ret = "".join(
+        parts[0]["text"]
+        for item in r.json()
+        for msg in item["candidates"]
+        if (parts := msg["content"].get("parts"))
+    )
+
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    record_cost_auto(
+        model=model_id,
+        sku=ModelSku.llm_prompt,
+        quantity=sum(
+            len(part.get("text") or "") for item in contents for part in item["parts"]
+        ),
+    )
+    record_cost_auto(
+        model=model_id,
+        sku=ModelSku.llm_completion,
+        quantity=len(ret),
+    )
+
+    return ret
 
 
 @retry_if(vertex_ai_should_retry)
@@ -922,22 +941,7 @@ def _run_palm_chat(
     )
     raise_for_status(r)
     out = r.json()
-
-    from usage_costs.cost_utils import record_cost_auto
-    from usage_costs.models import ModelSku
-
-    record_cost_auto(
-        model=model_id,
-        sku=ModelSku.llm_prompt,
-        quantity=out["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
-    )
-    record_cost_auto(
-        model=model_id,
-        sku=ModelSku.llm_completion,
-        quantity=out["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
-    )
-
-    return [
+    ret = [
         {
             "role": msg["author"],
             "content": msg["content"],
@@ -945,6 +949,22 @@ def _run_palm_chat(
         for pred in out["predictions"]
         for msg in pred["candidates"]
     ]
+
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    record_cost_auto(
+        model=model_id,
+        sku=ModelSku.llm_prompt,
+        quantity=sum(len(get_entry_text(entry)) for entry in messages),
+    )
+    record_cost_auto(
+        model=model_id,
+        sku=ModelSku.llm_completion,
+        quantity=sum(len(msg["content"] or "") for msg in ret),
+    )
+
+    return ret
 
 
 @retry_if(vertex_ai_should_retry)
