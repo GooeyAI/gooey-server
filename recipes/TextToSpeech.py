@@ -4,7 +4,6 @@ import time
 import typing
 
 import requests
-import mimetypes
 from pydantic import BaseModel
 import emoji
 
@@ -24,8 +23,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_provider_selector,
     azure_tts_voices,
-    AZURE_TTS_NON_STREAM_FORMATS_T,
-    AZURE_TTS_STREAM_FORMATS_T,
 )
 from daras_ai_v2.azure_asr import azure_auth_header
 from furl import furl
@@ -55,7 +52,6 @@ class TextToSpeechPage(BasePage):
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
-        "azure_audio_format": "audio-16khz-32kbitrate-mono-mp3",  # mp3 is the only format all browsers support so it makes sense as a default
     }
 
     class RequestModel(BaseModel):
@@ -84,9 +80,6 @@ class TextToSpeechPage(BasePage):
         elevenlabs_speaker_boost: bool | None
 
         azure_voice_name: str | None
-        azure_audio_format: (
-            AZURE_TTS_STREAM_FORMATS_T | AZURE_TTS_NON_STREAM_FORMATS_T | None
-        )
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -320,9 +313,7 @@ class TextToSpeechPage(BasePage):
                 )
 
             case TextToSpeechProviders.AZURE_TTS:
-                output_format = state.get(
-                    "azure_audio_format", "audio-16khz-32kbitrate-mono-mp3"
-                )
+                output_format = "audio-16khz-32kbitrate-mono-mp3"
                 voice = state.get("azure_voice_name", "en-US")
                 voice = azure_tts_voices().get(voice, {})
                 res = requests.post(
@@ -341,11 +332,10 @@ class TextToSpeechPage(BasePage):
                     """.strip(),  # Microsoft's implementation of Speech Synthesis Markup Language (SSML) does not support emojis etc. so we replace them with descriptive text. https://learn.microsoft.com/en-us/azure/ai-services/speech-service/speech-synthesis-markup
                 )
                 raise_for_status(res)
-                content_type = res.headers.get("Content-Type", "audio/mp3")
                 state["audio_url"] = upload_file_from_bytes(
-                    f"azure_tts{mimetypes.guess_extension(content_type, strict=False) or '.amr'}",
+                    "azure_tts.mp3",
                     res.content,
-                    content_type,
+                    "audio/mp3",
                 )
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):

@@ -4,11 +4,7 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from daras_ai_v2.text_to_speech_settings_widgets import (
-    text_to_speech_provider_selector,
-    AZURE_TTS_NON_STREAM_FORMATS_T,
-    AZURE_TTS_STREAM_FORMATS_T,
-)
+from daras_ai_v2.text_to_speech_settings_widgets import text_to_speech_provider_selector
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
 from daras_ai_v2.safety_checker import safety_checker
@@ -28,7 +24,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
-        "azure_audio_format": "audio-16khz-32kbitrate-mono-mp3",
     }
 
     class RequestModel(BaseModel):
@@ -63,9 +58,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         elevenlabs_speaker_boost: bool | None
 
         azure_voice_name: str | None
-        azure_audio_format: (
-            AZURE_TTS_STREAM_FORMATS_T | AZURE_TTS_NON_STREAM_FORMATS_T | None
-        )
 
     class ResponseModel(BaseModel):
         output_video: str

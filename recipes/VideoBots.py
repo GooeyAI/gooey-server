@@ -78,8 +78,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
     text_to_speech_provider_selector,
-    AZURE_TTS_NON_STREAM_FORMATS_T,
-    AZURE_TTS_STREAM_FORMATS_T,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
 from recipes.DocSearch import (
@@ -138,7 +136,6 @@ class VideoBotsPage(BasePage):
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
-        "azure_audio_format": "audio-16khz-32kbitrate-mono-mp3",
         # gpt3
         "selected_model": LargeLanguageModels.text_davinci_003.name,
         "avoid_repetition": True,
@@ -195,9 +192,6 @@ class VideoBotsPage(BasePage):
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
         azure_voice_name: str | None
-        azure_audio_format: (
-            AZURE_TTS_STREAM_FORMATS_T | AZURE_TTS_NON_STREAM_FORMATS_T | None
-        )
 
         # llm settings
         selected_model: (
