@@ -1,6 +1,9 @@
 from enum import Enum
+import typing
 
 import requests
+from furl import furl
+from daras_ai_v2.azure_asr import azure_auth_header
 
 import gooey_ui as st
 from daras_ai_v2 import settings
@@ -30,6 +33,7 @@ class TextToSpeechProviders(Enum):
     ELEVEN_LABS = "Eleven Labs"
     UBERDUCK = "Uberduck.ai"
     BARK = "Bark (suno-ai)"
+    AZURE_TTS = "Azure Text-to-Speech"
 
 
 # Mapping from Eleven Labs Voice Name -> Voice ID
@@ -140,6 +144,55 @@ BARK_ALLOWED_PROMPTS = {
     for n in range(10)
 }
 
+AZURE_TTS_NON_STREAM_FORMATS_T = typing.Literal[
+    "riff-8khz-8bit-mono-alaw",
+    "riff-8khz-8bit-mono-mulaw",
+    "riff-8khz-16bit-mono-pcm",
+    "riff-22050hz-16bit-mono-pcm",
+    "riff-24khz-16bit-mono-pcm",
+    "riff-44100hz-16bit-mono-pcm",
+    "riff-48khz-16bit-mono-pcm",
+]
+
+AZURE_TTS_NON_STREAM_FORMATS: tuple[AZURE_TTS_NON_STREAM_FORMATS_T] = typing.get_args(
+    AZURE_TTS_NON_STREAM_FORMATS_T
+)
+
+AZURE_TTS_STREAM_FORMATS_T = typing.Literal[
+    "amr-wb-16000hz",
+    "audio-16khz-16bit-32kbps-mono-opus",
+    "audio-16khz-32kbitrate-mono-mp3",
+    "audio-16khz-64kbitrate-mono-mp3",
+    "audio-16khz-128kbitrate-mono-mp3",
+    "audio-24khz-16bit-24kbps-mono-opus",
+    "audio-24khz-16bit-48kbps-mono-opus",
+    "audio-24khz-48kbitrate-mono-mp3",
+    "audio-24khz-96kbitrate-mono-mp3",
+    "audio-24khz-160kbitrate-mono-mp3",
+    "audio-48khz-96kbitrate-mono-mp3",
+    "audio-48khz-192kbitrate-mono-mp3",
+    "ogg-16khz-16bit-mono-opus",
+    "ogg-24khz-16bit-mono-opus",
+    "ogg-48khz-16bit-mono-opus",
+    "raw-8khz-8bit-mono-alaw",
+    "raw-8khz-8bit-mono-mulaw",
+    "raw-8khz-16bit-mono-pcm",
+    "raw-16khz-16bit-mono-pcm",
+    "raw-16khz-16bit-mono-truesilk",
+    "raw-22050hz-16bit-mono-pcm",
+    "raw-24khz-16bit-mono-pcm",
+    "raw-24khz-16bit-mono-truesilk",
+    "raw-44100hz-16bit-mono-pcm",
+    "raw-48khz-16bit-mono-pcm",
+    "webm-16khz-16bit-mono-opus",
+    "webm-24khz-16bit-24kbps-mono-opus",
+    "webm-24khz-16bit-mono-opus",
+]
+
+AZURE_TTS_STREAM_FORMATS: tuple[AZURE_TTS_STREAM_FORMATS_T] = typing.get_args(
+    AZURE_TTS_STREAM_FORMATS_T
+)
+
 
 def text_to_speech_provider_selector(page):
     col1, col2 = st.columns(2)
@@ -160,6 +213,8 @@ def text_to_speech_provider_selector(page):
                 uberduck_selector()
             case TextToSpeechProviders.ELEVEN_LABS.name:
                 elevenlabs_selector(page)
+            case TextToSpeechProviders.AZURE_TTS.name:
+                azure_tts_selector()
     return tts_provider
 
 
@@ -173,6 +228,84 @@ def text_to_speech_settings(page, tts_provider):
             uberduck_settings()
         case TextToSpeechProviders.ELEVEN_LABS.name:
             elevenlabs_settings()
+        case TextToSpeechProviders.AZURE_TTS.name:
+            azure_tts_settings()
+
+
+def azure_tts_selector():
+    st.selectbox(
+        label="""
+        ###### Azure TTS Voice name
+        """,
+        key="azure_voice_name",
+        format_func=lambda voice: f"{azure_tts_voices()[voice].get('DisplayName')} - {azure_tts_voices()[voice].get('LocaleName')}",
+        options=azure_tts_voices().keys(),
+    )
+
+
+def azure_tts_settings():
+    voice = st.session_state.get("azure_voice_name")
+    if not voice:
+        return
+    voice = azure_tts_voices()[voice]
+    st.markdown(
+        f"""
+        ###### {voice.get('Name')}:
+        * Name: {voice.get('LocalName')} {'(' + str(voice.get('DisplayName')) + ')' if voice.get('LocalName') != voice.get('DisplayName') else ''}
+        * Gender: {voice.get('Gender')}
+        * Locale: {voice.get('LocaleName')}
+        * Locale Code: {voice.get('Locale')}
+        * Sample Rate: {voice.get('SampleRateHertz')} Hz
+        * Voice Type: {voice.get('VoiceType')}
+        * Words Per Minute: {voice.get('WordsPerMinute')}
+
+        See all the supported languages and voices [here](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support?tabs=tts)
+        """
+    )
+
+    # we don't support streaming the audio to the browser or through copilot yet so we don't add an input for it but we can still allow the output formats
+    st.session_state.setdefault("azure_audio_format", "audio-16khz-32kbitrate-mono-mp3")
+    format: str = st.selectbox(
+        """
+        ###### Audio Format
+        """,
+        key="azure_audio_format",
+        options=(AZURE_TTS_STREAM_FORMATS + AZURE_TTS_NON_STREAM_FORMATS),
+    )  # type: ignore
+
+    # non-mp3 formats are not supported by all browsers (https://en.wikipedia.org/wiki/HTML5_audio#Supported_audio_coding_formats)
+    # but it is still useful to be able to select them for API usage, or usage in places that require non-mp3 formats
+    # so we show a warning if the format is not mp3
+    if "mp3" not in format:
+        st.error(
+            """
+            Not all browsers can preview non-mp3 audio formats. You may need to download the audio file to listen to it if the audio preview won't play.
+            """,
+            icon="⚠️",
+        )
+
+
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def azure_tts_voices() -> dict[str, dict[str, str]]:
+    # E.g., {"af-ZA-AdriNeural": {
+    #     "Name": "Microsoft Server Speech Text to Speech Voice (af-ZA, AdriNeural)",
+    #     "DisplayName": "Adri",
+    #     "LocalName": "Adri",
+    #     "ShortName": "af-ZA-AdriNeural",
+    #     "Gender": "Female",
+    #     "Locale": "af-ZA",
+    #     "LocaleName": "Afrikaans (South Africa)",
+    #     "SampleRateHertz": "48000",
+    #     "VoiceType": "Neural",
+    #     "Status": "GA",
+    #     "WordsPerMinute": "147",
+    # }}
+    res = requests.get(
+        str(furl(settings.AZURE_TTS_ENDPOINT) / "/cognitiveservices/voices/list"),
+        headers=azure_auth_header(),
+    )
+    raise_for_status(res)
+    return {voice.get("ShortName", "Unknown"): voice for voice in res.json()}
 
 
 def bark_selector():
