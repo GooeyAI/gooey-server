@@ -4,12 +4,12 @@ import os
 import os.path
 import typing
 
-from django.db.models import QuerySet, Q
+from django.db.models import QuerySet, Q, Sum
 from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
-from bots.models import BotIntegration, Platform
+from bots.models import BotIntegration, Platform, SavedRun
 from bots.models import Workflow
 from daras_ai.image_input import (
     truncate_text_words,
@@ -657,6 +657,17 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.audio(audio_url)
 
     def get_raw_price(self, state: dict):
+        saved_run = SavedRun.objects.filter(
+            uid=self.request.user.uid,
+        )
+        total = 0
+        if saved_run:
+            for run in saved_run:
+                usage_cost = run.usage_costs.all()
+                for cost in usage_cost:
+                    total += cost.dollar_amount
+            return total + 4
+
         match state.get("tts_provider"):
             case TextToSpeechProviders.ELEVEN_LABS.name:
                 output_text_list = state.get(
