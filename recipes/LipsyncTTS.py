@@ -57,6 +57,8 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         elevenlabs_style: float | None
         elevenlabs_speaker_boost: bool | None
 
+        azure_voice_name: str | None
+
     class ResponseModel(BaseModel):
         output_video: str
 
