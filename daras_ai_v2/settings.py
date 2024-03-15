@@ -230,6 +230,8 @@ UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
+GROQ_API_KEY = config("GROQ_API_KEY", default="")
+
 REPLICATE_API_KEY = config("REPLICATE_API_KEY", default="")
 TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
 
