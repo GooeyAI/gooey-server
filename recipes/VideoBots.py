@@ -657,8 +657,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.audio(audio_url)
 
     def get_raw_price(self, state: dict):
+        created = (
+            SavedRun.objects.filter(
+                uid=self.request.user.uid,
+            )
+            .latest("created_at")
+            .created_at
+        )
         saved_run = SavedRun.objects.filter(
             uid=self.request.user.uid,
+            created_at=created,
         )
         total = 0
         if saved_run:
