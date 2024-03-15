@@ -2,6 +2,7 @@ import datetime
 import typing
 from multiprocessing.pool import ThreadPool
 from textwrap import dedent
+import hashids
 
 import pytz
 from django.conf import settings
@@ -388,7 +389,18 @@ def _parse_dt(dt) -> datetime.datetime | None:
     return None
 
 
+_botintegration_hashids = hashids.Hashids(salt=settings.HASHIDS_SALT)
+
+
 class BotIntegrationQuerySet(models.QuerySet):
+    def get_by_hashid(self, hashid: str) -> "BotIntegration | None":
+        try:
+            obj_id = _botintegration_hashids.decode(hashid)[0]
+        except IndexError:
+            return None
+        else:
+            return self.get(id=obj_id)
+
     @transaction.atomic()
     def reset_fb_pages_for_user(
         self, uid: str, fb_pages: list[dict]
@@ -653,6 +665,11 @@ class BotIntegration(models.Model):
         )
 
     get_display_name.short_description = "Bot"
+
+    def get_hashid(self) -> str:
+        return _botintegration_hashids.encode(self.id)
+
+    get_hashid.short_description = "Hashid"
 
 
 class ConvoState(models.IntegerChoices):

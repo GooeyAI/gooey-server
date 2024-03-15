@@ -18,6 +18,7 @@ from bots.models import (
     Workflow,
     Platform,
     BotIntegration,
+    BotIntegrationQuerySet,
     Conversation,
     Message,
     Feedback,
@@ -99,13 +100,17 @@ class VideoBotsStatsPage(BasePage):
             )
             return
         if self.is_current_user_admin():
-            bot_integrations = BotIntegration.objects.all().order_by(
+            bot_integrations: (
+                BotIntegrationQuerySet
+            ) = BotIntegration.objects.all().order_by(
                 "platform", "-created_at"
-            )
+            )  # type: ignore
         else:
-            bot_integrations = BotIntegration.objects.filter(
+            bot_integrations: BotIntegrationQuerySet = BotIntegration.objects.filter(
                 billing_account_uid=self.request.user.uid
-            ).order_by("platform", "-created_at")
+            ).order_by(
+                "platform", "-created_at"
+            )  # type: ignore
 
         if bot_integrations.count() == 0:
             st.write(
@@ -113,11 +118,17 @@ class VideoBotsStatsPage(BasePage):
             )
             return
 
-        allowed_bids = [bi.id for bi in bot_integrations]
-        bid = self.request.query_params.get("bi_id", allowed_bids[0])
-        if int(bid) not in allowed_bids:
-            bid = allowed_bids[0]
-        bi = BotIntegration.objects.get(id=bid)
+        bi: BotIntegration = bot_integrations.first()  # type: ignore
+        bi_hash: str | None = self.request.query_params.get("bi_id")
+        if bi_hash:
+            bi = (
+                bot_integrations.get_by_hashid(bi_hash)
+                or bot_integrations.filter(
+                    id=bi_hash
+                ).first()  # for backwards compatibility, we allow actual bot ids and update the url to use the hash id
+                or bi  # if no match, we just use the first allowed bot
+            )
+        bi_hash = bi.get_hashid()
         has_analysis_run = bi.analysis_run is not None
         run_title, run_url = self.parse_run_info(bi)
 
@@ -127,7 +138,7 @@ class VideoBotsStatsPage(BasePage):
 
         with col1:
             conversations, messages = self.calculate_overall_stats(
-                bid, bi, run_title, run_url
+                bi, run_title, run_url
             )
 
             (
@@ -273,7 +284,7 @@ class VideoBotsStatsPage(BasePage):
         new_url = furl(
             self.app_url(),
             args={
-                "bi_id": bid,
+                "bi_id": bi_hash,
                 "view": view,
                 "details": details,
                 "start_date": start_date.strftime("%Y-%m-%d"),
@@ -347,9 +358,9 @@ class VideoBotsStatsPage(BasePage):
         run_url = furl(saved_run.get_app_url()).tostr() if saved_run else ""
         return run_title, run_url
 
-    def calculate_overall_stats(self, bid, bi, run_title, run_url):
+    def calculate_overall_stats(self, bi, run_title, run_url):
         conversations: ConversationQuerySet = Conversation.objects.filter(
-            bot_integration__id=bid
+            bot_integration__id=bi.id
         ).order_by()  # type: ignore
         # due to things like personal convos for slack, each user can have multiple conversations
         users = conversations.get_unique_users().order_by()
