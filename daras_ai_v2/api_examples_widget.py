@@ -182,9 +182,10 @@ while True:
 result = response.json()
 print(response.status_code, result)
 """
-        import black
+        from black import format_str
+        from black.mode import Mode
 
-        py_code = black.format_str(py_code, mode=black.Mode())
+        py_code = format_str(py_code, mode=Mode())
         st.write(
             rf"""
 1. Generate an api key [below👇](#api-keys)
