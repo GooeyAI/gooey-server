@@ -1111,64 +1111,64 @@ def parse_chatml(prompt: str) -> tuple[bool, list[dict]]:
     return is_chatml, messages
 
 
-# This prompt formatting was copied from the original Llama v2 repo:
-# https://github.com/facebookresearch/llama/blob/c769dfd53ddd509159216a5423204653850f79f4/llama/generation.py#L44
-# These are components of the prompt that should not be changed by the users
-B_INST, E_INST = "[INST]", "[/INST]"
-B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
-
-SPECIAL_TAGS = [B_INST, E_INST, B_SYS.strip(), E_SYS.strip()]
-
-
-def build_llama_prompt(messages: list[ConversationEntry]):
-    if any([tag in msg.get("content", "") for tag in SPECIAL_TAGS for msg in messages]):
-        raise ValueError(
-            f"Messages cannot contain any of the following: {SPECIAL_TAGS}"
-        )
-
-    if messages and messages[0]["role"] == CHATML_ROLE_SYSTEM:
-        system_prompt = messages[0].get("content", "").strip()
-        messages = messages[1:]
-    else:
-        system_prompt = ""
-
-    if messages and messages[0]["role"] == CHATML_ROLE_USER:
-        first_user_message = messages[0].get("content", "").strip()
-        messages = messages[1:]
-    else:
-        first_user_message = ""
-
-    if system_prompt:
-        first_user_message = B_SYS + system_prompt + E_SYS + first_user_message
-    messages = [
-        {
-            "role": CHATML_ROLE_USER,
-            "content": first_user_message,
-        },
-    ] + messages
-
-    assert all([msg["role"] == CHATML_ROLE_USER for msg in messages[::2]]) and all(
-        [msg["role"] == CHATML_ROLE_ASSISTANT for msg in messages[1::2]]
-    ), (
-        f"llama only supports '{CHATML_ROLE_SYSTEM}', '{CHATML_ROLE_USER}' and '{CHATML_ROLE_ASSISTANT}' roles, "
-        "starting with 'system', then 'user' and alternating (u/a/u/a/u...)"
-    )
-
-    if messages[-1]["role"] == CHATML_ROLE_ASSISTANT:
-        messages.append({"role": CHATML_ROLE_USER, "content": ""})
-
-    ret = "".join(
-        f"{B_INST} {prompt.get('content', '').strip()} {E_INST} {answer.get('content', '').strip()} "
-        for prompt, answer in zip(messages[::2], messages[1::2])
-    )
-
-    assert (
-        messages[-1]["role"] == CHATML_ROLE_USER
-    ), f"Last message must be from {CHATML_ROLE_USER}, got {messages[-1]['role']}"
-
-    ret += f"{B_INST} {messages[-1].get('content').strip()} {E_INST}"
-
-    return ret
+# # This prompt formatting was copied from the original Llama v2 repo:
+# # https://github.com/facebookresearch/llama/blob/c769dfd53ddd509159216a5423204653850f79f4/llama/generation.py#L44
+# # These are components of the prompt that should not be changed by the users
+# B_INST, E_INST = "[INST]", "[/INST]"
+# B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
+#
+# SPECIAL_TAGS = [B_INST, E_INST, B_SYS.strip(), E_SYS.strip()]
+#
+#
+# def build_llama_prompt(messages: list[ConversationEntry]):
+#     if any([tag in msg.get("content", "") for tag in SPECIAL_TAGS for msg in messages]):
+#         raise ValueError(
+#             f"Messages cannot contain any of the following: {SPECIAL_TAGS}"
+#         )
+#
+#     if messages and messages[0]["role"] == CHATML_ROLE_SYSTEM:
+#         system_prompt = messages[0].get("content", "").strip()
+#         messages = messages[1:]
+#     else:
+#         system_prompt = ""
+#
+#     if messages and messages[0]["role"] == CHATML_ROLE_USER:
+#         first_user_message = messages[0].get("content", "").strip()
+#         messages = messages[1:]
+#     else:
+#         first_user_message = ""
+#
+#     if system_prompt:
+#         first_user_message = B_SYS + system_prompt + E_SYS + first_user_message
+#     messages = [
+#         {
+#             "role": CHATML_ROLE_USER,
+#             "content": first_user_message,
+#         },
+#     ] + messages
+#
+#     assert all([msg["role"] == CHATML_ROLE_USER for msg in messages[::2]]) and all(
+#         [msg["role"] == CHATML_ROLE_ASSISTANT for msg in messages[1::2]]
+#     ), (
+#         f"llama only supports '{CHATML_ROLE_SYSTEM}', '{CHATML_ROLE_USER}' and '{CHATML_ROLE_ASSISTANT}' roles, "
+#         "starting with 'system', then 'user' and alternating (u/a/u/a/u...)"
+#     )
+#
+#     if messages[-1]["role"] == CHATML_ROLE_ASSISTANT:
+#         messages.append({"role": CHATML_ROLE_USER, "content": ""})
+#
+#     ret = "".join(
+#         f"{B_INST} {prompt.get('content', '').strip()} {E_INST} {answer.get('content', '').strip()} "
+#         for prompt, answer in zip(messages[::2], messages[1::2])
+#     )
+#
+#     assert (
+#         messages[-1]["role"] == CHATML_ROLE_USER
+#     ), f"Last message must be from {CHATML_ROLE_USER}, got {messages[-1]['role']}"
+#
+#     ret += f"{B_INST} {messages[-1].get('content').strip()} {E_INST}"
+#
+#     return ret
 
 
 def format_chat_entry(
