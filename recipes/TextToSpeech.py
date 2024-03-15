@@ -335,7 +335,7 @@ class TextToSpeechPage(BasePage):
                 state["audio_url"] = upload_file_from_bytes(
                     "azure_tts.mp3",
                     res.content,
-                    "audio/mp3",
+                    "audio/mpeg",
                 )
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):
