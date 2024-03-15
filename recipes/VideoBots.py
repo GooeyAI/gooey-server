@@ -1200,10 +1200,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             VideoBotsPage, current_run, published_run
         ).h1_title
 
-        bid = self.request.query_params.get("bi_id")
-        if bid is not None:
-            st.session_state.setdefault("bi_id", int(bid))
-
         add_integration = self.get_tab_url(
             MenuTabs.integrations, query_params={"add-integration": "true"}
         )
@@ -1239,12 +1235,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 )
                 bi = integrations.get(id=bid)
                 icon = f'<img src="{Platform(bi.platform).get_favicon()}" style="height: 20px; width: 20px;">'
-                st.change_url(
-                    self.get_tab_url(
-                        MenuTabs.integrations, query_params={"bi_id": bi.id}
-                    ),
-                    self.request,
-                )
         else:
             bi = integrations[0]
             icon = f'<img src="{Platform(bi.platform).get_favicon()}" style="height: 20px; width: 20px;">'
