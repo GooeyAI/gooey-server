@@ -2,7 +2,6 @@ import json
 import time
 import typing
 
-import emoji
 import requests
 from furl import furl
 from pydantic import BaseModel
@@ -312,6 +311,8 @@ class TextToSpeechPage(BasePage):
                 )
 
             case TextToSpeechProviders.AZURE_TTS:
+                import emoji
+
                 output_format = "audio-16khz-32kbitrate-mono-mp3"
                 voice_name = state.get("azure_voice_name", "en-US")
                 try:
