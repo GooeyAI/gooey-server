@@ -184,21 +184,25 @@ def text_to_speech_settings(page, tts_provider):
 
 
 def azure_tts_selector():
+    voices = azure_tts_voices()
     st.selectbox(
         label="""
         ###### Azure TTS Voice name
         """,
         key="azure_voice_name",
-        format_func=lambda voice: f"{azure_tts_voices()[voice].get('DisplayName')} - {azure_tts_voices()[voice].get('LocaleName')}",
-        options=azure_tts_voices().keys(),
+        format_func=lambda voice: f"{voices[voice].get('DisplayName')} - {voices[voice].get('LocaleName')}",
+        options=voices.keys(),
     )
 
 
 def azure_tts_settings():
-    voice = st.session_state.get("azure_voice_name")
-    if not voice:
+    voice_name = st.session_state.get("azure_voice_name")
+    if not voice_name:
         return
-    voice = azure_tts_voices()[voice]
+    try:
+        voice = azure_tts_voices()[voice_name]
+    except KeyError:
+        return
     st.markdown(
         f"""
         ###### {voice.get('Name')}:

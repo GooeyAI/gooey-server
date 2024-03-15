@@ -1,16 +1,17 @@
 import json
-import json
 import time
 import typing
 
-import requests
-from pydantic import BaseModel
 import emoji
+import requests
+from furl import furl
+from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
+from daras_ai_v2.azure_asr import azure_auth_header
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
@@ -24,8 +25,6 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_provider_selector,
     azure_tts_voices,
 )
-from daras_ai_v2.azure_asr import azure_auth_header
-from furl import furl
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
 
@@ -314,8 +313,11 @@ class TextToSpeechPage(BasePage):
 
             case TextToSpeechProviders.AZURE_TTS:
                 output_format = "audio-16khz-32kbitrate-mono-mp3"
-                voice = state.get("azure_voice_name", "en-US")
-                voice = azure_tts_voices().get(voice, {})
+                voice_name = state.get("azure_voice_name", "en-US")
+                try:
+                    voice = azure_tts_voices()[voice_name]
+                except KeyError as e:
+                    raise UserError(f"Invalid Azure voice name: {voice_name}") from e
                 res = requests.post(
                     str(furl(settings.AZURE_TTS_ENDPOINT) / "/cognitiveservices/v1"),
                     headers={
