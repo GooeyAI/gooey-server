@@ -47,9 +47,6 @@ from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
     ConversationEntry,
-    format_chatml_message,
-    CHATML_END_TOKEN,
-    CHATML_START_TOKEN,
     LargeLanguageModels,
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
@@ -853,66 +850,37 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
             model_max_tokens[model]
-            - calc_gpt_tokens([system_prompt, user_input], is_chat_model=is_chat_model)
+            - calc_gpt_tokens([system_prompt, user_input])
             - request.max_tokens
             - SAFETY_BUFFER
         )
         clip_idx = convo_window_clipper(
-            history_window, max_history_tokens, is_chat_model=is_chat_model
+            history_window,
+            max_history_tokens,
         )
         history_window = history_window[clip_idx:]
         prompt_messages = [system_prompt, *history_window, user_prompt]
-
-        # for backwards compat with non-chat models
-        if not is_chat_model:
-            # assistant prompt to triger a model response
-            prompt_messages.append(
-                {
-                    "role": CHATML_ROLE_ASSISTANT,
-                    "content": "",
-                }
-            )
-
         state["final_prompt"] = prompt_messages
 
         # ensure input script is not too big
-        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(
-            prompt_messages, is_chat_model=is_chat_model
-        )
+        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(prompt_messages)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
             raise UserError("Input Script is too long! Please reduce the script size.")
 
         yield f"Summarizing with {model.value}..."
-        if is_chat_model:
-            chunks = run_language_model(
-                model=request.selected_model,
-                messages=[
-                    {"role": s["role"], "content": s["content"]}
-                    for s in prompt_messages
-                ],
-                max_tokens=max_allowed_tokens,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                avoid_repetition=request.avoid_repetition,
-                tools=request.tools,
-                stream=True,
-            )
-        else:
-            prompt = "\n".join(
-                format_chatml_message(entry) for entry in prompt_messages
-            )
-            chunks = run_language_model(
-                model=request.selected_model,
-                prompt=prompt,
-                max_tokens=max_allowed_tokens,
-                quality=request.quality,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                avoid_repetition=request.avoid_repetition,
-                stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
-                stream=True,
-            )
+        chunks = run_language_model(
+            model=request.selected_model,
+            messages=[
+                {"role": s["role"], "content": s["content"]} for s in prompt_messages
+            ],
+            max_tokens=max_allowed_tokens,
+            num_outputs=request.num_outputs,
+            temperature=request.sampling_temperature,
+            avoid_repetition=request.avoid_repetition,
+            tools=request.tools,
+            stream=True,
+        )
         citation_style = (
             request.citation_style and CitationStyles[request.citation_style]
         ) or None
@@ -1434,9 +1402,6 @@ def convo_window_clipper(
     step=2,
 ):
     for i in range(len(window) - 2, -1, -step):
-        if (
-            calc_gpt_tokens(window[i:], sep=sep, is_chat_model=is_chat_model)
-            > max_tokens
-        ):
+        if calc_gpt_tokens(window[i:], sep=sep) > max_tokens:
             return i + step
     return 0
