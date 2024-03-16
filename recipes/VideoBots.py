@@ -1140,7 +1140,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     type="tertiary",
                 )
                 render_bot_test_link(bi)
-                stats_url = furl(VideoBotsStatsPage.app_url(), args={"bi_id": bi.id})
+                stats_url = furl(
+                    VideoBotsStatsPage.app_url(), args={"bi_id": bi.get_hashid()}
+                )
                 st.html(
                     f"""
                     <a class="btn btn-theme btn-tertiary d-inline-block" target="blank" href="{stats_url}">📊 Analytics</a>
