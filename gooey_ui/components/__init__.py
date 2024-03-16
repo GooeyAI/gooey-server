@@ -160,9 +160,9 @@ def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
         markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
 
 
-def caption(body: str, **props):
-    style = props.setdefault("style", {"fontSize": "0.9rem"})
-    markdown(body, className="text-muted", **props)
+def caption(body: str, className: str = None, **props):
+    className = className or "text-muted"
+    markdown(body, className=className, **props)
 
 
 def option_menu(*args, options, **kwargs):

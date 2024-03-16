@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "url_shortener",
     "glossary_resources",
     "usage_costs",
+    "embeddings",
 ]
 
 MIDDLEWARE = [
@@ -229,6 +230,8 @@ UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
+GROQ_API_KEY = config("GROQ_API_KEY", default="")
+
 REPLICATE_API_KEY = config("REPLICATE_API_KEY", default="")
 TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
 
@@ -320,6 +323,8 @@ AZURE_IMAGE_MODERATION_KEY = config("AZURE_IMAGE_MODERATION_KEY", "")
 AZURE_SPEECH_ENDPOINT = config("AZURE_SPEECH_ENDPOINT", "")
 AZURE_SPEECH_KEY = config("AZURE_SPEECH_KEY", "")
 
+AZURE_TTS_ENDPOINT = config("AZURE_TTS_ENDPOINT", "")
+
 AZURE_OPENAI_ENDPOINT = config("AZURE_OPENAI_ENDPOINT", "")
 AZURE_OPENAI_KEY = config("AZURE_OPENAI_KEY", "")
 
@@ -331,3 +336,7 @@ ELEVEN_LABS_API_KEY = config("ELEVEN_LABS_API_KEY", "")
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
 PAYPAL_SECRET = config("PAYPAL_SECRET", "")
 PAYPAL_BASE = config("PAYPAL_BASE", "")
+
+VESPA_URL = config("VESPA_URL", "http://localhost:8085")
+VESPA_CONFIG_SERVER_URL = config("VESPA_CONFIG_SERVER_URL", "http://localhost:19071")
+VESPA_SCHEMA = config("VESPA_SCHEMA", "gooey")

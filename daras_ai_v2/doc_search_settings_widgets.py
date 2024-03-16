@@ -6,6 +6,7 @@ from sentry_sdk import capture_exception
 
 import gooey_ui as st
 from daras_ai_v2 import settings
+from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
 from daras_ai_v2.prompt_vars import prompt_vars_widget
@@ -165,6 +166,8 @@ def doc_extract_selector():
 def doc_search_advanced_settings():
     from daras_ai_v2.vector_search import DocSearchRequest
 
+    embeddings_model_selector(key="embedding_model")
+
     dense_weight_ = DocSearchRequest.__fields__["dense_weight"]
     st.slider(
         label=f"###### {dense_weight_.field_info.title}\n{dense_weight_.field_info.description}",
@@ -203,4 +206,13 @@ Your knowledge base documents are split into overlapping snippets. This settings
         key="scroll_jump",
         min_value=1,
         max_value=50,
+    )
+
+
+def embeddings_model_selector(key: str):
+    return enum_selector(
+        EmbeddingModels,
+        label="##### Embeddings Model",
+        key=key,
+        use_selectbox=True,
     )

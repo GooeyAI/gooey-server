@@ -1,12 +1,10 @@
-import hashlib
-import io
 import json
+import mimetypes
 import re
 import typing
 from enum import Enum
-from functools import partial, wraps
+from functools import wraps
 
-import numpy as np
 import requests
 import typing_extensions
 from aifail import (
@@ -16,20 +14,16 @@ from aifail import (
     try_all,
 )
 from django.conf import settings
-from jinja2.lexer import whitespace_re
 from loguru import logger
 from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionChunk,
 )
 
+from daras_ai.image_input import gs_url_to_uri
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
-from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.functions import LLMTools
-from daras_ai_v2.redis_cache import (
-    get_redis_cache,
-)
 from daras_ai_v2.text_splitter import (
     default_length_function,
     default_separators,
@@ -49,9 +43,11 @@ SUPERSCRIPT = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
 
 
 class LLMApis(Enum):
-    vertex_ai = "Vertex AI"
-    openai = "OpenAI"
-    together = "Together"
+    palm2 = 1
+    gemini = 2
+    openai = 3
+    # together = 4
+    groq = 5
 
 
 class LargeLanguageModels(Enum):
@@ -61,38 +57,47 @@ class LargeLanguageModels(Enum):
     gpt_4_32k = "GPT-4 32K (openai)"
     gpt_3_5_turbo = "ChatGPT (openai)"
     gpt_3_5_turbo_16k = "ChatGPT 16k (openai)"
+    gpt_3_5_turbo_instruct = "GPT-3.5 Instruct (openai)"
 
-    llama2_70b_chat = "Llama 2 (Meta AI)"
+    llama2_70b_chat = "Llama 2 70b Chat (Meta AI)"
+    mixtral_8x7b_instruct_0_1 = "Mixtral 8x7b Instruct v0.1 (Mistral)"
+    gemma_7b_it = "Gemma 7B (Google)"
 
+    gemini_1_pro = "Gemini 1.0 Pro (Google)"
+    gemini_1_pro_vision = "Gemini 1.0 Pro Vision (Google)"
     palm2_chat = "PaLM 2 Chat (Google)"
     palm2_text = "PaLM 2 Text (Google)"
 
-    text_davinci_003 = "GPT-3.5 Davinci-3 (openai)"
-    text_davinci_002 = "GPT-3.5 Davinci-2 (openai)"
-    text_curie_001 = "Curie (openai)"
-    text_babbage_001 = "Babbage (openai)"
-    text_ada_001 = "Ada (openai)"
+    text_davinci_003 = "GPT-3.5 Davinci-3 [Deprecated] (openai)"
+    text_davinci_002 = "GPT-3.5 Davinci-2 [Deprecated] (openai)"
+    text_curie_001 = "Curie [Deprecated] (openai)"
+    text_babbage_001 = "Babbage [Deprecated] (openai)"
+    text_ada_001 = "Ada [Deprecated] (openai)"
 
     code_davinci_002 = "Codex [Deprecated] (openai)"
 
     @classmethod
     def _deprecated(cls):
-        return {cls.code_davinci_002}
+        return {
+            cls.text_davinci_003,
+            cls.text_davinci_002,
+            cls.text_curie_001,
+            cls.text_babbage_001,
+            cls.text_ada_001,
+            cls.code_davinci_002,
+        }
 
     def is_vision_model(self) -> bool:
         return self in {
             self.gpt_4_vision,
+            self.gemini_1_pro_vision,
         }
 
     def is_chat_model(self) -> bool:
         return self not in {
+            self.gpt_3_5_turbo_instruct,
             self.palm2_text,
-            self.text_davinci_003,
-            self.text_davinci_002,
-            self.text_curie_001,
-            self.text_babbage_001,
-            self.text_ada_001,
-            self.code_davinci_002,
+            self.gemini_1_pro_vision,
         }
 
 
@@ -117,6 +122,7 @@ llm_model_names = {
         "openai-gpt-35-turbo-16k-prod-ca-1",
         "gpt-3.5-turbo-16k-0613",
     ),
+    LargeLanguageModels.gpt_3_5_turbo_instruct: "gpt-3.5-turbo-instruct",
     LargeLanguageModels.text_davinci_003: "text-davinci-003",
     LargeLanguageModels.text_davinci_002: "text-davinci-002",
     LargeLanguageModels.code_davinci_002: "code-davinci-002",
@@ -125,7 +131,11 @@ llm_model_names = {
     LargeLanguageModels.text_ada_001: "text-ada-001",
     LargeLanguageModels.palm2_text: "text-bison",
     LargeLanguageModels.palm2_chat: "chat-bison",
-    LargeLanguageModels.llama2_70b_chat: "togethercomputer/llama-2-70b-chat",
+    LargeLanguageModels.gemini_1_pro: "gemini-1.0-pro",
+    LargeLanguageModels.gemini_1_pro_vision: "gemini-1.0-pro-vision",
+    LargeLanguageModels.llama2_70b_chat: "llama2-70b-4096",
+    LargeLanguageModels.mixtral_8x7b_instruct_0_1: "mixtral-8x7b-32768",
+    LargeLanguageModels.gemma_7b_it: "gemma-7b-it",
 }
 
 llm_api = {
@@ -135,15 +145,20 @@ llm_api = {
     LargeLanguageModels.gpt_4_32k: LLMApis.openai,
     LargeLanguageModels.gpt_3_5_turbo: LLMApis.openai,
     LargeLanguageModels.gpt_3_5_turbo_16k: LLMApis.openai,
+    LargeLanguageModels.gpt_3_5_turbo_instruct: LLMApis.openai,
     LargeLanguageModels.text_davinci_003: LLMApis.openai,
     LargeLanguageModels.text_davinci_002: LLMApis.openai,
     LargeLanguageModels.code_davinci_002: LLMApis.openai,
     LargeLanguageModels.text_curie_001: LLMApis.openai,
     LargeLanguageModels.text_babbage_001: LLMApis.openai,
     LargeLanguageModels.text_ada_001: LLMApis.openai,
-    LargeLanguageModels.palm2_text: LLMApis.vertex_ai,
-    LargeLanguageModels.palm2_chat: LLMApis.vertex_ai,
-    LargeLanguageModels.llama2_70b_chat: LLMApis.together,
+    LargeLanguageModels.gemini_1_pro: LLMApis.gemini,
+    LargeLanguageModels.gemini_1_pro_vision: LLMApis.gemini,
+    LargeLanguageModels.palm2_text: LLMApis.palm2,
+    LargeLanguageModels.palm2_chat: LLMApis.palm2,
+    LargeLanguageModels.llama2_70b_chat: LLMApis.groq,
+    LargeLanguageModels.mixtral_8x7b_instruct_0_1: LLMApis.groq,
+    LargeLanguageModels.gemma_7b_it: LLMApis.groq,
 }
 
 EMBEDDING_MODEL_MAX_TOKENS = 8191
@@ -159,6 +174,7 @@ model_max_tokens = {
     # https://platform.openai.com/docs/models/gpt-3-5
     LargeLanguageModels.gpt_3_5_turbo: 4096,
     LargeLanguageModels.gpt_3_5_turbo_16k: 16_384,
+    LargeLanguageModels.gpt_3_5_turbo_instruct: 4096,
     LargeLanguageModels.text_davinci_003: 4097,
     LargeLanguageModels.text_davinci_002: 4097,
     LargeLanguageModels.code_davinci_002: 8001,
@@ -167,10 +183,14 @@ model_max_tokens = {
     LargeLanguageModels.text_babbage_001: 2049,
     LargeLanguageModels.text_ada_001: 2049,
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
+    LargeLanguageModels.gemini_1_pro: 8192,
+    LargeLanguageModels.gemini_1_pro_vision: 2048,
     LargeLanguageModels.palm2_text: 8192,
     LargeLanguageModels.palm2_chat: 4096,
-    # https://huggingface.co/docs/transformers/main/model_doc/llama2#transformers.LlamaConfig.max_position_embeddings
+    # https://console.groq.com/docs/models
     LargeLanguageModels.llama2_70b_chat: 4096,
+    LargeLanguageModels.mixtral_8x7b_instruct_0_1: 32_768,
+    LargeLanguageModels.gemma_7b_it: 8_192,
 }
 
 llm_price = {
@@ -180,124 +200,37 @@ llm_price = {
     LargeLanguageModels.gpt_4_32k: 20,
     LargeLanguageModels.gpt_3_5_turbo: 1,
     LargeLanguageModels.gpt_3_5_turbo_16k: 2,
+    LargeLanguageModels.gpt_3_5_turbo_instruct: 1,
     LargeLanguageModels.text_davinci_003: 10,
     LargeLanguageModels.text_davinci_002: 10,
     LargeLanguageModels.code_davinci_002: 10,
     LargeLanguageModels.text_curie_001: 5,
     LargeLanguageModels.text_babbage_001: 2,
     LargeLanguageModels.text_ada_001: 1,
+    LargeLanguageModels.gemini_1_pro: 15,
+    LargeLanguageModels.gemini_1_pro_vision: 25,
     LargeLanguageModels.palm2_text: 15,
     LargeLanguageModels.palm2_chat: 10,
-    LargeLanguageModels.llama2_70b_chat: 5,
+    LargeLanguageModels.llama2_70b_chat: 1,
+    LargeLanguageModels.mixtral_8x7b_instruct_0_1: 1,
+    LargeLanguageModels.gemma_7b_it: 1,
 }
 
 
 def calc_gpt_tokens(
-    text: str | list[str] | dict | list[dict],
+    prompt: str | list[str] | dict | list[dict],
     *,
     sep: str = "",
-    is_chat_model: bool = True,
 ) -> int:
-    if isinstance(text, (str, dict)):
-        messages = [text]
+    if isinstance(prompt, (str, dict)):
+        messages = [prompt]
     else:
-        messages = text
+        messages = prompt
     combined = sep.join(
-        content
+        (format_chatml_message(entry) + "\n") if isinstance(entry, dict) else str(entry)
         for entry in messages
-        if (
-            content := (
-                (
-                    format_chatml_message(entry) + "\n"
-                    if is_chat_model
-                    else entry.get("content", "")
-                )
-                if isinstance(entry, dict)
-                else str(entry)
-            )
-        )
     )
     return default_length_function(combined)
-
-
-def openai_embedding_create(texts: list[str]) -> list[np.ndarray | None]:
-    # replace newlines, which can negatively affect performance.
-    texts = [whitespace_re.sub(" ", text) for text in texts]
-    # get the redis cache
-    redis_cache = get_redis_cache()
-    # load the embeddings from the cache
-    ret = [
-        np_loads(data) if (data := redis_cache.get(_embed_cache_key(text))) else None
-        for text in texts
-    ]
-    # list of embeddings that need to be created
-    misses = [i for i, c in enumerate(ret) if c is None]
-    if misses:
-        # create the embeddings in bulk
-        embeddings = _run_openai_embedding(input=[texts[i] for i in misses])
-        for i, embedding in zip(misses, embeddings):
-            # save the embedding to the cache
-            text = texts[i]
-            redis_cache.set(_embed_cache_key(text), np_dumps(embedding))
-            # fill in missing values
-            ret[i] = embedding
-    return ret
-
-
-def _embed_cache_key(text: str) -> str:
-    return "gooey/openai_ada2_embeddings_npy/v1/" + _sha256(text)
-
-
-def _sha256(text):
-    return hashlib.sha256(text.encode()).hexdigest()
-
-
-def np_loads(data: bytes) -> np.ndarray:
-    return np.load(io.BytesIO(data))
-
-
-def np_dumps(a: np.ndarray) -> bytes:
-    f = io.BytesIO()
-    np.save(f, a)
-    return f.getvalue()
-
-
-@retry_if(openai_should_retry)
-def _run_openai_embedding(
-    *,
-    input: list[str],
-    model: str = (
-        "openai-text-embedding-ada-002-prod-ca-1",
-        "text-embedding-ada-002",
-    ),
-) -> np.ndarray:
-    logger.info(f"{model=}, {len(input)=}")
-
-    if isinstance(model, str):
-        model = [model]
-    res = try_all(
-        *[
-            partial(
-                _get_openai_client(model_str).embeddings.create,
-                model=model_str,
-                input=input,
-            )
-            for model_str in model
-        ],
-    )
-    ret = np.array([data.embedding for data in res.data])
-
-    # see - https://community.openai.com/t/text-embedding-ada-002-embeddings-sometime-return-nan/279664/5
-    if np.isnan(ret).any():
-        raise RuntimeError("NaNs detected in embedding")
-        # raise openai.error.APIError("NaNs detected in embedding")  # this lets us retry
-    expected = (len(input), 1536)
-    if ret.shape != expected:
-        raise RuntimeError(
-            f"Unexpected shape for embedding: {ret.shape} (expected {expected})"
-        )
-
-    return ret
 
 
 class ConversationEntry(typing_extensions.TypedDict):
@@ -384,11 +317,23 @@ def run_language_model(
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
+        images = []
+        if not prompt:
+            # assistant prompt to triger a model response
+            messages.append({"role": CHATML_ROLE_ASSISTANT, "content": ""})
+            # for backwards compat with non-chat models
+            prompt = "\n".join(format_chatml_message(entry) for entry in messages)
+            stop = [CHATML_END_TOKEN, CHATML_START_TOKEN]
+            for entry in reversed(messages):
+                images = get_entry_images(entry)
+                if images:
+                    break
         logger.info(f"{model_name=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
         msgs = _run_text_model(
             api=api,
             model=model_name,
             prompt=prompt,
+            images=images,
             max_tokens=max_tokens,
             num_outputs=num_outputs,
             temperature=temperature,
@@ -451,6 +396,7 @@ def _run_text_model(
     api: LLMApis,
     model: str | tuple,
     prompt: str,
+    images: list[str],
     max_tokens: int,
     num_outputs: int,
     temperature: float,
@@ -470,13 +416,23 @@ def _run_text_model(
                 avoid_repetition=avoid_repetition,
                 quality=quality,
             )
-        case LLMApis.vertex_ai:
+        case LLMApis.palm2:
             return _run_palm_text(
                 model_id=model,
                 prompt=prompt,
                 max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
                 candidate_count=num_outputs,
                 temperature=temperature,
+                stop=stop,
+            )
+        case LLMApis.gemini:
+            return _run_gemini_pro_vision(
+                model_id=model,
+                prompt=prompt,
+                images=images,
+                max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
+                temperature=temperature,
+                stop=stop,
             )
         case _:
             raise UserError(f"Unsupported text api: {api}")
@@ -510,7 +466,16 @@ def _run_chat_model(
                 response_format_type=response_format_type,
                 stream=stream,
             )
-        case LLMApis.vertex_ai:
+        case LLMApis.gemini:
+            if tools:
+                raise ValueError("Only OpenAI chat models support Tools")
+            return _run_gemini_pro(
+                model_id=model,
+                messages=messages,
+                max_output_tokens=min(max_tokens, 1024),  # because of Vertex AI limits
+                temperature=temperature,
+            )
+        case LLMApis.palm2:
             if tools:
                 raise ValueError("Only OpenAI chat models support Tools")
             return _run_palm_chat(
@@ -520,17 +485,28 @@ def _run_chat_model(
                 candidate_count=num_outputs,
                 temperature=temperature,
             )
-        case LLMApis.together:
+        case LLMApis.groq:
             if tools:
-                raise UserError("Only OpenAI chat models support Tools")
-            return _run_together_chat(
+                raise ValueError("Only OpenAI chat models support Tools")
+            return _run_groq_chat(
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
-                num_outputs=num_outputs,
                 temperature=temperature,
-                repetition_penalty=1.15 if avoid_repetition else 1,
+                avoid_repetition=avoid_repetition,
+                stop=stop,
             )
+        # case LLMApis.together:
+        #     if tools:
+        #         raise UserError("Only OpenAI chat models support Tools")
+        #     return _run_together_chat(
+        #         model=model,
+        #         messages=messages,
+        #         max_tokens=max_tokens,
+        #         num_outputs=num_outputs,
+        #         temperature=temperature,
+        #         repetition_penalty=1.15 if avoid_repetition else 1,
+        #     )
         case _:
             raise UserError(f"Unsupported chat api: {api}")
 
@@ -590,7 +566,7 @@ def _run_openai_chat(
 
 
 def _get_chat_completions_create(model: str, **kwargs):
-    client = _get_openai_client(model)
+    client = get_openai_client(model)
 
     @wraps(client.chat.completions.create)
     def wrapper():
@@ -698,7 +674,7 @@ def _run_openai_text(
     avoid_repetition: bool,
     quality: float,
 ):
-    r = _get_openai_client(model).completions.create(
+    r = get_openai_client(model).completions.create(
         model=model,
         prompt=prompt,
         max_tokens=max_tokens,
@@ -727,7 +703,7 @@ def _run_openai_text(
     return [choice.text for choice in r.choices]
 
 
-def _get_openai_client(model: str):
+def get_openai_client(model: str):
     import openai
 
     if model.startswith(AZURE_OPENAI_MODEL_PREFIX):
@@ -745,72 +721,228 @@ def _get_openai_client(model: str):
     return client
 
 
-def _run_together_chat(
+def _run_groq_chat(
     *,
     model: str,
     messages: list[ConversationEntry],
     max_tokens: int,
     temperature: float,
-    repetition_penalty: float,
-    num_outputs: int,
-) -> list[ConversationEntry]:
-    """
-    Args:
-        model: The model version to use for the request.
-        messages: List of messages to generate model response. Will be converted to a single prompt.
-        max_tokens: The maximum number of tokens to generate.
-        temperature: The randomness of the prediction. This value must be between 0 and 1, inclusive. 0 means deterministic.
-        repetition_penalty: Penalty for repeated words in generated text; 1 is no penalty, values greater than 1 discourage repetition, less than 1 encourage it.
-        num_outputs: The number of responses to generate.
-    """
-    results = map_parallel(
-        lambda _: requests.post(
-            "https://api.together.xyz/inference",
-            json={
-                "model": model,
-                "prompt": build_llama_prompt(messages),
-                "max_tokens": max_tokens,
-                "stop": [B_INST],
-                "temperature": temperature,
-                "repetition_penalty": repetition_penalty,
-            },
-            headers={
-                "Authorization": f"Bearer {settings.TOGETHER_API_KEY}",
-            },
-        ),
-        range(num_outputs),
+    avoid_repetition: bool,
+    stop: list[str] | None,
+):
+    data = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    if avoid_repetition:
+        data["frequency_penalty"] = 0.1
+        data["presence_penalty"] = 0.25
+    if stop:
+        data["stop"] = stop
+    r = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        json=data,
+        headers={
+            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+        },
     )
-    ret = []
-    prompt_tokens = 0
-    completion_tokens = 0
-    for r in results:
-        raise_for_status(r)
-        data = r.json()
-        output = data["output"]
-        error = output.get("error")
-        if error:
-            raise ValueError(error)
-        ret.append(
+    raise_for_status(r)
+    out = r.json()
+    return [choice["message"] for choice in out["choices"]]
+
+
+# def _run_together_chat(
+#     *,
+#     model: str,
+#     messages: list[ConversationEntry],
+#     max_tokens: int,
+#     temperature: float,
+#     repetition_penalty: float,
+#     num_outputs: int,
+# ) -> list[ConversationEntry]:
+#     """
+#     Args:
+#         model: The model version to use for the request.
+#         messages: List of messages to generate model response. Will be converted to a single prompt.
+#         max_tokens: The maximum number of tokens to generate.
+#         temperature: The randomness of the prediction. This value must be between 0 and 1, inclusive. 0 means deterministic.
+#         repetition_penalty: Penalty for repeated words in generated text; 1 is no penalty, values greater than 1 discourage repetition, less than 1 encourage it.
+#         num_outputs: The number of responses to generate.
+#     """
+#     results = map_parallel(
+#         lambda _: requests.post(
+#             "https://api.together.xyz/inference",
+#             json={
+#                 "model": model,
+#                 "prompt": build_llama_prompt(messages),
+#                 "max_tokens": max_tokens,
+#                 "stop": [B_INST],
+#                 "temperature": temperature,
+#                 "repetition_penalty": repetition_penalty,
+#             },
+#             headers={
+#                 "Authorization": f"Bearer {settings.TOGETHER_API_KEY}",
+#             },
+#         ),
+#         range(num_outputs),
+#     )
+#     ret = []
+#     prompt_tokens = 0
+#     completion_tokens = 0
+#     for r in results:
+#         raise_for_status(r)
+#         data = r.json()
+#         output = data["output"]
+#         error = output.get("error")
+#         if error:
+#             raise ValueError(error)
+#         ret.append(
+#             {
+#                 "role": CHATML_ROLE_ASSISTANT,
+#                 "content": output["choices"][0]["text"],
+#             }
+#         )
+#         prompt_tokens += output.get("usage", {}).get("prompt_tokens", 0)
+#         completion_tokens += output.get("usage", {}).get("completion_tokens", 0)
+#     from usage_costs.cost_utils import record_cost_auto
+#     from usage_costs.models import ModelSku
+#
+#     record_cost_auto(
+#         model=model,
+#         sku=ModelSku.llm_prompt,
+#         quantity=prompt_tokens,
+#     )
+#     record_cost_auto(
+#         model=model,
+#         sku=ModelSku.llm_completion,
+#         quantity=completion_tokens,
+#     )
+#     return ret
+
+
+gemini_role_map = {
+    CHATML_ROLE_SYSTEM: "user",
+    CHATML_ROLE_USER: "user",
+    CHATML_ROLE_ASSISTANT: "model",
+}
+
+
+@retry_if(vertex_ai_should_retry)
+def _run_gemini_pro(
+    *,
+    model_id: str,
+    messages: list[ConversationEntry],
+    max_output_tokens: int,
+    temperature: float,
+):
+    contents = []
+    for entry in messages:
+        contents.append(
             {
-                "role": CHATML_ROLE_ASSISTANT,
-                "content": output["choices"][0]["text"],
-            }
+                "role": gemini_role_map[entry["role"]],
+                "parts": [{"text": get_entry_text(entry)}],
+            },
         )
-        prompt_tokens += output.get("usage", {}).get("prompt_tokens", 0)
-        completion_tokens += output.get("usage", {}).get("completion_tokens", 0)
+        if entry["role"] == CHATML_ROLE_SYSTEM:
+            contents.append(
+                {
+                    "role": "model",
+                    "parts": [{"text": "OK"}],
+                },
+            )
+    msg = _call_gemini_api(
+        model_id=model_id,
+        contents=contents,
+        max_output_tokens=max_output_tokens,
+        temperature=temperature,
+    )
+    return [{"role": CHATML_ROLE_ASSISTANT, "content": msg}]
+
+
+def _run_gemini_pro_vision(
+    *,
+    model_id: str,
+    prompt: str,
+    images: list[str],
+    max_output_tokens: int,
+    temperature: float,
+    stop: list[str] = None,
+):
+    contents = [
+        {
+            "role": gemini_role_map[CHATML_ROLE_USER],
+            "parts": [
+                {"text": prompt},
+            ]
+            + [
+                {
+                    "fileData": {
+                        "mimeType": mimetypes.guess_type(image)[0] or "image/png",
+                        "fileUri": gs_url_to_uri(image),
+                    },
+                }
+                for image in images
+            ],
+        }
+    ]
+    return [
+        _call_gemini_api(
+            model_id=model_id,
+            contents=contents,
+            max_output_tokens=max_output_tokens,
+            temperature=temperature,
+            stop=stop,
+        )
+    ]
+
+
+@retry_if(vertex_ai_should_retry)
+def _call_gemini_api(
+    *,
+    model_id: str,
+    contents: list[dict],
+    max_output_tokens: int,
+    temperature: float,
+    stop: list[str] = None,
+) -> str:
+    session, project = get_google_auth_session()
+    r = session.post(
+        f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{project}/locations/{settings.GCP_REGION}/publishers/google/models/{model_id}:streamGenerateContent",
+        json={
+            "contents": contents,
+            "generation_config": {
+                "temperature": temperature,
+                "maxOutputTokens": max_output_tokens,
+                "stopSequences": stop or [],
+            },
+        },
+    )
+    raise_for_status(r)
+    ret = "".join(
+        parts[0]["text"]
+        for item in r.json()
+        for msg in item["candidates"]
+        if (parts := msg["content"].get("parts"))
+    )
+
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
     record_cost_auto(
-        model=model,
+        model=model_id,
         sku=ModelSku.llm_prompt,
-        quantity=prompt_tokens,
+        quantity=sum(
+            len(part.get("text") or "") for item in contents for part in item["parts"]
+        ),
     )
     record_cost_auto(
-        model=model,
+        model=model_id,
         sku=ModelSku.llm_completion,
-        quantity=completion_tokens,
+        quantity=len(ret),
     )
+
     return ret
 
 
@@ -850,7 +982,7 @@ def _run_palm_chat(
 
     session, project = get_google_auth_session()
     r = session.post(
-        f"https://us-central1-aiplatform.googleapis.com/v1/projects/{project}/locations/us-central1/publishers/google/models/{model_id}:predict",
+        f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{project}/locations/{settings.GCP_REGION}/publishers/google/models/{model_id}:predict",
         json={
             "instances": [instance],
             "parameters": {
@@ -862,22 +994,7 @@ def _run_palm_chat(
     )
     raise_for_status(r)
     out = r.json()
-
-    from usage_costs.cost_utils import record_cost_auto
-    from usage_costs.models import ModelSku
-
-    record_cost_auto(
-        model=model_id,
-        sku=ModelSku.llm_prompt,
-        quantity=out["metadata"]["tokenMetadata"]["inputTokenCount"]["totalTokens"],
-    )
-    record_cost_auto(
-        model=model_id,
-        sku=ModelSku.llm_completion,
-        quantity=out["metadata"]["tokenMetadata"]["outputTokenCount"]["totalTokens"],
-    )
-
-    return [
+    ret = [
         {
             "role": msg["author"],
             "content": msg["content"],
@@ -885,6 +1002,22 @@ def _run_palm_chat(
         for pred in out["predictions"]
         for msg in pred["candidates"]
     ]
+
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    record_cost_auto(
+        model=model_id,
+        sku=ModelSku.llm_prompt,
+        quantity=sum(len(get_entry_text(entry)) for entry in messages),
+    )
+    record_cost_auto(
+        model=model_id,
+        sku=ModelSku.llm_completion,
+        quantity=sum(len(msg["content"] or "") for msg in ret),
+    )
+
+    return ret
 
 
 @retry_if(vertex_ai_should_retry)
@@ -895,6 +1028,7 @@ def _run_palm_text(
     max_output_tokens: int,
     candidate_count: int,
     temperature: float,
+    stop: list[str] = None,
 ) -> list[str]:
     """
     Args:
@@ -906,7 +1040,7 @@ def _run_palm_text(
     """
     session, project = get_google_auth_session()
     res = session.post(
-        f"https://us-central1-aiplatform.googleapis.com/v1/projects/{project}/locations/us-central1/publishers/google/models/{model_id}:predict",
+        f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{project}/locations/{settings.GCP_REGION}/publishers/google/models/{model_id}:predict",
         json={
             "instances": [
                 {
@@ -917,6 +1051,7 @@ def _run_palm_text(
                 "maxOutputTokens": max_output_tokens,
                 "temperature": temperature,
                 "candidateCount": candidate_count,
+                "stopSequences": stop or [],
             },
         },
     )
@@ -976,64 +1111,64 @@ def parse_chatml(prompt: str) -> tuple[bool, list[dict]]:
     return is_chatml, messages
 
 
-# This prompt formatting was copied from the original Llama v2 repo:
-# https://github.com/facebookresearch/llama/blob/c769dfd53ddd509159216a5423204653850f79f4/llama/generation.py#L44
-# These are components of the prompt that should not be changed by the users
-B_INST, E_INST = "[INST]", "[/INST]"
-B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
-
-SPECIAL_TAGS = [B_INST, E_INST, B_SYS.strip(), E_SYS.strip()]
-
-
-def build_llama_prompt(messages: list[ConversationEntry]):
-    if any([tag in msg.get("content", "") for tag in SPECIAL_TAGS for msg in messages]):
-        raise ValueError(
-            f"Messages cannot contain any of the following: {SPECIAL_TAGS}"
-        )
-
-    if messages and messages[0]["role"] == CHATML_ROLE_SYSTEM:
-        system_prompt = messages[0].get("content", "").strip()
-        messages = messages[1:]
-    else:
-        system_prompt = ""
-
-    if messages and messages[0]["role"] == CHATML_ROLE_USER:
-        first_user_message = messages[0].get("content", "").strip()
-        messages = messages[1:]
-    else:
-        first_user_message = ""
-
-    if system_prompt:
-        first_user_message = B_SYS + system_prompt + E_SYS + first_user_message
-    messages = [
-        {
-            "role": CHATML_ROLE_USER,
-            "content": first_user_message,
-        },
-    ] + messages
-
-    assert all([msg["role"] == CHATML_ROLE_USER for msg in messages[::2]]) and all(
-        [msg["role"] == CHATML_ROLE_ASSISTANT for msg in messages[1::2]]
-    ), (
-        f"llama only supports '{CHATML_ROLE_SYSTEM}', '{CHATML_ROLE_USER}' and '{CHATML_ROLE_ASSISTANT}' roles, "
-        "starting with 'system', then 'user' and alternating (u/a/u/a/u...)"
-    )
-
-    if messages[-1]["role"] == CHATML_ROLE_ASSISTANT:
-        messages.append({"role": CHATML_ROLE_USER, "content": ""})
-
-    ret = "".join(
-        f"{B_INST} {prompt.get('content', '').strip()} {E_INST} {answer.get('content', '').strip()} "
-        for prompt, answer in zip(messages[::2], messages[1::2])
-    )
-
-    assert (
-        messages[-1]["role"] == CHATML_ROLE_USER
-    ), f"Last message must be from {CHATML_ROLE_USER}, got {messages[-1]['role']}"
-
-    ret += f"{B_INST} {messages[-1].get('content').strip()} {E_INST}"
-
-    return ret
+# # This prompt formatting was copied from the original Llama v2 repo:
+# # https://github.com/facebookresearch/llama/blob/c769dfd53ddd509159216a5423204653850f79f4/llama/generation.py#L44
+# # These are components of the prompt that should not be changed by the users
+# B_INST, E_INST = "[INST]", "[/INST]"
+# B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
+#
+# SPECIAL_TAGS = [B_INST, E_INST, B_SYS.strip(), E_SYS.strip()]
+#
+#
+# def build_llama_prompt(messages: list[ConversationEntry]):
+#     if any([tag in msg.get("content", "") for tag in SPECIAL_TAGS for msg in messages]):
+#         raise ValueError(
+#             f"Messages cannot contain any of the following: {SPECIAL_TAGS}"
+#         )
+#
+#     if messages and messages[0]["role"] == CHATML_ROLE_SYSTEM:
+#         system_prompt = messages[0].get("content", "").strip()
+#         messages = messages[1:]
+#     else:
+#         system_prompt = ""
+#
+#     if messages and messages[0]["role"] == CHATML_ROLE_USER:
+#         first_user_message = messages[0].get("content", "").strip()
+#         messages = messages[1:]
+#     else:
+#         first_user_message = ""
+#
+#     if system_prompt:
+#         first_user_message = B_SYS + system_prompt + E_SYS + first_user_message
+#     messages = [
+#         {
+#             "role": CHATML_ROLE_USER,
+#             "content": first_user_message,
+#         },
+#     ] + messages
+#
+#     assert all([msg["role"] == CHATML_ROLE_USER for msg in messages[::2]]) and all(
+#         [msg["role"] == CHATML_ROLE_ASSISTANT for msg in messages[1::2]]
+#     ), (
+#         f"llama only supports '{CHATML_ROLE_SYSTEM}', '{CHATML_ROLE_USER}' and '{CHATML_ROLE_ASSISTANT}' roles, "
+#         "starting with 'system', then 'user' and alternating (u/a/u/a/u...)"
+#     )
+#
+#     if messages[-1]["role"] == CHATML_ROLE_ASSISTANT:
+#         messages.append({"role": CHATML_ROLE_USER, "content": ""})
+#
+#     ret = "".join(
+#         f"{B_INST} {prompt.get('content', '').strip()} {E_INST} {answer.get('content', '').strip()} "
+#         for prompt, answer in zip(messages[::2], messages[1::2])
+#     )
+#
+#     assert (
+#         messages[-1]["role"] == CHATML_ROLE_USER
+#     ), f"Last message must be from {CHATML_ROLE_USER}, got {messages[-1]['role']}"
+#
+#     ret += f"{B_INST} {messages[-1].get('content').strip()} {E_INST}"
+#
+#     return ret
 
 
 def format_chat_entry(

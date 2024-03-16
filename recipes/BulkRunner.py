@@ -689,12 +689,12 @@ def get_columns(files: list[str]) -> list[str]:
 
 
 def read_df_any(f_url: str) -> "pd.DataFrame":
-    doc_meta = doc_url_to_file_metadata(f_url)
+    file_meta = doc_url_to_file_metadata(f_url)
     f_bytes, mime_type = download_content_bytes(
-        f_url=f_url, mime_type=doc_meta.mime_type
+        f_url=f_url, mime_type=file_meta.mime_type
     )
     df = tabular_bytes_to_any_df(
-        f_name=doc_meta.name, f_bytes=f_bytes, mime_type=mime_type
+        f_name=file_meta.name, f_bytes=f_bytes, mime_type=mime_type
     )
     return df.dropna(how="all", axis=1).dropna(how="all", axis=0).fillna("")
 

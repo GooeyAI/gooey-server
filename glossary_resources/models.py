@@ -17,7 +17,6 @@ from daras_ai_v2.vector_search import (
 from daras_ai_v2.vector_search import (
     download_content_bytes,
     tabular_bytes_to_str_df,
-    DocMetadata,
 )
 from files.models import FileMetadata
 
@@ -39,7 +38,10 @@ class GlossaryResourceQuerySet(models.QuerySet):
         except GlossaryResource.DoesNotExist:
             try:
                 gr = create_glossary_cached(
-                    url, DocMetadata.from_file_metadata(metadata)
+                    url=url,
+                    name=metadata.name,
+                    etag=metadata.etag,
+                    mime_type=metadata.mime_type,
                 )
                 with transaction.atomic():
                     try:
@@ -59,16 +61,20 @@ class GlossaryResourceQuerySet(models.QuerySet):
 
 
 @redis_cache_decorator
-def create_glossary_cached(url: str, doc_meta: DocMetadata) -> "GlossaryResource":
-    f_bytes, mime_type = download_content_bytes(f_url=url, mime_type=doc_meta.mime_type)
-    df = tabular_bytes_to_str_df(
-        f_name=doc_meta.name, f_bytes=f_bytes, mime_type=mime_type
-    )
+def create_glossary_cached(
+    *,
+    url: str,
+    name: str,
+    etag: str | None,
+    mime_type: str | None,
+) -> "GlossaryResource":
+    f_bytes, mime_type = download_content_bytes(f_url=url, mime_type=mime_type)
+    df = tabular_bytes_to_str_df(f_name=name, f_bytes=f_bytes, mime_type=mime_type)
     if is_user_uploaded_url(url):
         glossary_url = url
     else:
         glossary_url = upload_file_from_bytes(
-            doc_meta.name + ".csv",
+            name + ".csv",
             df.to_csv(index=False).encode(),
             content_type="text/csv",
         )

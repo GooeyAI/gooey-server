@@ -83,7 +83,7 @@ def _render_results(results: list[AggFunctionResult]):
         g = list(g)
 
         columns = [d["column"] for d in g]
-        values = [round(d["value"], 2) for d in g]
+        values = [round(d["value"] or 0, 2) for d in g]
 
         norm_values = [
             (v - min(values)) / ((max(values) - min(values)) or 1) for v in values
