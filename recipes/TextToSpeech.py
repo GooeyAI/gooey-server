@@ -23,6 +23,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_provider_selector,
     azure_tts_voices,
+    OPENAI_TTS_MODELS_T,
+    OPENAI_TTS_VOICES_T,
 )
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
@@ -50,6 +52,8 @@ class TextToSpeechPage(BasePage):
         "elevenlabs_model": "eleven_multilingual_v2",
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
+        "openai_voice_name": "alloy",
+        "openai_tts_model_id": "tts-1",
     }
 
     class RequestModel(BaseModel):
@@ -78,6 +82,9 @@ class TextToSpeechPage(BasePage):
         elevenlabs_speaker_boost: bool | None
 
         azure_voice_name: str | None
+
+        openai_voice_name: OPENAI_TTS_VOICES_T | None
+        openai_tts_model_id: OPENAI_TTS_MODELS_T | None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -342,6 +349,24 @@ class TextToSpeechPage(BasePage):
                     "azure_tts.mp3",
                     res.content,
                     "audio/mpeg",
+                )
+
+            case TextToSpeechProviders.OPEN_AI:
+                from openai import OpenAI
+
+                client = OpenAI()
+
+                model = st.session_state.get("openai_tts_model_id", "tts-1")
+                voice = st.session_state.get("openai_voice_name", "alloy")
+
+                response = client.audio.speech.create(
+                    model=model,
+                    voice=voice,
+                    input=text.strip(),
+                )
+
+                state["audio_url"] = upload_file_from_bytes(
+                    "openai_tts.mp3", response.content
                 )
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):

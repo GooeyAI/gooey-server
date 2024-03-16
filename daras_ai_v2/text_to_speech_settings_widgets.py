@@ -27,6 +27,21 @@ UBERDUCK_VOICES = {
     "Carolyn Samuelson": "60c910d0-d924-4f74-a47c-6c9e44e2bb8b",
 }
 
+OPENAI_TTS_MODELS_T = typing.Literal["tts-1", "tts-1-hd"]
+
+OPENAI_TTS_MODELS: tuple[OPENAI_TTS_MODELS_T] = typing.get_args(OPENAI_TTS_MODELS_T)
+
+OPENAI_TTS_VOICES_T = typing.Literal[
+    "alloy",
+    "echo",
+    "fable",
+    "onyx",
+    "nova",
+    "shimmer",
+]
+
+OPENAI_TTS_VOICES: tuple[OPENAI_TTS_VOICES_T] = typing.get_args(OPENAI_TTS_VOICES_T)
+
 
 class TextToSpeechProviders(Enum):
     GOOGLE_TTS = "Google Text-to-Speech"
@@ -34,6 +49,7 @@ class TextToSpeechProviders(Enum):
     UBERDUCK = "Uberduck.ai"
     BARK = "Bark (suno-ai)"
     AZURE_TTS = "Azure Text-to-Speech"
+    OPEN_AI = "OpenAI"
 
 
 # Mapping from Eleven Labs Voice Name -> Voice ID
@@ -166,6 +182,8 @@ def text_to_speech_provider_selector(page):
                 elevenlabs_selector(page)
             case TextToSpeechProviders.AZURE_TTS.name:
                 azure_tts_selector()
+            case TextToSpeechProviders.OPEN_AI.name:
+                openai_tts_selector()
     return tts_provider
 
 
@@ -181,6 +199,31 @@ def text_to_speech_settings(page, tts_provider):
             elevenlabs_settings()
         case TextToSpeechProviders.AZURE_TTS.name:
             azure_tts_settings()
+        case TextToSpeechProviders.OPEN_AI.name:
+            openai_tts_settings()
+
+
+def openai_tts_selector():
+    st.selectbox(
+        label="""
+        ###### OpenAI Voice Name
+        """,
+        key="openai_voice_name",
+        options=OPENAI_TTS_VOICES,
+    )
+
+
+def openai_tts_settings():
+    st.selectbox(
+        label="""
+        ###### OpenAI TTS Model
+        """,
+        key="openai_tts_model_id",
+        options=OPENAI_TTS_MODELS,
+    )
+    st.caption(
+        "The HD version has less static noise in most situations at the cost of higher latency. Read more about the OpenAI voices and models [here](https://platform.openai.com/docs/guides/text-to-speech)."
+    )
 
 
 def azure_tts_selector():
