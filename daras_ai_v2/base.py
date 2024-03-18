@@ -702,6 +702,19 @@ class BasePage:
                 btn_text = "✅ Approve as Example"
             st.button(btn_text, key="--toggle-approve-example")
 
+            if published_run.is_approved_example:
+                example_priority = st.number_input(
+                    "Example Priority (Between 1 to 100 - Default is 1)",
+                    min_value=1,
+                    max_value=100,
+                    value=published_run.example_priority,
+                )
+                if example_priority != published_run.example_priority:
+                    if st.button("Save Priority"):
+                        published_run.example_priority = example_priority
+                        published_run.save(update_fields=["example_priority"])
+                        st.experimental_rerun()
+
             st.write("---")
 
             if st.checkbox("⭐️ Save as Root Workflow"):
@@ -1603,11 +1616,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 allow_hide=allow_hide,
             )
 
-        example_runs = PublishedRun.objects.filter(
-            workflow=self.workflow,
-            visibility=PublishedRunVisibility.PUBLIC,
-            is_approved_example=True,
-        ).exclude(published_run_id="")[:50]
+        example_runs = (
+            PublishedRun.objects.filter(
+                workflow=self.workflow,
+                visibility=PublishedRunVisibility.PUBLIC,
+                is_approved_example=True,
+            )
+            .exclude(published_run_id="")
+            .order_by("-example_priority", "-updated_at")[:50]
+        )
 
         grid_layout(3, example_runs, _render, column_props=dict(className="mb-0 pb-0"))
 
