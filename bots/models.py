@@ -1360,6 +1360,10 @@ class PublishedRun(models.Model):
         default=PublishedRunVisibility.UNLISTED,
     )
     is_approved_example = models.BooleanField(default=False)
+    example_priority = models.IntegerField(
+        default=1,
+        help_text="Priority of the example in the example list",
+    )
 
     created_by = models.ForeignKey(
         "app_users.AppUser",
@@ -1397,6 +1401,16 @@ class PublishedRun(models.Model):
                     "visibility",
                     "is_approved_example",
                     "published_run_id",
+                ]
+            ),
+            models.Index(
+                fields=[
+                    "workflow",
+                    "visibility",
+                    "is_approved_example",
+                    "published_run_id",
+                    "example_priority",
+                    "updated_at",
                 ]
             ),
         ]
