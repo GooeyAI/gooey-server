@@ -42,7 +42,7 @@ class BalanceResponse(BaseModel):
     balance: int = Field(description="Current balance in credits")
 
 
-@app.get("/v1/balance", response_model=BalanceResponse)
+@app.get("/v1/balance/", response_model=BalanceResponse)
 def get_balance(user: AppUser = Depends(api_auth_header)):
     return BalanceResponse(balance=user.balance)
 
