@@ -424,6 +424,7 @@ def selectbox(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     default_value: T = None,
+    **props,
 ) -> T | None:
     if not options:
         return None
@@ -448,6 +449,7 @@ def selectbox(
                 {"value": option, "label": str(format_func(option))}
                 for option in options
             ],
+            **props,
         ),
     ).mount()
     return value

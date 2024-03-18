@@ -1,7 +1,5 @@
 import json
 import mimetypes
-import os
-import os.path
 import typing
 
 from django.db.models import QuerySet, Q
@@ -1027,14 +1025,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             ).order_by("platform", "-created_at")
 
             # signed in, can edit, but no connected botintegrations on this run
-            if integrations.count() == 0:
+            if not integrations.exists():
                 self.integration_connect_screen()
                 return
 
             # signed in, can edit, and has connected botintegrations on this run
-            self.integration_test_config_screen(
-                integrations, current_run, published_run
-            )
+            with st.center():
+                self.integration_test_config_screen(
+                    integrations, current_run, published_run
+                )
 
     def integrations_on_connect(self, current_run, published_run):
         from app_users.models import AppUser
@@ -1181,153 +1180,142 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 "Configure your Copilot: Add a New Integration",
                 f'Run Saved ✅ • <b>Connected</b> ✅ • <a href="{cancel}">Test & Configure</a> ✅',
             )
-            with st.center():
-                if st.button("Return to Test & Configure"):
-                    raise RedirectException(cancel)
+            if st.button("Return to Test & Configure"):
+                raise RedirectException(cancel)
             return
 
-        with st.center():
-            st.markdown(
-                f"""
-                #### Configure your Copilot
-                """,
-                unsafe_allow_html=True,
-            )
+        st.markdown("#### Configure your Copilot")
 
         if integrations.count() > 1:
-            with st.center(direction="row"):
-                bid = st.horizontal_radio(
-                    "",
-                    [i.id for i in integrations],
-                    lambda i: {
-                        i.id: f'<img align="left" width="24" height="24" style="margin-right: 10px" src="{Platform(i.platform).get_favicon()}"> {i.name}'
-                        for i in integrations
-                    }[i],
+            with st.div(style={"minWidth": "500px", "textAlign": "left"}):
+                integrations_map = {i.id: i for i in integrations}
+                bi_id = st.selectbox(
+                    label="",
+                    options=integrations_map.keys(),
+                    format_func=lambda bi_id: f'<img width="20" height="20" style="margin-right: 10px" src="{Platform(integrations_map[bi_id].platform).get_favicon()}" /> {integrations_map[bi_id].name}',
                     key="bi_id",
                 )
-                bi = integrations.get(id=bid)
-                icon = f'<img src="{Platform(bi.platform).get_favicon()}" style="height: 20px; width: 20px;">'
+                bi = integrations_map[bi_id]
         else:
             bi = integrations[0]
-            icon = f'<img src="{Platform(bi.platform).get_favicon()}" style="height: 20px; width: 20px;">'
+        icon = f'<img src="{Platform(bi.platform).get_favicon()}" width="20" height="20" />'
 
         st.newline()
-        with st.center():
-            with st.div(style={"width": "100%", "text-align": "left"}):
-                test_link = get_bot_test_link(bi)
-                col1, col2 = st.columns(2, style={"align-items": "center"})
-                with col1:
-                    st.write("###### Connected To")
-                    st.write(f"{icon} {bi}", unsafe_allow_html=True)
-                with col2:
-                    if test_link:
-                        copy_to_clipboard_button(
-                            f'<i class="fa-regular fa-link"></i> Copy {Platform(bi.platform).label} Link',
-                            value=test_link,
-                            type="secondary",
-                        )
-                    else:
-                        st.write("Message quicklink not available.")
+        with st.div(style={"width": "100%", "textAlign": "left"}):
+            test_link = get_bot_test_link(bi)
+            col1, col2 = st.columns(2, style={"align-items": "center"})
+            with col1:
+                st.write("###### Connected To")
+                st.write(f"{icon} {bi}", unsafe_allow_html=True)
+            with col2:
+                if test_link:
+                    copy_to_clipboard_button(
+                        f'<i class="fa-regular fa-link"></i> Copy {Platform(bi.platform).label} Link',
+                        value=test_link,
+                        type="secondary",
+                    )
+                else:
+                    st.write("Message quicklink not available.")
 
-                col1, col2 = st.columns(2, style={"align-items": "center"})
-                with col1:
-                    st.write("###### Test")
-                    st.caption(f"Send a test {Platform(bi.platform).label} message.")
-                with col2:
-                    if test_link:
-                        st.anchor(
-                            f"{icon} Message {bi.get_display_name()}",
-                            test_link,
-                            unsafe_allow_html=True,
-                        )
-                    else:
-                        st.write("Message quicklink not available.")
-
-                col1, col2 = st.columns(2, style={"align-items": "center"})
-                with col1:
-                    st.write("###### Understand your Users")
-                    st.caption(f"See real-time analytics.")
-                with col2:
-                    stats_url = furl(
-                        VideoBotsStatsPage.app_url(), args={"bi_id": bi.id}
-                    ).tostr()
+            col1, col2 = st.columns(2, style={"align-items": "center"})
+            with col1:
+                st.write("###### Test")
+                st.caption(f"Send a test {Platform(bi.platform).label} message.")
+            with col2:
+                if test_link:
                     st.anchor(
-                        "📊 View Analytics",
-                        stats_url,
+                        f"{icon} Message {bi.get_display_name()}",
+                        test_link,
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.write("Message quicklink not available.")
+
+            col1, col2 = st.columns(2, style={"align-items": "center"})
+            with col1:
+                st.write("###### Understand your Users")
+                st.caption(f"See real-time analytics.")
+            with col2:
+                stats_url = furl(
+                    VideoBotsStatsPage.app_url(), args={"bi_id": bi.id}
+                ).tostr()
+                st.anchor(
+                    "📊 View Analytics",
+                    stats_url,
+                )
+
+            # ==== future changes ====
+            # col1, col2 = st.columns(2, style={"align-items": "center"})
+            # with col1:
+            #     st.write("###### Evaluate ⚖️")
+            #     st.caption(f"Run automated tests against sample user messages.")
+            # with col2:
+            #     st.anchor(
+            #         "Run Bulk Tests",
+            #         BulkRunnerPage.app_url(),
+            #     )
+
+            # st.write("#### Automated Analysis 🧠")
+            # st.caption(
+            #     "Add a Gooey.AI LLM prompt to automatically analyse and categorize user messages. [Example](https://gooey.ai/compare-large-language-models/how-farmerchat-turns-conversations-to-structured-data/?example_id=lbjnoem7) and [Guide](https://gooey.ai/docs/guides/copilot/conversation-analysis)."
+            # )
+
+            if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    st.write("###### WhatsApp Business Management")
+                    st.caption(
+                        f"Access your WhatsApp account on Meta to approve message templates, etc."
+                    )
+                with col2:
+                    st.anchor(
+                        "Business Settings",
+                        f"https://business.facebook.com/settings/whatsapp-business-accounts/{bi.wa_business_waba_id}",
+                        new_tab=True,
+                    )
+                    st.anchor(
+                        "WhatsApp Manager",
+                        f"https://business.facebook.com/wa/manage/home/?waba_id={bi.wa_business_waba_id}",
+                        new_tab=True,
                     )
 
-                # ==== future changes ====
-                # col1, col2 = st.columns(2, style={"align-items": "center"})
-                # with col1:
-                #     st.write("###### Evaluate ⚖️")
-                #     st.caption(f"Run automated tests against sample user messages.")
-                # with col2:
-                #     st.anchor(
-                #         "Run Bulk Tests",
-                #         BulkRunnerPage.app_url(),
-                #     )
+            col1, col2 = st.columns(2, style={"align-items": "center"})
+            with col1:
+                st.write("###### Add Integration")
+                st.caption(f"Add another connection for {run_title}.")
+            with col2:
+                if st.button(
+                    f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
+                    key="btn_connect",
+                ):
+                    raise RedirectException(add_integration)
 
-                # st.write("#### Automated Analysis 🧠")
-                # st.caption(
-                #     "Add a Gooey.AI LLM prompt to automatically analyse and categorize user messages. [Example](https://gooey.ai/compare-large-language-models/how-farmerchat-turns-conversations-to-structured-data/?example_id=lbjnoem7) and [Guide](https://gooey.ai/docs/guides/copilot/conversation-analysis)."
-                # )
+            with st.expander("Configure Settings 🛠️"):
+                if bi.platform == Platform.SLACK:
+                    slack_specific_settings(bi, run_title)
+                general_integration_settings(bi)
 
-                if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
-                    col1, col2 = st.columns(2, style={"align-items": "center"})
-                    with col1:
-                        st.write("###### WhatsApp Business Management")
-                        st.caption(
-                            f"Access your WhatsApp account on Meta to approve message templates, etc."
-                        )
-                    with col2:
-                        st.anchor(
-                            "Business Settings",
-                            f"https://business.facebook.com/settings/whatsapp-business-accounts/{bi.wa_business_waba_id}",
-                            new_tab=True,
-                        )
-                        st.anchor(
-                            "WhatsApp Manager",
-                            f"https://business.facebook.com/wa/manage/home/?waba_id={bi.wa_business_waba_id}",
-                            new_tab=True,
-                        )
+                if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
+                    st.newline()
+                    st.newline()
+                    broadcast_input(bi)
 
+                st.write("---")
                 col1, col2 = st.columns(2, style={"align-items": "center"})
                 with col1:
-                    st.write("###### Add Integration")
-                    st.caption(f"Add another connection for {run_title}.")
+                    st.write("###### Disconnect")
+                    st.caption(
+                        f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}."
+                    )
                 with col2:
                     if st.button(
-                        f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
-                        key="btn_connect",
+                        "💔️ Disconnect",
+                        key="btn_disconnect",
                     ):
-                        raise RedirectException(add_integration)
-
-                with st.expander("Configure Settings 🛠️"):
-                    if bi.platform == Platform.SLACK:
-                        slack_specific_settings(bi, run_title)
-                    general_integration_settings(bi)
-
-                    if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
-                        st.newline()
-                        st.newline()
-                        broadcast_input(bi)
-
-                    st.write("---")
-                    col1, col2 = st.columns(2, style={"align-items": "center"})
-                    with col1:
-                        st.write("###### Disconnect")
-                        st.caption(
-                            f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}."
-                        )
-                    with col2:
-                        if st.button(
-                            "💔️ Disconnect",
-                            key="btn_disconnect",
-                        ):
-                            bi.saved_run = None
-                            bi.published_run = None
-                            bi.save()
-                            st.experimental_rerun()
+                        bi.saved_run = None
+                        bi.published_run = None
+                        bi.save()
+                        st.experimental_rerun()
 
 
 def chat_list_view():
