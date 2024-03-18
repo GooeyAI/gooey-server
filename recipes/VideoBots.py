@@ -654,36 +654,29 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.audio(audio_url)
 
     def get_raw_price(self, state: dict):
-        created = (
-            SavedRun.objects.filter(
-                uid=self.request.user.uid,
-            )
-            .latest("created_at")
-            .created_at
-        )
-        saved_run = SavedRun.objects.filter(
-            uid=self.request.user.uid,
-            created_at=created,
-        )
-        total = 0
-        if saved_run:
-            for run in saved_run:
-                usage_cost = run.usage_costs.all()
-                for cost in usage_cost:
-                    total += cost.dollar_amount
-            return total + 4
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )  # type: ignore
 
-        match state.get("tts_provider"):
-            case TextToSpeechProviders.ELEVEN_LABS.name:
-                output_text_list = state.get(
-                    "raw_tts_text", state.get("raw_output_text", [])
-                )
-                tts_state = {"text_prompt": "".join(output_text_list)}
-                total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
-                    tts_state
-                )
-            case _:
-                total = super().get_raw_price(state)
+        run_id = current_run.run_id or published_run.published_run_id
+        if not run_id:
+            return 4
+        saved_run = SavedRun.objects.filter(run_id=run_id)
+        total = 0
+        for run in saved_run:
+            usage_cost = run.usage_costs.all()
+            for cost in usage_cost:
+                total += cost.dollar_amount
+        total += 4
+
+        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
+            output_text_list = state.get(
+                "raw_tts_text", state.get("raw_output_text", [])
+            )
+            tts_state = {"text_prompt": "".join(output_text_list)}
+            total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
+                tts_state
+            )
 
         return total * state.get("num_outputs", 1)
 
