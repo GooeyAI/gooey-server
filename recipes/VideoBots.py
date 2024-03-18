@@ -188,6 +188,7 @@ class VideoBotsPage(BasePage):
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
+        azure_voice_name: str | None
 
         # llm settings
         selected_model: (

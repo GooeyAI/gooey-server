@@ -1,15 +1,16 @@
 import json
-import json
 import time
 import typing
 
 import requests
+from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
+from daras_ai_v2.azure_asr import azure_auth_header
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
@@ -21,6 +22,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     text_to_speech_settings,
     TextToSpeechProviders,
     text_to_speech_provider_selector,
+    azure_tts_voices,
 )
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
@@ -74,6 +76,8 @@ class TextToSpeechPage(BasePage):
         elevenlabs_similarity_boost: float | None
         elevenlabs_style: float | None
         elevenlabs_speaker_boost: bool | None
+
+        azure_voice_name: str | None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -304,6 +308,37 @@ class TextToSpeechPage(BasePage):
                 yield "Uploading Audio file..."
                 state["audio_url"] = upload_file_from_bytes(
                     "elevenlabs_gen.mp3", response.content
+                )
+
+            case TextToSpeechProviders.AZURE_TTS:
+                import emoji
+
+                output_format = "audio-16khz-32kbitrate-mono-mp3"
+                voice_name = state.get("azure_voice_name", "en-US")
+                try:
+                    voice = azure_tts_voices()[voice_name]
+                except KeyError as e:
+                    raise UserError(f"Invalid Azure voice name: {voice_name}") from e
+                res = requests.post(
+                    str(furl(settings.AZURE_TTS_ENDPOINT) / "/cognitiveservices/v1"),
+                    headers={
+                        "Content-Type": "application/ssml+xml",
+                        "X-Microsoft-OutputFormat": output_format,
+                        **azure_auth_header(),
+                    },
+                    data=f"""
+                    <speak version='1.0' xml:lang='en-US'>
+                        <voice xml:lang='{voice.get('Locale', 'en-US')}' xml:gender='{voice.get('Gender', 'Male')}' name='{voice.get('ShortName', 'en-US-ChristopherNeural')}'>
+                            {emoji.demojize(text).encode("utf-8").decode("utf-8", "ignore")}
+                        </voice>
+                    </speak>
+                    """.strip(),  # Microsoft's implementation of Speech Synthesis Markup Language (SSML) does not support emojis etc. so we replace them with descriptive text. https://learn.microsoft.com/en-us/azure/ai-services/speech-service/speech-synthesis-markup
+                )
+                raise_for_status(res)
+                state["audio_url"] = upload_file_from_bytes(
+                    "azure_tts.mp3",
+                    res.content,
+                    "audio/mpeg",
                 )
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):

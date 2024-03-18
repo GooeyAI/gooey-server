@@ -205,7 +205,7 @@ def query_vespa(
     if query_embedding is None or not file_ids:
         return {"root": {"children": []}}
     file_ids_str = ", ".join(map(repr, file_ids))
-    query = f"select * from {settings.VESPA_SCHEMA} where file_id in ({file_ids_str}) and (userQuery() or ({{targetHits: {limit}}}nearestNeighbor(embedding, q))) limit {limit}"
+    query = f"select * from {settings.VESPA_SCHEMA} where file_id in (@fileIds) and (userQuery() or ({{targetHits: {limit}}}nearestNeighbor(embedding, q))) limit {limit}"
     logger.debug(f"Vespa query: {'-'*80}\n{query}\n{'-'*80}")
     if semantic_weight == 1.0:
         ranking = "semantic"
@@ -220,6 +220,7 @@ def query_vespa(
         body={
             "ranking.features.query(q)": padded_embedding(query_embedding),
             "ranking.features.query(semanticWeight)": semantic_weight,
+            "fileIds": file_ids_str,
         },
     )
     assert response.is_successful()

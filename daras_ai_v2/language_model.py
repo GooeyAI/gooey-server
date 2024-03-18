@@ -23,7 +23,6 @@ from openai.types.chat import (
 from daras_ai.image_input import gs_url_to_uri
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
-from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.text_splitter import (
     default_length_function,
@@ -47,7 +46,8 @@ class LLMApis(Enum):
     palm2 = 1
     gemini = 2
     openai = 3
-    together = 4
+    # together = 4
+    groq = 5
 
 
 class LargeLanguageModels(Enum):
@@ -59,7 +59,9 @@ class LargeLanguageModels(Enum):
     gpt_3_5_turbo_16k = "ChatGPT 16k (openai)"
     gpt_3_5_turbo_instruct = "GPT-3.5 Instruct (openai)"
 
-    llama2_70b_chat = "Llama 2 (Meta AI)"
+    llama2_70b_chat = "Llama 2 70b Chat (Meta AI)"
+    mixtral_8x7b_instruct_0_1 = "Mixtral 8x7b Instruct v0.1 (Mistral)"
+    gemma_7b_it = "Gemma 7B (Google)"
 
     gemini_1_pro = "Gemini 1.0 Pro (Google)"
     gemini_1_pro_vision = "Gemini 1.0 Pro Vision (Google)"
@@ -131,7 +133,9 @@ llm_model_names = {
     LargeLanguageModels.palm2_chat: "chat-bison",
     LargeLanguageModels.gemini_1_pro: "gemini-1.0-pro",
     LargeLanguageModels.gemini_1_pro_vision: "gemini-1.0-pro-vision",
-    LargeLanguageModels.llama2_70b_chat: "togethercomputer/llama-2-70b-chat",
+    LargeLanguageModels.llama2_70b_chat: "llama2-70b-4096",
+    LargeLanguageModels.mixtral_8x7b_instruct_0_1: "mixtral-8x7b-32768",
+    LargeLanguageModels.gemma_7b_it: "gemma-7b-it",
 }
 
 llm_api = {
@@ -152,7 +156,9 @@ llm_api = {
     LargeLanguageModels.gemini_1_pro_vision: LLMApis.gemini,
     LargeLanguageModels.palm2_text: LLMApis.palm2,
     LargeLanguageModels.palm2_chat: LLMApis.palm2,
-    LargeLanguageModels.llama2_70b_chat: LLMApis.together,
+    LargeLanguageModels.llama2_70b_chat: LLMApis.groq,
+    LargeLanguageModels.mixtral_8x7b_instruct_0_1: LLMApis.groq,
+    LargeLanguageModels.gemma_7b_it: LLMApis.groq,
 }
 
 EMBEDDING_MODEL_MAX_TOKENS = 8191
@@ -181,8 +187,10 @@ model_max_tokens = {
     LargeLanguageModels.gemini_1_pro_vision: 2048,
     LargeLanguageModels.palm2_text: 8192,
     LargeLanguageModels.palm2_chat: 4096,
-    # https://huggingface.co/docs/transformers/main/model_doc/llama2#transformers.LlamaConfig.max_position_embeddings
+    # https://console.groq.com/docs/models
     LargeLanguageModels.llama2_70b_chat: 4096,
+    LargeLanguageModels.mixtral_8x7b_instruct_0_1: 32_768,
+    LargeLanguageModels.gemma_7b_it: 8_192,
 }
 
 llm_price = {
@@ -203,7 +211,9 @@ llm_price = {
     LargeLanguageModels.gemini_1_pro_vision: 25,
     LargeLanguageModels.palm2_text: 15,
     LargeLanguageModels.palm2_chat: 10,
-    LargeLanguageModels.llama2_70b_chat: 5,
+    LargeLanguageModels.llama2_70b_chat: 1,
+    LargeLanguageModels.mixtral_8x7b_instruct_0_1: 1,
+    LargeLanguageModels.gemma_7b_it: 1,
 }
 
 
@@ -475,17 +485,28 @@ def _run_chat_model(
                 candidate_count=num_outputs,
                 temperature=temperature,
             )
-        case LLMApis.together:
+        case LLMApis.groq:
             if tools:
-                raise UserError("Only OpenAI chat models support Tools")
-            return _run_together_chat(
+                raise ValueError("Only OpenAI chat models support Tools")
+            return _run_groq_chat(
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
-                num_outputs=num_outputs,
                 temperature=temperature,
-                repetition_penalty=1.15 if avoid_repetition else 1,
+                avoid_repetition=avoid_repetition,
+                stop=stop,
             )
+        # case LLMApis.together:
+        #     if tools:
+        #         raise UserError("Only OpenAI chat models support Tools")
+        #     return _run_together_chat(
+        #         model=model,
+        #         messages=messages,
+        #         max_tokens=max_tokens,
+        #         num_outputs=num_outputs,
+        #         temperature=temperature,
+        #         repetition_penalty=1.15 if avoid_repetition else 1,
+        #     )
         case _:
             raise UserError(f"Unsupported chat api: {api}")
 
@@ -700,73 +721,105 @@ def get_openai_client(model: str):
     return client
 
 
-def _run_together_chat(
+def _run_groq_chat(
     *,
     model: str,
     messages: list[ConversationEntry],
     max_tokens: int,
     temperature: float,
-    repetition_penalty: float,
-    num_outputs: int,
-) -> list[ConversationEntry]:
-    """
-    Args:
-        model: The model version to use for the request.
-        messages: List of messages to generate model response. Will be converted to a single prompt.
-        max_tokens: The maximum number of tokens to generate.
-        temperature: The randomness of the prediction. This value must be between 0 and 1, inclusive. 0 means deterministic.
-        repetition_penalty: Penalty for repeated words in generated text; 1 is no penalty, values greater than 1 discourage repetition, less than 1 encourage it.
-        num_outputs: The number of responses to generate.
-    """
-    results = map_parallel(
-        lambda _: requests.post(
-            "https://api.together.xyz/inference",
-            json={
-                "model": model,
-                "prompt": build_llama_prompt(messages),
-                "max_tokens": max_tokens,
-                "stop": [B_INST],
-                "temperature": temperature,
-                "repetition_penalty": repetition_penalty,
-            },
-            headers={
-                "Authorization": f"Bearer {settings.TOGETHER_API_KEY}",
-            },
-        ),
-        range(num_outputs),
+    avoid_repetition: bool,
+    stop: list[str] | None,
+):
+    data = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    if avoid_repetition:
+        data["frequency_penalty"] = 0.1
+        data["presence_penalty"] = 0.25
+    if stop:
+        data["stop"] = stop
+    r = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        json=data,
+        headers={
+            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+        },
     )
-    ret = []
-    prompt_tokens = 0
-    completion_tokens = 0
-    for r in results:
-        raise_for_status(r)
-        data = r.json()
-        output = data["output"]
-        error = output.get("error")
-        if error:
-            raise ValueError(error)
-        ret.append(
-            {
-                "role": CHATML_ROLE_ASSISTANT,
-                "content": output["choices"][0]["text"],
-            }
-        )
-        prompt_tokens += output.get("usage", {}).get("prompt_tokens", 0)
-        completion_tokens += output.get("usage", {}).get("completion_tokens", 0)
-    from usage_costs.cost_utils import record_cost_auto
-    from usage_costs.models import ModelSku
+    raise_for_status(r)
+    out = r.json()
+    return [choice["message"] for choice in out["choices"]]
 
-    record_cost_auto(
-        model=model,
-        sku=ModelSku.llm_prompt,
-        quantity=prompt_tokens,
-    )
-    record_cost_auto(
-        model=model,
-        sku=ModelSku.llm_completion,
-        quantity=completion_tokens,
-    )
-    return ret
+
+# def _run_together_chat(
+#     *,
+#     model: str,
+#     messages: list[ConversationEntry],
+#     max_tokens: int,
+#     temperature: float,
+#     repetition_penalty: float,
+#     num_outputs: int,
+# ) -> list[ConversationEntry]:
+#     """
+#     Args:
+#         model: The model version to use for the request.
+#         messages: List of messages to generate model response. Will be converted to a single prompt.
+#         max_tokens: The maximum number of tokens to generate.
+#         temperature: The randomness of the prediction. This value must be between 0 and 1, inclusive. 0 means deterministic.
+#         repetition_penalty: Penalty for repeated words in generated text; 1 is no penalty, values greater than 1 discourage repetition, less than 1 encourage it.
+#         num_outputs: The number of responses to generate.
+#     """
+#     results = map_parallel(
+#         lambda _: requests.post(
+#             "https://api.together.xyz/inference",
+#             json={
+#                 "model": model,
+#                 "prompt": build_llama_prompt(messages),
+#                 "max_tokens": max_tokens,
+#                 "stop": [B_INST],
+#                 "temperature": temperature,
+#                 "repetition_penalty": repetition_penalty,
+#             },
+#             headers={
+#                 "Authorization": f"Bearer {settings.TOGETHER_API_KEY}",
+#             },
+#         ),
+#         range(num_outputs),
+#     )
+#     ret = []
+#     prompt_tokens = 0
+#     completion_tokens = 0
+#     for r in results:
+#         raise_for_status(r)
+#         data = r.json()
+#         output = data["output"]
+#         error = output.get("error")
+#         if error:
+#             raise ValueError(error)
+#         ret.append(
+#             {
+#                 "role": CHATML_ROLE_ASSISTANT,
+#                 "content": output["choices"][0]["text"],
+#             }
+#         )
+#         prompt_tokens += output.get("usage", {}).get("prompt_tokens", 0)
+#         completion_tokens += output.get("usage", {}).get("completion_tokens", 0)
+#     from usage_costs.cost_utils import record_cost_auto
+#     from usage_costs.models import ModelSku
+#
+#     record_cost_auto(
+#         model=model,
+#         sku=ModelSku.llm_prompt,
+#         quantity=prompt_tokens,
+#     )
+#     record_cost_auto(
+#         model=model,
+#         sku=ModelSku.llm_completion,
+#         quantity=completion_tokens,
+#     )
+#     return ret
 
 
 gemini_role_map = {
@@ -1058,64 +1111,64 @@ def parse_chatml(prompt: str) -> tuple[bool, list[dict]]:
     return is_chatml, messages
 
 
-# This prompt formatting was copied from the original Llama v2 repo:
-# https://github.com/facebookresearch/llama/blob/c769dfd53ddd509159216a5423204653850f79f4/llama/generation.py#L44
-# These are components of the prompt that should not be changed by the users
-B_INST, E_INST = "[INST]", "[/INST]"
-B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
-
-SPECIAL_TAGS = [B_INST, E_INST, B_SYS.strip(), E_SYS.strip()]
-
-
-def build_llama_prompt(messages: list[ConversationEntry]):
-    if any([tag in msg.get("content", "") for tag in SPECIAL_TAGS for msg in messages]):
-        raise ValueError(
-            f"Messages cannot contain any of the following: {SPECIAL_TAGS}"
-        )
-
-    if messages and messages[0]["role"] == CHATML_ROLE_SYSTEM:
-        system_prompt = messages[0].get("content", "").strip()
-        messages = messages[1:]
-    else:
-        system_prompt = ""
-
-    if messages and messages[0]["role"] == CHATML_ROLE_USER:
-        first_user_message = messages[0].get("content", "").strip()
-        messages = messages[1:]
-    else:
-        first_user_message = ""
-
-    if system_prompt:
-        first_user_message = B_SYS + system_prompt + E_SYS + first_user_message
-    messages = [
-        {
-            "role": CHATML_ROLE_USER,
-            "content": first_user_message,
-        },
-    ] + messages
-
-    assert all([msg["role"] == CHATML_ROLE_USER for msg in messages[::2]]) and all(
-        [msg["role"] == CHATML_ROLE_ASSISTANT for msg in messages[1::2]]
-    ), (
-        f"llama only supports '{CHATML_ROLE_SYSTEM}', '{CHATML_ROLE_USER}' and '{CHATML_ROLE_ASSISTANT}' roles, "
-        "starting with 'system', then 'user' and alternating (u/a/u/a/u...)"
-    )
-
-    if messages[-1]["role"] == CHATML_ROLE_ASSISTANT:
-        messages.append({"role": CHATML_ROLE_USER, "content": ""})
-
-    ret = "".join(
-        f"{B_INST} {prompt.get('content', '').strip()} {E_INST} {answer.get('content', '').strip()} "
-        for prompt, answer in zip(messages[::2], messages[1::2])
-    )
-
-    assert (
-        messages[-1]["role"] == CHATML_ROLE_USER
-    ), f"Last message must be from {CHATML_ROLE_USER}, got {messages[-1]['role']}"
-
-    ret += f"{B_INST} {messages[-1].get('content').strip()} {E_INST}"
-
-    return ret
+# # This prompt formatting was copied from the original Llama v2 repo:
+# # https://github.com/facebookresearch/llama/blob/c769dfd53ddd509159216a5423204653850f79f4/llama/generation.py#L44
+# # These are components of the prompt that should not be changed by the users
+# B_INST, E_INST = "[INST]", "[/INST]"
+# B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
+#
+# SPECIAL_TAGS = [B_INST, E_INST, B_SYS.strip(), E_SYS.strip()]
+#
+#
+# def build_llama_prompt(messages: list[ConversationEntry]):
+#     if any([tag in msg.get("content", "") for tag in SPECIAL_TAGS for msg in messages]):
+#         raise ValueError(
+#             f"Messages cannot contain any of the following: {SPECIAL_TAGS}"
+#         )
+#
+#     if messages and messages[0]["role"] == CHATML_ROLE_SYSTEM:
+#         system_prompt = messages[0].get("content", "").strip()
+#         messages = messages[1:]
+#     else:
+#         system_prompt = ""
+#
+#     if messages and messages[0]["role"] == CHATML_ROLE_USER:
+#         first_user_message = messages[0].get("content", "").strip()
+#         messages = messages[1:]
+#     else:
+#         first_user_message = ""
+#
+#     if system_prompt:
+#         first_user_message = B_SYS + system_prompt + E_SYS + first_user_message
+#     messages = [
+#         {
+#             "role": CHATML_ROLE_USER,
+#             "content": first_user_message,
+#         },
+#     ] + messages
+#
+#     assert all([msg["role"] == CHATML_ROLE_USER for msg in messages[::2]]) and all(
+#         [msg["role"] == CHATML_ROLE_ASSISTANT for msg in messages[1::2]]
+#     ), (
+#         f"llama only supports '{CHATML_ROLE_SYSTEM}', '{CHATML_ROLE_USER}' and '{CHATML_ROLE_ASSISTANT}' roles, "
+#         "starting with 'system', then 'user' and alternating (u/a/u/a/u...)"
+#     )
+#
+#     if messages[-1]["role"] == CHATML_ROLE_ASSISTANT:
+#         messages.append({"role": CHATML_ROLE_USER, "content": ""})
+#
+#     ret = "".join(
+#         f"{B_INST} {prompt.get('content', '').strip()} {E_INST} {answer.get('content', '').strip()} "
+#         for prompt, answer in zip(messages[::2], messages[1::2])
+#     )
+#
+#     assert (
+#         messages[-1]["role"] == CHATML_ROLE_USER
+#     ), f"Last message must be from {CHATML_ROLE_USER}, got {messages[-1]['role']}"
+#
+#     ret += f"{B_INST} {messages[-1].get('content').strip()} {E_INST}"
+#
+#     return ret
 
 
 def format_chat_entry(

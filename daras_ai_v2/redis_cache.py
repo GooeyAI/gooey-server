@@ -20,7 +20,7 @@ def get_redis_cache():
 F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
 
 
-def redis_cache_decorator(fn: F = None, ex=None) -> F:
+def redis_cache_decorator(fn: F | None = None, ex=None) -> F:
     def decorator(fn: F) -> F:
         @wraps(fn)
         def wrapper(*args, **kwargs):
