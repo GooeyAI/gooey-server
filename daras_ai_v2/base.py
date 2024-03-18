@@ -59,9 +59,7 @@ from daras_ai_v2.query_params_util import (
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import (
-    render_js_dynamic_dates,
-    re_render_js_dynamic_dates,
-    js_dynamic_date,
+    render_local_dt_attrs,
 )
 from gooey_ui import realtime_clear_subs
 from gooey_ui.components.modal import Modal
@@ -739,22 +737,18 @@ class BasePage:
                     self._render_help()
 
                 self.render_related_workflows()
-                render_js_dynamic_dates()
 
             case MenuTabs.examples:
                 self._examples_tab()
-                render_js_dynamic_dates()
 
             case MenuTabs.history:
                 self._history_tab()
-                render_js_dynamic_dates()
 
             case MenuTabs.run_as_api:
                 self.run_as_api_tab()
 
             case MenuTabs.saved:
                 self._saved_tab()
-                render_js_dynamic_dates()
 
     def _render_version_history(self):
         published_run = self.get_current_published_run()
@@ -766,7 +760,6 @@ class BasePage:
                 first_version = older_version
                 self._render_version_row(version, older_version)
             self._render_version_row(first_version, None)
-            re_render_js_dynamic_dates()
 
     def _render_version_row(
         self,
@@ -800,11 +793,14 @@ class BasePage:
         with col2:
             is_first_version = not older_version
             with st.div(className="fs-5 d-flex align-items-center"):
-                js_dynamic_date(
-                    version.created_at,
-                    container=self._render_version_history_date,
-                    date_options={"month": "short", "day": "numeric"},
-                )
+                with st.tag("span"):
+                    st.html(
+                        "Loading...",
+                        **render_local_dt_attrs(
+                            version.created_at,
+                            date_options={"month": "short", "day": "numeric"},
+                        ),
+                    )
                 if is_first_version:
                     with st.tag("span", className="badge bg-secondary px-3 ms-2"):
                         st.write("FIRST VERSION")
@@ -817,10 +813,6 @@ class BasePage:
                 self.render_author(
                     version.changed_by, image_size="18px", responsive=False
                 )
-
-    def _render_version_history_date(self, text, **props):
-        with st.tag("span", **props):
-            st.html(text)
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
@@ -1389,6 +1381,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
+        started_at_text()
         estimated_run_time = self.estimate_run_duration()
         if not estimated_run_time:
             return
@@ -1675,10 +1668,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.write(f"#### {tb.h1_title}")
 
         updated_at = saved_run.updated_at
-        if updated_at and isinstance(updated_at, datetime.datetime):
-            js_dynamic_date(updated_at)
+        if (
+            updated_at
+            and isinstance(updated_at, datetime.datetime)
+            and not saved_run.run_status
+        ):
+            st.caption("Loading...", **render_local_dt_attrs(updated_at))
 
         if saved_run.run_status:
+            started_at_text()
             html_spinner(saved_run.run_status)
         elif saved_run.error_msg:
             st.error(saved_run.error_msg, unsafe_allow_html=True)
@@ -1698,9 +1696,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         with st.div(className="d-flex align-items-center justify-content-between"):
             with st.div():
-                updated_at = published_run.updated_at
+                updated_at = published_run.saved_run.updated_at
                 if updated_at and isinstance(updated_at, datetime.datetime):
-                    js_dynamic_date(updated_at)
+                    st.caption("Loading...", **render_local_dt_attrs(updated_at))
 
             if published_run.visibility == PublishedRunVisibility.PUBLIC:
                 run_icon = '<i class="fa-regular fa-person-running"></i>'
@@ -1734,9 +1732,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         with st.div(className="d-flex align-items-center justify-content-between"):
             with st.div():
-                updated_at = published_run.updated_at
+                updated_at = published_run.saved_run.updated_at
                 if updated_at and isinstance(updated_at, datetime.datetime):
-                    js_dynamic_date(updated_at)
+                    st.caption("Loading...", **render_local_dt_attrs(updated_at))
 
             run_icon = '<i class="fa-regular fa-person-running"></i>'
             run_count = format_number_with_suffix(published_run.get_run_count())
@@ -1944,24 +1942,46 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
 
+def started_at_text():
+    with st.div(className="d-flex"):
+        text = "Started"
+        if seed := st.session_state.get("seed"):
+            text += f' with seed <span style="color: black;">{seed}</span>'
+        st.caption(text + " on&nbsp;", unsafe_allow_html=True)
+        st.caption(
+            "...",
+            className="text-black",
+            **render_local_dt_attrs(timezone.now()),
+        )
+
+
 def render_output_caption():
     caption = ""
 
     run_time = st.session_state.get(StateKeys.run_time, 0)
     if run_time:
-        caption += f'Generated in <span style="color: black;">{run_time :.2f}s</span>'
+        caption += f'Generated in <span style="color: black;">{run_time :.1f}s</span>'
 
     if seed := st.session_state.get("seed"):
         caption += f' with seed <span style="color: black;">{seed}</span> '
 
-    created_at = st.session_state.get(StateKeys.created_at, datetime.datetime.today())
-    if created_at:
-        if isinstance(created_at, str):
-            created_at = datetime.datetime.fromisoformat(created_at)
-        format_created_at = created_at.strftime(settings.SHORT_DATETIME_FORMAT)
-        caption += f' at <span style="color: black;">{format_created_at}</span>'
+    updated_at = st.session_state.get(StateKeys.updated_at, datetime.datetime.today())
+    if updated_at:
+        if isinstance(updated_at, str):
+            updated_at = datetime.datetime.fromisoformat(updated_at)
+        caption += " on&nbsp;"
 
-    st.caption(caption, unsafe_allow_html=True)
+    with st.div(className="d-flex"):
+        st.caption(caption, unsafe_allow_html=True)
+        if updated_at:
+            st.caption(
+                "...",
+                className="text-black",
+                **render_local_dt_attrs(
+                    updated_at,
+                    date_options={"month": "short", "day": "numeric"},
+                ),
+            )
 
 
 def extract_model_fields(

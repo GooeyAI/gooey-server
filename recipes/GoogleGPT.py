@@ -1,18 +1,19 @@
-import datetime
 import typing
 
-import jinja2
 from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.doc_search_settings_widgets import doc_search_settings
+from daras_ai_v2.doc_search_settings_widgets import (
+    query_instructions_widget,
+    doc_search_advanced_settings,
+)
+from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
-    model_max_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -94,6 +95,7 @@ class GoogleGPTPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
+        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
         dense_weight: float | None = DocSearchRequest.__fields__[
             "dense_weight"
         ].field_info
@@ -145,7 +147,9 @@ class GoogleGPTPage(BasePage):
         st.write("---")
         serp_search_settings()
         st.write("---")
-        doc_search_settings(asr_allowed=False)
+        st.write("##### 🔎 Document Search Settings")
+        query_instructions_widget()
+        doc_search_advanced_settings()
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage

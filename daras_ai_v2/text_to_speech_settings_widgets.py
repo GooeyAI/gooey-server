@@ -1,7 +1,9 @@
 from enum import Enum
+import typing
 
 import requests
-from google.cloud import texttospeech
+from furl import furl
+from daras_ai_v2.azure_asr import azure_auth_header
 
 import gooey_ui as st
 from daras_ai_v2 import settings
@@ -31,6 +33,7 @@ class TextToSpeechProviders(Enum):
     ELEVEN_LABS = "Eleven Labs"
     UBERDUCK = "Uberduck.ai"
     BARK = "Bark (suno-ai)"
+    AZURE_TTS = "Azure Text-to-Speech"
 
 
 # Mapping from Eleven Labs Voice Name -> Voice ID
@@ -161,6 +164,8 @@ def text_to_speech_provider_selector(page):
                 uberduck_selector()
             case TextToSpeechProviders.ELEVEN_LABS.name:
                 elevenlabs_selector(page)
+            case TextToSpeechProviders.AZURE_TTS.name:
+                azure_tts_selector()
     return tts_provider
 
 
@@ -174,6 +179,67 @@ def text_to_speech_settings(page, tts_provider):
             uberduck_settings()
         case TextToSpeechProviders.ELEVEN_LABS.name:
             elevenlabs_settings()
+        case TextToSpeechProviders.AZURE_TTS.name:
+            azure_tts_settings()
+
+
+def azure_tts_selector():
+    voices = azure_tts_voices()
+    st.selectbox(
+        label="""
+        ###### Azure TTS Voice name
+        """,
+        key="azure_voice_name",
+        format_func=lambda voice: f"{voices[voice].get('DisplayName')} - {voices[voice].get('LocaleName')}",
+        options=voices.keys(),
+    )
+
+
+def azure_tts_settings():
+    voice_name = st.session_state.get("azure_voice_name")
+    if not voice_name:
+        return
+    try:
+        voice = azure_tts_voices()[voice_name]
+    except KeyError:
+        return
+    st.markdown(
+        f"""
+        ###### {voice.get('Name')}:
+        * Name: {voice.get('LocalName')} {'(' + str(voice.get('DisplayName')) + ')' if voice.get('LocalName') != voice.get('DisplayName') else ''}
+        * Gender: {voice.get('Gender')}
+        * Locale: {voice.get('LocaleName')}
+        * Locale Code: {voice.get('Locale')}
+        * Sample Rate: {voice.get('SampleRateHertz')} Hz
+        * Voice Type: {voice.get('VoiceType')}
+        * Words Per Minute: {voice.get('WordsPerMinute')}
+
+        See all the supported languages and voices [here](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support?tabs=tts)
+        """
+    )
+
+
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def azure_tts_voices() -> dict[str, dict[str, str]]:
+    # E.g., {"af-ZA-AdriNeural": {
+    #     "Name": "Microsoft Server Speech Text to Speech Voice (af-ZA, AdriNeural)",
+    #     "DisplayName": "Adri",
+    #     "LocalName": "Adri",
+    #     "ShortName": "af-ZA-AdriNeural",
+    #     "Gender": "Female",
+    #     "Locale": "af-ZA",
+    #     "LocaleName": "Afrikaans (South Africa)",
+    #     "SampleRateHertz": "48000",
+    #     "VoiceType": "Neural",
+    #     "Status": "GA",
+    #     "WordsPerMinute": "147",
+    # }}
+    res = requests.get(
+        str(furl(settings.AZURE_TTS_ENDPOINT) / "/cognitiveservices/voices/list"),
+        headers=azure_auth_header(),
+    )
+    raise_for_status(res)
+    return {voice.get("ShortName", "Unknown"): voice for voice in res.json()}
 
 
 def bark_selector():
@@ -390,7 +456,9 @@ def elevenlabs_settings():
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def google_tts_voices() -> dict[str, str]:
-    voices: list[texttospeech.Voice] = (
+    from google.cloud import texttospeech
+
+    voices: list[texttospeech.Voice] = list(
         texttospeech.TextToSpeechClient().list_voices().voices
     )
     voices.sort(key=_voice_sort_key)
@@ -404,7 +472,7 @@ def _pretty_voice(voice) -> str:
 _lang_code_sort = ["en-US", "en-IN", "en-GB", "en-AU"]
 
 
-def _voice_sort_key(voice: texttospeech.Voice):
+def _voice_sort_key(voice: "texttospeech.Voice"):
     try:
         lang_index = _lang_code_sort.index(voice.language_codes[0])
     except ValueError:

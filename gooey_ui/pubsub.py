@@ -3,10 +3,10 @@ import json
 import threading
 import typing
 from contextlib import contextmanager
+from functools import lru_cache
 from time import time
 
-import redis
-from fastapi.encoders import jsonable_encoder
+
 from loguru import logger
 
 from daras_ai_v2 import settings
@@ -14,7 +14,13 @@ from daras_ai_v2 import settings
 T = typing.TypeVar("T")
 
 threadlocal = threading.local()
-r = redis.Redis.from_url(settings.REDIS_URL)
+
+
+@lru_cache
+def get_redis():
+    import redis
+
+    return redis.Redis.from_url(settings.REDIS_URL)
 
 
 def realtime_clear_subs():
@@ -32,6 +38,7 @@ def get_subscriptions() -> list[str]:
 def realtime_pull(channels: list[str]) -> list[typing.Any]:
     channels = [f"gooey-gui/state/{channel}" for channel in channels]
     threadlocal.channels = channels
+    r = get_redis()
     out = [
         json.loads(value) if (value := r.get(channel)) else None for channel in channels
     ]
@@ -39,8 +46,11 @@ def realtime_pull(channels: list[str]) -> list[typing.Any]:
 
 
 def realtime_push(channel: str, value: typing.Any = "ping"):
+    from fastapi.encoders import jsonable_encoder
+
     channel = f"gooey-gui/state/{channel}"
     msg = json.dumps(jsonable_encoder(value))
+    r = get_redis()
     r.set(channel, msg)
     r.publish(channel, json.dumps(time()))
     if isinstance(value, dict):
@@ -53,6 +63,7 @@ def realtime_push(channel: str, value: typing.Any = "ping"):
 @contextmanager
 def realtime_subscribe(channel: str) -> typing.Generator:
     channel = f"gooey-gui/state/{channel}"
+    r = get_redis()
     pubsub = r.pubsub()
     pubsub.subscribe(channel)
     logger.info(f"subscribe {channel=}")
@@ -64,11 +75,12 @@ def realtime_subscribe(channel: str) -> typing.Generator:
         pubsub.close()
 
 
-def _realtime_sub_gen(channel: str, pubsub: redis.client.PubSub) -> typing.Generator:
+def _realtime_sub_gen(channel: str, pubsub: "redis.client.PubSub") -> typing.Generator:
     while True:
         message = pubsub.get_message(timeout=10)
         if not (message and message["type"] == "message"):
             continue
+        r = get_redis()
         value = json.loads(r.get(channel))
         if isinstance(value, dict):
             run_status = value.get("__run_status")

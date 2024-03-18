@@ -29,9 +29,14 @@ from daras_ai_v2.bot_integration_widgets import (
     render_bot_test_link,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
-    doc_search_settings,
+    query_instructions_widget,
+    keyword_instructions_widget,
+    doc_search_advanced_settings,
+    doc_extract_selector,
     document_uploader,
+    citation_style_selector,
 )
+from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
@@ -42,9 +47,6 @@ from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
     ConversationEntry,
-    format_chatml_message,
-    CHATML_END_TOKEN,
-    CHATML_START_TOKEN,
     LargeLanguageModels,
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
@@ -162,6 +164,10 @@ class VideoBotsPage(BasePage):
         input_prompt: str
         input_images: list[str] | None
         input_documents: list[str] | None
+        doc_extract_url: str | None = Field(
+            title="📚 Document Extract Workflow",
+            description="Select a workflow to extract text from documents and images.",
+        )
 
         # conversation history/context
         messages: list[ConversationEntry] | None
@@ -182,6 +188,7 @@ class VideoBotsPage(BasePage):
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
+        azure_voice_name: str | None
 
         # llm settings
         selected_model: (
@@ -213,6 +220,8 @@ class VideoBotsPage(BasePage):
         max_references: int | None
         max_context_words: int | None
         scroll_jump: int | None
+
+        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
         dense_weight: float | None = DocSearchRequest.__fields__[
             "dense_weight"
         ].field_info
@@ -222,7 +231,7 @@ class VideoBotsPage(BasePage):
 
         user_language: str | None = Field(
             title="🔠 User Language",
-            description="If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.",
+            description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
         input_glossary_document: str | None = Field(
@@ -335,13 +344,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         document_uploader(
             """
             #### 📄 Knowledge
-            Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
-            """
+            Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
+            """,
         )
 
         st.markdown("#### Capabilities")
         if st.checkbox(
-            "##### 🗣️ Speak Responses",
+            "##### 🗣️ Text to Speech & Lipsync",
             value=bool(st.session_state.get("tts_provider")),
         ):
             text_to_speech_provider_selector(self)
@@ -357,8 +366,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.file_uploader(
                 """
                 ###### 👩‍🦰 Input Face
-                Upload a video/image that contains faces to use
-                *Recommended - mp4 / mov / png / jpg / gif*
+                Upload a video or image (with a human face) to lipsync responses. mp4, mov, png, jpg or gif preferred.
                 """,
                 key="input_face",
             )
@@ -375,6 +383,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 key="user_language",
             )
             st.write("---")
+        else:
+            st.session_state["user_language"] = None
 
         if st.checkbox(
             "##### 🩻 Photo & Document Intelligence",
@@ -407,10 +417,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         tts_provider = st.session_state.get("tts_provider")
         if tts_provider:
             text_to_speech_settings(self, tts_provider)
+            st.write("---")
 
-        input_face = st.session_state.get("__enable_video")
+        input_face = st.session_state.get("input_face")
         if input_face:
             lipsync_settings()
+            st.write("---")
 
         if st.session_state.get("user_language"):
             st.markdown("##### 🔠 Translation Settings")
@@ -439,12 +451,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             else:
                 st.session_state["input_glossary_document"] = None
                 st.session_state["output_glossary_document"] = None
+            st.write("---")
 
-        if st.session_state.get("documents"):
+        documents = st.session_state.get("documents")
+        if documents:
+            st.write("#### 📄 Knowledge Base")
             st.text_area(
                 """
-            ##### 👩‍🏫 Document Search Results Instructions
-            Guidelines to interpret the results of the knowledge base query.
+            ###### 👩‍🏫 Search Instructions
+            How should the LLM interpret the results from your knowledge base?
             """,
                 key="task_instructions",
                 height=300,
@@ -453,16 +468,29 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 "task_instructions",
             )
 
-            st.write("---")
+            citation_style_selector()
             st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
-            st.caption(
-                "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
-            )
+
+            doc_extract_selector()
+
             st.write("---")
-            doc_search_settings(keyword_instructions_allowed=True)
+
+        st.markdown(
+            """
+            #### Advanced Settings
+            In general, you should not need to adjust these.
+            """
+        )
+
+        if documents:
+            query_instructions_widget()
+            keyword_instructions_widget()
+            doc_search_advanced_settings()
             st.write("---")
 
         language_model_settings(show_selector=False)
+
+        st.write("---")
 
         enum_multiselect(
             enum_cls=LLMTools,
@@ -822,66 +850,37 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
             model_max_tokens[model]
-            - calc_gpt_tokens([system_prompt, user_input], is_chat_model=is_chat_model)
+            - calc_gpt_tokens([system_prompt, user_input])
             - request.max_tokens
             - SAFETY_BUFFER
         )
         clip_idx = convo_window_clipper(
-            history_window, max_history_tokens, is_chat_model=is_chat_model
+            history_window,
+            max_history_tokens,
         )
         history_window = history_window[clip_idx:]
         prompt_messages = [system_prompt, *history_window, user_prompt]
-
-        # for backwards compat with non-chat models
-        if not is_chat_model:
-            # assistant prompt to triger a model response
-            prompt_messages.append(
-                {
-                    "role": CHATML_ROLE_ASSISTANT,
-                    "content": "",
-                }
-            )
-
         state["final_prompt"] = prompt_messages
 
         # ensure input script is not too big
-        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(
-            prompt_messages, is_chat_model=is_chat_model
-        )
+        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(prompt_messages)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
             raise UserError("Input Script is too long! Please reduce the script size.")
 
         yield f"Summarizing with {model.value}..."
-        if is_chat_model:
-            chunks = run_language_model(
-                model=request.selected_model,
-                messages=[
-                    {"role": s["role"], "content": s["content"]}
-                    for s in prompt_messages
-                ],
-                max_tokens=max_allowed_tokens,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                avoid_repetition=request.avoid_repetition,
-                tools=request.tools,
-                stream=True,
-            )
-        else:
-            prompt = "\n".join(
-                format_chatml_message(entry) for entry in prompt_messages
-            )
-            chunks = run_language_model(
-                model=request.selected_model,
-                prompt=prompt,
-                max_tokens=max_allowed_tokens,
-                quality=request.quality,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                avoid_repetition=request.avoid_repetition,
-                stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
-                stream=True,
-            )
+        chunks = run_language_model(
+            model=request.selected_model,
+            messages=[
+                {"role": s["role"], "content": s["content"]} for s in prompt_messages
+            ],
+            max_tokens=max_allowed_tokens,
+            num_outputs=request.num_outputs,
+            temperature=request.sampling_temperature,
+            avoid_repetition=request.avoid_repetition,
+            tools=request.tools,
+            stream=True,
+        )
         citation_style = (
             request.citation_style and CitationStyles[request.citation_style]
         ) or None
@@ -1019,7 +1018,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # show_landbot_widget()
 
     def messenger_bot_integration(self):
-        from routers.facebook_api import ig_connect_url, fb_connect_url
+        from routers.facebook_api import ig_connect_url, fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
         from recipes.VideoBotsStats import VideoBotsStatsPage
 
@@ -1058,6 +1057,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 ℹ️
                 </a>
             </div>
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{wa_connect_url}">
+                <i class="fa-brands fa-whatsapp" style="color: lightgreen; font-size: 20px"></i>
+                &nbsp;
+                Add Your Whatsapp Number
+                </a>
+            </div>
+            <p>To connect a phone number, make sure it is not reserved for some other use on Whatsapp or <a href="https://business.facebook.com/wa/manage/phone-numbers/">connected to a different Whatsapp account</a>. If your business needs exceed the capacity of a free Whatsapp account and/or you don't want to manage the Whatsapp business yourself, contact us for a quote on a managed Whatsapp number through Gooey.</p>
             """,
             unsafe_allow_html=True,
         )
@@ -1395,9 +1402,6 @@ def convo_window_clipper(
     step=2,
 ):
     for i in range(len(window) - 2, -1, -step):
-        if (
-            calc_gpt_tokens(window[i:], sep=sep, is_chat_model=is_chat_model)
-            > max_tokens
-        ):
+        if calc_gpt_tokens(window[i:], sep=sep) > max_tokens:
             return i + step
     return 0

@@ -1,3 +1,4 @@
+import json
 import typing
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -37,7 +38,8 @@ def apply_parallel(
         it = as_completed(fs)
         for i in range(length):
             yield f"[{i + 1}/{length}] {message}"
-            ret[i] = next(it).result()
+            fut = next(it)
+            ret[fs.index(fut)] = fut.result()
         return ret
 
 
@@ -64,6 +66,21 @@ def flatmap_parallel(
     return flatten(map_parallel(fn, *iterables, max_workers=max_workers))
 
 
+def flatmap_parallel_ascompleted(
+    fn: typing.Callable[..., list[R]],
+    id_lists: typing.Iterator[list[T]] | typing.Sequence[list[T]],
+    *iterables,
+    max_workers: int = None,
+) -> typing.Iterator[tuple[T, R]]:
+    for id_list, result_list in map_parallel_ascompleted(
+        fn,
+        map(json.dumps, id_lists),
+        *iterables,
+        max_workers=max_workers,
+    ):
+        yield from zip(json.loads(id_list), result_list)
+
+
 def map_parallel(
     fn: typing.Callable[..., R],
     *iterables,
@@ -75,6 +92,25 @@ def map_parallel(
         return []
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         return list(pool.map(fn, *iterables))
+
+
+def map_parallel_ascompleted(
+    fn: typing.Callable[..., R],
+    ids: typing.Iterable[T] | typing.Sequence[T],
+    *iterables,
+    max_workers: int = None,
+) -> typing.Iterator[tuple[T, R]]:
+    assert iterables, "map_parallel_ascompleted() requires at least one iterable"
+    max_workers = max_workers or max(map(len, iterables))
+    if not max_workers:
+        return
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        fs = {
+            executor.submit(fn, *args): arg_id
+            for arg_id, args in zip(ids, zip(*iterables))
+        }
+        for fut in as_completed(fs):
+            yield fs.pop(fut), fut.result()
 
 
 def flatten(l1: typing.Iterable[typing.Iterable[T]]) -> list[T]:

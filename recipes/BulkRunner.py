@@ -1,5 +1,4 @@
 import datetime
-import io
 import typing
 import uuid
 
@@ -11,13 +10,17 @@ from bots.models import Workflow, PublishedRun, PublishedRunVisibility, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
-from daras_ai_v2.doc_search_settings_widgets import document_uploader
+from daras_ai_v2.doc_search_settings_widgets import (
+    document_uploader,
+    SUPPORTED_SPREADSHEET_TYPES,
+)
 from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.vector_search import (
-    doc_url_to_metadata,
     download_content_bytes,
+    doc_url_to_file_metadata,
+    tabular_bytes_to_any_df,
 )
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
@@ -93,7 +96,7 @@ List of URLs to the evaluation runs that you requested.
 
         files = document_uploader(
             f"---\n##### {field_title_desc(self.RequestModel, 'documents')}",
-            accept=(".csv", ".xlsx", ".xls", ".json", ".tsv", ".xml"),
+            accept=SUPPORTED_SPREADSHEET_TYPES,
         )
 
         required_input_fields = {}
@@ -686,26 +689,13 @@ def get_columns(files: list[str]) -> list[str]:
 
 
 def read_df_any(f_url: str) -> "pd.DataFrame":
-    import pandas as pd
-
-    doc_meta = doc_url_to_metadata(f_url)
-    f_bytes, ext = download_content_bytes(f_url=f_url, mime_type=doc_meta.mime_type)
-
-    f = io.BytesIO(f_bytes)
-    match ext:
-        case ".csv":
-            df = pd.read_csv(f)
-        case ".tsv":
-            df = pd.read_csv(f, sep="\t")
-        case ".xls" | ".xlsx":
-            df = pd.read_excel(f)
-        case ".json":
-            df = pd.read_json(f)
-        case ".xml":
-            df = pd.read_xml(f)
-        case _:
-            raise ValueError(f"Unsupported file type: {f_url}")
-
+    file_meta = doc_url_to_file_metadata(f_url)
+    f_bytes, mime_type = download_content_bytes(
+        f_url=f_url, mime_type=file_meta.mime_type
+    )
+    df = tabular_bytes_to_any_df(
+        f_name=file_meta.name, f_bytes=f_bytes, mime_type=mime_type
+    )
     return df.dropna(how="all", axis=1).dropna(how="all", axis=0).fillna("")
 
 

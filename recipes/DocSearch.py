@@ -7,9 +7,12 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    doc_search_settings,
     document_uploader,
     is_user_uploaded_url,
+    citation_style_selector,
+    doc_search_advanced_settings,
+    query_instructions_widget,
+    doc_extract_selector,
 )
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -128,7 +131,12 @@ class DocSearchPage(BasePage):
         st.write("---")
         language_model_settings()
         st.write("---")
-        doc_search_settings()
+        st.write("##### 🔎 Document Search Settings")
+        citation_style_selector()
+        doc_extract_selector()
+        st.write("---")
+        query_instructions_widget()
+        doc_search_advanced_settings()
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_DOC_SEARCH_META_IMG

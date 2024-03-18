@@ -2,11 +2,11 @@ import json
 import shlex
 from textwrap import indent
 
-import gooey_ui as st
 from furl import furl
 
-from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
+import gooey_ui as st
 from auth.token_authentication import auth_keyword
+from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 
 
 def get_filenames(request_body):
@@ -182,9 +182,10 @@ while True:
 result = response.json()
 print(response.status_code, result)
 """
-        import black
+        from black import format_str
+        from black.mode import Mode
 
-        py_code = black.format_str(py_code, mode=black.FileMode())
+        py_code = format_str(py_code, mode=Mode())
         st.write(
             rf"""
 1. Generate an api key [below👇](#api-keys)

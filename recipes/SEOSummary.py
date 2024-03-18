@@ -4,15 +4,12 @@ import typing
 
 import readability
 import requests
-from bs4 import BeautifulSoup
 from furl import furl
 from html_sanitizer import Sanitizer
-from lxml import etree
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from recipes.GoogleGPT import GoogleSearchMixin
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
@@ -33,6 +30,7 @@ from daras_ai_v2.serp_search_locations import (
     SerpSearchType,
 )
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
+from recipes.GoogleGPT import GoogleSearchMixin
 
 KEYWORDS_SEP = re.compile(r"[\n,]")
 
@@ -413,6 +411,8 @@ def _gen_final_prompt(
 
 
 def _summarize_url(url: str, enable_html: bool):
+    from lxml import etree
+
     try:
         title, summary = _call_summarize_url(url)
     except (requests.RequestException, etree.LxmlError):
@@ -438,6 +438,8 @@ def _summarize_url(url: str, enable_html: bool):
 
 
 def html_to_text(text):
+    from bs4 import BeautifulSoup
+
     return BeautifulSoup(text, "html.parser").get_text(separator=" ", strip=True)
 
 
