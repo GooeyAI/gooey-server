@@ -25,6 +25,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     azure_tts_voices,
     OPENAI_TTS_MODELS_T,
     OPENAI_TTS_VOICES_T,
+    OpenAI_TTS_Models,
+    OpenAI_TTS_Voices,
 )
 
 DEFAULT_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a73181ce-9457-11ee-8edd-02420a0001c7/Voice%20generators.jpg.png"
@@ -353,8 +355,16 @@ class TextToSpeechPage(BasePage):
 
                 client = OpenAI()
 
-                model = st.session_state.get("openai_tts_model_id", "tts-1")
-                voice = st.session_state.get("openai_voice_name", "alloy")
+                model = OpenAI_TTS_Models[
+                    st.session_state.get(
+                        "openai_tts_model_id", OpenAI_TTS_Models.tts.name
+                    )
+                ].value
+                voice = OpenAI_TTS_Voices[
+                    st.session_state.get(
+                        "openai_voice_name", OpenAI_TTS_Voices.alloy.name
+                    )
+                ].value
 
                 response = client.audio.speech.create(
                     model=model,

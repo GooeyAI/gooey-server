@@ -27,20 +27,25 @@ UBERDUCK_VOICES = {
     "Carolyn Samuelson": "60c910d0-d924-4f74-a47c-6c9e44e2bb8b",
 }
 
-OPENAI_TTS_MODELS_T = typing.Literal["tts-1", "tts-1-hd"]
 
-OPENAI_TTS_MODELS: tuple[OPENAI_TTS_MODELS_T] = typing.get_args(OPENAI_TTS_MODELS_T)
+class OpenAI_TTS_Models(str, Enum):
+    tts = "tts-1"
+    tts_hd = "tts-1-hd"
 
-OPENAI_TTS_VOICES_T = typing.Literal[
-    "alloy",
-    "echo",
-    "fable",
-    "onyx",
-    "nova",
-    "shimmer",
-]
 
-OPENAI_TTS_VOICES: tuple[OPENAI_TTS_VOICES_T] = typing.get_args(OPENAI_TTS_VOICES_T)
+OPENAI_TTS_MODELS_T = typing.Literal[tuple(e.name for e in OpenAI_TTS_Models)]
+
+
+class OpenAI_TTS_Voices(str, Enum):
+    alloy = "alloy"
+    echo = "echo"
+    fable = "fable"
+    onyx = "onyx"
+    nova = "nova"
+    shimmer = "shimmer"
+
+
+OPENAI_TTS_VOICES_T = typing.Literal[tuple(e.name for e in OpenAI_TTS_Voices)]
 
 
 class TextToSpeechProviders(Enum):
@@ -204,22 +209,20 @@ def text_to_speech_settings(page, tts_provider):
 
 
 def openai_tts_selector():
-    st.selectbox(
-        label="""
-        ###### OpenAI Voice Name
-        """,
+    enum_selector(
+        OpenAI_TTS_Voices,
+        label="###### OpenAI Voice Name",
         key="openai_voice_name",
-        options=OPENAI_TTS_VOICES,
+        use_selectbox=True,
     )
 
 
 def openai_tts_settings():
-    st.selectbox(
-        label="""
-        ###### OpenAI TTS Model
-        """,
+    enum_selector(
+        OpenAI_TTS_Models,
+        label="###### OpenAI TTS Model",
         key="openai_tts_model_id",
-        options=OPENAI_TTS_MODELS,
+        use_selectbox=True,
     )
     st.caption(
         "The HD version has less static noise in most situations at the cost of higher latency. Read more about the OpenAI voices and models [here](https://platform.openai.com/docs/guides/text-to-speech)."
