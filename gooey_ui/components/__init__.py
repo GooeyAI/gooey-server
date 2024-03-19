@@ -79,6 +79,7 @@ def write(*objs: typing.Any, line_clamp: int = None, unsafe_allow_html=False, **
         markdown(
             obj if isinstance(obj, str) else repr(obj),
             line_clamp=line_clamp,
+            unsafe_allow_html=unsafe_allow_html,
             **props,
         )
 
@@ -118,7 +119,7 @@ def _node(name: str, **props):
     return state.NestingCtx(node)
 
 
-def text(body: str, *, unsafe_allow_html=False, **props):
+def text(body: str, **props):
     state.RenderTreeNode(
         name="pre",
         props=dict(body=dedent(body), **props),
