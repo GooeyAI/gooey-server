@@ -72,10 +72,10 @@ class PublishedRunVisibility(models.IntegerChoices):
 
 
 class Platform(models.IntegerChoices):
-    FACEBOOK = 1
-    INSTAGRAM = (2, "Instagram & FB")
-    WHATSAPP = 3
-    SLACK = 4
+    FACEBOOK = (1, "Facebook")
+    INSTAGRAM = (2, "Instagram")
+    WHATSAPP = (3, "WhatsApp")
+    SLACK = (4, "Slack")
 
     def get_favicon(self):
         if self == Platform.WHATSAPP:

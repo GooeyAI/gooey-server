@@ -83,6 +83,22 @@ def write(*objs: typing.Any, unsafe_allow_html=False, **props):
         )
 
 
+def center(direction="column") -> state.NestingCtx:
+    return div(
+        style={
+            "display": "flex",
+            "justifyContent": "center",
+            "alignItems": "center",
+            "textAlign": "center",
+            "flexDirection": direction,
+        }
+    )
+
+
+def newline():
+    html("<br/>")
+
+
 def markdown(body: str | None, *, unsafe_allow_html=False, **props):
     if body is None:
         return _node("markdown", body="", **props)
@@ -198,6 +214,7 @@ def columns(
     *,
     gap: str = None,
     responsive: bool = True,
+    column_props: dict = {},
     **props,
 ) -> tuple[state.NestingCtx, ...]:
     if isinstance(spec, int):
@@ -206,7 +223,10 @@ def columns(
     props.setdefault("className", "row")
     with div(**props):
         return tuple(
-            div(className=f"col-lg-{p} {'col-12' if responsive else f'col-{p}'}")
+            div(
+                className=f"col-lg-{p} {'col-12' if responsive else f'col-{p}'}",
+                **column_props,
+            )
             for w in spec
             if (p := f"{round(w / total_weight * 12)}")
         )
@@ -404,6 +424,7 @@ def selectbox(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     default_value: T = None,
+    **props,
 ) -> T | None:
     if not options:
         return None
@@ -428,6 +449,7 @@ def selectbox(
                 {"value": option, "label": str(format_func(option))}
                 for option in options
             ],
+            **props,
         ),
     ).mount()
     return value
@@ -490,6 +512,26 @@ def button(
         ),
     ).mount()
     return bool(state.session_state.pop(key, False))
+
+
+def anchor(
+    label: str,
+    href: str,
+    *,
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
+    disabled: bool = False,
+    unsafe_allow_html: bool = False,
+    new_tab: bool = False,
+    **props,
+):
+    className = f"btn btn-theme btn-{type} " + props.pop("className", "")
+    style = props.pop("style", {})
+    if disabled:
+        style["pointerEvents"] = "none"
+    if new_tab:
+        props["target"] = "_blank"
+    with tag("a", href=href, className=className, style=style, **props):
+        markdown(dedent(label), unsafe_allow_html=unsafe_allow_html)
 
 
 form_submit_button = button
@@ -609,6 +651,7 @@ def horizontal_radio(
     disabled: bool = False,
     checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
+    button_props: dict = {},
 ) -> T | None:
     if not options:
         return None
@@ -629,6 +672,7 @@ def horizontal_radio(
             type="primary",
             className="replicate-nav " + ("active" if value == option else ""),
             disabled=disabled,
+            **button_props,
         ):
             state.session_state[key] = value = option
             state.experimental_rerun()
