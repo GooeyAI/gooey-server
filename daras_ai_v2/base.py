@@ -329,9 +329,9 @@ class BasePage:
                 and published_run.notes
                 and MenuTabs.integrations != self.tab
             ):
-                st.write(published_run.notes)
+                st.write(published_run.notes, line_clamp=2)
             elif is_root_example and MenuTabs.integrations != self.tab:
-                st.write(self.preview_description(current_run.to_dict()))
+                st.write(self.preview_description(current_run.to_dict()), line_clamp=2)
 
     def can_user_edit_run(self, current_run: SavedRun | None = None) -> bool:
         current_run = current_run or self.get_current_sr()

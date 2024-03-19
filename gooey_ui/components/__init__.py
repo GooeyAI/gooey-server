@@ -99,7 +99,9 @@ def newline():
     html("<br/>")
 
 
-def markdown(body: str | None, *, line_clamp: int = None, unsafe_allow_html=False, **props):
+def markdown(
+    body: str | None, *, line_clamp: int = None, unsafe_allow_html=False, **props
+):
     if body is None:
         return _node("markdown", body="", **props)
     if not unsafe_allow_html:
