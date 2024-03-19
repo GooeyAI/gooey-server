@@ -48,6 +48,11 @@ class VideoBotsStatsPage(BasePage):
         Workflow.VIDEO_BOTS
     )  # this is a hidden page, so this isn't used but type checking requires a workflow
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.bi = None
+
     def _get_current_app_url(self):
         # this is overwritten to include the query params in the copied url for the share button
         args = dict(self.request.query_params)
@@ -89,7 +94,7 @@ class VideoBotsStatsPage(BasePage):
         st.markdown("# " + self.get_dynamic_meta_title())
 
     def get_dynamic_meta_title(self):
-        return f"📊 {self.bi.name} Analytics"
+        return f"📊 {self.bi.name} Analytics" if self.bi else self.title
 
     def render(self):
         self.setup_sentry()
