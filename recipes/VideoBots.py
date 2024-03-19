@@ -1,9 +1,10 @@
 import json
+import mimetypes
 import os
 import os.path
 import typing
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -19,6 +20,7 @@ from daras_ai_v2.asr import (
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
+    azure_form_recognizer_models,
 )
 from daras_ai_v2.base import BasePage, MenuTabs
 from daras_ai_v2.bot_integration_widgets import (
@@ -27,20 +29,24 @@ from daras_ai_v2.bot_integration_widgets import (
     render_bot_test_link,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
-    doc_search_settings,
+    query_instructions_widget,
+    keyword_instructions_widget,
+    doc_search_advanced_settings,
+    doc_extract_selector,
     document_uploader,
+    citation_style_selector,
 )
+from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.field_render import field_title_desc
+from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.field_render import field_title_desc, field_desc
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input, validate_glossary_document
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
     ConversationEntry,
-    format_chatml_message,
-    CHATML_END_TOKEN,
-    CHATML_START_TOKEN,
     LargeLanguageModels,
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
@@ -49,6 +55,7 @@ from daras_ai_v2.language_model import (
     get_entry_images,
     get_entry_text,
     format_chat_entry,
+    SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -57,11 +64,17 @@ from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.query_params import gooey_get_query_params
 from daras_ai_v2.query_params_util import extract_query_params
-from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
+from daras_ai_v2.search_ref import (
+    parse_refs,
+    CitationStyles,
+    apply_response_formattings_prefix,
+    apply_response_formattings_suffix,
+)
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
+    text_to_speech_provider_selector,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
 from recipes.DocSearch import (
@@ -150,14 +163,19 @@ class VideoBotsPage(BasePage):
 
         input_prompt: str
         input_images: list[str] | None
+        input_documents: list[str] | None
+        doc_extract_url: str | None = Field(
+            title="📚 Document Extract Workflow",
+            description="Select a workflow to extract text from documents and images.",
+        )
 
         # conversation history/context
         messages: list[ConversationEntry] | None
 
         # tts settings
-        tts_provider: typing.Literal[
-            tuple(e.name for e in TextToSpeechProviders)
-        ] | None
+        tts_provider: (
+            typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+        )
         uberduck_voice_name: str | None
         uberduck_speaking_rate: float | None
         google_voice_name: str | None
@@ -170,11 +188,12 @@ class VideoBotsPage(BasePage):
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
+        azure_voice_name: str | None
 
         # llm settings
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         document_model: str | None = Field(
             title="🩻 Photo / Document Intelligence",
             description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
@@ -201,6 +220,8 @@ class VideoBotsPage(BasePage):
         max_references: int | None
         max_context_words: int | None
         scroll_jump: int | None
+
+        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
         dense_weight: float | None = DocSearchRequest.__fields__[
             "dense_weight"
         ].field_info
@@ -210,7 +231,7 @@ class VideoBotsPage(BasePage):
 
         user_language: str | None = Field(
             title="🔠 User Language",
-            description="If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.",
+            description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
         input_glossary_document: str | None = Field(
@@ -304,26 +325,82 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def render_form_v2(self):
         st.text_area(
             """
-            ##### 📝 Prompt
-            High-level system instructions.
+            #### 📝 Instructions
             """,
             key="bot_script",
             height=300,
         )
+        prompt_vars_widget(
+            "bot_script",
+        )
+
+        enum_selector(
+            LargeLanguageModels,
+            label="#### 🧠 Language Model",
+            key="selected_model",
+            use_selectbox=True,
+        )
 
         document_uploader(
             """
-##### 📄 Documents (*optional*)
-Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
-"""
+            #### 📄 Knowledge
+            Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
+            """,
         )
 
-        prompt_vars_widget(
-            "bot_script",
-            "task_instructions",
-            "query_instructions",
-            "keyword_instructions",
-        )
+        st.markdown("#### Capabilities")
+        if st.checkbox(
+            "##### 🗣️ Text to Speech & Lipsync",
+            value=bool(st.session_state.get("tts_provider")),
+        ):
+            text_to_speech_provider_selector(self)
+            st.write("---")
+            enable_video = st.checkbox(
+                "##### 🫦 Add Lipsync Video",
+                value=bool(st.session_state.get("input_face")),
+            )
+        else:
+            st.session_state["tts_provider"] = None
+            enable_video = False
+        if enable_video:
+            st.file_uploader(
+                """
+                ###### 👩‍🦰 Input Face
+                Upload a video or image (with a human face) to lipsync responses. mp4, mov, png, jpg or gif preferred.
+                """,
+                key="input_face",
+            )
+            st.write("---")
+        else:
+            st.session_state["input_face"] = None
+
+        if st.checkbox(
+            "##### 🔠 Translation",
+            value=bool(st.session_state.get("user_language")),
+        ):
+            google_translate_language_selector(
+                f"{field_desc(self.RequestModel, 'user_language')}",
+                key="user_language",
+            )
+            st.write("---")
+        else:
+            st.session_state["user_language"] = None
+
+        if st.checkbox(
+            "##### 🩻 Photo & Document Intelligence",
+            value=bool(
+                st.session_state.get("document_model"),
+            ),
+        ):
+            doc_model_descriptions = azure_form_recognizer_models()
+            st.selectbox(
+                f"{field_desc(self.RequestModel, 'document_model')}",
+                key="document_model",
+                options=[None, *doc_model_descriptions],
+                format_func=lambda x: (
+                    f"{doc_model_descriptions[x]} ({x})" if x else "———"
+                ),
+            )
 
     def validate_form_v2(self):
         input_glossary = st.session_state.get("input_glossary_document", "")
@@ -337,92 +414,84 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         youtube_video("-j2su1r8pEg")
 
     def render_settings(self):
-        if st.session_state.get("documents") or st.session_state.get(
-            "__documents_files"
-        ):
+        tts_provider = st.session_state.get("tts_provider")
+        if tts_provider:
+            text_to_speech_settings(self, tts_provider)
+            st.write("---")
+
+        input_face = st.session_state.get("input_face")
+        if input_face:
+            lipsync_settings()
+            st.write("---")
+
+        if st.session_state.get("user_language"):
+            st.markdown("##### 🔠 Translation Settings")
+            enable_glossary = st.checkbox(
+                "📖 Add Glossary",
+                value=bool(
+                    st.session_state.get("input_glossary_document")
+                    or st.session_state.get("output_glossary_document")
+                ),
+            )
+            if enable_glossary:
+                st.caption(
+                    """
+                    Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+                    If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
+                    """
+                )
+                glossary_input(
+                    f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
+                    key="input_glossary_document",
+                )
+                glossary_input(
+                    f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
+                    key="output_glossary_document",
+                )
+            else:
+                st.session_state["input_glossary_document"] = None
+                st.session_state["output_glossary_document"] = None
+            st.write("---")
+
+        documents = st.session_state.get("documents")
+        if documents:
+            st.write("#### 📄 Knowledge Base")
             st.text_area(
                 """
-            ##### 👩‍🏫 Document Search Results Instructions
-            Guidelines to interpret the results of the knowledge base query.
+            ###### 👩‍🏫 Search Instructions
+            How should the LLM interpret the results from your knowledge base?
             """,
                 key="task_instructions",
                 height=300,
             )
-
-            st.write("---")
-            st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
-            st.caption(
-                "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
+            prompt_vars_widget(
+                "task_instructions",
             )
-            st.write("---")
-            doc_search_settings(keyword_instructions_allowed=True)
+
+            citation_style_selector()
+            st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
+
+            doc_extract_selector()
+
             st.write("---")
 
-        language_model_settings(show_document_model=True)
-
-        st.write("---")
-        google_translate_language_selector(
-            f"##### {field_title_desc(self.RequestModel, 'user_language')}",
-            key="user_language",
-        )
-        enable_glossary = st.checkbox(
-            "📖 Customize with Glossary",
-            value=bool(
-                st.session_state.get("input_glossary_document")
-                or st.session_state.get("output_glossary_document")
-            ),
-        )
         st.markdown(
             """
-            Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
+            #### Advanced Settings
+            In general, you should not need to adjust these.
             """
         )
-        if enable_glossary:
-            glossary_input(
-                f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
-                key="input_glossary_document",
-            )
-            glossary_input(
-                f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
-                key="output_glossary_document",
-            )
-        else:
-            st.session_state["input_glossary_document"] = None
-            st.session_state["output_glossary_document"] = None
-        st.write("---")
 
-        if not "__enable_audio" in st.session_state:
-            st.session_state["__enable_audio"] = bool(
-                st.session_state.get("tts_provider")
-            )
-        enable_audio = st.checkbox("Enable Audio Output?", key="__enable_audio")
-        if not enable_audio:
+        if documents:
+            query_instructions_widget()
+            keyword_instructions_widget()
+            doc_search_advanced_settings()
             st.write("---")
-            st.session_state["tts_provider"] = None
-        else:
-            text_to_speech_settings(page=self)
+
+        language_model_settings(show_selector=False)
 
         st.write("---")
-        if not "__enable_video" in st.session_state:
-            st.session_state["__enable_video"] = bool(
-                st.session_state.get("input_face")
-            )
-        enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
-        if not enable_video:
-            st.session_state["input_face"] = None
-        else:
-            st.file_uploader(
-                """
-                #### 👩‍🦰 Input Face
-                Upload a video/image that contains faces to use
-                *Recommended - mp4 / mov / png / jpg / gif*
-                """,
-                key="input_face",
-            )
-            lipsync_settings()
 
-        st.write("---")
         enum_multiselect(
             enum_cls=LLMTools,
             label="##### " + field_title_desc(self.RequestModel, "tools"),
@@ -458,16 +527,22 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         # chat window
         with st.div(className="pb-3"):
             chat_list_view()
-            pressed_send, new_input, new_input_images = chat_input_view()
+            (
+                pressed_send,
+                new_input,
+                new_input_images,
+                new_input_documents,
+            ) = chat_input_view()
 
         if pressed_send:
-            self.on_send(new_input, new_input_images)
+            self.on_send(new_input, new_input_images, new_input_documents)
 
         # clear chat inputs
         if st.button("🗑️ Clear"):
             st.session_state["messages"] = []
             st.session_state["input_prompt"] = ""
             st.session_state["input_images"] = None
+            st.session_state["new_input_documents"] = None
             st.session_state["raw_input_text"] = ""
             self.clear_outputs()
             st.session_state["final_keyword_query"] = ""
@@ -487,12 +562,18 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     label_visibility="collapsed",
                 )
 
-    def on_send(self, new_input: str, new_input_images: list[str]):
+    def on_send(
+        self,
+        new_input: str,
+        new_input_images: list[str],
+        new_input_documents: list[str],
+    ):
         prev_input = st.session_state.get("raw_input_text") or ""
         prev_output = (st.session_state.get("raw_output_text") or [""])[0]
         prev_input_images = st.session_state.get("input_images")
+        prev_input_documents = st.session_state.get("input_documents")
 
-        if (prev_input or prev_input_images) and prev_output:
+        if (prev_input or prev_input_images or prev_input_documents) and prev_output:
             # append previous input to the history
             st.session_state["messages"] = st.session_state.get("messages", []) + [
                 format_chat_entry(
@@ -507,8 +588,14 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             ]
 
         # add new input to the state
+        if new_input_documents:
+            filenames = ", ".join(
+                furl(url.strip("/")).path.segments[-1] for url in new_input_documents
+            )
+            new_input = f"Files: {filenames}\n\n{new_input}"
         st.session_state["input_prompt"] = new_input
         st.session_state["input_images"] = new_input_images or None
+        st.session_state["input_documents"] = new_input_documents or None
 
         self.on_submit()
 
@@ -574,35 +661,45 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     "raw_tts_text", state.get("raw_output_text", [])
                 )
                 tts_state = {"text_prompt": "".join(output_text_list)}
-                return super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
+                total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
                     tts_state
                 )
             case _:
-                return super().get_raw_price(state)
+                total = super().get_raw_price(state)
+
+        return total * state.get("num_outputs", 1)
 
     def additional_notes(self):
         tts_provider = st.session_state.get("tts_provider")
         match tts_provider:
             case TextToSpeechProviders.ELEVEN_LABS.name:
-                return f"""
-                    - *Base cost = {super().get_raw_price(st.session_state)} credits*
-                    - *Additional {TextToSpeechPage().additional_notes()}*
-                """
+                return (
+                    f" \\\n"
+                    f"*Base cost = {super().get_raw_price(st.session_state)} credits*"
+                    f" | "
+                    f"*Additional {TextToSpeechPage().get_cost_note()}*"
+                )
             case _:
                 return ""
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
-            assert (
-                self.is_current_user_paying() or self.is_current_user_admin()
-            ), """
+        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name and not (
+            self.is_current_user_paying() or self.is_current_user_admin()
+        ):
+            raise UserError(
+                """
                 Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
                 """
+            )
+
+        state.update(
+            dict(final_prompt=[], output_text=[], output_audio=[], output_video=[])
+        )
 
         user_input = request.input_prompt.strip()
-        if not (user_input or request.input_images):
+        if not (user_input or request.input_images or request.input_documents):
             return
         model = LargeLanguageModels[request.selected_model]
         is_chat_model = model.is_chat_model()
@@ -610,13 +707,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         bot_script = request.bot_script
 
         ocr_texts = []
-        if request.input_images:
+        if request.document_model and (request.input_images or request.input_documents):
             yield "Running Azure Form Recognizer..."
-            for img in request.input_images:
+            for url in (request.input_images or []) + (request.input_documents or []):
                 ocr_text = (
-                    azure_form_recognizer(
-                        img, model_id=request.document_model or "prebuilt-read"
-                    )
+                    azure_form_recognizer(url, model_id="prebuilt-read")
                     .get("content", "")
                     .strip()
                 )
@@ -642,7 +737,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 target_language="en",
             )
             for text in ocr_texts:
-                user_input = f"Image: {text!r}\n{user_input}"
+                user_input = f"Exracted Text: {text!r}\n\n{user_input}"
 
         # parse the bot script
         # system_message, scripted_msgs = parse_script(bot_script)
@@ -689,7 +784,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
-                yield "Generating search query..."
+                yield "Creating search query..."
                 state["final_search_query"] = generate_final_search_query(
                     request=request,
                     instructions=query_instructions,
@@ -703,7 +798,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
-                yield "Extracting keywords..."
+                yield "Finding keywords..."
                 k_request = request.copy()
                 # other models dont support JSON mode
                 k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
@@ -755,102 +850,88 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
             model_max_tokens[model]
-            - calc_gpt_tokens([system_prompt, user_input], is_chat_model=is_chat_model)
+            - calc_gpt_tokens([system_prompt, user_input])
             - request.max_tokens
             - SAFETY_BUFFER
         )
         clip_idx = convo_window_clipper(
-            history_window, max_history_tokens, is_chat_model=is_chat_model
+            history_window,
+            max_history_tokens,
         )
         history_window = history_window[clip_idx:]
         prompt_messages = [system_prompt, *history_window, user_prompt]
-
-        # for backwards compat with non-chat models
-        if not is_chat_model:
-            # assistant prompt to triger a model response
-            prompt_messages.append(
-                {
-                    "role": CHATML_ROLE_ASSISTANT,
-                    "content": "",
-                }
-            )
-
         state["final_prompt"] = prompt_messages
 
         # ensure input script is not too big
-        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(
-            prompt_messages, is_chat_model=is_chat_model
-        )
+        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(prompt_messages)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
-            raise ValueError("Input Script is too long! Please reduce the script size.")
+            raise UserError("Input Script is too long! Please reduce the script size.")
 
-        yield f"Running {model.value}..."
-        if is_chat_model:
-            output_text = run_language_model(
-                model=request.selected_model,
-                messages=[
-                    {"role": s["role"], "content": s["content"]}
-                    for s in prompt_messages
-                ],
-                max_tokens=max_allowed_tokens,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                avoid_repetition=request.avoid_repetition,
-                tools=request.tools,
-            )
-        else:
-            prompt = "\n".join(
-                format_chatml_message(entry) for entry in prompt_messages
-            )
-            output_text = run_language_model(
-                model=request.selected_model,
-                prompt=prompt,
-                max_tokens=max_allowed_tokens,
-                quality=request.quality,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                avoid_repetition=request.avoid_repetition,
-                stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
-            )
-        if request.tools:
-            output_text, tool_call_choices = output_text
-            state["output_documents"] = output_documents = []
-            for tool_calls in tool_call_choices:
-                for call in tool_calls:
+        yield f"Summarizing with {model.value}..."
+        chunks = run_language_model(
+            model=request.selected_model,
+            messages=[
+                {"role": s["role"], "content": s["content"]} for s in prompt_messages
+            ],
+            max_tokens=max_allowed_tokens,
+            num_outputs=request.num_outputs,
+            temperature=request.sampling_temperature,
+            avoid_repetition=request.avoid_repetition,
+            tools=request.tools,
+            stream=True,
+        )
+        citation_style = (
+            request.citation_style and CitationStyles[request.citation_style]
+        ) or None
+        for i, entries in enumerate(chunks):
+            if not entries:
+                continue
+            output_text = [entry["content"] for entry in entries]
+            if request.tools:
+                # output_text, tool_call_choices = output_text
+                state["output_documents"] = output_documents = []
+                for call in entries[0].get("tool_calls") or []:
                     result = yield from exec_tool_call(call)
                     output_documents.append(result)
 
-        # save model response
-        state["raw_output_text"] = [
-            "".join(snippet for snippet, _ in parse_refs(text, references))
-            for text in output_text
-        ]
-
-        # translate response text
-        if request.user_language and request.user_language != "en":
-            yield f"Translating response to {request.user_language}..."
-            output_text = run_google_translate(
-                texts=output_text,
-                source_language="en",
-                target_language=request.user_language,
-                glossary_url=request.output_glossary_document,
-            )
-            state["raw_tts_text"] = [
+            # save model response
+            state["raw_output_text"] = [
                 "".join(snippet for snippet, _ in parse_refs(text, references))
                 for text in output_text
             ]
 
-        if references:
-            citation_style = (
-                request.citation_style and CitationStyles[request.citation_style]
-            ) or None
-            apply_response_template(output_text, references, citation_style)
+            # translate response text
+            if request.user_language and request.user_language != "en":
+                yield f"Translating response to {request.user_language}..."
+                output_text = run_google_translate(
+                    texts=output_text,
+                    source_language="en",
+                    target_language=request.user_language,
+                    glossary_url=request.output_glossary_document,
+                )
+                state["raw_tts_text"] = [
+                    "".join(snippet for snippet, _ in parse_refs(text, references))
+                    for text in output_text
+                ]
 
-        state["output_text"] = output_text
+            if references:
+                all_refs_list = apply_response_formattings_prefix(
+                    output_text, references, citation_style
+                )
+            else:
+                all_refs_list = None
 
-        state["output_audio"] = []
-        state["output_video"] = []
+            state["output_text"] = output_text
+            if all(entry.get("finish_reason") for entry in entries):
+                if all_refs_list:
+                    apply_response_formattings_suffix(
+                        all_refs_list, state["output_text"], citation_style
+                    )
+                finish_reason = entries[0]["finish_reason"]
+                yield f"Completed with {finish_reason=}"  # avoid changing this message since it's used to detect end of stream
+            else:
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
         if not request.tts_provider:
             return
@@ -930,16 +1011,16 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     unsafe_allow_html=True,
                 )
 
-            st.write("---")
-            st.text_input(
-                "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
-            )
-
-        show_landbot_widget()
+            # st.write("---")
+            # st.text_input(
+            #     "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
+            # )
+            # show_landbot_widget()
 
     def messenger_bot_integration(self):
-        from routers.facebook_api import ig_connect_url, fb_connect_url
+        from routers.facebook_api import ig_connect_url, fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
+        from recipes.VideoBotsStats import VideoBotsStatsPage
 
         st.markdown(
             # language=html
@@ -971,11 +1052,19 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 &nbsp;
                 Add Your Slack Workspace
                 </a>
-                <a target="_blank" href="https://docs.google.com/document/d/1EuBaC4TGHTFSOgKYM1eOlisjvPAwLji9dExKwbt2ocA/edit?usp=sharing" class="streamlit-like-btn" aria-label="docs">
+                <a target="_blank" href="https://gooey.ai/docs/guides/copilot/deploy-to-slack" class="streamlit-like-btn" aria-label="docs">
                 <img height="20" width="0" src="https://www.slack.com/favicon.ico">   <!-- for vertical alignment -->
                 ℹ️
                 </a>
             </div>
+            <div style='height: 50px'>
+                <a target="_blank" class="streamlit-like-btn" href="{wa_connect_url}">
+                <i class="fa-brands fa-whatsapp" style="color: lightgreen; font-size: 20px"></i>
+                &nbsp;
+                Add Your Whatsapp Number
+                </a>
+            </div>
+            <p>To connect a phone number, make sure it is not reserved for some other use on Whatsapp or <a href="https://business.facebook.com/wa/manage/phone-numbers/">connected to a different Whatsapp account</a>. If your business needs exceed the capacity of a free Whatsapp account and/or you don't want to manage the Whatsapp business yourself, contact us for a quote on a managed Whatsapp number through Gooey.</p>
             """,
             unsafe_allow_html=True,
         )
@@ -983,15 +1072,28 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         st.button("🔄 Refresh")
 
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )  # type: ignore
+
+        integrations_q = Q(billing_account_uid=self.request.user.uid)
+
+        # show admins all the bots connected to the current run
+        if self.is_current_user_admin():
+            integrations_q |= Q(saved_run=current_run)
+            if published_run:
+                integrations_q |= Q(
+                    saved_run__example_id=published_run.published_run_id
+                )
+                integrations_q |= Q(published_run=published_run)
+
         integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
-            billing_account_uid=self.request.user.uid
+            integrations_q
         ).order_by("platform", "-created_at")
+
         if not integrations:
             return
 
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )
         for bi in integrations:
             is_connected = (bi.saved_run == current_run) or (
                 (
@@ -1008,12 +1110,27 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             col1, col2, col3, *_ = st.columns([1, 1, 2])
             with col1:
                 favicon = Platform(bi.platform).get_favicon()
+                if bi.published_run:
+                    url = self.app_url(
+                        example_id=bi.published_run.published_run_id,
+                        tab_name=MenuTabs.paths[MenuTabs.integrations],
+                    )
+                elif bi.saved_run:
+                    url = self.app_url(
+                        run_id=bi.saved_run.run_id,
+                        uid=bi.saved_run.uid,
+                        example_id=bi.saved_run.example_id,
+                        tab_name=MenuTabs.paths[MenuTabs.integrations],
+                    )
+                else:
+                    url = None
+                if url:
+                    href = f'<a href="{url}">{bi}</a>'
+                else:
+                    href = f"<span>{bi}</span>"
                 with st.div(className="mt-2"):
                     st.markdown(
-                        f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                        f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
-                        if bi.saved_run
-                        else f"<span>{bi}</span>",
+                        f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;{href}',
                         unsafe_allow_html=True,
                     )
             with col2:
@@ -1023,6 +1140,12 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     type="tertiary",
                 )
                 render_bot_test_link(bi)
+                stats_url = furl(VideoBotsStatsPage.app_url(), args={"bi_id": bi.id})
+                st.html(
+                    f"""
+                    <a class="btn btn-theme btn-tertiary d-inline-block" target="blank" href="{stats_url}">📊 Analytics</a>
+                    """
+                )
             if is_connected:
                 with col3, st.expander(f"📨 {bi.get_platform_display()} Settings"):
                     if bi.platform == Platform.SLACK:
@@ -1042,7 +1165,10 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     st.session_state.get("user_language") or bi.user_language
                 )
                 bi.saved_run = current_run
-                bi.published_run = published_run
+                if published_run and published_run.saved_run_id == current_run.id:
+                    bi.published_run = published_run
+                else:
+                    bi.published_run = None
                 if bi.platform == Platform.SLACK:
                     from daras_ai_v2.slack_bot import send_confirmation_msg
 
@@ -1058,9 +1184,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.session_state[f"_bi_name_{bi.id}"] = (
                 pr and pr.title
             ) or self.get_recipe_title()
-            st.session_state[
-                f"_bi_slack_read_receipt_msg_{bi.id}"
-            ] = BotIntegration._meta.get_field("slack_read_receipt_msg").default
+            st.session_state[f"_bi_slack_read_receipt_msg_{bi.id}"] = (
+                BotIntegration._meta.get_field("slack_read_receipt_msg").default
+            )
 
         bi.slack_read_receipt_msg = st.text_input(
             """
@@ -1081,6 +1207,7 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             value=bi.name,
             key=f"_bi_name_{bi.id}",
         )
+        st.caption("Enable streaming messages to Slack in real-time.")
 
 
 def show_landbot_widget():
@@ -1219,7 +1346,7 @@ def chat_list_view():
                         st.image(im, style={"maxHeight": "200px"})
 
 
-def chat_input_view() -> tuple[bool, str, list[str]]:
+def chat_input_view() -> tuple[bool, str, list[str], list[str]]:
     with st.div(
         className="px-3 pt-3 d-flex gap-1",
         style=dict(background="rgba(239, 239, 239, 0.6)"),
@@ -1239,23 +1366,29 @@ def chat_input_view() -> tuple[bool, str, list[str]]:
         pressed_send = st.button("✈ Send", style=dict(height="3.2rem"))
 
     if show_uploader:
-        new_input_images = st.file_uploader(
-            "",
-            accept_multiple_files=True,
-        )
+        uploaded_files = st.file_uploader("", accept_multiple_files=True)
+        new_input_images = []
+        new_input_documents = []
+        for f in uploaded_files:
+            mime_type = mimetypes.guess_type(f)[0] or ""
+            if mime_type.startswith("image/"):
+                new_input_images.append(f)
+            else:
+                new_input_documents.append(f)
     else:
         new_input_images = None
+        new_input_documents = None
 
-    return pressed_send, new_input, new_input_images
+    return pressed_send, new_input, new_input_images, new_input_documents
 
 
 def msg_container_widget(role: str):
     return st.div(
         className="px-3 py-1 pt-2",
         style=dict(
-            background="rgba(239, 239, 239, 0.6)"
-            if role == CHATML_ROLE_USER
-            else "#fff",
+            background=(
+                "rgba(239, 239, 239, 0.6)" if role == CHATML_ROLE_USER else "#fff"
+            ),
         ),
     )
 
@@ -1269,9 +1402,6 @@ def convo_window_clipper(
     step=2,
 ):
     for i in range(len(window) - 2, -1, -step):
-        if (
-            calc_gpt_tokens(window[i:], sep=sep, is_chat_model=is_chat_model)
-            > max_tokens
-        ):
+        if calc_gpt_tokens(window[i:], sep=sep) > max_tokens:
             return i + step
     return 0

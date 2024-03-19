@@ -28,6 +28,7 @@ def build_meta_tags(
         metadata=metadata,
         sr=sr,
         pr=pr,
+        tab=page.tab,
     )
     description = meta_description_for_page(
         metadata=metadata,
@@ -108,27 +109,41 @@ def meta_title_for_page(
     metadata: WorkflowMetadata,
     sr: SavedRun,
     pr: PublishedRun | None,
+    tab: str,
 ) -> str:
-    tbreadcrumbs = get_title_breadcrumbs(page, sr, pr)
+    match tab:
+        case MenuTabs.examples:
+            label = MenuTabs.display_labels[tab]
+            ret = f"{label}: {metadata.meta_title}"
+        case MenuTabs.run_as_api | MenuTabs.integrations:
+            label = MenuTabs.display_labels[tab]
+            return f"{label} for {meta_title_for_page(page=page, metadata=metadata, sr=sr, pr=pr, tab=MenuTabs.run)}"
+        case MenuTabs.history | MenuTabs.saved:
+            label = MenuTabs.display_labels[tab]
+            ret = f"{label} for {metadata.short_title}"
+        case _ if pr and pr.saved_run == sr and pr.is_root():
+            # for root page
+            ret = metadata.meta_title
+        case _:
+            # non-root runs and examples
+            parts = []
 
-    parts = []
-    if tbreadcrumbs.published_title or tbreadcrumbs.root_title:
-        parts.append(tbreadcrumbs.h1_title)
-        # use the short title for non-root examples
-        part = metadata.short_title
-        if tbreadcrumbs.published_title:
-            part = f"{pr.title} {part}"
-        # add the creator's name
-        user = sr.get_creator()
-        if user and user.display_name:
-            part += f" by {user.display_name}"
-        parts.append(part)
-    else:
-        # for root recipe, a longer, SEO-friendly title
-        parts.append(metadata.meta_title)
+            tbreadcrumbs = get_title_breadcrumbs(page, sr, pr)
+            parts.append(tbreadcrumbs.h1_title)
 
-    parts.append("Gooey.AI")
-    return sep.join(parts)
+            # use the short title for non-root examples
+            part = metadata.short_title
+            if tbreadcrumbs.published_title:
+                part = f"{pr.title} {part}"
+            # add the creator's name
+            user = sr.get_creator()
+            if user and user.display_name:
+                part += f" by {user.display_name}"
+            parts.append(part)
+
+            ret = sep.join(parts)
+
+    return f"{ret} {sep} Gooey.AI"
 
 
 def meta_description_for_page(

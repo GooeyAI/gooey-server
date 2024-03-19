@@ -11,9 +11,9 @@ from daras_ai_v2.text_splitter import text_splitter
 
 WA_MSG_MAX_SIZE = 1024
 
-WHATSAPP_AUTH_HEADER = {
-    "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
-}
+
+def get_wa_auth_header(access_token: str | None = None):
+    return {"Authorization": f"Bearer {access_token or settings.WHATSAPP_ACCESS_TOKEN}"}
 
 
 class WhatsappBot(BotInterface):
@@ -29,6 +29,7 @@ class WhatsappBot(BotInterface):
         self.input_type = message["type"]
 
         bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
+        self.access_token = bi.wa_business_access_token
         self.convo = Conversation.objects.get_or_create(
             bot_integration=bi,
             wa_phone_number="+" + self.user_id,
@@ -54,7 +55,7 @@ class WhatsappBot(BotInterface):
             except KeyError:
                 return None
         # download file from whatsapp
-        data, mime_type = retrieve_wa_media_by_id(media_id)
+        data, mime_type = retrieve_wa_media_by_id(media_id, self.access_token)
         data, _ = audio_bytes_to_wav(data)
         mime_type = "audio/wav"
         # upload file to firebase
@@ -71,9 +72,16 @@ class WhatsappBot(BotInterface):
             return None
         return [self._download_wa_media(media_id)]
 
+    def get_input_documents(self) -> list[str] | None:
+        try:
+            media_id = self.input_message["document"]["id"]
+        except KeyError:
+            return None
+        return [self._download_wa_media(media_id)]
+
     def _download_wa_media(self, media_id: str) -> str:
         # download file from whatsapp
-        data, mime_type = retrieve_wa_media_by_id(media_id)
+        data, mime_type = retrieve_wa_media_by_id(media_id, self.access_token)
         # upload file to firebase
         return upload_file_from_bytes(
             filename=self.nice_filename(mime_type),
@@ -95,12 +103,12 @@ class WhatsappBot(BotInterface):
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
         should_translate: bool = False,
+        update_msg_id: str = None,
     ) -> str | None:
         if text and should_translate and self.language and self.language != "en":
             text = run_google_translate(
                 [text], self.language, glossary_url=self.output_glossary
             )[0]
-        text = text or "\u200b"  # handle empty text with zero-width space
         return self.send_msg_to(
             bot_number=self.bot_id,
             user_number=self.user_id,
@@ -109,16 +117,19 @@ class WhatsappBot(BotInterface):
             video=video,
             documents=documents,
             buttons=buttons,
+            access_token=self.access_token,
         )
 
     def mark_read(self):
-        wa_mark_read(self.bot_id, self.input_message["id"])
+        wa_mark_read(
+            self.bot_id, self.input_message["id"], access_token=self.access_token
+        )
 
     @classmethod
     def send_msg_to(
-        self,
+        cls,
         *,
-        text: str,
+        text: str = None,
         audio: str = None,
         video: str = None,
         documents: list[str] = None,
@@ -126,11 +137,12 @@ class WhatsappBot(BotInterface):
         ## whatsapp specific
         bot_number: str,
         user_number: str,
+        access_token: str | None = None,
     ) -> str | None:
         # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
 
         # split text into chunks if too long
-        if len(text) > WA_MSG_MAX_SIZE:
+        if text and len(text) > WA_MSG_MAX_SIZE:
             splits = text_splitter(
                 text, chunk_size=WA_MSG_MAX_SIZE, length_function=len
             )
@@ -151,8 +163,10 @@ class WhatsappBot(BotInterface):
                     }
                     for doc in splits[:-1]
                 ],
+                access_token=access_token,
             )
 
+        messages = []
         if video:
             if buttons:
                 messages = [
@@ -161,7 +175,7 @@ class WhatsappBot(BotInterface):
                         buttons,
                         {
                             "body": {
-                                "text": text,
+                                "text": text or "\u200b",
                             },
                             "header": {
                                 "type": "video",
@@ -181,74 +195,38 @@ class WhatsappBot(BotInterface):
                         },
                     },
                 ]
-        elif audio:
-            if buttons:
-                # audio can't be sent as an interaction, so send text and audio separately
-                messages = [
-                    # simple audio msg
+        elif buttons:
+            # interactive text msg
+            messages = [
+                _build_msg_buttons(
+                    buttons,
                     {
-                        "type": "audio",
-                        "audio": {"link": audio},
+                        "body": {
+                            "text": text or "\u200b",
+                        }
                     },
-                ]
-                send_wa_msgs_raw(
-                    bot_number=bot_number,
-                    user_number=user_number,
-                    messages=messages,
-                )
-                messages = [
-                    # interactive text msg
-                    _build_msg_buttons(
-                        buttons,
-                        {
-                            "body": {
-                                "text": text,
-                            },
-                        },
-                    )
-                ]
-            else:
-                # audio doesn't support captions, so send text and audio separately
-                messages = [
-                    # simple text msg
-                    {
-                        "type": "text",
-                        "text": {
-                            "body": text,
-                            "preview_url": True,
-                        },
+                ),
+            ]
+        elif text:
+            # simple text msg
+            messages = [
+                {
+                    "type": "text",
+                    "text": {
+                        "body": text,
+                        "preview_url": True,
                     },
-                    # simple audio msg
-                    {
-                        "type": "audio",
-                        "audio": {"link": audio},
-                    },
-                ]
-        else:
-            # text message
-            if buttons:
-                messages = [
-                    # interactive text msg
-                    _build_msg_buttons(
-                        buttons,
-                        {
-                            "body": {
-                                "text": text,
-                            }
-                        },
-                    ),
-                ]
-            else:
-                messages = [
-                    # simple text msg
-                    {
-                        "type": "text",
-                        "text": {
-                            "body": text,
-                            "preview_url": True,
-                        },
-                    },
-                ]
+                },
+            ]
+
+        if audio and not video:  # video already has audio
+            # simple audio msg
+            messages.append(
+                {
+                    "type": "audio",
+                    "audio": {"link": audio},
+                }
+            )
 
         if documents:
             messages += [
@@ -267,21 +245,24 @@ class WhatsappBot(BotInterface):
             bot_number=bot_number,
             user_number=user_number,
             messages=messages,
+            access_token=access_token,
         )
 
 
-def retrieve_wa_media_by_id(media_id: str) -> (bytes, str):
+def retrieve_wa_media_by_id(
+    media_id: str, access_token: str | None = None
+) -> (bytes, str):
     # get media info
     r1 = requests.get(
         f"https://graph.facebook.com/v16.0/{media_id}/",
-        headers=WHATSAPP_AUTH_HEADER,
+        headers=get_wa_auth_header(access_token),
     )
     raise_for_status(r1)
     media_info = r1.json()
     # download media
     r2 = requests.get(
         media_info["url"],
-        headers=WHATSAPP_AUTH_HEADER,
+        headers=get_wa_auth_header(access_token),
     )
     raise_for_status(r2)
     content = r2.content
@@ -308,13 +289,15 @@ def _build_msg_buttons(buttons: list[ReplyButton], msg: dict) -> dict:
     }
 
 
-def send_wa_msgs_raw(*, bot_number, user_number, messages: list) -> str | None:
+def send_wa_msgs_raw(
+    *, bot_number, user_number, messages: list, access_token: str | None = None
+) -> str | None:
     msg_id = None
     for msg in messages:
         print(f"send_wa_msgs_raw: {msg=}")
         r = requests.post(
             f"https://graph.facebook.com/v16.0/{bot_number}/messages",
-            headers=WHATSAPP_AUTH_HEADER,
+            headers=get_wa_auth_header(access_token),
             json={
                 "messaging_product": "whatsapp",
                 "to": user_number,
@@ -332,11 +315,11 @@ def send_wa_msgs_raw(*, bot_number, user_number, messages: list) -> str | None:
     return msg_id
 
 
-def wa_mark_read(bot_number: str, message_id: str):
+def wa_mark_read(bot_number: str, message_id: str, access_token: str | None = None):
     # send read receipt
     r = requests.post(
         f"https://graph.facebook.com/v16.0/{bot_number}/messages",
-        headers=WHATSAPP_AUTH_HEADER,
+        headers=get_wa_auth_header(access_token),
         json={
             "messaging_product": "whatsapp",
             "status": "read",
@@ -391,6 +374,7 @@ class FacebookBot(BotInterface):
         buttons: list[ReplyButton] = None,
         documents: list[str] = None,
         should_translate: bool = False,
+        update_msg_id: str = None,
     ) -> str | None:
         if text and should_translate and self.language and self.language != "en":
             text = run_google_translate(

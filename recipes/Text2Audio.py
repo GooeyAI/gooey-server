@@ -49,9 +49,9 @@ class Text2AudioPage(BasePage):
         seed: int | None
         sd_2_upscaling: bool | None
 
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in Text2AudioModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in Text2AudioModels)]] | None
+        )
 
     class ResponseModel(BaseModel):
         output_audios: dict[
@@ -64,7 +64,7 @@ class Text2AudioPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### 👩‍💻 Prompt
+            #### 👩‍💻 Prompt
             Describe the audio that you'd like to generate.
             """,
             key="text_prompt",
@@ -114,9 +114,9 @@ class Text2AudioPage(BasePage):
                 ),
                 inputs=dict(
                     prompt=[request.text_prompt],
-                    negative_prompt=[request.negative_prompt]
-                    if request.negative_prompt
-                    else None,
+                    negative_prompt=(
+                        [request.negative_prompt] if request.negative_prompt else None
+                    ),
                     num_waveforms_per_prompt=request.num_outputs,
                     num_inference_steps=request.quality,
                     guidance_scale=request.guidance_scale,
@@ -146,4 +146,6 @@ def _render_output(state):
     for key in selected_models:
         output: dict = state.get("output_audios", {}).get(key, [])
         for audio in output:
-            st.audio(audio, caption=Text2AudioModels[key].value)
+            st.audio(
+                audio, caption=Text2AudioModels[key].value, show_download_button=True
+            )

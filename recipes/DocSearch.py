@@ -7,9 +7,12 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
-    doc_search_settings,
     document_uploader,
     is_user_uploaded_url,
+    citation_style_selector,
+    doc_search_advanced_settings,
+    query_instructions_widget,
+    doc_extract_selector,
 )
 from daras_ai_v2.language_model import (
     run_language_model,
@@ -23,8 +26,9 @@ from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
     render_output_with_refs,
-    apply_response_template,
     CitationStyles,
+    apply_response_formattings_prefix,
+    apply_response_formattings_suffix,
 )
 from daras_ai_v2.vector_search import (
     DocSearchRequest,
@@ -60,9 +64,9 @@ class DocSearchPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -80,9 +84,13 @@ class DocSearchPage(BasePage):
         final_prompt: str
         final_search_query: str | None
 
+    @classmethod
+    def get_example_preferred_fields(self, state: dict) -> list[str]:
+        return ["documents"]
+
     def render_form_v2(self):
-        st.text_area("##### Search Query", key="search_query")
-        document_uploader("##### Documents")
+        st.text_area("#### Search Query", key="search_query")
+        document_uploader("#### Documents")
         prompt_vars_widget("task_instructions", "query_instructions")
 
     def validate_form_v2(self):
@@ -110,7 +118,7 @@ class DocSearchPage(BasePage):
 
     def render_example(self, state: dict):
         render_documents(state)
-        st.write("**Search Query**")
+        st.html("**Search Query**")
         st.write("```properties\n" + state.get("search_query", "") + "\n```")
         render_output_with_refs(state, 200)
 
@@ -123,7 +131,12 @@ class DocSearchPage(BasePage):
         st.write("---")
         language_model_settings()
         st.write("---")
-        doc_search_settings()
+        st.write("##### 🔎 Document Search Settings")
+        citation_style_selector()
+        doc_extract_selector()
+        st.write("---")
+        query_instructions_widget()
+        doc_search_advanced_settings()
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_DOC_SEARCH_META_IMG
@@ -194,16 +207,20 @@ class DocSearchPage(BasePage):
         citation_style = (
             request.citation_style and CitationStyles[request.citation_style]
         ) or None
-        apply_response_template(
+        all_refs_list = apply_response_formattings_prefix(
             response.output_text, response.references, citation_style
+        )
+        apply_response_formattings_suffix(
+            all_refs_list, response.output_text, citation_style
         )
 
     def get_raw_price(self, state: dict) -> float:
         name = state.get("selected_model")
         try:
-            return llm_price[LargeLanguageModels[name]] * 2
+            unit_price = llm_price[LargeLanguageModels[name]] * 2
         except KeyError:
-            return 10
+            unit_price = 10
+        return unit_price * state.get("num_outputs", 1)
 
 
 def render_documents(state, label="**Documents**", *, key="documents"):

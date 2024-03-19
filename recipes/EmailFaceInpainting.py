@@ -1,7 +1,6 @@
 import re
 import typing
 
-import glom
 import requests
 from pydantic import BaseModel
 
@@ -88,6 +87,10 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
         output_images: list[str]
         email_sent: bool = False
 
+    @classmethod
+    def get_example_preferred_fields(self, state: dict) -> list[str]:
+        return ["email_address"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_EMAIL_FACE_INPAINTING_META_IMG
 
@@ -115,7 +118,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            #### Prompt
             Describe the scene that you'd like to generate around the face. 
             """,
             key="text_prompt",
@@ -130,7 +133,7 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
 
         source = st.radio(
             """
-            ### Photo Source
+            #### Photo Source
             From where we should get the photo?""",
             options=["Email Address", "Twitter Handle"],
             key="__photo_source",
@@ -355,6 +358,8 @@ class TwitterError(Exception):
 
 
 def get_photo_for_email(email_address):
+    import glom
+
     doc_ref = db.get_doc_ref(email_address, collection_id="apollo_io_photo_cache")
 
     doc = db.get_or_create_doc(doc_ref).to_dict()
@@ -389,6 +394,8 @@ def get_photo_for_email(email_address):
 
 
 def get_photo_for_twitter_handle(twitter_handle):
+    import glom
+
     doc_ref = db.get_doc_ref(twitter_handle, collection_id="twitter_photo_cache")
 
     doc = db.get_or_create_doc(doc_ref).to_dict()

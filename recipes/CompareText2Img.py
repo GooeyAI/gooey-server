@@ -17,6 +17,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     scheduler_setting,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
     Text2ImgModels,
     text2img,
@@ -63,9 +64,9 @@ class CompareText2ImgPage(BasePage):
         seed: int | None
         sd_2_upscaling: bool | None
 
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in Text2ImgModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in Text2ImgModels)]] | None
+        )
         scheduler: typing.Literal[tuple(e.name for e in Schedulers)] | None
 
         edit_instruction: str | None
@@ -75,6 +76,10 @@ class CompareText2ImgPage(BasePage):
         output_images: dict[
             typing.Literal[tuple(e.name for e in Text2ImgModels)], list[str]
         ]
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["selected_models"]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COMPARE_TEXT2IMG_META_IMG
@@ -95,7 +100,7 @@ class CompareText2ImgPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### 👩‍💻 Prompt
+            #### 👩‍💻 Prompt
             Describe the scene that you'd like to generate.
             """,
             key="text_prompt",
@@ -178,6 +183,10 @@ class CompareText2ImgPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareText2ImgPage.RequestModel = self.RequestModel.parse_obj(state)
 
+        if not self.request.user.disable_safety_checker:
+            yield "Running safety checker..."
+            safety_checker(text=request.text_prompt)
+
         state["output_images"] = output_images = {}
 
         for selected_model in request.selected_models:
@@ -241,7 +250,9 @@ class CompareText2ImgPage(BasePage):
         for key in selected_models:
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
-                st.image(img, caption=Text2ImgModels[key].value)
+                st.image(
+                    img, caption=Text2ImgModels[key].value, show_download_button=True
+                )
 
     def preview_description(self, state: dict) -> str:
         return "Create multiple AI photos from one prompt using Stable Diffusion (1.5 -> 2.1, Open/Midjourney), DallE, and other models.  Find out which AI Image generator works best for your text prompt on comparing OpenAI, Stability.AI etc."
@@ -257,4 +268,4 @@ class CompareText2ImgPage(BasePage):
                     total += 15
                 case _:
                     total += 2
-        return total
+        return total * state.get("num_outputs", 1)

@@ -1,10 +1,9 @@
 import random
 import typing
 
-
-import gooey_ui as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
@@ -12,6 +11,7 @@ from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
     llm_price,
+    SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -36,9 +36,9 @@ class CompareLLMPage(BasePage):
 
     class RequestModel(BaseModel):
         input_prompt: str | None
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
+        )
 
         avoid_repetition: bool | None
         num_outputs: int | None
@@ -58,6 +58,10 @@ class CompareLLMPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return "Which language model works best your prompt? Compare your text generations across multiple large language models (LLMs) like OpenAI's evolving and latest ChatGPT engines and others like Curie, Ada, Babbage."
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["input_prompt", "selected_models"]
 
     def render_form_v2(self):
         st.text_area(
@@ -94,9 +98,9 @@ class CompareLLMPage(BasePage):
         state["output_text"] = output_text = {}
 
         for selected_model in request.selected_models:
-            yield f"Running {LargeLanguageModels[selected_model].value}..."
-
-            output_text[selected_model] = run_language_model(
+            model = LargeLanguageModels[selected_model]
+            yield f"Running {model.value}..."
+            ret = run_language_model(
                 model=selected_model,
                 quality=request.quality,
                 num_outputs=request.num_outputs,
@@ -104,7 +108,11 @@ class CompareLLMPage(BasePage):
                 prompt=prompt,
                 max_tokens=request.max_tokens,
                 avoid_repetition=request.avoid_repetition,
+                stream=True,
             )
+            for i, entries in enumerate(ret):
+                output_text[selected_model] = [e["content"] for e in entries]
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
         self._render_outputs(st.session_state, 450)

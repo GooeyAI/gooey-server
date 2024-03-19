@@ -195,12 +195,14 @@ def billing_tab(request: Request):
     is_admin = request.user.email in settings.ADMIN_EMAILS
 
     context = {
+        "title": "Account • Gooey.AI",
         "request": request,
         "settings": settings,
         "available_subscriptions": available_subscriptions,
         "user_credits": request.user.balance,
         "subscription": get_user_subscription(request.user),
         "is_admin": is_admin,
+        "canonical_url": account_url,
     }
 
     st.html(templates.get_template("account.html").render(**context))

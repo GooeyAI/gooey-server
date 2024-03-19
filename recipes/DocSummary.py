@@ -20,7 +20,10 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.pt import PromptTree
 from daras_ai_v2.text_splitter import text_splitter
-from daras_ai_v2.vector_search import doc_url_to_text_pages, doc_url_to_metadata
+from daras_ai_v2.vector_search import (
+    doc_url_to_text_pages,
+    doc_url_to_file_metadata,
+)
 from recipes.DocSearch import (
     DocSearchPage,
     render_documents,
@@ -60,9 +63,9 @@ class DocSummaryPage(BasePage):
         task_instructions: str | None
         merge_instructions: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -80,12 +83,16 @@ class DocSummaryPage(BasePage):
         prompt_tree: PromptTree | None
         final_prompt: str
 
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["task_instructions", "merge_instructions"]
+
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_DOC_SUMMARY_META_IMG
 
     def render_form_v2(self):
-        document_uploader("##### 📎 Documents")
-        st.text_area("##### 👩‍💻 Instructions", key="task_instructions", height=150)
+        document_uploader("#### 📎 Documents")
+        st.text_area("#### 👩‍💻 Instructions", key="task_instructions", height=150)
 
     def render_settings(self):
         st.text_area(
@@ -164,12 +171,10 @@ Prompt for merging several outputs together
 
         full_text = ""
         for f_url in request.documents:
-            doc_meta = doc_url_to_metadata(f_url)
             pages = doc_url_to_text_pages(
                 f_url=f_url,
-                doc_meta=doc_meta,
+                file_meta=doc_url_to_file_metadata(f_url),
                 selected_asr_model=request.selected_asr_model,
-                google_translate_target=request.google_translate_target,
             )
             full_text += "\n\n".join(pages)
 

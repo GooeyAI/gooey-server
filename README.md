@@ -25,13 +25,14 @@ $ poetry run honcho start
 The processes that it starts are defined in [`Procfile`](Procfile).
 Currently they are these:
 
-| Service          | Port |
-| -------          | ---- |
-| API + GUI Server | 8080 |
-| Admin site       | 8000 |
-| Usage dashboard  | 8501 |
-| Celery           | -    |
-| UI               | 3000 |
+| Service          | Port    |
+|------------------|---------|
+| API + GUI Server | `8080`  |
+| Admin site       | `8000`  |
+| Usage dashboard  | `8501`  |
+| Celery           | -       |
+| UI               | `3000`  |
+| Vespa            | `8085`  |
 
 This default startup assumes that Redis, RabbitMQ, and PostgreSQL are installed and running
 as background services on ports 6379, 5672, and 5432 respectively. 
@@ -45,6 +46,27 @@ can do this by stopping and starting Honcho.
 ## To run any recipe 
 
 * Save `serviceAccountKey.json` to project root
+
+## To run vespa (used for vector search)
+
+You need to install OrbStack or Docker Desktop for this to work.
+
+1. Create a persistent volume for Vespa:
+```bash
+docker volume create vespa
+```
+2. Run the container:
+```bash
+docker run \
+  --hostname vespa-container \
+  -p 8085:8080 -p 19071:19071 \
+  --volume vespa:/opt/vespa/var \
+  -it --rm --name vespa vespaengine/vespa
+```
+3. Run the setup script
+```bash
+./manage.py runscript setup_vespa_db
+```
 
 ## To connect to our GPU cluster 
 
@@ -108,6 +130,12 @@ ngrok http 8080
 5. Copy the temporary access token there and set env var `WHATSAPP_ACCESS_TOKEN = XXXX`
 
 
+**(Optional) Use the test script to send yourself messages** 
+
+```bash
+python manage.py runscript test_wa_msg_send --script-args 104696745926402 +918764022384
+```
+Replace `+918764022384` with your number and `104696745926402` with the test number ID
 
 ## Dangerous postgres commands
 
@@ -145,6 +173,9 @@ pg_restore --no-privileges --no-owner -d $PGDATABASE $fname
 cid=$(docker ps  | grep gooey-api-prod | cut -d " " -f 1 | head -1)
 # exec the script to create the fixture
 docker exec -it $cid poetry run ./manage.py runscript create_fixture
+```
+
+```bash
 # copy the fixture outside container
 docker cp $cid:/app/fixture.json .
 # print the absolute path

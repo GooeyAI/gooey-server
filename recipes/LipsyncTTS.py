@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
+from daras_ai_v2.text_to_speech_settings_widgets import text_to_speech_provider_selector
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
 from daras_ai_v2.safety_checker import safety_checker
@@ -56,19 +57,20 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         elevenlabs_style: float | None
         elevenlabs_speaker_boost: bool | None
 
+        azure_voice_name: str | None
+
     class ResponseModel(BaseModel):
         output_video: str
 
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
         from recipes.DeforumSD import DeforumSDPage
-        from recipes.CompareText2Img import CompareText2ImgPage
 
         return [
             VideoBotsPage,
             TextToSpeechPage,
             DeforumSDPage,
-            CompareText2ImgPage,
+            LipsyncPage,
         ]
 
     def render_form_v2(self):
@@ -87,6 +89,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             """,
             key="text_prompt",
         )
+        text_to_speech_provider_selector(self)
 
     def validate_form_v2(self):
         assert st.session_state.get(
@@ -128,37 +131,16 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         yield from LipsyncPage.run(self, state)
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
-
-        with col1:
-            input_face = state.get("input_face")
-            if not input_face:
-                pass
-            elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
-                st.video(input_face, caption="Input Face (Video)")
-            else:
-                st.image(input_face, caption="Input Face (Image)")
-
-            input_text = state.get("text_prompt")
-            if input_text:
-                st.write("**Input Text**")
-                st.write(input_text)
-            else:
-                st.div()
-
-            # input_audio = state.get("input_audio")
-            # if input_audio:
-            #    st.write("Synthesized Voice")
-            #    st.audio(input_audio)
-            # else:
-            #    st.empty()
-
-        with col2:
-            output_video = state.get("output_video")
-            if output_video:
-                st.video(output_video, caption="Output Video", autoplay=True)
-            else:
-                st.div()
+        output_video = state.get("output_video")
+        if output_video:
+            st.video(
+                output_video,
+                caption="#### Output Video",
+                autoplay=True,
+                show_download_button=True,
+            )
+        else:
+            st.div()
 
     def render_output(self):
         self.render_example(st.session_state)

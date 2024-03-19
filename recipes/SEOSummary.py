@@ -4,15 +4,12 @@ import typing
 
 import readability
 import requests
-from bs4 import BeautifulSoup
 from furl import furl
 from html_sanitizer import Sanitizer
-from lxml import etree
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from recipes.GoogleGPT import GoogleSearchMixin
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
@@ -33,6 +30,7 @@ from daras_ai_v2.serp_search_locations import (
     SerpSearchType,
 )
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
+from recipes.GoogleGPT import GoogleSearchMixin
 
 KEYWORDS_SEP = re.compile(r"[\n,]")
 
@@ -98,9 +96,9 @@ class SEOSummaryPage(BasePage):
 
         enable_html: bool | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         sampling_temperature: float | None
         max_tokens: int | None
         num_outputs: int | None
@@ -160,7 +158,7 @@ SearchSEO > Page Parsing > GPT3
         )
 
     def render_form_v2(self):
-        st.write("### Inputs")
+        st.write("#### Inputs")
         st.text_input("Google Search Query", key="search_query")
         st.text_input("Website Name", key="title")
         st.text_input("Website URL", key="company_url")
@@ -192,7 +190,7 @@ SearchSEO > Page Parsing > GPT3
     def render_output(self):
         output_content = st.session_state.get("output_content")
         if output_content:
-            st.write("### Generated Content")
+            st.write("#### Generated Content")
             for idx, text in enumerate(output_content):
                 if st.session_state.get("enable_html"):
                     scrollable_html(text)
@@ -413,6 +411,8 @@ def _gen_final_prompt(
 
 
 def _summarize_url(url: str, enable_html: bool):
+    from lxml import etree
+
     try:
         title, summary = _call_summarize_url(url)
     except (requests.RequestException, etree.LxmlError):
@@ -438,6 +438,8 @@ def _summarize_url(url: str, enable_html: bool):
 
 
 def html_to_text(text):
+    from bs4 import BeautifulSoup
+
     return BeautifulSoup(text, "html.parser").get_text(separator=" ", strip=True)
 
 

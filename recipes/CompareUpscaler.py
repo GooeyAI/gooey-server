@@ -8,6 +8,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.face_restoration import UpscalerModels, run_upscaler_model
 from daras_ai_v2.stable_diffusion import SD_IMG_MAX_SIZE
+from daras_ai_v2.safety_checker import safety_checker
 
 DEFAULT_COMPARE_UPSCALER_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2e8ee512-93fe-11ee-a083-02420a0001c8/Image%20upscaler.jpg.png"
 
@@ -23,9 +24,9 @@ class CompareUpscalerPage(BasePage):
 
         scale: int
 
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in UpscalerModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in UpscalerModels)]] | None
+        )
 
     class ResponseModel(BaseModel):
         output_images: dict[typing.Literal[tuple(e.name for e in UpscalerModels)], str]
@@ -33,7 +34,7 @@ class CompareUpscalerPage(BasePage):
     def render_form_v2(self):
         st.file_uploader(
             """
-            ### Input Image
+            #### Input Image
             """,
             key="input_image",
             upload_meta=dict(resize=f"{SD_IMG_MAX_SIZE[0] * SD_IMG_MAX_SIZE[1]}@>"),
@@ -76,6 +77,10 @@ class CompareUpscalerPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: CompareUpscalerPage.RequestModel = self.RequestModel.parse_obj(state)
 
+        if not self.request.user.disable_safety_checker:
+            yield "Running safety checker..."
+            safety_checker(image=request.input_image)
+
         state["output_images"] = output_images = {}
 
         for selected_model in request.selected_models:
@@ -102,7 +107,7 @@ class CompareUpscalerPage(BasePage):
             img: dict = state.get("output_images", {}).get(key)
             if not img:
                 continue
-            st.image(img, caption=UpscalerModels[key].value)
+            st.image(img, caption=UpscalerModels[key].value, show_download_button=True)
 
     def get_raw_price(self, state: dict) -> int:
         selected_models = state.get("selected_models", [])

@@ -21,6 +21,7 @@ from daras_ai_v2.img_model_settings_widgets import (
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.repositioning import repositioning_preview_img
+from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
 DEFAULT_FACE_INPAINTING_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a146bfc0-93ff-11ee-b86c-02420a0001c7/Face%20in%20painting.jpg.png"
@@ -104,7 +105,7 @@ class FaceInpaintingPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            #### Prompt
             Describe the character that you'd like to generate. 
             """,
             key="text_prompt",
@@ -113,7 +114,7 @@ class FaceInpaintingPage(BasePage):
 
         st.file_uploader(
             """
-            ### Face Photo
+            #### Face Photo
             Give us a photo of yourself, or anyone else
             """,
             key="input_image",
@@ -195,11 +196,9 @@ class FaceInpaintingPage(BasePage):
         output_images = st.session_state.get("output_images")
 
         if output_images:
+            st.write("#### Output Image")
             for url in output_images:
-                st.image(
-                    url,
-                    caption="```" + text_prompt.replace("\n", "") + "```",
-                )
+                st.image(url, show_download_button=True)
         else:
             st.div()
 
@@ -250,6 +249,10 @@ class FaceInpaintingPage(BasePage):
         # loom_video("788dfdee763a4e329e28e749239f9810")
 
     def run(self, state: dict):
+        if not self.request.user.disable_safety_checker:
+            yield "Running safety checker..."
+            safety_checker(image=state["input_image"])
+
         yield "Extracting Face..."
 
         input_image_url = state["input_image"]
@@ -333,6 +336,8 @@ class FaceInpaintingPage(BasePage):
         selected_model = state.get("selected_model")
         match selected_model:
             case InpaintingModels.dall_e.name:
-                return 20
+                unit_price = 20
             case _:
-                return 5
+                unit_price = 5
+
+        return unit_price * state.get("num_outputs", 1)

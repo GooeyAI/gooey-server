@@ -82,33 +82,12 @@ class LipsyncPage(BasePage):
         )
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
-
-        with col1:
-            input_face = state.get("input_face")
-            if not input_face:
-                st.div()
-            elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
-                st.write("Input Face (Video)")
-                st.video(input_face)
-            else:
-                st.write("Input Face (Image)")
-                st.image(input_face)
-
-            input_audio = state.get("input_audio")
-            if input_audio:
-                st.write("Input Audio")
-                st.audio(input_audio)
-            else:
-                st.div()
-
-        with col2:
-            output_video = state.get("output_video")
-            if output_video:
-                st.write("Output Video")
-                st.video(output_video, autoplay=True)
-            else:
-                st.div()
+        output_video = state.get("output_video")
+        if output_video:
+            st.write("#### Output Video")
+            st.video(output_video, autoplay=True, show_download_button=True)
+        else:
+            st.div()
 
     def render_output(self):
         self.render_example(st.session_state)
@@ -145,3 +124,31 @@ class LipsyncPage(BasePage):
 
         total_mb = total_bytes / 1024 / 1024
         return total_mb * CREDITS_PER_MB
+
+    def download_blob(self, bucket_name, source_blob_name, destination_file_name):
+        """Downloads a blob from the bucket."""
+        # The ID of your GCS bucket
+        # bucket_name = "your-bucket-name"
+
+        # The ID of your GCS object
+        # source_blob_name = "storage-object-name"
+
+        # The path to which the file should be downloaded
+        # destination_file_name = "local/path/to/file"
+
+        storage_client = storage.Client()
+
+        bucket = storage_client.bucket(bucket_name)
+
+        # Construct a client side representation of a blob.
+        # Note `Bucket.blob` differs from `Bucket.get_blob` as it doesn't retrieve
+        # any content from Google Cloud Storage. As we don't need additional data,
+        # using `Bucket.blob` is preferred here.
+        blob = bucket.blob(source_blob_name)
+        blob.download_to_filename(destination_file_name)
+
+        print(
+            "Downloaded storage object {} from bucket {} to local file {}.".format(
+                source_blob_name, bucket_name, destination_file_name
+            )
+        )

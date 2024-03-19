@@ -13,7 +13,6 @@ from random import Random
 from time import sleep
 from types import SimpleNamespace
 
-import requests
 import sentry_sdk
 from django.utils import timezone
 from django.utils.text import slugify
@@ -60,9 +59,7 @@ from daras_ai_v2.query_params_util import (
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import (
-    render_js_dynamic_dates,
-    re_render_js_dynamic_dates,
-    js_dynamic_date,
+    render_local_dt_attrs,
 )
 from gooey_ui import realtime_clear_subs
 from gooey_ui.components.modal import Modal
@@ -180,24 +177,52 @@ class BasePage:
             tab_name=MenuTabs.paths[tab],
         )
 
-    def setup_render(self):
+    def setup_sentry(self, event_processor: typing.Callable = None):
+        def add_user_to_event(event, hint):
+            user = self.request and self.request.user
+            if not user:
+                return event
+            event["user"] = {
+                "id": user.id,
+                "name": user.display_name,
+                "email": user.email,
+                "data": {
+                    field: getattr(user, field)
+                    for field in [
+                        "uid",
+                        "phone_number",
+                        "photo_url",
+                        "balance",
+                        "is_paying",
+                        "is_anonymous",
+                        "is_disabled",
+                        "disable_safety_checker",
+                        "created_at",
+                    ]
+                },
+            }
+            return event
+
         with sentry_sdk.configure_scope() as scope:
             scope.set_extra("base_url", self.app_url())
             scope.set_transaction_name(
                 "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
             )
+            scope.add_event_processor(add_user_to_event)
+            if event_processor:
+                scope.add_event_processor(event_processor)
 
     def refresh_state(self):
         _, run_id, uid = extract_query_params(gooey_get_query_params())
-        channel = f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
+        channel = self.realtime_channel_name(run_id, uid)
         output = realtime_pull([channel])[0]
         if output:
             st.session_state.update(output)
 
     def render(self):
-        self.setup_render()
+        self.setup_sentry()
 
-        if self.get_run_state() == RecipeRunState.running:
+        if self.get_run_state(st.session_state) == RecipeRunState.running:
             self.refresh_state()
         else:
             realtime_clear_subs()
@@ -232,7 +257,9 @@ class BasePage:
             and published_run.is_root()
             and published_run.saved_run == current_run
         )
-        tbreadcrumbs = get_title_breadcrumbs(self, current_run, published_run)
+        tbreadcrumbs = get_title_breadcrumbs(
+            self, current_run, published_run, tab=self.tab
+        )
 
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
@@ -241,7 +268,12 @@ class BasePage:
 
                 if tbreadcrumbs:
                     with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
-                        render_breadcrumbs(tbreadcrumbs)
+                        render_breadcrumbs(
+                            tbreadcrumbs,
+                            is_api_call=(
+                                current_run.is_api_call and self.tab == MenuTabs.run
+                            ),
+                        )
 
                 author = self.run_user or current_run.get_creator()
                 if not is_root_example:
@@ -314,7 +346,7 @@ class BasePage:
 
         copy_to_clipboard_button(
             f'<i class="fa-regular fa-link"></i>{button_text}',
-            value=self._get_current_app_url(),
+            value=self.get_tab_url(self.tab),
             type="secondary",
             className="mb-0 ms-lg-2",
         )
@@ -705,22 +737,18 @@ class BasePage:
                     self._render_help()
 
                 self.render_related_workflows()
-                render_js_dynamic_dates()
 
             case MenuTabs.examples:
                 self._examples_tab()
-                render_js_dynamic_dates()
 
             case MenuTabs.history:
                 self._history_tab()
-                render_js_dynamic_dates()
 
             case MenuTabs.run_as_api:
                 self.run_as_api_tab()
 
             case MenuTabs.saved:
                 self._saved_tab()
-                render_js_dynamic_dates()
 
     def _render_version_history(self):
         published_run = self.get_current_published_run()
@@ -732,7 +760,6 @@ class BasePage:
                 first_version = older_version
                 self._render_version_row(version, older_version)
             self._render_version_row(first_version, None)
-            re_render_js_dynamic_dates()
 
     def _render_version_row(
         self,
@@ -766,11 +793,14 @@ class BasePage:
         with col2:
             is_first_version = not older_version
             with st.div(className="fs-5 d-flex align-items-center"):
-                js_dynamic_date(
-                    version.created_at,
-                    container=self._render_version_history_date,
-                    date_options={"month": "short", "day": "numeric"},
-                )
+                with st.tag("span"):
+                    st.html(
+                        "Loading...",
+                        **render_local_dt_attrs(
+                            version.created_at,
+                            date_options={"month": "short", "day": "numeric"},
+                        ),
+                    )
                 if is_first_version:
                     with st.tag("span", className="badge bg-secondary px-3 ms-2"):
                         st.write("FIRST VERSION")
@@ -783,10 +813,6 @@ class BasePage:
                 self.render_author(
                     version.changed_by, image_size="18px", responsive=False
                 )
-
-    def _render_version_history_date(self, text, **props):
-        with st.tag("span", **props):
-            st.html(text)
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()
@@ -921,7 +947,7 @@ class BasePage:
     ) -> tuple[SavedRun, PublishedRun | None]:
         if run_id and uid:
             sr = cls.run_doc_sr(run_id, uid)
-            pr = (sr and sr.parent_version and sr.parent_version.published_run) or None
+            pr = sr.parent_published_run()
         else:
             pr = cls.get_published_run(published_run_id=example_id or "")
             sr = pr.saved_run
@@ -938,9 +964,7 @@ class BasePage:
     ) -> PublishedRun | None:
         if run_id and uid:
             sr = cls.get_sr_from_query_params(example_id, run_id, uid)
-            return (
-                sr and sr.parent_version and sr.parent_version.published_run
-            ) or None
+            return sr.parent_published_run()
         elif example_id:
             return cls.get_published_run(published_run_id=example_id)
         else:
@@ -996,9 +1020,7 @@ class BasePage:
             workflow=cls.workflow,
             published_run_id="",
             defaults={
-                "saved_run": lambda: cls.run_doc_sr(
-                    run_id="", uid="", create=True, parent=None, parent_version=None
-                ),
+                "saved_run": lambda: cls.run_doc_sr(run_id="", uid="", create=True),
                 "created_by": None,
                 "last_edited_by": None,
                 "title": cls.title,
@@ -1022,15 +1044,11 @@ class BasePage:
         run_id: str,
         uid: str,
         create: bool = False,
-        parent: SavedRun | None = None,
-        parent_version: PublishedRunVersion | None = None,
+        defaults: dict = None,
     ) -> SavedRun:
         config = dict(workflow=cls.workflow, uid=uid, run_id=run_id)
         if create:
-            return SavedRun.objects.get_or_create(
-                **config,
-                defaults=dict(parent=parent, parent_version=parent_version),
-            )[0]
+            return SavedRun.objects.get_or_create(**config, defaults=defaults)[0]
         else:
             return SavedRun.objects.get(**config)
 
@@ -1092,6 +1110,7 @@ class BasePage:
         image_size: str = "30px",
         responsive: bool = True,
         show_as_link: bool = False,
+        text_size: str | None = None,
     ):
         if not user or (not user.photo_url and not user.display_name):
             return
@@ -1105,47 +1124,44 @@ class BasePage:
         if responsive:
             class_name += "-responsive"
 
-        html = "<div style='display:flex; align-items:center;'>"
-        if user.photo_url:
-            st.html(
-                f"""
-                <style>
-                .{class_name} {{
-                    width: {responsive_image_size};
-                    height: {responsive_image_size};
-                    margin-right: 6px;
-                    border-radius: 50%;
-                    pointer-events: none;
-                }}
-
-                @media (min-width: 1024px) {{
-                    .{class_name} {{
-                        width: {image_size};
-                        height: {image_size};
-                    }}
-                }}
-                </style>
-            """
-            )
-            html += f"""
-                <img class="{class_name}" src="{user.photo_url}">
-            """
-        if user.display_name:
-            html += f"<span>{user.display_name}</span>"
-        html += "</div>"
-
         if show_as_link:
-            linkto = lambda: st.link(
+            linkto = st.link(
                 to=self.app_url(
                     tab_name=MenuTabs.paths[MenuTabs.history],
                     query_params={"uid": user.uid},
                 )
             )
         else:
-            linkto = st.dummy
+            linkto = st.dummy()
 
-        with linkto():
-            st.html(html)
+        with linkto, st.div(className="d-flex align-items-center"):
+            if user.photo_url:
+                st.html(
+                    f"""
+                    <style>
+                    .{class_name} {{
+                        width: {responsive_image_size};
+                        height: {responsive_image_size};
+                        margin-right: 6px;
+                        border-radius: 50%;
+                        pointer-events: none;
+                    }}
+
+                    @media (min-width: 1024px) {{
+                        .{class_name} {{
+                            width: {image_size};
+                            height: {image_size};
+                        }}
+                    }}
+                    </style>
+                """
+                )
+                st.image(user.photo_url, className=class_name)
+
+            if user.display_name:
+                name_style = {"fontSize": text_size} if text_size else {}
+                with st.tag("span", style=name_style):
+                    st.html(html.escape(user.display_name))
 
     def get_credits_click_url(self):
         if self.request.user and self.request.user.is_anonymous:
@@ -1266,7 +1282,9 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         if not (self.request.user and run_id and uid):
             return
 
-        reported = st.button("❗Report")
+        reported = st.button(
+            '<i class="fa-regular fa-flag"></i> Report', type="tertiary"
+        )
         if not reported:
             return
 
@@ -1300,7 +1318,6 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         self.render_form_v2()
         with st.expander("⚙️ Settings"):
             self.render_settings()
-            st.write("---")
         submitted = self.render_submit_button()
         with st.div(style={"textAlign": "right"}):
             st.caption(
@@ -1309,12 +1326,13 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
         return submitted
 
-    def get_run_state(self) -> RecipeRunState:
-        if st.session_state.get(StateKeys.run_status):
+    @classmethod
+    def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
+        if state.get(StateKeys.run_status):
             return RecipeRunState.running
-        elif st.session_state.get(StateKeys.error_msg):
+        elif state.get(StateKeys.error_msg):
             return RecipeRunState.failed
-        elif st.session_state.get(StateKeys.run_time):
+        elif state.get(StateKeys.run_time):
             return RecipeRunState.completed
         else:
             # when user is at a recipe root, and not running anything
@@ -1333,7 +1351,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
 
         self._render_before_output()
 
-        run_state = self.get_run_state()
+        run_state = self.get_run_state(st.session_state)
         match run_state:
             case RecipeRunState.completed:
                 self._render_completed_output()
@@ -1347,12 +1365,11 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         # render outputs
         self.render_output()
 
-        if run_state != "waiting":
+        if run_state != RecipeRunState.running:
             self._render_after_output()
 
     def _render_completed_output(self):
-        run_time = st.session_state.get(StateKeys.run_time, 0)
-        st.success(f"Success! Run Time: `{run_time:.2f}` seconds.")
+        pass
 
     def _render_failed_output(self):
         err_msg = st.session_state.get(StateKeys.error_msg)
@@ -1364,16 +1381,15 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
+        started_at_text()
         estimated_run_time = self.estimate_run_duration()
         if not estimated_run_time:
             return
         if created_at := st.session_state.get("created_at"):
-            if isinstance(created_at, datetime.datetime):
-                start_time = created_at
-            else:
-                start_time = datetime.datetime.fromisoformat(created_at)
+            if isinstance(created_at, str):
+                created_at = datetime.datetime.fromisoformat(created_at)
             with st.countdown_timer(
-                end_time=start_time + datetime.timedelta(seconds=estimated_run_time),
+                end_time=created_at + datetime.timedelta(seconds=estimated_run_time),
                 delay_text="Sorry for the wait. Your run is taking longer than we expected.",
             ):
                 if self.is_current_user_owner() and self.request.user.email:
@@ -1410,7 +1426,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             and not self.request.user.is_anonymous
         )
 
-    def create_new_run(self):
+    def create_new_run(self, is_api_call: bool = False):
         st.session_state[StateKeys.run_status] = "Starting..."
         st.session_state.pop(StateKeys.error_msg, None)
         st.session_state.pop(StateKeys.run_time, None)
@@ -1445,8 +1461,11 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             run_id,
             uid,
             create=True,
-            parent=parent,
-            parent_version=parent_version,
+            defaults=dict(
+                parent=parent,
+                parent_version=parent_version,
+                is_api_call=is_api_call,
+            ),
         ).set(self.state_to_doc(st.session_state))
 
         return None, run_id, uid
@@ -1460,12 +1479,15 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             run_id=run_id,
             uid=uid,
             state=st.session_state,
-            channel=f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}",
+            channel=self.realtime_channel_name(run_id, uid),
             query_params=self.clean_query_params(
                 example_id=example_id, run_id=run_id, uid=uid
             ),
             is_api_call=is_api_call,
         )
+
+    def realtime_channel_name(self, run_id, uid):
+        return f"gooey-outputs/{self.slug_versions[0]}/{uid}/{run_id}"
 
     def generate_credit_error_message(self, example_id, run_id, uid) -> str:
         account_url = furl(settings.APP_BASE_URL) / "account/"
@@ -1511,22 +1533,17 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             st.session_state.pop(field_name, None)
 
     def _render_after_output(self):
-        col1, col2, col3 = st.columns([1, 1, 1], responsive=False)
-        col2.node.props[
-            "className"
-        ] += " d-flex justify-content-center align-items-center"
-        col3.node.props["className"] += " d-flex justify-content-end align-items-center"
+        self._render_report_button()
+
         if "seed" in self.RequestModel.schema_json():
-            seed = st.session_state.get("seed")
-            with col1:
-                st.caption(f"*Seed\\\n`{seed}`*")
-            with col2:
-                randomize = st.button("♻️ Regenerate")
-                if randomize:
-                    st.session_state[StateKeys.pressed_randomize] = True
-                    st.experimental_rerun()
-        with col3:
-            self._render_report_button()
+            randomize = st.button(
+                '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
+            )
+            if randomize:
+                st.session_state[StateKeys.pressed_randomize] = True
+                st.experimental_rerun()
+
+        render_output_caption()
 
     def state_to_doc(self, state: dict):
         ret = {
@@ -1564,7 +1581,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             is_approved_example=True,
         ).exclude(published_run_id="")[:50]
 
-        grid_layout(3, example_runs, _render)
+        grid_layout(3, example_runs, _render, column_props=dict(className="mb-0 pb-0"))
 
     def _saved_tab(self):
         self.ensure_authentication()
@@ -1578,10 +1595,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             return
 
         def _render(pr: PublishedRun):
-            self._render_example_preview(
-                published_run=pr,
-                allow_hide=False,
-            )
+            self._render_published_run_preview(published_run=pr)
 
         grid_layout(3, published_runs, _render)
 
@@ -1636,24 +1650,66 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             )
 
     def _render_run_preview(self, saved_run: SavedRun):
-        url = saved_run.get_app_url()
-        with st.link(to=url):
-            st.html(
-                # language=HTML
-                f"""<button type="button" class="btn btn-theme">✏️ Tweak</button>"""
-            )
-        copy_to_clipboard_button("🔗 Copy URL", value=url)
+        published_run: PublishedRun | None = (
+            saved_run.parent_version.published_run if saved_run.parent_version else None
+        )
+        is_latest_version = published_run and published_run.saved_run == saved_run
+        tb = get_title_breadcrumbs(self, sr=saved_run, pr=published_run)
+
+        with st.link(to=saved_run.get_app_url()):
+            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
+                if is_latest_version:
+                    st.html(
+                        PublishedRunVisibility(
+                            published_run.visibility
+                        ).get_badge_html()
+                    )
+
+            st.write(f"#### {tb.h1_title}")
 
         updated_at = saved_run.updated_at
-        if updated_at and isinstance(updated_at, datetime.datetime):
-            js_dynamic_date(updated_at)
+        if (
+            updated_at
+            and isinstance(updated_at, datetime.datetime)
+            and not saved_run.run_status
+        ):
+            st.caption("Loading...", **render_local_dt_attrs(updated_at))
 
         if saved_run.run_status:
+            started_at_text()
             html_spinner(saved_run.run_status)
         elif saved_run.error_msg:
             st.error(saved_run.error_msg, unsafe_allow_html=True)
 
         return self.render_example(saved_run.to_dict())
+
+    def _render_published_run_preview(self, published_run: PublishedRun):
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
+
+        with st.link(to=published_run.get_app_url()):
+            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
+                st.html(
+                    PublishedRunVisibility(published_run.visibility).get_badge_html()
+                )
+
+            st.write(f"#### {tb.h1_title}")
+
+        with st.div(className="d-flex align-items-center justify-content-between"):
+            with st.div():
+                updated_at = published_run.saved_run.updated_at
+                if updated_at and isinstance(updated_at, datetime.datetime):
+                    st.caption("Loading...", **render_local_dt_attrs(updated_at))
+
+            if published_run.visibility == PublishedRunVisibility.PUBLIC:
+                run_icon = '<i class="fa-regular fa-person-running"></i>'
+                run_count = format_number_with_suffix(published_run.get_run_count())
+                st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
+
+        if published_run.notes:
+            st.caption(published_run.notes)
+
+        doc = published_run.saved_run.to_dict()
+        self.render_example(doc)
 
     def _render_example_preview(
         self,
@@ -1661,27 +1717,34 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         published_run: PublishedRun,
         allow_hide: bool,
     ):
-        url = published_run.get_app_url()
-        with st.link(to=url):
-            st.html(
-                # language=HTML
-                f"""<button type="button" class="btn btn-theme">✏️ Tweak</button>"""
-            )
-        copy_to_clipboard_button("🔗 Copy URL", value=url)
+        tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
+
+        with st.link(to=published_run.get_app_url()):
+            with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
+                if published_run.created_by and self.is_user_admin(
+                    published_run.created_by
+                ):
+                    self.render_author(
+                        published_run.created_by, image_size="20px", text_size="0.9rem"
+                    )
+
+            st.write(f"#### {tb.h1_title}")
+
+        with st.div(className="d-flex align-items-center justify-content-between"):
+            with st.div():
+                updated_at = published_run.saved_run.updated_at
+                if updated_at and isinstance(updated_at, datetime.datetime):
+                    st.caption("Loading...", **render_local_dt_attrs(updated_at))
+
+            run_icon = '<i class="fa-regular fa-person-running"></i>'
+            run_count = format_number_with_suffix(published_run.get_run_count())
+            st.caption(f"{run_icon} {run_count} runs", unsafe_allow_html=True)
+
+        if published_run.notes:
+            st.caption(published_run.notes)
 
         if allow_hide:
             self._example_hide_button(published_run=published_run)
-
-        updated_at = published_run.updated_at
-        if updated_at and isinstance(updated_at, datetime.datetime):
-            js_dynamic_date(updated_at)
-
-        title = published_run.title
-        if title and title.strip() != self.title.strip():
-            st.write("#### " + title)
-
-        if published_run.notes:
-            st.write(published_run.notes)
 
         doc = published_run.saved_run.to_dict()
         self.render_example(doc)
@@ -1753,8 +1816,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         as_async = st.checkbox("##### Run Async")
         as_form_data = st.checkbox("##### Upload Files via Form Data")
 
-        request_body = get_example_request_body(
-            self.RequestModel, st.session_state, include_all=include_all
+        request_body = self.get_example_request_body(
+            st.session_state, include_all=include_all
         )
         response_body = self.get_example_response_body(
             st.session_state, as_async=as_async, include_all=include_all
@@ -1800,7 +1863,27 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return max(1, math.ceil(self.get_raw_price(state)))
 
     def get_raw_price(self, state: dict) -> float:
-        return self.price
+        return self.price * state.get("num_outputs", 1)
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        """
+        Fields that are not required, but are preferred to be shown in the example.
+        """
+        return []
+
+    @classmethod
+    def get_example_request_body(
+        cls,
+        state: dict,
+        include_all: bool = False,
+    ) -> dict:
+        return extract_model_fields(
+            cls.RequestModel,
+            state,
+            include_all=include_all,
+            preferred_fields=cls.get_example_preferred_fields(state),
+        )
 
     def get_example_response_body(
         self,
@@ -1816,6 +1899,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             run_id=run_id,
             uid=self.request.user and self.request.user.uid,
         )
+        output = extract_model_fields(self.ResponseModel, state, include_all=True)
         if as_async:
             return dict(
                 run_id=run_id,
@@ -1823,18 +1907,14 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 created_at=created_at,
                 run_time_sec=st.session_state.get(StateKeys.run_time, 0),
                 status="completed",
-                output=get_example_request_body(
-                    self.ResponseModel, state, include_all=include_all
-                ),
+                output=output,
             )
         else:
             return dict(
                 id=run_id,
                 url=web_url,
                 created_at=created_at,
-                output=get_example_request_body(
-                    self.ResponseModel, state, include_all=include_all
-                ),
+                output=output,
             )
 
     def additional_notes(self) -> str | None:
@@ -1843,11 +1923,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_cost_note(self) -> str | None:
         pass
 
+    @classmethod
+    def is_user_admin(cls, user: AppUser) -> bool:
+        email = user.email
+        return email and email in settings.ADMIN_EMAILS
+
     def is_current_user_admin(self) -> bool:
         if not self.request or not self.request.user:
             return False
-        email = self.request.user.email
-        return email and email in settings.ADMIN_EMAILS
+        return self.is_user_admin(self.request.user)
 
     def is_current_user_paying(self) -> bool:
         return bool(self.request and self.request.user and self.request.user.is_paying)
@@ -1858,15 +1942,63 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         )
 
 
-def get_example_request_body(
-    request_model: typing.Type[BaseModel],
+def started_at_text():
+    with st.div(className="d-flex"):
+        text = "Started"
+        if seed := st.session_state.get("seed"):
+            text += f' with seed <span style="color: black;">{seed}</span>'
+        st.caption(text + " on&nbsp;", unsafe_allow_html=True)
+        st.caption(
+            "...",
+            className="text-black",
+            **render_local_dt_attrs(timezone.now()),
+        )
+
+
+def render_output_caption():
+    caption = ""
+
+    run_time = st.session_state.get(StateKeys.run_time, 0)
+    if run_time:
+        caption += f'Generated in <span style="color: black;">{run_time :.1f}s</span>'
+
+    if seed := st.session_state.get("seed"):
+        caption += f' with seed <span style="color: black;">{seed}</span> '
+
+    updated_at = st.session_state.get(StateKeys.updated_at, datetime.datetime.today())
+    if updated_at:
+        if isinstance(updated_at, str):
+            updated_at = datetime.datetime.fromisoformat(updated_at)
+        caption += " on&nbsp;"
+
+    with st.div(className="d-flex"):
+        st.caption(caption, unsafe_allow_html=True)
+        if updated_at:
+            st.caption(
+                "...",
+                className="text-black",
+                **render_local_dt_attrs(
+                    updated_at,
+                    date_options={"month": "short", "day": "numeric"},
+                ),
+            )
+
+
+def extract_model_fields(
+    model: typing.Type[BaseModel],
     state: dict,
     include_all: bool = False,
+    preferred_fields: list[str] = None,
 ) -> dict:
+    """Only returns required fields unless include_all is set to True."""
     return {
         field_name: state.get(field_name)
-        for field_name, field in request_model.__fields__.items()
-        if include_all or field.required
+        for field_name, field in model.__fields__.items()
+        if (
+            include_all
+            or field.required
+            or (preferred_fields and field_name in preferred_fields)
+        )
     }
 
 
@@ -1884,27 +2016,6 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
-
-
-def err_msg_for_exc(e):
-    if isinstance(e, requests.HTTPError):
-        response: requests.Response = e.response
-        try:
-            err_body = response.json()
-        except requests.JSONDecodeError:
-            err_str = response.text
-        else:
-            format_exc = err_body.get("format_exc")
-            if format_exc:
-                print("⚡️ " + format_exc)
-            err_type = err_body.get("type")
-            err_str = err_body.get("str")
-            if err_type and err_str:
-                return f"(GPU) {err_type}: {err_str}"
-            err_str = str(err_body)
-        return f"(HTTP {response.status_code}) {html.escape(err_str[:1000])}"
-    else:
-        return f"{type(e).__name__}: {e}"
 
 
 def force_redirect(url: str):
@@ -1933,3 +2044,20 @@ class QueryParamsRedirectException(RedirectException):
 
 class TitleValidationError(Exception):
     pass
+
+
+def format_number_with_suffix(num: int) -> str:
+    """
+    Formats large number with a suffix.
+
+    Ref: https://stackoverflow.com/a/45846841
+    """
+    num_float = float("{:.3g}".format(num))
+    magnitude = 0
+    while abs(num_float) >= 1000:
+        magnitude += 1
+        num_float /= 1000.0
+    return "{}{}".format(
+        "{:f}".format(num_float).rstrip("0").rstrip("."),
+        ["", "K", "M", "B", "T"][magnitude],
+    )

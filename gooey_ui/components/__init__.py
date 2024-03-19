@@ -144,9 +144,9 @@ def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
         markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
 
 
-def caption(body: str, **props):
-    style = props.setdefault("style", {"fontSize": "0.9rem"})
-    markdown(body, className="text-muted", **props)
+def caption(body: str, className: str = None, **props):
+    className = className or "text-muted"
+    markdown(body, className=className, **props)
 
 
 def option_menu(*args, options, **kwargs):
@@ -217,6 +217,7 @@ def image(
     caption: str = None,
     alt: str = None,
     href: str = None,
+    show_download_button: bool = False,
     **props,
 ):
     if isinstance(src, np.ndarray):
@@ -241,9 +242,18 @@ def image(
             **props,
         ),
     ).mount()
+    if show_download_button:
+        download_button(
+            label='<i class="fa-regular fa-download"></i> Download', url=src
+        )
 
 
-def video(src: str, caption: str = None, autoplay: bool = False):
+def video(
+    src: str,
+    caption: str = None,
+    autoplay: bool = False,
+    show_download_button: bool = False,
+):
     autoplay_props = {}
     if autoplay:
         autoplay_props = {
@@ -266,15 +276,23 @@ def video(src: str, caption: str = None, autoplay: bool = False):
         name="video",
         props=dict(src=src, caption=dedent(caption), **autoplay_props),
     ).mount()
+    if show_download_button:
+        download_button(
+            label='<i class="fa-regular fa-download"></i> Download', url=src
+        )
 
 
-def audio(src: str, caption: str = None):
+def audio(src: str, caption: str = None, show_download_button: bool = False):
     if not src:
         return
     state.RenderTreeNode(
         name="audio",
         props=dict(src=src, caption=dedent(caption)),
     ).mount()
+    if show_download_button:
+        download_button(
+            label='<i class="fa-regular fa-download"></i> Download', url=src
+        )
 
 
 def text_area(
@@ -293,9 +311,7 @@ def text_area(
     #     assert not value, "only one of value or key can be provided"
     # else:
     if not key:
-        key = md5_values(
-            "textarea", label, height, help, value, placeholder, label_visibility
-        )
+        key = md5_values("textarea", label, height, help, placeholder, label_visibility)
     value = str(state.session_state.setdefault(key, value) or "")
     if label_visibility != "visible":
         label = None
@@ -380,7 +396,7 @@ def multiselect(
 
 def selectbox(
     label: str,
-    options: typing.Sequence[T],
+    options: typing.Iterable[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
     key: str = None,
     help: str = None,
@@ -417,6 +433,29 @@ def selectbox(
     return value
 
 
+def download_button(
+    label: str,
+    url: str,
+    key: str = None,
+    help: str = None,
+    *,
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
+    disabled: bool = False,
+    **props,
+) -> bool:
+    url = furl(url).remove(fragment=True).url
+    return button(
+        component="download-button",
+        url=url,
+        label=label,
+        key=key,
+        help=help,
+        type=type,
+        disabled=disabled,
+        **props,
+    )
+
+
 def button(
     label: str,
     key: str = None,
@@ -424,6 +463,7 @@ def button(
     *,
     type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
     disabled: bool = False,
+    component: typing.Literal["download-button", "gui-button"] = "gui-button",
     **props,
 ) -> bool:
     """
@@ -437,7 +477,7 @@ def button(
         key = md5_values("button", label, help, type, props)
     className = f"btn-{type} " + props.pop("className", "")
     state.RenderTreeNode(
-        name="gui-button",
+        name=component,
         props=dict(
             type="submit",
             value="yes",
@@ -567,41 +607,6 @@ def horizontal_radio(
     help: str = None,
     *,
     disabled: bool = False,
-    label_visibility: LabelVisibility = "visible",
-) -> T | None:
-    if not options:
-        return None
-    options = list(options)
-    if not key:
-        key = md5_values("horizontal_radio", label, options, help, label_visibility)
-    value = state.session_state.get(key)
-    if key not in state.session_state or value not in options:
-        value = options[0]
-    state.session_state.setdefault(key, value)
-    if label_visibility != "visible":
-        label = None
-    markdown(label)
-    for option in options:
-        if button(
-            format_func(option),
-            key=f"tab-{key}-{option}",
-            type="primary",
-            className="replicate-nav " + ("active" if value == option else ""),
-            disabled=disabled,
-        ):
-            state.session_state[key] = value = option
-            state.experimental_rerun()
-    return value
-
-
-def horizontal_radio(
-    label: str,
-    options: typing.Sequence[T],
-    format_func: typing.Callable[[T], typing.Any] = _default_format,
-    key: str = None,
-    help: str = None,
-    *,
-    disabled: bool = False,
     checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
 ) -> T | None:
@@ -695,6 +700,38 @@ def text_input(
         **props,
     )
     return value or ""
+
+
+def date_input(
+    label: str,
+    value: str | None = None,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    **props,
+) -> datetime | None:
+    value = _input_widget(
+        input_type="date",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        style=dict(
+            border="1px solid hsl(0, 0%, 80%)",
+            padding="0.375rem 0.75rem",
+            borderRadius="0.25rem",
+            margin="0 0.5rem 0 0.5rem",
+        ),
+        **props,
+    )
+    try:
+        return datetime.strptime(value, "%Y-%m-%d") if value else None
+    except ValueError:
+        return None
 
 
 def password_input(
@@ -888,3 +925,29 @@ def js(src: str, **kwargs):
             args=kwargs,
         ),
     ).mount()
+
+
+def change_url(url: str, request):
+    """Change the url of the page, without reloading the page. Only for urls on the current domain due to browser security policies."""
+    # this is useful to store certain state inputs in the url to allow for sharing/returning to a state
+    old_url = furl(request.url).remove(origin=True).tostr()
+    url = furl(url).remove(origin=True).tostr()
+    if old_url == url:
+        return
+    # the request is likely processing which means it will overwrite the url we set once it is done
+    # so we set up a timer to keep setting the url until the request is done at which point we stop
+    js(
+        f"""
+        setTimeout(() => window.history.replaceState(null, '', '{url}'));
+        function change_url() {{
+            if (window.location.href.replace(window.location.origin, "") == '{old_url}') {{
+                clearInterval(window._change_url_timer);
+            }}
+            window.history.replaceState(null, '', '{url}');
+        }}
+        clearInterval(window._change_url_timer);
+        if (window.location.href.replace(window.location.origin, "") != '{url}') {{
+            window._change_url_timer = setInterval(change_url, 100);
+        }}
+        """,
+    )

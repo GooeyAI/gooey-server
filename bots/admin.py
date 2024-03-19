@@ -5,7 +5,7 @@ import django.db.models
 from django import forms
 from django.conf import settings
 from django.contrib import admin
-from django.db.models import Max, Count, F
+from django.db.models import Max, Count, F, Sum
 from django.template import loader
 from django.utils import dateformat
 from django.utils.safestring import mark_safe
@@ -28,13 +28,41 @@ from bots.models import (
     WorkflowMetadata,
 )
 from bots.tasks import create_personal_channels_for_all_members
-from daras_ai.image_input import truncate_text_words
-from daras_ai_v2.base import BasePage
 from gooeysite.custom_actions import export_to_excel, export_to_csv
 from gooeysite.custom_filters import (
     related_json_field_summary,
 )
 from gooeysite.custom_widgets import JSONEditorWidget
+
+fb_fields = [
+    "fb_page_id",
+    "fb_page_name",
+    "fb_page_access_token",
+]
+ig_fields = [
+    "ig_account_id",
+    "ig_username",
+]
+wa_fields = [
+    "wa_phone_number",
+    "wa_phone_number_id",
+    "wa_business_access_token",
+    "wa_business_waba_id",
+    "wa_business_user_id",
+    "wa_business_name",
+    "wa_business_account_name",
+    "wa_business_message_template_namespace",
+]
+slack_fields = [
+    "slack_team_id",
+    "slack_team_name",
+    "slack_channel_id",
+    "slack_channel_name",
+    "slack_channel_hook_url",
+    "slack_access_token",
+    "slack_read_receipt_msg",
+    "slack_create_personal_channels",
+]
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
@@ -44,11 +72,13 @@ class BotIntegrationAdminForm(forms.ModelForm):
         widgets = {
             "platform": forms.Select(
                 attrs={
-                    "--hideshow-fields": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username,wa_phone_number,wa_phone_number_id,slack_team_id,slack_team_name,slack_channel_id,slack_channel_name,slack_channel_hook_url,slack_access_token,slack_read_receipt_msg,slack_create_personal_channels",
-                    "--show-on-1": "fb_page_id,fb_page_name,fb_page_access_token",
-                    "--show-on-2": "fb_page_id,fb_page_name,fb_page_access_token,ig_account_id,ig_username",
-                    "--show-on-3": "wa_phone_number,wa_phone_number_id",
-                    "--show-on-4": "slack_team_id,slack_team_name,slack_channel_id,slack_channel_name,slack_channel_hook_url,slack_access_token,slack_read_receipt_msg,slack_create_personal_channels",
+                    "--hideshow-fields": ",".join(
+                        fb_fields + ig_fields + wa_fields + slack_fields
+                    ),
+                    "--show-on-1": ",".join(fb_fields),
+                    "--show-on-2": ",".join(fb_fields + ig_fields),
+                    "--show-on-3": ",".join(wa_fields),
+                    "--show-on-4": ",".join(slack_fields),
                 },
             ),
         }
@@ -135,21 +165,10 @@ class BotIntegrationAdmin(admin.ModelAdmin):
             {
                 "fields": [
                     "platform",
-                    "fb_page_id",
-                    "fb_page_name",
-                    "fb_page_access_token",
-                    "ig_account_id",
-                    "ig_username",
-                    "wa_phone_number",
-                    "wa_phone_number_id",
-                    "slack_team_id",
-                    "slack_team_name",
-                    "slack_channel_id",
-                    "slack_channel_name",
-                    "slack_channel_hook_url",
-                    "slack_access_token",
-                    "slack_read_receipt_msg",
-                    "slack_create_personal_channels",
+                    *fb_fields,
+                    *ig_fields,
+                    *wa_fields,
+                    *slack_fields,
                 ]
             },
         ),
@@ -168,6 +187,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
             "Settings",
             {
                 "fields": [
+                    "streaming_enabled",
                     "show_feedback_buttons",
                     "analysis_run",
                     "view_analysis_results",
@@ -219,14 +239,16 @@ class PublishedRunAdmin(admin.ModelAdmin):
         "view_user",
         "open_in_gooey",
         "linked_saved_run",
+        "view_runs",
         "created_at",
         "updated_at",
     ]
     list_filter = ["workflow", "visibility", "created_by__is_paying"]
-    search_fields = ["workflow", "published_run_id"]
+    search_fields = ["workflow", "published_run_id", "title", "notes"]
     autocomplete_fields = ["saved_run", "created_by", "last_edited_by"]
     readonly_fields = [
         "open_in_gooey",
+        "view_runs",
         "created_at",
         "updated_at",
     ]
@@ -243,21 +265,34 @@ class PublishedRunAdmin(admin.ModelAdmin):
 
     linked_saved_run.short_description = "Linked Run"
 
+    @admin.display(description="View Runs")
+    def view_runs(self, published_run: PublishedRun):
+        return list_related_html_url(
+            SavedRun.objects.filter(parent_version__published_run=published_run),
+            query_param="parent_version__published_run__id__exact",
+            instance_id=published_run.id,
+            show_add=False,
+        )
+
 
 @admin.register(SavedRun)
 class SavedRunAdmin(admin.ModelAdmin):
     list_display = [
         "__str__",
-        "example_id",
         "run_id",
         "view_user",
-        "created_at",
+        "open_in_gooey",
+        "view_parent_published_run",
         "run_time",
-        "updated_at",
         "price",
-        "preview_input",
+        "is_api_call",
+        "created_at",
+        "updated_at",
     ]
-    list_filter = ["workflow"]
+    list_filter = [
+        "workflow",
+        "is_api_call",
+    ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
     autocomplete_fields = ["parent_version"]
 
@@ -266,10 +301,12 @@ class SavedRunAdmin(admin.ModelAdmin):
         "parent",
         "view_bots",
         "price",
+        "view_usage_cost",
         "transaction",
         "created_at",
         "updated_at",
         "run_time",
+        "is_api_call",
     ]
 
     actions = [export_to_csv, export_to_excel]
@@ -278,11 +315,25 @@ class SavedRunAdmin(admin.ModelAdmin):
         django.db.models.JSONField: {"widget": JSONEditorWidget},
     }
 
-    def view_user(self, saved_run: SavedRun):
-        return change_obj_url(
-            AppUser.objects.get(uid=saved_run.uid),
-            label=f"{saved_run.uid}",
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related(
+                "parent_version",
+                "parent_version__published_run",
+                "parent_version__published_run__saved_run",
+            )
         )
+
+    def lookup_allowed(self, key, value):
+        if key in ["parent_version__published_run__id__exact"]:
+            return True
+        return super().lookup_allowed(key, value)
+
+    def view_user(self, saved_run: SavedRun):
+        user = AppUser.objects.get(uid=saved_run.uid)
+        return change_obj_url(user)
 
     view_user.short_description = "View User"
 
@@ -291,9 +342,19 @@ class SavedRunAdmin(admin.ModelAdmin):
 
     view_bots.short_description = "View Bots"
 
-    @admin.display(description="Input")
-    def preview_input(self, saved_run: SavedRun):
-        return truncate_text_words(BasePage.preview_input(saved_run.state) or "", 100)
+    @admin.display(description="View Published Run")
+    def view_parent_published_run(self, saved_run: SavedRun):
+        pr = saved_run.parent_published_run()
+        return pr and change_obj_url(pr)
+
+    @admin.display(description="Usage Costs")
+    def view_usage_cost(self, saved_run: SavedRun):
+        total_cost = saved_run.usage_costs.aggregate(total_cost=Sum("dollar_amount"))[
+            "total_cost"
+        ]
+        return list_related_html_url(
+            saved_run.usage_costs, extra_label=f"${total_cost.normalize()}"
+        )
 
 
 @admin.register(PublishedRunVersion)
@@ -474,6 +535,7 @@ class MessageAdmin(admin.ModelAdmin):
         "prev_msg_content",
         "prev_msg_display_content",
         "prev_msg_saved_run",
+        "response_time",
     ]
     ordering = ["created_at"]
     actions = [export_to_csv, export_to_excel]
@@ -533,6 +595,7 @@ class MessageAdmin(admin.ModelAdmin):
                 "Analysis",
                 {
                     "fields": [
+                        "response_time",
                         "analysis_result",
                         "analysis_run",
                         "question_answered",
@@ -705,7 +768,7 @@ class FeedbackAdmin(admin.ModelAdmin):
 
 
 @admin.register(WorkflowMetadata)
-class WorkflowMetadata(admin.ModelAdmin):
+class WorkflowMetadataAdmin(admin.ModelAdmin):
     list_display = [
         "workflow",
         "short_title",

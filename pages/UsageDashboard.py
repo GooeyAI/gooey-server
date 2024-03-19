@@ -29,7 +29,6 @@ team_user_Q = (
     Q(email__in=team_emails)
     | Q(email__endswith="gooey.ai")
     | Q(email__endswith="dara.network")
-    | Q(email__endswith="gooey.ai")
     | Q(email__endswith="jaaga.in")
 )
 

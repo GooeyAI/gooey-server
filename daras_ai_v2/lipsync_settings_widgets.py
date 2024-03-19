@@ -2,12 +2,9 @@ import gooey_ui as st
 
 
 def lipsync_settings():
-    st.write(
-        """
-        ##### ⌖ Face Padding
-        Adjust the detected face bounding box. Often leads to improved results.  
-        Recommended to give at least 10 padding for the chin region. 
-        """
+    st.write("##### ⌖ Lipsync Face Padding")
+    st.caption(
+        "Adjust the detected face bounding box. Often leads to improved results. Recommended to give at least 10 padding for the chin region."
     )
 
     col1, col2, col3, col4 = st.columns(4)
