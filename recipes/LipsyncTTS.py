@@ -4,16 +4,18 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
+from daras_ai_v2.text_to_speech_settings_widgets import text_to_speech_provider_selector
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.loom_video_widget import youtube_video
 
-DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/lipsync_meta_img.gif"
+DEFAULT_LIPSYNC_TTS_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/13b4d352-9456-11ee-8edd-02420a0001c7/Lipsync%20TTS.jpg.png"
 
 
 class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     title = "Lipsync Video with Any Text"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1acfa370-88d9-11ee-bf6c-02420a000166/Lipsync%20with%20audio%201.png.png"
     workflow = Workflow.LIPSYNC_TTS
     slug_versions = ["LipsyncTTS", "lipsync-maker"]
 
@@ -52,6 +54,10 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
+        elevenlabs_style: float | None
+        elevenlabs_speaker_boost: bool | None
+
+        azure_voice_name: str | None
 
     class ResponseModel(BaseModel):
         output_video: str
@@ -59,13 +65,12 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
         from recipes.DeforumSD import DeforumSDPage
-        from recipes.CompareText2Img import CompareText2ImgPage
 
         return [
             VideoBotsPage,
             TextToSpeechPage,
             DeforumSDPage,
-            CompareText2ImgPage,
+            LipsyncPage,
         ]
 
     def render_form_v2(self):
@@ -84,6 +89,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
             """,
             key="text_prompt",
         )
+        text_to_speech_provider_selector(self)
 
     def validate_form_v2(self):
         assert st.session_state.get(
@@ -125,37 +131,16 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         yield from LipsyncPage.run(self, state)
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
-
-        with col1:
-            input_face = state.get("input_face")
-            if not input_face:
-                pass
-            elif input_face.endswith(".mp4") or input_face.endswith(".mov"):
-                st.video(input_face, caption="Input Face (Video)")
-            else:
-                st.image(input_face, caption="Input Face (Image)")
-
-            input_text = state.get("text_prompt")
-            if input_text:
-                st.write("**Input Text**")
-                st.write(input_text)
-            else:
-                st.div()
-
-            # input_audio = state.get("input_audio")
-            # if input_audio:
-            #    st.write("Synthesized Voice")
-            #    st.audio(input_audio)
-            # else:
-            #    st.empty()
-
-        with col2:
-            output_video = state.get("output_video")
-            if output_video:
-                st.video(output_video, caption="Output Video", autoplay=True)
-            else:
-                st.div()
+        output_video = state.get("output_video")
+        if output_video:
+            st.video(
+                output_video,
+                caption="#### Output Video",
+                autoplay=True,
+                show_download_button=True,
+            )
+        else:
+            st.div()
 
     def render_output(self):
         self.render_example(st.session_state)

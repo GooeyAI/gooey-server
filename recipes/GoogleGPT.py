@@ -1,18 +1,19 @@
-import datetime
 import typing
 
-import jinja2
 from furl import furl
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.doc_search_settings_widgets import doc_search_settings
+from daras_ai_v2.doc_search_settings_widgets import (
+    query_instructions_widget,
+    doc_search_advanced_settings,
+)
+from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
-    model_max_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -37,11 +38,12 @@ from recipes.DocSearch import (
     EmptySearchResults,
 )
 
-DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/WEBSEARCH%20%2B%20CHATGPT.jpg"
+DEFAULT_GOOGLE_GPT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85ed60a2-9405-11ee-9747-02420a0001ce/Web%20search%20GPT.jpg.png"
 
 
 class GoogleGPTPage(BasePage):
     title = "Web Search + GPT3"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/28649544-9406-11ee-bba3-02420a0001cc/Websearch%20GPT%20option%202.png.png"
     workflow = Workflow.GOOGLE_GPT
     slug_versions = ["google-gpt"]
 
@@ -78,9 +80,9 @@ class GoogleGPTPage(BasePage):
         task_instructions: str | None
         query_instructions: str | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -93,6 +95,7 @@ class GoogleGPTPage(BasePage):
         max_context_words: int | None
         scroll_jump: int | None
 
+        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
         dense_weight: float | None = DocSearchRequest.__fields__[
             "dense_weight"
         ].field_info
@@ -110,7 +113,7 @@ class GoogleGPTPage(BasePage):
         final_search_query: str | None
 
     def render_form_v2(self):
-        st.text_area("##### Google Search Query", key="search_query")
+        st.text_area("#### Google Search Query", key="search_query")
         st.text_input("Search on a specific site *(optional)*", key="site_filter")
         prompt_vars_widget("task_instructions", "query_instructions")
 
@@ -144,7 +147,9 @@ class GoogleGPTPage(BasePage):
         st.write("---")
         serp_search_settings()
         st.write("---")
-        doc_search_settings(asr_allowed=False)
+        st.write("##### 🔎 Document Search Settings")
+        query_instructions_widget()
+        doc_search_advanced_settings()
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage

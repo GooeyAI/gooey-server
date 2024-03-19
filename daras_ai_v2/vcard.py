@@ -1,10 +1,10 @@
 import base64
-import time
 
 import requests
 from pydantic import BaseModel
 
 from daras_ai.image_input import resize_img_scale
+from daras_ai_v2.exceptions import raise_for_status, UserError
 
 # see - https://datatracker.ietf.org/doc/html/rfc6350#section-3.2
 CRLF = "\r\n"
@@ -42,7 +42,7 @@ class VCARD(BaseModel):
 
     def to_vcf_str(self, compress_and_base64: bool = True) -> str:
         if not self.format_name:
-            raise ValueError("Please provide a name")
+            raise UserError("Please provide a name for the contact")
         lines = [
             vard_line("FN", self.format_name),
         ]
@@ -115,7 +115,7 @@ class VCARD(BaseModel):
 def vard_img(prop: str, img: str, compress_and_base64: bool, fmt: str = "PNG") -> str:
     if compress_and_base64:
         r = requests.get(img)
-        r.raise_for_status()
+        raise_for_status(r)
         downscaled = resize_img_scale(r.content, (400, 400))
         img = base64.b64encode(downscaled).decode()
     return prop + ";" + vard_line(f"ENCODING=BASE64;TYPE={fmt}", img)

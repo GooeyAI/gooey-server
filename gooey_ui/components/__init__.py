@@ -1,7 +1,9 @@
 import base64
+import html as html_lib
 import math
 import textwrap
 import typing
+from datetime import datetime, timezone
 
 import numpy as np
 
@@ -28,8 +30,18 @@ def dummy(*args, **kwargs):
 spinner = dummy
 set_page_config = dummy
 form = dummy
-plotly_chart = dummy
 dataframe = dummy
+
+
+def countdown_timer(
+    end_time: datetime,
+    delay_text: str,
+) -> state.NestingCtx:
+    return _node(
+        "countdown-timer",
+        endTime=end_time.astimezone(timezone.utc).isoformat(),
+        delayText=delay_text,
+    )
 
 
 def nav_tabs():
@@ -71,9 +83,27 @@ def write(*objs: typing.Any, line_clamp: int = None, unsafe_allow_html=False, **
         )
 
 
-def markdown(body: str, *, line_clamp: int = None, unsafe_allow_html=False, **props):
+def center(direction="column") -> state.NestingCtx:
+    return div(
+        style={
+            "display": "flex",
+            "justifyContent": "center",
+            "alignItems": "center",
+            "textAlign": "center",
+            "flexDirection": direction,
+        }
+    )
+
+
+def newline():
+    html("<br/>")
+
+
+def markdown(body: str | None, *, line_clamp: int = None, unsafe_allow_html=False, **props):
     if body is None:
         return _node("markdown", body="", **props)
+    if not unsafe_allow_html:
+        body = html_lib.escape(body)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
     )
@@ -130,9 +160,9 @@ def success(body: str, icon: str = "✅", *, unsafe_allow_html=False):
         markdown(dedent(body), unsafe_allow_html=unsafe_allow_html)
 
 
-def caption(body: str, **props):
-    style = props.setdefault("style", {"fontSize": "0.9rem"})
-    markdown(body, className="text-muted", **props)
+def caption(body: str, className: str = None, **props):
+    className = className or "text-muted"
+    markdown(body, className=className, **props)
 
 
 def option_menu(*args, options, **kwargs):
@@ -184,6 +214,7 @@ def columns(
     *,
     gap: str = None,
     responsive: bool = True,
+    column_props: dict = {},
     **props,
 ) -> tuple[state.NestingCtx, ...]:
     if isinstance(spec, int):
@@ -192,7 +223,10 @@ def columns(
     props.setdefault("className", "row")
     with div(**props):
         return tuple(
-            div(className=f"col-lg-{p} {'col-12' if responsive else f'col-{p}'}")
+            div(
+                className=f"col-lg-{p} {'col-12' if responsive else f'col-{p}'}",
+                **column_props,
+            )
             for w in spec
             if (p := f"{round(w / total_weight * 12)}")
         )
@@ -202,6 +236,8 @@ def image(
     src: str | np.ndarray,
     caption: str = None,
     alt: str = None,
+    href: str = None,
+    show_download_button: bool = False,
     **props,
 ):
     if isinstance(src, np.ndarray):
@@ -222,12 +258,22 @@ def image(
             src=src,
             caption=dedent(caption),
             alt=alt or caption,
+            href=href,
             **props,
         ),
     ).mount()
+    if show_download_button:
+        download_button(
+            label='<i class="fa-regular fa-download"></i> Download', url=src
+        )
 
 
-def video(src: str, caption: str = None, autoplay: bool = False):
+def video(
+    src: str,
+    caption: str = None,
+    autoplay: bool = False,
+    show_download_button: bool = False,
+):
     autoplay_props = {}
     if autoplay:
         autoplay_props = {
@@ -250,15 +296,23 @@ def video(src: str, caption: str = None, autoplay: bool = False):
         name="video",
         props=dict(src=src, caption=dedent(caption), **autoplay_props),
     ).mount()
+    if show_download_button:
+        download_button(
+            label='<i class="fa-regular fa-download"></i> Download', url=src
+        )
 
 
-def audio(src: str, caption: str = None):
+def audio(src: str, caption: str = None, show_download_button: bool = False):
     if not src:
         return
     state.RenderTreeNode(
         name="audio",
         props=dict(src=src, caption=dedent(caption)),
     ).mount()
+    if show_download_button:
+        download_button(
+            label='<i class="fa-regular fa-download"></i> Download', url=src
+        )
 
 
 def text_area(
@@ -273,13 +327,12 @@ def text_area(
     **props,
 ) -> str:
     style = props.setdefault("style", {})
-    if key:
-        assert not value, "only one of value or key can be provided"
-    else:
-        key = md5_values(
-            "textarea", label, height, help, value, placeholder, label_visibility
-        )
-    value = str(state.session_state.setdefault(key, value))
+    # if key:
+    #     assert not value, "only one of value or key can be provided"
+    # else:
+    if not key:
+        key = md5_values("textarea", label, height, help, placeholder, label_visibility)
+    value = str(state.session_state.setdefault(key, value) or "")
     if label_visibility != "visible":
         label = None
     if disabled:
@@ -363,7 +416,7 @@ def multiselect(
 
 def selectbox(
     label: str,
-    options: typing.Sequence[T],
+    options: typing.Iterable[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
     key: str = None,
     help: str = None,
@@ -371,6 +424,7 @@ def selectbox(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     default_value: T = None,
+    **props,
 ) -> T | None:
     if not options:
         return None
@@ -395,9 +449,33 @@ def selectbox(
                 {"value": option, "label": str(format_func(option))}
                 for option in options
             ],
+            **props,
         ),
     ).mount()
     return value
+
+
+def download_button(
+    label: str,
+    url: str,
+    key: str = None,
+    help: str = None,
+    *,
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
+    disabled: bool = False,
+    **props,
+) -> bool:
+    url = furl(url).remove(fragment=True).url
+    return button(
+        component="download-button",
+        url=url,
+        label=label,
+        key=key,
+        help=help,
+        type=type,
+        disabled=disabled,
+        **props,
+    )
 
 
 def button(
@@ -405,14 +483,23 @@ def button(
     key: str = None,
     help: str = None,
     *,
-    type: typing.Literal["primary", "secondary"] = "secondary",
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
     disabled: bool = False,
+    component: typing.Literal["download-button", "gui-button"] = "gui-button",
     **props,
 ) -> bool:
+    """
+    Example:
+        st.button("Primary", key="test0", type="primary")
+        st.button("Secondary", key="test1")
+        st.button("Tertiary", key="test3", type="tertiary")
+        st.button("Link Button", key="test3", type="link")
+    """
     if not key:
         key = md5_values("button", label, help, type, props)
+    className = f"btn-{type} " + props.pop("className", "")
     state.RenderTreeNode(
-        name="gui-button",
+        name=component,
         props=dict(
             type="submit",
             value="yes",
@@ -420,10 +507,31 @@ def button(
             label=dedent(label),
             help=help,
             disabled=disabled,
+            className=className,
             **props,
         ),
     ).mount()
     return bool(state.session_state.pop(key, False))
+
+
+def anchor(
+    label: str,
+    href: str,
+    *,
+    type: typing.Literal["primary", "secondary", "tertiary", "link"] = "secondary",
+    disabled: bool = False,
+    unsafe_allow_html: bool = False,
+    new_tab: bool = False,
+    **props,
+):
+    className = f"btn btn-theme btn-{type} " + props.pop("className", "")
+    style = props.pop("style", {})
+    if disabled:
+        style["pointerEvents"] = "none"
+    if new_tab:
+        props["target"] = "_blank"
+    with tag("a", href=href, className=className, style=style, **props):
+        markdown(dedent(label), unsafe_allow_html=unsafe_allow_html)
 
 
 form_submit_button = button
@@ -453,6 +561,7 @@ def file_uploader(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     upload_meta: dict = None,
+    optional: bool = False,
 ):
     if label_visibility != "visible":
         label = None
@@ -466,6 +575,13 @@ def file_uploader(
             help,
             label_visibility,
         )
+    if optional:
+        if not checkbox(
+            label, value=bool(state.session_state.get(key)), disabled=disabled
+        ):
+            state.session_state.pop(key, None)
+            return None
+        label = None
     value = state.session_state.get(key)
     if not value:
         if accept_multiple_files:
@@ -501,60 +617,31 @@ def json(value: typing.Any, expanded: bool = False, depth: int = 1):
     ).mount()
 
 
-def data_table(file_url: str):
-    return _node("data-table", fileUrl=file_url)
+def data_table(file_url_or_cells: str | list):
+    if isinstance(file_url_or_cells, str):
+        file_url = file_url_or_cells
+        return _node("data-table", fileUrl=file_url)
+    else:
+        cells = file_url_or_cells
+        return _node("data-table-raw", cells=cells)
 
 
 def table(df: "pd.DataFrame"):
-    state.RenderTreeNode(
-        name="table",
-        children=[
-            state.RenderTreeNode(
-                name="thead",
-                children=[
-                    state.RenderTreeNode(
-                        name="tr",
-                        children=[
-                            state.RenderTreeNode(
-                                name="th",
-                                children=[
-                                    state.RenderTreeNode(
-                                        name="markdown",
-                                        props=dict(body=dedent(col)),
-                                    ),
-                                ],
-                            )
-                            for col in df.columns
-                        ],
-                    ),
-                ],
-            ),
-            state.RenderTreeNode(
-                name="tbody",
-                children=[
-                    state.RenderTreeNode(
-                        name="tr",
-                        children=[
-                            state.RenderTreeNode(
-                                name="td",
-                                children=[
-                                    state.RenderTreeNode(
-                                        name="markdown",
-                                        props=dict(body=dedent(str(value))),
-                                    ),
-                                ],
-                            )
-                            for value in row
-                        ],
-                    )
-                    for row in df.itertuples(index=False)
-                ],
-            ),
-        ],
-    ).mount()
+    with tag("table", className="table table-striped table-sm"):
+        with tag("thead"):
+            with tag("tr"):
+                for col in df.columns:
+                    with tag("th", scope="col"):
+                        html(dedent(col))
+        with tag("tbody"):
+            for row in df.itertuples(index=False):
+                with tag("tr"):
+                    for value in row:
+                        with tag("td"):
+                            html(dedent(str(value)))
 
 
-def radio(
+def horizontal_radio(
     label: str,
     options: typing.Sequence[T],
     format_func: typing.Callable[[T], typing.Any] = _default_format,
@@ -562,6 +649,46 @@ def radio(
     help: str = None,
     *,
     disabled: bool = False,
+    checked_by_default: bool = True,
+    label_visibility: LabelVisibility = "visible",
+    button_props: dict = {},
+) -> T | None:
+    if not options:
+        return None
+    options = list(options)
+    if not key:
+        key = md5_values("horizontal_radio", label, options, help, label_visibility)
+    value = state.session_state.get(key)
+    if (key not in state.session_state or value not in options) and checked_by_default:
+        value = options[0]
+    state.session_state.setdefault(key, value)
+    if label_visibility != "visible":
+        label = None
+    markdown(label)
+    for option in options:
+        if button(
+            format_func(option),
+            key=f"tab-{key}-{option}",
+            type="primary",
+            className="replicate-nav " + ("active" if value == option else ""),
+            disabled=disabled,
+            **button_props,
+        ):
+            state.session_state[key] = value = option
+            state.experimental_rerun()
+    return value
+
+
+def radio(
+    label: str,
+    options: typing.Sequence[T],
+    format_func: typing.Callable[[T], typing.Any] = _default_format,
+    key: str = None,
+    value: T = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    checked_by_default: bool = True,
     label_visibility: LabelVisibility = "visible",
 ) -> T | None:
     if not options:
@@ -569,10 +696,10 @@ def radio(
     options = list(options)
     if not key:
         key = md5_values("radio", label, options, help, label_visibility)
-    value = state.session_state.get(key)
-    if key not in state.session_state or value not in options:
+    value = state.session_state.setdefault(key, value)
+    if value not in options and checked_by_default:
         value = options[0]
-    state.session_state.setdefault(key, value)
+        state.session_state[key] = value
     if label_visibility != "visible":
         label = None
     markdown(label)
@@ -617,6 +744,38 @@ def text_input(
         **props,
     )
     return value or ""
+
+
+def date_input(
+    label: str,
+    value: str | None = None,
+    key: str = None,
+    help: str = None,
+    *,
+    disabled: bool = False,
+    label_visibility: LabelVisibility = "visible",
+    **props,
+) -> datetime | None:
+    value = _input_widget(
+        input_type="date",
+        label=label,
+        value=value,
+        key=key,
+        help=help,
+        disabled=disabled,
+        label_visibility=label_visibility,
+        style=dict(
+            border="1px solid hsl(0, 0%, 80%)",
+            padding="0.375rem 0.75rem",
+            borderRadius="0.25rem",
+            margin="0 0.5rem 0 0.5rem",
+        ),
+        **props,
+    )
+    try:
+        return datetime.strptime(value, "%Y-%m-%d") if value else None
+    except ValueError:
+        return None
 
 
 def password_input(
@@ -765,6 +924,37 @@ def _input_widget(
     return value
 
 
+def breadcrumbs(divider: str = "/", **props) -> state.NestingCtx:
+    style = props.pop("style", {}) | {"--bs-breadcrumb-divider": f"'{divider}'"}
+    with tag("nav", style=style, **props):
+        return tag("ol", className="breadcrumb mb-0")
+
+
+def breadcrumb_item(inner_html: str, link_to: str | None = None, **props):
+    className = "breadcrumb-item " + props.pop("className", "")
+    with tag("li", className=className, **props):
+        if link_to:
+            with tag("a", href=link_to):
+                html(inner_html)
+        else:
+            html(inner_html)
+
+
+def plotly_chart(figure_or_data, **kwargs):
+    data = (
+        figure_or_data.to_plotly_json()
+        if hasattr(figure_or_data, "to_plotly_json")
+        else figure_or_data
+    )
+    state.RenderTreeNode(
+        name="plotly-chart",
+        props=dict(
+            chart=data,
+            args=kwargs,
+        ),
+    ).mount()
+
+
 def dedent(text: str | None) -> str | None:
     if not text:
         return text
@@ -779,3 +969,29 @@ def js(src: str, **kwargs):
             args=kwargs,
         ),
     ).mount()
+
+
+def change_url(url: str, request):
+    """Change the url of the page, without reloading the page. Only for urls on the current domain due to browser security policies."""
+    # this is useful to store certain state inputs in the url to allow for sharing/returning to a state
+    old_url = furl(request.url).remove(origin=True).tostr()
+    url = furl(url).remove(origin=True).tostr()
+    if old_url == url:
+        return
+    # the request is likely processing which means it will overwrite the url we set once it is done
+    # so we set up a timer to keep setting the url until the request is done at which point we stop
+    js(
+        f"""
+        setTimeout(() => window.history.replaceState(null, '', '{url}'));
+        function change_url() {{
+            if (window.location.href.replace(window.location.origin, "") == '{old_url}') {{
+                clearInterval(window._change_url_timer);
+            }}
+            window.history.replaceState(null, '', '{url}');
+        }}
+        clearInterval(window._change_url_timer);
+        if (window.location.href.replace(window.location.origin, "") != '{url}') {{
+            window._change_url_timer = setInterval(change_url, 100);
+        }}
+        """,
+    )

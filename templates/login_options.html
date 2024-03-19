@@ -1,7 +1,9 @@
 {% extends 'base.html' %}
 
+{% block title %}Login to Gooey.AI{% endblock title %}
+
 {% block head %}
-    <title>Login - Gooey.AI</title>
+    <meta name="description" content="Sign in for incredible Open source, shared AI workflows."/>
     <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.css"/>
 {% endblock %}
 
@@ -13,7 +15,7 @@
             <h4 style="padding: 1rem">Loading...</h4>
         </div>
         <div style="padding: 1rem" id="firebaseui-auth-container"></div>
-        <p class="text-muted" style="font-size: 10px">💰 Sign up via Email does not activate credits. Please choose one of the top options instead.</p>
+        <p class="text-muted" style="font-size: 10px">💰 Sign up via non-Gmail accounts does not activate credits.</p>
     </div>
     <script src="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.js"></script>
     <script src="/static/js/login_options.js?v=2"></script>

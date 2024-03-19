@@ -29,9 +29,12 @@ from daras_ai_v2.stable_diffusion import (
     instruct_pix2pix,
 )
 
+DEFAULT_GOOGLE_IMG_GEN_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/dcd82b68-9400-11ee-9e3a-02420a0001ce/Search%20result%20photo.jpg.png"
+
 
 class GoogleImageGenPage(BasePage):
     title = "Render Image Search Results with AI"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/eb23c078-88da-11ee-aa86-02420a000165/web%20search%20render.png.png"
     workflow = Workflow.GOOGLE_IMAGE_GEN
     slug_versions = ["GoogleImageGen", "render-images-with-ai"]
 
@@ -72,6 +75,9 @@ class GoogleImageGenPage(BasePage):
 
         image_urls: list[str]
         selected_image: str | None
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_GOOGLE_IMG_GEN_META_IMG
 
     def related_workflows(self):
         from recipes.ObjectInpainting import ObjectInpaintingPage
@@ -174,7 +180,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
     def render_form_v2(self):
         st.text_input(
             """
-            ### 🔎 Google Image Search
+            #### 🔎 Google Image Search
             Type a query you'd use in [Google image search](https://images.google.com/?gws_rd=ssl)
             """,
             key="search_query",
@@ -182,7 +188,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         model_selector(Img2ImgModels)
         st.text_area(
             """
-            ### 👩‍💻 Prompt
+            #### 👩‍💻 Prompt
             Describe how you want to edit the photo in words
             """,
             key="text_prompt",
@@ -200,7 +206,7 @@ The result is a fantastic, one of kind image that's relevant to your search (and
         out_imgs = st.session_state.get("output_images")
         if out_imgs:
             for img in out_imgs:
-                st.image(img, caption="Generated Image")
+                st.image(img, caption="#### Generated Image", show_download_button=True)
         else:
             st.div()
 

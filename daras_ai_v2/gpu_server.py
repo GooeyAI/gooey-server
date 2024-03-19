@@ -2,12 +2,15 @@ import base64
 import datetime
 import os
 import typing
+from time import time
 
 import requests
 from furl import furl
 
 from daras_ai.image_input import storage_blob_for
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import raise_for_status, GPUError
+from gooeysite.bg_db_conn import get_celery_result_db_safe
 
 
 class GpuEndpoints:
@@ -32,7 +35,7 @@ def call_gpu_server(*, endpoint: str, input_data: dict) -> typing.Any:
         f"{endpoint}/predictions",
         json={"input": input_data},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     return r.json()["output"]
 
 
@@ -97,7 +100,7 @@ def call_gooey_gpu(
         str(endpoint),
         json={"pipeline": pipeline, "inputs": inputs},
     )
-    r.raise_for_status()
+    raise_for_status(r)
     return [blob.public_url for blob in blobs]
 
 
@@ -137,6 +140,7 @@ def get_celery():
         _app = Celery()
         _app.conf.broker_url = settings.GPU_CELERY_BROKER_URL
         _app.conf.result_backend = settings.GPU_CELERY_RESULT_BACKEND
+        _app.conf.result_extended = True
 
     return _app
 
@@ -148,8 +152,24 @@ def call_celery_task(
     inputs: dict,
     queue_prefix: str = "gooey-gpu",
 ):
-    queue = os.path.join(queue_prefix, pipeline["model_id"].strip()).strip("/")
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    queue = build_queue_name(queue_prefix, pipeline["model_id"])
     result = get_celery().send_task(
         task_name, kwargs=dict(pipeline=pipeline, inputs=inputs), queue=queue
     )
-    return result.get(disable_sync_subtasks=False)
+    s = time()
+    ret = get_celery_result_db_safe(result, propagate=False)
+    try:
+        result.maybe_throw()
+    except Exception as e:
+        raise GPUError(f"Error in GPU Task {queue}:{task_name} - {e}") from e
+    record_cost_auto(
+        model=queue, sku=ModelSku.gpu_ms, quantity=int((time() - s) * 1000)
+    )
+    return ret
+
+
+def build_queue_name(queue_prefix: str, model_id: str) -> str:
+    return os.path.join(queue_prefix, model_id.strip()).strip("/")

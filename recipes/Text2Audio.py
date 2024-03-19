@@ -14,7 +14,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     num_outputs_setting,
 )
 
-DEFAULT_TEXT2AUDIO_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ddc6e894-538b-11ee-a837-02420a000190/text2audio1%201.png.png"
+DEFAULT_TEXT2AUDIO_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85cf8ea4-9457-11ee-bd77-02420a0001ce/Text%20guided%20audio.jpg.png"
 
 
 class Text2AudioModels(Enum):
@@ -28,6 +28,7 @@ text2audio_model_ids = {
 
 class Text2AudioPage(BasePage):
     title = "Text guided audio generator"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/a4481d58-88d9-11ee-aa86-02420a000165/Text%20guided%20audio%20generator.png.png"
     workflow = Workflow.TEXT_2_AUDIO
     slug_versions = ["text2audio"]
 
@@ -48,9 +49,9 @@ class Text2AudioPage(BasePage):
         seed: int | None
         sd_2_upscaling: bool | None
 
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in Text2AudioModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in Text2AudioModels)]] | None
+        )
 
     class ResponseModel(BaseModel):
         output_audios: dict[
@@ -63,7 +64,7 @@ class Text2AudioPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### 👩‍💻 Prompt
+            #### 👩‍💻 Prompt
             Describe the audio that you'd like to generate.
             """,
             key="text_prompt",
@@ -113,9 +114,9 @@ class Text2AudioPage(BasePage):
                 ),
                 inputs=dict(
                     prompt=[request.text_prompt],
-                    negative_prompt=[request.negative_prompt]
-                    if request.negative_prompt
-                    else None,
+                    negative_prompt=(
+                        [request.negative_prompt] if request.negative_prompt else None
+                    ),
                     num_waveforms_per_prompt=request.num_outputs,
                     num_inference_steps=request.quality,
                     guidance_scale=request.guidance_scale,
@@ -145,4 +146,6 @@ def _render_output(state):
     for key in selected_models:
         output: dict = state.get("output_audios", {}).get(key, [])
         for audio in output:
-            st.audio(audio, caption=Text2AudioModels[key].value)
+            st.audio(
+                audio, caption=Text2AudioModels[key].value, show_download_button=True
+            )

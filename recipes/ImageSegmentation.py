@@ -28,9 +28,12 @@ from daras_ai_v2.repositioning import (
     repositioning_preview_widget,
 )
 
+DEFAULT_IMG_SEGMENTATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8363ed50-9401-11ee-878f-02420a0001cb/AI%20bg%20changer.jpg.png"
+
 
 class ImageSegmentationPage(BasePage):
     title = "AI Background Changer"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/06fc595e-88db-11ee-b428-02420a000168/AI%20Background%20Remover.png.png"
     workflow = Workflow.IMAGE_SEGMENTATION
     slug_versions = ["ImageSegmentation", "remove-image-background-with-ai"]
 
@@ -46,9 +49,9 @@ class ImageSegmentationPage(BasePage):
     class RequestModel(BaseModel):
         input_image: str
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in ImageSegmentationModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in ImageSegmentationModels)] | None
+        )
         mask_threshold: float | None
 
         rect_persepective_transform: bool | None
@@ -63,6 +66,9 @@ class ImageSegmentationPage(BasePage):
         cutout_image: str
         resized_image: str
         resized_mask: str
+
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_IMG_SEGMENTATION_META_IMG
 
     def related_workflows(self) -> list:
         from recipes.ObjectInpainting import ObjectInpaintingPage
@@ -80,7 +86,7 @@ class ImageSegmentationPage(BasePage):
     def render_form_v2(self):
         st.file_uploader(
             """
-            ### Input Photo
+            #### Input Photo
             Give us a photo of anything
             """,
             key="input_image",
@@ -336,7 +342,7 @@ class ImageSegmentationPage(BasePage):
         with col1:
             input_image = state.get("input_image")
             if input_image:
-                st.image(input_image, caption="Input Photo")
+                st.image(input_image, caption="Input Photo", show_download_button=True)
             else:
                 st.div()
 

@@ -35,7 +35,7 @@ else:
 HASHIDS_SALT = config("HASHIDS_SALT", default="")
 
 ALLOWED_HOSTS = ["*"]
-INTERNAL_IPS = ["127.0.0.1"]
+INTERNAL_IPS = ["127.0.0.1", "localhost"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Application definition
@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "bots",
     "django_extensions",
+    # "debug_toolbar",
     # the order matters, since we want to override the admin templates
     "django.forms",  # needed to override admin forms
     "django.contrib.admin",
@@ -55,6 +56,8 @@ INSTALLED_APPS = [
     "files",
     "url_shortener",
     "glossary_resources",
+    "usage_costs",
+    "embeddings",
 ]
 
 MIDDLEWARE = [
@@ -66,6 +69,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 
 ROOT_URLCONF = "gooeysite.urls"
@@ -161,6 +165,8 @@ from django.conf.locale.en import formats as es_formats
 
 es_formats.DATETIME_FORMAT = DATETIME_FORMAT
 
+SHORT_DATETIME_FORMAT = "%b %d, %Y %-I:%M %p"
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
@@ -224,6 +230,8 @@ UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
+GROQ_API_KEY = config("GROQ_API_KEY", default="")
+
 REPLICATE_API_KEY = config("REPLICATE_API_KEY", default="")
 TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
 
@@ -242,7 +250,18 @@ EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="sean@dara.network")
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
-SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 20)
+SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 60)
+
+DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default="") + [
+    # tab names
+    "api",
+    "examples",
+    "history",
+    "saved",
+    "integrations",
+    # other
+    "docs",
+]
 
 SAFTY_CHECKER_EXAMPLE_ID = "3rcxqx0r"
 SAFTY_CHECKER_BILLING_EMAIL = "support+mods@gooey.ai"
@@ -251,6 +270,10 @@ CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
 LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 1000, cast=int)
+
+LOW_BALANCE_EMAIL_CREDITS = config("LOW_BALANCE_EMAIL_CREDITS", 200, cast=int)
+LOW_BALANCE_EMAIL_DAYS = config("LOW_BALANCE_EMAIL_DAYS", 7, cast=int)
+LOW_BALANCE_EMAIL_ENABLED = config("LOW_BALANCE_EMAIL_ENABLED", True, cast=bool)
 
 stripe.api_key = config("STRIPE_SECRET_KEY", None)
 STRIPE_ENDPOINT_SECRET = config("STRIPE_ENDPOINT_SECRET", None)
@@ -266,6 +289,8 @@ APOLLO_API_KEY = config("APOLLO_API_KEY", None)
 FB_APP_ID = config("FB_APP_ID", "")
 FB_APP_SECRET = config("FB_APP_SECRET", "")
 FB_WEBHOOK_TOKEN = config("FB_WEBHOOK_TOKEN", "")
+FB_WHATSAPP_CONFIG_ID = config("FB_WHATSAPP_CONFIG_ID", "")
+WHATSAPP_2FA_PIN = config("WHATSAPP_2FA_PIN", "190604")
 WHATSAPP_ACCESS_TOKEN = config("WHATSAPP_ACCESS_TOKEN", None)
 SLACK_VERIFICATION_TOKEN = config("SLACK_VERIFICATION_TOKEN", "")
 SLACK_CLIENT_ID = config("SLACK_CLIENT_ID", "")
@@ -278,6 +303,8 @@ REDIS_URL = config("REDIS_URL", "redis://localhost:6379")
 # redis configured as cache backend
 REDIS_CACHE_URL = config("REDIS_CACHE_URL", "redis://localhost:6379")
 TWITTER_BEARER_TOKEN = config("TWITTER_BEARER_TOKEN", None)
+
+REDIS_MODELS_CACHE_EXPIRY = 60 * 60 * 24 * 7
 
 GPU_CELERY_BROKER_URL = config("GPU_CELERY_BROKER_URL", "amqp://localhost:5674")
 GPU_CELERY_RESULT_BACKEND = config(
@@ -293,6 +320,23 @@ AZURE_FORM_RECOGNIZER_KEY = config("AZURE_FORM_RECOGNIZER_KEY", "")
 AZURE_IMAGE_MODERATION_ENDPOINT = config("AZURE_IMAGE_MODERATION_ENDPOINT", "")
 AZURE_IMAGE_MODERATION_KEY = config("AZURE_IMAGE_MODERATION_KEY", "")
 
+AZURE_SPEECH_ENDPOINT = config("AZURE_SPEECH_ENDPOINT", "")
+AZURE_SPEECH_KEY = config("AZURE_SPEECH_KEY", "")
+
+AZURE_TTS_ENDPOINT = config("AZURE_TTS_ENDPOINT", "")
+
+AZURE_OPENAI_ENDPOINT = config("AZURE_OPENAI_ENDPOINT", "")
+AZURE_OPENAI_KEY = config("AZURE_OPENAI_KEY", "")
+
 DEEPGRAM_API_KEY = config("DEEPGRAM_API_KEY", "")
 
 ELEVEN_LABS_API_KEY = config("ELEVEN_LABS_API_KEY", "")
+
+# Paypal
+PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")
+PAYPAL_SECRET = config("PAYPAL_SECRET", "")
+PAYPAL_BASE = config("PAYPAL_BASE", "")
+
+VESPA_URL = config("VESPA_URL", "http://localhost:8085")
+VESPA_CONFIG_SERVER_URL = config("VESPA_CONFIG_SERVER_URL", "http://localhost:19071")
+VESPA_SCHEMA = config("VESPA_SCHEMA", "gooey")

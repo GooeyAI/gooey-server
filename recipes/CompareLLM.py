@@ -1,23 +1,28 @@
 import random
 import typing
 
-
-import gooey_ui as st
 from pydantic import BaseModel
 
+import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
+from daras_ai_v2.language_model import (
+    run_language_model,
+    LargeLanguageModels,
+    llm_price,
+    SUPERSCRIPT,
+)
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import prompt_vars_widget, render_prompt_vars
 
-DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/compare%20llm%20under%201%20mg%20gif.gif"
+DEFAULT_COMPARE_LM_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5e4f4c58-93fc-11ee-a39e-02420a0001ce/LLMs.jpg.png"
 
 
 class CompareLLMPage(BasePage):
     title = "Large Language Models: GPT-3"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ae42015e-88d7-11ee-aac9-02420a00016b/Compare%20LLMs.png.png"
     workflow = Workflow.COMPARE_LLM
     slug_versions = ["CompareLLM", "llm", "compare-large-language-models"]
 
@@ -31,9 +36,9 @@ class CompareLLMPage(BasePage):
 
     class RequestModel(BaseModel):
         input_prompt: str | None
-        selected_models: list[
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)]
-        ] | None
+        selected_models: (
+            list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
+        )
 
         avoid_repetition: bool | None
         num_outputs: int | None
@@ -53,6 +58,10 @@ class CompareLLMPage(BasePage):
 
     def preview_description(self, state: dict) -> str:
         return "Which language model works best your prompt? Compare your text generations across multiple large language models (LLMs) like OpenAI's evolving and latest ChatGPT engines and others like Curie, Ada, Babbage."
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["input_prompt", "selected_models"]
 
     def render_form_v2(self):
         st.text_area(
@@ -89,9 +98,9 @@ class CompareLLMPage(BasePage):
         state["output_text"] = output_text = {}
 
         for selected_model in request.selected_models:
-            yield f"Running {LargeLanguageModels[selected_model].value}..."
-
-            output_text[selected_model] = run_language_model(
+            model = LargeLanguageModels[selected_model]
+            yield f"Running {model.value}..."
+            ret = run_language_model(
                 model=selected_model,
                 quality=request.quality,
                 num_outputs=request.num_outputs,
@@ -99,7 +108,11 @@ class CompareLLMPage(BasePage):
                 prompt=prompt,
                 max_tokens=request.max_tokens,
                 avoid_repetition=request.avoid_repetition,
+                stream=True,
             )
+            for i, entries in enumerate(ret):
+                output_text[selected_model] = [e["content"] for e in entries]
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
         self._render_outputs(st.session_state, 450)
@@ -131,27 +144,10 @@ class CompareLLMPage(BasePage):
         selected_models = state.get("selected_models", [])
         total = 0
         for name in selected_models:
-            match name:
-                case LargeLanguageModels.gpt_4.name:
-                    total += 10
-                case LargeLanguageModels.gpt_3_5_turbo_16k.name:
-                    total += 2
-                case LargeLanguageModels.gpt_3_5_turbo.name:
-                    total += 1
-                case LargeLanguageModels.text_davinci_003.name | LargeLanguageModels.code_davinci_002.name:
-                    total += 10
-                case LargeLanguageModels.text_curie_001.name:
-                    total += 5
-                case LargeLanguageModels.text_babbage_001.name:
-                    total += 2
-                case LargeLanguageModels.text_ada_001.name:
-                    total += 1
-                case LargeLanguageModels.palm2_text.name:
-                    total += 15
-                case LargeLanguageModels.palm2_chat.name:
-                    total += 10
-                case LargeLanguageModels.llama2_70b_chat.name:
-                    total += 5
+            try:
+                total += llm_price[LargeLanguageModels[name]]
+            except KeyError:
+                total += 5
         return total * state.get("num_outputs", 1)
 
     def related_workflows(self) -> list:

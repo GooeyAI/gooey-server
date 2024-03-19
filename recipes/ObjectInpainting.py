@@ -24,9 +24,12 @@ from daras_ai_v2.repositioning import (
 )
 from daras_ai_v2.stable_diffusion import InpaintingModels
 
+DEFAULT_OBJECT_INPAINTING_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/4bca6982-9456-11ee-bc12-02420a0001cc/Product%20photo%20backgrounds.jpg.png"
+
 
 class ObjectInpaintingPage(BasePage):
     title = "Generate Product Photo Backgrounds"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f07b731e-88d9-11ee-a658-02420a000163/W.I.3.png.png"
     workflow = Workflow.OBJECT_INPAINTING
     slug_versions = ["ObjectInpainting", "product-photo-background-generator"]
 
@@ -73,6 +76,9 @@ class ObjectInpaintingPage(BasePage):
         # diffusion_images: list[str]
         output_images: list[str]
 
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_OBJECT_INPAINTING_META_IMG
+
     def related_workflows(self) -> list:
         from recipes.ImageSegmentation import ImageSegmentationPage
         from recipes.GoogleImageGen import GoogleImageGenPage
@@ -89,7 +95,7 @@ class ObjectInpaintingPage(BasePage):
     def render_form_v2(self):
         st.text_area(
             """
-            ### Prompt
+            #### Prompt
             Describe the scene that you'd like to generate. 
             """,
             key="text_prompt",
@@ -98,7 +104,7 @@ class ObjectInpaintingPage(BasePage):
 
         st.file_uploader(
             """
-            ### Object Photo
+            #### Object Photo
             Give us a photo of anything
             """,
             key="input_image",
@@ -195,7 +201,7 @@ class ObjectInpaintingPage(BasePage):
 
         if output_images:
             for url in output_images:
-                st.image(url, caption=f"{text_prompt}")
+                st.image(url, caption=f"{text_prompt}", show_download_button=True)
         else:
             st.div()
 
@@ -308,6 +314,8 @@ class ObjectInpaintingPage(BasePage):
         selected_model = state.get("selected_model")
         match selected_model:
             case InpaintingModels.dall_e.name:
-                return 20
+                unit_price = 20
             case _:
-                return 5
+                unit_price = 5
+
+        return unit_price * state.get("num_outputs", 1)

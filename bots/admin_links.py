@@ -1,3 +1,4 @@
+import re
 import typing
 
 from django.db import models
@@ -8,6 +9,7 @@ from furl import furl
 
 
 def open_in_new_tab(url: str, *, label: str = "", add_related_url: str = None) -> str:
+    label = re.sub(r"https?://", "", label)
     context = {
         "url": url,
         "label": label,
@@ -33,6 +35,7 @@ def list_related_html_url(
     query_param: str = None,
     instance_id: int = None,
     show_add: bool = True,
+    extra_label: str = None,
 ) -> typing.Optional[str]:
     num = manager.all().count()
 
@@ -58,6 +61,8 @@ def list_related_html_url(
     ).url
 
     label = f"{num} {meta.verbose_name if num == 1 else meta.verbose_name_plural}"
+    if extra_label:
+        label = f"{label} ({extra_label})"
 
     if show_add:
         add_related_url = furl(

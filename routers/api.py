@@ -30,11 +30,22 @@ from daras_ai_v2.base import (
     BasePage,
     StateKeys,
 )
+from gooeysite.bg_db_conn import get_celery_result_db_safe
 
 app = APIRouter()
 
 
 O = typing.TypeVar("O")
+
+
+class BalanceResponse(BaseModel):
+    balance: int = Field(description="Current balance in credits")
+
+
+@app.get("/v1/balance/", response_model=BalanceResponse)
+def get_balance(user: AppUser = Depends(api_auth_header)):
+    return BalanceResponse(balance=user.balance)
+
 
 ## v2
 
@@ -121,7 +132,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         return call_api(
             page_cls=page_cls,
             user=user,
-            request_body=page_request.dict(),
+            request_body=page_request.dict(exclude_unset=True),
             query_params=dict(request.query_params),
         )
 
@@ -175,7 +186,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         ret = call_api(
             page_cls=page_cls,
             user=user,
-            request_body=page_request.dict(),
+            request_body=page_request.dict(exclude_unset=True),
             query_params=dict(request.query_params),
             run_async=True,
         )
@@ -332,14 +343,11 @@ def submit_api_call(
     state = self.get_sr_from_query_params_dict(query_params).to_dict()
     if state is None:
         raise HTTPException(status_code=404)
-
     # set sane defaults
     for k, v in self.sane_defaults.items():
         state.setdefault(k, v)
-
-    # remove None values & insert request data
-    request_dict = {k: v for k, v in request_body.items() if v is not None}
-    state.update(request_dict)
+    # insert request data
+    state.update(request_body)
 
     # set streamlit session state
     st.set_session_state(state)
@@ -355,7 +363,7 @@ def submit_api_call(
             },
         )
     # create a new run
-    example_id, run_id, uid = self.create_new_run()
+    example_id, run_id, uid = self.create_new_run(is_api_call=True)
     # submit the task
     result = self.call_runner_task(example_id, run_id, uid, is_api_call=True)
     return self, result, run_id, uid
@@ -370,7 +378,7 @@ def build_api_response(
     run_async: bool,
     created_at: str,
 ):
-    web_url = str(furl(self.app_url(run_id=run_id, uid=uid)))
+    web_url = self.app_url(run_id=run_id, uid=uid)
     if run_async:
         status_url = str(
             furl(settings.API_BASE_URL, query_params=dict(run_id=run_id))
@@ -386,7 +394,7 @@ def build_api_response(
         }
     else:
         # wait for the result
-        result.get(disable_sync_subtasks=False)
+        get_celery_result_db_safe(result)
         state = self.run_doc_sr(run_id, uid).to_dict()
         # check for errors
         err_msg = state.get(StateKeys.error_msg)

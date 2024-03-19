@@ -1,18 +1,55 @@
-from daras_ai_v2.asr import google_translate_languages
+from daras_ai_v2.asr import google_translate_target_languages
 
-from daras_ai_v2.doc_search_settings_widgets import document_uploader
+from daras_ai_v2.doc_search_settings_widgets import (
+    document_uploader,
+    SUPPORTED_SPREADSHEET_TYPES,
+)
+
+
+def validate_glossary_document(document: str):
+    """
+    Throws AssertionError for the most common errors in a glossary document.
+    I.e. the glossary must have at least 2 columns, top row must be language codes or "description" or "pos"
+    """
+    import langcodes
+    from daras_ai_v2.vector_search import (
+        download_content_bytes,
+        tabular_bytes_to_str_df,
+        doc_url_to_file_metadata,
+    )
+
+    metadata = doc_url_to_file_metadata(document)
+    f_bytes, mime_type = download_content_bytes(
+        f_url=document, mime_type=metadata.mime_type
+    )
+    df = tabular_bytes_to_str_df(
+        f_name=metadata.name, f_bytes=f_bytes, mime_type=mime_type
+    )
+
+    if len(df.columns) < 2:
+        raise AssertionError(
+            f"Invalid glossary: must have at least 2 columns, but has {len(df.columns)}."
+        )
+    for col in df.columns:
+        if col not in ["description", "pos"]:
+            try:
+                langcodes.Language.get(col).language
+            except langcodes.LanguageTagError:
+                raise AssertionError(
+                    f'Invalid glossary: column header "{col}" is not a valid language code.'
+                )
 
 
 def glossary_input(
     label: str = "##### Glossary",
     key: str = "glossary_document",
-):
+) -> str:
     return document_uploader(
         label=label,
         key=key,
-        accept=[".csv", ".xlsx", ".xls", ".gsheet", ".ods", ".tsv"],
+        accept=SUPPORTED_SPREADSHEET_TYPES,
         accept_multiple_files=False,
-    )
+    )  # type: ignore
 
 
 def create_glossary(
@@ -95,7 +132,8 @@ def get_langcodes_from_df(df: "pd.DataFrame") -> list[str]:
     import langcodes
 
     supported = {
-        langcodes.Language.get(code).language for code in google_translate_languages()
+        langcodes.Language.get(code).language
+        for code in google_translate_target_languages()
     }
     ret = []
     for col in df.columns:

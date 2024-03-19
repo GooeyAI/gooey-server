@@ -1,10 +1,8 @@
-import json
 import os.path
-import subprocess
+import os.path
 import tempfile
 from enum import Enum
 
-import langcodes
 import requests
 import typing_extensions
 from django.db.models import F
@@ -12,48 +10,127 @@ from furl import furl
 
 import gooey_ui as st
 from daras_ai.image_input import upload_file_from_bytes, gs_url_to_uri
+from daras_ai_v2 import settings
+from daras_ai_v2.azure_asr import azure_asr
+from daras_ai_v2.exceptions import (
+    raise_for_status,
+    UserError,
+    ffmpeg,
+    call_cmd,
+    ffprobe,
+)
+from daras_ai_v2.functional import map_parallel, flatten
 from daras_ai_v2.gdrive_downloader import (
     is_gdrive_url,
     gdrive_download,
     gdrive_metadata,
     url_to_gdrive_file_id,
 )
-from daras_ai_v2 import settings
-from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.gpu_server import (
-    call_celery_task,
-)
+from daras_ai_v2.google_asr import gcp_asr_v1
+from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
+
+TRANSLATE_DETECT_BATCH_SIZE = 8
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
-
 TRANSLITERATION_SUPPORTED = {"ar", "bn", " gu", "hi", "ja", "kn", "ru", "ta", "te"}
 
-# below list was found experimentally since the supported languages list by google is actually wrong:
-CHIRP_SUPPORTED = {"af-ZA", "sq-AL", "am-ET", "ar-EG", "hy-AM", "as-IN", "ast-ES", "az-AZ", "eu-ES", "be-BY", "bs-BA", "bg-BG", "my-MM", "ca-ES", "ceb-PH", "ckb-IQ", "zh-Hans-CN", "yue-Hant-HK", "hr-HR", "cs-CZ", "da-DK", "nl-NL", "en-AU", "en-IN", "en-GB", "en-US", "et-EE", "fil-PH", "fi-FI", "fr-CA", "fr-FR", "gl-ES", "ka-GE", "de-DE", "el-GR", "gu-IN", "ha-NG", "iw-IL", "hi-IN", "hu-HU", "is-IS", "id-ID", "it-IT", "ja-JP", "jv-ID", "kea-CV", "kam-KE", "kn-IN", "kk-KZ", "km-KH", "ko-KR", "ky-KG", "lo-LA", "lv-LV", "ln-CD", "lt-LT", "luo-KE", "lb-LU", "mk-MK", "ms-MY", "ml-IN", "mt-MT", "mi-NZ", "mr-IN", "mn-MN", "ne-NP", "ny-MW", "oc-FR", "ps-AF", "fa-IR", "pl-PL", "pt-BR", "pa-Guru-IN", "ro-RO", "ru-RU", "nso-ZA", "sr-RS", "sn-ZW", "sd-IN", "si-LK", "sk-SK", "sl-SI", "so-SO", "es-ES", "es-US", "su-ID", "sw", "sv-SE", "tg-TJ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-PK", "uz-UZ", "vi-VN", "cy-GB", "wo-SN", "yo-NG", "zu-ZA"}  # fmt: skip
+# https://cloud.google.com/speech-to-text/docs/speech-to-text-supported-languages
+GCP_V1_SUPPORTED = {
+    "af-ZA", "sq-AL", "am-ET", "ar-DZ", "ar-BH", "ar-EG", "ar-IQ", "ar-IL", "ar-JO", "ar-KW", "ar-LB", "ar-MR", "ar-MA",
+    "ar-OM", "ar-QA", "ar-SA", "ar-PS", "ar-SY", "ar-TN", "ar-AE", "ar-YE", "hy-AM", "az-AZ", "eu-ES", "bn-BD", "bn-IN",
+    "bs-BA", "bg-BG", "my-MM", "ca-ES", "yue-Hant-HK", "zh", "zh-TW", "hr-HR", "cs-CZ",
+    "da-DK", "nl-BE", "nl-NL", "en-AU", "en-CA", "en-GH", "en-HK", "en-IN", "en-IE", "en-KE", "en-NZ", "en-NG", "en-PK",
+    "en-PH", "en-SG", "en-ZA", "en-TZ", "en-GB", "en-US", "et-EE", "fil-PH", "fi-FI", "fr-BE", "fr-CA", "fr-FR",
+    "fr-CH", "gl-ES", "ka-GE", "de-AT", "de-DE", "de-CH", "el-GR", "gu-IN", "iw-IL", "hi-IN", "hu-HU", "is-IS", "id-ID",
+    "it-IT", "it-CH", "ja-JP", "jv-ID", "kn-IN", "kk-KZ", "km-KH", "ko-KR", "lo-LA", "lv-LV", "lt-LT", "mk-MK", "ms-MY",
+    "ml-IN", "mr-IN", "mn-MN", "ne-NP", "no-NO", "fa-IR", "pl-PL", "pt-BR", "pt-PT", "pa-Guru-IN", "ro-RO", "ru-RU",
+    "sr-RS", "si-LK", "sk-SK", "sl-SI", "es-AR", "es-BO", "es-CL", "es-CO", "es-CR", "es-DO", "es-EC", "es-SV", "es-GT",
+    "es-HN", "es-MX", "es-NI", "es-PA", "es-PY", "es-PE", "es-PR", "es-ES", "es-US", "es-UY", "es-VE", "su-ID", "sw-KE",
+    "sw-TZ", "sv-SE", "ta-IN", "ta-MY", "ta-SG", "ta-LK", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-IN", "ur-PK", "uz-UZ",
+    "vi-VN", "zu-ZA",
+}  # fmt: skip
 
-WHISPER_SUPPORTED = {"af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de", "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no", "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"}  # fmt: skip
+# https://cloud.google.com/speech-to-text/v2/docs/speech-to-text-supported-languages
+CHIRP_SUPPORTED = {
+    "af-ZA", "sq-AL", "am-ET", "ar-EG", "hy-AM", "as-IN", "ast-ES", "az-AZ", "eu-ES", "be-BY", "bs-BA", "bg-BG",
+    "my-MM", "ca-ES", "ceb-PH", "ckb-IQ", "yue-Hant-HK", "zh-TW", "hr-HR", "cs-CZ", "da-DK", "nl-NL",
+    "en-AU", "en-IN", "en-GB", "en-US", "et-EE", "fil-PH", "fi-FI", "fr-CA", "fr-FR", "gl-ES", "ka-GE", "de-DE",
+    "el-GR", "gu-IN", "ha-NG", "iw-IL", "hi-IN", "hu-HU", "is-IS", "id-ID", "it-IT", "ja-JP", "jv-ID", "kea-CV",
+    "kam-KE", "kn-IN", "kk-KZ", "km-KH", "ko-KR", "ky-KG", "lo-LA", "lv-LV", "ln-CD", "lt-LT", "luo-KE", "lb-LU",
+    "mk-MK", "ms-MY", "ml-IN", "mt-MT", "mi-NZ", "mr-IN", "mn-MN", "ne-NP", "no-NO", "ny-MW", "oc-FR", "ps-AF", "fa-IR",
+    "pl-PL", "pt-BR", "pa-Guru-IN", "ro-RO", "ru-RU", "nso-ZA", "sr-RS", "sn-ZW", "sd-IN", "si-LK", "sk-SK", "sl-SI",
+    "so-SO", "es-ES", "es-US", "su-ID", "sw", "sv-SE", "tg-TJ", "ta-IN", "te-IN", "th-TH", "tr-TR", "uk-UA", "ur-PK",
+    "uz-UZ", "vi-VN", "cy-GB", "wo-SN", "yo-NG", "zu-ZA"
+}  # fmt: skip
+
+WHISPER_SUPPORTED = {
+    "af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de",
+    "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no",
+    "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy"
+}  # fmt: skip
+
+# See page 14 of https://scontent-sea1-1.xx.fbcdn.net/v/t39.2365-6/369747868_602316515432698_2401716319310287708_n.pdf?_nc_cat=106&ccb=1-7&_nc_sid=3c67a6&_nc_ohc=_5cpNOcftdYAX8rCrVo&_nc_ht=scontent-sea1-1.xx&oh=00_AfDVkx7XubifELxmB_Un-yEYMJavBHFzPnvTbTlalbd_1Q&oe=65141B39
+# For now, below are listed the languages that support ASR. Note that Seamless only accepts ISO 639-3 codes.
+SEAMLESS_SUPPORTED = {
+    "afr", "amh", "arb", "ary", "arz", "asm", "ast", "azj", "bel", "ben", "bos", "bul", "cat", "ceb", "ces", "ckb",
+    "cmn", "cym", "dan", "deu", "ell", "eng", "est", "eus", "fin", "fra", "gaz", "gle", "glg", "guj", "heb", "hin",
+    "hrv", "hun", "hye", "ibo", "ind", "isl", "ita", "jav", "jpn", "kam", "kan", "kat", "kaz", "kea", "khk", "khm",
+    "kir", "kor", "lao", "lit", "ltz", "lug", "luo", "lvs", "mai", "mal", "mar", "mkd", "mlt", "mni", "mya", "nld",
+    "nno", "nob", "npi", "nya", "oci", "ory", "pan", "pbt", "pes", "pol", "por", "ron", "rus", "slk", "slv", "sna",
+    "snd", "som", "spa", "srp", "swe", "swh", "tam", "tel", "tgk", "tgl", "tha", "tur", "ukr", "urd", "uzn", "vie",
+    "xho", "yor", "yue", "zlm", "zul"
+}  # fmt: skip
+
+AZURE_SUPPORTED = {
+    "af-ZA", "am-ET", "ar-AE", "ar-BH", "ar-DZ", "ar-EG", "ar-IL", "ar-IQ", "ar-JO", "ar-KW", "ar-LB", "ar-LY", "ar-MA",
+    "ar-OM", "ar-PS", "ar-QA", "ar-SA", "ar-SY", "ar-TN", "ar-YE", "az-AZ", "bg-BG", "bn-IN", "bs-BA", "ca-ES", "cs-CZ",
+    "cy-GB", "da-DK", "de-AT", "de-CH", "de-DE", "el-GR", "en-AU", "en-CA", "en-GB", "en-GH", "en-HK", "en-IE", "en-IN",
+    "en-KE", "en-NG", "en-NZ", "en-PH", "en-SG", "en-TZ", "en-US", "en-ZA", "es-AR", "es-BO", "es-CL", "es-CO", "es-CR",
+    "es-CU", "es-DO", "es-EC", "es-ES", "es-GQ", "es-GT", "es-HN", "es-MX", "es-NI", "es-PA", "es-PE", "es-PR", "es-PY",
+    "es-SV", "es-US", "es-UY", "es-VE", "et-EE", "eu-ES", "fa-IR", "fi-FI", "fil-PH", "fr-BE", "fr-CA", "fr-CH",
+    "fr-FR", "ga-IE", "gl-ES", "gu-IN", "he-IL", "hi-IN", "hr-HR", "hu-HU", "hy-AM", "id-ID", "is-IS", "it-CH", "it-IT",
+    "ja-JP", "jv-ID", "ka-GE", "kk-KZ", "km-KH", "kn-IN", "ko-KR", "lo-LA", "lt-LT", "lv-LV", "mk-MK", "ml-IN", "mn-MN",
+    "mr-IN", "ms-MY", "mt-MT", "my-MM", "nb-NO", "ne-NP", "nl-BE", "nl-NL", "pa-IN", "pl-PL", "ps-AF", "pt-BR", "pt-PT",
+    "ro-RO", "ru-RU", "si-LK", "sk-SK", "sl-SI", "so-SO", "sq-AL", "sr-RS", "sv-SE", "sw-KE", "sw-TZ", "ta-IN", "te-IN",
+    "th-TH", "tr-TR", "uk-UA", "ur-IN", "uz-UZ", "vi-VN", "wuu-CN", "yue-CN", "zh-CN", "zh-CN-shandong",
+    "zh-CN-sichuan", "zh-HK", "zh-TW", "zu-ZA"
+}  # fmt: skip
+
+# https://deepgram.com/product/languages for the "general" model:
+# DEEPGRAM_SUPPORTED = {"nl","en","en-AU","en-US","en-GB","en-NZ","en-IN","fr","fr-CA","de","hi","hi-Latn","id","it","ja","ko","cmn-Hans-CN","cmn-Hant-TW","no","pl","pt","pt-PT","pt-BR","ru","es","es-419","sv","tr","uk"}  # fmt: skip
+# but we only have the Nova tier so these are our languages (https://developers.deepgram.com/docs/models-languages-overview):
+DEEPGRAM_SUPPORTED = {"en", "en-US", "en-AU", "en-GB", "en-NZ", "en-IN", "es", "es-419"}  # fmt: skip
 
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
+    whisper_large_v3 = "Whisper Large v3 (openai)"
     whisper_hindi_large_v2 = "Whisper Hindi Large v2 (Bhashini)"
     whisper_telugu_large_v2 = "Whisper Telugu Large v2 (Bhashini)"
     nemo_english = "Conformer English (ai4bharat.org)"
     nemo_hindi = "Conformer Hindi (ai4bharat.org)"
     vakyansh_bhojpuri = "Vakyansh Bhojpuri (Open-Speech-EkStep)"
-    usm = "Chirp / USM (Google)"
+    gcp_v1 = "Google Cloud V1"
+    usm = "Chirp / USM (Google V2)"
     deepgram = "Deepgram"
+    azure = "Azure Speech"
+    seamless_m4t = "Seamless M4T (Facebook Research)"
+
+    def supports_auto_detect(self) -> bool:
+        return self not in {self.azure, self.gcp_v1}
 
 
 asr_model_ids = {
+    AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:37dfc0d6a7eb43ff84e230f74a24dab84e6bb7756c9b457dbdcceca3de7a4a04",
     AsrModels.whisper_large_v2: "openai/whisper-large-v2",
     AsrModels.whisper_hindi_large_v2: "vasista22/whisper-hindi-large-v2",
     AsrModels.whisper_telugu_large_v2: "vasista22/whisper-telugu-large-v2",
     AsrModels.vakyansh_bhojpuri: "Harveenchadha/vakyansh-wav2vec2-bhojpuri-bhom-60",
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
+    AsrModels.seamless_m4t: "facebook/hf-seamless-m4t-large",
 }
 
 forced_asr_languages = {
@@ -65,9 +142,13 @@ forced_asr_languages = {
 }
 
 asr_supported_languages = {
+    AsrModels.whisper_large_v3: WHISPER_SUPPORTED,
     AsrModels.whisper_large_v2: WHISPER_SUPPORTED,
+    AsrModels.gcp_v1: GCP_V1_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
-    AsrModels.deepgram: WHISPER_SUPPORTED,
+    AsrModels.deepgram: DEEPGRAM_SUPPORTED,
+    AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
+    AsrModels.azure: AZURE_SUPPORTED,
 }
 
 
@@ -94,6 +175,8 @@ def google_translate_language_selector(
     ###### Google Translate (*optional*)
     """,
     key="google_translate_target",
+    allow_none=True,
+    **kwargs,
 ):
     """
     Streamlit widget for selecting a language for Google Translate.
@@ -101,19 +184,21 @@ def google_translate_language_selector(
         label: the label to display
         key: the key to save the selected language to in the session state
     """
-    languages = google_translate_languages()
+    languages = google_translate_target_languages()
     options = list(languages.keys())
-    options.insert(0, None)
-    st.selectbox(
+    if allow_none:
+        options.insert(0, None)
+    return st.selectbox(
         label=label,
         key=key,
         format_func=lambda k: languages[k] if k else "———",
         options=options,
+        **kwargs,
     )
 
 
-@redis_cache_decorator
-def google_translate_languages() -> dict[str, str]:
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def google_translate_target_languages() -> dict[str, str]:
     """
     Get list of supported languages for Google Translate.
     :return: Dictionary of language codes and display names.
@@ -133,18 +218,52 @@ def google_translate_languages() -> dict[str, str]:
     }
 
 
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def google_translate_source_languages() -> dict[str, str]:
+    """
+    Get list of supported languages for Google Translate.
+    :return: Dictionary of language codes and display names.
+    """
+    from google.cloud import translate
+
+    _, project = get_google_auth_session()
+    parent = f"projects/{project}/locations/global"
+    client = translate.TranslationServiceClient()
+    supported_languages = client.get_supported_languages(
+        parent=parent, display_language_code="en"
+    )
+    return {
+        lang.language_code: lang.display_name
+        for lang in supported_languages.languages
+        if lang.support_source
+    }
+
+
+def get_language_in_collection(langcode: str, languages):
+    import langcodes
+
+    for lang in languages:
+        if langcodes.get(lang).language == langcodes.get(langcode).language:
+            return langcode
+    return None
+
+
 def asr_language_selector(
     selected_model: AsrModels,
     label="##### Spoken Language",
     key="language",
 ):
+    import langcodes
+
     # don't show language selector for models with forced language
     forced_lang = forced_asr_languages.get(selected_model)
     if forced_lang:
         st.session_state[key] = forced_lang
         return forced_lang
 
-    options = [None, *asr_supported_languages.get(selected_model, [])]
+    options = list(asr_supported_languages.get(selected_model, []))
+    if selected_model and selected_model.supports_auto_detect():
+        options.insert(0, None)
 
     # handle non-canonical language codes
     old_val = st.session_state.get(key)
@@ -182,13 +301,30 @@ def run_google_translate(
         list[str]: Translated text.
     """
     from google.cloud import translate_v2 as translate
+    import langcodes
+
+    # convert to BCP-47 format (google handles consistent language codes but sometimes gets confused by a mix of iso2 and iso3 which we have)
+    if source_language:
+        source_language = langcodes.Language.get(source_language).to_tag()
+        source_language = get_language_in_collection(
+            source_language, google_translate_source_languages().keys()
+        )  # this will default to autodetect if language is not found as supported
+    target_language = langcodes.Language.get(target_language).to_tag()
+    target_language: str | None = get_language_in_collection(
+        target_language, google_translate_target_languages().keys()
+    )
+    if not target_language:
+        raise UserError(f"Unsupported target language: {target_language!r}")
 
     # if the language supports transliteration, we should check if the script is Latin
     if source_language and source_language not in TRANSLITERATION_SUPPORTED:
         language_codes = [source_language] * len(texts)
     else:
         translate_client = translate.Client()
-        detections = translate_client.detect_language(texts)
+        detections = flatten(
+            translate_client.detect_language(texts[i : i + TRANSLATE_DETECT_BATCH_SIZE])
+            for i in range(0, len(texts), TRANSLATE_DETECT_BATCH_SIZE)
+        )
         language_codes = [detection["language"] for detection in detections]
 
     return map_parallel(
@@ -197,6 +333,7 @@ def run_google_translate(
         ),
         texts,
         language_codes,
+        max_workers=TRANSLATE_DETECT_BATCH_SIZE,
     )
 
 
@@ -213,19 +350,20 @@ def _translate_text(
     )
 
     # prevent incorrect API calls
-    if source_language == target_language or not text:
+    if not text or source_language == target_language or source_language == "und":
         return text
 
     if source_language == "wo-SN" or target_language == "wo-SN":
         return _MinT_translate_one_text(text, source_language, target_language)
 
     config = {
-        "source_language_code": source_language,
         "target_language_code": target_language,
         "contents": text,
         "mime_type": "text/plain",
         "transliteration_config": {"enable_transliteration": enable_transliteration},
     }
+    if source_language != "auto":
+        config["source_language_code"] = source_language
 
     # glossary does not work with transliteration
     if glossary_url and not enable_transliteration:
@@ -248,7 +386,7 @@ def _translate_text(
         f"https://translation.googleapis.com/v3/projects/{project}/locations/{location}:translateText",
         json=config,
     )
-    res.raise_for_status()
+    raise_for_status(res)
     data = res.json()
     try:
         result = data["glossaryTranslations"][0]["translatedText"]
@@ -263,13 +401,15 @@ _session = None
 def _MinT_translate_one_text(
     text: str, source_language: str, target_language: str
 ) -> str:
+    import langcodes
+
     source_language = langcodes.Language.get(source_language).language
     target_language = langcodes.Language.get(target_language).language
     res = requests.post(
         f"https://translate.wmcloud.org/api/translate/{source_language}/{target_language}",
         json={"text": text},
     )
-    res.raise_for_status()
+    raise_for_status(res)
 
     # e.g. {"model":"IndicTrans2_indec_en","sourcelanguage":"hi","targetlanguage":"en","translation":"hello","translationtime":0.8}
     tanslation = res.json()
@@ -311,15 +451,16 @@ def run_asr(
     import google.cloud.speech_v2 as cloud_speech
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding
+    from daras_ai_v2.vector_search import is_yt_url
+    import langcodes
 
     selected_model = AsrModels[selected_model]
     output_format = AsrOutputFormat[output_format]
-    is_youtube_url = "youtube" in audio_url or "youtu.be" in audio_url
-    if is_youtube_url:
-        audio_url, size = download_youtube_to_wav(audio_url)
+    if is_yt_url(audio_url):
+        audio_url, size = download_youtube_to_wav_url(audio_url)
     elif is_gdrive_url(furl(audio_url)):
         meta: dict[str, str] = gdrive_metadata(url_to_gdrive_file_id(furl(audio_url)))
-        anybytes, ext = gdrive_download(
+        anybytes, _ = gdrive_download(
             furl(audio_url), meta.get("mimeType", "audio/wav")
         )
         wavbytes, size = audio_bytes_to_wav(anybytes)
@@ -332,7 +473,22 @@ def run_asr(
         audio_url, size = audio_url_to_wav(audio_url)
     is_short = size < SHORT_FILE_CUTOFF
 
-    if selected_model == AsrModels.deepgram:
+    if selected_model == AsrModels.azure:
+        return azure_asr(audio_url, language)
+    elif selected_model == AsrModels.whisper_large_v3:
+        import replicate
+
+        config = {
+            "audio": audio_url,
+            "return_timestamps": output_format != AsrOutputFormat.text,
+        }
+        if language:
+            config["language"] = language
+        data = replicate.run(
+            asr_model_ids[AsrModels.whisper_large_v3],
+            input=config,
+        )
+    elif selected_model == AsrModels.deepgram:
         r = requests.post(
             "https://api.deepgram.com/v1/listen",
             headers={
@@ -349,7 +505,7 @@ def run_asr(
                 "url": audio_url,
             },
         )
-        r.raise_for_status()
+        raise_for_status(r)
         data = r.json()
         result = data["results"]["channels"][0]["alternatives"][0]
         chunk = None
@@ -367,7 +523,20 @@ def run_asr(
         return "\n".join(
             f"Speaker {chunk['speaker']}: {chunk['text']}" for chunk in chunks
         )
-
+    elif selected_model == AsrModels.seamless_m4t:
+        data = call_celery_task(
+            "seamless",
+            pipeline=dict(
+                model_id=asr_model_ids[AsrModels.seamless_m4t],
+            ),
+            inputs=dict(
+                audio=audio_url,
+                task="ASR",
+                src_lang=language,
+            ),
+        )
+    elif selected_model == AsrModels.gcp_v1:
+        return gcp_asr_v1(audio_url, language)
     elif selected_model == AsrModels.usm:
         location = settings.GCP_REGION
 
@@ -476,7 +645,7 @@ def run_asr(
             assert data.get("chunks"), f"{selected_model.value} can't generate VTT"
             return generate_vtt(data["chunks"])
         case _:
-            raise ValueError(f"Invalid output format: {output_format}")
+            raise UserError(f"Invalid output format: {output_format}")
 
 
 def _get_or_create_recognizer(
@@ -516,17 +685,23 @@ def _get_or_create_recognizer(
 FFMPEG_WAV_ARGS = ["-vn", "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000"]
 
 
-def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
+def download_youtube_to_wav_url(youtube_url: str) -> tuple[str, int]:
     """
     Convert a youtube video to wav audio file.
     Returns:
         str: url of the wav audio file.
     """
+    wavdata = download_youtube_to_wav(youtube_url)
+    # upload the wav file
+    return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
+
+
+def download_youtube_to_wav(youtube_url: str) -> bytes:
     with tempfile.TemporaryDirectory() as tmpdir:
         infile = os.path.join(tmpdir, "infile")
         outfile = os.path.join(tmpdir, "outfile.wav")
         # run yt-dlp to download audio
-        args = [
+        call_cmd(
             "yt-dlp",
             "--no-playlist",
             "--format",
@@ -534,23 +709,18 @@ def download_youtube_to_wav(youtube_url: str) -> tuple[str, int]:
             "--output",
             infile,
             youtube_url,
-        ]
-        print("\t$ " + " ".join(args))
-        subprocess.check_call(args)
+        )
         # convert audio to single channel wav
-        args = ["ffmpeg", "-y", "-i", infile, *FFMPEG_WAV_ARGS, outfile]
-        print("\t$ " + " ".join(args))
-        subprocess.check_call(args)
+        ffmpeg("-i", infile, *FFMPEG_WAV_ARGS, outfile)
         # read wav file into memory
         with open(outfile, "rb") as f:
             wavdata = f.read()
-    # upload the wav file
-    return upload_file_from_bytes("yt_audio.wav", wavdata, "audio/wav"), len(wavdata)
+    return wavdata
 
 
 def audio_url_to_wav(audio_url: str) -> tuple[str, int]:
     r = requests.get(audio_url)
-    r.raise_for_status()
+    raise_for_status(r)
 
     wavdata, size = audio_bytes_to_wav(r.content)
     if not wavdata:
@@ -571,43 +741,12 @@ def audio_bytes_to_wav(audio_bytes: bytes) -> tuple[bytes | None, int]:
 
         with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
             # convert audio to single channel wav
-            args = [
-                "ffmpeg",
-                "-y",
-                "-i",
-                infile.name,
-                *FFMPEG_WAV_ARGS,
-                outfile.name,
-            ]
-            print("\t$ " + " ".join(args))
-            try:
-                subprocess.check_output(args, stderr=subprocess.STDOUT)
-            except subprocess.CalledProcessError as e:
-                ffmpeg_output_error = ValueError(e.output, e)
-                raise ValueError(
-                    "Invalid audio file. Could not convert audio to wav format. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
-                ) from ffmpeg_output_error
+            ffmpeg("-i", infile.name, *FFMPEG_WAV_ARGS, outfile.name)
             return outfile.read(), os.path.getsize(outfile.name)
 
 
 def check_wav_audio_format(filename: str) -> bool:
-    args = [
-        "ffprobe",
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_streams",
-        filename,
-    ]
-    print("\t$ " + " ".join(args))
-    try:
-        data = json.loads(subprocess.check_output(args, stderr=subprocess.STDOUT))
-    except subprocess.CalledProcessError as e:
-        ffmpeg_output_error = ValueError(e.output, e)
-        raise ValueError(
-            "Invalid audio file. Please confirm the file is not corrupted and has a supported format (google 'ffmpeg supported audio file types')"
-        ) from ffmpeg_output_error
+    data = ffprobe(filename)
     return (
         len(data["streams"]) == 1
         and data["streams"][0]["codec_name"] == "pcm_s16le"

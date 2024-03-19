@@ -2,20 +2,21 @@ import pytest
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from bots.models import SavedRun
-from daras_ai_v2.all_pages import all_api_pages
+from bots.models import PublishedRun, Workflow
+from daras_ai_v2.all_pages import all_api_pages, all_hidden_pages
 from daras_ai_v2.tabs_widget import MenuTabs
-from routers import facebook
-from routers.slack import slack_connect_redirect_shortcuts, slack_connect_redirect
+from routers import facebook_api
+from routers.slack_api import slack_connect_redirect_shortcuts, slack_connect_redirect
 from server import app
 
 client = TestClient(app)
 
 excluded_endpoints = [
-    facebook.fb_webhook_verify.__name__,  # gives 403
+    facebook_api.fb_webhook_verify.__name__,  # gives 403
     slack_connect_redirect.__name__,
     slack_connect_redirect_shortcuts.__name__,
     "get_run_status",  # needs query params
+    "get_balance",  # needs authentication
 ]
 
 route_paths = [
@@ -31,39 +32,36 @@ route_paths = [
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("path", route_paths)
-def test_all_get(path):
+def test_all_get(threadpool_subtest):
+    for path in route_paths:
+        threadpool_subtest(_test_get_path, path)
+
+
+def _test_get_path(path):
     r = client.get(path, allow_redirects=False)
     assert r.ok
 
 
-page_slugs = [slug for page_cls in all_api_pages for slug in page_cls.slug_versions]
-tabs = list(MenuTabs.paths.values())
+@pytest.mark.django_db
+def test_all_slugs(threadpool_subtest):
+    for page_cls in all_api_pages + all_hidden_pages:
+        for slug in page_cls.slug_versions:
+            for tab in MenuTabs.paths.values():
+                url = f"/{slug}/{tab}"
+                threadpool_subtest(_test_post_path, url)
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("slug", page_slugs)
-@pytest.mark.parametrize("tab", tabs)
-def test_page_slugs(slug, tab):
-    r = client.post(
-        f"/{slug}/{tab}",
-        json={},
-        allow_redirects=True,
-    )
+def test_all_examples(threadpool_subtest):
+    qs = PublishedRun.objects.exclude(
+        is_approved_example=False, published_run_id=""
+    ).order_by("workflow")
+    for pr in qs:
+        slug = Workflow(pr.workflow).page_cls.slug_versions[-1]
+        url = f"/{slug}?example_id={pr.published_run_id}"
+        threadpool_subtest(_test_post_path, url)
+
+
+def _test_post_path(url):
+    r = client.post(url, json={}, allow_redirects=True)
     assert r.status_code == 200
-
-
-@pytest.mark.django_db
-def test_example_slugs(subtests):
-    for page_cls in all_api_pages:
-        for tab in tabs:
-            for example_id in SavedRun.objects.filter(
-                workflow=page_cls.workflow,
-                hidden=False,
-                example_id__isnull=False,
-            ).values_list("example_id", flat=True):
-                slug = page_cls.slug_versions[0]
-                url = f"/{slug}/{tab}?example_id={example_id}"
-                with subtests.test(msg=url):
-                    r = client.post(url, json={}, allow_redirects=True)
-                    assert r.status_code == 200

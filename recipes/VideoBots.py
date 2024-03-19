@@ -1,9 +1,8 @@
-import os
-import os.path
-import re
+import json
+import mimetypes
 import typing
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -17,24 +16,45 @@ from daras_ai_v2.asr import (
     run_google_translate,
     google_translate_language_selector,
 )
-from daras_ai_v2.base import BasePage, MenuTabs, StateKeys
-from daras_ai_v2.doc_search_settings_widgets import (
-    doc_search_settings,
-    document_uploader,
+from daras_ai_v2.azure_doc_extract import (
+    azure_form_recognizer,
+    azure_form_recognizer_models,
 )
-from daras_ai_v2.glossary import glossary_input
+from daras_ai_v2.base import BasePage, MenuTabs
+from daras_ai_v2.bot_integration_widgets import (
+    general_integration_settings,
+    slack_specific_settings,
+    broadcast_input,
+    get_bot_test_link,
+)
+from daras_ai_v2.doc_search_settings_widgets import (
+    query_instructions_widget,
+    keyword_instructions_widget,
+    doc_search_advanced_settings,
+    doc_extract_selector,
+    document_uploader,
+    citation_style_selector,
+)
+from daras_ai_v2.embedding_model import EmbeddingModels
+from daras_ai_v2.enum_selector_widget import enum_multiselect
+from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.field_render import field_title_desc, field_desc
+from daras_ai_v2.functions import LLMTools
+from daras_ai_v2.glossary import glossary_input, validate_glossary_document
 from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
     ConversationEntry,
-    format_chatml_message,
-    CHATML_END_TOKEN,
-    CHATML_START_TOKEN,
     LargeLanguageModels,
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
     CHATML_ROLE_SYSTEM,
     model_max_tokens,
+    get_entry_images,
+    get_entry_text,
+    format_chat_entry,
+    SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
@@ -42,11 +62,18 @@ from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.prompt_vars import render_prompt_vars, prompt_vars_widget
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.query_params import gooey_get_query_params
-from daras_ai_v2.search_ref import apply_response_template, parse_refs, CitationStyles
+from daras_ai_v2.query_params_util import extract_query_params
+from daras_ai_v2.search_ref import (
+    parse_refs,
+    CitationStyles,
+    apply_response_formattings_prefix,
+    apply_response_formattings_suffix,
+)
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
+    text_to_speech_provider_selector,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
 from recipes.DocSearch import (
@@ -58,97 +85,34 @@ from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
 
-DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c8b24b0c-538a-11ee-a1a3-02420a00018d/meta%20tags1%201.png.png"
-
-BOT_SCRIPT_RE = re.compile(
-    # start of line
-    r"^"
-    # name of bot / user
-    r"([\w\ \t]+)"
-    # colon
-    r"\:\ ",
-    flags=re.M,
-)
+DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f454d64a-9457-11ee-b6d5-02420a0001cb/Copilot.jpg.png"
+INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
+INSTAGRAM_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3e7ebbb6-d6c8-11ee-a182-02420a000125/image.png"
+FACEBOOK_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/4243ce22-d6db-11ee-8e6a-02420a000126/facebook.png"
+SLACK_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ee8c5b1c-d6c8-11ee-b278-02420a000126/image.png"
+WHATSAPP_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1e49ad50-d6c9-11ee-99c3-02420a000123/Digital_Inline_Green.png"
+LANDBOT_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3705ed24-d6db-11ee-a22a-02420a000125/landbot.png"
+GRAYCOLOR = "#00000073"
 
 SAFETY_BUFFER = 100
 
 
-def show_landbot_widget():
-    landbot_url = st.session_state.get("landbot_url")
-    if not landbot_url:
-        st.html("", **{"data-landbot-config-url": ""})
-        return
-
-    f = furl(landbot_url)
-    config_path = os.path.join(f.host, *f.path.segments[:2])
-    config_url = f"https://storage.googleapis.com/{config_path}/index.json"
-
-    st.html(
-        # language=HTML
-        """
-<script>
-function updateLandbotWidget() {
-    if (window.myLandbot) {
-        try {
-            window.myLandbot.destroy();
-        } catch (e) {}
-    }
-    const configUrl = document.querySelector("[data-landbot-config-url]")?.getAttribute("data-landbot-config-url");
-    if (configUrl) {
-        window.myLandbot = new Landbot.Livechat({ configUrl });
-    }
-}
-if (typeof Landbot === "undefined") {
-    const script = document.createElement("script");
-    script.src = "https://cdn.landbot.io/landbot-3/landbot-3.0.0.js";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-        window.waitUntilHydrated.then(updateLandbotWidget);
-        window.addEventListener("hydrated", updateLandbotWidget);
-    };
-    document.body.appendChild(script);
-}
-</script>
-        """,
-        **{"data-landbot-config-url": config_url},
-    )
+def exec_tool_call(call: dict):
+    tool_name = call["function"]["name"]
+    tool = LLMTools[tool_name]
+    yield f"🛠 {tool.label}..."
+    kwargs = json.loads(call["function"]["arguments"])
+    return tool.fn(**kwargs)
 
 
-def parse_script(bot_script: str) -> (str, list[ConversationEntry]):
-    # run regex to find scripted messages in script text
-    script_matches = list(BOT_SCRIPT_RE.finditer(bot_script))
-    # extract system message from script
-    system_message = bot_script
-    if script_matches:
-        system_message = system_message[: script_matches[0].start()]
-    system_message = system_message.strip()
-    # extract pre-scripted messages from script
-    scripted_msgs: list[ConversationEntry] = []
-    for idx in range(len(script_matches)):
-        match = script_matches[idx]
-        try:
-            next_match = script_matches[idx + 1]
-        except IndexError:
-            next_match_start = None
-        else:
-            next_match_start = next_match.start()
-        if (len(script_matches) - idx) % 2 == 0:
-            role = CHATML_ROLE_USER
-        else:
-            role = CHATML_ROLE_ASSISTANT
-        scripted_msgs.append(
-            {
-                "role": role,
-                "display_name": match.group(1).strip(),
-                "content": bot_script[match.end() : next_match_start].strip(),
-            }
-        )
-    return system_message, scripted_msgs
+class ReplyButton(typing.TypedDict):
+    id: str
+    title: str
 
 
 class VideoBotsPage(BasePage):
     title = "Copilot for your Enterprise"  # "Create Interactive Video Bots"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8c014530-88d4-11ee-aac9-02420a00016b/Copilot.png.png"
     workflow = Workflow.VIDEO_BOTS
     slug_versions = ["video-bots", "bots", "copilot"]
 
@@ -191,13 +155,23 @@ class VideoBotsPage(BasePage):
     }
 
     class RequestModel(BaseModel):
-        input_prompt: str
         bot_script: str | None
 
+        input_prompt: str
+        input_images: list[str] | None
+        input_documents: list[str] | None
+        doc_extract_url: str | None = Field(
+            title="📚 Document Extract Workflow",
+            description="Select a workflow to extract text from documents and images.",
+        )
+
+        # conversation history/context
+        messages: list[ConversationEntry] | None
+
         # tts settings
-        tts_provider: typing.Literal[
-            tuple(e.name for e in TextToSpeechProviders)
-        ] | None
+        tts_provider: (
+            typing.Literal[tuple(e.name for e in TextToSpeechProviders)] | None
+        )
         uberduck_voice_name: str | None
         uberduck_speaking_rate: float | None
         google_voice_name: str | None
@@ -210,11 +184,17 @@ class VideoBotsPage(BasePage):
         elevenlabs_model: str | None
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
+        azure_voice_name: str | None
 
         # llm settings
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
+        document_model: str | None = Field(
+            title="🩻 Photo / Document Intelligence",
+            description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
+            "(via [Azure](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/use-sdk-rest-api?view=doc-intel-3.1.0&tabs=linux&pivots=programming-language-rest-api))",
+        )
         avoid_repetition: bool | None
         num_outputs: int | None
         quality: float | None
@@ -228,9 +208,6 @@ class VideoBotsPage(BasePage):
         face_padding_left: int | None
         face_padding_right: int | None
 
-        # conversation history/context
-        messages: list[ConversationEntry] | None
-
         # doc search
         task_instructions: str | None
         query_instructions: str | None
@@ -239,6 +216,8 @@ class VideoBotsPage(BasePage):
         max_references: int | None
         max_context_words: int | None
         scroll_jump: int | None
+
+        embedding_model: typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
         dense_weight: float | None = DocSearchRequest.__fields__[
             "dense_weight"
         ].field_info
@@ -246,25 +225,33 @@ class VideoBotsPage(BasePage):
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
 
-        user_language: str | None
+        user_language: str | None = Field(
+            title="🔠 User Language",
+            description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
+        )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
         input_glossary_document: str | None = Field(
             title="Input Glossary",
             description="""
-Translation Glossary for User Langauge -> LLM Language (English)  
+Translation Glossary for User Langauge -> LLM Language (English)
             """,
         )
         output_glossary_document: str | None = Field(
             title="Output Glossary",
             description="""
-Translation Glossary for LLM Language (English) -> User Langauge  
+Translation Glossary for LLM Language (English) -> User Langauge
             """,
         )
 
         variables: dict[str, typing.Any] | None
 
+        tools: list[LLMTools] | None = Field(
+            title="🛠️ Tools",
+            description="Give your copilot superpowers by giving it access to tools. Powered by [Function calling](https://platform.openai.com/docs/guides/function-calling).",
+        )
+
     class ResponseModel(BaseModel):
-        final_prompt: str
+        final_prompt: str | list[ConversationEntry]
 
         output_text: list[str]
 
@@ -282,7 +269,11 @@ Translation Glossary for LLM Language (English) -> User Langauge
         # doc search
         references: list[SearchReference] | None
         final_search_query: str | None
-        final_keyword_query: str | None
+        final_keyword_query: str | list[str] | None
+
+        # function calls
+        output_documents: list[str] | None
+        reply_buttons: list[ReplyButton] | None
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_COPILOT_META_IMG
@@ -310,126 +301,198 @@ Translation Glossary for LLM Language (English) -> User Langauge
     def render_description(self):
         st.write(
             """
-Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how. 
+Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how.
 
-This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot’s face and  voice settings. 
- 
-We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page. 
+This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot’s face and  voice settings.
+
+We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page.
 
 How It Works:
-1. Appends the user's question to the bottom of your dialog script. 
+1. Appends the user's question to the bottom of your dialog script.
 2. Sends the appended script to OpenAI’s GPT3 asking it to respond to the question in the style of your character
 3. Synthesizes your character's response as audio using your voice settings (using Google Text-To-Speech or Uberduck)
 4. Lip syncs the face video clip to the voice clip
 5. Shows the resulting video to the user
 
-PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers. 
+PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers.
         """
         )
 
     def render_form_v2(self):
         st.text_area(
             """
-            ##### 📝 Prompt
-            High-level system instructions to the copilot + optional example conversations between the bot and the user.
+            #### 📝 Instructions
             """,
             key="bot_script",
             height=300,
         )
+        prompt_vars_widget(
+            "bot_script",
+        )
+
+        enum_selector(
+            LargeLanguageModels,
+            label="#### 🧠 Language Model",
+            key="selected_model",
+            use_selectbox=True,
+        )
 
         document_uploader(
             """
-##### 📄 Documents (*optional*)
-Upload documents or enter URLs to give your copilot a knowledge base. With each incoming user message, we'll search your documents via a vector DB query.
-"""
+            #### 📄 Knowledge
+            Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
+            """,
         )
 
-        prompt_vars_widget(
-            "bot_script",
-            "task_instructions",
-            "query_instructions",
-            "keyword_instructions",
-        )
+        st.markdown("#### Capabilities")
+        if st.checkbox(
+            "##### 🗣️ Text to Speech & Lipsync",
+            value=bool(st.session_state.get("tts_provider")),
+        ):
+            text_to_speech_provider_selector(self)
+            st.write("---")
+            enable_video = st.checkbox(
+                "##### 🫦 Add Lipsync Video",
+                value=bool(st.session_state.get("input_face")),
+            )
+        else:
+            st.session_state["tts_provider"] = None
+            enable_video = False
+        if enable_video:
+            st.file_uploader(
+                """
+                ###### 👩‍🦰 Input Face
+                Upload a video or image (with a human face) to lipsync responses. mp4, mov, png, jpg or gif preferred.
+                """,
+                key="input_face",
+            )
+            st.write("---")
+        else:
+            st.session_state["input_face"] = None
+
+        if st.checkbox(
+            "##### 🔠 Translation",
+            value=bool(st.session_state.get("user_language")),
+        ):
+            google_translate_language_selector(
+                f"{field_desc(self.RequestModel, 'user_language')}",
+                key="user_language",
+            )
+            st.write("---")
+        else:
+            st.session_state["user_language"] = None
+
+        if st.checkbox(
+            "##### 🩻 Photo & Document Intelligence",
+            value=bool(
+                st.session_state.get("document_model"),
+            ),
+        ):
+            doc_model_descriptions = azure_form_recognizer_models()
+            st.selectbox(
+                f"{field_desc(self.RequestModel, 'document_model')}",
+                key="document_model",
+                options=[None, *doc_model_descriptions],
+                format_func=lambda x: (
+                    f"{doc_model_descriptions[x]} ({x})" if x else "———"
+                ),
+            )
+
+    def validate_form_v2(self):
+        input_glossary = st.session_state.get("input_glossary_document", "")
+        output_glossary = st.session_state.get("output_glossary_document", "")
+        if input_glossary:
+            validate_glossary_document(input_glossary)
+        if output_glossary:
+            validate_glossary_document(output_glossary)
 
     def render_usage_guide(self):
         youtube_video("-j2su1r8pEg")
 
     def render_settings(self):
-        if st.session_state.get("documents") or st.session_state.get(
-            "__documents_files"
-        ):
+        tts_provider = st.session_state.get("tts_provider")
+        if tts_provider:
+            text_to_speech_settings(self, tts_provider)
+            st.write("---")
+
+        input_face = st.session_state.get("input_face")
+        if input_face:
+            lipsync_settings()
+            st.write("---")
+
+        if st.session_state.get("user_language"):
+            st.markdown("##### 🔠 Translation Settings")
+            enable_glossary = st.checkbox(
+                "📖 Add Glossary",
+                value=bool(
+                    st.session_state.get("input_glossary_document")
+                    or st.session_state.get("output_glossary_document")
+                ),
+            )
+            if enable_glossary:
+                st.caption(
+                    """
+                    Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+                    If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
+                    """
+                )
+                glossary_input(
+                    f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
+                    key="input_glossary_document",
+                )
+                glossary_input(
+                    f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
+                    key="output_glossary_document",
+                )
+            else:
+                st.session_state["input_glossary_document"] = None
+                st.session_state["output_glossary_document"] = None
+            st.write("---")
+
+        documents = st.session_state.get("documents")
+        if documents:
+            st.write("#### 📄 Knowledge Base")
             st.text_area(
                 """
-            ##### 👩‍🏫 Document Search Results Instructions
-            Guidelines to interpret the results of the knowledge base query.
+            ###### 👩‍🏫 Search Instructions
+            How should the LLM interpret the results from your knowledge base?
             """,
                 key="task_instructions",
                 height=300,
             )
-
-            st.write("---")
-            st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
-            st.caption(
-                "Shorten citation links and enable click tracking of knowledge base URLs, docs, PDF and/or videos."
+            prompt_vars_widget(
+                "task_instructions",
             )
-            st.write("---")
-            doc_search_settings(keyword_instructions_allowed=True)
-            st.write("---")
-        language_model_settings()
 
-        st.write("---")
-        google_translate_language_selector(
-            """
-            ##### 🔠 User Language
-            If provided, the copilot will translate user messages to English and the copilot's response back to the selected language.
-            If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).            """,
-            key="user_language",
-        )
+            citation_style_selector()
+            st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
+
+            doc_extract_selector()
+
+            st.write("---")
+
         st.markdown(
             """
-            ###### 📖 Customize with Glossary
-            Provide a glossary to customize translation and improve accuracy of domain-specific terms.
+            #### Advanced Settings
+            In general, you should not need to adjust these.
             """
         )
-        glossary_input(
-            f"##### {self.RequestModel.__fields__['input_glossary_document'].field_info.title}\n{self.RequestModel.__fields__['input_glossary_document'].field_info.description or ''}",
-            key="input_glossary_document",
-        )
-        glossary_input(
-            f"##### {self.RequestModel.__fields__['output_glossary_document'].field_info.title}\n{self.RequestModel.__fields__['output_glossary_document'].field_info.description or ''}",
-            key="output_glossary_document",
-        )
-        st.write("---")
 
-        if not "__enable_audio" in st.session_state:
-            st.session_state["__enable_audio"] = bool(
-                st.session_state.get("tts_provider")
-            )
-        enable_audio = st.checkbox("Enable Audio Output?", key="__enable_audio")
-        if not enable_audio:
+        if documents:
+            query_instructions_widget()
+            keyword_instructions_widget()
+            doc_search_advanced_settings()
             st.write("---")
-            st.session_state["tts_provider"] = None
-        else:
-            text_to_speech_settings(page=self)
+
+        language_model_settings(show_selector=False)
 
         st.write("---")
-        if not "__enable_video" in st.session_state:
-            st.session_state["__enable_video"] = bool(
-                st.session_state.get("input_face")
-            )
-        enable_video = st.checkbox("Enable Video Output?", key="__enable_video")
-        if not enable_video:
-            st.session_state["input_face"] = None
-        else:
-            st.file_uploader(
-                """
-                #### 👩‍🦰 Input Face
-                Upload a video/image that contains faces to use  
-                *Recommended - mp4 / mov / png / jpg / gif* 
-                """,
-                key="input_face",
-            )
-            lipsync_settings()
+
+        enum_multiselect(
+            enum_cls=LLMTools,
+            label="##### " + field_title_desc(self.RequestModel, "tools"),
+            key="tools",
+        )
 
     def fields_to_save(self) -> [str]:
         fields = super().fields_to_save() + ["landbot_url"]
@@ -457,81 +520,32 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             st.write(output_text[0], line_clamp=5)
 
     def render_output(self):
+        # chat window
         with st.div(className="pb-3"):
-            with st.div(
-                className="pb-1",
-                style=dict(
-                    maxHeight="80vh",
-                    overflowY="scroll",
-                    display="flex",
-                    flexDirection="column-reverse",
-                    border="1px solid #c9c9c9",
-                ),
-            ):
-                with msg_container_widget(CHATML_ROLE_ASSISTANT):
-                    output_text = st.session_state.get("output_text", [])
-                    output_video = st.session_state.get("output_video", [])
-                    output_audio = st.session_state.get("output_audio", [])
-                    if output_text:
-                        st.write(f"**Assistant**")
-                        for idx, text in enumerate(output_text):
-                            st.write(text)
-                            try:
-                                st.video(output_video[idx], autoplay=True)
-                            except IndexError:
-                                try:
-                                    st.audio(output_audio[idx])
-                                except IndexError:
-                                    pass
+            chat_list_view()
+            (
+                pressed_send,
+                new_input,
+                new_input_images,
+                new_input_documents,
+            ) = chat_input_view()
 
-                input_prompt = st.session_state.get("input_prompt")
-                if input_prompt:
-                    with msg_container_widget(CHATML_ROLE_USER):
-                        st.write(f"**User** \\\n{input_prompt}")
+        if pressed_send:
+            self.on_send(new_input, new_input_images, new_input_documents)
 
-                for entry in reversed(st.session_state.get("messages", [])):
-                    with msg_container_widget(entry["role"]):
-                        display_name = entry.get("display_name") or entry["role"]
-                        display_name = display_name.capitalize()
-                        st.write(f'**{display_name}** \\\n{entry["content"]}')
-
-            with st.div(
-                className="px-3 pt-3 d-flex gap-1",
-                style=dict(background="rgba(239, 239, 239, 0.6)"),
-            ):
-                with st.div(className="flex-grow-1"):
-                    new_input = st.text_area(
-                        "", placeholder="Send a message", height=50
-                    )
-
-                if st.button("✈ Send", style=dict(height="3.2rem")):
-                    messsages = st.session_state.get("messages", [])
-                    raw_input_text = st.session_state.get("raw_input_text") or ""
-                    raw_output_text = (st.session_state.get("raw_output_text") or [""])[
-                        0
-                    ]
-                    if raw_input_text and raw_output_text:
-                        messsages += [
-                            {
-                                "role": CHATML_ROLE_USER,
-                                "content": raw_input_text,
-                            },
-                            {
-                                "role": CHATML_ROLE_ASSISTANT,
-                                "content": raw_output_text,
-                            },
-                        ]
-                    st.session_state["messages"] = messsages
-                    st.session_state["input_prompt"] = new_input
-                    self.on_submit()
-
+        # clear chat inputs
         if st.button("🗑️ Clear"):
             st.session_state["messages"] = []
             st.session_state["input_prompt"] = ""
+            st.session_state["input_images"] = None
+            st.session_state["new_input_documents"] = None
             st.session_state["raw_input_text"] = ""
             self.clear_outputs()
+            st.session_state["final_keyword_query"] = ""
+            st.session_state["final_search_query"] = ""
             st.experimental_rerun()
 
+        # render sources
         references = st.session_state.get("references", [])
         if not references:
             return
@@ -543,6 +557,43 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     value=ref["snippet"],
                     label_visibility="collapsed",
                 )
+
+    def on_send(
+        self,
+        new_input: str,
+        new_input_images: list[str],
+        new_input_documents: list[str],
+    ):
+        prev_input = st.session_state.get("raw_input_text") or ""
+        prev_output = (st.session_state.get("raw_output_text") or [""])[0]
+        prev_input_images = st.session_state.get("input_images")
+        prev_input_documents = st.session_state.get("input_documents")
+
+        if (prev_input or prev_input_images or prev_input_documents) and prev_output:
+            # append previous input to the history
+            st.session_state["messages"] = st.session_state.get("messages", []) + [
+                format_chat_entry(
+                    role=CHATML_ROLE_USER,
+                    content=prev_input,
+                    images=prev_input_images,
+                ),
+                format_chat_entry(
+                    role=CHATML_ROLE_ASSISTANT,
+                    content=prev_output,
+                ),
+            ]
+
+        # add new input to the state
+        if new_input_documents:
+            filenames = ", ".join(
+                furl(url.strip("/")).path.segments[-1] for url in new_input_documents
+            )
+            new_input = f"Files: {filenames}\n\n{new_input}"
+        st.session_state["input_prompt"] = new_input
+        st.session_state["input_images"] = new_input_images or None
+        st.session_state["input_documents"] = new_input_documents or None
+
+        self.on_submit()
 
     def render_steps(self):
         if st.session_state.get("tts_provider"):
@@ -556,9 +607,15 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         final_keyword_query = st.session_state.get("final_keyword_query")
         if final_keyword_query:
-            st.text_area(
-                "**Final Keyword Query**", value=final_keyword_query, disabled=True
-            )
+            if isinstance(final_keyword_query, list):
+                st.write("**Final Keyword Query**")
+                st.json(final_keyword_query)
+            else:
+                st.text_area(
+                    "**Final Keyword Query**",
+                    value=str(final_keyword_query),
+                    disabled=True,
+                )
 
         references = st.session_state.get("references", [])
         if references:
@@ -567,11 +624,11 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
-            text_output(
-                "**Final Prompt**",
-                value=final_prompt,
-                height=300,
-            )
+            if isinstance(final_prompt, str):
+                text_output("**Final Prompt**", value=final_prompt, height=300)
+            else:
+                st.write("**Final Prompt**")
+                st.json(final_prompt)
 
         for idx, text in enumerate(st.session_state.get("raw_output_text", [])):
             st.text_area(
@@ -600,44 +657,67 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                     "raw_tts_text", state.get("raw_output_text", [])
                 )
                 tts_state = {"text_prompt": "".join(output_text_list)}
-                return super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
+                total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
                     tts_state
                 )
             case _:
-                return super().get_raw_price(state)
+                total = super().get_raw_price(state)
+
+        return total * state.get("num_outputs", 1)
 
     def additional_notes(self):
         tts_provider = st.session_state.get("tts_provider")
         match tts_provider:
             case TextToSpeechProviders.ELEVEN_LABS.name:
-                return f"""
-                    - *Base cost = {super().get_raw_price(st.session_state)} credits*
-                    - *Additional {TextToSpeechPage().additional_notes()}*
-                """
+                return (
+                    f" \\\n"
+                    f"*Base cost = {super().get_raw_price(st.session_state)} credits*"
+                    f" | "
+                    f"*Additional {TextToSpeechPage().get_cost_note()}*"
+                )
             case _:
                 return ""
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
 
-        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
-            assert (
-                self.is_current_user_paying() or self.is_current_user_admin()
-            ), """
+        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name and not (
+            self.is_current_user_paying() or self.is_current_user_admin()
+        ):
+            raise UserError(
+                """
                 Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
                 """
+            )
+
+        state.update(
+            dict(final_prompt=[], output_text=[], output_audio=[], output_video=[])
+        )
 
         user_input = request.input_prompt.strip()
-        if not user_input:
+        if not (user_input or request.input_images or request.input_documents):
             return
         model = LargeLanguageModels[request.selected_model]
         is_chat_model = model.is_chat_model()
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
+        ocr_texts = []
+        if request.document_model and (request.input_images or request.input_documents):
+            yield "Running Azure Form Recognizer..."
+            for url in (request.input_images or []) + (request.input_documents or []):
+                ocr_text = (
+                    azure_form_recognizer(url, model_id="prebuilt-read")
+                    .get("content", "")
+                    .strip()
+                )
+                if not ocr_text:
+                    continue
+                ocr_texts.append(ocr_text)
+
         # translate input text
         if request.user_language and request.user_language != "en":
-            yield f"Translating input to english..."
+            yield f"Translating Input to English..."
             user_input = run_google_translate(
                 texts=[user_input],
                 source_language=request.user_language,
@@ -645,8 +725,20 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
                 glossary_url=request.input_glossary_document,
             )[0]
 
+        if ocr_texts:
+            yield f"Translating Image Text to English..."
+            ocr_texts = run_google_translate(
+                texts=ocr_texts,
+                source_language="auto",
+                target_language="en",
+            )
+            for text in ocr_texts:
+                user_input = f"Exracted Text: {text!r}\n\n{user_input}"
+
         # parse the bot script
-        system_message, scripted_msgs = parse_script(bot_script)
+        # system_message, scripted_msgs = parse_script(bot_script)
+        system_message = bot_script.strip()
+        scripted_msgs = []
 
         # consturct the system prompt
         if system_message:
@@ -656,41 +748,39 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         else:
             system_prompt = None
 
-        # get user/bot display names
-        try:
-            bot_display_name = scripted_msgs[-1]["display_name"]
-        except IndexError:
-            bot_display_name = CHATML_ROLE_ASSISTANT
-        try:
-            user_display_name = scripted_msgs[-2]["display_name"]
-        except IndexError:
-            user_display_name = CHATML_ROLE_USER
+        # # get user/bot display names
+        # try:
+        #     bot_display_name = scripted_msgs[-1]["display_name"]
+        # except IndexError:
+        #     bot_display_name = CHATML_ROLE_ASSISTANT
+        # try:
+        #     user_display_name = scripted_msgs[-2]["display_name"]
+        # except IndexError:
+        #     user_display_name = CHATML_ROLE_USER
 
-        # construct user prompt
+        # save raw input for reference
         state["raw_input_text"] = user_input
-        user_prompt = {
-            "role": CHATML_ROLE_USER,
-            "display_name": user_display_name,
-            "content": user_input,
-        }
 
         # if documents are provided, run doc search on the saved msgs and get back the references
         references = None
         if request.documents:
             # formulate the search query as a history of all the messages
-            query_msgs = saved_msgs + [user_prompt]
+            query_msgs = saved_msgs + [
+                format_chat_entry(role=CHATML_ROLE_USER, content=user_input)
+            ]
             clip_idx = convo_window_clipper(
                 query_msgs, model_max_tokens[model] // 2, sep=" "
             )
             query_msgs = query_msgs[clip_idx:]
 
             chat_history = "\n".join(
-                f'{msg["role"]}: """{msg["content"]}"""' for msg in query_msgs
+                f'{entry["role"]}: """{get_entry_text(entry)}"""'
+                for entry in query_msgs
             )
 
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
-                yield "Generating search query..."
+                yield "Creating search query..."
                 state["final_search_query"] = generate_final_search_query(
                     request=request,
                     instructions=query_instructions,
@@ -699,17 +789,25 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
             else:
                 query_msgs.reverse()
                 state["final_search_query"] = "\n---\n".join(
-                    msg["content"] for msg in query_msgs
+                    get_entry_text(entry) for entry in query_msgs
                 )
 
             keyword_instructions = (request.keyword_instructions or "").strip()
             if keyword_instructions:
-                yield "Extracting keywords..."
-                state["final_keyword_query"] = generate_final_search_query(
-                    request=request,
+                yield "Finding keywords..."
+                k_request = request.copy()
+                # other models dont support JSON mode
+                k_request.selected_model = LargeLanguageModels.gpt_4_turbo.name
+                keyword_query = generate_final_search_query(
+                    request=k_request,
                     instructions=keyword_instructions,
                     context={**state, "messages": chat_history},
+                    response_format_type="json_object",
                 )
+                if keyword_query and isinstance(keyword_query, dict):
+                    keyword_query = list(keyword_query.values())[0]
+                state["final_keyword_query"] = keyword_query
+            # return
 
             # perform doc search
             references = yield from get_top_k_references(
@@ -733,110 +831,112 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         if references:
             # add task instructions
             task_instructions = render_prompt_vars(request.task_instructions, state)
-            user_prompt["content"] = (
+            user_input = (
                 references_as_prompt(references)
                 + f"\n**********\n{task_instructions.strip()}\n**********\n"
-                + user_prompt["content"]
+                + user_input
             )
+
+        # construct user prompt
+        user_prompt = format_chat_entry(
+            role=CHATML_ROLE_USER, content=user_input, images=request.input_images
+        )
 
         # truncate the history to fit the model's max tokens
         history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
             model_max_tokens[model]
-            - calc_gpt_tokens([system_prompt, user_prompt], is_chat_model=is_chat_model)
+            - calc_gpt_tokens([system_prompt, user_input])
             - request.max_tokens
             - SAFETY_BUFFER
         )
         clip_idx = convo_window_clipper(
-            history_window, max_history_tokens, is_chat_model=is_chat_model
+            history_window,
+            max_history_tokens,
         )
         history_window = history_window[clip_idx:]
         prompt_messages = [system_prompt, *history_window, user_prompt]
-
-        # for backwards compat with non-chat models
-        if not is_chat_model:
-            # assistant prompt to triger a model response
-            prompt_messages.append(
-                {
-                    "role": CHATML_ROLE_ASSISTANT,
-                    "display_name": bot_display_name,
-                    "content": "",
-                }
-            )
-
-        # final prompt to display
-        prompt = "\n".join(format_chatml_message(entry) for entry in prompt_messages)
-        state["final_prompt"] = prompt
+        state["final_prompt"] = prompt_messages
 
         # ensure input script is not too big
-        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(
-            prompt_messages, is_chat_model=is_chat_model
-        )
+        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(prompt_messages)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
-            raise ValueError("Input Script is too long! Please reduce the script size.")
+            raise UserError("Input Script is too long! Please reduce the script size.")
 
-        yield f"Running {model.value}..."
-        if is_chat_model:
-            output_text = run_language_model(
-                model=request.selected_model,
-                messages=[
-                    {"role": s["role"], "content": s["content"]}
-                    for s in prompt_messages
-                ],
-                max_tokens=max_allowed_tokens,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                avoid_repetition=request.avoid_repetition,
-            )
-        else:
-            output_text = run_language_model(
-                model=request.selected_model,
-                prompt=prompt,
-                max_tokens=max_allowed_tokens,
-                quality=request.quality,
-                num_outputs=request.num_outputs,
-                temperature=request.sampling_temperature,
-                avoid_repetition=request.avoid_repetition,
-                stop=[CHATML_END_TOKEN, CHATML_START_TOKEN],
-            )
-        # save model response
-        state["raw_output_text"] = [
-            "".join(snippet for snippet, _ in parse_refs(text, references))
-            for text in output_text
-        ]
+        yield f"Summarizing with {model.value}..."
+        chunks = run_language_model(
+            model=request.selected_model,
+            messages=[
+                {"role": s["role"], "content": s["content"]} for s in prompt_messages
+            ],
+            max_tokens=max_allowed_tokens,
+            num_outputs=request.num_outputs,
+            temperature=request.sampling_temperature,
+            avoid_repetition=request.avoid_repetition,
+            tools=request.tools,
+            stream=True,
+        )
+        citation_style = (
+            request.citation_style and CitationStyles[request.citation_style]
+        ) or None
+        for i, entries in enumerate(chunks):
+            if not entries:
+                continue
+            output_text = [entry["content"] for entry in entries]
+            if request.tools:
+                # output_text, tool_call_choices = output_text
+                state["output_documents"] = output_documents = []
+                for call in entries[0].get("tool_calls") or []:
+                    result = yield from exec_tool_call(call)
+                    output_documents.append(result)
 
-        # translate response text
-        if request.user_language and request.user_language != "en":
-            yield f"Translating response to {request.user_language}..."
-            output_text = run_google_translate(
-                texts=output_text,
-                source_language="en",
-                target_language=request.user_language,
-                glossary_url=request.output_glossary_document,
-            )
-            state["raw_tts_text"] = [
+            # save model response
+            state["raw_output_text"] = [
                 "".join(snippet for snippet, _ in parse_refs(text, references))
                 for text in output_text
             ]
 
-        if references:
-            citation_style = (
-                request.citation_style and CitationStyles[request.citation_style]
-            ) or None
-            apply_response_template(output_text, references, citation_style)
+            # translate response text
+            if request.user_language and request.user_language != "en":
+                yield f"Translating response to {request.user_language}..."
+                output_text = run_google_translate(
+                    texts=output_text,
+                    source_language="en",
+                    target_language=request.user_language,
+                    glossary_url=request.output_glossary_document,
+                )
+                state["raw_tts_text"] = [
+                    "".join(snippet for snippet, _ in parse_refs(text, references))
+                    for text in output_text
+                ]
 
-        state["output_text"] = output_text
+            if references:
+                all_refs_list = apply_response_formattings_prefix(
+                    output_text, references, citation_style
+                )
+            else:
+                all_refs_list = None
 
-        state["output_audio"] = []
-        state["output_video"] = []
+            state["output_text"] = output_text
+            if all(entry.get("finish_reason") for entry in entries):
+                if all_refs_list:
+                    apply_response_formattings_suffix(
+                        all_refs_list, state["output_text"], citation_style
+                    )
+                finish_reason = entries[0]["finish_reason"]
+                yield f"Completed with {finish_reason=}"  # avoid changing this message since it's used to detect end of stream
+            else:
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
         if not request.tts_provider:
             return
         tts_state = dict(state)
         for text in state.get("raw_tts_text", state["raw_output_text"]):
             tts_state["text_prompt"] = text
-            yield from TextToSpeechPage().run(tts_state)
+            yield from TextToSpeechPage(
+                request=self.request, run_user=self.run_user
+            ).run(tts_state)
             state["output_audio"].append(tts_state["audio_url"])
 
         if not request.input_face:
@@ -844,7 +944,9 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         lip_state = dict(state)
         for audio_url in state["output_audio"]:
             lip_state["input_audio"] = audio_url
-            yield from LipsyncPage().run(lip_state)
+            yield from LipsyncPage(request=self.request, run_user=self.run_user).run(
+                lip_state
+            )
             state["output_video"].append(lip_state["output_video"])
 
     def get_tabs(self):
@@ -856,179 +958,473 @@ Upload documents or enter URLs to give your copilot a knowledge base. With each 
         super().render_selected_tab(selected_tab)
 
         if selected_tab == MenuTabs.integrations:
+            st.newline()
+
+            # not signed in case
             if not self.request.user or self.request.user.is_anonymous:
-                st.write(
-                    "**Please Login to connect this workflow to Your Website, Instagram, Whatsapp & More**"
-                )
+                self.integration_welcome_screen()
+                st.newline()
+                with st.center():
+                    st.anchor(
+                        "Get Started",
+                        href=self.get_auth_url(self.app_url(query_params={})),
+                        type="primary",
+                    )
                 return
 
-            self.messenger_bot_integration()
+            current_run, published_run = self.get_runs_from_query_params(
+                *extract_query_params(gooey_get_query_params())
+            )  # type: ignore
 
+            # signed in but not on a run the user can edit (admins will never see this)
+            if not self.can_user_edit_run(current_run):
+                self.integration_welcome_screen(
+                    title="Create your Saved Copilot",
+                )
+                st.newline()
+                with st.center():
+                    st.anchor(
+                        "Run & Save this Copilot",
+                        href=self.get_auth_url(self.app_url(query_params={})),
+                        type="primary",
+                    )
+                return
+
+            # signed, has submitted run, but not published (admins will never see this)
+            # note: this means we no longer allow botintegrations on non-published runs which is a breaking change requested by Sean
+            if not self.can_user_edit_published_run(published_run):
+                self.integration_welcome_screen(
+                    title="Save your Published Copilot",
+                )
+                st.newline()
+                with st.center():
+                    self._render_published_run_buttons(
+                        current_run=current_run,
+                        published_run=published_run,
+                        redirect_to=self.get_tab_url(MenuTabs.integrations),
+                    )
+                return
+
+            # if we come from an integration redirect, we connect the integrations
+            if "connect_ids" in self.request.query_params:
+                self.integrations_on_connect(
+                    current_run,
+                    published_run,
+                )
+
+            # see which integrations are available to the user for the current published run
+            assert published_run, "At this point, published_run should be available"
+            integrations_q = Q(published_run=published_run) | Q(
+                saved_run__example_id=published_run.published_run_id
+            )
+            if not self.is_current_user_admin():
+                integrations_q &= Q(billing_account_uid=self.request.user.uid)
+
+            integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
+                integrations_q
+            ).order_by("platform", "-created_at")
+
+            # signed in, can edit, but no connected botintegrations on this run
+            if not integrations.exists():
+                self.integration_connect_screen()
+                return
+
+            # signed in, can edit, and has connected botintegrations on this run
+            with st.center():
+                self.integration_test_config_screen(
+                    integrations, current_run, published_run
+                )
+
+    def integrations_on_connect(self, current_run, published_run):
+        from app_users.models import AppUser
+        from daras_ai_v2.base import RedirectException
+        from daras_ai_v2.slack_bot import send_confirmation_msg
+
+        for bid in self.request.query_params.getlist("connect_ids"):
+            bi = BotIntegration.objects.filter(id=bid).first()
+            if not bi:
+                continue
+            if bi.saved_run is not None:
+                with st.center():
+                    st.write(
+                        f"⚠️ {bi.get_display_name()} is already connected to a different published run by {AppUser.objects.filter(uid=bi.billing_account_uid).first().display_name}. Please disconnect it first."
+                    )
+                return
+
+            bi.streaming_enabled = True
+            bi.user_language = st.session_state.get("user_language") or bi.user_language
+            bi.saved_run = current_run
+            if published_run and published_run.saved_run_id == current_run.id:
+                bi.published_run = published_run
+            else:
+                bi.published_run = None
+            if bi.platform == Platform.SLACK:
+                bi.slack_create_personal_channels = False
+                send_confirmation_msg(bi)
+            bi.save()
+
+        raise RedirectException(self.get_tab_url(MenuTabs.integrations))
+
+    def integration_welcome_screen(self, title="Connect your Copilot"):
+        with st.center():
+            st.markdown(f"#### {title}")
+
+        col1, col2, col3 = st.columns(
+            3,
+            column_props=dict(
+                style={
+                    "display": "flex",
+                    "flex-direction": "column",
+                    "align-items": "center",
+                    "text-align": "center",
+                    "max-width": "300px",
+                }
+            ),
+            style={"justify-content": "center"},
+        )
+        with col1:
+            st.html("🏃‍♀️", style={"fontSize": "4rem"})
             st.markdown(
                 """
-                ### How to Integrate Chatbots
+                1. Fork & Save your Run
                 """
             )
+            st.caption("Make changes, Submit & Save your perfect workflow")
+        with col2:
+            st.image(INTEGRATION_IMG, alt="Integrations", style={"height": "5rem"})
+            st.markdown("2. Connect to Slack, Whatsapp or your App")
+            st.caption("Or Facebook, Instagram and the web. Wherever your users chat.")
+        with col3:
+            st.html("📈", style={"fontSize": "4rem"})
+            st.markdown("3. Test, Analyze & Iterate")
+            st.caption("Analyze your usage. Update your Saved Run to test changes.")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write(
-                    """
-                    #### Part 1:
-                    [Interactive Chatbots for your Content - Part 1: Make your Chatbot - How to use Gooey.AI Workflows ](https://youtu.be/-j2su1r8pEg)
-                    """
-                )
-                st.markdown(
-                    """
-                    <div style="position: relative; padding-bottom: 56.25%; height: 0; width:100%">
-                            <iframe src="https://www.youtube.com/embed/-j2su1r8pEg" title="YouTube video player" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                    </iframe>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with col2:
-                st.write(
-                    """
-                    
-                    #### Part 2:
-                    [Interactive Chatbots for your Content - Part 2: Make your Chatbot - How to use Gooey.AI Workflows ](https://youtu.be/h817RolPjq4)
-                    """
-                )
-                st.markdown(
-                    """
-                    <div style="position: relative; padding-bottom: 56.25%; height: 0;">
-                            <iframe src="https://www.youtube.com/embed/h817RolPjq4" title="YouTube video player" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                    </iframe>                    
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+    def integration_connect_screen(
+        self, title="Connect your Copilot", status: str | None = None
+    ):
+        from routers.facebook_api import ig_connect_url, fb_connect_url, wa_connect_url
+        from routers.slack_api import slack_connect_url
 
-            st.write("---")
-            st.text_input(
-                "###### 🤖 [Landbot](https://landbot.io/) URL", key="landbot_url"
+        on_connect = self.get_tab_url(MenuTabs.integrations)
+
+        with st.center():
+            st.markdown(
+                f"""
+                #### {title}
+                {status or f'Run Saved ✅ • <b>Connect</b> • <span style="color: {GRAYCOLOR}">Test & Configure</span>'}
+                """,
+                unsafe_allow_html=True,
             )
 
-        show_landbot_widget()
+            LINKSTYLE = 'class="btn btn-theme btn-secondary" style="margin: 0; display: flex; justify-content: center; align-items: center; padding: 8px; border: 1px solid black; min-width: 120px; width: 160px; aspect-ratio: 5 / 2; overflow: hidden; border-radius: 10px" draggable="false"'
+            IMGSTYLE = 'style="width: 80%" draggable="false"'
+            ROWSTYLE = 'style="display: flex; align-items: center; gap: 1em; margin-bottom: 1rem" draggable="false"'
+            DESCRIPTIONSTYLE = f'style="color: {GRAYCOLOR}; text-align: left"'
+            st.markdown(
+                # language=html
+                f"""
+                <div>
+                <div {ROWSTYLE}>
+                    <a href="{wa_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Whatsapp number">
+                        <img src="{WHATSAPP_IMG}" {IMGSTYLE} alt="Whatsapp">
+                    </a>
+                    <div {DESCRIPTIONSTYLE}>Bring your own <a href="https://business.facebook.com/wa/manage/phone-numbers">WhatsApp number</a> to connect. Need a new one? Email <a href="mailto:sales@gooey.ai">sales@gooey.ai</a>.</div>
+                </div>
+                <div {ROWSTYLE}>
+                    <a href="{slack_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Slack Workspace">
+                        <img src="{SLACK_IMG}" {IMGSTYLE} alt="Slack">
+                    </a>
+                    <div {DESCRIPTIONSTYLE}>Connect to a Slack Channel. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-slack">Help Guide</a>.</div>
+                </div>
+                <div {ROWSTYLE}>
+                    <a href="{fb_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Facebook Page">
+                        <img src="{FACEBOOK_IMG}" {IMGSTYLE} alt="Facebook Messenger">
+                    </a>
+                    <div {DESCRIPTIONSTYLE}>Connect to a Facebook Page you own. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-facebook">Help Guide</a>.</div>
+                </div>
+                <!--<div {ROWSTYLE}>
+                    <a href="{ig_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Instagram Page">
+                        <img src="{INSTAGRAM_IMG}" {IMGSTYLE} alt="Instagram">
+                    </a>
+                    <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
+                </div>-->
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-    def messenger_bot_integration(self):
-        from routers.facebook import ig_connect_url, fb_connect_url
-        from routers.slack import slack_connect_url
+            st.newline()
+            st.write(
+                f"Or use [our API]({self.get_tab_url(MenuTabs.run_as_api)}) to integrate with your own app."
+            )
 
-        st.markdown(
-            # language=html
-            f"""
-            <h3>Connect this bot to your Website, Instagram, Whatsapp & More</h3>       
+    def integration_test_config_screen(
+        self, integrations: QuerySet[BotIntegration], current_run, published_run
+    ):
+        from daras_ai_v2.base import RedirectException, get_title_breadcrumbs
+        from recipes.VideoBotsStats import VideoBotsStatsPage
 
-            Your can connect your FB Messenger account and Slack Workspace here directly.<br>
-            If you ping us at support@gooey.ai, we'll add your other accounts too!
+        # from recipes.BulkRunner import BulkRunnerPage
+        from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
-            <!--
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{ig_connect_url}">
-                <img height="20" src="https://www.instagram.com/favicon.ico">️
-                &nbsp; 
-                Add Your Instagram Page
-                </a>
-            </div>
-            -->
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{fb_connect_url}">
-                <img height="20" src="https://www.facebook.com/favicon.ico">️             
-                &nbsp; 
-                Add Your Facebook Page
-                </a>
-            </div>
-            <div style='height: 50px'>
-                <a target="_blank" class="streamlit-like-btn" href="{slack_connect_url}">
-                <img height="20" src="https://www.slack.com/favicon.ico">             
-                &nbsp; 
-                Add Your Slack Workspace
-                </a>
-                <a target="_blank" href="https://docs.google.com/document/d/1EuBaC4TGHTFSOgKYM1eOlisjvPAwLji9dExKwbt2ocA/edit?usp=sharing" class="streamlit-like-btn" aria-label="docs">
-                <img height="20" width="0" src="https://www.slack.com/favicon.ico">   <!-- for vertical alignment -->          
-                ℹ️
-                </a>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        run_title = get_title_breadcrumbs(
+            VideoBotsPage, current_run, published_run
+        ).h1_title
+
+        add_integration = self.get_tab_url(
+            MenuTabs.integrations, query_params={"add-integration": "true"}
         )
-        st.write("---")
-
-        st.button("🔄 Refresh")
-
-        integrations: QuerySet[BotIntegration] = BotIntegration.objects.filter(
-            billing_account_uid=self.request.user.uid
-        ).order_by("platform", "-created_at")
-        if not integrations:
+        if self.request.query_params.get("add-integration") == "true":
+            cancel = self.get_tab_url(MenuTabs.integrations)
+            self.integration_connect_screen(
+                "Configure your Copilot: Add a New Integration",
+                f'Run Saved ✅ • <b>Connected</b> ✅ • <a href="{cancel}">Test & Configure</a> ✅',
+            )
+            if st.button("Return to Test & Configure"):
+                raise RedirectException(cancel)
             return
 
-        current_sr = self.get_sr_from_query_params_dict(gooey_get_query_params())
-        for bi in integrations:
-            is_connected = bi.saved_run == current_sr
-            col1, col2, col3, *_ = st.columns([1, 1, 2])
+        st.markdown("#### Configure your Copilot")
+
+        if integrations.count() > 1:
+            with st.div(style={"minWidth": "500px", "textAlign": "left"}):
+                integrations_map = {i.id: i for i in integrations}
+                bi_id = st.selectbox(
+                    label="",
+                    options=integrations_map.keys(),
+                    format_func=lambda bi_id: f'<img width="20" height="20" style="margin-right: 10px" src="{Platform(integrations_map[bi_id].platform).get_favicon()}" /> {integrations_map[bi_id].name}',
+                    key="bi_id",
+                )
+                bi = integrations_map[bi_id]
+        else:
+            bi = integrations[0]
+        icon = f'<img src="{Platform(bi.platform).get_favicon()}" width="20" height="20" />'
+
+        st.newline()
+        with st.div(style={"width": "100%", "textAlign": "left"}):
+            test_link = get_bot_test_link(bi)
+            col1, col2 = st.columns(2, style={"align-items": "center"})
             with col1:
-                favicon = Platform(bi.platform).get_favicon()
-                st.markdown(
-                    f'<img height="20" width="20" src={favicon!r}>&nbsp;&nbsp;'
-                    f'<a href="{bi.saved_run.get_app_url()}">{bi}</a>'
-                    if bi.saved_run
-                    else f"<span>{bi}</span>",
-                    unsafe_allow_html=True,
-                )
+                st.write("###### Connected To")
+                st.write(f"{icon} {bi}", unsafe_allow_html=True)
             with col2:
-                pressed = st.button(
-                    "🔌💔️ Disconnect" if is_connected else "🖇️ Connect",
-                    key=f"btn_connect_{bi.id}",
+                if test_link:
+                    copy_to_clipboard_button(
+                        f'<i class="fa-regular fa-link"></i> Copy {Platform(bi.platform).label} Link',
+                        value=test_link,
+                        type="secondary",
+                    )
+                else:
+                    st.write("Message quicklink not available.")
+
+            col1, col2 = st.columns(2, style={"align-items": "center"})
+            with col1:
+                st.write("###### Test")
+                st.caption(f"Send a test {Platform(bi.platform).label} message.")
+            with col2:
+                if test_link:
+                    st.anchor(
+                        f"{icon} Message {bi.get_display_name()}",
+                        test_link,
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.write("Message quicklink not available.")
+
+            col1, col2 = st.columns(2, style={"align-items": "center"})
+            with col1:
+                st.write("###### Understand your Users")
+                st.caption(f"See real-time analytics.")
+            with col2:
+                stats_url = furl(
+                    VideoBotsStatsPage.app_url(), args={"bi_id": bi.id}
+                ).tostr()
+                st.anchor(
+                    "📊 View Analytics",
+                    stats_url,
                 )
-            with col3:
+
+            # ==== future changes ====
+            # col1, col2 = st.columns(2, style={"align-items": "center"})
+            # with col1:
+            #     st.write("###### Evaluate ⚖️")
+            #     st.caption(f"Run automated tests against sample user messages.")
+            # with col2:
+            #     st.anchor(
+            #         "Run Bulk Tests",
+            #         BulkRunnerPage.app_url(),
+            #     )
+
+            # st.write("#### Automated Analysis 🧠")
+            # st.caption(
+            #     "Add a Gooey.AI LLM prompt to automatically analyse and categorize user messages. [Example](https://gooey.ai/compare-large-language-models/how-farmerchat-turns-conversations-to-structured-data/?example_id=lbjnoem7) and [Guide](https://gooey.ai/docs/guides/copilot/conversation-analysis)."
+            # )
+
+            if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    st.write("###### WhatsApp Business Management")
+                    st.caption(
+                        f"Access your WhatsApp account on Meta to approve message templates, etc."
+                    )
+                with col2:
+                    st.anchor(
+                        "Business Settings",
+                        f"https://business.facebook.com/settings/whatsapp-business-accounts/{bi.wa_business_waba_id}",
+                        new_tab=True,
+                    )
+                    st.anchor(
+                        "WhatsApp Manager",
+                        f"https://business.facebook.com/wa/manage/home/?waba_id={bi.wa_business_waba_id}",
+                        new_tab=True,
+                    )
+
+            col1, col2 = st.columns(2, style={"align-items": "center"})
+            with col1:
+                st.write("###### Add Integration")
+                st.caption(f"Add another connection for {run_title}.")
+            with col2:
+                if st.button(
+                    f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
+                    key="btn_connect",
+                ):
+                    raise RedirectException(add_integration)
+
+            with st.expander("Configure Settings 🛠️"):
                 if bi.platform == Platform.SLACK:
-                    with st.expander("📨 Slack Settings"):
-                        read_receipt_key = "slack_read_receipt_" + str(bi.id)
-                        st.session_state.setdefault(
-                            read_receipt_key, bi.slack_read_receipt_msg
-                        )
-                        read_msg = st.text_input(
-                            "Read Receipt (leave blank to disable)",
-                            key=read_receipt_key,
-                            placeholder=bi.slack_read_receipt_msg,
-                        )
-                        bot_name_key = "slack_bot_name_" + str(bi.id)
-                        st.session_state.setdefault(bot_name_key, bi.name)
-                        bot_name = st.text_input(
-                            "Channel Specific Bot Name (to be displayed in Slack)",
-                            key=bot_name_key,
-                            placeholder=bi.name,
-                        )
-                        if st.button("Reset to Default"):
-                            bi.name = st.session_state.get(
-                                StateKeys.page_title, bi.name
-                            )
-                            bi.slack_read_receipt_msg = BotIntegration._meta.get_field(
-                                "slack_read_receipt_msg"
-                            ).default
-                            bi.save()
-                            st.experimental_rerun()
-                        if st.button("Update"):
-                            bi.slack_read_receipt_msg = read_msg
-                            bi.name = bot_name
-                            bi.save()
-                            st.experimental_rerun()
-            if not pressed:
-                continue
-            if is_connected:
-                bi.saved_run = None
+                    slack_specific_settings(bi, run_title)
+                general_integration_settings(bi)
+
+                if bi.platform in [Platform.SLACK, Platform.WHATSAPP]:
+                    st.newline()
+                    st.newline()
+                    broadcast_input(bi)
+
+                st.write("---")
+                col1, col2 = st.columns(2, style={"align-items": "center"})
+                with col1:
+                    st.write("###### Disconnect")
+                    st.caption(
+                        f"Disconnect {run_title} from {Platform(bi.platform).label} {bi.get_display_name()}."
+                    )
+                with col2:
+                    if st.button(
+                        "💔️ Disconnect",
+                        key="btn_disconnect",
+                    ):
+                        bi.saved_run = None
+                        bi.published_run = None
+                        bi.save()
+                        st.experimental_rerun()
+
+
+def chat_list_view():
+    # render a reversed list view
+    with st.div(
+        className="pb-1",
+        style=dict(
+            maxHeight="80vh",
+            overflowY="scroll",
+            display="flex",
+            flexDirection="column-reverse",
+            border="1px solid #c9c9c9",
+        ),
+    ):
+        with st.div(className="px-3"):
+            show_raw_msgs = st.checkbox("_Show Raw Output_")
+        # render the last output
+        with msg_container_widget(CHATML_ROLE_ASSISTANT):
+            if show_raw_msgs:
+                output_text = st.session_state.get("raw_output_text", [])
             else:
-                bi.saved_run = current_sr
-                if bi.platform == Platform.SLACK:
-                    from daras_ai_v2.slack_bot import send_confirmation_msg
+                output_text = st.session_state.get("output_text", [])
+            output_video = st.session_state.get("output_video", [])
+            output_audio = st.session_state.get("output_audio", [])
+            if output_text:
+                st.write(f"**Assistant**")
+                for idx, text in enumerate(output_text):
+                    st.write(text)
+                    try:
+                        st.video(output_video[idx], autoplay=True)
+                    except IndexError:
+                        try:
+                            st.audio(output_audio[idx])
+                        except IndexError:
+                            pass
+            output_documents = st.session_state.get("output_documents", [])
+            if output_documents:
+                for doc in output_documents:
+                    st.write(doc)
+        messages = st.session_state.get("messages", []).copy()
+        # add last input to history if present
+        if show_raw_msgs:
+            input_prompt = st.session_state.get("raw_input_text")
+        else:
+            input_prompt = st.session_state.get("input_prompt")
+        input_images = st.session_state.get("input_images")
+        if input_prompt or input_images:
+            messages += [
+                format_chat_entry(
+                    role=CHATML_ROLE_USER, content=input_prompt, images=input_images
+                ),
+            ]
+        # render history
+        for entry in reversed(messages):
+            with msg_container_widget(entry["role"]):
+                images = get_entry_images(entry)
+                text = get_entry_text(entry)
+                if text or images:
+                    st.write(f"**{entry['role'].capitalize()}**  \n{text}")
+                if images:
+                    for im in images:
+                        st.image(im, style={"maxHeight": "200px"})
 
-                    send_confirmation_msg(bi)
-            bi.save()
-            st.experimental_rerun()
 
-        st.write("---")
+def chat_input_view() -> tuple[bool, str, list[str], list[str]]:
+    with st.div(
+        className="px-3 pt-3 d-flex gap-1",
+        style=dict(background="rgba(239, 239, 239, 0.6)"),
+    ):
+        show_uploader_key = "--show-file-uploader"
+        show_uploader = st.session_state.setdefault(show_uploader_key, False)
+        if st.button(
+            "📎",
+            style=dict(height="3.2rem", backgroundColor="white"),
+        ):
+            show_uploader = not show_uploader
+            st.session_state[show_uploader_key] = show_uploader
+
+        with st.div(className="flex-grow-1"):
+            new_input = st.text_area("", placeholder="Send a message", height=50)
+
+        pressed_send = st.button("✈ Send", style=dict(height="3.2rem"))
+
+    if show_uploader:
+        uploaded_files = st.file_uploader("", accept_multiple_files=True)
+        new_input_images = []
+        new_input_documents = []
+        for f in uploaded_files:
+            mime_type = mimetypes.guess_type(f)[0] or ""
+            if mime_type.startswith("image/"):
+                new_input_images.append(f)
+            else:
+                new_input_documents.append(f)
+    else:
+        new_input_images = None
+        new_input_documents = None
+
+    return pressed_send, new_input, new_input_images, new_input_documents
+
+
+def msg_container_widget(role: str):
+    return st.div(
+        className="px-3 py-1 pt-2",
+        style=dict(
+            background=(
+                "rgba(239, 239, 239, 0.6)" if role == CHATML_ROLE_USER else "#fff"
+            ),
+        ),
+    )
 
 
 def convo_window_clipper(
@@ -1040,20 +1436,6 @@ def convo_window_clipper(
     step=2,
 ):
     for i in range(len(window) - 2, -1, -step):
-        if (
-            calc_gpt_tokens(window[i:], sep=sep, is_chat_model=is_chat_model)
-            > max_tokens
-        ):
+        if calc_gpt_tokens(window[i:], sep=sep) > max_tokens:
             return i + step
     return 0
-
-
-def msg_container_widget(role: str):
-    return st.div(
-        className="px-3 py-1 pt-2",
-        style=dict(
-            background="rgba(239, 239, 239, 0.6)"
-            if role == CHATML_ROLE_USER
-            else "#fff",
-        ),
-    )

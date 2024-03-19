@@ -13,11 +13,16 @@ from daras_ai.image_input import (
     resize_img_fit,
     get_downscale_factor,
 )
+from daras_ai_v2.exceptions import (
+    raise_for_status,
+    UserError,
+)
 from daras_ai_v2.extract_face import rgb_img_to_rgba
 from daras_ai_v2.gpu_server import (
     b64_img_decode,
     call_sd_multi,
 )
+from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 
 SD_IMG_MAX_SIZE = (768, 768)
 
@@ -42,20 +47,22 @@ inpaint_model_ids = {
 
 class Text2ImgModels(Enum):
     # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
+    dream_shaper = "DreamShaper (Lykon)"
+    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
-    dream_shaper = "DreamShaper (Lykon)"
-    openjourney = "Open Journey (PromptHero)"
-    openjourney_2 = "Open Journey v2 beta (PromptHero)"
-    analog_diffusion = "Analog Diffusion (wavymulder)"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
-    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
+
     dall_e = "DALL·E 2 (OpenAI)"
     dall_e_3 = "DALL·E 3 (OpenAI)"
 
+    openjourney_2 = "Open Journey v2 beta (PromptHero) 🐢"
+    openjourney = "Open Journey (PromptHero) 🐢"
+    analog_diffusion = "Analog Diffusion (wavymulder) 🐢"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150) 🐢"
+
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
-    deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
+    deepfloyd_if = "DeepFloyd IF [Deprecated] (stability.ai)"
 
     @classmethod
     def _deprecated(cls):
@@ -77,17 +84,18 @@ text2img_model_ids = {
 
 
 class Img2ImgModels(Enum):
-    # sd_1_4 = "SD v1.4 (RunwayML)" # Host this too?
-    instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
+    dream_shaper = "DreamShaper (Lykon)"
+    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
     sd_2 = "Stable Diffusion v2.1 (stability.ai)"
     sd_1_5 = "Stable Diffusion v1.5 (RunwayML)"
-    dream_shaper = "DreamShaper (Lykon)"
-    openjourney = "Open Journey (PromptHero)"
-    openjourney_2 = "Open Journey v2 beta (PromptHero)"
-    analog_diffusion = "Analog Diffusion (wavymulder)"
-    protogen_5_3 = "Protogen v5.3 (darkstorm2150)"
-    dreamlike_2 = "Dreamlike Photoreal 2.0 (dreamlike.art)"
+
     dall_e = "Dall-E (OpenAI)"
+
+    instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
+    openjourney_2 = "Open Journey v2 beta (PromptHero) 🐢"
+    openjourney = "Open Journey (PromptHero) 🐢"
+    analog_diffusion = "Analog Diffusion (wavymulder) 🐢"
+    protogen_5_3 = "Protogen v5.3 (darkstorm2150) 🐢"
 
     jack_qiao = "Stable Diffusion v1.4 [Deprecated] (Jack Qiao)"
     rodent_diffusion_1_5 = "Rodent Diffusion 1.5 [Deprecated] (NerdyRodent)"
@@ -243,9 +251,9 @@ def instruct_pix2pix(
         },
         inputs={
             "prompt": [prompt] * len(images),
-            "negative_prompt": [negative_prompt] * len(images)
-            if negative_prompt
-            else None,
+            "negative_prompt": (
+                [negative_prompt] * len(images) if negative_prompt else None
+            ),
             "num_images_per_prompt": num_outputs,
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
@@ -267,32 +275,41 @@ def text2img(
     guidance_scale: float = None,
     negative_prompt: str = None,
     scheduler: str = None,
+    dall_e_3_quality: str | None = None,
+    dall_e_3_style: str | None = None,
 ):
-    _resolution_check(width, height, max_size=(1024, 1024))
+    if selected_model != Text2ImgModels.dall_e_3.name:
+        _resolution_check(width, height, max_size=(1024, 1024))
 
     match selected_model:
         case Text2ImgModels.dall_e_3.name:
             from openai import OpenAI
 
             client = OpenAI()
-            response = client.images.generate(
-                model=text2img_model_ids[Text2ImgModels[selected_model]],
-                n=num_outputs,
-                prompt=prompt,
-                response_format="b64_json",
-            )
+            width, height = _get_dall_e_3_img_size(width, height)
+            with capture_openai_content_policy_violation():
+                response = client.images.generate(
+                    model=text2img_model_ids[Text2ImgModels[selected_model]],
+                    n=1,  # num_outputs, not supported yet
+                    prompt=prompt,
+                    response_format="b64_json",
+                    quality=dall_e_3_quality,
+                    style=dall_e_3_style,
+                    size=f"{width}x{height}",
+                )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case Text2ImgModels.dall_e.name:
             from openai import OpenAI
 
-            edge = _get_dalle_img_size(width, height)
+            edge = _get_dall_e_img_size(width, height)
             client = OpenAI()
-            response = client.images.generate(
-                n=num_outputs,
-                prompt=prompt,
-                size=f"{edge}x{edge}",
-                response_format="b64_json",
-            )
+            with capture_openai_content_policy_violation():
+                response = client.images.generate(
+                    n=num_outputs,
+                    prompt=prompt,
+                    size=f"{edge}x{edge}",
+                    response_format="b64_json",
+                )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
         case _:
             prompt = add_prompt_prefix(prompt, selected_model)
@@ -321,7 +338,7 @@ def text2img(
     ]
 
 
-def _get_dalle_img_size(width: int, height: int) -> int:
+def _get_dall_e_img_size(width: int, height: int) -> int:
     edge = max(width, height)
     if edge < 512:
         edge = 256
@@ -330,6 +347,15 @@ def _get_dalle_img_size(width: int, height: int) -> int:
     elif edge > 1024:
         edge = 1024
     return edge
+
+
+def _get_dall_e_3_img_size(width: int, height: int) -> tuple[int, int]:
+    if height == width:
+        return 1024, 1024
+    elif width < height:
+        return 1024, 1792
+    else:
+        return 1792, 1024
 
 
 def img2img(
@@ -355,16 +381,17 @@ def img2img(
         case Img2ImgModels.dall_e.name:
             from openai import OpenAI
 
-            edge = _get_dalle_img_size(width, height)
+            edge = _get_dall_e_img_size(width, height)
             image = resize_img_pad(init_image_bytes, (edge, edge))
 
             client = OpenAI()
-            response = client.images.create_variation(
-                image=image,
-                n=num_outputs,
-                size=f"{edge}x{edge}",
-                response_format="b64_json",
-            )
+            with capture_openai_content_policy_violation():
+                response = client.images.create_variation(
+                    image=image,
+                    n=num_outputs,
+                    size=f"{edge}x{edge}",
+                    response_format="b64_json",
+                )
 
             out_imgs = [
                 resize_img_fit(b64_img_decode(part.b64_json), (width, height))
@@ -403,7 +430,7 @@ def controlnet(
     scheduler: str = None,
     prompt: str,
     num_outputs: int = 1,
-    init_image: str,
+    init_images: list[str] | str,
     num_inference_steps: int = 50,
     negative_prompt: str = None,
     guidance_scale: float = 7.5,
@@ -412,15 +439,17 @@ def controlnet(
 ):
     if isinstance(selected_controlnet_model, str):
         selected_controlnet_model = [selected_controlnet_model]
+    if isinstance(init_images, str):
+        init_images = [init_images] * len(selected_controlnet_model)
     prompt = add_prompt_prefix(prompt, selected_model)
     return call_sd_multi(
         "diffusion.controlnet",
         pipeline={
             "model_id": text2img_model_ids[Text2ImgModels[selected_model]],
             "seed": seed,
-            "scheduler": Schedulers[scheduler].label
-            if scheduler
-            else "UniPCMultistepScheduler",
+            "scheduler": (
+                Schedulers[scheduler].label if scheduler else "UniPCMultistepScheduler"
+            ),
             "disable_safety_checker": True,
             "controlnet_model_id": [
                 controlnet_model_ids[ControlNetModels[model]]
@@ -433,7 +462,7 @@ def controlnet(
             "num_images_per_prompt": num_outputs,
             "num_inference_steps": num_inference_steps,
             "guidance_scale": guidance_scale,
-            "image": [init_image] * len(selected_controlnet_model),
+            "image": init_images,
             "controlnet_conditioning_scale": controlnet_conditioning_scale,
             # "strength": prompt_strength,
         },
@@ -475,19 +504,20 @@ def inpainting(
         case InpaintingModels.dall_e.name:
             from openai import OpenAI
 
-            edge = _get_dalle_img_size(width, height)
+            edge = _get_dall_e_img_size(width, height)
             edit_image_bytes = resize_img_pad(edit_image_bytes, (edge, edge))
             mask_bytes = resize_img_pad(mask_bytes, (edge, edge))
             image = rgb_img_to_rgba(edit_image_bytes, mask_bytes)
 
             client = OpenAI()
-            response = client.images.edit(
-                prompt=prompt,
-                image=image,
-                n=num_outputs,
-                size=f"{edge}x{edge}",
-                response_format="b64_json",
-            )
+            with capture_openai_content_policy_violation():
+                response = client.images.edit(
+                    prompt=prompt,
+                    image=image,
+                    n=num_outputs,
+                    size=f"{edge}x{edge}",
+                    response_format="b64_json",
+                )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
 
         case InpaintingModels.sd_2.name | InpaintingModels.runway_ml.name:
@@ -514,11 +544,11 @@ def inpainting(
             out_imgs = []
             for url in out_imgs_urls:
                 r = requests.get(url)
-                r.raise_for_status()
+                raise_for_status(r)
                 out_imgs.append(r.content)
 
         case _:
-            raise ValueError(f"Invalid model {selected_model}")
+            raise UserError(f"Invalid inpainting model {selected_model}")
 
     out_imgs = _recomposite_inpainting_outputs(out_imgs, edit_image_bytes, mask_bytes)
 

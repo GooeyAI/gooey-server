@@ -9,9 +9,12 @@ import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.safety_checker import safety_checker
+
+DEFAULT_DEFORUMSD_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/7dc25196-93fe-11ee-9e3a-02420a0001ce/AI%20Animation%20generator.jpg.png"
 
 
 class AnimationModels(TextChoices):
@@ -27,6 +30,7 @@ class _AnimationPrompt(TypedDict):
 AnimationPrompts = list[_AnimationPrompt]
 
 CREDITS_PER_FRAME = 1.5
+MODEL_ESTIMATED_TIME_PER_FRAME = 2.4  # seconds
 
 
 def input_prompt_to_animation_prompts(input_prompt: str):
@@ -77,7 +81,7 @@ def animation_prompts_editor(
     st.write("#### 👩‍💻 Animation Prompts")
     st.caption(
         """
-        Describe the scenes or series of images that you want to generate into an animation. You can add as many prompts as you like. Mention the keyframe number for each prompt i.e. the transition point from the first prompt to the next. 
+        Describe the scenes or series of images that you want to generate into an animation. You can add as many prompts as you like. Mention the keyframe number for each prompt i.e. the transition point from the first prompt to the next.
         View the ‘Details’ drop down menu to get started.
         """
     )
@@ -144,7 +148,7 @@ def animation_prompts_editor(
     )
     st.caption(
         """
-        Pro-tip: To avoid abrupt endings on your animation, ensure that the last keyframe prompt is set for a higher number of keyframes/time than the previous transition rate. There should be an ample number of frames between the last frame and the total frame count of the animation. 
+        Pro-tip: To avoid abrupt endings on your animation, ensure that the last keyframe prompt is set for a higher number of keyframes/time than the previous transition rate. There should be an ample number of frames between the last frame and the total frame count of the animation.
         """
     )
 
@@ -158,6 +162,7 @@ DEFAULT_ANIMATION_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.
 
 class DeforumSDPage(BasePage):
     title = "AI Animation Generator"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/media/users/kxmNIYAOJbfOURxHBKNCWeUSKiP2/dd88c110-88d6-11ee-9b4f-2b58bd50e819/animation.gif"
     workflow = Workflow.DEFORUM_SD
     slug_versions = ["DeforumSD", "animation-generator"]
 
@@ -195,6 +200,9 @@ class DeforumSDPage(BasePage):
     class ResponseModel(BaseModel):
         output_video: str
 
+    def preview_image(self, state: dict) -> str | None:
+        return DEFAULT_DEFORUMSD_META_IMG
+
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
         from recipes.LipsyncTTS import LipsyncTTSPage
@@ -225,7 +233,7 @@ class DeforumSDPage(BasePage):
             )
             st.caption(
                 """
-Pro-tip: The more frames you add, the longer it will take to render the animation. Test your prompts before adding more frames. 
+Pro-tip: The more frames you add, the longer it will take to render the animation. Test your prompts before adding more frames.
             """
             )
 
@@ -270,14 +278,14 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
         st.text_input(
             """
 ###### Zoom
-How should the camera zoom in or out? This setting scales the canvas size, multiplicatively. 
-1 is static, with numbers greater than 1 moving forward (or zooming in) and numbers less than 1 moving backwards (or zooming out). 
+How should the camera zoom in or out? This setting scales the canvas size, multiplicatively.
+1 is static, with numbers greater than 1 moving forward (or zooming in) and numbers less than 1 moving backwards (or zooming out).
             """,
             key="zoom",
         )
         st.caption(
             """
-            With 0 as the starting keyframe, the input of 0: (1.004) can be used to zoom in moderately, starting at frame 0 and continuing until the end. 
+            With 0 as the starting keyframe, the input of 0: (1.004) can be used to zoom in moderately, starting at frame 0 and continuing until the end.
             """
         )
         st.text_input(
@@ -318,7 +326,7 @@ Tilts the camera up or down in degrees per frame. This parameter uses positive v
             )
         st.slider(
             """
-###### FPS (Frames per second) 
+###### FPS (Frames per second)
 Choose fps for the video.
             """,
             min_value=10,
@@ -358,13 +366,13 @@ Choose fps for the video.
     def render_description(self):
         st.markdown(
             f"""
-            - Every Submit will require approximately 3-5 minutes to render.  
+            - Every Submit will require approximately 3-5 minutes to render.
 
-            - Animation is complex: Please watch the video and review our decks to help you. 
+            - Animation is complex: Please watch the video and review our decks to help you.
 
-            - Test your image prompts BEFORE adding lots of frames e.g. Tweak key frame images with just 10 frames between them AND then increase the FPS or frame count between them once you like the outputs. This will save you time and credits. 
+            - Test your image prompts BEFORE adding lots of frames e.g. Tweak key frame images with just 10 frames between them AND then increase the FPS or frame count between them once you like the outputs. This will save you time and credits.
 
-            - No lost work! All your animations or previously generated versions are in the History tab. If they don't appear here, it likely means they aren't done rendering yet. 
+            - No lost work! All your animations or previously generated versions are in the History tab. If they don't appear here, it likely means they aren't done rendering yet.
 
             """
         )
@@ -379,23 +387,23 @@ Choose fps for the video.
             Here’s a comprehensive style guide to assist you with different stylized animation prompts:
 
             [StableDiffusion CheatSheet](https://supagruen.github.io/StableDiffusion-CheatSheet/)
-            
+
             """
         )
         st.write("---")
         st.markdown(
             """
-            Animation Length: You can indicate how long you want your animation to be by increasing or decreasing your frame count. 
+            Animation Length: You can indicate how long you want your animation to be by increasing or decreasing your frame count.
 
-            FPS: Every Animation is set at 12 frames per second by default. You can change this default frame rate/ frames per second (FPS) on the Settings menu. 
+            FPS: Every Animation is set at 12 frames per second by default. You can change this default frame rate/ frames per second (FPS) on the Settings menu.
 
-            Prompts: Within your sequence you can input multiple text Prompts for your visuals. Each prompt can be defined for a specific keyframe number. 
+            Prompts: Within your sequence you can input multiple text Prompts for your visuals. Each prompt can be defined for a specific keyframe number.
 
-            ##### What are keyframes? 
+            ##### What are keyframes?
 
             Keyframes define the transition points from one prompt to the next, or the start and end points of a prompted action set in between the total frame count or sequence. These keyframes or markers are necessary to establish smooth transitions or jump cuts, whatever you prefer.
 
-            Use the Camera Settings to generate animations with depth and other 3D parameters.  
+            Use the Camera Settings to generate animations with depth and other 3D parameters.
             """
         )
         st.markdown(
@@ -414,8 +422,12 @@ Choose fps for the video.
     def render_output(self):
         output_video = st.session_state.get("output_video")
         if output_video:
-            st.write("Output Video")
-            st.video(output_video, autoplay=True)
+            st.write("#### Output Video")
+            st.video(output_video, autoplay=True, show_download_button=True)
+
+    def estimate_run_duration(self):
+        # in seconds
+        return st.session_state.get("max_frames", 100) * MODEL_ESTIMATED_TIME_PER_FRAME
 
     def render_example(self, state: dict):
         display = self.preview_input(state)
@@ -423,14 +435,15 @@ Choose fps for the video.
 
         st.video(state.get("output_video"), autoplay=True)
 
-    def preview_input(self, state: dict) -> str:
+    @classmethod
+    def preview_input(cls, state: dict) -> str:
         input_prompt = state.get("input_prompt")
         if input_prompt:
             animation_prompts = input_prompt_to_animation_prompts(input_prompt)
         else:
             animation_prompts = state.get("animation_prompts", [])
         display = "\n\n".join(
-            [f"[{fp['frame']}] {fp['prompt']}" for fp in animation_prompts]
+            [f"{fp['prompt']} [{fp['frame']}]" for fp in animation_prompts]
         )
         return display
 
@@ -441,27 +454,32 @@ Choose fps for the video.
         if not self.request.user.disable_safety_checker:
             safety_checker(text=self.preview_input(state))
 
-        state["output_video"] = call_celery_task_outfile(
-            "deforum",
-            pipeline=dict(
-                model_id=AnimationModels[request.selected_model].value,
-                seed=request.seed,
-            ),
-            inputs=dict(
-                animation_mode=request.animation_mode,
-                animation_prompts={
-                    fp["frame"]: fp["prompt"] for fp in request.animation_prompts
-                },
-                max_frames=request.max_frames,
-                zoom=request.zoom,
-                translation_x=request.translation_x,
-                translation_y=request.translation_y,
-                rotation_3d_x=request.rotation_3d_x,
-                rotation_3d_y=request.rotation_3d_y,
-                rotation_3d_z=request.rotation_3d_z,
-                translation_z="0:(0)",
-                fps=request.fps,
-            ),
-            content_type="video/mp4",
-            filename=f"gooey.ai animation {request.animation_prompts}.mp4",
-        )[0]
+        try:
+            state["output_video"] = call_celery_task_outfile(
+                "deforum",
+                pipeline=dict(
+                    model_id=AnimationModels[request.selected_model].value,
+                    seed=request.seed,
+                ),
+                inputs=dict(
+                    animation_mode=request.animation_mode,
+                    animation_prompts={
+                        fp["frame"]: fp["prompt"] for fp in request.animation_prompts
+                    },
+                    max_frames=request.max_frames,
+                    zoom=request.zoom,
+                    translation_x=request.translation_x,
+                    translation_y=request.translation_y,
+                    rotation_3d_x=request.rotation_3d_x,
+                    rotation_3d_y=request.rotation_3d_y,
+                    rotation_3d_z=request.rotation_3d_z,
+                    translation_z="0:(0)",
+                    fps=request.fps,
+                ),
+                content_type="video/mp4",
+                filename=f"gooey.ai animation {request.animation_prompts}.mp4",
+            )[0]
+        except RuntimeError as e:
+            msg = "\n\n".join(e.args).lower()
+            if "key frame string not correctly formatted" in msg:
+                raise UserError(str(e)) from e

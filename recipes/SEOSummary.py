@@ -4,16 +4,14 @@ import typing
 
 import readability
 import requests
-from bs4 import BeautifulSoup
 from furl import furl
 from html_sanitizer import Sanitizer
-from lxml import etree
 from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from recipes.GoogleGPT import GoogleSearchMixin
 from daras_ai_v2.base import BasePage
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fake_user_agents import FAKE_USER_AGENTS
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
@@ -32,11 +30,12 @@ from daras_ai_v2.serp_search_locations import (
     SerpSearchType,
 )
 from daras_ai_v2.settings import EXTERNAL_REQUEST_TIMEOUT_SEC
+from recipes.GoogleGPT import GoogleSearchMixin
 
 KEYWORDS_SEP = re.compile(r"[\n,]")
 
 STOP_SEQ = "$" * 10
-SEO_SUMMARY_DEFAULT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/assets/seo.png"
+SEO_SUMMARY_DEFAULT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/13d3ab1e-9457-11ee-98a6-02420a0001c9/SEO.jpg.png"
 
 BANNED_HOSTS = [
     # youtube generally returns garbage
@@ -56,6 +55,7 @@ sanitizer = Sanitizer(
 
 class SEOSummaryPage(BasePage):
     title = "Create a perfect SEO-optimized Title & Paragraph"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/85f38b42-88d6-11ee-ad97-02420a00016c/Create%20SEO%20optimized%20content%20option%202.png.png"
     workflow = Workflow.SEO_SUMMARY
     slug_versions = ["SEOSummary", "seo-paragraph-generator"]
 
@@ -96,9 +96,9 @@ class SEOSummaryPage(BasePage):
 
         enable_html: bool | None
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels)
-        ] | None
+        selected_model: (
+            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
+        )
         sampling_temperature: float | None
         max_tokens: int | None
         num_outputs: int | None
@@ -158,7 +158,7 @@ SearchSEO > Page Parsing > GPT3
         )
 
     def render_form_v2(self):
-        st.write("### Inputs")
+        st.write("#### Inputs")
         st.text_input("Google Search Query", key="search_query")
         st.text_input("Website Name", key="title")
         st.text_input("Website URL", key="company_url")
@@ -190,7 +190,7 @@ SearchSEO > Page Parsing > GPT3
     def render_output(self):
         output_content = st.session_state.get("output_content")
         if output_content:
-            st.write("### Generated Content")
+            st.write("#### Generated Content")
             for idx, text in enumerate(output_content):
                 if st.session_state.get("enable_html"):
                     scrollable_html(text)
@@ -411,6 +411,8 @@ def _gen_final_prompt(
 
 
 def _summarize_url(url: str, enable_html: bool):
+    from lxml import etree
+
     try:
         title, summary = _call_summarize_url(url)
     except (requests.RequestException, etree.LxmlError):
@@ -436,6 +438,8 @@ def _summarize_url(url: str, enable_html: bool):
 
 
 def html_to_text(text):
+    from bs4 import BeautifulSoup
+
     return BeautifulSoup(text, "html.parser").get_text(separator=" ", strip=True)
 
 
@@ -445,6 +449,6 @@ def _call_summarize_url(url: str) -> (str, str):
         headers={"User-Agent": random.choice(FAKE_USER_AGENTS)},
         timeout=EXTERNAL_REQUEST_TIMEOUT_SEC,
     )
-    r.raise_for_status()
+    raise_for_status(r)
     doc = readability.Document(r.text)
     return doc.title(), doc.summary()

@@ -25,11 +25,12 @@ from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
 
-DEFAULT_ASR_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3b98d906-538b-11ee-9c77-02420a000193/Speech1%201.png.png"
+DEFAULT_ASR_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/1916825c-93fa-11ee-97be-02420a0001c8/Speech.jpg.png"
 
 
 class AsrPage(BasePage):
     title = "Speech Recognition & Translation"
+    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/5fb7e5f6-88d9-11ee-aa86-02420a000165/Speech.png.png"
     workflow = Workflow.ASR
     slug_versions = ["asr", "speech"]
 
@@ -46,6 +47,10 @@ class AsrPage(BasePage):
     class ResponseModel(BaseModel):
         raw_output_text: list[str] | None
         output_text: list[str | AsrOutputJson]
+
+    @classmethod
+    def get_example_preferred_fields(cls, state: dict) -> list[str]:
+        return ["selected_model", "language", "google_translate_target"]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_ASR_META_IMG
@@ -81,14 +86,14 @@ class AsrPage(BasePage):
 
     def render_form_v2(self):
         document_uploader(
-            "##### Audio Files",
+            "#### Audio Files",
             accept=("audio/*", "video/*", "application/octet-stream"),
         )
         col1, col2 = st.columns(2, responsive=False)
         with col1:
             selected_model = enum_selector(
                 AsrModels,
-                label="##### ASR Model",
+                label="#### ASR Model",
                 key="selected_model",
                 use_selectbox=True,
             )
@@ -138,6 +143,7 @@ class AsrPage(BasePage):
                 output_format=request.output_format,
             ),
             request.documents,
+            max_workers=4,
         )
 
         # Run Translation

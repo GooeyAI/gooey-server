@@ -2,6 +2,7 @@
 
 * Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile)
 * Install [poetry](https://python-poetry.org/docs/)
+* Clone the github repo to gooey-server (and make sure that's the folder name)
 * Create & activate a virtualenv (e.g. `poetry shell`)
 * Run `poetry install --with dev`
 * Install [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/), [rabbitmq](https://www.rabbitmq.com/install-homebrew.html), and [postgresql](https://formulae.brew.sh/formula/postgresql@15) (e.g. `brew install redis rabbitmq postgresql@15`)
@@ -24,13 +25,14 @@ $ poetry run honcho start
 The processes that it starts are defined in [`Procfile`](Procfile).
 Currently they are these:
 
-| Service          | Port |
-| -------          | ---- |
-| API + GUI Server | 8080 |
-| Admin site       | 8000 |
-| Usage dashboard  | 8501 |
-| Celery           | -    |
-| UI               | 3000 |
+| Service          | Port    |
+|------------------|---------|
+| API + GUI Server | `8080`  |
+| Admin site       | `8000`  |
+| Usage dashboard  | `8501`  |
+| Celery           | -       |
+| UI               | `3000`  |
+| Vespa            | `8085`  |
 
 This default startup assumes that Redis, RabbitMQ, and PostgreSQL are installed and running
 as background services on ports 6379, 5672, and 5432 respectively. 
@@ -44,6 +46,27 @@ can do this by stopping and starting Honcho.
 ## To run any recipe 
 
 * Save `serviceAccountKey.json` to project root
+
+## To run vespa (used for vector search)
+
+You need to install OrbStack or Docker Desktop for this to work.
+
+1. Create a persistent volume for Vespa:
+```bash
+docker volume create vespa
+```
+2. Run the container:
+```bash
+docker run \
+  --hostname vespa-container \
+  -p 8085:8080 -p 19071:19071 \
+  --volume vespa:/opt/vespa/var \
+  -it --rm --name vespa vespaengine/vespa
+```
+3. Run the setup script
+```bash
+./manage.py runscript setup_vespa_db
+```
 
 ## To connect to our GPU cluster 
 
@@ -78,6 +101,42 @@ Use black - https://pypi.org/project/black
 
 **Recommended**: Black IDE integration Guide: [Pycharm](https://black.readthedocs.io/en/stable/integrations/editors.html#pycharm-intellij-idea)
 
+
+## Running test Whatsapp bot
+
+We use the following facebook app for testing - 
+```
+gooey.ai (dev)
+App ID: 228027632918921
+```
+
+Create a [meta developer account](https://developers.facebook.com/docs/development/register/) & send admin your **facebook ID** to add you to the test app [here](https://developers.facebook.com/apps/228027632918921/roles/roles/?business_id=549319917267066)
+
+1. start ngrok
+
+```
+ngrok http 8080
+```
+
+2. set env var `FB_WEBHOOK_TOKEN = asdf1234`
+
+
+3. Open [WhatsApp Configuration](https://developers.facebook.com/apps/228027632918921/whatsapp-business/wa-settings/?business_id=549319917267066), set the Callback URL and Verify Token
+<img width="500" alt="image" src="https://github.com/GooeyAI/gooey-server/assets/19492893/95bb3a87-ae4f-4f6b-a04e-583ee51b85de">
+
+4. Open [WhatsApp API Setup](https://developers.facebook.com/apps/228027632918921/whatsapp-business/wa-dev-console/?business_id=549319917267066), send yourself a message from the test number.
+<img width="500" alt="image" src="https://github.com/GooeyAI/gooey-server/assets/19492893/f9417723-77c0-4be5-9814-778662215d9c">
+
+5. Copy the temporary access token there and set env var `WHATSAPP_ACCESS_TOKEN = XXXX`
+
+
+**(Optional) Use the test script to send yourself messages** 
+
+```bash
+python manage.py runscript test_wa_msg_send --script-args 104696745926402 +918764022384
+```
+Replace `+918764022384` with your number and `104696745926402` with the test number ID
+
 ## Dangerous postgres commands
 
 ### backup & restore postgres db
@@ -96,6 +155,7 @@ docker cp $cid:/app/$fname .
 echo $PWD/$fname
 ```
 
+**on local**
 ```bash
 # reset the database
 ./manage.py reset_db -c
@@ -107,15 +167,25 @@ pg_restore --no-privileges --no-owner -d $PGDATABASE $fname
 
 ### create & load fixtures
 
+**on server**
 ```bash
 # select a running container
 cid=$(docker ps  | grep gooey-api-prod | cut -d " " -f 1 | head -1)
 # exec the script to create the fixture
 docker exec -it $cid poetry run ./manage.py runscript create_fixture
+```
+
+```bash
 # copy the fixture outside container
 docker cp $cid:/app/fixture.json .
 # print the absolute path
 echo $PWD/fixture.json
+```
+
+**on local**
+```bash
+# copy fixture.json from server to local
+rsync -P -a <username>@captain.us-1.gooey.ai:/home/<username>/fixture.json .
 ```
 
 ```bash
@@ -127,11 +197,14 @@ echo $PWD/fixture.json
 ./manage.py migrate
 # load the fixture
 ./manage.py loaddata fixture.json
+# create a superuser to access admin
+./manage.py createsuperuser
 ```
 
 ### copy one postgres db to another
 
-```
+**on server**
+```bash
 ./manage.py reset_db
 createdb -T template0 $PGDATABASE
 pg_dump $SOURCE_DATABASE | psql -q $PGDATABASE

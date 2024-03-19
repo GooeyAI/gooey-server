@@ -1,6 +1,5 @@
 import datetime
 import os.path
-import subprocess
 import tempfile
 import typing
 from time import time
@@ -21,18 +20,23 @@ from starlette.responses import (
 
 import gooey_ui as st
 from app_users.models import AppUser
+from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, safe_filename
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages, normalize_slug, page_slug_map
+from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
-from daras_ai_v2.base import (
-    RedirectException,
-)
+from daras_ai_v2.base import RedirectException
+from daras_ai_v2.bots import request_json
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
+from daras_ai_v2.exceptions import ffmpeg, UserError
+from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
+from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
+from daras_ai_v2.tabs_widget import MenuTabs
 from routers.api import request_form_files
 
 app = APIRouter()
@@ -159,6 +163,11 @@ async def logout(request: Request):
     return RedirectResponse(request.query_params.get("next", DEFAULT_LOGOUT_REDIRECT))
 
 
+@app.post("/__/file-upload/url/meta")
+async def file_upload(request: Request, body_json: dict = Depends(request_json)):
+    return dict(name=(body_json["url"]), type="url/undefined", size=None)
+
+
 @app.post("/__/file-upload/")
 def file_upload(request: Request, form_data: FormData = Depends(request_form_files)):
     from wand.image import Image
@@ -174,26 +183,20 @@ def file_upload(request: Request, form_data: FormData = Depends(request_form_fil
         ) as infile:
             infile.write(data)
             infile.flush()
-            if not check_wav_audio_format(infile.name):
-                with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
-                    args = [
-                        "ffmpeg",
-                        "-y",
-                        "-i",
-                        infile.name,
-                        *FFMPEG_WAV_ARGS,
-                        outfile.name,
-                    ]
-                    print("\t$ " + " ".join(args))
-                    subprocess.check_call(args)
+            try:
+                if not check_wav_audio_format(infile.name):
+                    with tempfile.NamedTemporaryFile(suffix=".wav") as outfile:
+                        ffmpeg("-i", infile.name, *FFMPEG_WAV_ARGS, outfile.name)
 
-                    filename += ".wav"
-                    content_type = "audio/wav"
-                    data = outfile.read()
+                        filename += ".wav"
+                        content_type = "audio/wav"
+                        data = outfile.read()
+            except UserError as e:
+                return Response(content=str(e), status_code=400)
 
     if content_type.startswith("image/"):
         with Image(blob=data) as img:
-            if img.format not in ["png", "jpeg", "jpg", "gif"]:
+            if img.format.lower() not in ["png", "jpeg", "jpg", "gif"]:
                 img.format = "png"
                 content_type = "image/png"
                 filename += ".png"
@@ -225,31 +228,139 @@ def explore_page(request: Request, json_data: dict = Depends(request_json)):
     return ret
 
 
+@app.post("/api/")
+def api_docs_page(request: Request, json_data: dict = Depends(request_json)):
+    ret = st.runner(
+        lambda: page_wrapper(
+            request=request, render_fn=lambda: _api_docs_page(request)
+        ),
+        **json_data,
+    )
+    ret |= {
+        "meta": raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title="Gooey.AI API Platform",
+            description="Explore resources, tutorials, API docs, and dynamic examples to get the most out of GooeyAI's developer platform.",
+            image=meta_preview_url(
+                "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/e48d59be-aaee-11ee-b112-02420a000175/API%20Docs.png.png"
+            ),
+        ),
+    }
+    return ret
+
+
+def _api_docs_page(request):
+    api_docs_url = str(furl(settings.API_BASE_URL) / "docs")
+
+    st.markdown(
+        f"""
+# Gooey.AI API Platform
+
+##### 📖 Introduction 
+You can interact with the API through HTTP requests from any language.
+
+If you're comfortable with OpenAPI specs, jump straight to our <a href="{api_docs_url}" target="_blank">complete API</a>
+
+##### 🔐 Authentication
+The Gooey.AI API uses API keys for authentication. Visit the [API Keys](#api-keys) section to retrieve the API key you'll use in your requests.
+
+Remember that your API key is a secret! Do not share it with others or expose it in any client-side code (browsers, apps). Production requests must be routed through your own backend server where your API key can be securely loaded from an environment variable or key management service.
+
+All API requests should include your API key in an Authorization HTTP header as follows:
+
+```bash
+Authorization: Bearer GOOEY_API_KEY
+```
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.write("---")
+    options = {
+        page_cls.workflow.value: page_cls().get_recipe_title()
+        for page_cls in all_api_pages
+    }
+    workflow = Workflow(
+        st.selectbox(
+            "##### ⚕ API Generator\nChoose a workflow to see how you can interact with it via the API",
+            options=options,
+            format_func=lambda x: options[x],
+        )
+    )
+
+    st.write("###### 📤 Example Request")
+
+    include_all = st.checkbox("Show all fields")
+    as_async = st.checkbox("Run Async")
+    as_form_data = st.checkbox("Upload Files via Form Data")
+
+    page = workflow.page_cls(request=request)
+    state = page.get_root_published_run().saved_run.to_dict()
+    request_body = page.get_example_request_body(state, include_all=include_all)
+    response_body = page.get_example_response_body(
+        state, as_async=as_async, include_all=include_all
+    )
+
+    api_example_generator(
+        api_url=page._get_current_api_url(),
+        request_body=request_body,
+        as_form_data=as_form_data,
+        as_async=as_async,
+    )
+    st.write("")
+
+    st.write("###### 🎁 Example Response")
+    st.json(response_body, expanded=True)
+
+    st.write("---")
+    with st.tag("a", id="api-keys"):
+        st.write("##### 🔐 API keys")
+
+    if not page.request.user or page.request.user.is_anonymous:
+        st.write(
+            "**Please [Login](/login/?next=/api/) to generate the `$GOOEY_API_KEY`**"
+        )
+        return
+
+    manage_api_keys(page.request.user)
+
+
 @app.post("/")
 @app.post("/{page_slug}/")
-@app.post("/{page_slug}/{tab}/")
+@app.post("/{page_slug}/{run_slug_or_tab}/")
+@app.post("/{page_slug}/{run_slug_or_tab}/{tab}/")
 def st_page(
     request: Request,
     page_slug="",
+    run_slug_or_tab="",
     tab="",
     json_data: dict = Depends(request_json),
 ):
+    run_slug, tab = _extract_run_slug_and_tab(run_slug_or_tab, tab)
+    try:
+        selected_tab = MenuTabs.paths_reverse[tab]
+    except KeyError:
+        raise HTTPException(status_code=404)
+
     try:
         page_cls = page_slug_map[normalize_slug(page_slug)]
     except KeyError:
         raise HTTPException(status_code=404)
+
     # ensure the latest slug is used
     latest_slug = page_cls.slug_versions[-1]
     if latest_slug != page_slug:
         return RedirectResponse(
-            request.url.replace(path=os.path.join("/", latest_slug, tab, ""))
+            request.url.replace(path=os.path.join("/", latest_slug, run_slug, tab, ""))
         )
 
     example_id, run_id, uid = extract_query_params(request.query_params)
 
-    page = page_cls(tab=tab, request=request, run_user=get_run_user(request, uid))
+    page = page_cls(
+        tab=selected_tab, request=request, run_user=get_run_user(request, uid)
+    )
 
-    state = json_data.setdefault("state", {})
+    state = json_data.get("state", {})
     if not state:
         db_state = page.get_sr_from_query_params(example_id, run_id, uid).to_dict()
         if db_state is not None:
@@ -263,23 +374,10 @@ def st_page(
         ret = st.runner(
             lambda: page_wrapper(request, page.render),
             query_params=dict(request.query_params),
-            **json_data,
+            state=state,
         )
     except RedirectException as e:
         return RedirectResponse(e.url, status_code=e.status_code)
-
-    # Canonical URLs should not include uid or run_id (don't index specific runs).
-    # In the case of examples, all tabs other than "Run" are duplicates of the page
-    # without the `example_id`, and so their canonical shouldn't include `example_id`
-    canonical_url = str(
-        furl(
-            str(settings.APP_BASE_URL),
-            query_params={"example_id": example_id} if not tab and example_id else {},
-        )
-        / latest_slug
-        / tab
-        / "/"  # preserve trailing slash
-    )
 
     ret |= {
         "meta": build_meta_tags(
@@ -290,11 +388,6 @@ def st_page(
             uid=uid,
             example_id=example_id,
         )
-        + [dict(tagName="link", rel="canonical", href=canonical_url)]
-        # + [
-        #     dict(tagName="link", rel="icon", href="/static/favicon.ico"),
-        #     dict(tagName="link", rel="stylesheet", href="/static/css/app.css"),
-        # ],
     }
     return ret
 
@@ -336,3 +429,12 @@ def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
 
     st.html(templates.get_template("footer.html").render(**context))
     st.html(templates.get_template("login_scripts.html").render(**context))
+
+
+def _extract_run_slug_and_tab(run_slug_or_tab, tab) -> tuple[str, str]:
+    if run_slug_or_tab and tab:
+        return run_slug_or_tab, tab
+    elif run_slug_or_tab in MenuTabs.paths_reverse:
+        return "", run_slug_or_tab
+    else:
+        return run_slug_or_tab, ""
