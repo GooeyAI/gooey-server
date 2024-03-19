@@ -517,7 +517,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         output_text = state.get("output_text")
         if output_text:
-            st.write(truncate_text_words(output_text[0], maxlen=200))
+            st.write(output_text[0], line_clamp=5)
 
     def render_output(self):
         # chat window
