@@ -1206,7 +1206,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             col1, col2 = st.columns(2, style={"align-items": "center"})
             with col1:
                 st.write("###### Connected To")
-                st.write(f"{icon} {bi}", unsafe_allow_html=True)
+                st.html(f"<p>{icon} {bi}</p>")
             with col2:
                 if test_link:
                     copy_to_clipboard_button(
