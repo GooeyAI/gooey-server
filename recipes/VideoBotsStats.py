@@ -59,12 +59,20 @@ class VideoBotsStatsPage(BasePage):
         return furl(self.app_url(), args=args).tostr()
 
     def show_title_breadcrumb_share(self, run_title, run_url, bi):
+        if bi.published_run and bi.published_run.published_run_id:
+            # internally treat the stats page as belonging to a specific publish run
+            # this way, links like get_tab_url will point to the example
+            # note that Sean does not want the run url here
+            st.threadlocal.query_params |= dict(
+                example_id=bi.published_run.published_run_id
+            )
+
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
                 with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
                     with st.breadcrumbs():
                         st.breadcrumb_item(
-                            VideoBotsPage.title,
+                            VideoBotsPage.workflow.get_or_create_metadata().short_title,
                             link_to=VideoBotsPage.app_url(),
                             className="text-muted",
                         )
@@ -85,6 +93,7 @@ class VideoBotsStatsPage(BasePage):
                 self.render_author(
                     author,
                     show_as_link=self.is_current_user_admin(),
+                    page_instance=VideoBotsPage(),
                 )
 
             with st.div(className="d-flex align-items-center"):
@@ -368,10 +377,11 @@ class VideoBotsStatsPage(BasePage):
         if bi.published_run:
             run_title = bi.published_run.title
         elif saved_run:
-            run_title = "This Copilot Run"
+            run_title = saved_run.title or "This Copilot Run"
         else:
             run_title = "No Run Connected"
-        run_url = furl(saved_run.get_app_url()).tostr() if saved_run else ""
+        run_url = bi.published_run.get_app_url()
+        run_url = run_url or saved_run.get_app_url() if saved_run else ""
         return run_title, run_url
 
     def calculate_overall_stats(self, bid, bi, run_title, run_url):
