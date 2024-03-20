@@ -163,9 +163,9 @@ class TextToSpeechPage(BasePage):
         if tts_provider == TextToSpeechProviders.ELEVEN_LABS.name:
             _, is_user_provided_key = self._get_elevenlabs_api_key(st.session_state)
             if is_user_provided_key:
-                return "*Eleven Labs ≈ No additional credit charge given we'll use your API key*"
+                return "*No additional credit charge given we'll use your API key*"
             else:
-                return "*Eleven Labs ≈ 4 credits per 10 words*"
+                return "*4 credits per 10 words*"
         else:
             return ""
 

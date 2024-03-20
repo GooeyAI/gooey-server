@@ -661,6 +661,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             tts_state = {"text_prompt": "".join(output_text_list)}
             total += TextToSpeechPage().get_raw_price(tts_state)
 
+        if st.session_state.get("input_face"):
+            total += 1
+
         return total * state.get("num_outputs", 1)
 
     def get_usage_cost(self):
@@ -681,6 +684,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         match tts_provider:
             case TextToSpeechProviders.ELEVEN_LABS.name:
                 notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
+        if st.session_state.get("input_face"):
+            notes += " *+ 1 (lipsync)*"
         return notes
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
