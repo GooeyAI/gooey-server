@@ -2,22 +2,6 @@
 <script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater" defer async id="paypal-sdk"></script>
 
 <div class="container">
-    <div class="user-info">
-        {% if request.user.photo_url %}
-            <img id="profile-picture" src="{{ request.user.photo_url }}" alt="" width="128" height="128">
-        {% endif %}
-        <div class="user-info-text-box">
-            {% if request.user.display_name %}
-                <h2>{{ request.user.display_name }}</h2>
-            {% endif %}
-            <span style="font-weight: normal">{{ request.user.email or request.user.phone_number }}</span>
-            <div style="font-weight: normal; font-size: x-small">
-                <a href="/privacy">Privacy</a>&nbsp & &nbsp;<a href="/terms">Terms</a>
-            </div>
-            <br/>
-            <a href="/logout">Signout</a>
-        </div>
-    </div>
     {% if is_admin %}
         <hr>
         <div class="admin-div">
