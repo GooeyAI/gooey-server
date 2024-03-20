@@ -99,9 +99,12 @@ class AppUserAdmin(admin.ModelAdmin):
 
     @admin.display(description="Total Usage Cost")
     def total_usage_cost(self, user: models.AppUser):
-        total_cost = UsageCost.objects.filter(saved_run__uid=user.uid).aggregate(
-            Sum("dollar_amount")
-        )["dollar_amount__sum"]
+        total_cost = (
+            UsageCost.objects.filter(saved_run__uid=user.uid).aggregate(
+                Sum("dollar_amount")
+            )["dollar_amount__sum"]
+            or 0
+        )
         return round(total_cost, 2)
 
     def open_in_firebase(self, user: models.AppUser):
