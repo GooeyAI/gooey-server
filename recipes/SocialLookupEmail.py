@@ -137,12 +137,9 @@ class SocialLookupEmailPage(BasePage):
         # st.text_input("Key Words", key="key_words")
 
     def validate_form_v2(self):
-        input_prompt = st.session_state.get("input_prompt")
         email_address = st.session_state.get("email_address")
 
-        assert (
-            input_prompt and email_address
-        ), "Please provide a Prompt and an Email Address"
+        assert email_address, "Please provide a Prompt and an Email Address"
 
         assert re.fullmatch(
             email_regex, email_address
@@ -157,6 +154,11 @@ class SocialLookupEmailPage(BasePage):
         if not person:
             raise ValueError("Could not find person")
         state["person_data"] = person
+
+        if not request.input_prompt:
+            state["final_prompt"] = ""
+            state["output_text"] = []
+            return
 
         state["final_prompt"] = daras_ai_format_str(
             format_str=request.input_prompt,
