@@ -13,6 +13,7 @@ from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import settings
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
+from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.settings import templates
 from routers.root import page_wrapper, request_json
 
@@ -140,7 +141,7 @@ def account(
 
     tab = AccountTab.paths_reverse[tab_path]
     try:
-        return st.runner(
+        ret = st.runner(
             lambda: page_wrapper(
                 request,
                 render_fn=lambda: render_account_page(request, tab),
@@ -150,6 +151,17 @@ def account(
         )
     except RedirectException as e:
         return RedirectResponse(e.url, status_code=e.status_code)
+    else:
+        ret |= {
+            "meta": raw_build_meta_tags(
+                url=account_url,
+                title="Account • Gooey.AI",
+                description="Your API keys, profile, and billing details.",
+                canonical_url=account_url,
+                robots="noindex,nofollow",
+            )
+        }
+        return ret
 
 
 def render_account_page(request: Request, tab: str):
@@ -191,14 +203,12 @@ def billing_tab(request: Request):
     is_admin = request.user.email in settings.ADMIN_EMAILS
 
     context = {
-        "title": "Account • Gooey.AI",
         "request": request,
         "settings": settings,
         "available_subscriptions": available_subscriptions,
         "user_credits": request.user.balance,
         "subscription": get_user_subscription(request.user),
         "is_admin": is_admin,
-        "canonical_url": account_url,
     }
 
     st.html(templates.get_template("account.html").render(**context))
