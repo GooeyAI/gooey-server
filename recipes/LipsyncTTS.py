@@ -157,7 +157,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
     def get_cost_note(self):
         return "Lipsync cost + TTS cost"
 
-    def additional_notes(self):
+    def additional_notes(self, state: dict):
         cost_notes = {
             "Lipsync": LipsyncPage.get_cost_note(self),
             "TTS": TextToSpeechPage.get_cost_note(self),

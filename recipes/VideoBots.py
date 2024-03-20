@@ -7,6 +7,7 @@ from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
+from usage_costs.models import UsageCost
 from bots.models import BotIntegration, Platform, SavedRun
 from bots.models import Workflow
 from daras_ai.image_input import (
@@ -651,44 +652,36 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.audio(audio_url)
 
     def get_raw_price(self, state: dict):
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )  # type: ignore
-
-        run_id = current_run.run_id or published_run.published_run_id
-        if not run_id:
-            return 4
-        saved_run = SavedRun.objects.filter(run_id=run_id)
-        total = 0
-        for run in saved_run:
-            usage_cost = run.usage_costs.all()
-            for cost in usage_cost:
-                total += cost.dollar_amount
-        total += 4
+        total = self.get_usage_cost() + 3
 
         if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
             output_text_list = state.get(
                 "raw_tts_text", state.get("raw_output_text", [])
             )
             tts_state = {"text_prompt": "".join(output_text_list)}
-            total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
-                tts_state
-            )
+            total += TextToSpeechPage().get_raw_price(tts_state)
 
         return total * state.get("num_outputs", 1)
 
-    def additional_notes(self):
+    def get_usage_cost(self):
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )  # type: ignore
+        run_id = current_run.run_id or published_run.published_run_id
+        return round(
+            UsageCost.objects.filter(saved_run__run_id=run_id).aggregate(
+                Sum("dollar_amount")
+            )["dollar_amount__sum"]
+            or 0
+        )
+
+    def additional_notes(self, state: dict):
+        notes = f" \\\n*Breakdown: {self.get_usage_cost()} ({state['selected_model']}) + 3/run*"
         tts_provider = st.session_state.get("tts_provider")
         match tts_provider:
             case TextToSpeechProviders.ELEVEN_LABS.name:
-                return (
-                    f" \\\n"
-                    f"*Base cost = {super().get_raw_price(st.session_state)} credits*"
-                    f" | "
-                    f"*Additional {TextToSpeechPage().get_cost_note()}*"
-                )
-            case _:
-                return ""
+                notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
+        return notes
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
