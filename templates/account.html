@@ -3,7 +3,6 @@
 
 <div class="container">
     {% if is_admin %}
-        <hr>
         <div class="admin-div">
             <h2>Admin Links</h2>
             <ul>
@@ -20,9 +19,8 @@
                         target="_blank">Most Popular Pages</a></li>
             </ul>
         </div>
+        <hr>
     {% endif %}
-
-    <hr>
 
     <div class="credits-container">
         <h2>Remaining Credits: {{ humanize.intcomma(user_credits) }}</h2>
