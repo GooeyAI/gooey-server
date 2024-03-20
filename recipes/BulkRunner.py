@@ -22,6 +22,7 @@ from daras_ai_v2.vector_search import (
     doc_url_to_file_metadata,
     tabular_bytes_to_any_df,
 )
+from gooey_ui.components.url_button import url_button
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
 
@@ -533,18 +534,6 @@ def render_eval_url_inputs(key: str, del_key: str, d: dict):
     except Exception as e:
         st.error(repr(e))
     d["url"] = url
-
-
-def url_button(url):
-    st.html(
-        f"""
-<a href='{url}' target='_blank'>
-    <button type="button" class="btn btn-theme btn-tertiary">
-        <i class="fa-regular fa-external-link-square"></i>
-    </button>
-</a>
-        """
-    )
 
 
 def edit_button(key: str):
