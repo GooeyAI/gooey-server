@@ -1,7 +1,7 @@
 import base64
 from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
 
+from dateutil.relativedelta import relativedelta
 from django.db.models import Count, Avg, Q
 from django.db.models.functions import (
     TruncMonth,
@@ -90,10 +90,9 @@ class VideoBotsStatsPage(BasePage):
                     AppUser.objects.filter(uid=bi.billing_account_uid).first()
                     or self.request.user
                 )
-                self.render_author(
+                VideoBotsPage().render_author(
                     author,
                     show_as_link=self.is_current_user_admin(),
-                    page_instance=VideoBotsPage(),
                 )
 
             with st.div(className="d-flex align-items-center"):
@@ -381,7 +380,8 @@ class VideoBotsStatsPage(BasePage):
         else:
             run_title = "No Run Connected"
         run_url = bi.published_run.get_app_url()
-        run_url = run_url or saved_run.get_app_url() if saved_run else ""
+        if saved_run and not run_url:
+            run_url = saved_run.get_app_url()
         return run_title, run_url
 
     def calculate_overall_stats(self, bid, bi, run_title, run_url):
