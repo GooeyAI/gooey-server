@@ -1,6 +1,6 @@
 <script src="https://js.stripe.com/v3/" async defer></script>
-<script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater"
-        async defer onload="renderPaypalButtons()"></script>
+<script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater" defer async id="paypal-sdk"></script>
+
 <div class="container">
     <div class="user-info">
         {% if request.user.photo_url %}
@@ -59,7 +59,7 @@
                         type="radio"
                         id="payment-method-stripe"
                         name="payment-method"
-                        onchange="stripeLayout()"
+                        data-submit-disabled
                         checked>
                 <label class="form-check-label" for="payment-method-stripe"><b>Stripe</b></label>
 
@@ -67,86 +67,8 @@
                         type="radio"
                         id="payment-method-paypal"
                         name="payment-method"
-                        onchange="paypalLayout()">
-                <label class="form-check-label" for="payment-method-paypal"><b>Paypal</b></label>
-            </div>
-            <div id="stripe-container">
-                {% for lookup_key, subscription in available_subscriptions.items() %}
-                    <ul id="{{ subscription['display']['name'] }}">
-                        <li>
-                            <h4>{{ subscription["display"]["title"] }}</h4>
-                            <h5>{{ subscription["display"]["description"] | safe }}</h5>
-                            {% if lookup_key == "addon" %}
-                                {% include 'add_on_credits.html' %}
-                            {% else %}
-                                <form action="/__/stripe/create-checkout-session" method="POST">
-                                    <!-- Add a hidden field with the lookup_key of your Price -->
-                                    <input type="hidden" name="lookup_key" value="{{ lookup_key }}"/>
-                                    <button class="streamlit-like-btn" type="submit">Buy</button>
-                                </form>
-                            {% endif %}
-                        </li>
-                    </ul>
-                {% endfor %}
-            </div>
-            <div id="paypal-container" style="display: none;">
-                {% for lookup_key, subscription in available_subscriptions.items() %}
-                    {% if lookup_key == "addon" %}
-                        <h4>{{ subscription["display"]["title"] }}</h4>
-                        <h5>{{ subscription["display"]["description"] | safe }}</h5>
-                        {% for option in [10, 30, 50, 100, 300, 500] %}
-                            <button class="streamlit-like-btn paypal-checkout-option"
-                                    onclick="setQuantity(this, {{ option * 100 }});">
-                                Buy ${{ option }}
-                            </button>
-                        {% endfor %}
-                        <div class="pt-3" style="width: fit-content; display: none;"
-                                id="paypal-button-container"></div>
-                        <p id="result-message"></p>
-                    {% endif %}
-                {% endfor %}
-            </div>
-        </div>
-    {% else %}
-        <hr/>
-        <h4 id="subscription-text">
-            You are subscribed to {{ subscription["display"]["name"] }}, {{ subscription["display"]["title"] }}
-        </h4>
-        <form class="d-inline" action="/__/stripe/cancel-subscription" method="POST">
-            <button class="bg-danger streamlit-like-btn" id="cancel-button" type="submit">Cancel Subscription
-            </button>
-        </form>
-        <form class="d-inline" action="/__/stripe/create-portal-session" method="POST">
-            <button class="streamlit-like-btn" id="portal-button" type="submit">Manage your billing
-                information
-            </button>
-        </form>
-
-        <div class="p-1"></div>
-        {% include 'add_on_credits.html' %}
-    {% endif %}
-    </div>
-
-    {% if not subscription %}
-        <hr>
-        <div class="buy-credits-container">
-            <div class="h2">Buy Credits</div>
-            <div class="pb-2">
-                Pay via
-
-                <input class="form-check-input mx-1"
-                        type="radio"
-                        id="payment-method-stripe"
-                        name="payment-method"
-                        onchange="stripeLayout()"
-                        checked>
-                <label class="form-check-label" for="payment-method-stripe"><b>Stripe</b></label>
-
-                <input class="form-check-input mx-1"
-                        type="radio"
-                        id="payment-method-paypal"
-                        name="payment-method"
-                        onchange="paypalLayout()">
+                        onchange="paypalLayout"
+                        data-submit-disabled>
                 <label class="form-check-label" for="payment-method-paypal"><b>Paypal</b></label>
             </div>
             <div id="stripe-container">
@@ -175,7 +97,9 @@
                         <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
                         {% for option in [10, 30, 50, 100, 300, 500] %}
                             <button class="streamlit-like-btn paypal-checkout-option"
-                                    onclick="setQuantity(this, {{ option * 100 }});">
+                                    type="button"
+                                    data-option="{{ option }}"
+                                    data-submit-disabled>
                                 Buy ${{ option }}
                             </button>
                         {% endfor %}
@@ -207,6 +131,26 @@
 </div>
 
 <script>
+    document.getElementById("payment-method-stripe").setAttribute("onchange", `
+        document.getElementById("paypal-container").style.display = "none";
+        document.getElementById("stripe-container").style.display = "block";
+    `);
+    document.getElementById("payment-method-paypal").setAttribute("onchange", `
+        document.getElementById("stripe-container").style.display = "none";
+        document.getElementById("paypal-container").style.display = "block";
+        document.getElementById("paypal-button-container").innerHTML = "";
+        window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
+    `);
+    document.querySelectorAll(".paypal-checkout-option").forEach(button => {
+        button.setAttribute("onclick", `
+            let option = parseInt(this.getAttribute('data-option'));
+            setQuantity(this, option * 100);
+        `);
+    });
+    document.getElementById("paypal-sdk").setAttribute("onload", `
+        window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
+    `);
+
     function stripeLayout() {
         document.getElementById("paypal-container").style.display = "none";
         document.getElementById("stripe-container").style.display = "block";
@@ -217,7 +161,7 @@
         document.getElementById("paypal-container").style.display = "block";
     }
 
-    let selectedQty = 0;
+    var selectedQty = 0;
 
     // Handle Paypal
     function setQuantity(el, qty) {
@@ -227,10 +171,6 @@
         el.className += " bg-secondary";
         document.getElementById("paypal-button-container").style.display = "block";
         selectedQty = qty;
-    }
-
-    function renderPaypalButtons() {
-        window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
     }
 
     async function createOrder() {
