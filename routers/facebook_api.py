@@ -22,7 +22,8 @@ def fb_connect_whatsapp_redirect(request: Request):
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
-    retry_button = f'<a href="{wa_connect_url}">Retry</a>'
+    on_completion = request.query_params.get("state")
+    retry_button = f'<a href="{wa_connect_url(on_completion)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -62,6 +63,7 @@ def fb_connect_whatsapp_redirect(request: Request):
     # {'data': [{'verified_name': 'XXXX', 'code_verification_status': 'VERIFIED', 'display_phone_number': 'XXXX', 'quality_rating': 'UNKNOWN', 'platform_type': 'NOT_APPLICABLE', 'throughput': {'level': 'NOT_APPLICABLE'}, 'last_onboarded_time': '2024-02-22T20:42:16+0000', 'id': 'XXXX'}], 'paging': {'cursors': {'before': 'XXXX', 'after': 'XXXX'}}}
     phone_numbers = r.json()["data"]
 
+    integrations = []
     for phone_number in phone_numbers:
         business_name = phone_number["verified_name"]
         display_phone_number = phone_number["display_phone_number"]
@@ -108,7 +110,9 @@ def fb_connect_whatsapp_redirect(request: Request):
         )
         r.raise_for_status()
 
-    return HTMLResponse(
+        integrations.append(bi)
+
+    return return_to_app_url(integrations, on_completion) or HTMLResponse(
         f"Sucessfully Connected to whatsapp! You may now close this page."
     )
 
@@ -119,7 +123,8 @@ def fb_connect_redirect(request: Request):
         redirect_url = furl("/login", query_params={"next": request.url})
         return RedirectResponse(str(redirect_url))
 
-    retry_button = f'<a href="{ig_connect_url}">Retry</a>'
+    on_completion = request.query_params.get("state")
+    retry_button = f'<a href="{fb_connect_url(on_completion)}">Retry</a>'
 
     code = request.query_params.get("code")
     if not code:
@@ -128,7 +133,7 @@ def fb_connect_redirect(request: Request):
             + retry_button,
             status_code=400,
         )
-    user_access_token = _get_access_token_from_code(code)
+    user_access_token = _get_access_token_from_code(code, fb_connect_redirect_url)
 
     db.get_user_doc_ref(request.user.uid).set(
         {"fb_access_token": user_access_token}, merge=True
@@ -147,7 +152,7 @@ def fb_connect_redirect(request: Request):
     )
 
     page_names = ", ".join(map(str, integrations))
-    return HTMLResponse(
+    return return_to_app_url(integrations, on_completion) or HTMLResponse(
         f"Sucessfully Connected to {page_names}! You may now close this page."
     )
 
@@ -216,13 +221,29 @@ def fb_webhook(
     return Response("OK")
 
 
-wa_connect_redirect_url = str(
-    furl(settings.APP_BASE_URL)
-    / router.url_path_for(fb_connect_whatsapp_redirect.__name__)
-)
+def return_to_app_url(
+    integrations: list,
+    on_completion: str | None = None,
+) -> bool | RedirectResponse:
+    if not on_completion or not integrations:
+        return False
+    return RedirectResponse(
+        furl(on_completion)
+        .add(query_params={"connect_ids": ",".join([str(i.id) for i in integrations])})
+        .tostr()
+    )
 
-wa_connect_url = str(
+
+wa_connect_redirect_url = (
     furl(
+        settings.APP_BASE_URL,
+    )
+    / router.url_path_for(fb_connect_whatsapp_redirect.__name__)
+).tostr()
+
+
+def wa_connect_url(on_completion: str | None = None) -> str:
+    return furl(
         "https://www.facebook.com/v18.0/dialog/oauth",
         query_params={
             "client_id": settings.FB_APP_ID,
@@ -230,16 +251,21 @@ wa_connect_url = str(
             "redirect_uri": wa_connect_redirect_url,
             "response_type": "code",
             "config_id": settings.FB_WHATSAPP_CONFIG_ID,
+            "state": on_completion,
         },
-    )
-)
+    ).tostr()
 
-fb_connect_redirect_url = str(
-    furl(settings.APP_BASE_URL) / router.url_path_for(fb_connect_redirect.__name__)
-)
 
-fb_connect_url = str(
+fb_connect_redirect_url = (
     furl(
+        settings.APP_BASE_URL,
+    )
+    / router.url_path_for(fb_connect_redirect.__name__)
+).tostr()
+
+
+def fb_connect_url(on_completion: str | None = None) -> str:
+    return furl(
         "https://www.facebook.com/dialog/oauth",
         query_params={
             "client_id": settings.FB_APP_ID,
@@ -253,12 +279,13 @@ fb_connect_url = str(
                     "pages_show_list",
                 ]
             ),
+            "state": on_completion,
         },
-    )
-)
+    ).tostr()
 
-ig_connect_url = str(
-    furl(
+
+def ig_connect_url(on_completion: str | None = None) -> str:
+    return furl(
         "https://www.facebook.com/dialog/oauth",
         query_params={
             "client_id": settings.FB_APP_ID,
@@ -275,17 +302,17 @@ ig_connect_url = str(
                     "pages_show_list",
                 ]
             ),
+            "state": on_completion,
         },
-    )
-)
+    ).tostr()
 
 
-def _get_access_token_from_code(code: str, redirect_uri: str | None = None) -> str:
+def _get_access_token_from_code(code: str, redirect_uri: str) -> str:
     r = requests.get(
         "https://graph.facebook.com/v15.0/oauth/access_token",
         params={
             "client_id": settings.FB_APP_ID,
-            "redirect_uri": redirect_uri or fb_connect_redirect_url,
+            "redirect_uri": redirect_uri,
             "client_secret": settings.FB_APP_SECRET,
             "code": code,
         },

@@ -214,7 +214,7 @@ def azure_tts_settings():
         * Voice Type: {voice.get('VoiceType')}
         * Words Per Minute: {voice.get('WordsPerMinute')}
 
-        See all the supported languages and voices [here](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support?tabs=tts)
+        See all the supported languages and voices [here](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support?tabs=tts).
         """
     )
 
