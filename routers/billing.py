@@ -143,9 +143,7 @@ def account(
         return st.runner(
             lambda: page_wrapper(
                 request,
-                render_account_page,
-                tab=tab,
-                request_=request,
+                render_fn=lambda: render_account_page(request, tab),
             ),
             query_params=dict(request.query_params),
             **json_data,
@@ -154,9 +152,7 @@ def account(
         return RedirectResponse(e.url, status_code=e.status_code)
 
 
-def render_account_page(request_: Request, tab: str):
-    request = request_
-
+def render_account_page(request: Request, tab: str):
     if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
         redirect_url = furl("/login", query_params={"next": next_url})
