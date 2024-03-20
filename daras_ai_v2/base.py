@@ -1152,7 +1152,6 @@ class BasePage:
         responsive: bool = True,
         show_as_link: bool = False,
         text_size: str | None = None,
-        page_instance=None,
     ):
         if not user or (not user.photo_url and not user.display_name):
             return
@@ -1168,7 +1167,7 @@ class BasePage:
 
         if show_as_link:
             linkto = st.link(
-                to=(page_instance or self).app_url(
+                to=self.app_url(
                     tab_name=MenuTabs.paths[MenuTabs.history],
                     query_params={"uid": user.uid},
                 )
