@@ -49,9 +49,7 @@ def render():
         preview = page.preview_description(state)
         if preview:
             with gui.tag("p", style={"margin-bottom": "25px"}):
-                gui.html(
-                    truncate_text_words(preview, 150),
-                )
+                gui.write(preview, line_clamp=2)
         else:
             page.render_description()
         # with gui.tag(

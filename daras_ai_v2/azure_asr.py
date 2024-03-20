@@ -90,7 +90,7 @@ def azure_get_latest_model(language: str) -> dict | None:
         return {"self": model["self"]}
 
 
-def azure_auth_header():
+def azure_auth_header() -> dict[str, str]:
     return {
         "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
     }

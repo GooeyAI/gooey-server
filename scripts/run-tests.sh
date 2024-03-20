@@ -7,4 +7,4 @@ echo "==> Linting with black..."
 black --check --diff .
 
 echo "==> Running pytest..."
-pytest -n 2
+pytest
