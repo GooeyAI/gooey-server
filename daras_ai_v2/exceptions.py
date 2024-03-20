@@ -1,6 +1,5 @@
 import json
 import subprocess
-import urllib.parse
 
 import requests
 from loguru import logger
