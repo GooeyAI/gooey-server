@@ -5,6 +5,7 @@ from app_users import models
 from django.db.models import Sum
 from bots.admin_links import open_in_new_tab, list_related_html_url
 from bots.models import SavedRun
+from usage_costs.models import UsageCost
 
 
 # Register your models here.
@@ -98,12 +99,9 @@ class AppUserAdmin(admin.ModelAdmin):
 
     @admin.display(description="Total Usage Cost")
     def total_usage_cost(self, user: models.AppUser):
-        saved_run = SavedRun.objects.filter(uid=user.uid)
-        total_cost = 0
-        for run in saved_run:
-            usage_cost = run.usage_costs.all()
-            for cost in usage_cost:
-                total_cost += cost.dollar_amount
+        total_cost = UsageCost.objects.filter(saved_run__uid=user.uid).aggregate(
+            Sum("dollar_amount")
+        )["dollar_amount__sum"]
         return round(total_cost, 2)
 
     def open_in_firebase(self, user: models.AppUser):
