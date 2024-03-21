@@ -1,4 +1,7 @@
 import html
+import os
+import typing
+from enum import Enum
 from urllib.parse import quote_plus
 
 import stripe
@@ -20,7 +23,6 @@ from routers.root import page_wrapper, request_json
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
 router = APIRouter()
-
 
 available_subscriptions = {
     "addon": {
@@ -110,25 +112,33 @@ available_subscriptions = {
 }
 
 
-class AccountTab:
-    billing = "Billing"
-    profile = "Profile"
-    api_keys = "🚀 API Keys"
+class _AccountTab(typing.NamedTuple):
+    title: str
+    tab_path: str
 
-    paths = {
-        billing: "",
-        profile: "profile",
-        api_keys: "api-keys",
-    }
-    paths_reverse = {v: k for k, v in paths.items()}
+
+class AccountTabs(Enum):
+    billing = _AccountTab(title="Billing", tab_path="")
+    profile = _AccountTab(title="Profile", tab_path="profile")
+    api_keys = _AccountTab(title="🚀 API Keys", tab_path="api-keys")
+
+    @property
+    def title(self) -> str:
+        return self.value.title
+
+    @property
+    def tab_path(self) -> str:
+        return self.value.tab_path
 
     @classmethod
-    def get_url(cls, tab: str) -> str:
-        return str(furl("/account/") / cls.paths[tab])
+    def from_tab_path(cls, tab_path: str) -> "AccountTabs":
+        for tab in cls:
+            if tab.tab_path == tab_path:
+                return tab
+        raise HTTPException(status_code=404)
 
-    @classmethod
-    def get_tabs(cls) -> list[str]:
-        return list(cls.paths.keys())
+    def get_full_path(self) -> str:
+        return os.path.join("/account", self.tab_path, "")
 
 
 @router.post("/account/", include_in_schema=False)
@@ -136,10 +146,7 @@ class AccountTab:
 def account(
     request: Request, tab_path: str = "", json_data: dict = Depends(request_json)
 ):
-    if tab_path not in AccountTab.paths_reverse:
-        raise HTTPException(status_code=404)
-
-    tab = AccountTab.paths_reverse[tab_path]
+    tab = AccountTabs.from_tab_path(tab_path)
     try:
         ret = st.runner(
             lambda: page_wrapper(
@@ -164,7 +171,7 @@ def account(
         return ret
 
 
-def render_account_page(request: Request, tab: str):
+def render_account_page(request: Request, current_tab: AccountTabs):
     if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
         redirect_url = furl("/login", query_params={"next": next_url})
@@ -172,23 +179,21 @@ def render_account_page(request: Request, tab: str):
 
     st.div(className="mt-5")
     with st.nav_tabs():
-        tab_names = AccountTab.get_tabs()
-        for name in tab_names:
-            url = AccountTab.get_url(name)
-            with st.nav_item(url, active=name == tab):
-                st.html(name)
+        for tab in AccountTabs:
+            with st.nav_item(tab.get_full_path(), active=tab == current_tab):
+                st.html(tab.title)
 
     with st.nav_tab_content():
-        render_selected_tab(request, tab)
+        render_selected_tab(request, current_tab)
 
 
-def render_selected_tab(request: Request, tab: str):
-    match tab:
-        case AccountTab.billing:
+def render_selected_tab(request: Request, current_tab: AccountTabs):
+    match current_tab:
+        case AccountTabs.billing:
             billing_tab(request)
-        case AccountTab.profile:
+        case AccountTabs.profile:
             profile_tab(request)
-        case AccountTab.api_keys:
+        case AccountTabs.api_keys:
             api_keys_tab(request)
         case _:
             raise HTTPException(status_code=401)
