@@ -1,4 +1,4 @@
-<h5 id="add-on-text">Buy a one-time top up @ 100 Credits per dollar.</h5>
+<div class="h5" id="add-on-text">Buy a one-time top up @ 100 Credits per dollar.</div>
 {% for amt in [10, 30, 50, 100, 300, 500] %}
     <form class="d-inline" action="/__/stripe/create-checkout-session" method="POST">
         <!-- Add a hidden field with the lookup_key of your Price -->
