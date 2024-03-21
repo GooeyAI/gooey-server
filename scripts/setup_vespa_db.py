@@ -147,7 +147,7 @@ def run():
             furl(settings.VESPA_CONFIG_SERVER_URL)
             / "application/v2/tenant/default/prepareandactivate"
         ),
-        files={"applicationZipFile": package.to_zip()},
+        data=package.to_zip(),
         headers={"Content-Type": "application/zip"},
     )
     raise_for_status(r)

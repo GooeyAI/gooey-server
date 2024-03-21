@@ -52,7 +52,7 @@ const uiConfig = {
       // This can be obtained from the Credentials page of the Google APIs
       // console. Use the same OAuth client ID used for the Google provider
       // configured with GCIP or Firebase Auth.
-      clientId: CLIENT_ID,
+      clientId: window.GOOGLE_CLIENT_ID,
     },
     {
       provider: "apple.com",
