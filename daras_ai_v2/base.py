@@ -1911,7 +1911,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return max(1, math.ceil(self.get_raw_price(state)))
 
     def get_raw_price(self, state: dict) -> float:
-        return self.price * state.get("num_outputs", 1)
+        return self.price * (state.get("num_outputs") or 1)
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:

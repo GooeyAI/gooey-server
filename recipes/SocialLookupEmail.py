@@ -10,7 +10,12 @@ from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
-from daras_ai_v2.language_model import run_language_model, LargeLanguageModels
+from daras_ai_v2.language_model import (
+    run_language_model,
+    LargeLanguageModels,
+    SUPERSCRIPT,
+)
+from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.redis_cache import redis_cache_decorator
 
@@ -26,30 +31,39 @@ class SocialLookupEmailPage(BasePage):
 
     sane_defaults = {
         "selected_model": LargeLanguageModels.gpt_4.name,
+        "avoid_repetition": True,
+        "num_outputs": 1,
+        "quality": 1.0,
+        "max_tokens": 1500,
+        "sampling_temperature": 0.5,
     }
 
     class RequestModel(BaseModel):
         email_address: str
 
-        input_email_body: str | None
+        input_prompt: str | None
 
-        url1: str | None
-        url2: str | None
-        company: str | None
-        article_title: str | None
-        domain: str | None
-        key_words: str | None
+        # url1: str | None
+        # url2: str | None
+        # company: str | None
+        # article_title: str | None
+        # domain: str | None
+        # key_words: str | None
 
+        # llm settings
         selected_model: (
             typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
         )
-        sampling_temperature: float | None
+        num_outputs: int | None
+        avoid_repetition: bool | None
+        quality: float | None
         max_tokens: int | None
+        sampling_temperature: float | None
 
     class ResponseModel(BaseModel):
         person_data: dict
         final_prompt: str
-        output_email_body: str
+        output_text: list[str]
 
     def preview_description(self, state: dict) -> str:
         return "Look up any email's public social profile (from LinkedIn, Facebook, the web, etc) and then use the profile's name, employment history, city, etc in your GPT3-powered AI mail merge to create personalized emails that get through spam filters."
@@ -91,32 +105,6 @@ class SocialLookupEmailPage(BasePage):
     def render_usage_guide(self):
         youtube_video("lVWQbS_rFaM")
 
-    def render_settings(self):
-        st.slider(
-            """
-            ##### Model Creativity 
-
-            *(Sampling Temperature)*
-
-            Higher values allow the model to take more risks.
-            Try 0.9 for more creative applications, 
-            and 0 for ones with a well-defined answer. 
-            """,
-            key="sampling_temperature",
-            min_value=0.0,
-            max_value=1.0,
-        )
-
-        st.number_input(
-            """
-            #### Max Output Tokens
-            The maximum number of [tokens](https://beta.openai.com/tokenizer) to generate in the completion.
-            """,
-            key="max_tokens",
-            min_value=1,
-            max_value=4096,
-        )
-
     def render_form_v2(self):
         st.text_input(
             """
@@ -132,26 +120,26 @@ class SocialLookupEmailPage(BasePage):
 
         st.text_area(
             """
-            #### Email Body
+            #### Email Prompt
             """,
-            key="input_email_body",
+            key="input_prompt",
             height=200,
         )
 
-        st.text_input("URL 1", key="url1")
-        st.text_input("URL 2", key="url2")
-        st.text_input("Company", key="company")
-        st.text_input("Article Title", key="article_title")
-        st.text_input("Domain", key="domain")
-        st.text_input("Key Words", key="key_words")
+    def render_settings(self):
+        language_model_settings()
+
+        # st.text_input("URL 1", key="url1")
+        # st.text_input("URL 2", key="url2")
+        # st.text_input("Company", key="company")
+        # st.text_input("Article Title", key="article_title")
+        # st.text_input("Domain", key="domain")
+        # st.text_input("Key Words", key="key_words")
 
     def validate_form_v2(self):
-        text_prompt = st.session_state.get("input_email_body")
         email_address = st.session_state.get("email_address")
 
-        assert (
-            text_prompt and email_address
-        ), "Please provide a Prompt and an Email Address"
+        assert email_address, "Please provide a Prompt and an Email Address"
 
         assert re.fullmatch(
             email_regex, email_address
@@ -167,72 +155,84 @@ class SocialLookupEmailPage(BasePage):
             raise ValueError("Could not find person")
         state["person_data"] = person
 
+        if not request.input_prompt:
+            state["final_prompt"] = ""
+            state["output_text"] = []
+            return
+
         state["final_prompt"] = daras_ai_format_str(
-            format_str=request.input_email_body,
-            variables=self._input_variables(state),
+            format_str=request.input_prompt,
+            variables=_input_variables(state),
         )
 
-        yield "Running GPT-3..."
+        model = LargeLanguageModels[request.selected_model]
+        yield f"Running {model.value}..."
 
-        state["output_email_body"] = run_language_model(
+        chunks = run_language_model(
             model=request.selected_model,
-            quality=1,
-            num_outputs=1,
-            temperature=request.sampling_temperature,
             prompt=state["final_prompt"],
+            num_outputs=request.num_outputs,
             max_tokens=request.max_tokens,
-        )[0]
-
-    def _input_variables(self, state: dict):
-        return {
-            "person": state.get("person_data"),
-            "email_address": state.get("email_address"),
-            "url1": state.get("url1"),
-            "url2": state.get("url2"),
-            "company": state.get("company"),
-            "article_title": state.get("article_title"),
-            "domain": state.get("domain"),
-            "key_words": state.get("key_words"),
-        }
+            temperature=request.sampling_temperature,
+            avoid_repetition=request.avoid_repetition,
+            stream=True,
+        )
+        for i, entries in enumerate(chunks):
+            if not entries:
+                continue
+            state["output_text"] = [entry["content"] for entry in entries]
+            yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
-        st.text_area(
+        output_text = st.session_state.get("output_text", "")
+        if not output_text:
+            return
+        st.write(
             """
-            #### Email Body Output 
-            """,
-            disabled=True,
-            value=st.session_state.get("output_email_body", ""),
-            height=200,
+                #### Email Body Output 
+                """
         )
+        for idx, text in enumerate(output_text):
+            st.text_area(
+                "",
+                disabled=True,
+                value=text,
+                key=f"output:{idx}:{text}",
+                height=300,
+            )
 
     def render_steps(self):
         person_data = st.session_state.get("person_data")
         if person_data:
             st.write("**Input Variables**")
-            st.json(
-                self._input_variables(st.session_state),
-                expanded=False,
-            )
+            st.json(_input_variables(st.session_state))
         else:
             st.div()
 
         final_prompt = st.session_state.get("final_prompt")
         if final_prompt:
-            st.text_area(
-                "Final Prompt",
-                disabled=True,
-                value=final_prompt,
-                height=200,
-            )
+            st.text_area("Final Prompt", disabled=True, value=final_prompt, height=200)
         else:
             st.div()
 
     def render_example(self, state: dict):
-        col1, col2 = st.columns(2)
         st.write("**Email Address**")
         st.write(state.get("email_address", ""))
         st.write("**Email Body Output**")
         st.write(state.get("output_email_body", ""))
+
+
+def _input_variables(state: dict):
+    return {
+        "person": state.get("person_data"),
+        "email_address": state.get("email_address"),
+        # "url1": state.get("url1"),
+        # "url2": state.get("url2"),
+        # "company": state.get("company"),
+        # "article_title": state.get("article_title"),
+        # "domain": state.get("domain"),
+        # "key_words": state.get("key_words"),
+    }
 
 
 @redis_cache_decorator
