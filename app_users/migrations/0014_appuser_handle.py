@@ -9,8 +9,6 @@ import django.db.models.deletion
 
 from loguru import logger
 
-from handles.models import validate_handles_blacklist
-
 
 def make_handle_from(text):
     text = text.lower()
@@ -23,6 +21,7 @@ def make_handle_from(text):
 def attempt_create_handle(Handle, handle_name):
     handle = Handle(name=handle_name)
     try:
+        # handle.save() also runs the validators
         handle.save()
         return handle
     except (IntegrityError, ValidationError):
