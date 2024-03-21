@@ -101,16 +101,29 @@ def newline():
 
 
 def markdown(
-    body: str | None, *, line_clamp: int = None, unsafe_allow_html=False, **props
+    body: str | None,
+    *,
+    line_clamp: int = None,
+    unsafe_allow_html=False,
+    key: str | None = None,
+    **props,
 ):
     if body is None:
         return _node("markdown", body="", **props)
     if not unsafe_allow_html:
         body = html_lib.escape(body)
+    if key is None:
+        key = md5_values("markdown", body, line_clamp, props)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
     )
-    return _node("markdown", body=dedent(body).strip(), lineClamp=line_clamp, **props)
+    return _node(
+        "markdown",
+        body=dedent(body).strip(),
+        lineClamp=line_clamp,
+        key=key,
+        **props,
+    )
 
 
 def _node(name: str, **props):
