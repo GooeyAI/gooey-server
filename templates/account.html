@@ -1,5 +1,6 @@
 <script src="https://js.stripe.com/v3/" async defer></script>
-<script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater" defer async id="paypal-sdk"></script>
+<script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater"
+        async defer onload = renderPaypalButtons></script>
 
 <div class="container">
     {% if is_admin %}
@@ -8,15 +9,15 @@
             <ul>
                 <li><a href="https://gooey-dash-prod.us-1.gooey.ai/" target="_blank">Usage Dashboard</a></li>
                 <li><a href="https://datastudio.google.com/reporting/5c9bb981-ef13-4e46-a5af-eef92f3c42d7"
-                        target="_blank">Traffic Dashboard</a></li>
+                       target="_blank">Traffic Dashboard</a></li>
                 <li><a href="https://sentry.io/organizations/dara-network/issues/?project=4504338635423744"
-                        target="_blank">Sentry</a></li>
+                       target="_blank">Sentry</a></li>
                 <li>
                     <a href="https://analytics.google.com/analytics/web/#/p342900654/reports/reportinghub?params=_u..nav%3Dmaui "
-                        target="_blank">Analytics Summary</a></li>
+                       target="_blank">Analytics Summary</a></li>
                 <li>
                     <a href="https://analytics.google.com/analytics/web/#/p342900654/reports/explorer?params=_u..nav%3Dmaui%26_u.date00%3D20221115%26_u.date01%3D20230108%26_u.comparisonOption%3Ddisabled%26_r.explorerCard..seldim%3D%5B%22unifiedPagePathScreen%22%5D%26_r.explorerCard..rowsPerPage%3D25%26_r.explorerCard..startRow%3D0%26_r.explorerCard..selmet%3D%5B%22screenPageViews%22,%22activeUsers%22%5D%26_r.explorerCard..sortKey%3DscreenPageViews&r=4354450696&ruid=all-pages-and-screens,life-cycle,engagement&collectionId=4354433299"
-                        target="_blank">Most Popular Pages</a></li>
+                       target="_blank">Most Popular Pages</a></li>
             </ul>
         </div>
         <hr>
@@ -38,19 +39,20 @@
                 Pay via
 
                 <input class="form-check-input mx-1"
-                        type="radio"
-                        id="payment-method-stripe"
-                        name="payment-method"
-                        data-submit-disabled
-                        checked>
+                       type="radio"
+                       id="payment-method-stripe"
+                       name="payment-method"
+                       onchange="stripeLayout()"
+                       data-submit-disabled
+                       checked>
                 <label class="form-check-label" for="payment-method-stripe"><b>Stripe</b></label>
 
                 <input class="form-check-input mx-1"
-                        type="radio"
-                        id="payment-method-paypal"
-                        name="payment-method"
-                        onchange="paypalLayout"
-                        data-submit-disabled>
+                       type="radio"
+                       id="payment-method-paypal"
+                       name="payment-method"
+                       onchange="paypalLayout()"
+                       data-submit-disabled>
                 <label class="form-check-label" for="payment-method-paypal"><b>Paypal</b></label>
             </div>
             <div id="stripe-container">
@@ -79,14 +81,14 @@
                         <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
                         {% for option in [10, 30, 50, 100, 300, 500] %}
                             <button class="streamlit-like-btn paypal-checkout-option"
+                                    onclick="setQuantity(this, {{ option * 100 }});"
                                     type="button"
-                                    data-option="{{ option }}"
                                     data-submit-disabled>
                                 Buy ${{ option }}
                             </button>
                         {% endfor %}
                         <div class="pt-3" style="width: fit-content; display: none;"
-                                id="paypal-button-container"></div>
+                             id="paypal-button-container"></div>
                         <p id="result-message"></p>
                     {% endif %}
                 {% endfor %}
@@ -113,26 +115,6 @@
 </div>
 
 <script>
-    document.getElementById("payment-method-stripe").setAttribute("onchange", `
-        document.getElementById("paypal-container").style.display = "none";
-        document.getElementById("stripe-container").style.display = "block";
-    `);
-    document.getElementById("payment-method-paypal").setAttribute("onchange", `
-        document.getElementById("stripe-container").style.display = "none";
-        document.getElementById("paypal-container").style.display = "block";
-        document.getElementById("paypal-button-container").innerHTML = "";
-        window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
-    `);
-    document.querySelectorAll(".paypal-checkout-option").forEach(button => {
-        button.setAttribute("onclick", `
-            let option = parseInt(this.getAttribute('data-option'));
-            setQuantity(this, option * 100);
-        `);
-    });
-    document.getElementById("paypal-sdk").setAttribute("onload", `
-        window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
-    `);
-
     function stripeLayout() {
         document.getElementById("paypal-container").style.display = "none";
         document.getElementById("stripe-container").style.display = "block";
@@ -141,9 +123,10 @@
     function paypalLayout() {
         document.getElementById("stripe-container").style.display = "none";
         document.getElementById("paypal-container").style.display = "block";
+        renderPaypalButtons();
     }
 
-    var selectedQty = 0;
+    let selectedQty = 0;
 
     // Handle Paypal
     function setQuantity(el, qty) {
@@ -154,6 +137,11 @@
         document.getElementById("paypal-button-container").style.display = "block";
         selectedQty = qty;
     }
+
+        function renderPaypalButtons() {
+            if (document.querySelector("#paypal-button-container").innerHTML) return;
+            window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
+        }
 
     async function createOrder() {
         try {

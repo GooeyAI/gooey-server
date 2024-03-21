@@ -187,8 +187,8 @@ def render_account_page(request: Request, current_tab: AccountTabs):
         render_selected_tab(request, current_tab)
 
 
-def render_selected_tab(request: Request, current_tab: AccountTabs):
-    match current_tab:
+def render_selected_tab(request: Request, tab: AccountTabs):
+    match tab:
         case AccountTabs.billing:
             billing_tab(request)
         case AccountTabs.profile:
