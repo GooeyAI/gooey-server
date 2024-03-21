@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "glossary_resources",
     "usage_costs",
     "embeddings",
+    "handles",
 ]
 
 MIDDLEWARE = [

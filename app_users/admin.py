@@ -13,6 +13,7 @@ from bots.models import SavedRun
 class AppUserAdmin(admin.ModelAdmin):
     list_display = [
         "uid",
+        "user_handle",
         "display_name",
         "email",
         "phone_number",
@@ -26,6 +27,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "email",
         "phone_number",
         "stripe_customer_id",
+        "user_handle",
     ]
     list_filter = [
         "is_anonymous",
@@ -52,6 +54,15 @@ class AppUserAdmin(admin.ModelAdmin):
             instance_id=user.uid,
             show_add=False,
         )
+
+    @admin.display(description="User Handle")
+    def user_handle(self, user: models.AppUser):
+        if user.handle:
+            return open_in_new_tab(
+                f"/admin/handles/handle/{user.handle.id}/change/",
+                label=user.handle.name,
+            )
+        return None
 
     def open_in_firebase(self, user: models.AppUser):
         path = f"users/{user.uid}"
