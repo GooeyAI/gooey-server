@@ -11,9 +11,9 @@ from daras_ai_v2 import settings
 from daras_ai_v2.bots import request_json
 from daras_ai_v2.exceptions import raise_for_status
 
-# from daras_ai_v2.redis_cache import (
-#     get_redis_cache,
-# )
+from daras_ai_v2.redis_cache import (
+    get_redis_cache,
+)
 from routers.billing import available_subscriptions
 
 router = APIRouter()
@@ -30,10 +30,9 @@ def generate_auth_header() -> str:
     auth = base64.b64encode(
         (settings.PAYPAL_CLIENT_ID + ":" + settings.PAYPAL_SECRET).encode()
     ).decode()
-    # redis_cache = get_redis_cache()
-    # if access_token := redis_cache.get(auth):
-    #     print("Using cached access token")
-    #     return f"Bearer " + access_token.decode()
+    redis_cache = get_redis_cache()
+    if access_token := redis_cache.get(auth):
+        return f"Bearer " + access_token.decode()
     response = requests.post(
         str(furl(settings.PAYPAL_BASE) / "v1/oauth2/token"),
         data="grant_type=client_credentials",
@@ -43,7 +42,7 @@ def generate_auth_header() -> str:
     data = response.json()
     access_token = data.get("access_token")
     assert access_token, "Missing access token in response"
-    # redis_cache.set(auth, access_token, ex=data.get("expires_in"))
+    redis_cache.set(auth, access_token, ex=data.get("expires_in"))
     return f"Bearer " + access_token
 
 
