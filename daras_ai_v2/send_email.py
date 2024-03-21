@@ -13,7 +13,6 @@ from app_users.models import AppUser
 from daras_ai_v2 import settings
 from daras_ai_v2.settings import templates
 from gooey_ui import UploadedFile
-from routers.billing import account_url
 
 
 def send_reported_run_email(
@@ -50,6 +49,8 @@ def send_low_balance_email(
     user: AppUser,
     total_credits_consumed: int,
 ):
+    from routers.billing import account_url
+
     recipeints = "support@gooey.ai, devs@gooey.ai"
     html_body = templates.get_template("low_balance_email.html").render(
         user=user,

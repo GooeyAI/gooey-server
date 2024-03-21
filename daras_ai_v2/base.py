@@ -3,7 +3,6 @@ import html
 import inspect
 import math
 import typing
-import urllib
 import urllib.parse
 import uuid
 from copy import deepcopy
