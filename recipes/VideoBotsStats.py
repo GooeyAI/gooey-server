@@ -1,5 +1,6 @@
 import base64
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 from django.db.models import Count, Avg, Q
 from django.db.models.functions import (
@@ -47,6 +48,11 @@ class VideoBotsStatsPage(BasePage):
         Workflow.VIDEO_BOTS
     )  # this is a hidden page, so this isn't used but type checking requires a workflow
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.bi = None
+
     def _get_current_app_url(self):
         # this is overwritten to include the query params in the copied url for the share button
         args = dict(self.request.query_params)
@@ -85,7 +91,10 @@ class VideoBotsStatsPage(BasePage):
                 with st.div(className="d-flex align-items-start right-action-icons"):
                     self._render_social_buttons(show_button_text=True)
 
-        st.markdown(f"# 📊 {bi.name} Analytics")
+        st.markdown("# " + self.get_dynamic_meta_title())
+
+    def get_dynamic_meta_title(self):
+        return f"📊 {self.bi.name} Analytics" if self.bi else self.title
 
     def render(self):
         self.setup_sentry()
@@ -117,7 +126,7 @@ class VideoBotsStatsPage(BasePage):
         bid = self.request.query_params.get("bi_id", allowed_bids[0])
         if int(bid) not in allowed_bids:
             bid = allowed_bids[0]
-        bi = BotIntegration.objects.get(id=bid)
+        self.bi = bi = BotIntegration.objects.get(id=bid)
         has_analysis_run = bi.analysis_run is not None
         run_title, run_url = self.parse_run_info(bi)
 
@@ -144,6 +153,14 @@ class VideoBotsStatsPage(BasePage):
 
         if df.empty or "date" not in df.columns:
             st.write("No data to show yet.")
+            self.update_url(
+                bid,
+                view,
+                st.session_state.get("details"),
+                start_date,
+                end_date,
+                st.session_state.get("sort_by"),
+            )
             return
 
         with col2:
@@ -174,6 +191,7 @@ class VideoBotsStatsPage(BasePage):
 
         if details == "Conversations":
             options = [
+                "Last Sent",
                 "Messages",
                 "Correct Answers",
                 "Thumbs up",
@@ -267,9 +285,12 @@ class VideoBotsStatsPage(BasePage):
         else:
             st.write("No data to show yet.")
 
-        # we store important inputs in the url so the user can return to the same view (e.g. bookmark it)
-        # this also allows them to share the url (once organizations are supported)
-        # and allows us to share a url to a specific view with users
+        self.update_url(bid, view, details, start_date, end_date, sort_by)
+
+    # we store important inputs in the url so the user can return to the same view (e.g. bookmark it)
+    # this also allows them to share the url (once organizations are supported)
+    # and allows us to share a url to a specific view with users
+    def update_url(self, bid, view, details, start_date, end_date, sort_by):
         new_url = furl(
             self.app_url(),
             args={
@@ -286,7 +307,7 @@ class VideoBotsStatsPage(BasePage):
     def render_date_view_inputs(self, bi):
         if st.checkbox("Show All"):
             start_date = bi.created_at
-            end_date = timezone.now()
+            end_date = timezone.now() + timedelta(days=1)
         else:
             fifteen_days_ago = timezone.now() - timedelta(days=15)
             fifteen_days_ago = fifteen_days_ago.replace(hour=0, minute=0, second=0)
@@ -302,7 +323,8 @@ class VideoBotsStatsPage(BasePage):
             st.session_state.setdefault(
                 "end_date",
                 self.request.query_params.get(
-                    "end_date", timezone.now().strftime("%Y-%m-%d")
+                    "end_date",
+                    (timezone.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
                 ),
             )
             end_date: datetime = (
@@ -332,6 +354,11 @@ class VideoBotsStatsPage(BasePage):
                 trunc_fn = TruncDay
         elif view == "Monthly":
             trunc_fn = TruncMonth
+            start_date = start_date.replace(day=1)
+            st.session_state["start_date"] = start_date.strftime("%Y-%m-%d")
+            if end_date.day != 1:
+                end_date = end_date.replace(day=1) + relativedelta(months=1)
+                st.session_state["end_date"] = end_date.strftime("%Y-%m-%d")
         else:
             trunc_fn = TruncYear
         return start_date, end_date, view, factor, trunc_fn
@@ -548,6 +575,13 @@ class VideoBotsStatsPage(BasePage):
     def plot_graphs(self, view, df):
         import plotly.graph_objects as go
 
+        dateformat = "%B %Y" if view == "Monthly" else "%x"
+        xaxis_ticks = dict(
+            tickmode="array",
+            tickvals=list(df["date"]),
+            ticktext=list(df["date"].apply(lambda x: x.strftime(dateformat))),
+        )
+
         fig = go.Figure(
             data=[
                 go.Bar(
@@ -566,7 +600,7 @@ class VideoBotsStatsPage(BasePage):
                     title="User Messages Sent",
                     range=[
                         0,
-                        df["Messages_Sent"].max() + 10,
+                        df["Messages_Sent"].max() + 1,
                     ],
                     tickvals=[
                         *range(
@@ -576,6 +610,7 @@ class VideoBotsStatsPage(BasePage):
                         )
                     ],
                 ),
+                xaxis=xaxis_ticks,
                 title=dict(
                     text=f"{view} Messages Sent",
                 ),
@@ -652,6 +687,7 @@ class VideoBotsStatsPage(BasePage):
                 title=dict(
                     text=f"{view} Usage Trends",
                 ),
+                xaxis=xaxis_ticks,
                 height=300,
                 template="plotly_white",
             ),
@@ -708,6 +744,7 @@ class VideoBotsStatsPage(BasePage):
                 title=dict(
                     text=f"{view} Performance Metrics",
                 ),
+                xaxis=xaxis_ticks,
                 height=300,
                 template="plotly_white",
             ),
@@ -754,6 +791,7 @@ class VideoBotsStatsPage(BasePage):
                         )
                     ],
                 ),
+                xaxis=xaxis_ticks,
                 title=dict(
                     text=f"{view} Feedback Distribution",
                 ),
@@ -780,9 +818,10 @@ class VideoBotsStatsPage(BasePage):
         df = pd.DataFrame()
         if details == "Conversations":
             if start_date and end_date:
-                conversations = conversations.filter(
+                messages = messages.filter(
                     created_at__date__gte=start_date, created_at__date__lte=end_date
                 )
+                conversations = conversations.filter(messages__in=messages).distinct()
             df = conversations.to_df_format(row_limit=rows)
         elif details == "Messages":
             if start_date and end_date:
@@ -792,7 +831,21 @@ class VideoBotsStatsPage(BasePage):
             df = messages.order_by("-created_at", "conversation__id").to_df_format(
                 row_limit=rows
             )
-            df = df.sort_values(by=["Name", "Sent"], ascending=False).reset_index()
+            most_recent = (
+                df.groupby("Name")["Sent"]
+                .max()
+                .reset_index()
+                .rename(columns={"Sent": "Last Sent"})
+            )
+            df = df.merge(
+                most_recent,
+                how="left",
+                left_on="Name",
+                right_on="Name",
+            )
+            df = df.sort_values(
+                by=["Last Sent", "Name", "Sent"], ascending=False
+            ).reset_index()
             df.drop(columns=["index"], inplace=True)
         elif details == "Feedback Positive":
             pos_feedbacks: FeedbackQuerySet = Feedback.objects.filter(

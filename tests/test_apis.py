@@ -83,3 +83,13 @@ def _test_apis_examples(sr: SavedRun):
         allow_redirects=False,
     )
     assert r.status_code == 200, r.text
+
+
+@pytest.mark.django_db
+def test_get_balance(force_authentication):
+    r = client.get(
+        "/v1/balance/",
+        headers={"Authorization": "Token None"},
+        allow_redirects=False,
+    )
+    assert r.status_code == 200, r.text

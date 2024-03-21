@@ -227,6 +227,7 @@ class TextToSpeechPage(BasePage):
 
             case TextToSpeechProviders.GOOGLE_TTS:
                 from google.cloud import texttospeech
+                import emoji
 
                 voice_name = (
                     state["google_voice_name"]
@@ -240,7 +241,9 @@ class TextToSpeechPage(BasePage):
                     else 1.0
                 )
 
-                synthesis_input = texttospeech.SynthesisInput(text=text)
+                synthesis_input = texttospeech.SynthesisInput(
+                    text=emoji.replace_emoji(text, replace="")
+                )
 
                 voice = texttospeech.VoiceSelectionParams()
                 voice.language_code = "-".join(voice_name.split("-")[:2])
@@ -329,7 +332,7 @@ class TextToSpeechPage(BasePage):
                     data=f"""
                     <speak version='1.0' xml:lang='en-US'>
                         <voice xml:lang='{voice.get('Locale', 'en-US')}' xml:gender='{voice.get('Gender', 'Male')}' name='{voice.get('ShortName', 'en-US-ChristopherNeural')}'>
-                            {emoji.demojize(text).encode("utf-8").decode("utf-8", "ignore")}
+                            {emoji.replace_emoji(text, replace='')}
                         </voice>
                     </speak>
                     """.strip(),  # Microsoft's implementation of Speech Synthesis Markup Language (SSML) does not support emojis etc. so we replace them with descriptive text. https://learn.microsoft.com/en-us/azure/ai-services/speech-service/speech-synthesis-markup

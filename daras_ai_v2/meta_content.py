@@ -123,7 +123,7 @@ def meta_title_for_page(
             ret = f"{label} for {metadata.short_title}"
         case _ if pr and pr.saved_run == sr and pr.is_root():
             # for root page
-            ret = metadata.meta_title
+            ret = page.get_dynamic_meta_title() or metadata.meta_title
         case _:
             # non-root runs and examples
             parts = []
