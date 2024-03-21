@@ -1229,6 +1229,7 @@ class BasePage:
 Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}
 {self.additional_notes(st.session_state) or ""}
                     """,
+                    line_clamp=1,
                     unsafe_allow_html=True,
                 )
             with col2:
