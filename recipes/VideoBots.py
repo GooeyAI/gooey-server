@@ -675,7 +675,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             UsageCost.objects.filter(saved_run__run_id=run_id).aggregate(
                 Sum("dollar_amount")
             )["dollar_amount__sum"]
-            or 0
+            or 1
         )
 
     def additional_notes(self, state: dict):
