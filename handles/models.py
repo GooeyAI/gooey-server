@@ -7,7 +7,7 @@ from django.db.models.functions import Lower
 from bots.custom_fields import CustomURLField
 
 
-HANDLE_REGEX = r"^[a-z][a-z0-9_.-]*$"
+HANDLE_REGEX = r"^[a-z0-9_.-]+$"
 
 HANDLE_BLACKLIST = [
     "admin",
@@ -26,7 +26,10 @@ HANDLE_BLACKLIST = [
     "sales",
 ]
 
-validate_handle_regex = RegexValidator(regex=HANDLE_REGEX)
+validate_handle_regex = RegexValidator(
+    regex=HANDLE_REGEX,
+    message="Handles must contain only letters, numbers, and the characters . _ -",
+)
 
 
 def validate_handles_blacklist(value):
@@ -73,7 +76,12 @@ class Handle(models.Model):
 
     @property
     def has_user(self):
-        return self.user is not None
+        try:
+            self.user
+        except Handle.user.RelatedObjectDoesNotExist:
+            return False
+        else:
+            return True
 
     class Meta:
         constraints = [
