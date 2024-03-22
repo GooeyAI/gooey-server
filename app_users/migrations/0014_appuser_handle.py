@@ -76,7 +76,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='appuser',
             name='handle',
-            field=models.OneToOneField(null=True, on_delete=django.db.models.deletion.SET_NULL, to='handles.handle'),
+            field=models.OneToOneField(blank=True, default=None, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='user', to='handles.handle'),
         ),
         migrations.RunPython(forwards_func, reverse_code=migrations.RunPython.noop)
     ]

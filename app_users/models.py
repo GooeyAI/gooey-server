@@ -99,7 +99,12 @@ class AppUser(models.Model):
     disable_safety_checker = models.BooleanField(default=False)
 
     handle = models.OneToOneField(
-        "handles.Handle", on_delete=models.SET_NULL, null=True
+        "handles.Handle",
+        on_delete=models.SET_NULL,
+        default=None,
+        blank=True,
+        null=True,
+        related_name="user",
     )
 
     objects = AppUserQuerySet.as_manager()

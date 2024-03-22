@@ -73,7 +73,7 @@ class Handle(models.Model):
 
     @property
     def has_user(self):
-        raise NotImplemented()
+        return self.user is not None
 
     class Meta:
         constraints = [
