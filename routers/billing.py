@@ -1,10 +1,11 @@
-import html
 import os
 import typing
 from enum import Enum
 from urllib.parse import quote_plus
 
 import stripe
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -18,6 +19,7 @@ from daras_ai_v2.base import RedirectException
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.settings import templates
+from handles.models import Handle
 from routers.root import page_wrapper, request_json
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
@@ -220,28 +222,78 @@ def billing_tab(request: Request):
 
 
 def profile_tab(request: Request):
-    with st.div(className="user-info"):
-        if request.user and request.user.photo_url:
-            st.html(
-                f"""
-            <img id="profile-picture" src="{html.escape(request.user.photo_url)}" alt="" width="128" height="128">
-            """
-            )
-        with st.div(className="user-info-text-box"):
-            if request.user.display_name:
-                st.write(f"## {request.user.display_name}")
-            if contact := request.user.email or request.user.phone_number:
-                with st.div(style={"font-weight": "normal"}):
-                    st.html(html.escape(contact))
-            with st.div(
-                className="mb-4",
-                style={"font-size": "x-small", "font-weight": "normal"},
-            ):
-                st.html(
-                    """<a href="/privacy">Privacy</a> & <a href="/terms">Terms</a>"""
-                )
-            with st.link(to="/logout"):
-                st.caption("Sign out")
+    col1, col2 = st.columns([2, 10])
+    with col1:
+        with st.div(className="w-100 h-100 p-3 rounded-3"):
+            profile_image(request)
+
+    with col2:
+        display_name = st.text_input("Name", value=request.user.display_name)
+        handle_style: dict[str, str] = {}
+        if handle := st.text_input(
+            "Handle",
+            value=(request.user.handle and request.user.handle.name or ""),
+            style=handle_style,
+        ):
+            if not request.user.handle or request.user.handle.name != handle:
+                try:
+                    Handle(name=handle).full_clean()
+                except ValidationError as e:
+                    st.error(e.messages[0], icon="")
+                    handle_style["border"] = "1px solid var(--bs-danger)"
+                else:
+                    st.success("Handle is available", icon="")
+                    handle_style["border"] = "1px solid var(--bs-success)"
+        if email := request.user.email:
+            st.text_input("Email", value=email, disabled=True)
+        if phone_number := request.user.phone_number:
+            st.text_input("Phone Number", value=phone_number, disabled=True)
+
+        col1, col2 = st.columns(2, responsive=False)
+        with col1:
+            save_button = st.button("Save")
+        with col2:
+            with st.div(className="d-flex justify-content-end"):
+                with st.link(to="/logout", className="text-secondary"):
+                    st.button("Logout", type="tertiary")
+
+        if save_button:
+            update_fields = []
+
+            if handle and not request.user.handle:
+                request.user.handle = Handle(name=handle)
+                update_fields.append("handle")
+            elif handle and request.user.handle != handle:
+                request.user.handle.name = handle
+                update_fields.append("handle")
+
+            if display_name and display_name != request.user.display_name:
+                request.user.display_name = display_name
+                update_fields.append("display_name")
+
+            try:
+                with transaction.atomic():
+                    if "handle" in update_fields:
+                        request.user.handle.save()
+                    request.user.save(update_fields=update_fields)
+            except (ValidationError, IntegrityError) as e:
+                for m in e.messages:
+                    st.error(m)
+            else:
+                st.experimental_rerun()
+
+
+def profile_image(request: Request):
+    with st.div(className="d-flex justify-content-center"):
+        st.image(
+            src=request.user.photo_url or "https://via.placeholder.com/128",
+            alt="",
+            style={
+                "height": "128px",
+                "width": "128px",
+                "margin-bottom": "0.5rem",
+            },
+        )
 
 
 def api_keys_tab(request: Request):
