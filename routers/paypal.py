@@ -1,4 +1,5 @@
 import base64
+from time import time
 
 import requests
 from fastapi import APIRouter, Depends
@@ -10,7 +11,6 @@ from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import request_json
 from daras_ai_v2.exceptions import raise_for_status
-
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
@@ -31,18 +31,27 @@ def generate_auth_header() -> str:
         (settings.PAYPAL_CLIENT_ID + ":" + settings.PAYPAL_SECRET).encode()
     ).decode()
     redis_cache = get_redis_cache()
-    if access_token := redis_cache.get(auth):
-        return f"Bearer " + access_token.decode()
-    response = requests.post(
-        str(furl(settings.PAYPAL_BASE) / "v1/oauth2/token"),
-        data="grant_type=client_credentials",
-        headers={"Authorization": f"Basic {auth}"},
-    )
-    raise_for_status(response)
-    data = response.json()
-    access_token = data.get("access_token")
-    assert access_token, "Missing access token in response"
-    redis_cache.set(auth, access_token, ex=data.get("expires_in"))
+
+    # to reset token: $ redis-cli --scan --pattern 'gooey/paypal-access-token/*' | xargs redis-cli unlink
+    cache_key = f"gooey/paypal-access-token/v1/{auth}"
+    cache_val = redis_cache.get(cache_key)
+    if cache_val:
+        access_token = cache_val.decode()
+    else:
+        s = time()
+        response = requests.post(
+            str(furl(settings.PAYPAL_BASE) / "v1/oauth2/token"),
+            data="grant_type=client_credentials",
+            headers={"Authorization": f"Basic {auth}"},
+        )
+        raise_for_status(response)
+        data = response.json()
+        access_token = data.get("access_token")
+        assert access_token, "Missing access token in response"
+        # expiry with a buffer of the time taken to fetch the token + 1 minute
+        expiry = int((data.get("expires_in") or 300) - (time() - s + 60))
+        redis_cache.set(cache_key, access_token.encode(), ex=expiry)
+
     return f"Bearer " + access_token
 
 
