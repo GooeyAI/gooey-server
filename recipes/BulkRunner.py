@@ -1,7 +1,6 @@
 import datetime
 import typing
 import uuid
-from functools import partial
 
 from django.db.models import Q
 from furl import furl
@@ -94,7 +93,7 @@ List of URLs to the evaluation runs that you requested.
         run_urls = list_view_editor(
             add_btn_label="➕ Add a Workflow",
             key="run_urls",
-            render_inputs=partial(self.render_run_url_inputs),
+            render_inputs=self.render_run_url_inputs,
             flatten_dict_key="url",
         )
 
