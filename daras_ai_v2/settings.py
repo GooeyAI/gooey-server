@@ -225,6 +225,9 @@ GCP_REGION = config("GCP_REGION", default="us-central1")
 GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
 
+GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
+FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")
+
 UBERDUCK_KEY = config("UBERDUCK_KEY", None)
 UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 
@@ -249,7 +252,7 @@ EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
-ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="sean@dara.network")
+ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default=[])
 SUPPORT_EMAIL = "Gooey.AI Support <support@gooey.ai>"
 SEND_RUN_EMAIL_AFTER_SEC = config("SEND_RUN_EMAIL_AFTER_SEC", 60)
 
