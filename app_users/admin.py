@@ -2,8 +2,10 @@ from django.contrib import admin
 from django.contrib.admin.models import LogEntry
 
 from app_users import models
+from django.db.models import Sum
 from bots.admin_links import open_in_new_tab, list_related_html_url
 from bots.models import SavedRun
+from usage_costs.models import UsageCost
 
 
 # Register your models here.
@@ -11,6 +13,29 @@ from bots.models import SavedRun
 
 @admin.register(models.AppUser)
 class AppUserAdmin(admin.ModelAdmin):
+    fields = [
+        "uid",
+        "display_name",
+        "email",
+        "phone_number",
+        "balance",
+        "total_payments",
+        "total_charged",
+        "total_usage_cost",
+        "user_runs",
+        "view_transactions",
+        "is_anonymous",
+        "is_disabled",
+        "photo_url",
+        "stripe_customer_id",
+        "is_paying",
+        "disable_safety_checker",
+        "created_at",
+        "upgraded_from_anonymous_at",
+        "open_in_firebase",
+        "open_in_stripe",
+        "low_balance_email_sent_at",
+    ]
     list_display = [
         "uid",
         "display_name",
@@ -35,6 +60,9 @@ class AppUserAdmin(admin.ModelAdmin):
         "upgraded_from_anonymous_at",
     ]
     readonly_fields = [
+        "total_payments",
+        "total_charged",
+        "total_usage_cost",
         "created_at",
         "upgraded_from_anonymous_at",
         "user_runs",
@@ -52,6 +80,32 @@ class AppUserAdmin(admin.ModelAdmin):
             instance_id=user.uid,
             show_add=False,
         )
+
+    @admin.display(description="Total Payments")
+    def total_payments(self, user: models.AppUser):
+        return "$" + str(
+            user.transactions.aggregate(Sum("charged_amount"))["charged_amount__sum"]
+            or 0
+        )
+
+    @admin.display(description="Total Charged")
+    def total_charged(self, user: models.AppUser):
+        return -1 * (
+            user.transactions.filter(amount__lt=0).aggregate(Sum("amount"))[
+                "amount__sum"
+            ]
+            or 0
+        )
+
+    @admin.display(description="Total Usage Cost")
+    def total_usage_cost(self, user: models.AppUser):
+        total_cost = (
+            UsageCost.objects.filter(saved_run__uid=user.uid).aggregate(
+                Sum("dollar_amount")
+            )["dollar_amount__sum"]
+            or 0
+        )
+        return round(total_cost, 2)
 
     def open_in_firebase(self, user: models.AppUser):
         path = f"users/{user.uid}"

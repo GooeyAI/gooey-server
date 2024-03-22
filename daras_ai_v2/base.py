@@ -240,6 +240,7 @@ class BasePage:
             return
 
         self._render_header()
+        st.newline()
 
         self._render_tab_menu(selected_tab=self.tab)
         with st.nav_tab_content():
