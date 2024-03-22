@@ -1,11 +1,14 @@
 import datetime
 import typing
 import uuid
+from functools import partial
 
+from django.db.models import Q
 from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
+from app_users.models import AppUser
 from bots.models import Workflow, PublishedRun, PublishedRunVisibility, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
@@ -91,7 +94,9 @@ List of URLs to the evaluation runs that you requested.
         run_urls = list_view_editor(
             add_btn_label="➕ Add a Workflow",
             key="run_urls",
-            render_inputs=render_run_url_inputs,
+            render_inputs=partial(
+                render_run_url_inputs, current_user=self.request.user
+            ),
             flatten_dict_key="url",
         )
 
@@ -408,7 +413,7 @@ To get started:
         )
 
 
-def render_run_url_inputs(key: str, del_key: str, d: dict):
+def render_run_url_inputs(key: str, del_key: str, d: dict, current_user: AppUser):
     from daras_ai_v2.all_pages import all_home_pages
 
     _prefill_workflow(d, key)
@@ -446,7 +451,9 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
                 st.session_state[last_workflow_key] = workflow
         with scol2:
             page_cls = Workflow(workflow).page_cls
-            options = _get_approved_example_options(page_cls, workflow)
+            options = _get_published_run_options(
+                page_cls, workflow, current_user=current_user
+            )
             with st.div(className="pt-1"):
                 url = st.selectbox(
                     "",
@@ -470,21 +477,42 @@ def render_run_url_inputs(key: str, del_key: str, d: dict):
 
 
 @st.cache_in_session_state
-def _get_approved_example_options(
-    page_cls: typing.Type[BasePage], workflow: Workflow
+def _get_published_run_options(
+    page_cls: typing.Type[BasePage],
+    workflow: Workflow,
+    current_user: AppUser | None = None,
 ) -> dict[str, str]:
+    # approved examples
+    pr_query = Q(is_approved_example=True, visibility=PublishedRunVisibility.PUBLIC)
+
+    if current_user:
+        # user's saved runs
+        pr_query |= Q(created_by=current_user)
+
+    saved_runs_and_examples = PublishedRun.objects.filter(
+        pr_query,
+        workflow=workflow,
+    ).exclude(published_run_id="")
+    saved_runs_and_examples = sorted(
+        saved_runs_and_examples,
+        reverse=True,
+        key=lambda pr: (
+            int(
+                current_user and pr.created_by == current_user or False
+            ),  # user's saved first
+            pr.example_priority,  # higher priority first
+            pr.updated_at,  # newer first
+        ),
+    )
+
     options = {
         # root recipe
         page_cls.get_root_published_run().get_app_url(): "Default",
     } | {
-        # approved examples
         pr.get_app_url(): get_title_breadcrumbs(page_cls, pr.saved_run, pr).h1_title
-        for pr in PublishedRun.objects.filter(
-            workflow=workflow,
-            is_approved_example=True,
-            visibility=PublishedRunVisibility.PUBLIC,
-        ).exclude(published_run_id="")
+        for pr in saved_runs_and_examples
     }
+
     return options
 
 
