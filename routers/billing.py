@@ -224,7 +224,7 @@ def billing_tab(request: Request):
 def profile_tab(request: Request):
     col1, col2 = st.columns([2, 10])
     with col1:
-        with st.div(className="w-100 h-100 p-3 rounded-3"):
+        with st.div(className="w-100 h-100 rounded-3"):
             profile_image(request)
 
     with col2:
