@@ -346,7 +346,11 @@ class BasePage:
                 and self.request.user
                 and current_run.uid == self.request.user.uid
             )
-            or self.can_user_edit_published_run(published_run)
+            or bool(
+                published_run
+                and published_run.saved_run == current_run
+                and self.can_user_edit_published_run(published_run)
+            )
         )
 
     def can_user_edit_published_run(
