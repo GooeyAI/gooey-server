@@ -289,7 +289,7 @@ class BasePage:
                     )
 
             with st.div(className="d-flex align-items-center"):
-                can_user_edit_run = self.can_user_edit_run(current_run)
+                can_user_edit_run = self.can_user_edit_run(current_run, published_run)
                 has_unpublished_changes = (
                     published_run
                     and published_run.saved_run != current_run
@@ -333,12 +333,20 @@ class BasePage:
             elif is_root_example and MenuTabs.integrations != self.tab:
                 st.write(self.preview_description(current_run.to_dict()), line_clamp=2)
 
-    def can_user_edit_run(self, current_run: SavedRun | None = None) -> bool:
+    def can_user_edit_run(
+        self,
+        current_run: SavedRun | None = None,
+        published_run: PublishedRun | None = None,
+    ) -> bool:
         current_run = current_run or self.get_current_sr()
-        return self.is_current_user_admin() or bool(
-            self.request
-            and self.request.user
-            and current_run.uid == self.request.user.uid
+        return (
+            self.is_current_user_admin()
+            or bool(
+                self.request
+                and self.request.user
+                and current_run.uid == self.request.user.uid
+            )
+            or self.can_user_edit_published_run(published_run)
         )
 
     def can_user_edit_published_run(
