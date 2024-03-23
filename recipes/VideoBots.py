@@ -977,7 +977,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             )  # type: ignore
 
             # signed in but not on a run the user can edit (admins will never see this)
-            if not self.can_user_edit_run(current_run):
+            if not self.can_user_edit_run(current_run, published_run):
                 self.integration_welcome_screen(
                     title="Create your Saved Copilot",
                 )
