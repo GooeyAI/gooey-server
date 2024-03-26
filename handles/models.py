@@ -1,14 +1,14 @@
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import MaxLengthValidator, RegexValidator
 from django.db import models
 from django.db.models import CheckConstraint, Q
 from django.db.models.functions import Lower
 
 from bots.custom_fields import CustomURLField
 
-
-HANDLE_REGEX = r"^[a-z0-9_.-]+$"
-
+HANDLE_ALLOWED_CHARS = r"[a-z0-9_\.-]+"
+HANDLE_REGEX = rf"^{HANDLE_ALLOWED_CHARS}$"
+HANDLE_MAX_LENGTH = 40
 HANDLE_BLACKLIST = [
     "admin",
     "account",
@@ -31,6 +31,11 @@ validate_handle_regex = RegexValidator(
     message="Handles must contain only letters, numbers, and the characters . _ -",
 )
 
+validate_handle_length = MaxLengthValidator(
+    limit_value=HANDLE_MAX_LENGTH,
+    message=f"Handles must be at most {HANDLE_MAX_LENGTH} characters long",
+)
+
 
 def validate_handles_blacklist(value):
     if value.lower() in HANDLE_BLACKLIST:
@@ -46,6 +51,7 @@ class Handle(models.Model):
     name = models.TextField(
         unique=True,
         validators=[
+            validate_handle_length,
             validate_handle_regex,
             validate_handles_blacklist,
         ],
