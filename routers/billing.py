@@ -252,10 +252,12 @@ def profile_tab(request: Request):
         col1, col2 = st.columns(2, responsive=False)
         with col1:
             save_button = st.button("Save")
-        with col2:
-            with st.div(className="d-flex justify-content-end"):
-                with st.link(to="/logout", className="text-secondary"):
-                    st.button("Logout", type="tertiary")
+        with (
+            col2,
+            st.div(className="d-flex justify-content-end"),
+            st.link(to="/logout", className="text-secondary"),
+        ):
+            st.button("Logout", type="tertiary")
 
         if save_button:
             update_fields = []
