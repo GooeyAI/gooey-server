@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
             name='Handle',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.TextField(unique=True, validators=[django.core.validators.RegexValidator(regex='^[a-z][a-z0-9_.-]*$'), handles.models.validate_handles_blacklist])),
+                ('name', models.TextField(unique=True,  validators=[django.core.validators.MaxLengthValidator(limit_value=40, message='Handles must be at most 40 characters long'), django.core.validators.RegexValidator(message='Handles must contain only letters, numbers, and the characters . _ -', regex='^[a-z0-9_\\.-]+$'), handles.models.validate_handles_blacklist])),
                 ('redirect_url', bots.custom_fields.CustomURLField(blank=True, default=None, max_length=2048, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),

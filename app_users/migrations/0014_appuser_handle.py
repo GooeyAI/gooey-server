@@ -9,19 +9,41 @@ import django.db.models.deletion
 
 from loguru import logger
 
+from app_users.models import AppUser
+from handles.models import HANDLE_MAX_LENGTH, HANDLE_ALLOWED_CHARS
 
-def make_handle_from(text):
-    text = text.lower()
-    text = re.sub(r"[^a-z0-9_.-]", " ", text)
-    text = re.sub("\s+", "-", text)
-    text = text.strip("-")
-    return text
+
+def make_handle_from(name):
+    name = name.lower()
+    name = "-".join(re.findall(HANDLE_ALLOWED_CHARS, name))  # take only valid characters
+    name = re.sub(r"-+", "-", name)  # remove consecutive dashes
+    name = name[:HANDLE_MAX_LENGTH]
+    name = name.rstrip("-_")
+    return name
+
+
+def generate_handle_options(user):
+    first_name_handle = make_handle_from(AppUser.first_name(user))
+    if first_name_handle:
+        yield first_name_handle
+
+    email_handle = make_handle_from(user.email.split("@")[0]) if user.email else ""
+    if email_handle:
+        yield email_handle
+
+    if first_name_handle:
+        yield first_name_handle + f"-{str(user.id)[:2]}"
+        yield first_name_handle + f"-{uuid.uuid4().hex[:4]}"
+
+    if email_handle:
+        yield email_handle + f"-{str(user.id)[:2]}"
+        yield email_handle + f"-{uuid.uuid4().hex[:4]}"
 
 
 def attempt_create_handle(Handle, handle_name):
     handle = Handle(name=handle_name)
     try:
-        # handle.save() also runs the validators
+        handle.full_clean()
         handle.save()
         return handle
     except (IntegrityError, ValidationError):
@@ -38,31 +60,16 @@ def forwards_func(apps, schema_editor):
         email__isnull=False,
     )
 
-    for user in registered_users.iterator(chunk_size=500):
-        if not user.email:
-            continue
-
-        email_prefix = user.email.split("@")[0]
-        handle_name = make_handle_from(email_prefix)
-        if not handle_name:
-            handle_name = "user"
-
-        handle = attempt_create_handle(Handle, handle_name)
-        if handle is None:
-            # first fallback
-            handle_name = f"{handle_name}-{user.uid[:4]}"
+    for user in registered_users:
+        for handle_name in generate_handle_options(user):
             handle = attempt_create_handle(Handle, handle_name)
-        if handle is None:
-            # second fallback
-            handle_name = f"{handle_name}-{(uuid.uuid4().hex)[:4]}"
-            handle = attempt_create_handle(Handle, handle_name)
-        if handle is None:
-            # nothing worked - continue with the rest
-            logger.warning(f"Failed to create handle for user {user.uid} - skipping")
-            continue
-
-        user.handle = handle
-        user.save()
+            if handle is not None:
+                user.handle = handle
+                user.save()
+                break
+        else:
+            # for-else runs when "break" is not hit in the loop
+            logger.warning(f"unable to find acceptable handle for user: {user}")
 
 
 class Migration(migrations.Migration):
