@@ -2,7 +2,7 @@ from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 
 
-def wav2lip(*, face: str, audio: str, pads: (int, int, int, int)) -> bytes:
+def wav2lip(*, face: str, audio: str, pads: tuple[int, int, int, int]) -> bytes:
     try:
         return call_celery_task_outfile(
             "wav2lip",
