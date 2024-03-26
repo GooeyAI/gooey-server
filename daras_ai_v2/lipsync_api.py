@@ -25,3 +25,5 @@ def wav2lip(*, face: str, audio: str, pads: tuple[int, int, int, int]) -> bytes:
         msg = "\n\n".join(e.args).lower()
         if "unsupported" in msg:
             raise UserError(msg) from e
+        else:
+            raise
