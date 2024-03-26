@@ -91,9 +91,13 @@ class AppUserAdmin(admin.ModelAdmin):
     @admin.display(description="Total Payments")
     def total_payments(self, user: models.AppUser):
         return "$" + str(
-            user.transactions.aggregate(Sum("charged_amount"))["charged_amount__sum"]
+            (
+                user.transactions.aggregate(Sum("charged_amount"))[
+                    "charged_amount__sum"
+                ]
+                or 0
+            )
             / 100
-            or 0
         )
 
     @admin.display(description="Total Charged")
