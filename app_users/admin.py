@@ -3,7 +3,7 @@ from django.contrib.admin.models import LogEntry
 
 from app_users import models
 from django.db.models import Sum
-from bots.admin_links import open_in_new_tab, list_related_html_url
+from bots.admin_links import change_obj_url, open_in_new_tab, list_related_html_url
 from bots.models import SavedRun
 from usage_costs.models import UsageCost
 
@@ -86,9 +86,9 @@ class AppUserAdmin(admin.ModelAdmin):
     @admin.display(description="User Handle")
     def user_handle(self, user: models.AppUser):
         if user.handle:
-            return open_in_new_tab(
-                f"/admin/handles/handle/{user.handle.id}/change/",
-                label=user.handle.name,
+            return change_obj_url(
+                user.handle,
+                label=str(user.handle),
             )
         return None
 

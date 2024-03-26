@@ -1,3 +1,8 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import Handle
+
+
+@admin.register(Handle)
+class HandleAdmin(admin.ModelAdmin):
+    pass
