@@ -1,6 +1,7 @@
 import json
 import mimetypes
 import typing
+import math
 
 from django.db.models import QuerySet, Q, Sum
 from furl import furl
@@ -661,7 +662,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             tts_state = {"text_prompt": "".join(output_text_list)}
             total += TextToSpeechPage().get_raw_price(tts_state)
 
-        if st.session_state.get("input_face"):
+        if state.get("input_face"):
             total += 1
 
         return total * state.get("num_outputs", 1)
@@ -671,7 +672,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             *extract_query_params(gooey_get_query_params())
         )  # type: ignore
         run_id = current_run.run_id or published_run.published_run_id
-        return round(
+        return math.ceil(
             UsageCost.objects.filter(saved_run__run_id=run_id).aggregate(
                 Sum("dollar_amount")
             )["dollar_amount__sum"]
