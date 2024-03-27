@@ -1345,7 +1345,7 @@ def chat_list_view():
                 for idx, text in enumerate(output_text):
                     st.write(text)
                     try:
-                        st.video(output_video[idx], autoplay=True)
+                        st.video(output_video[idx])
                     except IndexError:
                         try:
                             st.audio(output_audio[idx])
