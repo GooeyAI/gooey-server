@@ -1939,7 +1939,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             state=state,
             include_all=include_all,
             preferred_fields=cls.get_example_preferred_fields(state),
-            diff_from=pr.saved_run.to_dict() if pr and not pr.is_root() else None,
+            diff_from=pr.saved_run.to_dict() if pr else None,
         )
         return api_url, fields
 
