@@ -200,6 +200,11 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
             return
         return f"${obj.charged_amount / 100}"
 
+    @admin.display(description="User")
+    def user(self, saved_run: SavedRun):
+        user = AppUser.objects.get(uid=saved_run.uid)
+        return change_obj_url(user)
+
 
 @admin.register(LogEntry)
 class LogEntryAdmin(admin.ModelAdmin):
