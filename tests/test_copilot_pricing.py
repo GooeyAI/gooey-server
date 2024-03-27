@@ -2,6 +2,7 @@ from bots.models import AppUser
 from recipes.VideoBots import VideoBotsPage
 from usage_costs.models import UsageCost, ModelPricing
 from bots.models import SavedRun, Workflow
+from gooey_ui.state import set_query_params
 
 
 def test_copilot_get_raw_price_round_up(transactional_db):
@@ -37,4 +38,6 @@ def test_copilot_get_raw_price_round_up(transactional_db):
         unit_quantity=model_pricing.unit_quantity,
         dollar_amount=model_pricing.unit_cost * 1 / model_pricing.unit_quantity,
     )
-    assert VideoBotsPage().get_price_roundoff(state=state) == 6
+    copilot_page = VideoBotsPage(run_user=user)
+    set_query_params({"run_id": bot_saved_run.run_id or "", "uid": user.uid or ""})
+    assert copilot_page.get_price_roundoff(state=state) == 6
