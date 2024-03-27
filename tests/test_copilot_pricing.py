@@ -18,8 +18,19 @@ def test_copilot_get_raw_price_round_up():
         run_id="test_run",
         uid=user.uid,
     )
+
+    pricing = 1
+    quantity = 1
+    unit_cost = 1
+    unit_quantity = 1
+    dollar_amount = 2.1
+
     bot_usage_cost = UsageCost.objects.create(
         saved_run=bot_saved_run,
-        dollar_amount=2.1,
+        pricing=pricing,
+        quantity=quantity,
+        unit_cost=unit_cost,
+        unit_quantity=unit_quantity,
+        dollar_amount=dollar_amount,
     )
     assert VideoBotsPage.get_raw_price(self=VideoBotsPage(), state=state) == 6
