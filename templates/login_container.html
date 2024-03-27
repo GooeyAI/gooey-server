@@ -32,18 +32,21 @@
 
     <script>
         window.addEventListener("DOMContentLoaded", async function () {
-            await window.waitUntilHydrated;
             google.accounts.id.initialize({
-                client_id: CLIENT_ID,
+                client_id: window.GOOGLE_CLIENT_ID,
                 callback: handleCredentialResponse,
             });
+            oneTapSignin();
+            window.addEventListener("hydrated", oneTapSignin);
+        });
+        async function oneTapSignin() {
+            google.accounts.id.prompt();
             google.accounts.id.renderButton(document.getElementById("g_id_signin"), {
                 shape: "rectangular",
                 width: 200,
                 text: "continue_with",
             });
-            google.accounts.id.prompt();
-        });
+        }
     </script>
     <script defer src="https://accounts.google.com/gsi/client"></script>
 {% endif %}

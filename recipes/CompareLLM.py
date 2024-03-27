@@ -115,7 +115,7 @@ class CompareLLMPage(BasePage):
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
 
     def render_output(self):
-        self._render_outputs(st.session_state, 450)
+        _render_outputs(st.session_state, 450)
 
     def render_example(self, state: dict):
         col1, col2 = st.columns(2)
@@ -125,20 +125,7 @@ class CompareLLMPage(BasePage):
             for key, value in state.get("variables", {}).items():
                 st.text_area(f"`{key}`", value=value, disabled=True)
         with col2:
-            self._render_outputs(state, 300)
-
-    def _render_outputs(self, state, height):
-        selected_models = state.get("selected_models", [])
-        for key in selected_models:
-            output_text: dict = state.get("output_text", {}).get(key, [])
-            for idx, text in enumerate(output_text):
-                st.text_area(
-                    f"**{LargeLanguageModels[key].value}**",
-                    help=f"output {key} {idx} {random.random()}",
-                    disabled=True,
-                    value=text,
-                    height=height,
-                )
+            _render_outputs(state, 300)
 
     def get_raw_price(self, state: dict) -> int:
         selected_models = state.get("selected_models", [])
@@ -162,3 +149,17 @@ class CompareLLMPage(BasePage):
             VideoBotsPage,
             LipsyncTTSPage,
         ]
+
+
+def _render_outputs(state, height):
+    selected_models = state.get("selected_models", [])
+    for key in selected_models:
+        output_text: dict = state.get("output_text", {}).get(key, [])
+        for idx, text in enumerate(output_text):
+            st.text_area(
+                f"**{LargeLanguageModels[key].value}**",
+                help=f"output {key} {idx} {random.random()}",
+                disabled=True,
+                value=text,
+                height=height,
+            )
