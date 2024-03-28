@@ -3,7 +3,6 @@ import html
 import inspect
 import math
 import typing
-import urllib
 import urllib.parse
 import uuid
 from copy import deepcopy
@@ -241,6 +240,7 @@ class BasePage:
             return
 
         self._render_header()
+        st.newline()
 
         self._render_tab_menu(selected_tab=self.tab)
         with st.nav_tab_content():
@@ -289,7 +289,7 @@ class BasePage:
                     )
 
             with st.div(className="d-flex align-items-center"):
-                can_user_edit_run = self.can_user_edit_run(current_run)
+                can_user_edit_run = self.can_user_edit_run(current_run, published_run)
                 has_unpublished_changes = (
                     published_run
                     and published_run.saved_run != current_run
@@ -333,12 +333,24 @@ class BasePage:
             elif is_root_example and MenuTabs.integrations != self.tab:
                 st.write(self.preview_description(current_run.to_dict()), line_clamp=2)
 
-    def can_user_edit_run(self, current_run: SavedRun | None = None) -> bool:
+    def can_user_edit_run(
+        self,
+        current_run: SavedRun | None = None,
+        published_run: PublishedRun | None = None,
+    ) -> bool:
         current_run = current_run or self.get_current_sr()
-        return self.is_current_user_admin() or bool(
-            self.request
-            and self.request.user
-            and current_run.uid == self.request.user.uid
+        return (
+            self.is_current_user_admin()
+            or bool(
+                self.request
+                and self.request.user
+                and current_run.uid == self.request.user.uid
+            )
+            or bool(
+                published_run
+                and published_run.saved_run == current_run
+                and self.can_user_edit_published_run(published_run)
+            )
         )
 
     def can_user_edit_published_run(
@@ -1911,7 +1923,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return max(1, math.ceil(self.get_raw_price(state)))
 
     def get_raw_price(self, state: dict) -> float:
-        return self.price * state.get("num_outputs", 1)
+        return self.price * (state.get("num_outputs") or 1)
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:

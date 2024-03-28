@@ -37,6 +37,7 @@ from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from daras_ai_v2.tabs_widget import MenuTabs
+from gooey_ui.components.url_button import url_button
 from routers.api import request_form_files
 
 app = APIRouter()
@@ -164,8 +165,8 @@ async def logout(request: Request):
 
 
 @app.post("/__/file-upload/url/meta")
-async def file_upload(request: Request, body_json: dict = Depends(request_json)):
-    return dict(name=(body_json["url"]), type="url/undefined", size=None)
+async def file_upload(body_json: dict = Depends(request_json)):
+    return dict(name=body_json["url"], type="url/undefined")
 
 
 @app.post("/__/file-upload/")
@@ -280,13 +281,23 @@ Authorization: Bearer GOOEY_API_KEY
         page_cls.workflow.value: page_cls().get_recipe_title()
         for page_cls in all_api_pages
     }
-    workflow = Workflow(
-        st.selectbox(
-            "##### ⚕ API Generator\nChoose a workflow to see how you can interact with it via the API",
-            options=options,
-            format_func=lambda x: options[x],
-        )
+
+    st.write(
+        "##### ⚕ API Generator\nChoose a workflow to see how you can interact with it via the API"
     )
+
+    col1, col2 = st.columns([11, 1], responsive=False)
+    with col1:
+        with st.div(className="pt-1"):
+            workflow = Workflow(
+                st.selectbox(
+                    "",
+                    options=options,
+                    format_func=lambda x: options[x],
+                )
+            )
+    with col2:
+        url_button(workflow.get_app_url("", "", ""))
 
     st.write("###### 📤 Example Request")
 

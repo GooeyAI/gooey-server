@@ -215,8 +215,8 @@ import fetch, { FormData, fileFrom } from 'node-fetch';
 const payload = %(json)s;
 
 async function gooeyAPI() {
-  const formData = new FormData()
-  formData.set('json', JSON.stringify(payload))
+  const formData = new FormData();
+  formData.set('json', JSON.stringify(payload));
 %(files)s
 
   const response = await fetch("%(api_url)s", {
@@ -230,7 +230,7 @@ async function gooeyAPI() {
                 json=json.dumps(request_body, indent=2),
                 files=indent(
                     "\n".join(
-                        "formData.append(%r, await fileFrom(%r)" % (key, name)
+                        "formData.append(%r, await fileFrom(%r));" % (key, name)
                         for key, name in filenames
                     ),
                     " " * 2,

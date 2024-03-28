@@ -1,20 +1,28 @@
+import html
+import os
+import typing
+from enum import Enum
 from urllib.parse import quote_plus
 
 import stripe
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from furl import furl
 from starlette.datastructures import FormData
 
+import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import settings
+from daras_ai_v2.base import RedirectException
+from daras_ai_v2.manage_api_keys_widget import manage_api_keys
+from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.settings import templates
+from routers.root import page_wrapper, request_json
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
 router = APIRouter()
-
 
 available_subscriptions = {
     "addon": {
@@ -104,8 +112,94 @@ available_subscriptions = {
 }
 
 
-@router.get("/account/", include_in_schema=False)
-def account(request: Request):
+class _AccountTab(typing.NamedTuple):
+    title: str
+    tab_path: str
+
+
+class AccountTabs(Enum):
+    billing = _AccountTab(title="Billing", tab_path="")
+    profile = _AccountTab(title="Profile", tab_path="profile")
+    api_keys = _AccountTab(title="🚀 API Keys", tab_path="api-keys")
+
+    @property
+    def title(self) -> str:
+        return self.value.title
+
+    @property
+    def tab_path(self) -> str:
+        return self.value.tab_path
+
+    @classmethod
+    def from_tab_path(cls, tab_path: str) -> "AccountTabs":
+        for tab in cls:
+            if tab.tab_path == tab_path:
+                return tab
+        raise HTTPException(status_code=404)
+
+    def get_full_path(self) -> str:
+        return os.path.join("/account", self.tab_path, "")
+
+
+@router.post("/account/", include_in_schema=False)
+@router.post("/account/{tab_path}/", include_in_schema=False)
+def account(
+    request: Request, tab_path: str = "", json_data: dict = Depends(request_json)
+):
+    tab = AccountTabs.from_tab_path(tab_path)
+    try:
+        ret = st.runner(
+            lambda: page_wrapper(
+                request,
+                render_fn=lambda: render_account_page(request, tab),
+            ),
+            query_params=dict(request.query_params),
+            **json_data,
+        )
+    except RedirectException as e:
+        return RedirectResponse(e.url, status_code=e.status_code)
+    else:
+        ret |= {
+            "meta": raw_build_meta_tags(
+                url=account_url,
+                title="Account • Gooey.AI",
+                description="Your API keys, profile, and billing details.",
+                canonical_url=account_url,
+                robots="noindex,nofollow",
+            )
+        }
+        return ret
+
+
+def render_account_page(request: Request, current_tab: AccountTabs):
+    if not request.user or request.user.is_anonymous:
+        next_url = request.query_params.get("next", "/account/")
+        redirect_url = furl("/login", query_params={"next": next_url})
+        raise RedirectException(str(redirect_url))
+
+    st.div(className="mt-5")
+    with st.nav_tabs():
+        for tab in AccountTabs:
+            with st.nav_item(tab.get_full_path(), active=tab == current_tab):
+                st.html(tab.title)
+
+    with st.nav_tab_content():
+        render_selected_tab(request, current_tab)
+
+
+def render_selected_tab(request: Request, tab: AccountTabs):
+    match tab:
+        case AccountTabs.billing:
+            billing_tab(request)
+        case AccountTabs.profile:
+            profile_tab(request)
+        case AccountTabs.api_keys:
+            api_keys_tab(request)
+        case _:
+            raise HTTPException(status_code=401)
+
+
+def billing_tab(request: Request):
     if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
         redirect_url = furl("/login", query_params={"next": next_url})
@@ -114,17 +208,45 @@ def account(request: Request):
     is_admin = request.user.email in settings.ADMIN_EMAILS
 
     context = {
-        "title": "Account • Gooey.AI",
         "request": request,
         "settings": settings,
         "available_subscriptions": available_subscriptions,
         "user_credits": request.user.balance,
         "subscription": get_user_subscription(request.user),
         "is_admin": is_admin,
-        "canonical_url": account_url,
     }
 
-    return templates.TemplateResponse("account.html", context)
+    st.html(templates.get_template("account.html").render(**context))
+
+
+def profile_tab(request: Request):
+    with st.div(className="user-info"):
+        if request.user and request.user.photo_url:
+            st.html(
+                f"""
+            <img id="profile-picture" src="{html.escape(request.user.photo_url)}" alt="" width="128" height="128">
+            """
+            )
+        with st.div(className="user-info-text-box"):
+            if request.user.display_name:
+                st.write(f"## {request.user.display_name}")
+            if contact := request.user.email or request.user.phone_number:
+                with st.div(style={"font-weight": "normal"}):
+                    st.html(html.escape(contact))
+            with st.div(
+                className="mb-4",
+                style={"font-size": "x-small", "font-weight": "normal"},
+            ):
+                st.html(
+                    """<a href="/privacy">Privacy</a> & <a href="/terms">Terms</a>"""
+                )
+            if st.button("Sign Out", type="link"):
+                raise RedirectException("/logout/")
+
+
+def api_keys_tab(request: Request):
+    st.write("# 🔐 API Keys")
+    manage_api_keys(request.user)
 
 
 async def request_form(request: Request):

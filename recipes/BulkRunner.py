@@ -2,10 +2,12 @@ import datetime
 import typing
 import uuid
 
+from django.db.models import Q
 from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
+from app_users.models import AppUser
 from bots.models import Workflow, PublishedRun, PublishedRunVisibility, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
@@ -22,6 +24,7 @@ from daras_ai_v2.vector_search import (
     doc_url_to_file_metadata,
     tabular_bytes_to_any_df,
 )
+from gooey_ui.components.url_button import url_button
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from recipes.DocSearch import render_documents
 
@@ -90,7 +93,7 @@ List of URLs to the evaluation runs that you requested.
         run_urls = list_view_editor(
             add_btn_label="➕ Add a Workflow",
             key="run_urls",
-            render_inputs=render_run_url_inputs,
+            render_inputs=self.render_run_url_inputs,
             flatten_dict_key="url",
         )
 
@@ -257,7 +260,10 @@ To understand what each field represents, check out our [API docs](https://api.g
                 except SavedRun.DoesNotExist:
                     continue
                 st.set_session_state(sr.state)
-                page_cls().render_output()
+                try:
+                    page_cls().render_output()
+                except Exception as e:
+                    st.error(repr(e))
                 st.write("---")
             st.set_session_state(_backup)
         else:
@@ -403,84 +409,106 @@ To get started:
         """
         )
 
+    def render_run_url_inputs(self, key: str, del_key: str, d: dict):
+        from daras_ai_v2.all_pages import all_home_pages
 
-def render_run_url_inputs(key: str, del_key: str, d: dict):
-    from daras_ai_v2.all_pages import all_home_pages
+        _prefill_workflow(d, key)
 
-    _prefill_workflow(d, key)
-
-    col1, col2, col3 = st.columns([10, 1, 1], responsive=False)
-    if not d.get("workflow") and d.get("url"):
-        with col1:
-            url = st.text_input(
-                "",
-                key=key + ":url",
-                value=d.get("url"),
-                placeholder="https://gooey.ai/.../?run_id=...",
-            )
-    else:
-        with col1:
-            scol1, scol2, scol3 = st.columns([5, 6, 1], responsive=False)
-        with scol1:
-            with st.div(className="pt-1"):
-                options = {
-                    page_cls.workflow: page_cls.get_recipe_title()
-                    for page_cls in all_home_pages
-                }
-                last_workflow_key = "__last_run_url_workflow"
-                workflow = st.selectbox(
-                    "",
-                    key=key + ":workflow",
-                    default_value=(
-                        d.get("workflow") or st.session_state.get(last_workflow_key)
-                    ),
-                    options=options,
-                    format_func=lambda x: options[x],
-                )
-                d["workflow"] = workflow
-                # use this to set default for next time
-                st.session_state[last_workflow_key] = workflow
-        with scol2:
-            page_cls = Workflow(workflow).page_cls
-            options = _get_approved_example_options(page_cls, workflow)
-            with st.div(className="pt-1"):
-                url = st.selectbox(
+        col1, col2, col3 = st.columns([10, 1, 1], responsive=False)
+        if not d.get("workflow") and d.get("url"):
+            with col1:
+                url = st.text_input(
                     "",
                     key=key + ":url",
-                    options=options,
-                    default_value=d.get("url"),
-                    format_func=lambda x: options[x],
+                    value=d.get("url"),
+                    placeholder="https://gooey.ai/.../?run_id=...",
                 )
-        with scol3:
-            edit_button(key + ":editmode")
-    with col2:
-        url_button(url)
-    with col3:
-        del_button(del_key)
+        else:
+            with col1:
+                scol1, scol2, scol3 = st.columns([5, 6, 1], responsive=False)
+            with scol1:
+                with st.div(className="pt-1"):
+                    options = {
+                        page_cls.workflow: page_cls.get_recipe_title()
+                        for page_cls in all_home_pages
+                    }
+                    last_workflow_key = "__last_run_url_workflow"
+                    workflow = st.selectbox(
+                        "",
+                        key=key + ":workflow",
+                        default_value=(
+                            d.get("workflow") or st.session_state.get(last_workflow_key)
+                        ),
+                        options=options,
+                        format_func=lambda x: options[x],
+                    )
+                    d["workflow"] = workflow
+                    # use this to set default for next time
+                    st.session_state[last_workflow_key] = workflow
+            with scol2:
+                page_cls = Workflow(workflow).page_cls
+                options = _get_published_run_options(
+                    page_cls, workflow, current_user=self.request.user
+                )
+                with st.div(className="pt-1"):
+                    url = st.selectbox(
+                        "",
+                        key=key + ":url",
+                        options=options,
+                        default_value=d.get("url"),
+                        format_func=lambda x: options[x],
+                    )
+            with scol3:
+                edit_button(key + ":editmode")
+        with col2:
+            url_button(url)
+        with col3:
+            del_button(del_key)
 
-    try:
-        url_to_runs(url)
-    except Exception as e:
-        st.error(repr(e))
-    d["url"] = url
+        try:
+            url_to_runs(url)
+        except Exception as e:
+            st.error(repr(e))
+        d["url"] = url
 
 
 @st.cache_in_session_state
-def _get_approved_example_options(
-    page_cls: typing.Type[BasePage], workflow: Workflow
+def _get_published_run_options(
+    page_cls: typing.Type[BasePage],
+    workflow: Workflow,
+    current_user: AppUser | None = None,
 ) -> dict[str, str]:
+    # approved examples
+    pr_query = Q(is_approved_example=True, visibility=PublishedRunVisibility.PUBLIC)
+
+    if current_user:
+        # user's saved runs
+        pr_query |= Q(created_by=current_user)
+
+    saved_runs_and_examples = PublishedRun.objects.filter(
+        pr_query,
+        workflow=workflow,
+    ).exclude(published_run_id="")
+    saved_runs_and_examples = sorted(
+        saved_runs_and_examples,
+        reverse=True,
+        key=lambda pr: (
+            int(
+                current_user and pr.created_by == current_user or False
+            ),  # user's saved first
+            pr.example_priority,  # higher priority first
+            pr.updated_at,  # newer first
+        ),
+    )
+
     options = {
         # root recipe
         page_cls.get_root_published_run().get_app_url(): "Default",
     } | {
-        # approved examples
         pr.get_app_url(): get_title_breadcrumbs(page_cls, pr.saved_run, pr).h1_title
-        for pr in PublishedRun.objects.filter(
-            workflow=workflow,
-            is_approved_example=True,
-            visibility=PublishedRunVisibility.PUBLIC,
-        ).exclude(published_run_id="")
+        for pr in saved_runs_and_examples
     }
+
     return options
 
 
@@ -533,18 +561,6 @@ def render_eval_url_inputs(key: str, del_key: str, d: dict):
     except Exception as e:
         st.error(repr(e))
     d["url"] = url
-
-
-def url_button(url):
-    st.html(
-        f"""
-<a href='{url}' target='_blank'>
-    <button type="button" class="btn btn-theme btn-tertiary">
-        <i class="fa-regular fa-external-link-square"></i>
-    </button>
-</a>
-        """
-    )
 
 
 def edit_button(key: str):
