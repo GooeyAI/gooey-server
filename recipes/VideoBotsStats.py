@@ -372,7 +372,7 @@ class VideoBotsStatsPage(BasePage):
         if bi.published_run:
             run_title = bi.published_run.title
         elif saved_run:
-            run_title = saved_run.title or "This Copilot Run"
+            run_title = saved_run.page_title or "This Copilot Run"
         else:
             run_title = "No Run Connected"
         run_url = bi.published_run.get_app_url()
