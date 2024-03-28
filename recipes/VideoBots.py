@@ -192,7 +192,7 @@ class VideoBotsPage(BasePage):
         elevenlabs_similarity_boost: float | None
         azure_voice_name: str | None
         openai_voice_name: OPENAI_TTS_VOICES_T | None
-        openai_tts_model_id: OPENAI_TTS_MODELS_T | None
+        openai_tts_model: OPENAI_TTS_MODELS_T | None
 
         # llm settings
         selected_model: (
