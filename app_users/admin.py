@@ -13,28 +13,35 @@ from usage_costs.models import UsageCost
 
 @admin.register(models.AppUser)
 class AppUserAdmin(admin.ModelAdmin):
-    fields = [
-        "uid",
-        "display_name",
-        "email",
-        "phone_number",
-        "balance",
-        "total_payments",
-        "total_charged",
-        "total_usage_cost",
-        "user_runs",
-        "view_transactions",
-        "is_anonymous",
-        "is_disabled",
-        "photo_url",
-        "stripe_customer_id",
-        "is_paying",
-        "disable_safety_checker",
-        "created_at",
-        "upgraded_from_anonymous_at",
-        "open_in_firebase",
-        "open_in_stripe",
-        "low_balance_email_sent_at",
+    fieldsets = [
+        (
+            None,
+            {
+                "fields": [
+                    "uid",
+                    "display_name",
+                    "email",
+                    "phone_number",
+                    "balance",
+                    "total_payments",
+                    "total_charged",
+                    "total_usage_cost",
+                    "user_runs",
+                    "view_transactions",
+                    "is_anonymous",
+                    "is_disabled",
+                    "photo_url",
+                    "stripe_customer_id",
+                    "is_paying",
+                    "disable_safety_checker",
+                    "created_at",
+                    "upgraded_from_anonymous_at",
+                    "open_in_firebase",
+                    "open_in_stripe",
+                    "low_balance_email_sent_at",
+                ],
+            },
+        )
     ]
     list_display = [
         "uid",
@@ -84,8 +91,13 @@ class AppUserAdmin(admin.ModelAdmin):
     @admin.display(description="Total Payments")
     def total_payments(self, user: models.AppUser):
         return "$" + str(
-            user.transactions.aggregate(Sum("charged_amount"))["charged_amount__sum"]
-            or 0
+            (
+                user.transactions.aggregate(Sum("charged_amount"))[
+                    "charged_amount__sum"
+                ]
+                or 0
+            )
+            / 100
         )
 
     @admin.display(description="Total Charged")
