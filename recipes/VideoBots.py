@@ -342,6 +342,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             #### 📄 Knowledge
             Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
             """,
+            accept=["audio/*", "application/*", "video/*", "text/*"],
         )
 
         st.markdown("#### Capabilities")
