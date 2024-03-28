@@ -29,8 +29,8 @@ UBERDUCK_VOICES = {
 
 
 class OpenAI_TTS_Models(str, Enum):
-    tts = "tts-1"
-    tts_hd = "tts-1-hd"
+    tts_1 = "tts-1"
+    tts_1_hd = "tts-1-hd"
 
 
 OPENAI_TTS_MODELS_T = typing.Literal[tuple(e.name for e in OpenAI_TTS_Models)]
