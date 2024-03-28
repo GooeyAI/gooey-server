@@ -140,6 +140,7 @@ def keyword_instructions_widget():
 def doc_extract_selector():
     from recipes.DocExtract import DocExtractPage
     from bots.models import PublishedRun, Workflow, PublishedRunVisibility
+    from gooey_ui.components.url_button import url_button
 
     options = {
         None: "---",
@@ -152,15 +153,28 @@ def doc_extract_selector():
             visibility=PublishedRunVisibility.PUBLIC,
         ).exclude(published_run_id="")
     }
-    st.selectbox(
+    st.write("###### Create Synthetic Data")
+    st.caption(
+        f"""
+        To improve answer quality, pick a [synthetic data maker workflow]({DocExtractPage.get_root_published_run().get_app_url()}) to scan & OCR any  images in your documents or transcribe & translate any videos. It also can synthesize a helpful FAQ. Adds ~2 minutes of one-time processing per file.
         """
-        ###### Create Synthetic Data
-        To improve answer quality, pick a synthetic data maker workflow to scan & OCR any  images in your documents or transcribe & translate any videos. It also can synthesize a helpful FAQ. Adds ~2 minutes of one-time processing per file.
-        """,
-        key="doc_extract_url",
-        options=options,
-        format_func=lambda x: options[x],
     )
+    url = st.session_state.get("doc_extract_url")
+    if url:
+        col1, col2 = st.columns(
+            [6, 1], responsive=False, style={"align-items": "center"}
+        )
+    else:
+        col1, col2 = st.div(), st.div(style={"display": "none"})
+    with col1:
+        st.selectbox(
+            "",
+            key="doc_extract_url",
+            options=options,
+            format_func=lambda x: options[x],
+        )
+    with col2:
+        url_button(url)
 
 
 def doc_search_advanced_settings():
