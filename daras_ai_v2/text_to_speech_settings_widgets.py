@@ -221,7 +221,7 @@ def openai_tts_settings():
     enum_selector(
         OpenAI_TTS_Models,
         label="###### OpenAI TTS Model",
-        key="openai_tts_model_id",
+        key="openai_tts_model",
         use_selectbox=True,
     )
     st.caption(

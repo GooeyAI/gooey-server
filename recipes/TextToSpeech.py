@@ -55,7 +55,7 @@ class TextToSpeechPage(BasePage):
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
         "openai_voice_name": "alloy",
-        "openai_tts_model_id": "tts-1",
+        "openai_tts_model": "tts-1",
     }
 
     class RequestModel(BaseModel):
@@ -86,7 +86,7 @@ class TextToSpeechPage(BasePage):
         azure_voice_name: str | None
 
         openai_voice_name: OPENAI_TTS_VOICES_T | None
-        openai_tts_model_id: OPENAI_TTS_MODELS_T | None
+        openai_tts_model: OPENAI_TTS_MODELS_T | None
 
     class ResponseModel(BaseModel):
         audio_url: str
@@ -359,9 +359,7 @@ class TextToSpeechPage(BasePage):
                 client = OpenAI()
 
                 model = OpenAI_TTS_Models[
-                    st.session_state.get(
-                        "openai_tts_model_id", OpenAI_TTS_Models.tts.name
-                    )
+                    st.session_state.get("openai_tts_model", OpenAI_TTS_Models.tts.name)
                 ].value
                 voice = OpenAI_TTS_Voices[
                     st.session_state.get(
