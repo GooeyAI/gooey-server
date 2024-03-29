@@ -7,8 +7,15 @@ from django.db import IntegrityError, transaction
 
 import gooey_ui as st
 from app_users.models import AppUser
-from bots.models import PublishedRunVersion, SavedRun, Workflow
+from bots.models import (
+    PublishedRun,
+    PublishedRunVersion,
+    PublishedRunVisibility,
+    SavedRun,
+    Workflow,
+)
 from daras_ai_v2.base import RedirectException, format_number_with_suffix
+from daras_ai_v2.grid_layout_widget import grid_layout
 from handles.models import Handle
 
 
@@ -23,6 +30,8 @@ class ContributionsSummary:
 
 def user_profile_page(user: AppUser):
     user_profile_header(user)
+    st.html("\n<hr>\n")
+    user_profile_main_content(user)
 
 
 def user_profile_header(user: AppUser):
@@ -46,6 +55,10 @@ def user_profile_header(user: AppUser):
 
         with st.tag("p", className="lead text-secondary mb-0"):
             st.html(escape_html(user.handle and user.handle.name or ""))
+
+        if user.bio:
+            with st.div(className="mt-2 text-secondary"):
+                st.html(escape_html(user.bio))
 
         with st.div(className="mt-3"):
             if user.github_username:
@@ -102,6 +115,28 @@ def user_profile_header(user: AppUser):
 </div>
 """
         )
+
+
+def user_profile_main_content(user: AppUser):
+    public_runs = PublishedRun.objects.filter(
+        created_by=user,
+        visibility=PublishedRunVisibility.PUBLIC,
+    ).order_by("-updated_at")
+
+    def _render(pr: PublishedRun):
+        workflow = Workflow(pr.workflow)
+        with st.div(className="mb-2"), st.tag(
+            "span", className="bg-light text-dark px-2 py-1 rounded-pill"
+        ):
+            st.html(escape_html(workflow.short_title))
+
+        page_cls = workflow.page_cls
+        page_cls().render_published_run_preview(pr, show_visibility=False)
+
+    if public_runs:
+        grid_layout(3, public_runs, _render)
+    else:
+        st.write("No public runs yet", className="text-muted")
 
 
 def get_run_count(user: AppUser) -> int:
@@ -173,6 +208,7 @@ def edit_user_profile_page(user: AppUser):
             updated_fields = _validate_user_profile_changes(
                 user,
                 handle=handle,
+                display_name=display_name,
                 bio=bio,
                 company=company,
                 github_username=github_username,

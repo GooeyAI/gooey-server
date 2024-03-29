@@ -1652,7 +1652,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             return
 
         def _render(pr: PublishedRun):
-            self._render_published_run_preview(published_run=pr)
+            self.render_published_run_preview(published_run=pr)
 
         grid_layout(3, published_runs, _render)
 
@@ -1743,14 +1743,22 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         return self.render_example(saved_run.to_dict())
 
-    def _render_published_run_preview(self, published_run: PublishedRun):
+    def render_published_run_preview(
+        self,
+        published_run: PublishedRun,
+        *,
+        show_visibility: bool = True,
+    ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
         with st.link(to=published_run.get_app_url()):
-            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
-                st.html(
-                    PublishedRunVisibility(published_run.visibility).get_badge_html()
-                )
+            if show_visibility:
+                with st.div(className="mb-1", style={"font-size": "0.9rem"}):
+                    st.html(
+                        PublishedRunVisibility(
+                            published_run.visibility
+                        ).get_badge_html()
+                    )
 
             st.write(f"#### {tb.h1_title}")
 
