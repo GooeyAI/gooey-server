@@ -121,6 +121,11 @@ class Workflow(models.IntegerChoices):
     def short_slug(self):
         return min(self.page_cls.slug_versions, key=len)
 
+    @property
+    def short_title(self):
+        metadata = self.get_or_create_metadata()
+        return metadata.short_title
+
     def get_app_url(self, example_id: str, run_id: str, uid: str, run_slug: str = ""):
         """return the url to the gooey app"""
         query_params = {}
@@ -275,6 +280,7 @@ class SavedRun(models.Model):
             models.Index(fields=["-created_at"]),
             models.Index(fields=["-updated_at"]),
             models.Index(fields=["workflow"]),
+            models.Index(fields=["uid"]),
             models.Index(fields=["run_id", "uid"]),
             models.Index(fields=["workflow", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
@@ -1532,6 +1538,7 @@ class PublishedRunVersion(models.Model):
         indexes = [
             models.Index(fields=["published_run", "-created_at"]),
             models.Index(fields=["version_id"]),
+            models.Index(fields=["changed_by"]),
         ]
 
     def __str__(self):
