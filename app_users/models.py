@@ -5,7 +5,7 @@ from django.utils import timezone
 from firebase_admin import auth
 from phonenumber_field.modelfields import PhoneNumberField
 
-from bots.custom_fields import CustomURLField
+from bots.custom_fields import CustomURLField, StrippedTextField, ValidatedURLField
 from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
 from daras_ai_v2 import settings, db
 from gooeysite.bg_db_conn import db_middleware
@@ -106,6 +106,11 @@ class AppUser(models.Model):
         null=True,
         related_name="user",
     )
+
+    bio = StrippedTextField(blank=True, default="")
+    company = models.CharField(max_length=255, blank=True, default="")
+    github_username = models.CharField(max_length=255, blank=True, default="")
+    website_url = ValidatedURLField(blank=True, default="")
 
     objects = AppUserQuerySet.as_manager()
 
