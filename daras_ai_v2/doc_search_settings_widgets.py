@@ -7,7 +7,7 @@ from sentry_sdk import capture_exception
 import gooey_ui as st
 from daras_ai_v2 import settings
 from daras_ai_v2.embedding_model import EmbeddingModels
-from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.enum_selector_widget import enum_selector, BLANK_OPTION
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
 from daras_ai_v2.prompt_vars import prompt_vars_widget
 from daras_ai_v2.search_ref import CitationStyles
@@ -143,7 +143,7 @@ def doc_extract_selector():
     from gooey_ui.components.url_button import url_button
 
     options = {
-        None: "---",
+        None: BLANK_OPTION,
         DocExtractPage.get_root_published_run().get_app_url(): "Default",
     } | {
         pr.get_app_url(): pr.title
