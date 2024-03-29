@@ -369,7 +369,9 @@ def st_page(
     latest_slug = page_cls.slug_versions[-1]
     if latest_slug != page_slug:
         return RedirectResponse(
-            request.url.replace(path=os.path.join("/", latest_slug, run_slug, tab, ""))
+            request.url.replace(
+                path=os.path.join("/", latest_slug, run_slug, tab, subtab, "")
+            )
         )
 
     example_id, run_id, uid = extract_query_params(request.query_params)
