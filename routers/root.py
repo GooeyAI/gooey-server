@@ -338,7 +338,7 @@ Authorization: Bearer GOOEY_API_KEY
     manage_api_keys(page.request.user)
 
 
-@app.post("/u/{user_handle}")
+@app.post("/u/{user_handle}/")
 def user_profile(
     request: Request, user_handle: str, json_data: dict = Depends(request_json)
 ):
