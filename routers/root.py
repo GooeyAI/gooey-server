@@ -339,18 +339,25 @@ Authorization: Bearer GOOEY_API_KEY
 @app.post("/")
 @app.post("/{page_slug}/")
 @app.post("/{page_slug}/{run_slug_or_tab}/")
-@app.post("/{page_slug}/{run_slug_or_tab}/{tab}/")
+@app.post("/{page_slug}/{run_slug_or_tab}/{tab_or_subtab}/")
+@app.post("/{page_slug}/{run_slug_or_tab}/{tab_or_subtab}/{subtab}/")
 def st_page(
     request: Request,
     page_slug="",
     run_slug_or_tab="",
-    tab="",
+    tab_or_subtab="",
+    subtab="",
     json_data: dict = Depends(request_json),
 ):
-    run_slug, tab = _extract_run_slug_and_tab(run_slug_or_tab, tab)
-    try:
+    run_slug, tab, subtab = _extract_run_slug_and_tab(
+        run_slug_or_tab, tab_or_subtab, subtab
+    )
+
+    if f"{tab}/{subtab}" in MenuTabs.paths_reverse:
+        selected_tab = MenuTabs.paths_reverse[f"{tab}/{subtab}"]
+    elif not subtab and tab in MenuTabs.paths_reverse:
         selected_tab = MenuTabs.paths_reverse[tab]
-    except KeyError:
+    else:
         raise HTTPException(status_code=404)
 
     try:
@@ -370,6 +377,9 @@ def st_page(
     page = page_cls(
         tab=selected_tab, request=request, run_user=get_run_user(request, uid)
     )
+
+    if selected_tab not in page.get_tabs():
+        raise HTTPException(status_code=404)
 
     state = json_data.get("state", {})
     if not state:
@@ -442,10 +452,22 @@ def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
     st.html(templates.get_template("login_scripts.html").render(**context))
 
 
-def _extract_run_slug_and_tab(run_slug_or_tab, tab) -> tuple[str, str]:
-    if run_slug_or_tab and tab:
-        return run_slug_or_tab, tab
-    elif run_slug_or_tab in MenuTabs.paths_reverse:
-        return "", run_slug_or_tab
+def _extract_run_slug_and_tab(
+    run_slug_or_tab, tab_or_subtab, subtab
+) -> tuple[str, str, str]:
+    print("hello:", run_slug_or_tab, tab_or_subtab, subtab)
+    if run_slug_or_tab and tab_or_subtab and subtab:
+        return run_slug_or_tab, tab_or_subtab, subtab
+    elif (
+        tab_or_subtab
+        and subtab
+        and f"{tab_or_subtab}/{subtab}" in MenuTabs.paths_reverse
+    ):
+        return run_slug_or_tab, tab_or_subtab, subtab
+    elif (
+        run_slug_or_tab in MenuTabs.paths_reverse
+        or f"{run_slug_or_tab}/{tab_or_subtab}" in MenuTabs.paths_reverse
+    ):
+        return "", run_slug_or_tab, tab_or_subtab
     else:
-        return run_slug_or_tab, ""
+        return run_slug_or_tab, tab_or_subtab, subtab

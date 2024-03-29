@@ -240,7 +240,7 @@ def robots_tag_for_page(
             no_follow, no_index = False, False
         case MenuTabs.run_as_api:
             no_follow, no_index = False, True
-        case MenuTabs.integrations:
+        case MenuTabs.integrations | MenuTabs.integrations_add:
             no_follow, no_index = True, True
         case MenuTabs.history:
             no_follow, no_index = True, True

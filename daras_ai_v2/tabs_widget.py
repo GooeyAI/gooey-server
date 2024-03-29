@@ -12,6 +12,7 @@ class MenuTabs:
     run_as_api = "🚀 API"
     history = "📖 History"
     integrations = f'<img align="left" width="24" height="24" style="margin-right: 10px" src="{INTEGRATION_IMG}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Integrations'
+    integrations_add = "➕ Add Integration"
     saved = "📁 Saved"
 
     paths = {
@@ -20,6 +21,7 @@ class MenuTabs:
         run_as_api: "api",
         history: "history",
         integrations: "integrations",
+        integrations_add: "integrations/add",
         saved: "saved",
     }
     paths_reverse = {v: k for k, v in paths.items()}
@@ -31,18 +33,3 @@ class MenuTabs:
         run_as_api: "API",
         integrations: "Integrations",
     }
-
-
-def page_tabs(*, tabs, key=None):
-    selected_menu = option_menu(
-        None,
-        options=tabs,
-        icons=["-"] * len(tabs),
-        orientation="horizontal",
-        key=st.session_state.get(key),
-        styles={
-            "nav-link": {"white-space": "nowrap;"},
-            "nav-link-selected": {"font-weight": "normal;", "color": "black"},
-        },
-    )
-    return selected_menu

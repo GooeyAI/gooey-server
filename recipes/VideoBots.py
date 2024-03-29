@@ -951,13 +951,19 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def get_tabs(self):
         tabs = super().get_tabs()
-        tabs.extend([MenuTabs.integrations])
+        if self.tab == MenuTabs.integrations_add:
+            tabs.append(MenuTabs.integrations_add)
+        else:
+            tabs.append(MenuTabs.integrations)
         return tabs
 
     def render_selected_tab(self, selected_tab):
         super().render_selected_tab(selected_tab)
 
-        if selected_tab == MenuTabs.integrations:
+        if (
+            selected_tab == MenuTabs.integrations
+            or selected_tab == MenuTabs.integrations_add
+        ):
             st.newline()
 
             # not signed in case
@@ -1171,10 +1177,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             VideoBotsPage, current_run, published_run
         ).h1_title
 
-        add_integration = self.get_tab_url(
-            MenuTabs.integrations, query_params={"add-integration": "true"}
-        )
-        if self.request.query_params.get("add-integration") == "true":
+        add_integration = self.get_tab_url(MenuTabs.integrations_add)
+        if self.tab == MenuTabs.integrations_add:
             cancel = self.get_tab_url(MenuTabs.integrations)
             self.integration_connect_screen(
                 "Configure your Copilot: Add a New Integration",
