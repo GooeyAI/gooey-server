@@ -240,8 +240,8 @@ def profile_tab(request: Request):
                 st.html(
                     """<a href="/privacy">Privacy</a> & <a href="/terms">Terms</a>"""
                 )
-            if st.button("Sign Out", type="link"):
-                raise RedirectException("/logout/")
+            with st.tag("a", href="/logout/"):
+                st.caption("Sign out")
 
 
 def api_keys_tab(request: Request):
