@@ -5,6 +5,8 @@ from typing import TypeVar, Type
 import gooey_ui as st
 from daras_ai_v2.grid_layout_widget import grid_layout
 
+BLANK_OPTION = "———"
+
 E = TypeVar("E", bound=Type[enum.Enum])
 
 
@@ -90,7 +92,7 @@ def enum_selector(
 def _format_func(enum_cls: E) -> typing.Callable[[str], str]:
     def _format(k):
         if not k:
-            return "———"
+            return BLANK_OPTION
         e = enum_cls[k]
         try:
             return e.label

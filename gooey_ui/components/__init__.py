@@ -10,6 +10,7 @@ import numpy as np
 from furl import furl
 
 from daras_ai.image_input import resize_img_scale
+from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from gooey_ui import state
 from gooey_ui.pubsub import md5_values
 
@@ -19,7 +20,7 @@ LabelVisibility = typing.Literal["visible", "collapsed"]
 
 def _default_format(value: typing.Any) -> str:
     if value is None:
-        return "---"
+        return BLANK_OPTION
     return str(value)
 
 
