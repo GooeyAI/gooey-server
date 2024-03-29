@@ -34,10 +34,12 @@ from daras_ai_v2.exceptions import ffmpeg, UserError
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.profiles import user_profile_page
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from daras_ai_v2.tabs_widget import MenuTabs
 from gooey_ui.components.url_button import url_button
+from handles.models import Handle
 from routers.api import request_form_files
 
 app = APIRouter()
@@ -334,6 +336,26 @@ Authorization: Bearer GOOEY_API_KEY
         return
 
     manage_api_keys(page.request.user)
+
+
+@app.post("/u/{user_handle}")
+def user_profile(
+    request: Request, user_handle: str, json_data: dict = Depends(request_json)
+):
+    try:
+        handle = Handle.objects.get(name=user_handle)
+    except Handle.DoesNotExist:
+        raise HTTPException(status_code=404)
+
+    if not handle.has_user:
+        raise HTTPException(status_code=404)
+
+    return st.runner(
+        lambda: page_wrapper(
+            request=request, render_fn=user_profile_page, user=handle.user
+        ),
+        **json_data,
+    )
 
 
 @app.post("/")
