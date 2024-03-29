@@ -340,22 +340,23 @@ Authorization: Bearer GOOEY_API_KEY
 @app.post("/{page_slug}/")
 @app.post("/{page_slug}/{run_slug_or_tab}/")
 @app.post("/{page_slug}/{run_slug_or_tab}/{tab_or_subtab}/")
-@app.post("/{page_slug}/{run_slug_or_tab}/{tab_or_subtab}/{subtab}/")
+@app.post("/{page_slug}/{run_slug_or_tab}/{tab_or_subtab}/{subtabs:path}/")
 def st_page(
     request: Request,
     page_slug="",
     run_slug_or_tab="",
     tab_or_subtab="",
-    subtab="",
+    subtabs="",
     json_data: dict = Depends(request_json),
 ):
-    run_slug, tab, subtab = _extract_run_slug_and_tab(
-        run_slug_or_tab, tab_or_subtab, subtab
+    # run_slug is "" if not present
+    # tab is the longest match in MenuTabs
+    # subtabs is any additional path segments
+    run_slug, tab, *subtabs = _extract_run_slug_and_tab(
+        run_slug_or_tab, tab_or_subtab, subtabs
     )
 
-    if f"{tab}/{subtab}" in MenuTabs.paths_reverse:
-        selected_tab = MenuTabs.paths_reverse[f"{tab}/{subtab}"]
-    elif not subtab and tab in MenuTabs.paths_reverse:
+    if tab in MenuTabs.paths_reverse:
         selected_tab = MenuTabs.paths_reverse[tab]
     else:
         raise HTTPException(status_code=404)
@@ -370,17 +371,21 @@ def st_page(
     if latest_slug != page_slug:
         return RedirectResponse(
             request.url.replace(
-                path=os.path.join("/", latest_slug, run_slug, tab, subtab, "")
+                path=os.path.join("/", latest_slug, run_slug, tab, *subtabs, "")
             )
         )
 
     example_id, run_id, uid = extract_query_params(request.query_params)
 
     page = page_cls(
-        tab=selected_tab, request=request, run_user=get_run_user(request, uid)
+        run_slug=run_slug,
+        tab=selected_tab,
+        subtabs=subtabs,
+        request=request,
+        run_user=get_run_user(request, uid),
     )
 
-    if selected_tab not in page.get_tabs():
+    if not page.accept_subtabs():
         raise HTTPException(status_code=404)
 
     state = json_data.get("state", {})
@@ -455,21 +460,20 @@ def page_wrapper(request: Request, render_fn: typing.Callable, **kwargs):
 
 
 def _extract_run_slug_and_tab(
-    run_slug_or_tab, tab_or_subtab, subtab
-) -> tuple[str, str, str]:
-    print("hello:", run_slug_or_tab, tab_or_subtab, subtab)
-    if run_slug_or_tab and tab_or_subtab and subtab:
-        return run_slug_or_tab, tab_or_subtab, subtab
-    elif (
-        tab_or_subtab
-        and subtab
-        and f"{tab_or_subtab}/{subtab}" in MenuTabs.paths_reverse
-    ):
-        return run_slug_or_tab, tab_or_subtab, subtab
-    elif (
-        run_slug_or_tab in MenuTabs.paths_reverse
-        or f"{run_slug_or_tab}/{tab_or_subtab}" in MenuTabs.paths_reverse
-    ):
-        return "", run_slug_or_tab, tab_or_subtab
+    run_slug_or_tab: str, tab_or_subtab: str, subtab_path: str
+) -> tuple[str, ...]:
+    """Returns the runslug (empty string if not present), longest tab match in Menutabs, and any additional subtabs."""
+    subtabs: list[str] = subtab_path.split("/")
+
+    if run_slug_or_tab in MenuTabs.paths_reverse:
+        matches = [run_slug_or_tab, tab_or_subtab, *subtabs]
+        run_slug = ""
     else:
-        return run_slug_or_tab, tab_or_subtab, subtab
+        run_slug = run_slug_or_tab
+        matches = [tab_or_subtab, *subtabs]
+
+    subtabs = []
+    matches = list(filter(lambda a: a, matches))
+    while matches and os.path.join(*matches) not in MenuTabs.paths_reverse:
+        subtabs.insert(0, matches.pop())
+    return run_slug, os.path.join(*matches) if matches else "", *subtabs

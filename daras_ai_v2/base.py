@@ -113,11 +113,15 @@ class BasePage:
 
     def __init__(
         self,
+        run_slug: str = "",
         tab: str = "",
+        subtabs: list[str] = [],
         request: Request | SimpleNamespace = None,
         run_user: AppUser = None,
     ):
+        self.run_slug = run_slug
         self.tab = tab
+        self.subtabs = subtabs
         self.request = request
         self.run_user = run_user
 
@@ -773,6 +777,11 @@ class BasePage:
         if self.request.user and not self.request.user.is_anonymous:
             tabs.extend([MenuTabs.saved])
         return tabs
+
+    def accept_subtabs(self):
+        """Returns true if the self.tab is valid and the self.subtabs are valid for the self.tab"""
+        print("self.subtabs", self.tab, self.subtabs)
+        return len(self.subtabs) == 0 and self.tab in self.get_tabs()
 
     def render_selected_tab(self, selected_tab: str):
         match selected_tab:

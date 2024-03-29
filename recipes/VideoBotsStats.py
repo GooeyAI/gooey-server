@@ -51,7 +51,35 @@ class VideoBotsStatsPage(BasePage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.subtabs = [self.run_slug, *self.subtabs]
+
+        # for backwards compatibility, we get default values from the query params
+        default_subtabs = [
+            self.request.query_params.get("bi_id"),
+            self.request.query_params.get("view"),
+            self.request.query_params.get("details"),
+            self.request.query_params.get("start_date"),
+            self.request.query_params.get("end_date"),
+            self.request.query_params.get("sort_by"),
+        ]
+        if len(self.subtabs) < 6:
+            self.subtabs = self.subtabs + default_subtabs[len(self.subtabs) :]
+        (
+            self.bid,
+            self.view,
+            self.details,
+            self.start_date,
+            self.end_date,
+            self.sort_by,
+        ) = self.subtabs
+
         self.bi = None
+
+    def get_tabs(self):
+        return [MenuTabs.run]
+
+    def accept_subtabs(self):
+        return self.tab == MenuTabs.run and len(self.subtabs) <= 6
 
     def _get_current_app_url(self):
         # this is overwritten to include the query params in the copied url for the share button
@@ -123,20 +151,20 @@ class VideoBotsStatsPage(BasePage):
             return
 
         allowed_bids = [bi.id for bi in bot_integrations]
-        bid = self.request.query_params.get("bi_id", allowed_bids[0])
-        if int(bid) not in allowed_bids:
-            bid = allowed_bids[0]
-        self.bi = bi = BotIntegration.objects.get(id=bid)
-        has_analysis_run = bi.analysis_run is not None
-        run_title, run_url = self.parse_run_info(bi)
+        self.bid = self.bid or allowed_bids[0]
+        if int(self.bid) not in allowed_bids:
+            self.bid = allowed_bids[0]
+        self.bi = BotIntegration.objects.get(id=self.bid)
+        has_analysis_run = self.bi.analysis_run is not None
+        run_title, run_url = self.parse_run_info(self.bi)
 
-        self.show_title_breadcrumb_share(run_title, run_url, bi)
+        self.show_title_breadcrumb_share(run_title, run_url, self.bi)
 
         col1, col2 = st.columns([1, 2])
 
         with col1:
             conversations, messages = self.calculate_overall_stats(
-                bid, bi, run_title, run_url
+                self.bid, self.bi, run_title, run_url
             )
 
             (
@@ -145,16 +173,16 @@ class VideoBotsStatsPage(BasePage):
                 view,
                 factor,
                 trunc_fn,
-            ) = self.render_date_view_inputs(bi)
+            ) = self.render_date_view_inputs(self.bi)
 
         df = self.calculate_stats_binned_by_time(
-            bi, start_date, end_date, factor, trunc_fn
+            self.bi, start_date, end_date, factor, trunc_fn
         )
 
         if df.empty or "date" not in df.columns:
             st.write("No data to show yet.")
             self.update_url(
-                bid,
+                self.bid,
                 view,
                 st.session_state.get("details"),
                 start_date,
@@ -224,9 +252,8 @@ class VideoBotsStatsPage(BasePage):
 
         sort_by = None
         if options:
-            query_sort_by = self.request.query_params.get("sort_by")
             st.session_state.setdefault(
-                "sort_by", query_sort_by if query_sort_by in options else options[0]
+                "sort_by", self.sort_by if self.sort_by in options else options[0]
             )
             st.selectbox(
                 "Sort by",
@@ -236,7 +263,7 @@ class VideoBotsStatsPage(BasePage):
             sort_by = st.session_state["sort_by"]
 
         df = self.get_tabular_data(
-            bi,
+            self.bi,
             run_url,
             conversations,
             messages,
@@ -267,7 +294,7 @@ class VideoBotsStatsPage(BasePage):
             st.html("<br/>")
             if st.checkbox("Export"):
                 df = self.get_tabular_data(
-                    bi,
+                    self.bi,
                     run_url,
                     conversations,
                     messages,
@@ -279,29 +306,33 @@ class VideoBotsStatsPage(BasePage):
                 csv = df.to_csv()
                 b64 = base64.b64encode(csv.encode()).decode()
                 st.html(
-                    f'<a href="data:file/csv;base64,{b64}" download="{bi.name}.csv" class="btn btn-theme btn-secondary">Download CSV File</a>'
+                    f'<a href="data:file/csv;base64,{b64}" download="{self.bi.name}.csv" class="btn btn-theme btn-secondary">Download CSV File</a>'
                 )
                 st.caption("Includes full data (UI only shows first 500 rows)")
         else:
             st.write("No data to show yet.")
 
-        self.update_url(bid, view, details, start_date, end_date, sort_by)
+        self.update_url(self.bid, view, details, start_date, end_date, sort_by)
 
     # we store important inputs in the url so the user can return to the same view (e.g. bookmark it)
     # this also allows them to share the url (once organizations are supported)
     # and allows us to share a url to a specific view with users
     def update_url(self, bid, view, details, start_date, end_date, sort_by):
-        new_url = furl(
-            self.app_url(),
-            args={
-                "bi_id": bid,
-                "view": view,
-                "details": details,
-                "start_date": start_date.strftime("%Y-%m-%d"),
-                "end_date": end_date.strftime("%Y-%m-%d"),
-                "sort_by": sort_by,
-            },
-        ).tostr()
+        import os
+
+        new_url = str(
+            furl(
+                self.app_url(),
+            )
+            / os.path.join(
+                str(bid),
+                str(view),
+                str(details),
+                str(start_date.strftime("%Y-%m-%d")),
+                str(end_date.strftime("%Y-%m-%d")),
+                str(sort_by),
+            )
+        )
         st.change_url(new_url, self.request)
 
     def render_date_view_inputs(self, bi):
@@ -312,27 +343,20 @@ class VideoBotsStatsPage(BasePage):
             fifteen_days_ago = timezone.now() - timedelta(days=15)
             fifteen_days_ago = fifteen_days_ago.replace(hour=0, minute=0, second=0)
             st.session_state.setdefault(
-                "start_date",
-                self.request.query_params.get(
-                    "start_date", fifteen_days_ago.strftime("%Y-%m-%d")
-                ),
+                "start_date", self.start_date or fifteen_days_ago.strftime("%Y-%m-%d")
             )
             start_date: datetime = (
                 st.date_input("Start date", key="start_date") or fifteen_days_ago
             )
             st.session_state.setdefault(
                 "end_date",
-                self.request.query_params.get(
-                    "end_date",
-                    (timezone.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
-                ),
+                self.end_date
+                or (timezone.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
             )
             end_date: datetime = (
                 st.date_input("End date", key="end_date") or timezone.now()
             )
-            st.session_state.setdefault(
-                "view", self.request.query_params.get("view", "Daily")
-            )
+        st.session_state.setdefault("view", self.view or "Daily")
         st.write("---")
         view = st.horizontal_radio(
             "### View",
