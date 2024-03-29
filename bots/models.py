@@ -1419,6 +1419,12 @@ class PublishedRun(models.Model):
                     "updated_at",
                 ]
             ),
+            models.Index(
+                "created_by",
+                "visibility",
+                models.F("updated_at").desc(),
+                name="published_run_cre_vis_upd_idx",
+            ),
         ]
 
     def __str__(self):
