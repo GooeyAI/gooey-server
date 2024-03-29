@@ -160,13 +160,8 @@ def doc_extract_selector():
         """
     )
     url = st.session_state.get("doc_extract_url")
-    if url:
-        col1, col2 = st.columns(
-            [6, 1], responsive=False, style={"align-items": "center"}
-        )
-    else:
-        col1, col2 = st.div(), st.div(style={"display": "none"})
-    with col1:
+    col1, col2 = st.columns([11, 1], responsive=False)
+    with col1, st.div(className="pt-1"):
         st.selectbox(
             "",
             key="doc_extract_url",
@@ -174,7 +169,8 @@ def doc_extract_selector():
             format_func=lambda x: options[x],
         )
     with col2:
-        url_button(url)
+        if url:
+            url_button(url)
 
 
 def doc_search_advanced_settings():
