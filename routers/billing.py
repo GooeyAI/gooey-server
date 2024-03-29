@@ -255,9 +255,9 @@ def profile_tab(request: Request):
         with (
             col2,
             st.div(className="d-flex justify-content-end"),
-            st.link(to="/logout", className="text-secondary"),
         ):
-            st.button("Logout", type="tertiary")
+            if st.button("Logout", type="tertiary"):
+                raise RedirectException("/logout/")
 
         if save_button:
             update_fields = []

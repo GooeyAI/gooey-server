@@ -167,8 +167,8 @@ async def logout(request: Request):
 
 
 @app.post("/__/file-upload/url/meta")
-async def file_upload(request: Request, body_json: dict = Depends(request_json)):
-    return dict(name=(body_json["url"]), type="url/undefined", size=None)
+async def file_upload(body_json: dict = Depends(request_json)):
+    return dict(name=body_json["url"], type="url/undefined")
 
 
 @app.post("/__/file-upload/")
