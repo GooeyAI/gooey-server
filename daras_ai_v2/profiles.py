@@ -1,3 +1,4 @@
+import hashlib
 from html import escape as escape_html
 from dataclasses import dataclass
 
@@ -19,9 +20,6 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from handles.models import Handle
 
 
-PLACEHOLDER_PROFILE_IMAGE = "https://via.placeholder.com/128"
-
-
 @dataclass
 class ContributionsSummary:
     total: int
@@ -41,7 +39,11 @@ def user_profile_header(user: AppUser):
     with col1, st.div(
         className="d-flex justify-content-center align-items-center h-100"
     ):
-        profile_image(user, rounded=True)
+        profile_image(
+            user.photo_url,
+            placeholder_seed=user.uid,
+            className="rounded-circle",
+        )
 
     run_icon = '<i class="fa-regular fa-person-running"></i>'
     run_count = get_run_count(user)
@@ -160,12 +162,11 @@ def get_contributions_summary(user: AppUser, *, top_n: int = 3) -> Contributions
     return ContributionsSummary(total=total, top_contributions=top_contributions)
 
 
-def profile_image(user: AppUser, *, rounded=False):
-    rounded_class = " rounded-circle" if rounded else ""
+def profile_image(url: str, placeholder_seed: str, **props):
     st.image(
-        user.photo_url or PLACEHOLDER_PROFILE_IMAGE,
+        url or get_placeholder_profile_image(placeholder_seed),
         style={"width": "150px", "height": "150px"},
-        className="me-0 me-lg-3 mb-3 mb-lg-0" + rounded_class,
+        **props,
     )
 
 
@@ -302,3 +303,8 @@ def set_changed_attrs(
 
 def github_url_for_username(username: str) -> str:
     return f"https://github.com/{escape_html(username)}"
+
+
+def get_placeholder_profile_image(seed: str) -> str:
+    hash = hashlib.md5(seed.encode()).hexdigest()
+    return f"https://gravatar.com/avatar/{hash}?d=robohash&size=150"
