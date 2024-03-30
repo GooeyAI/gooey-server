@@ -74,6 +74,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
     text_to_speech_provider_selector,
+    OPENAI_TTS_MODELS_T,
+    OPENAI_TTS_VOICES_T,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
 from recipes.DocSearch import (
@@ -185,6 +187,8 @@ class VideoBotsPage(BasePage):
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
         azure_voice_name: str | None
+        openai_voice_name: OPENAI_TTS_VOICES_T | None
+        openai_tts_model: OPENAI_TTS_MODELS_T | None
 
         # llm settings
         selected_model: (
@@ -342,6 +346,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             #### 📄 Knowledge
             Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
             """,
+            accept=["audio/*", "application/*", "video/*", "text/*"],
         )
 
         st.markdown("#### Capabilities")
