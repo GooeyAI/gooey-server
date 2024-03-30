@@ -2,8 +2,8 @@ import hashlib
 from html import escape as escape_html
 from dataclasses import dataclass
 
-from django.db.models import Count
 from django.core.exceptions import ValidationError
+from django.db.models import Count
 from django.db import IntegrityError, transaction
 
 import gooey_ui as st
@@ -50,7 +50,7 @@ def user_profile_header(user: AppUser):
     contribs = get_contributions_summary(user)
 
     with col2, st.div(
-        className="d-flex flex-column justify-content-center align-items-center align-items-lg-start"
+        className="d-flex text-center flex-column justify-content-center align-items-center align-items-lg-start"
     ):
         with st.tag("h1", className="m-0"):
             st.html(escape_html(user.display_name))
@@ -66,7 +66,7 @@ def user_profile_header(user: AppUser):
             if user.github_username:
                 with st.tag(
                     "span",
-                    className="text-sm bg-light border border-dark rounded-pill px-2 py-1 me-4",
+                    className="text-sm bg-light border border-dark rounded-pill px-2 py-1 me-4 d-inline-block mb-1",
                 ), st.link(
                     to=github_url_for_username(user.github_username),
                     className="text-decoration-none",
@@ -79,8 +79,8 @@ def user_profile_header(user: AppUser):
             if user.website_url:
                 with st.tag(
                     "span",
-                    className="text-sm text-muted me-4",
-                ), st.link(to=user.website_url, className="text-decoration-none"):
+                    className="text-sm me-4 d-inline-block mb-1",
+                ), st.link(to=user.website_url):
                     st.html(
                         '<i class="fa-solid fa-link"></i> '
                         + escape_html(
@@ -91,7 +91,7 @@ def user_profile_header(user: AppUser):
             if user.company:
                 with st.tag(
                     "span",
-                    className="text-sm text-muted me-4",
+                    className="text-sm text-muted me-4 d-inline-block mb-1",
                 ):
                     st.html(
                         '<i class="fa-solid fa-buildings"></i> '
@@ -170,135 +170,144 @@ def profile_image(url: str, placeholder_seed: str, **props):
     )
 
 
+def _set_new_profile_photo(user: AppUser, image_url: str):
+    user.photo_url = image_url
+    try:
+        user.full_clean()
+    except (ValidationError, IntegrityError) as e:
+        st.error(e)
+    else:
+        user.save(update_fields=["photo_url"])
+
+
+def _is_uploading_photo() -> bool:
+    return bool(st.session_state.get("_uploading_photo"))
+
+
+def _set_is_uploading_photo(val: bool):
+    st.session_state["_uploading_photo"] = val
+
+
 def edit_user_profile_page(user: AppUser):
-    col1, col2 = st.columns([2, 10])
-    with col1, st.div(className="w-100 h-100 d-flex justify-content-center"):
-        profile_image(user)
+    colspec = [2, 10] if not _is_uploading_photo() else [6, 6]
+    photo_col, form_col = st.columns(colspec)
 
-    with col2:
-        display_name = st.text_input("Name", value=user.display_name)
-        handle_style: dict[str, str] = {}
-        if handle := st.text_input(
-            "Handle",
-            value=(user.handle and user.handle.name or ""),
-            style=handle_style,
-        ):
-            if not user.handle or user.handle.name != handle:
-                try:
-                    Handle(name=handle).full_clean()
-                except ValidationError as e:
-                    st.error(e.messages[0], icon="")
-                    handle_style["border"] = "1px solid var(--bs-danger)"
-                else:
-                    st.success("Handle is available", icon="")
-                    handle_style["border"] = "1px solid var(--bs-success)"
+    with photo_col:
+        _edit_user_profile_photo_section(user)
+    with form_col:
+        _edit_user_profile_form_section(user)
 
-        if email := user.email:
-            st.text_input("Email", value=email, disabled=True)
-        if phone_number := user.phone_number:
-            st.text_input("Phone Number", value=phone_number, disabled=True)
 
-        bio = st.text_area("Bio", value=user.bio)
-        company = st.text_input("Company", value=user.company)
-        github_username = st.text_input("GitHub Username", value=user.github_username)
-        website_url = st.text_input("Website URL", value=user.website_url)
-
-        error_msg: str | None = None
-        updated_fields: list[str] = []
-        try:
-            updated_fields = _validate_user_profile_changes(
-                user,
-                handle=handle,
-                display_name=display_name,
-                bio=bio,
-                company=company,
-                github_username=github_username,
-                website_url=website_url,
+def _edit_user_profile_photo_section(user: AppUser):
+    with st.div(className="w-100 h-100 d-flex align-items-center flex-column"):
+        if _is_uploading_photo():
+            image_div = st.div(
+                className="d-flex justify-content-center align-items-center"
             )
-        except ValidationError as e:
-            error_msg = "\n\n".join(e.messages)
+            image_url = st.file_uploader("", accept=["image/*"])
 
-        if error_msg:
-            st.error(error_msg, icon="⚠️")
+            with st.div(className="d-flex justify-content-center"):
+                if st.button(
+                    "Save", type="primary", disabled=not image_url, className="me-3"
+                ):
+                    _set_new_profile_photo(user, image_url)
+                    _set_is_uploading_photo(False)
+                    st.experimental_rerun()
 
-        col1, col2 = st.columns(2, responsive=False)
-        with col1:
-            save_button = st.button(
-                "Save",
-                type="primary",
-                disabled=bool(error_msg or not updated_fields),
-            )
-        with (
-            col2,
-            st.div(className="d-flex justify-content-end"),
-        ):
-            if st.button("Logout", type="tertiary"):
-                raise RedirectException("/logout/")
+                if st.button(
+                    '<i class="fa-solid fa-xmark-large"></i> Cancel',
+                    className="text-danger",
+                ):
+                    _set_is_uploading_photo(False)
+                    st.experimental_rerun()
 
-        if save_button:
+            with image_div:
+                profile_image(image_url or user.photo_url, placeholder_seed=user.uid)
+        else:
+            profile_image(user.photo_url, placeholder_seed=user.uid)
+            if user.photo_url and st.button(
+                "Clear Photo", type="link", className="text-decoration-none px-2 py-1"
+            ):
+                _set_new_profile_photo(user, "")
+                st.experimental_rerun()
+            if st.button(
+                "Upload Photo", type="link", className="text-decoration-none px-2 py-1"
+            ):
+                _set_is_uploading_photo(True)
+                st.experimental_rerun()
+
+
+def _edit_user_profile_form_section(user: AppUser):
+    user.display_name = st.text_input("Name", value=user.display_name)
+
+    handle_style: dict[str, str] = {}
+    if handle := st.text_input(
+        "Handle",
+        value=(user.handle and user.handle.name or ""),
+        style=handle_style,
+    ):
+        if not user.handle or user.handle.name != handle:
             try:
-                with transaction.atomic():
-                    if "handle" in updated_fields:
-                        user.handle.save()
-                    user.full_clean()
-                    user.save(update_fields=updated_fields)
-            except (ValidationError, IntegrityError) as e:
-                for m in e.messages:
-                    st.error(m, icon="⚠️")
+                Handle(name=handle).full_clean()
+            except ValidationError as e:
+                st.error(e.messages[0], icon="")
+                handle_style["border"] = "1px solid var(--bs-danger)"
             else:
-                st.success("Changes saved")
+                st.success("Handle is available", icon="")
+                handle_style["border"] = "1px solid var(--bs-success)"
 
+    if email := user.email:
+        st.text_input("Email", value=email, disabled=True)
+    if phone_number := user.phone_number:
+        st.text_input("Phone Number", value=phone_number, disabled=True)
 
-def _validate_user_profile_changes(
-    user: AppUser,
-    *,
-    handle: str | None = None,
-    display_name: str | None = None,
-    bio: str | None = None,
-    company: str | None = None,
-    github_username: str | None = None,
-    website_url: str | None = None,
-) -> list[str]:
-    """
-    Returns updated fields
+    user.bio = st.text_area("Bio", value=user.bio)
+    user.company = st.text_input("Company", value=user.company)
+    user.github_username = st.text_input("GitHub Username", value=user.github_username)
+    user.website_url = st.text_input("Website URL", value=user.website_url)
 
-    Might raise ValidationError
-    """
-    updated_fields = []
+    error_msg: str | None = None
+    try:
+        user.full_clean()
+    except ValidationError as e:
+        error_msg = "\n\n".join(e.messages)
 
-    if handle and not user.handle:
-        user.handle = Handle(name=handle)
-        updated_fields.append("handle")
-    elif handle and user.handle and user.handle.name != handle:
-        user.handle.name = handle
-        updated_fields.append("handle")
+    if error_msg:
+        st.error(error_msg, icon="⚠️")
 
-    updated_fields += set_changed_attrs(
-        user,
-        display_name=display_name,
-        bio=bio,
-        company=company,
-        github_username=github_username,
-        website_url=website_url,
-    )
+    col1, col2 = st.columns(2, responsive=False)
+    with col1:
+        save_button = st.button(
+            "Save",
+            type="primary",
+            disabled=bool(error_msg),
+        )
+    with (
+        col2,
+        st.div(className="d-flex justify-content-end"),
+    ):
+        if st.button("Logout", type="tertiary"):
+            raise RedirectException("/logout/")
 
-    user.full_clean()
-    return updated_fields
+    if save_button:
+        try:
+            with transaction.atomic():
+                if handle and not user.handle:
+                    # user adds a new handle
+                    user.handle = Handle(name=handle)
+                    user.handle.save()
+                elif handle and user.handle and user.handle.name != handle:
+                    # user changes existing handle
+                    user.handle.name = handle
+                    user.handle.save()
 
-
-def set_changed_attrs(
-    obj,
-    **possible_updates,
-) -> list[str]:
-    """
-    Returns updated fields
-    """
-    updated_fields = []
-    for k, v in possible_updates.items():
-        if v is not None and getattr(obj, k) != v:
-            setattr(obj, k, v)
-            updated_fields.append(k)
-    return updated_fields
+                user.full_clean()
+                user.save()
+        except (ValidationError, IntegrityError) as e:
+            for m in e.messages:
+                st.error(m, icon="⚠️")
+        else:
+            st.success("Changes saved")
 
 
 def github_url_for_username(username: str) -> str:
