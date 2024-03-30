@@ -29,6 +29,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='appuser',
             name='website_url',
-            field=bots.custom_fields.ValidatedURLField(blank=True, default='', max_length=2048),
+            field=bots.custom_fields.CustomURLField(blank=True, default='', max_length=2048),
         ),
     ]
