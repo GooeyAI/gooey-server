@@ -284,10 +284,10 @@ def _edit_user_profile_form_section(user: AppUser):
         )
     with (
         col2,
-        st.div(className="d-flex justify-content-end"),
+        st.div(className="d-flex justify-content-end align-items-center h-100"),
+        st.tag("a", href="/logout/"),
     ):
-        if st.button("Logout", type="tertiary"):
-            raise RedirectException("/logout/")
+        st.caption("Sign out")
 
     if save_button:
         try:
