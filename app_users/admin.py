@@ -3,7 +3,7 @@ from django.contrib.admin.models import LogEntry
 
 from app_users import models
 from django.db.models import Sum
-from bots.admin_links import open_in_new_tab, list_related_html_url
+from bots.admin_links import open_in_new_tab, list_related_html_url, change_obj_url
 from bots.models import SavedRun
 from usage_costs.models import UsageCost
 
@@ -194,7 +194,7 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
     autocomplete_fields = ["user"]
     list_display = [
         "invoice_id",
-        "user",
+        "view_user",
         "amount",
         "end_balance",
         "payment_provider",
@@ -212,10 +212,12 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
             return
         return f"${obj.charged_amount / 100}"
 
-    @admin.display(description="User")
-    def user(self, saved_run: SavedRun):
-        user = AppUser.objects.get(uid=saved_run.uid)
-        return change_obj_url(user)
+    def view_user(self, obj: models.AppUserTransaction):
+        if obj.user is None:
+            return None
+        return change_obj_url(obj.user)
+
+    view_user.short_description = "Name"
 
 
 @admin.register(LogEntry)
