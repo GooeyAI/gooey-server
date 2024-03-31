@@ -189,6 +189,26 @@ class IsStripeFilter(admin.SimpleListFilter):
             return queryset.exclude(invoice_id__startswith="in_")
 
 
+class IsPaymentFilter(admin.SimpleListFilter):
+    title = "Is Payment"
+    parameter_name = "is_payment"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("1", "Yes"),
+            ("0", "No"),
+        )
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value is None:
+            return queryset
+        if int(value):
+            return queryset.filter(amount__gt=0)
+        else:
+            return queryset.exclude(amount__gt=0)
+
+
 @admin.register(models.AppUserTransaction)
 class AppUserTransactionAdmin(admin.ModelAdmin):
     autocomplete_fields = ["user"]
@@ -202,7 +222,7 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         "created_at",
     ]
     readonly_fields = ["created_at"]
-    list_filter = ["created_at", IsStripeFilter, "payment_provider"]
+    list_filter = ["created_at", IsStripeFilter, IsPaymentFilter, "payment_provider"]
     inlines = [SavedRunInline]
     ordering = ["-created_at"]
 
