@@ -258,11 +258,8 @@ class BasePage:
     def _render_header(self):
         current_run = self.get_current_sr()
         published_run = self.get_current_published_run()
-        is_root_example = (
-            published_run
-            and published_run.is_root()
-            and published_run.saved_run == current_run
-        )
+        is_example = published_run and published_run.saved_run == current_run
+        is_root_example = is_example and published_run.is_root()
         tbreadcrumbs = get_title_breadcrumbs(
             self, current_run, published_run, tab=self.tab
         )
@@ -281,7 +278,11 @@ class BasePage:
                             ),
                         )
 
-                author = self.run_user or current_run.get_creator()
+                if is_example:
+                    assert published_run
+                    author = published_run.created_by
+                else:
+                    author = self.run_user or current_run.get_creator()
                 if not is_root_example:
                     self.render_author(
                         author,

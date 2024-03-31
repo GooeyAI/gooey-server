@@ -4,7 +4,11 @@ from pydantic import BaseModel
 
 import gooey_ui as st
 from bots.models import Workflow
-from daras_ai_v2.text_to_speech_settings_widgets import text_to_speech_provider_selector
+from daras_ai_v2.text_to_speech_settings_widgets import (
+    text_to_speech_provider_selector,
+    OPENAI_TTS_MODELS_T,
+    OPENAI_TTS_VOICES_T,
+)
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechProviders
 from daras_ai_v2.safety_checker import safety_checker
@@ -58,6 +62,9 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         elevenlabs_speaker_boost: bool | None
 
         azure_voice_name: str | None
+
+        openai_voice_name: OPENAI_TTS_VOICES_T | None
+        openai_tts_model: OPENAI_TTS_MODELS_T | None
 
     class ResponseModel(BaseModel):
         output_video: str

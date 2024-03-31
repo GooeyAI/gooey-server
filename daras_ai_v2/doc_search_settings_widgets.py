@@ -7,7 +7,7 @@ from sentry_sdk import capture_exception
 import gooey_ui as st
 from daras_ai_v2 import settings
 from daras_ai_v2.embedding_model import EmbeddingModels
-from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.enum_selector_widget import enum_selector, BLANK_OPTION
 from daras_ai_v2.gdrive_downloader import gdrive_list_urls_of_files_in_folder
 from daras_ai_v2.prompt_vars import prompt_vars_widget
 from daras_ai_v2.search_ref import CitationStyles
@@ -140,9 +140,10 @@ def keyword_instructions_widget():
 def doc_extract_selector():
     from recipes.DocExtract import DocExtractPage
     from bots.models import PublishedRun, Workflow, PublishedRunVisibility
+    from gooey_ui.components.url_button import url_button
 
     options = {
-        None: "---",
+        None: BLANK_OPTION,
         DocExtractPage.get_root_published_run().get_app_url(): "Default",
     } | {
         pr.get_app_url(): pr.title
@@ -152,15 +153,24 @@ def doc_extract_selector():
             visibility=PublishedRunVisibility.PUBLIC,
         ).exclude(published_run_id="")
     }
-    st.selectbox(
+    st.write("###### Create Synthetic Data")
+    st.caption(
+        f"""
+        To improve answer quality, pick a [synthetic data maker workflow]({DocExtractPage.get_root_published_run().get_app_url()}) to scan & OCR any  images in your documents or transcribe & translate any videos. It also can synthesize a helpful FAQ. Adds ~2 minutes of one-time processing per file.
         """
-        ###### Create Synthetic Data
-        To improve answer quality, pick a synthetic data maker workflow to scan & OCR any  images in your documents or transcribe & translate any videos. It also can synthesize a helpful FAQ. Adds ~2 minutes of one-time processing per file.
-        """,
-        key="doc_extract_url",
-        options=options,
-        format_func=lambda x: options[x],
     )
+    url = st.session_state.get("doc_extract_url")
+    col1, col2 = st.columns([11, 1], responsive=False)
+    with col1, st.div(className="pt-1"):
+        st.selectbox(
+            "",
+            key="doc_extract_url",
+            options=options,
+            format_func=lambda x: options[x],
+        )
+    with col2:
+        if url:
+            url_button(url)
 
 
 def doc_search_advanced_settings():
