@@ -163,9 +163,12 @@ def get_contributions_summary(user: AppUser, *, top_n: int = 3) -> Contributions
 
 
 def profile_image(url: str, placeholder_seed: str, **props):
+    style = {"width": "150px", "height": "150px", "object-fit": "cover"} | props.get(
+        "style", {}
+    )
     st.image(
         url or get_placeholder_profile_image(placeholder_seed),
-        style={"width": "150px", "height": "150px"},
+        style=style,
         **props,
     )
 
