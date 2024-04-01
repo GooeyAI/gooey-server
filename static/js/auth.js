@@ -66,7 +66,7 @@ async function handleAuthResult({ user }) {
 
 function showLoginProgress() {
   for (const elem of document.querySelectorAll(
-    "[data-replace-login-spinner]"
+    "[data-replace-login-spinner]",
   )) {
     elem.innerHTML = "<h5>Logging you in...</h5>";
   }

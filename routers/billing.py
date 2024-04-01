@@ -235,7 +235,7 @@ def profile_tab(request: Request):
                     st.html(html.escape(contact))
             with st.div(
                 className="mb-4",
-                style={"font-size": "x-small", "font-weight": "normal"},
+                style={"fontSize": "x-small", "font-weight": "normal"},
             ):
                 st.html(
                     """<a href="/privacy">Privacy</a> & <a href="/terms">Terms</a>"""
