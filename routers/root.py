@@ -10,6 +10,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.routing import APIRouter
 from firebase_admin import auth, exceptions
 from furl import furl
+from loguru import logger
 from starlette.datastructures import FormData
 from starlette.requests import Request
 from starlette.responses import (
@@ -26,7 +27,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages, normalize_slug, page_slug_map
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
-from daras_ai_v2.base import RedirectException
+from daras_ai_v2.base import BasePage, RedirectException
 from daras_ai_v2.bots import request_json
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
@@ -338,45 +339,51 @@ Authorization: Bearer GOOEY_API_KEY
     manage_api_keys(page.request.user)
 
 
-@app.post("/u/{user_handle}/")
-def user_profile(
-    request: Request, user_handle: str, json_data: dict = Depends(request_json)
-):
-    try:
-        handle = Handle.objects.get(name=user_handle)
-    except Handle.DoesNotExist:
-        raise HTTPException(status_code=404)
-
-    if not handle.has_user:
-        raise HTTPException(status_code=404)
-
-    return st.runner(
-        lambda: page_wrapper(
-            request=request, render_fn=user_profile_page, user=handle.user
-        ),
-        **json_data,
-    )
-
-
-@app.post("/")
-@app.post("/{page_slug}/")
-@app.post("/{page_slug}/{run_slug_or_tab}/")
-@app.post("/{page_slug}/{run_slug_or_tab}/{tab}/")
+@app.post("/{page_slug_or_handle}/")
+@app.post("/{page_slug_or_handle}/{run_slug_or_tab}/")
+@app.post("/{page_slug_or_handle}/{run_slug_or_tab}/{tab}/")
 def st_page(
     request: Request,
-    page_slug="",
+    page_slug_or_handle: str = "",
     run_slug_or_tab="",
     tab="",
     json_data: dict = Depends(request_json),
 ):
+    try:
+        page_cls = page_slug_map[normalize_slug(page_slug_or_handle)]
+    except KeyError:
+        pass
+    else:
+        return recipe_page(
+            request=request,
+            page_cls=page_cls,
+            page_slug=page_slug_or_handle,
+            run_slug_or_tab=run_slug_or_tab,
+            tab=tab,
+            json_data=json_data,
+        )
+
+    try:
+        handle = Handle.objects.get(name=page_slug_or_handle)
+    except Handle.DoesNotExist:
+        pass
+    else:
+        return handle_page(request=request, handle=handle, json_data=json_data)
+
+    raise HTTPException(status_code=404)
+
+
+def recipe_page(
+    request: Request,
+    page_cls: type[BasePage],
+    page_slug: str,
+    run_slug_or_tab: str,
+    tab: str,
+    json_data: dict,
+):
     run_slug, tab = _extract_run_slug_and_tab(run_slug_or_tab, tab)
     try:
         selected_tab = MenuTabs.paths_reverse[tab]
-    except KeyError:
-        raise HTTPException(status_code=404)
-
-    try:
-        page_cls = page_slug_map[normalize_slug(page_slug)]
     except KeyError:
         raise HTTPException(status_code=404)
 
@@ -423,6 +430,21 @@ def st_page(
         )
     }
     return ret
+
+
+def handle_page(request: Request, handle: Handle, json_data: dict):
+    if handle.has_user:
+        return st.runner(
+            lambda: page_wrapper(
+                request=request, render_fn=user_profile_page, user=handle.user
+            ),
+            **json_data,
+        )
+    elif handle.has_redirect:
+        raise RedirectException(handle.redirect_url, status_code=301)
+    else:
+        logger.error(f"Handle {handle.name} has no user or redirect")
+        raise HTTPException(status_code=404)
 
 
 def get_og_url_path(request) -> str:

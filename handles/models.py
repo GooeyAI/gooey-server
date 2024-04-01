@@ -67,7 +67,7 @@ class Handle(models.Model):
 
     def clean(self):
         lookups = [
-            bool(self.redirect_url),
+            self.has_redirect,
             self.has_user,
         ]
         if sum(lookups) > 1:
@@ -88,6 +88,10 @@ class Handle(models.Model):
             return False
         else:
             return True
+
+    @property
+    def has_redirect(self):
+        return bool(self.redirect_url)
 
     class Meta:
         constraints = [
