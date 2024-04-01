@@ -1551,7 +1551,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
             # language=HTML
             error_msg = f"""
-<p>
+<p data-{SUBMIT_AFTER_LOGIN_Q}>
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
