@@ -1,3 +1,5 @@
+from daras_ai_v2.all_pages import normalize_slug, page_slug_map
+
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
 from django.db import models
@@ -24,11 +26,11 @@ HANDLE_BLACKLIST = [
     "blog",
     "contact",
     "sales",
-]
+] + list(page_slug_map.keys())
 
 validate_handle_regex = RegexValidator(
     regex=HANDLE_REGEX,
-    message="Handles must contain only letters, numbers, and the characters . _ -",
+    message="Handles must contain only lowercase letters, numbers, and the characters . _ -",
 )
 
 validate_handle_length = MaxLengthValidator(
@@ -38,7 +40,7 @@ validate_handle_length = MaxLengthValidator(
 
 
 def validate_handles_blacklist(value):
-    if value.lower() in HANDLE_BLACKLIST:
+    if normalize_slug(value) in HANDLE_BLACKLIST:
         raise ValidationError(f"{value} is a reserved handle")
 
 
