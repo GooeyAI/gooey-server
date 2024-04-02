@@ -1749,18 +1749,24 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         published_run: PublishedRun,
         *,
         show_visibility: bool = True,
+        pills: list[str] = [],
     ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        with st.link(to=published_run.get_app_url()):
+        with st.div(className="mb-1", style={"font-size": "0.9rem"}):
             if show_visibility:
-                with st.div(className="mb-1", style={"font-size": "0.9rem"}):
-                    st.html(
-                        PublishedRunVisibility(
-                            published_run.visibility
-                        ).get_badge_html()
-                    )
+                st.html(
+                    PublishedRunVisibility(published_run.visibility).get_badge_html()
+                )
 
+                for pill_html in pills:
+                    with st.tag(
+                        "span",
+                        className="bg-light text-dark px-2 py-1 rounded-pill border border-dark me-2",
+                    ):
+                        st.html(pill_html)
+
+        with st.link(to=published_run.get_app_url()):
             st.write(f"#### {tb.h1_title}")
 
         with st.div(className="d-flex align-items-center justify-content-between"):

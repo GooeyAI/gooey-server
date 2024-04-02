@@ -45,7 +45,7 @@ class PublishedRunVisibility(models.IntegerChoices):
 
     def get_badge_html(self):
         badge_container_class = (
-            "text-sm bg-light border border-dark rounded-pill px-2 py-1"
+            "text-sm bg-light border border-dark rounded-pill px-2 py-1 me-1"
         )
 
         match self:

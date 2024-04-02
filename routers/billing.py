@@ -1,6 +1,7 @@
-import os
 import typing
+from html import escape as escape_html
 from enum import Enum
+from pathlib import Path
 from urllib.parse import quote_plus
 
 import stripe
@@ -14,10 +15,12 @@ import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from daras_ai_v2 import settings
 from daras_ai_v2.base import RedirectException
+from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.settings import templates
+from bots.models import PublishedRun, Workflow
 from routers.root import page_wrapper, request_json
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
@@ -115,12 +118,14 @@ available_subscriptions = {
 class _AccountTab(typing.NamedTuple):
     title: str
     tab_path: str
+    prefixed: bool = True
 
 
 class AccountTabs(Enum):
     billing = _AccountTab(title="Billing", tab_path="")
     profile = _AccountTab(title="Profile", tab_path="profile")
     api_keys = _AccountTab(title="🚀 API Keys", tab_path="api-keys")
+    saved = _AccountTab(title="Saved", tab_path="saved", prefixed=False)
 
     @property
     def title(self) -> str:
@@ -130,23 +135,36 @@ class AccountTabs(Enum):
     def tab_path(self) -> str:
         return self.value.tab_path
 
+    @property
+    def prefixed(self) -> bool:
+        return self.value.prefixed
+
     @classmethod
-    def from_tab_path(cls, tab_path: str) -> "AccountTabs":
+    def from_request_and_tab_path(
+        cls, request: Request, tab_path: str
+    ) -> "AccountTabs":
+        from loguru import logger
+
+        logger.info(f"{request.url.path=}, {tab_path=}")
         for tab in cls:
-            if tab.tab_path == tab_path:
+            logger.info(f"{tab=}, {tab.get_full_path()=}")
+            if request.url.path == tab.get_full_path():
+                logger.info("found tab! {tab=}")
                 return tab
         raise HTTPException(status_code=404)
 
     def get_full_path(self) -> str:
-        return os.path.join("/account", self.tab_path, "")
+        prefix = "/account" if self.prefixed else "/"
+        return str(Path(prefix) / self.tab_path) + "/"
 
 
+@router.post("/saved/", include_in_schema=False)
 @router.post("/account/", include_in_schema=False)
 @router.post("/account/{tab_path}/", include_in_schema=False)
 def account(
     request: Request, tab_path: str = "", json_data: dict = Depends(request_json)
 ):
-    tab = AccountTabs.from_tab_path(tab_path)
+    tab = AccountTabs.from_request_and_tab_path(request=request, tab_path=tab_path)
     try:
         ret = st.runner(
             lambda: page_wrapper(
@@ -195,6 +213,8 @@ def render_selected_tab(request: Request, tab: AccountTabs):
             profile_tab(request)
         case AccountTabs.api_keys:
             api_keys_tab(request)
+        case AccountTabs.saved:
+            all_saved_runs_tab(request)
         case _:
             raise HTTPException(status_code=401)
 
@@ -221,6 +241,24 @@ def billing_tab(request: Request):
 
 def profile_tab(request: Request):
     return edit_user_profile_page(user=request.user)
+
+
+def all_saved_runs_tab(request: Request):
+    saved_runs = PublishedRun.objects.filter(
+        created_by=request.user,
+    ).order_by("-updated_at")
+
+    def _render(pr: PublishedRun):
+        workflow = Workflow(pr.workflow)
+        page_cls = workflow.page_cls
+        page_cls().render_published_run_preview(
+            pr, show_visibility=True, pills=[Workflow(pr.workflow).short_title]
+        )
+
+    if saved_runs:
+        grid_layout(3, saved_runs, _render)
+    else:
+        st.write("No saved runs yet", className="text-muted")
 
 
 def api_keys_tab(request: Request):
