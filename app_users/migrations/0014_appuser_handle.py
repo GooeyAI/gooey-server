@@ -39,6 +39,10 @@ def generate_handle_options(user):
         yield email_handle + f"-{str(user.id)[:2]}"
         yield email_handle + f"-{uuid.uuid4().hex[:4]}"
 
+    for _ in range(5):
+        # generate random handles
+        yield f"user-{uuid.uuid4().hex[:8]}"
+
 
 def attempt_create_handle(Handle, handle_name):
     handle = Handle(name=handle_name)
