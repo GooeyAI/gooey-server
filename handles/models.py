@@ -11,7 +11,7 @@ from bots.custom_fields import CustomURLField
 HANDLE_ALLOWED_CHARS = r"[a-z0-9_\.-]+"
 HANDLE_REGEX = rf"^{HANDLE_ALLOWED_CHARS}$"
 HANDLE_MAX_LENGTH = 40
-HANDLE_BLACKLIST = [
+BASE_HANDLE_BLACKLIST = [
     "admin",
     "account",
     "login",
@@ -26,7 +26,7 @@ HANDLE_BLACKLIST = [
     "blog",
     "contact",
     "sales",
-] + list(page_slug_map.keys())
+]
 
 validate_handle_regex = RegexValidator(
     regex=HANDLE_REGEX,
@@ -39,8 +39,16 @@ validate_handle_length = MaxLengthValidator(
 )
 
 
+def get_handle_blacklist():
+    from daras_ai_v2.all_pages import page_slug_map
+
+    return BASE_HANDLE_BLACKLIST + list(page_slug_map.keys())
+
+
 def validate_handles_blacklist(value):
-    if normalize_slug(value) in HANDLE_BLACKLIST:
+    from daras_ai_v2.all_pages import normalize_slug
+
+    if normalize_slug(value) in get_handle_blacklist():
         raise ValidationError(f"{value} is a reserved handle")
 
 
