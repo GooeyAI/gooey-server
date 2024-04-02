@@ -1,8 +1,11 @@
-from daras_ai_v2.all_pages import normalize_slug, page_slug_map
+from __future__ import annotations
+
+import re
+import uuid
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
-from django.db import models
+from django.db import IntegrityError, models
 from django.db.models import CheckConstraint, Q
 from django.db.models.functions import Lower
 
@@ -112,3 +115,55 @@ class Handle(models.Model):
                 violation_error_message="Handle must be lowercase",
             )
         ]
+
+    @classmethod
+    def create_default_for_user(cls, user: "AppUser"):
+        for handle_name in _generate_handle_options(user):
+            if handle := _attempt_create_handle(handle_name):
+                return handle
+        return None
+
+
+def _make_handle_from(name):
+    name = name.lower()
+    name = "-".join(
+        re.findall(HANDLE_ALLOWED_CHARS, name)
+    )  # find groups of valid chars
+    name = re.sub(r"-+", "-", name)  # remove consecutive dashes
+    name = name[:HANDLE_MAX_LENGTH]
+    name = name.rstrip("-_")
+    return name
+
+
+def _generate_handle_options(user):
+    first_name_handle = _make_handle_from(user.first_name())
+    if first_name_handle:
+        yield first_name_handle
+
+    email_handle = _make_handle_from(user.email.split("@")[0]) if user.email else ""
+    if email_handle:
+        yield email_handle
+
+    if first_name_handle:
+        yield first_name_handle + f"-{str(user.pk)[:2]}"
+        yield first_name_handle + f"-{uuid.uuid4().hex[:4]}"
+
+    if email_handle:
+        yield email_handle + f"-{str(user.pk)[:2]}"
+        yield email_handle + f"-{uuid.uuid4().hex[:4]}"
+
+    for _ in range(5):
+        # generate random handles
+        yield f"user-{uuid.uuid4().hex[:8]}"
+
+
+def _attempt_create_handle(handle_name):
+    from handles.models import Handle
+
+    handle = Handle(name=handle_name)
+    try:
+        handle.full_clean()
+        handle.save()
+        return handle
+    except (IntegrityError, ValidationError):
+        return None

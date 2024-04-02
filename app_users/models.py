@@ -9,6 +9,7 @@ from bots.custom_fields import CustomURLField, StrippedTextField
 from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
 from daras_ai_v2 import settings, db
 from gooeysite.bg_db_conn import db_middleware
+from handles.models import Handle
 
 
 class AppUserQuerySet(models.QuerySet):
@@ -207,6 +208,8 @@ class AppUser(models.Model):
             field=db.USER_BALANCE_FIELD,
             default=default_balance,
         )
+        if handle := Handle.create_default_for_user(user=self):
+            self.handle = handle
 
         return self
 
