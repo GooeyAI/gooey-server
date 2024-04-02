@@ -40,7 +40,7 @@ def render():
         gui.image(
             meta_preview_url(page.get_explore_image(state), page.preview_image(state)),
             href=page.app_url(),
-            style={"border-radius": 5},
+            style={"borderRadius": 5},
         )
 
     def render_description(page, state):

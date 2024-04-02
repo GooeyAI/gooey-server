@@ -776,6 +776,16 @@ class BasePage:
         return tabs
 
     def render_selected_tab(self, selected_tab: str):
+        if st.button("pressme"):
+            st.html(
+                """
+                <script>
+                console.log('Hello, World!');
+                </script>
+                <script src="/static/js/hello.js"/>
+                """
+            )
+
         match selected_tab:
             case MenuTabs.run:
                 input_col, output_col = st.columns([3, 2], gap="medium")
@@ -1738,7 +1748,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         if saved_run.run_status:
             started_at_text()
-            html_spinner(saved_run.run_status)
+            html_spinner(saved_run.run_status, scroll_into_view=False)
         elif saved_run.error_msg:
             st.error(saved_run.error_msg, unsafe_allow_html=True)
 
@@ -2080,14 +2090,7 @@ def extract_nested_str(obj) -> str:
 
 
 def force_redirect(url: str):
-    # note: assumes sanitized URLs
-    st.html(
-        f"""
-    <script>
-    window.location = '{url}';
-    </script>
-    """
-    )
+    st.js(f"window.location = {url!r}")
 
 
 class RedirectException(Exception):
