@@ -566,7 +566,7 @@ class BasePage:
                 notes=published_run_notes.strip(),
                 visibility=published_run_visibility,
             )
-        force_redirect(redirect_to or published_run.get_app_url())
+        raise RedirectException(redirect_to or published_run.get_app_url())
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
@@ -776,16 +776,6 @@ class BasePage:
         return tabs
 
     def render_selected_tab(self, selected_tab: str):
-        if st.button("pressme"):
-            st.html(
-                """
-                <script>
-                console.log('Hello, World!');
-                </script>
-                <script src="/static/js/hello.js"/>
-                """
-            )
-
         match selected_tab:
             case MenuTabs.run:
                 input_col, output_col = st.columns([3, 2], gap="medium")
@@ -2087,10 +2077,6 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
-
-
-def force_redirect(url: str):
-    st.js(f"window.location = {url!r}")
 
 
 class RedirectException(Exception):
