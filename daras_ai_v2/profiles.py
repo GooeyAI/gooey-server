@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from django.core.exceptions import ValidationError
 from django.db.models import Count
 from django.db import IntegrityError, transaction
+from furl import furl
 
 import gooey_ui as st
 from app_users.models import AppUser
@@ -15,7 +16,9 @@ from bots.models import (
     SavedRun,
     Workflow,
 )
-from daras_ai_v2.base import RedirectException, format_number_with_suffix
+from daras_ai_v2 import settings
+from daras_ai_v2.base import format_number_with_suffix
+from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
 from gooey_ui.components.pills import pill
 from handles.models import Handle
@@ -192,13 +195,39 @@ def _set_is_uploading_photo(val: bool):
 
 
 def edit_user_profile_page(user: AppUser):
+    _edit_user_profile_header(user)
+
     colspec = [2, 10] if not _is_uploading_photo() else [6, 6]
     photo_col, form_col = st.columns(colspec)
-
     with photo_col:
         _edit_user_profile_photo_section(user)
     with form_col:
         _edit_user_profile_form_section(user)
+
+
+def _edit_user_profile_header(user: AppUser):
+    st.write("# Update your Profile")
+    with st.div(className="mb-3 d-flex align-items-start"):
+        with st.tag("span"):
+            with st.tag("span", className="text-muted"):
+                st.html("Your profile and public saved runs appear on ")
+            with st.tag("span"):
+                st.html(
+                    str(furl(settings.APP_BASE_URL) / "/")
+                    + f"<strong>{escape_html(user.handle.name) if user.handle else 'your-username'}</strong> ",
+                )
+
+        if user.handle:
+            copy_to_clipboard_button(
+                '<i class="fa-solid fa-copy"></i> Copy',
+                value=user.handle.get_app_url(),
+                type="link",
+                className="d-inline text-decoration-none border-0 ms-3 my-0 pt-0",
+            )
+            with st.link(
+                to=user.handle.get_app_url(), className="ms-3 text-decoration-none"
+            ):
+                st.html('<i class="fa-solid fa-eye"></i> Preview')
 
 
 def _edit_user_profile_photo_section(user: AppUser):
