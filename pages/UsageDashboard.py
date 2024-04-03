@@ -9,7 +9,7 @@ from django.db.models import Q, QuerySet, Count, Func
 
 from bots.models import SavedRun, Workflow
 
-from app_users.models import AppUser
+from app_users.models import AppUser, AppUserTransaction
 import datetime
 import pandas as pd
 import plotly.express as px
@@ -214,6 +214,33 @@ Press Ctrl/Cmd + A to copy all and paste into a excel.
         function="date_trunc",
         datepart=datepart,
         template="%(function)s('%(datepart)s', %(expressions)s)",
+    )
+
+    st.write(
+        """
+#### Recent Paid Transactions
+        """
+    )
+    recent_transactions = AppUserTransaction.objects.filter(
+        created_at__gte=start_time,
+        created_at__lte=end_time,
+        charged_amount__gt=0,
+        user__in=app_users,
+    ).order_by("-created_at")
+
+    st.dataframe(
+        pd.DataFrame.from_records(
+            [
+                {
+                    "name": tr.user.display_name,
+                    "amount_paid": tr.charged_amount,
+                    "email": tr.user.email,
+                    "date": tr.created_at.astimezone(timezone),
+                    "paid_via": "Stripe" if tr.payment_provider == 1 else "Paypal",
+                }
+                for tr in recent_transactions
+            ]
+        )
     )
 
     st.write(
