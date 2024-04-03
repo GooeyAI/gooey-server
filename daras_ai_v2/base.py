@@ -1199,6 +1199,7 @@ class BasePage:
                         height: {responsive_image_size};
                         margin-right: 6px;
                         border-radius: 50%;
+                        object-fit: cover;
                         pointer-events: none;
                     }}
 
