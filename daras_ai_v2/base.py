@@ -1659,6 +1659,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                 pill(
                     PublishedRunVisibility(pr.visibility).get_badge_html(),
                     unsafe_allow_html=True,
+                    type="light",
                     className="border border-dark",
                 )
 
@@ -1732,7 +1733,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
                     pill(
                         PublishedRunVisibility(
                             published_run.visibility
-                        ).get_badge_html()
+                        ).get_badge_html(),
+                        unsafe_allow_html=True,
+                        type="light",
+                        className="border border-dark",
                     )
 
             st.write(f"#### {tb.h1_title}")

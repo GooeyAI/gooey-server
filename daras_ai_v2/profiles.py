@@ -17,6 +17,7 @@ from bots.models import (
 )
 from daras_ai_v2.base import RedirectException, format_number_with_suffix
 from daras_ai_v2.grid_layout_widget import grid_layout
+from gooey_ui.components.pills import pill
 from handles.models import Handle
 
 
@@ -62,25 +63,25 @@ def user_profile_header(user: AppUser):
             with st.div(className="mt-2 text-secondary"):
                 st.html(escape_html(user.bio))
 
-        with st.div(className="mt-3"):
+        with st.div(className="mt-3 d-flex flex-column d-lg-block"):
             if user.github_username:
-                with st.tag(
-                    "span",
-                    className="text-sm bg-light border border-dark rounded-pill px-2 py-1 me-4 d-inline-block mb-1",
-                ), st.link(
+                with st.link(
                     to=github_url_for_username(user.github_username),
                     className="text-decoration-none",
                 ):
-                    st.html(
+                    pill(
                         '<i class="fa-brands fa-github"></i> '
-                        + escape_html(user.github_username)
+                        + escape_html(user.github_username),
+                        unsafe_allow_html=True,
+                        type=None,
+                        className="text-black border border-dark fs-6 me-2 me-lg-4 mb-1",
                     )
 
             if user.website_url:
                 with st.tag(
                     "span",
-                    className="text-sm me-4 d-inline-block mb-1",
-                ), st.link(to=user.website_url):
+                    className="text-sm mb-1 me-2 me-lg-4 d-inline-block mb-1",
+                ), st.link(to=user.website_url, className="text-decoration-none"):
                     st.html(
                         '<i class="fa-solid fa-link"></i> '
                         + escape_html(
@@ -91,7 +92,7 @@ def user_profile_header(user: AppUser):
             if user.company:
                 with st.tag(
                     "span",
-                    className="text-sm text-muted me-4 d-inline-block mb-1",
+                    className="text-sm text-muted me-lg-4 mb-1 d-inline-block",
                 ):
                     st.html(
                         '<i class="fa-solid fa-buildings"></i> '
@@ -105,8 +106,8 @@ def user_profile_header(user: AppUser):
         {run_icon} {escape_html(format_number_with_suffix(run_count))} runs
     </div>
 
-    <div>
-        <div>{contribs.total} contributions since joining</div>
+    <div class="text-start">
+        <div>{contribs.total} contributions since {user.created_at.strftime("%b %Y")}</div>
         <small class="mt-1">
             {", ".join(
                 f"{escape_html(workflow.short_title)} ({count})"
@@ -127,12 +128,9 @@ def user_profile_main_content(user: AppUser):
 
     def _render(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
-        with st.div(className="mb-2"), st.tag(
-            "span", className="bg-light text-dark px-2 py-1 rounded-pill"
-        ):
-            st.html(escape_html(workflow.short_title))
-
         page_cls = workflow.page_cls
+
+        pill(workflow.short_title, className="mb-2")
         page_cls().render_published_run_preview(pr)
 
     if public_runs:
