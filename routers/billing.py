@@ -140,17 +140,27 @@ class AccountTabs(Enum):
         return self.value.prefixed
 
     @classmethod
+    def unprefixed_tabs(cls) -> list["AccountTabs"]:
+        return [tab for tab in cls if not tab.prefixed]
+
+    @classmethod
+    def prefixed_tabs(cls) -> list["AccountTabs"]:
+        return [tab for tab in cls if tab.prefixed]
+
+    @classmethod
     def from_request_and_tab_path(
         cls, request: Request, tab_path: str
     ) -> "AccountTabs":
-        from loguru import logger
-
-        logger.info(f"{request.url.path=}, {tab_path=}")
-        for tab in cls:
-            logger.info(f"{tab=}, {tab.get_full_path()=}")
+        for tab in cls.unprefixed_tabs():
+            # like /saved/
             if request.url.path == tab.get_full_path():
-                logger.info("found tab! {tab=}")
                 return tab
+
+        for tab in cls.prefixed_tabs():
+            # like /account/{tab_path}/
+            if tab_path == tab.tab_path:
+                return tab
+
         raise HTTPException(status_code=404)
 
     def get_full_path(self) -> str:
