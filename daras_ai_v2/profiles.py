@@ -130,7 +130,7 @@ def user_profile_main_content(user: AppUser):
         workflow = Workflow(pr.workflow)
         page_cls = workflow.page_cls
 
-        pill(workflow.short_title, className="mb-2")
+        pill(workflow.short_title, className="mb-2 border border-dark")
         page_cls().render_published_run_preview(pr)
 
     if public_runs:

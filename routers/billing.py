@@ -268,7 +268,7 @@ def all_saved_runs_tab(request: Request):
                 unsafe_allow_html=True,
                 className="border border-dark",
             )
-            pill(workflow.short_title)
+            pill(workflow.short_title, className="border border-dark")
 
         workflow.page_cls().render_published_run_preview(pr)
 
