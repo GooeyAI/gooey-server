@@ -219,7 +219,7 @@ def _edit_user_profile_header(user: AppUser):
 
         if user.handle:
             copy_to_clipboard_button(
-                '<i class="fa-regular fa-copy"></i> Copy',
+                '<i class="fa-solid fa-copy"></i> Copy',
                 value=user.handle.get_app_url(),
                 type="link",
                 className="d-inline text-decoration-none border-0 ms-3 my-0 pt-0",
@@ -227,7 +227,7 @@ def _edit_user_profile_header(user: AppUser):
             with st.link(
                 to=user.handle.get_app_url(), className="ms-3 text-decoration-none"
             ):
-                st.html('<i class="fa-regular fa-eye"></i> Preview')
+                st.html('<i class="fa-solid fa-eye"></i> Preview')
 
 
 def _edit_user_profile_photo_section(user: AppUser):
