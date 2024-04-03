@@ -219,7 +219,7 @@ def _edit_user_profile_header(user: AppUser):
 
         if user.handle:
             copy_to_clipboard_button(
-                '<i class="fa-solid fa-copy"></i> Copy',
+                '<i class="fa-regular fa-copy"></i> Copy',
                 value=user.handle.get_app_url(),
                 type="link",
                 className="d-inline text-decoration-none border-0 ms-3 my-0 pt-0",
@@ -227,7 +227,7 @@ def _edit_user_profile_header(user: AppUser):
             with st.link(
                 to=user.handle.get_app_url(), className="ms-3 text-decoration-none"
             ):
-                st.html('<i class="fa-solid fa-eye"></i> Preview')
+                st.html('<i class="fa-regular fa-eye"></i> Preview')
 
 
 def _edit_user_profile_photo_section(user: AppUser):
@@ -257,16 +257,22 @@ def _edit_user_profile_photo_section(user: AppUser):
                 profile_image(image_url or user.photo_url, placeholder_seed=user.uid)
         else:
             profile_image(user.photo_url, placeholder_seed=user.uid)
-            if user.photo_url and st.button(
-                "Clear Photo", type="link", className="text-decoration-none px-2 py-1"
-            ):
-                _set_new_profile_photo(user, "")
-                st.experimental_rerun()
-            if st.button(
-                "Upload Photo", type="link", className="text-decoration-none px-2 py-1"
-            ):
-                _set_is_uploading_photo(True)
-                st.experimental_rerun()
+
+            with st.div(className="mt-2"):
+                if st.button(
+                    '<i class="fa-regular fa-camera"></i> Upload',
+                    type="link",
+                    className="d-block text-decoration-none px-2 py-1 my-2",
+                ):
+                    _set_is_uploading_photo(True)
+                    st.experimental_rerun()
+                if user.photo_url and st.button(
+                    '<i class="fa-regular fa-broom-wide"></i> Clear',
+                    type="link",
+                    className="d-block text-decoration-none px-2 py-1 my-2",
+                ):
+                    _set_new_profile_photo(user, "")
+                    st.experimental_rerun()
 
 
 def _edit_user_profile_form_section(user: AppUser):
