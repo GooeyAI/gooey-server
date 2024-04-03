@@ -31,7 +31,7 @@ from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import text_splitter
 
-TRANSLATE_DETECT_BATCH_SIZE = 8
+TRANSLATE_BATCH_SIZE = 8
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -197,7 +197,7 @@ MMS_SUPPORTED = {
 
 # https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
 GHANA_NLP_SUPPORTED = { 'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani', 'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru' }  # fmt: skip
-GHANA_NLP_MAXLEN = 1000
+GHANA_NLP_MAXLEN = 500
 
 
 class AsrModels(Enum):
@@ -484,7 +484,6 @@ def run_ghana_nlp_translate(
     source_language: str,
 ) -> list[str]:
     import langcodes
-    from daras_ai_v2.text_splitter import text_splitter
 
     assert (
         target_language in GHANA_NLP_SUPPORTED
@@ -504,23 +503,32 @@ def run_ghana_nlp_translate(
         return texts
 
     return map_parallel(
-        lambda doc: _call_ghana_nlp(doc, source_language, target_language),
+        lambda doc: _call_ghana_nlp_chunked(doc, source_language, target_language),
         texts,
-        max_workers=TRANSLATE_DETECT_BATCH_SIZE,
+        max_workers=TRANSLATE_BATCH_SIZE,
     )
 
 
-def _call_ghana_nlp(text: str, source_language: str, target_language: str):
-    ret = ""
-    for doc in text_splitter(text, chunk_size=GHANA_NLP_MAXLEN):
-        r = requests.post(
-            "https://translation-api.ghananlp.org/v1/translate",
-            headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
-            json={"in": doc.text, "lang": source_language + "-" + target_language},
+def _call_ghana_nlp_chunked(
+    text: str, source_language: str, target_language: str
+) -> str:
+    return "".join(
+        map_parallel(
+            lambda doc: _call_ghana_nlp_raw(doc.text, source_language, target_language),
+            text_splitter(text, chunk_size=GHANA_NLP_MAXLEN, length_function=len),
+            max_workers=TRANSLATE_BATCH_SIZE,
         )
-        raise_for_status(r)
-        ret += r.json()
-    return ret
+    )
+
+
+def _call_ghana_nlp_raw(text: str, source_language: str, target_language: str) -> str:
+    r = requests.post(
+        "https://translation-api.ghananlp.org/v1/translate",
+        headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
+        json={"in": text, "lang": source_language + "-" + target_language},
+    )
+    raise_for_status(r)
+    return r.json()
 
 
 def run_google_translate(
@@ -561,8 +569,8 @@ def run_google_translate(
     else:
         translate_client = translate.Client()
         detections = flatten(
-            translate_client.detect_language(texts[i : i + TRANSLATE_DETECT_BATCH_SIZE])
-            for i in range(0, len(texts), TRANSLATE_DETECT_BATCH_SIZE)
+            translate_client.detect_language(texts[i : i + TRANSLATE_BATCH_SIZE])
+            for i in range(0, len(texts), TRANSLATE_BATCH_SIZE)
         )
         language_codes = [detection["language"] for detection in detections]
 
@@ -572,7 +580,7 @@ def run_google_translate(
         ),
         texts,
         language_codes,
-        max_workers=TRANSLATE_DETECT_BATCH_SIZE,
+        max_workers=TRANSLATE_BATCH_SIZE,
     )
 
 
