@@ -40,7 +40,7 @@ def render():
         gui.image(
             meta_preview_url(page.get_explore_image(state), page.preview_image(state)),
             href=page.app_url(),
-            style={"border-radius": 5},
+            style={"borderRadius": 5},
         )
 
     def render_description(page, state):
@@ -48,7 +48,7 @@ def render():
             gui.markdown(f"#### {page.get_recipe_title()}")
         preview = page.preview_description(state)
         if preview:
-            with gui.tag("p", style={"margin-bottom": "25px"}):
+            with gui.tag("p", style={"marginBottom": "25px"}):
                 gui.write(preview, line_clamp=4)
         else:
             page.render_description()
@@ -78,18 +78,16 @@ def render():
 def heading(
     title: str, description: str, margin_top: str = "2rem", margin_bottom: str = "2rem"
 ):
-    with gui.tag(
-        "div", style={"margin-top": margin_top, "margin-bottom": margin_bottom}
-    ):
+    with gui.tag("div", style={"marginTop": margin_top, "marginBottom": margin_bottom}):
         with gui.tag(
             "p",
-            style={"margin-top": "0rem", "margin-bottom": "0rem"},
+            style={"marginTop": "0rem", "marginBottom": "0rem"},
             className="text-muted",
         ):
             gui.html(description.upper())
         with gui.tag(
             "h1",
-            style={"margin-top": "0px", "margin-bottom": "0px", "font-weight": "500"},
+            style={"marginTop": "0px", "marginBottom": "0px", "fontWeight": "500"},
         ):
             gui.html(title)
 
@@ -98,10 +96,10 @@ def section_heading(title: str, margin_top: str = "1rem", margin_bottom: str = "
     with gui.tag(
         "h5",
         style={
-            "font-weight": "600",
-            "margin-top": margin_top,
-            "margin-bottom": margin_bottom,
+            "fontWeight": "600",
+            "marginTop": margin_top,
+            "marginBottom": margin_bottom,
         },
     ):
-        with gui.tag("span", style={"background-color": "#A5FFEE"}):
+        with gui.tag("span", style={"backgroundColor": "#A5FFEE"}):
             gui.html(title.upper())

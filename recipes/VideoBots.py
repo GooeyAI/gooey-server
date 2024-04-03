@@ -76,6 +76,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     text_to_speech_settings,
     text_to_speech_provider_selector,
+    OPENAI_TTS_MODELS_T,
+    OPENAI_TTS_VOICES_T,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
 from recipes.DocSearch import (
@@ -187,6 +189,8 @@ class VideoBotsPage(BasePage):
         elevenlabs_stability: float | None
         elevenlabs_similarity_boost: float | None
         azure_voice_name: str | None
+        openai_voice_name: OPENAI_TTS_VOICES_T | None
+        openai_tts_model: OPENAI_TTS_MODELS_T | None
 
         # llm settings
         selected_model: (
@@ -344,6 +348,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             #### 📄 Knowledge
             Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. 
             """,
+            accept=["audio/*", "application/*", "video/*", "text/*"],
         )
 
         st.markdown("#### Capabilities")
@@ -1083,15 +1088,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         col1, col2, col3 = st.columns(
             3,
             column_props=dict(
-                style={
-                    "display": "flex",
-                    "flex-direction": "column",
-                    "align-items": "center",
-                    "text-align": "center",
-                    "max-width": "300px",
-                }
+                style=dict(
+                    display="flex",
+                    flexDirection="column",
+                    alignItems="center",
+                    textAlign="center",
+                    maxWidth="300px",
+                ),
             ),
-            style={"justify-content": "center"},
+            style={"justifyContent": "center"},
         )
         with col1:
             st.html("🏃‍♀️", style={"fontSize": "4rem"})
@@ -1214,7 +1219,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         st.newline()
         with st.div(style={"width": "100%", "textAlign": "left"}):
             test_link = get_bot_test_link(bi)
-            col1, col2 = st.columns(2, style={"align-items": "center"})
+            col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
                 st.write("###### Connected To")
                 st.write(f"{icon} {bi}", unsafe_allow_html=True)
@@ -1228,7 +1233,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 else:
                     st.write("Message quicklink not available.")
 
-            col1, col2 = st.columns(2, style={"align-items": "center"})
+            col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
                 st.write("###### Test")
                 st.caption(f"Send a test {Platform(bi.platform).label} message.")
@@ -1242,7 +1247,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 else:
                     st.write("Message quicklink not available.")
 
-            col1, col2 = st.columns(2, style={"align-items": "center"})
+            col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
                 st.write("###### Understand your Users")
                 st.caption(f"See real-time analytics.")
@@ -1256,7 +1261,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 )
 
             # ==== future changes ====
-            # col1, col2 = st.columns(2, style={"align-items": "center"})
+            # col1, col2 = st.columns(2, style={"alignItems": "center"})
             # with col1:
             #     st.write("###### Evaluate ⚖️")
             #     st.caption(f"Run automated tests against sample user messages.")
@@ -1272,7 +1277,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # )
 
             if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
-                col1, col2 = st.columns(2, style={"align-items": "center"})
+                col1, col2 = st.columns(2, style={"alignItems": "center"})
                 with col1:
                     st.write("###### WhatsApp Business Management")
                     st.caption(
@@ -1290,7 +1295,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         new_tab=True,
                     )
 
-            col1, col2 = st.columns(2, style={"align-items": "center"})
+            col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
                 st.write("###### Add Integration")
                 st.caption(f"Add another connection for {run_title}.")
@@ -1312,7 +1317,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     broadcast_input(bi)
 
                 st.write("---")
-                col1, col2 = st.columns(2, style={"align-items": "center"})
+                col1, col2 = st.columns(2, style={"alignItems": "center"})
                 with col1:
                     st.write("###### Disconnect")
                     st.caption(
@@ -1356,7 +1361,7 @@ def chat_list_view():
                 for idx, text in enumerate(output_text):
                     st.write(text)
                     try:
-                        st.video(output_video[idx], autoplay=True)
+                        st.video(output_video[idx])
                     except IndexError:
                         try:
                             st.audio(output_audio[idx])

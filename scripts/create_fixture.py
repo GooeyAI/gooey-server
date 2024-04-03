@@ -3,7 +3,7 @@ import sys
 from django.core import serializers
 
 from app_users.models import AppUser
-from bots.models import BotIntegration, PublishedRun
+from bots.models import BotIntegration, PublishedRun, PublishedRunVisibility
 
 
 def run():
@@ -20,7 +20,10 @@ def run():
 
 
 def get_objects():
-    for pr in PublishedRun.objects.all():
+    for pr in PublishedRun.objects.filter(
+        is_approved_example=True,
+        visibility=PublishedRunVisibility.PUBLIC,
+    ):
         set_fk_null(pr.saved_run)
         if pr.saved_run_id:
             yield pr.saved_run
