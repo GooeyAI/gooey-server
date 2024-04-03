@@ -47,6 +47,9 @@ async function handleAuthResult({ user }) {
   let next = windowUrl.searchParams.get("next");
   // if no next param, redirect to the current page (but not the login page)
   if (!next && windowUrl.pathname !== action) {
+    if (document.querySelector("[data-submitafterlogin]")) {
+      windowUrl.searchParams.set("submitafterlogin", "1");
+    }
     next = windowUrl.pathname + windowUrl.search + windowUrl.hash;
   }
   if (next) {
@@ -66,7 +69,7 @@ async function handleAuthResult({ user }) {
 
 function showLoginProgress() {
   for (const elem of document.querySelectorAll(
-    "[data-replace-login-spinner]"
+    "[data-replace-login-spinner]",
   )) {
     elem.innerHTML = "<h5>Logging you in...</h5>";
   }

@@ -30,7 +30,7 @@ def copy_to_clipboard_button(
 <button
     type="button"
     class="btn btn-theme btn-{type} {className}"
-    onClick="copyToClipboard(this);"
+    onclick="copyToClipboard(this);"
     style="{style}"
     data-clipboard-text={value!r}>
     {label}

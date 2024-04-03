@@ -425,7 +425,7 @@ class BasePage:
             if pressed_options:
                 options_modal.open()
             if options_modal.is_open():
-                with options_modal.container(style={"min-width": "min(300px, 100vw)"}):
+                with options_modal.container(style={"minWidth": "min(300px, 100vw)"}):
                     self._render_options_modal(
                         current_run=current_run,
                         published_run=published_run,
@@ -446,7 +446,7 @@ class BasePage:
             if pressed_save:
                 publish_modal.open()
             if publish_modal.is_open():
-                with publish_modal.container(style={"min-width": "min(500px, 100vw)"}):
+                with publish_modal.container(style={"minWidth": "min(500px, 100vw)"}):
                     self._render_publish_modal(
                         current_run=current_run,
                         published_run=published_run,
@@ -566,7 +566,7 @@ class BasePage:
                 notes=published_run_notes.strip(),
                 visibility=published_run_visibility,
             )
-        force_redirect(redirect_to or published_run.get_app_url())
+        raise RedirectException(redirect_to or published_run.get_app_url())
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
@@ -837,7 +837,7 @@ class BasePage:
         with st.link(to=url, className="text-decoration-none"):
             with st.div(
                 className="d-flex mb-4 disable-p-margin",
-                style={"min-width": "min(100vw, 500px)"},
+                style={"minWidth": "min(100vw, 500px)"},
             ):
                 col1 = st.div(className="me-4")
                 col2 = st.div()
@@ -863,7 +863,7 @@ class BasePage:
                     st.write(f"Renamed: {version.title}")
                 elif not older_version:
                     st.write(version.title)
-            with st.div(className="mt-1", style={"font-size": "0.85rem"}):
+            with st.div(className="mt-1", style={"fontSize": "0.85rem"}):
                 self.render_author(
                     version.changed_by, image_size="18px", responsive=False
                 )
@@ -1551,7 +1551,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
             # language=HTML
             error_msg = f"""
-<p>
+<p data-{SUBMIT_AFTER_LOGIN_Q}>
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
@@ -1718,7 +1718,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         tb = get_title_breadcrumbs(self, sr=saved_run, pr=published_run)
 
         with st.link(to=saved_run.get_app_url()):
-            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
+            with st.div(className="mb-1", style={"fontSize": "0.9rem"}):
                 if is_latest_version:
                     st.html(
                         PublishedRunVisibility(
@@ -1738,7 +1738,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         if saved_run.run_status:
             started_at_text()
-            html_spinner(saved_run.run_status)
+            html_spinner(saved_run.run_status, scroll_into_view=False)
         elif saved_run.error_msg:
             st.error(saved_run.error_msg, unsafe_allow_html=True)
 
@@ -1748,7 +1748,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
         with st.link(to=published_run.get_app_url()):
-            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
+            with st.div(className="mb-1", style={"fontSize": "0.9rem"}):
                 st.html(
                     PublishedRunVisibility(published_run.visibility).get_badge_html()
                 )
@@ -2077,17 +2077,6 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
-
-
-def force_redirect(url: str):
-    # note: assumes sanitized URLs
-    st.html(
-        f"""
-    <script>
-    window.location = '{url}';
-    </script>
-    """
-    )
 
 
 class RedirectException(Exception):

@@ -231,11 +231,11 @@ def profile_tab(request: Request):
             if request.user.display_name:
                 st.write(f"## {request.user.display_name}")
             if contact := request.user.email or request.user.phone_number:
-                with st.div(style={"font-weight": "normal"}):
+                with st.div(style={"fontWeight": "normal"}):
                     st.html(html.escape(contact))
             with st.div(
                 className="mb-4",
-                style={"font-size": "x-small", "font-weight": "normal"},
+                style={"fontSize": "x-small", "fontWeight": "normal"},
             ):
                 st.html(
                     """<a href="/privacy">Privacy</a> & <a href="/terms">Terms</a>"""
