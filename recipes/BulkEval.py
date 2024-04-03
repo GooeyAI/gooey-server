@@ -1,4 +1,5 @@
 import itertools
+import os
 import typing
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from itertools import zip_longest
@@ -74,6 +75,17 @@ class AggFunctionResult(typing.TypedDict):
     value: float
 
 
+def remove_common_prefix_suffix(a: list[str]) -> list[str]:
+    if not a:
+        return a
+    prefix = len(os.path.commonprefix(a)) or 0
+    suffix = -len(os.path.commonprefix([s[::-1] for s in a])) or None
+    ret = [s[prefix:suffix] for s in a]
+    if not all(ret) or all(s.isdigit() for s in ret):
+        return a
+    return ret
+
+
 def _render_results(results: list[AggFunctionResult]):
     import plotly.graph_objects as go
     from plotly.colors import sample_colorscale
@@ -83,7 +95,7 @@ def _render_results(results: list[AggFunctionResult]):
 
         g = list(g)
 
-        columns = [d["column"] for d in g]
+        columns = remove_common_prefix_suffix([d["column"] for d in g])
         values = [round(d["value"] or 0, 2) for d in g]
 
         norm_values = [
@@ -303,12 +315,12 @@ Here's what you uploaded:
         return price * nprompts * nrows
 
     def render_steps(self):
-        documents = st.session_state.get("documents", [])
-        final_prompts = st.session_state.get("final_prompts", [])
+        documents = st.session_state.get("documents") or []
+        final_prompts = st.session_state.get("final_prompts") or []
         for doc, prompts in zip_longest(documents, final_prompts):
-            st.write(f"###### {doc}")
             if not prompts:
                 continue
+            st.write(f"###### {doc}")
             for i, prompt in enumerate(prompts):
                 st.text_area("", value=prompt, height=200, key=f"--final-prompt-{i}")
 
