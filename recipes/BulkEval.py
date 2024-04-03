@@ -1,5 +1,6 @@
 import itertools
 import typing
+from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from itertools import zip_longest
 
 import typing_extensions
@@ -183,6 +184,7 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
 
     class ResponseModel(BaseModel):
         output_documents: list[str]
+        final_prompts: list[list[str]] | None
         aggregations: list[list[AggFunctionResult]] | None
 
     def render_form_v2(self):
@@ -235,14 +237,6 @@ Here's what you uploaded:
         def render_agg_inputs(key: str, del_key: str, d: AggFunction):
             col1, col3 = st.columns([8, 1], responsive=False)
             with col1:
-                #     d["column"] = st.text_input(
-                #         "",
-                #         label_visibility="collapsed",
-                #         placeholder="Column Name",
-                #         key=key + ":column",
-                #         value=d.get("column"),
-                #     ).strip()
-                # with col2:
                 with st.div(className="pt-1"):
                     d["function"] = st.selectbox(
                         "",
@@ -262,8 +256,8 @@ Here's what you uploaded:
             render_inputs=render_agg_inputs,
         )
 
-    def render_settings(self):
-        language_model_settings()
+    # def render_settings(self):
+    #     language_model_settings()
 
     def render_example(self, state: dict):
         render_documents(state)
@@ -286,76 +280,13 @@ Here's what you uploaded:
         request: "BulkEvalPage.RequestModel",
         response: "BulkEvalPage.ResponseModel",
     ) -> typing.Iterator[str | None]:
-        import pandas as pd
-
         response.output_documents = []
+        response.final_prompts = []
         response.aggregations = []
 
-        for doc_ix, doc in enumerate(request.documents):
-            df = read_df_any(doc)
-            in_recs = df.to_dict(orient="records")
-            out_recs = []
-
-            out_df = None
-            f = upload_file_from_bytes(
-                filename=f"bulk-eval-{doc_ix}-0.csv",
-                data=df.to_csv(index=False).encode(),
-                content_type="text/csv",
-            )
-            response.output_documents.append(f)
-            response.aggregations.append([])
-
-            for df_ix in range(len(in_recs)):
-                rec_ix = len(out_recs)
-                out_recs.append(in_recs[df_ix])
-
-                for ep_ix, ep in enumerate(request.eval_prompts):
-                    progress = round(
-                        (doc_ix + df_ix + ep_ix)
-                        / (len(request.documents) + len(df) + len(request.eval_prompts))
-                        * 100
-                    )
-                    yield f"{progress}%"
-                    prompt = render_prompt_vars(
-                        ep["prompt"],
-                        st.session_state | {"columns": out_recs[rec_ix]},
-                    )
-                    ret = run_language_model(
-                        model=LargeLanguageModels.gpt_4_turbo.name,
-                        prompt=prompt,
-                        response_format_type="json_object",
-                    )[0]
-                    assert isinstance(ret, dict)
-                    for metric_name, metric_value in ret.items():
-                        col = f"{ep['name']} - {metric_name}"
-                        out_recs[rec_ix][col] = metric_value
-
-                out_df = pd.DataFrame.from_records(out_recs)
-                f = upload_file_from_bytes(
-                    filename=f"evaluator-{doc_ix}-{df_ix}.csv",
-                    data=out_df.to_csv(index=False).encode(),
-                    content_type="text/csv",
-                )
-                response.output_documents[doc_ix] = f
-
-            if out_df is None:
-                continue
-            for agg in request.agg_functions:
-                if agg.get("column"):
-                    cols = [agg["column"]]
-                else:
-                    cols = out_df.select_dtypes(include=["float", "int"]).columns
-                for col in cols:
-                    col_values = out_df[col].dropna()
-                    agg_value = col_values.agg(agg["function"])
-                    response.aggregations[doc_ix].append(
-                        {
-                            "column": col,
-                            "function": agg["function"],
-                            "count": len(col_values),
-                            "value": agg_value,
-                        }
-                    )
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futs = submit(pool, request, response)
+            yield from iterate(futs, request, response)
 
     def fields_to_save(self) -> [str]:
         return super().fields_to_save() + [NROWS_CACHE_KEY]
@@ -370,6 +301,120 @@ Here's what you uploaded:
             state.get(NROWS_CACHE_KEY) or get_nrows(state.get("documents") or []) or 1
         )
         return price * nprompts * nrows
+
+    def render_steps(self):
+        documents = st.session_state.get("documents", [])
+        final_prompts = st.session_state.get("final_prompts", [])
+        for doc, prompts in zip_longest(documents, final_prompts):
+            st.write(f"###### {doc}")
+            if not prompts:
+                continue
+            for i, prompt in enumerate(prompts):
+                st.text_area("", value=prompt, height=200, key=f"--final-prompt-{i}")
+
+
+class TaskResult(typing.NamedTuple):
+    llm_output: dict
+    doc_ix: int
+    current_rec: dict
+    out_df_recs: list[dict]
+    ep: EvalPrompt
+
+
+def submit(
+    pool: ThreadPoolExecutor,
+    request: BulkEvalPage.RequestModel,
+    response: BulkEvalPage.ResponseModel,
+) -> list[Future[TaskResult]]:
+    futs = []
+    for doc_ix, doc in enumerate(request.documents):
+        response.output_documents.append(doc)
+        response.final_prompts.append([])
+        response.aggregations.append([])
+        df = read_df_any(doc)
+        out_df_recs = []
+        for current_rec in df.to_dict(orient="records"):
+            out_df_recs.append(current_rec)
+            for ep_ix, ep in enumerate(request.eval_prompts):
+                prompt = render_prompt_vars(
+                    ep["prompt"],
+                    st.session_state | {"columns": current_rec},
+                )
+                response.final_prompts[doc_ix].append(prompt)
+                futs.append(
+                    pool.submit(
+                        _run_language_model,
+                        prompt=prompt,
+                        result=TaskResult(
+                            llm_output={},
+                            doc_ix=doc_ix,
+                            current_rec=current_rec,
+                            out_df_recs=out_df_recs,
+                            ep=ep,
+                        ),
+                    ),
+                )
+    return futs
+
+
+def _run_language_model(prompt: str, result: TaskResult):
+    ret = run_language_model(
+        model=LargeLanguageModels.gpt_4_turbo.name,
+        prompt=prompt,
+        response_format_type="json_object",
+    )[0]
+    assert isinstance(ret, dict)
+    result.llm_output.update(ret)
+    return result
+
+
+def iterate(
+    futs: list[Future[TaskResult]],
+    request: BulkEvalPage.RequestModel,
+    response: BulkEvalPage.ResponseModel,
+):
+    import pandas as pd
+
+    yield f"Running Evals (1/{len(futs)})..."
+
+    for i, fut in enumerate(as_completed(futs)):
+        if i + 1 < len(futs):
+            yield f"Running Evals ({i + 2}/{len(futs)})..."
+        else:
+            yield "Uploading Results..."
+
+        result = fut.result()
+
+        for metric_name, metric_value in result.llm_output.items():
+            col = f"{result.ep['name']} - {metric_name}"
+            result.current_rec[col] = metric_value
+
+        out_df = pd.DataFrame.from_records(result.out_df_recs)
+        f = upload_file_from_bytes(
+            filename=f"evaluator-{i + 1}.csv",
+            data=out_df.to_csv(index=False).encode(),
+            content_type="text/csv",
+        )
+        response.output_documents[result.doc_ix] = f
+
+        aggs = []
+        for agg in request.agg_functions:
+            if agg.get("column"):
+                cols = [agg["column"]]
+            else:
+                cols = out_df.select_dtypes(include=["float", "int"]).columns
+            for col in cols:
+                col_values = out_df[col].dropna()
+                agg_value = col_values.agg(agg["function"])
+                aggs.append(
+                    {
+                        "column": col,
+                        "function": agg["function"],
+                        "count": len(col_values),
+                        "value": agg_value,
+                    }
+                )
+        response.aggregations[result.doc_ix] = aggs
 
 
 @st.cache_in_session_state
