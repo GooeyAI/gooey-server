@@ -677,7 +677,6 @@ def run_asr(
     Returns:
         str: Transcribed text.
     """
-    return "nĩ mĩthemba irĩkũ ya kahũa ikũragio kenya"
     import google.cloud.speech_v2 as cloud_speech
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding
