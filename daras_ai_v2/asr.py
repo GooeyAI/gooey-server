@@ -29,6 +29,7 @@ from daras_ai_v2.gdrive_downloader import (
 from daras_ai_v2.google_asr import gcp_asr_v1
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from daras_ai_v2.text_splitter import text_splitter
 
 TRANSLATE_DETECT_BATCH_SIZE = 8
 
@@ -268,7 +269,7 @@ class AsrOutputFormat(Enum):
     vtt = "VTT"
 
 
-class TranslationProvider(Enum):
+class TranslationModels(Enum):
     google = "Google Translate"
     ghana_nlp = "Ghana NLP"
 
@@ -280,21 +281,21 @@ class TranslationProvider(Enum):
 
 
 def translation_language_selector(
-    provider: TranslationProvider | None = TranslationProvider.google,
+    model: TranslationModels | None,
     label="###### Target Language",
     key="translation_target",
     **kwargs,
 ) -> str | None:
-    if not provider:
+    if not model:
         st.session_state[key] = None
         return
 
-    if provider == TranslationProvider.google:
+    if model == TranslationModels.google:
         languages = google_translate_target_languages()
-    elif provider == TranslationProvider.ghana_nlp:
+    elif model == TranslationModels.ghana_nlp:
         languages = GHANA_NLP_SUPPORTED
     else:
-        raise ValueError("Unsupported provider: " + str(provider))
+        raise ValueError("Unsupported translation model: " + str(model))
 
     options = list(languages.keys())
     return st.selectbox(
@@ -306,20 +307,20 @@ def translation_language_selector(
     )
 
 
-def translation_provider_selector(
-    key="translation_provider", allow_none=True
-) -> TranslationProvider | None:
+def translation_model_selector(
+    key="translation_model", allow_none=True
+) -> TranslationModels | None:
     from daras_ai_v2.enum_selector_widget import enum_selector
 
-    provider = enum_selector(
-        TranslationProvider,
-        "###### Translation Provider",
+    model = enum_selector(
+        TranslationModels,
+        "###### Translation Model",
         allow_none=allow_none,
         use_selectbox=True,
         key=key,
     )
-    if provider:
-        return TranslationProvider[provider]
+    if model:
+        return TranslationModels[model]
     else:
         return None
 
@@ -455,26 +456,26 @@ def run_translate(
     target_language: str,
     source_language: str | None = None,
     glossary_url: str | None = None,
-    provider: str = TranslationProvider.google.name,
+    model: str = TranslationModels.google.name,
 ):
-    if not provider:
+    if not model:
         return texts
 
-    if provider == TranslationProvider.google.name:
+    if model == TranslationModels.google.name:
         return run_google_translate(
             texts=texts,
             target_language=target_language,
             source_language=source_language,
             glossary_url=glossary_url,
         )
-    elif provider == TranslationProvider.ghana_nlp.name:
+    elif model == TranslationModels.ghana_nlp.name:
         return run_ghana_nlp_translate(
             texts=texts,
             target_language=target_language,
             source_language=source_language,
         )
     else:
-        raise ValueError("Unsupported provider: " + str(provider))
+        raise ValueError("Unsupported translation model: " + str(model))
 
 
 def run_ghana_nlp_translate(
@@ -503,14 +504,23 @@ def run_ghana_nlp_translate(
         return texts
 
     return map_parallel(
-        lambda doc: requests.post(
+        lambda doc: _call_ghana_nlp(doc, source_language, target_language),
+        texts,
+        max_workers=TRANSLATE_DETECT_BATCH_SIZE,
+    )
+
+
+def _call_ghana_nlp(text: str, source_language: str, target_language: str):
+    ret = ""
+    for doc in text_splitter(text, chunk_size=GHANA_NLP_MAXLEN):
+        r = requests.post(
             "https://translation-api.ghananlp.org/v1/translate",
             headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
             json={"in": doc.text, "lang": source_language + "-" + target_language},
-        ).json(),
-        text_splitter(texts, chunk_size=GHANA_NLP_MAXLEN),
-        max_workers=TRANSLATE_DETECT_BATCH_SIZE,
-    )
+        )
+        raise_for_status(r)
+        ret += r.json()
+    return ret
 
 
 def run_google_translate(

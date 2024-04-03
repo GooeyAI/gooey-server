@@ -4,11 +4,11 @@ from jinja2.lexer import whitespace_re
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
-from bots.models import Workflow
+from bots.models import Workflow, SavedRun
 from daras_ai_v2.asr import (
     AsrModels,
-    TranslationProvider,
-    translation_provider_selector,
+    TranslationModels,
+    translation_model_selector,
     translation_language_selector,
     run_translate,
     run_asr,
@@ -40,15 +40,18 @@ class AsrPage(BasePage):
 
     class RequestModel(BaseModel):
         documents: list[str]
+
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
-        translation_provider: (
-            typing.Literal[tuple(e.name for e in TranslationProvider)] | None
+
+        translation_model: (
+            typing.Literal[tuple(e.name for e in TranslationModels)] | None
         )
         translation_target: str | None
         google_translate_target: str | None = Field(
-            description="DEPRECATED: when provided, forces the translation_provider to Google Translate and acts as the translation_target"
+            description="DEPRECATED: use translation_model & translation_target instead."
         )
+
         glossary_document: str | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
 
@@ -56,9 +59,23 @@ class AsrPage(BasePage):
         raw_output_text: list[str] | None
         output_text: list[str | AsrOutputJson]
 
+    def load_state_from_sr(self, sr: SavedRun) -> dict:
+        state = super().load_state_from_sr(sr)
+        google_translate_target = state.pop("google_translate_target", None)
+        translation_model = state.get("translation_model")
+        if google_translate_target and not translation_model:
+            state["translation_model"] = TranslationModels.google.name
+            state["translation_target"] = google_translate_target
+        return state
+
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
-        return ["selected_model", "language", "google_translate_target"]
+        return [
+            "selected_model",
+            "language",
+            "translation_model",
+            "translation_target",
+        ]
 
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_ASR_META_IMG
@@ -109,9 +126,12 @@ class AsrPage(BasePage):
             asr_language_selector(AsrModels[selected_model])
 
     def render_settings(self):
-        translator = translation_provider_selector()
-        translation_language_selector(translator)
-        if translator and translator.supports_glossary():
+        col1, col2 = st.columns(2)
+        with col1:
+            translation_model = translation_model_selector()
+        with col2:
+            translation_language_selector(translation_model)
+        if translation_model and translation_model.supports_glossary():
             glossary_input()
         st.write("---")
         enum_selector(
@@ -129,7 +149,7 @@ class AsrPage(BasePage):
         text_outputs("**Transcription**", value=state.get("output_text"))
 
     def render_steps(self):
-        if st.session_state.get("google_translate_target"):
+        if st.session_state.get("translation_model"):
             col1, col2 = st.columns(2)
             with col1:
                 text_outputs("**Transcription**", key="raw_output_text")
@@ -159,16 +179,7 @@ class AsrPage(BasePage):
         # Save the raw ASR text for details view
         state["raw_output_text"] = asr_output
         # Run Translation
-        if request.google_translate_target:
-            state["output_text"] = run_translate(
-                asr_output,
-                target_language=request.google_translate_target,
-                source_language=forced_asr_languages.get(
-                    selected_model, request.language
-                ),
-                glossary_url=request.glossary_document,
-            )
-        elif request.translation_provider and request.translation_target:
+        if request.translation_model and request.translation_target:
             state["output_text"] = run_translate(
                 asr_output,
                 target_language=request.translation_target,
@@ -176,7 +187,7 @@ class AsrPage(BasePage):
                     selected_model, request.language
                 ),
                 glossary_url=request.glossary_document,
-                provider=request.translation_provider,
+                model=request.translation_model,
             )
         else:
             state["raw_output_text"] = None
