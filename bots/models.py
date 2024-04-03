@@ -44,29 +44,11 @@ class PublishedRunVisibility(models.IntegerChoices):
                 return self.label
 
     def get_badge_html(self):
-        badge_container_class = (
-            "text-sm bg-light border border-dark rounded-pill px-2 py-1 me-1"
-        )
-
         match self:
             case PublishedRunVisibility.UNLISTED:
-                return dedent(
-                    f"""\
-                <span class="{badge_container_class}">
-                    <i class="fa-regular fa-lock"></i>
-                    Private
-                </span>
-                """
-                )
+                return '<i class="fa-regular fa-lock"></i> Private'
             case PublishedRunVisibility.PUBLIC:
-                return dedent(
-                    f"""\
-                <span class="{badge_container_class}">
-                    <i class="fa-regular fa-globe"></i>
-                    Public
-                </span>
-                """
-                )
+                return '<i class="fa-regular fa-globe"></i> Public'
             case _:
                 raise NotImplementedError(self)
 

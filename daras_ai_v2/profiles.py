@@ -133,7 +133,7 @@ def user_profile_main_content(user: AppUser):
             st.html(escape_html(workflow.short_title))
 
         page_cls = workflow.page_cls
-        page_cls().render_published_run_preview(pr, show_visibility=False)
+        page_cls().render_published_run_preview(pr)
 
     if public_runs:
         grid_layout(3, public_runs, _render)

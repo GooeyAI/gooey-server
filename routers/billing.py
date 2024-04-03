@@ -1,5 +1,4 @@
 import typing
-from html import escape as escape_html
 from enum import Enum
 from pathlib import Path
 from urllib.parse import quote_plus
@@ -13,6 +12,7 @@ from starlette.datastructures import FormData
 
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
+from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import settings
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -20,7 +20,7 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.settings import templates
-from bots.models import PublishedRun, Workflow
+from gooey_ui.components.pills import pill
 from routers.root import page_wrapper, request_json
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
@@ -260,10 +260,17 @@ def all_saved_runs_tab(request: Request):
 
     def _render(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
-        page_cls = workflow.page_cls
-        page_cls().render_published_run_preview(
-            pr, show_visibility=True, pills=[Workflow(pr.workflow).short_title]
-        )
+        visibility = PublishedRunVisibility(pr.visibility)
+
+        with st.div(className="mb-2 d-flex justify-content-between align-items-start"):
+            pill(
+                visibility.get_badge_html(),
+                unsafe_allow_html=True,
+                className="border border-dark",
+            )
+            pill(workflow.short_title)
+
+        workflow.page_cls().render_published_run_preview(pr)
 
     if saved_runs:
         grid_layout(3, saved_runs, _render)

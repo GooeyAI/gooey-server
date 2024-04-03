@@ -62,6 +62,7 @@ from daras_ai_v2.user_date_widgets import (
 )
 from gooey_ui import realtime_clear_subs
 from gooey_ui.components.modal import Modal
+from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
 
 DEFAULT_META_IMG = (
@@ -1653,6 +1654,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             return
 
         def _render(pr: PublishedRun):
+            with st.div(className="mb-2", style={"font-size": "0.9rem"}):
+                pill(
+                    PublishedRunVisibility(pr.visibility).get_badge_html(),
+                    unsafe_allow_html=True,
+                    className="border border-dark",
+                )
+
             self.render_published_run_preview(published_run=pr)
 
         grid_layout(3, published_runs, _render)
@@ -1720,7 +1728,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         with st.link(to=saved_run.get_app_url()):
             with st.div(className="mb-1", style={"font-size": "0.9rem"}):
                 if is_latest_version:
-                    st.html(
+                    pill(
                         PublishedRunVisibility(
                             published_run.visibility
                         ).get_badge_html()
@@ -1744,28 +1752,8 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         return self.render_example(saved_run.to_dict())
 
-    def render_published_run_preview(
-        self,
-        published_run: PublishedRun,
-        *,
-        show_visibility: bool = True,
-        pills: list[str] = [],
-    ):
+    def render_published_run_preview(self, published_run: PublishedRun):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
-
-        with st.div(className="mb-1", style={"font-size": "0.9rem"}):
-            if show_visibility:
-                st.html(
-                    PublishedRunVisibility(published_run.visibility).get_badge_html()
-                )
-
-                for pill_html in pills:
-                    with st.tag(
-                        "span",
-                        className="bg-light text-dark px-2 py-1 rounded-pill border border-dark me-2",
-                    ):
-                        st.html(pill_html)
-
         with st.link(to=published_run.get_app_url()):
             st.write(f"#### {tb.h1_title}")
 
