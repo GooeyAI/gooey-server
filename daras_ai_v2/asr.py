@@ -194,6 +194,10 @@ MMS_SUPPORTED = {
     'zpt', 'zpu', 'zpz', 'ztq', 'zty', 'zul', 'zyb', 'zyp', 'zza'
 }  # fmt: skip
 
+# https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
+GHANA_NLP_SUPPORTED = { 'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani', 'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru' }  # fmt: skip
+GHANA_NLP_MAXLEN = 1000
+
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
@@ -262,6 +266,62 @@ class AsrOutputFormat(Enum):
     json = "JSON"
     srt = "SRT"
     vtt = "VTT"
+
+
+class TranslationProvider(Enum):
+    google = "Google Translate"
+    ghana_nlp = "Ghana NLP"
+
+    def supports_glossary(self) -> bool:
+        return self in {self.google}
+
+    def supports_auto_detect(self) -> bool:
+        return self in {self.google}
+
+
+def translation_language_selector(
+    provider: TranslationProvider | None = TranslationProvider.google,
+    label="###### Target Language",
+    key="translation_target",
+    **kwargs,
+) -> str | None:
+    if not provider:
+        st.session_state[key] = None
+        return
+
+    if provider == TranslationProvider.google:
+        languages = google_translate_target_languages()
+    elif provider == TranslationProvider.ghana_nlp:
+        languages = GHANA_NLP_SUPPORTED
+    else:
+        raise ValueError("Unsupported provider: " + str(provider))
+
+    options = list(languages.keys())
+    return st.selectbox(
+        label=label,
+        key=key,
+        format_func=lambda k: languages[k],
+        options=options,
+        **kwargs,
+    )
+
+
+def translation_provider_selector(
+    key="translation_provider", allow_none=True
+) -> TranslationProvider | None:
+    from daras_ai_v2.enum_selector_widget import enum_selector
+
+    provider = enum_selector(
+        TranslationProvider,
+        "###### Translation Provider",
+        allow_none=allow_none,
+        use_selectbox=True,
+        key=key,
+    )
+    if provider:
+        return TranslationProvider[provider]
+    else:
+        return None
 
 
 def google_translate_language_selector(
@@ -388,6 +448,69 @@ def lang_format_func(l):
         return f"{langcodes.Language.get(l).display_name()} | {l}"
     except langcodes.LanguageTagError:
         return l
+
+
+def run_translate(
+    texts: list[str],
+    target_language: str,
+    source_language: str | None = None,
+    glossary_url: str | None = None,
+    provider: str = TranslationProvider.google.name,
+):
+    if not provider:
+        return texts
+
+    if provider == TranslationProvider.google.name:
+        return run_google_translate(
+            texts=texts,
+            target_language=target_language,
+            source_language=source_language,
+            glossary_url=glossary_url,
+        )
+    elif provider == TranslationProvider.ghana_nlp.name:
+        return run_ghana_nlp_translate(
+            texts=texts,
+            target_language=target_language,
+            source_language=source_language,
+        )
+    else:
+        raise ValueError("Unsupported provider: " + str(provider))
+
+
+def run_ghana_nlp_translate(
+    texts: list[str],
+    target_language: str,
+    source_language: str,
+) -> list[str]:
+    import langcodes
+    from daras_ai_v2.text_splitter import text_splitter
+
+    assert (
+        target_language in GHANA_NLP_SUPPORTED
+    ), "Ghana NLP does not support this target language"
+
+    if source_language not in GHANA_NLP_SUPPORTED:
+        src = langcodes.Language.get(source_language).language
+        for lang in GHANA_NLP_SUPPORTED:
+            if src == langcodes.Language.get(lang).language:
+                source_language = lang
+                break
+    assert (
+        source_language in GHANA_NLP_SUPPORTED
+    ), "Ghana NLP does not support this source language"
+
+    if source_language == target_language:
+        return texts
+
+    return map_parallel(
+        lambda doc: requests.post(
+            "https://translation-api.ghananlp.org/v1/translate",
+            headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
+            json={"in": doc.text, "lang": source_language + "-" + target_language},
+        ).json(),
+        text_splitter(texts, chunk_size=GHANA_NLP_MAXLEN),
+        max_workers=TRANSLATE_DETECT_BATCH_SIZE,
+    )
 
 
 def run_google_translate(
@@ -554,6 +677,7 @@ def run_asr(
     Returns:
         str: Transcribed text.
     """
+    return "nĩ mĩthemba irĩkũ ya kahũa ikũragio kenya"
     import google.cloud.speech_v2 as cloud_speech
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding

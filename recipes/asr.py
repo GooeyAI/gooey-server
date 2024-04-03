@@ -1,15 +1,17 @@
 import typing
 
 from jinja2.lexer import whitespace_re
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.asr import (
     AsrModels,
-    google_translate_language_selector,
+    TranslationProvider,
+    translation_provider_selector,
+    translation_language_selector,
+    run_translate,
     run_asr,
-    run_google_translate,
     AsrOutputFormat,
     AsrOutputJson,
     forced_asr_languages,
@@ -40,7 +42,13 @@ class AsrPage(BasePage):
         documents: list[str]
         selected_model: typing.Literal[tuple(e.name for e in AsrModels)] | None
         language: str | None
-        google_translate_target: str | None
+        translation_provider: (
+            typing.Literal[tuple(e.name for e in TranslationProvider)] | None
+        )
+        translation_target: str | None
+        google_translate_target: str | None = Field(
+            description="DEPRECATED: when provided, forces the translation_provider to Google Translate and acts as the translation_target"
+        )
         glossary_document: str | None
         output_format: typing.Literal[tuple(e.name for e in AsrOutputFormat)] | None
 
@@ -101,8 +109,10 @@ class AsrPage(BasePage):
             asr_language_selector(AsrModels[selected_model])
 
     def render_settings(self):
-        google_translate_language_selector()
-        glossary_input()
+        translator = translation_provider_selector()
+        translation_language_selector(translator)
+        if translator and translator.supports_glossary():
+            glossary_input()
         st.write("---")
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
@@ -146,12 +156,11 @@ class AsrPage(BasePage):
             max_workers=4,
         )
 
+        # Save the raw ASR text for details view
+        state["raw_output_text"] = asr_output
         # Run Translation
         if request.google_translate_target:
-            # Save the raw ASR text for details view
-            state["raw_output_text"] = asr_output
-            # Run Translation
-            state["output_text"] = run_google_translate(
+            state["output_text"] = run_translate(
                 asr_output,
                 target_language=request.google_translate_target,
                 source_language=forced_asr_languages.get(
@@ -159,8 +168,18 @@ class AsrPage(BasePage):
                 ),
                 glossary_url=request.glossary_document,
             )
+        elif request.translation_provider and request.translation_target:
+            state["output_text"] = run_translate(
+                asr_output,
+                target_language=request.translation_target,
+                source_language=forced_asr_languages.get(
+                    selected_model, request.language
+                ),
+                glossary_url=request.glossary_document,
+                provider=request.translation_provider,
+            )
         else:
-            # Save the raw ASR text for details view
+            state["raw_output_text"] = None
             state["output_text"] = asr_output
 
     def get_cost_note(self) -> str | None:
