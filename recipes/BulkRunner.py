@@ -264,6 +264,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                     page_cls().render_output()
                 except Exception as e:
                     st.error(repr(e))
+                st.write(url)
                 st.write("---")
             st.set_session_state(_backup)
         else:
