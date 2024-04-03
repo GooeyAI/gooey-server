@@ -794,9 +794,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             query_msgs = saved_msgs + [
                 format_chat_entry(role=CHATML_ROLE_USER, content=user_input)
             ]
-            clip_idx = convo_window_clipper(
-                query_msgs, model_max_tokens[model] // 2, sep=" "
-            )
+            clip_idx = convo_window_clipper(query_msgs, model_max_tokens[model] // 2)
             query_msgs = query_msgs[clip_idx:]
 
             chat_history = "\n".join(
@@ -1458,11 +1456,9 @@ def convo_window_clipper(
     window: list[ConversationEntry],
     max_tokens,
     *,
-    sep: str = "",
-    is_chat_model: bool = True,
     step=2,
 ):
     for i in range(len(window) - 2, -1, -step):
-        if calc_gpt_tokens(window[i:], sep=sep) > max_tokens:
+        if calc_gpt_tokens(window[i:]) > max_tokens:
             return i + step
     return 0
