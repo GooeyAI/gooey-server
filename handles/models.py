@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from pathlib import Path
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
@@ -10,6 +11,7 @@ from django.db.models import CheckConstraint, Q
 from django.db.models.functions import Lower
 
 from bots.custom_fields import CustomURLField
+from daras_ai_v2 import settings
 
 HANDLE_ALLOWED_CHARS = r"[a-z0-9_\.-]+"
 HANDLE_REGEX = rf"^{HANDLE_ALLOWED_CHARS}$"
@@ -122,6 +124,9 @@ class Handle(models.Model):
             if handle := _attempt_create_handle(handle_name):
                 return handle
         return None
+
+    def get_app_url(self):
+        return str(Path(settings.APP_BASE_URL) / self.name) + "/"
 
 
 def _make_handle_from(name):
