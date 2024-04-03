@@ -124,8 +124,8 @@ class _AccountTab(typing.NamedTuple):
 class AccountTabs(Enum):
     billing = _AccountTab(title="Billing", tab_path="")
     profile = _AccountTab(title="Profile", tab_path="profile")
-    api_keys = _AccountTab(title="🚀 API Keys", tab_path="api-keys")
     saved = _AccountTab(title="Saved", tab_path="saved", prefixed=False)
+    api_keys = _AccountTab(title="🚀 API Keys", tab_path="api-keys")
 
     @property
     def title(self) -> str:
