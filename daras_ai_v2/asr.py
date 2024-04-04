@@ -29,8 +29,9 @@ from daras_ai_v2.gdrive_downloader import (
 from daras_ai_v2.google_asr import gcp_asr_v1
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from daras_ai_v2.text_splitter import text_splitter
 
-TRANSLATE_DETECT_BATCH_SIZE = 8
+TRANSLATE_BATCH_SIZE = 8
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -194,6 +195,10 @@ MMS_SUPPORTED = {
     'zpt', 'zpu', 'zpz', 'ztq', 'zty', 'zul', 'zyb', 'zyp', 'zza'
 }  # fmt: skip
 
+# https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
+GHANA_NLP_SUPPORTED = { 'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani', 'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru' }  # fmt: skip
+GHANA_NLP_MAXLEN = 500
+
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
@@ -262,6 +267,62 @@ class AsrOutputFormat(Enum):
     json = "JSON"
     srt = "SRT"
     vtt = "VTT"
+
+
+class TranslationModels(Enum):
+    google = "Google Translate"
+    ghana_nlp = "Ghana NLP"
+
+    def supports_glossary(self) -> bool:
+        return self in {self.google}
+
+    def supports_auto_detect(self) -> bool:
+        return self in {self.google}
+
+
+def translation_language_selector(
+    model: TranslationModels | None,
+    label="###### Target Language",
+    key="translation_target",
+    **kwargs,
+) -> str | None:
+    if not model:
+        st.session_state[key] = None
+        return
+
+    if model == TranslationModels.google:
+        languages = google_translate_target_languages()
+    elif model == TranslationModels.ghana_nlp:
+        languages = GHANA_NLP_SUPPORTED
+    else:
+        raise ValueError("Unsupported translation model: " + str(model))
+
+    options = list(languages.keys())
+    return st.selectbox(
+        label=label,
+        key=key,
+        format_func=lambda k: languages[k],
+        options=options,
+        **kwargs,
+    )
+
+
+def translation_model_selector(
+    key="translation_model", allow_none=True
+) -> TranslationModels | None:
+    from daras_ai_v2.enum_selector_widget import enum_selector
+
+    model = enum_selector(
+        TranslationModels,
+        "###### Translation Model",
+        allow_none=allow_none,
+        use_selectbox=True,
+        key=key,
+    )
+    if model:
+        return TranslationModels[model]
+    else:
+        return None
 
 
 def google_translate_language_selector(
@@ -390,6 +451,86 @@ def lang_format_func(l):
         return l
 
 
+def run_translate(
+    texts: list[str],
+    target_language: str,
+    source_language: str | None = None,
+    glossary_url: str | None = None,
+    model: str = TranslationModels.google.name,
+):
+    if not model:
+        return texts
+
+    if model == TranslationModels.google.name:
+        return run_google_translate(
+            texts=texts,
+            target_language=target_language,
+            source_language=source_language,
+            glossary_url=glossary_url,
+        )
+    elif model == TranslationModels.ghana_nlp.name:
+        return run_ghana_nlp_translate(
+            texts=texts,
+            target_language=target_language,
+            source_language=source_language,
+        )
+    else:
+        raise ValueError("Unsupported translation model: " + str(model))
+
+
+def run_ghana_nlp_translate(
+    texts: list[str],
+    target_language: str,
+    source_language: str,
+) -> list[str]:
+    import langcodes
+
+    assert (
+        target_language in GHANA_NLP_SUPPORTED
+    ), "Ghana NLP does not support this target language"
+
+    if source_language not in GHANA_NLP_SUPPORTED:
+        src = langcodes.Language.get(source_language).language
+        for lang in GHANA_NLP_SUPPORTED:
+            if src == langcodes.Language.get(lang).language:
+                source_language = lang
+                break
+    assert (
+        source_language in GHANA_NLP_SUPPORTED
+    ), "Ghana NLP does not support this source language"
+
+    if source_language == target_language:
+        return texts
+
+    return map_parallel(
+        lambda doc: _call_ghana_nlp_chunked(doc, source_language, target_language),
+        texts,
+        max_workers=TRANSLATE_BATCH_SIZE,
+    )
+
+
+def _call_ghana_nlp_chunked(
+    text: str, source_language: str, target_language: str
+) -> str:
+    return "".join(
+        map_parallel(
+            lambda doc: _call_ghana_nlp_raw(doc.text, source_language, target_language),
+            text_splitter(text, chunk_size=GHANA_NLP_MAXLEN, length_function=len),
+            max_workers=TRANSLATE_BATCH_SIZE,
+        )
+    )
+
+
+def _call_ghana_nlp_raw(text: str, source_language: str, target_language: str) -> str:
+    r = requests.post(
+        "https://translation-api.ghananlp.org/v1/translate",
+        headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
+        json={"in": text, "lang": source_language + "-" + target_language},
+    )
+    raise_for_status(r)
+    return r.json()
+
+
 def run_google_translate(
     texts: list[str],
     target_language: str,
@@ -428,8 +569,8 @@ def run_google_translate(
     else:
         translate_client = translate.Client()
         detections = flatten(
-            translate_client.detect_language(texts[i : i + TRANSLATE_DETECT_BATCH_SIZE])
-            for i in range(0, len(texts), TRANSLATE_DETECT_BATCH_SIZE)
+            translate_client.detect_language(texts[i : i + TRANSLATE_BATCH_SIZE])
+            for i in range(0, len(texts), TRANSLATE_BATCH_SIZE)
         )
         language_codes = [detection["language"] for detection in detections]
 
@@ -439,7 +580,7 @@ def run_google_translate(
         ),
         texts,
         language_codes,
-        max_workers=TRANSLATE_DETECT_BATCH_SIZE,
+        max_workers=TRANSLATE_BATCH_SIZE,
     )
 
 

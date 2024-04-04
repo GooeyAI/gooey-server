@@ -15,8 +15,10 @@ from daras_ai.image_input import (
     truncate_text_words,
 )
 from daras_ai_v2.asr import (
-    run_google_translate,
-    google_translate_language_selector,
+    translation_model_selector,
+    translation_language_selector,
+    run_translate,
+    TranslationModels,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
@@ -41,7 +43,7 @@ from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
-from daras_ai_v2.field_render import field_title_desc, field_desc
+from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input, validate_glossary_document
 from daras_ai_v2.language_model import (
@@ -156,6 +158,7 @@ class VideoBotsPage(BasePage):
         "scroll_jump": 5,
         "use_url_shortener": False,
         "dense_weight": 1.0,
+        "translation_model": TranslationModels.google.name,
     }
 
     class RequestModel(BaseModel):
@@ -231,8 +234,11 @@ class VideoBotsPage(BasePage):
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
 
+        translation_model: (
+            typing.Literal[tuple(e.name for e in TranslationModels)] | None
+        )
         user_language: str | None = Field(
-            title="🔠 User Language",
+            title="User Language",
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
@@ -381,12 +387,19 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             "##### 🔠 Translation",
             value=bool(st.session_state.get("user_language")),
         ):
-            google_translate_language_selector(
-                f"{field_desc(self.RequestModel, 'user_language')}",
-                key="user_language",
-            )
+            st.caption(field_desc(self.RequestModel, "user_language"))
+            col1, col2 = st.columns(2)
+            with col1:
+                translation_model = translation_model_selector(allow_none=False)
+            with col2:
+                translation_language_selector(
+                    translation_model,
+                    label=f"###### {field_title(self.RequestModel, 'user_language')}",
+                    key="user_language",
+                )
             st.write("---")
         else:
+            st.session_state["translation_model"] = None
             st.session_state["user_language"] = None
 
         if st.checkbox(
@@ -399,11 +412,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.selectbox(
                 f"{field_desc(self.RequestModel, 'document_model')}",
                 key="document_model",
-                options=[None, *doc_model_descriptions],
-                format_func=lambda x: (
-                    f"{doc_model_descriptions[x]} ({x})" if x else "———"
-                ),
+                options=doc_model_descriptions,
+                format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
             )
+        else:
+            st.session_state["document_model"] = None
 
     def validate_form_v2(self):
         input_glossary = st.session_state.get("input_glossary_document", "")
@@ -427,7 +440,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             lipsync_settings()
             st.write("---")
 
-        if st.session_state.get("user_language"):
+        translation_model = st.session_state.get(
+            "translation_model", TranslationModels.google.name
+        )
+        if (
+            st.session_state.get("user_language")
+            and TranslationModels[translation_model].supports_glossary()
+        ):
             st.markdown("##### 🔠 Translation Settings")
             enable_glossary = st.checkbox(
                 "📖 Add Glossary",
@@ -732,18 +751,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 ocr_texts.append(ocr_text)
 
         # translate input text
+        translation_model = request.translation_model or TranslationModels.google.name
         if request.user_language and request.user_language != "en":
             yield f"Translating Input to English..."
-            user_input = run_google_translate(
+            user_input = run_translate(
                 texts=[user_input],
                 source_language=request.user_language,
                 target_language="en",
                 glossary_url=request.input_glossary_document,
+                model=translation_model,
             )[0]
 
         if ocr_texts:
             yield f"Translating Image Text to English..."
-            ocr_texts = run_google_translate(
+            ocr_texts = run_translate(
                 texts=ocr_texts,
                 source_language="auto",
                 target_language="en",
@@ -784,9 +805,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             query_msgs = saved_msgs + [
                 format_chat_entry(role=CHATML_ROLE_USER, content=user_input)
             ]
-            clip_idx = convo_window_clipper(
-                query_msgs, model_max_tokens[model] // 2, sep=" "
-            )
+            clip_idx = convo_window_clipper(query_msgs, model_max_tokens[model] // 2)
             query_msgs = query_msgs[clip_idx:]
 
             chat_history = "\n".join(
@@ -916,11 +935,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # translate response text
             if request.user_language and request.user_language != "en":
                 yield f"Translating response to {request.user_language}..."
-                output_text = run_google_translate(
+                output_text = run_translate(
                     texts=output_text,
                     source_language="en",
                     target_language=request.user_language,
                     glossary_url=request.output_glossary_document,
+                    model=translation_model,
                 )
                 state["raw_tts_text"] = [
                     "".join(snippet for snippet, _ in parse_refs(text, references))
@@ -1447,11 +1467,9 @@ def convo_window_clipper(
     window: list[ConversationEntry],
     max_tokens,
     *,
-    sep: str = "",
-    is_chat_model: bool = True,
     step=2,
 ):
     for i in range(len(window) - 2, -1, -step):
-        if calc_gpt_tokens(window[i:], sep=sep) > max_tokens:
+        if calc_gpt_tokens(window[i:]) > max_tokens:
             return i + step
     return 0

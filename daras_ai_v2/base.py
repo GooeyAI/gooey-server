@@ -1466,7 +1466,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
                 example_id, run_id, uid
             )
-            self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
+            self.dump_state_to_sr(st.session_state, self.run_doc_sr(run_id, uid))
         else:
             self.call_runner_task(example_id, run_id, uid)
         raise QueryParamsRedirectException(
@@ -1512,16 +1512,15 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         except PublishedRunVersion.DoesNotExist:
             parent_version = None
 
-        self.run_doc_sr(
+        sr = self.run_doc_sr(
             run_id,
             uid,
             create=True,
             defaults=dict(
-                parent=parent,
-                parent_version=parent_version,
-                is_api_call=is_api_call,
+                parent=parent, parent_version=parent_version, is_api_call=is_api_call
             ),
-        ).set(self.state_to_doc(st.session_state))
+        )
+        self.dump_state_to_sr(st.session_state, sr)
 
         return None, run_id, uid
 
@@ -1600,14 +1599,22 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         render_output_caption()
 
-    def state_to_doc(self, state: dict):
-        ret = {
-            field_name: deepcopy(state[field_name])
-            for field_name in self.fields_to_save()
-            if field_name in state
-        }
+    def load_state_from_sr(self, sr: SavedRun) -> dict:
+        state = sr.to_dict()
+        if state is None:
+            raise HTTPException(status_code=404)
+        for k, v in self.sane_defaults.items():
+            state.setdefault(k, v)
+        return state
 
-        return ret
+    def dump_state_to_sr(self, state: dict, sr: SavedRun):
+        sr.set(
+            {
+                field_name: deepcopy(state[field_name])
+                for field_name in self.fields_to_save()
+                if field_name in state
+            }
+        )
 
     def fields_to_save(self) -> [str]:
         # only save the fields in request/response

@@ -373,11 +373,11 @@ def st_page(
 
     state = json_data.get("state", {})
     if not state:
-        db_state = page.get_sr_from_query_params(example_id, run_id, uid).to_dict()
-        if db_state is not None:
-            state.update(db_state)
-            for k, v in page.sane_defaults.items():
-                state.setdefault(k, v)
+        sr = page.get_sr_from_query_params(example_id, run_id, uid)
+        try:
+            state.update(page.load_state_from_sr(sr))
+        except HTTPException:
+            pass
     if state is None:
         raise HTTPException(status_code=404)
 

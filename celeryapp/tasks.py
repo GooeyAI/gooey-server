@@ -92,7 +92,7 @@ def gui_runner(
         # send outputs to ui
         realtime_push(channel, output)
         # save to db
-        sr.set(page.state_to_doc(st.session_state | output))
+        page.dump_state_to_sr(st.session_state | output, sr)
 
     try:
         gen = page.run(st.session_state)

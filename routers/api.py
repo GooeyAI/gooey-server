@@ -340,13 +340,9 @@ def submit_api_call(
 
     # get saved state from db
     query_params.setdefault("uid", user.uid)
-    state = self.get_sr_from_query_params_dict(query_params).to_dict()
-    if state is None:
-        raise HTTPException(status_code=404)
-    # set sane defaults
-    for k, v in self.sane_defaults.items():
-        state.setdefault(k, v)
-    # insert request data
+    sr = self.get_sr_from_query_params_dict(query_params)
+    state = self.load_state_from_sr(sr)
+    # load request data
     state.update(request_body)
 
     # set streamlit session state
