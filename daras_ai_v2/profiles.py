@@ -37,6 +37,9 @@ def user_profile_page(user: AppUser):
 
 
 def user_profile_header(user: AppUser):
+    with _banner_image_div(user.banner_url, className="my-3"):
+        pass
+
     with st.div(className="mt-3"):
         col1, col2 = st.columns([2, 10])
 
@@ -46,7 +49,7 @@ def user_profile_header(user: AppUser):
         profile_image(
             user.photo_url,
             placeholder_seed=user.uid,
-            className="rounded-circle",
+            className="mb-3",
         )
 
     run_icon = '<i class="fa-regular fa-person-running"></i>'
@@ -164,10 +167,12 @@ def get_contributions_summary(user: AppUser, *, top_n: int = 3) -> Contributions
 
 
 def profile_image(url: str, placeholder_seed: str, **props):
-    style = {"width": "150px", "height": "150px", "object-fit": "cover"} | props.pop(
-        "style", {}
-    )
-    className = "rounded-circle " + props.pop("className", "")
+    style = {
+        "max-width": "200px",
+        "aspect-ratio": "1",
+        "object-fit": "cover",
+    } | props.pop("style", {})
+    className = "w-100 rounded-circle " + props.pop("className", "")
     st.image(
         url or get_placeholder_profile_image(placeholder_seed),
         style=style,
@@ -196,6 +201,7 @@ def _set_is_uploading_photo(val: bool):
 
 def edit_user_profile_page(user: AppUser):
     _edit_user_profile_header(user)
+    _edit_user_profile_banner(user)
 
     colspec = [2, 10] if not _is_uploading_photo() else [6, 6]
     photo_col, form_col = st.columns(colspec)
@@ -207,7 +213,7 @@ def edit_user_profile_page(user: AppUser):
 
 def _edit_user_profile_header(user: AppUser):
     st.write("# Update your Profile")
-    with st.div(className="mb-3 d-flex align-items-start"):
+    with st.div(className="mb-3"):
         with st.tag("span"):
             with st.tag("span", className="text-muted"):
                 st.html("Your profile and public saved runs appear on ")
@@ -222,12 +228,98 @@ def _edit_user_profile_header(user: AppUser):
                 '<i class="fa-solid fa-copy"></i> Copy',
                 value=user.handle.get_app_url(),
                 type="link",
-                className="d-inline text-decoration-none border-0 ms-3 my-0 pt-0",
+                className="d-inline text-decoration-none border-0 my-0 ms-2",
             )
             with st.link(
-                to=user.handle.get_app_url(), className="ms-3 text-decoration-none"
+                to=user.handle.get_app_url(), className="ms-2 text-decoration-none"
             ):
                 st.html('<i class="fa-solid fa-eye"></i> Preview')
+
+
+def _banner_image_div(url: str | None, **props):
+    style = {
+        "min-height": "200px",
+        "max-height": "400px",
+        "width": "100%",
+        "aspect-ratio": "3 / 1",
+        "background-color": "rgba(180, 180, 180, 1.0)",
+    }
+    if url:
+        style |= {
+            "background-image": f'url("{url}")',
+            "background-size": "cover",
+            "background-position": "center",
+            "background-repeat": "no-repeat",
+        }
+
+    className = "w-100 h-100 rounded-2 " + props.pop("className", "")
+    style |= props.pop("style", {})
+    return st.div(style=style, className=className)
+
+
+def _edit_user_profile_banner(user: AppUser):
+    def _is_uploading_banner_photo() -> bool:
+        return bool(st.session_state.get("_uploading_banner_photo"))
+
+    def _set_uploading_banner_photo(val: bool):
+        if val:
+            st.session_state["_uploading_banner_photo"] = val
+        else:
+            st.session_state.pop("_uploading_banner_photo", None)
+            st.session_state.pop("banner_photo_url", None)
+
+    def _get_uploading_banner_photo() -> str | None:
+        return st.session_state.get("banner_photo_url")
+
+    banner_photo = _get_uploading_banner_photo() or user.banner_url or None
+    with _banner_image_div(
+        banner_photo,
+        className="d-flex justify-content-center align-items-center position-relative mb-3",
+    ):
+        if _is_uploading_banner_photo():
+            translucent_style = {"background-color": "rgba(255, 255, 255, 0.2)"}
+            with st.div(
+                className="d-flex justify-content-center align-items-center w-100 h-100",
+                style=translucent_style,
+            ), st.div():
+                banner_url = st.file_uploader(
+                    "", accept=["image/*"], key="banner_photo_url"
+                )
+
+                with st.div(className="d-flex justify-content-center"):
+                    if banner_url and st.button("Save"):
+                        user.banner_url = banner_url
+                        user.save(update_fields=["banner_url"])
+                        _set_uploading_banner_photo(False)
+                        st.experimental_rerun()
+
+                    if user.banner_url and st.button(
+                        '<i class="fa-regular fa-broom-wide"></i> Clear'
+                    ):
+                        user.banner_url = ""
+                        user.save(update_fields=["banner_url"])
+                        _set_uploading_banner_photo(False)
+                        st.experimental_rerun()
+
+                    if st.button(
+                        '<i class="fa-regular fa-xmark-large"></i> Cancel',
+                        className="text-danger",
+                    ):
+                        _set_uploading_banner_photo(False)
+                        st.experimental_rerun()
+        else:
+            with st.div(className="position-absolute bottom-0 end-0"):
+                camera_icon = '<i class="fa-regular fa-camera"></i>'
+                upload_banner_text = (
+                    f"{camera_icon} Edit Banner Photo"
+                    if user.banner_url
+                    else f"{camera_icon} Add Banner Photo"
+                )
+                if st.button(
+                    upload_banner_text, className="mb-3 me-3", type="secondary"
+                ):
+                    _set_uploading_banner_photo(True)
+                    st.experimental_rerun()
 
 
 def _edit_user_profile_photo_section(user: AppUser):
