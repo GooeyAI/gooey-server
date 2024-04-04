@@ -436,7 +436,8 @@ def handle_page(request: Request, handle: Handle, json_data: dict):
     if handle.has_user:
         return st.runner(
             lambda: page_wrapper(
-                request=request, render_fn=user_profile_page, user=handle.user
+                request=request,
+                render_fn=lambda: user_profile_page(request=request, user=handle.user),
             ),
             **json_data,
         )

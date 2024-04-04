@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from django.core.exceptions import ValidationError
 from django.db.models import Count
 from django.db import IntegrityError, transaction
+from fastapi import Request
 from furl import furl
 
 import gooey_ui as st
@@ -30,7 +31,17 @@ class ContributionsSummary:
     top_contributions: dict[Workflow, int]  # sorted dict
 
 
-def user_profile_page(user: AppUser):
+def user_profile_page(request: Request, user: AppUser):
+    if request.user == user:
+        with st.link(
+            to=request.url_for("account", tab_path="profile"), className="d-block mt-3"
+        ):
+            st.caption(
+                '<i class="fa-solid fa-pencil"></i> Edit Profile',
+                type="link",
+                unsafe_allow_html=True,
+            )
+
     user_profile_header(user)
     st.html("\n<hr>\n")
     user_profile_main_content(user)
