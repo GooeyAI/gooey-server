@@ -13,7 +13,11 @@ class CustomURLField(models.URLField):
     def clean(self, value, model_instance):
         if "://" not in value:
             value = "http://" + value
-        URLValidator(schemes=["http", "https"])(value)
+
+        # allow blanks - that will be validated separately (e.g. with blank=True)
+        if value:
+            URLValidator(schemes=["http", "https"])(value)
+
         return super().clean(value, model_instance)
 
 
