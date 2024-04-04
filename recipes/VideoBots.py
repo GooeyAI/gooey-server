@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 import gooey_ui as st
 from usage_costs.models import UsageCost
-from bots.models import BotIntegration, Platform, SavedRun
+from bots.models import BotIntegration, Platform
 from bots.models import Workflow
 from daras_ai.image_input import (
     truncate_text_words,
