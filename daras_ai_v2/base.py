@@ -285,10 +285,7 @@ class BasePage:
                 else:
                     author = self.run_user or current_run.get_creator()
                 if not is_root_example:
-                    self.render_author(
-                        author,
-                        show_as_link=self.is_current_user_admin(),
-                    )
+                    self.render_author(author)
 
             with st.div(className="d-flex align-items-center"):
                 can_user_edit_run = self.can_user_edit_run(current_run, published_run)
@@ -1784,7 +1781,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        if published_run.created_by and self.is_user_admin(published_run.created_by):
+        if published_run.created_by:
             with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
                 self.render_author(
                     published_run.created_by,
