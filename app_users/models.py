@@ -108,6 +108,7 @@ class AppUser(models.Model):
         related_name="user",
     )
 
+    banner_url = CustomURLField(blank=True, default="")
     bio = StrippedTextField(blank=True, default="")
     company = models.CharField(max_length=255, blank=True, default="")
     github_username = models.CharField(max_length=255, blank=True, default="")
