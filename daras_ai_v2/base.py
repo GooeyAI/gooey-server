@@ -1164,7 +1164,7 @@ class BasePage:
         *,
         image_size: str = "30px",
         responsive: bool = True,
-        show_as_link: bool = False,
+        show_as_link: bool = True,
         text_size: str | None = None,
     ):
         if not user or (not user.photo_url and not user.display_name):
@@ -1179,12 +1179,9 @@ class BasePage:
         if responsive:
             class_name += "-responsive"
 
-        if show_as_link:
+        if show_as_link and user and user.handle:
             linkto = st.link(
-                to=self.app_url(
-                    tab_name=MenuTabs.paths[MenuTabs.history],
-                    query_params={"uid": user.uid},
-                )
+                to=user.handle.get_app_url(), className="text-decoration-none"
             )
         else:
             linkto = st.dummy()
@@ -1787,15 +1784,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        with st.link(to=published_run.get_app_url()):
+        if published_run.created_by and self.is_user_admin(published_run.created_by):
             with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
-                if published_run.created_by and self.is_user_admin(
-                    published_run.created_by
-                ):
-                    self.render_author(
-                        published_run.created_by, image_size="20px", text_size="0.9rem"
-                    )
+                self.render_author(
+                    published_run.created_by,
+                    image_size="20px",
+                    text_size="0.9rem",
+                )
 
+        with st.link(to=published_run.get_app_url()):
             st.write(f"#### {tb.h1_title}")
 
         with st.div(className="d-flex align-items-center justify-content-between"):
