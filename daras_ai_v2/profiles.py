@@ -38,9 +38,10 @@ def user_profile_page(request: Request, user: AppUser):
     user_profile_main_content(user)
 
 
-def user_profile_header(user: AppUser):
-    with _banner_image_div(user.banner_url, className="my-3"):
-        pass
+def user_profile_header(request, user: AppUser):
+    if user.banner_url:
+        with _banner_image_div(user.banner_url, className="my-3"):
+            pass
 
     with st.div(className="mt-3"):
         col1, col2 = st.columns([2, 10])
