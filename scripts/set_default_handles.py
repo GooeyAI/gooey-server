@@ -8,7 +8,6 @@ def run():
     registered_users = AppUser.objects.filter(
         handle__isnull=True,
         is_anonymous=False,
-        email__isnull=False,
     )
 
     for user in registered_users:

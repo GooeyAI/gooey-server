@@ -132,10 +132,9 @@ class Handle(models.Model):
 
 def _make_handle_from(name):
     name = name.lower()
-    name = "-".join(
-        re.findall(HANDLE_ALLOWED_CHARS, name)
+    name = "".join(
+        m.capitalize() for m in re.findall(HANDLE_ALLOWED_CHARS, name)
     )  # find groups of valid chars
-    name = re.sub(r"-+", "-", name)  # remove consecutive dashes
     name = name[:HANDLE_MAX_LENGTH]
     name = name.rstrip("-_")
     return name
