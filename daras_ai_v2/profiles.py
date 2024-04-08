@@ -227,7 +227,15 @@ def edit_user_profile_page(user: AppUser):
 
 
 def _edit_user_profile_header(user: AppUser):
-    st.write("# Update your Profile")
+    with st.div(
+        className="d-block d-md-flex flex-row-reverse justify-content-between align-items-center"
+    ):
+        with st.tag(
+            "a", href="/logout/", className="btn btn-theme btn-secondary d-inline-block"
+        ):
+            st.write("Sign out")
+        st.write("# Update your Profile")
+
     with st.div(className="mb-3"):
         with st.tag("span"):
             with st.tag("span", className="text-muted"):
@@ -426,21 +434,11 @@ def _edit_user_profile_form_section(user: AppUser):
     if error_msg:
         st.error(error_msg, icon="⚠️")
 
-    col1, col2 = st.columns(2, responsive=False)
-    with col1:
-        save_button = st.button(
-            "Save",
-            type="primary",
-            disabled=bool(error_msg),
-        )
-    with (
-        col2,
-        st.div(className="d-flex justify-content-end align-items-center h-100"),
-        st.tag("a", href="/logout/"),
+    if st.button(
+        "Save",
+        type="primary",
+        disabled=bool(error_msg),
     ):
-        st.caption("Sign out")
-
-    if save_button:
         try:
             with transaction.atomic():
                 if handle and not user.handle:
