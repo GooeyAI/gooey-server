@@ -32,17 +32,8 @@ class ContributionsSummary:
 
 
 def user_profile_page(request: Request, user: AppUser):
-    if request.user == user:
-        with st.link(
-            to=request.url_for("account", tab_path="profile"), className="d-block mt-3"
-        ):
-            st.caption(
-                '<i class="fa-solid fa-pencil"></i> Edit Profile',
-                type="link",
-                unsafe_allow_html=True,
-            )
-
-    user_profile_header(user)
+    with st.div(className="mt-3"):
+        user_profile_header(request, user)
     st.html("\n<hr>\n")
     user_profile_main_content(user)
 
@@ -70,8 +61,20 @@ def user_profile_header(user: AppUser):
     with col2, st.div(
         className="d-flex text-center flex-column justify-content-center align-items-center align-items-lg-start"
     ):
-        with st.tag("h1", className="m-0"):
-            st.html(escape_html(user.display_name))
+        with st.div(
+            className="d-flex w-100 justify-content-between align-items-center flex-row"
+        ):
+            with st.tag("h1", className="m-0"):
+                st.html(escape_html(user.display_name))
+
+            if request.user == user:
+                with st.link(
+                    to=remove_hostname_from_url(
+                        request.url_for("account", tab_path="profile")
+                    ),
+                    className="text-decoration-none btn btn-theme btn-secondary",
+                ):
+                    st.html('<i class="fa-solid fa-pencil"></i> Edit Profile')
 
         with st.tag("p", className="lead text-secondary mb-0"):
             st.html(escape_html(user.handle and user.handle.name or ""))
@@ -458,3 +461,11 @@ def github_url_for_username(username: str) -> str:
 def get_placeholder_profile_image(seed: str) -> str:
     hash = hashlib.md5(seed.encode()).hexdigest()
     return f"https://gravatar.com/avatar/{hash}?d=robohash&size=150"
+
+
+def remove_hostname_from_url(url: str) -> str:
+    full_url = furl(url)
+    short_url = furl(full_url.path)
+    short_url.query = str(full_url.query)
+    short_url.fragment = str(full_url.fragment)
+    return str(short_url)
