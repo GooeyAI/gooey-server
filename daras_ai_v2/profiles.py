@@ -302,16 +302,10 @@ def _edit_user_profile_banner(user: AppUser):
                 )
 
                 with st.div(className="d-flex justify-content-center"):
-                    if banner_url and st.button("Save"):
-                        user.banner_url = banner_url
-                        user.save(update_fields=["banner_url"])
-                        _set_uploading_banner_photo(False)
-                        st.experimental_rerun()
-
-                    if user.banner_url and st.button(
-                        '<i class="fa-regular fa-broom-wide"></i> Clear'
+                    if banner_url and st.button(
+                        '<i class="fa-regular fa-floppy-disk"></i> Save', type="primary"
                     ):
-                        user.banner_url = ""
+                        user.banner_url = banner_url
                         user.save(update_fields=["banner_url"])
                         _set_uploading_banner_photo(False)
                         st.experimental_rerun()
@@ -324,11 +318,21 @@ def _edit_user_profile_banner(user: AppUser):
                         st.experimental_rerun()
         else:
             with st.div(className="position-absolute bottom-0 end-0"):
+                if user.banner_url and st.button(
+                    '<i class="fa-regular fa-broom-wide"></i> Clear',
+                    type="tertiary",
+                    className="text-dark",
+                ):
+                    user.banner_url = ""
+                    user.save(update_fields=["banner_url"])
+                    _set_uploading_banner_photo(False)
+                    st.experimental_rerun()
+
                 camera_icon = '<i class="fa-regular fa-camera"></i>'
                 upload_banner_text = (
-                    f"{camera_icon} Edit Banner Photo"
+                    f"{camera_icon} Edit Cover Photo"
                     if user.banner_url
-                    else f"{camera_icon} Add Banner Photo"
+                    else f"{camera_icon} Add Cover Photo"
                 )
                 if st.button(
                     upload_banner_text, className="mb-3 me-3", type="secondary"
