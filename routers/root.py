@@ -364,7 +364,7 @@ def st_page(
         )
 
     try:
-        handle = Handle.objects.get(name=page_slug_or_handle)
+        handle = Handle.objects.get_by_name(page_slug_or_handle)
     except Handle.DoesNotExist:
         pass
     else:
