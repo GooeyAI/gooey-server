@@ -1177,9 +1177,7 @@ class BasePage:
             class_name += "-responsive"
 
         if show_as_link and user and user.handle:
-            linkto = st.link(
-                to=user.handle.get_app_url(), className="text-decoration-none"
-            )
+            linkto = st.link(to=user.handle.get_app_url())
         else:
             linkto = st.dummy()
 
