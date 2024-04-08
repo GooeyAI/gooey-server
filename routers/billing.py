@@ -13,7 +13,7 @@ from starlette.datastructures import FormData
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
-from daras_ai_v2 import settings
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -122,10 +122,10 @@ class _AccountTab(typing.NamedTuple):
 
 
 class AccountTabs(Enum):
-    billing = _AccountTab(title="Billing", tab_path="")
-    profile = _AccountTab(title="Profile", tab_path="profile")
-    saved = _AccountTab(title="Saved", tab_path="saved", prefixed=False)
-    api_keys = _AccountTab(title="🚀 API Keys", tab_path="api-keys")
+    billing = _AccountTab(title=f"{icons.billing} Billing", tab_path="")
+    profile = _AccountTab(title=f"{icons.profile} Profile", tab_path="profile")
+    saved = _AccountTab(title=f"{icons.save} Saved", tab_path="saved", prefixed=False)
+    api_keys = _AccountTab(title=f"{icons.api} API Keys", tab_path="api-keys")
 
     @property
     def title(self) -> str:

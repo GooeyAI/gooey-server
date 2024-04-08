@@ -1,0 +1,7 @@
+billing = '<i class="fa-solid fa-square-dollar"></i>'
+save = '<i class="fa-regular fa-floppy-disk"></i>'
+profile = '<i class="fa-regular fa-address-card"></i>'
+api = '<i class="fa-regular fa-rocket"></i>'
+run = '<i class="fa-solid fa-person-running"></i>'
+example = '<i class="fa-regular fa-gift"></i>'
+history = '<i class="fa-solid fa-rotate-left"></i>'
