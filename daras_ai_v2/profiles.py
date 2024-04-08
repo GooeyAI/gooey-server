@@ -251,10 +251,11 @@ def _edit_user_profile_header(user: AppUser):
                 '<i class="fa-solid fa-copy"></i> Copy',
                 value=user.handle.get_app_url(),
                 type="link",
-                className="d-inline text-decoration-none border-0 my-0 ms-2",
+                className="ms-2 text-decoration-none border-0 my-0",
             )
             with st.link(
-                to=user.handle.get_app_url(), className="ms-2 text-decoration-none"
+                to=user.handle.get_app_url(),
+                className="btn btn-theme btn-link ms-2 text-decoration-none border-0 my-0",
             ):
                 st.html('<i class="fa-solid fa-eye"></i> Preview')
 
