@@ -15,5 +15,4 @@ def run():
             user.handle = handle
             user.save()
         else:
-            # for-else runs when "break" is not hit in the loop
             logger.warning(f"unable to find acceptable handle for user: {user}")
