@@ -66,7 +66,7 @@ def user_profile_header(request, user: AppUser):
             className="d-flex w-100 justify-content-between align-items-center flex-row"
         ):
             with st.tag("h1", className="m-0"):
-                st.html(escape_html(user.display_name))
+                st.html(escape_html(get_profile_title(user)))
 
             if request.user == user:
                 with st.link(
@@ -475,3 +475,14 @@ def remove_hostname_from_url(url: str) -> str:
     short_url.query = str(full_url.query)
     short_url.fragment = str(full_url.fragment)
     return str(short_url)
+
+
+def get_profile_title(user: AppUser) -> str:
+    if user.display_name:
+        return user.display_name
+    elif user.email:
+        return user.email.split("@")[0]
+    elif user.phone_number:
+        return user.phone_number.as_e164[:-4] + "XXXX"
+    else:
+        return ""
