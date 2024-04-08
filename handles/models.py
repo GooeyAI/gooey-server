@@ -142,25 +142,16 @@ def _make_handle_from(name):
 
 
 def _generate_handle_options(user):
-    first_name_handle = _make_handle_from(user.first_name())
-    if first_name_handle:
-        yield first_name_handle
-
     email_handle = _make_handle_from(user.email.split("@")[0]) if user.email else ""
     if email_handle:
         yield email_handle
 
-    if first_name_handle:
-        yield first_name_handle + f"-{str(user.pk)[:2]}"
-        yield first_name_handle + f"-{uuid.uuid4().hex[:4]}"
+    if user.display_name:
+        yield _make_handle_from(user.display_name)
 
     if email_handle:
-        yield email_handle + f"-{str(user.pk)[:2]}"
-        yield email_handle + f"-{uuid.uuid4().hex[:4]}"
-
-    for _ in range(5):
-        # generate random handles
-        yield f"user-{uuid.uuid4().hex[:8]}"
+        for i in range(10):
+            yield f"{email_handle}{i}"
 
 
 def _attempt_create_handle(handle_name):

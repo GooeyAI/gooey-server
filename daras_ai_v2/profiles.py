@@ -408,7 +408,9 @@ def _edit_user_profile_form_section(user: AppUser):
     if email := user.email:
         st.text_input("Email", value=email, disabled=True)
     if phone_number := user.phone_number:
-        st.text_input("Phone Number", value=phone_number, disabled=True)
+        st.text_input(
+            "Phone Number", value=phone_number.as_international, disabled=True
+        )
 
     user.bio = st.text_area("Bio", value=user.bio)
     user.company = st.text_input("Company", value=user.company)
