@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import re
 import uuid
-from pathlib import Path
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
 from django.db import IntegrityError, models
 from django.db.models.functions import Upper
+from furl import furl
 
 from bots.custom_fields import CustomURLField
 from daras_ai_v2 import settings
@@ -127,7 +127,7 @@ class Handle(models.Model):
         return None
 
     def get_app_url(self):
-        return str(Path(settings.APP_BASE_URL) / self.name) + "/"
+        return str(furl(settings.APP_BASE_URL) / self.name / "/")
 
 
 def _make_handle_from(name):
