@@ -250,12 +250,12 @@ def _edit_user_profile_header(user: AppUser):
             copy_to_clipboard_button(
                 '<i class="fa-solid fa-copy"></i> Copy',
                 value=user.handle.get_app_url(),
-                type="link",
-                className="ms-2 text-decoration-none border-0 my-0",
+                type="tertiary",
+                className="m-0",
             )
             with st.link(
                 to=user.handle.get_app_url(),
-                className="btn btn-theme btn-link ms-2 text-decoration-none border-0 my-0",
+                className="btn btn-theme btn-tertiary m-0",
             ):
                 st.html('<i class="fa-solid fa-eye"></i> Preview')
 
