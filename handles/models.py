@@ -7,13 +7,12 @@ from pathlib import Path
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
 from django.db import IntegrityError, models
-from django.db.models import CheckConstraint, Q
-from django.db.models.functions import Lower
+from django.db.models.functions import Upper
 
 from bots.custom_fields import CustomURLField
 from daras_ai_v2 import settings
 
-HANDLE_ALLOWED_CHARS = r"[a-z0-9_\.-]+"
+HANDLE_ALLOWED_CHARS = r"[A-Za-z0-9_\.-]+"
 HANDLE_REGEX = rf"^{HANDLE_ALLOWED_CHARS}$"
 HANDLE_MAX_LENGTH = 40
 BASE_HANDLE_BLACKLIST = [
@@ -35,7 +34,7 @@ BASE_HANDLE_BLACKLIST = [
 
 validate_handle_regex = RegexValidator(
     regex=HANDLE_REGEX,
-    message="Handles must contain only lowercase letters, numbers, and the characters . _ -",
+    message="Handles must contain only letters, numbers, and the characters . _ -",
 )
 
 validate_handle_length = MaxLengthValidator(
@@ -57,14 +56,16 @@ def validate_handles_blacklist(value):
         raise ValidationError(f"{value} is a reserved handle")
 
 
-class Handle(models.Model):
-    """
-    Note: always convert the search name to lowercase when matching with `name`.
-    e.g. to find a handle with name `search_value`, use `Handle.objects.get(name=search_value.lower())`.
-    """
+class HandleQuerySet(models.QuerySet):
+    def get_by_name(self, name: str) -> Handle:
+        """
+        Get a handle by name, case-insensitive
+        """
+        return self.get(name__iexact=name)
 
+
+class Handle(models.Model):
     name = models.TextField(
-        unique=True,
         validators=[
             validate_handle_length,
             validate_handle_regex,
@@ -76,6 +77,17 @@ class Handle(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = HandleQuerySet.as_manager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                Upper("name"),
+                name="handle_upper_name_is_unique",
+                violation_error_message="A handle with this name already exists",
+            )
+        ]
 
     def __str__(self):
         return f"@{self.name}"
@@ -91,7 +103,6 @@ class Handle(models.Model):
         super().clean()
 
     def save(self, *args, **kwargs):
-        self.name = self.name.lower()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -107,16 +118,6 @@ class Handle(models.Model):
     @property
     def has_redirect(self):
         return bool(self.redirect_url)
-
-    class Meta:
-        constraints = [
-            # Ensure that all names are lowercase
-            CheckConstraint(
-                check=Q(name=Lower("name")),
-                name="handle_name_is_lowercase",
-                violation_error_message="Handle must be lowercase",
-            )
-        ]
 
     @classmethod
     def create_default_for_user(cls, user: "AppUser"):
