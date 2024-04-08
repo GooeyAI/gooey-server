@@ -400,7 +400,7 @@ def _edit_user_profile_form_section(user: AppUser):
 
     handle_style: dict[str, str] = {}
     if handle := st.text_input(
-        "Handle",
+        "Username",
         value=(user.handle and user.handle.name or ""),
         style=handle_style,
     ):
