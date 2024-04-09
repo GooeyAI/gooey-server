@@ -63,9 +63,9 @@ def user_profile_header(request, user: AppUser):
         className="d-flex text-center flex-column justify-content-center align-items-center align-items-lg-start"
     ):
         with st.div(
-            className="d-flex w-100 justify-content-between align-items-center flex-row"
+            className="d-inline d-lg-flex w-100 justify-content-between align-items-end"
         ):
-            with st.tag("h1", className="m-0"):
+            with st.tag("h1", className="d-inline my-0 me-2"):
                 st.html(escape_html(get_profile_title(user)))
 
             if request.user == user:
@@ -73,7 +73,7 @@ def user_profile_header(request, user: AppUser):
                     to=remove_hostname_from_url(
                         request.url_for("account", tab_path="profile")
                     ),
-                    className="text-decoration-none btn btn-theme btn-secondary",
+                    className="text-decoration-none btn btn-theme btn-secondary mb-0",
                 ):
                     st.html('<i class="fa-solid fa-pencil"></i> Edit Profile')
 
@@ -183,9 +183,9 @@ def get_contributions_summary(user: AppUser, *, top_n: int = 3) -> Contributions
 
 def profile_image(url: str, placeholder_seed: str, **props):
     style = {
-        "max-width": "200px",
-        "aspect-ratio": "1",
-        "object-fit": "cover",
+        "maxWidth": "200px",
+        "aspectRatio": "1",
+        "objectFit": "cover",
     } | props.pop("style", {})
     className = "w-100 rounded-circle " + props.pop("className", "")
     st.image(
@@ -262,18 +262,18 @@ def _edit_user_profile_header(user: AppUser):
 
 def _banner_image_div(url: str | None, **props):
     style = {
-        "min-height": "200px",
-        "max-height": "400px",
+        "minHeight": "200px",
+        "maxHeight": "400px",
         "width": "100%",
-        "aspect-ratio": "3 / 1",
-        "background-color": "rgba(180, 180, 180, 1.0)",
+        "aspectRatio": "3 / 1",
+        "backgroundColor": "rgba(180, 180, 180, 1.0)",
     }
     if url:
         style |= {
-            "background-image": f'url("{url}")',
-            "background-size": "cover",
-            "background-position": "center",
-            "background-repeat": "no-repeat",
+            "backgroundImage": f'url("{url}")',
+            "backgroundSize": "cover",
+            "backgroundPosition": "center",
+            "backgroundRepeat": "no-repeat",
         }
 
     className = "w-100 h-100 rounded-2 " + props.pop("className", "")
@@ -301,7 +301,7 @@ def _edit_user_profile_banner(user: AppUser):
         className="d-flex justify-content-center align-items-center position-relative mb-3",
     ):
         if _is_uploading_banner_photo():
-            translucent_style = {"background-color": "rgba(255, 255, 255, 0.2)"}
+            translucent_style = {"backgroundColor": "rgba(255, 255, 255, 0.2)"}
             with st.div(
                 className="d-flex justify-content-center align-items-center w-100 h-100",
                 style=translucent_style,
