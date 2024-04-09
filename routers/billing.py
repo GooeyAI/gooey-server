@@ -18,7 +18,7 @@ from daras_ai_v2.base import RedirectException
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
-from daras_ai_v2.profiles import edit_user_profile_page
+from daras_ai_v2.profiles import edit_user_profile_page, remove_hostname_from_url
 from daras_ai_v2.settings import templates
 from gooey_ui.components.pills import pill
 from routers.root import page_wrapper, request_json
@@ -276,17 +276,21 @@ def all_saved_runs_tab(request: Request):
 
     if prs:
         if request.user.handle:
-            st.write(
+            st.caption(
                 "All your Saved workflows are here, with public ones listed on your "
                 f"profile page at {request.user.handle.get_app_url()}."
             )
         else:
-            st.write(
+            edit_profile_url = remove_hostname_from_url(
+                request.url_for("account", tab_path="profile")
+            )
+            st.caption(
                 "All your Saved workflows are here. Public ones will be listed on your "
-                "profile page if you [create a username](/account/profile/)."
+                f"profile page if you [create a username]({edit_profile_url})."
             )
 
-        grid_layout(3, prs, _render_run)
+        with st.div(className="mt-4"):
+            grid_layout(3, prs, _render_run)
     else:
         st.write("No saved runs yet", className="text-muted")
 
