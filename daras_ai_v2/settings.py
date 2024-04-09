@@ -240,6 +240,7 @@ TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
 
 APP_BASE_URL = config("APP_BASE_URL", "/")
 API_BASE_URL = config("API_BASE_URL", "/")
+ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))

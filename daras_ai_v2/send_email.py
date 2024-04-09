@@ -67,6 +67,35 @@ def send_low_balance_email(
     )
 
 
+def send_integration_attempt_email(
+    *, user: AppUser, integration_type: str, run_url: str
+):
+    from django.urls import reverse
+    from furl import furl
+
+    account_url = str(
+        furl(settings.ADMIN_BASE_URL)
+        / reverse(
+            "admin:%s_%s_change" % (user._meta.app_label, user._meta.model_name),
+            args=[user.pk],
+        )
+    )
+
+    recipeints = "sales@gooey.ai"
+    html_body = templates.get_template("integration_attempt_email.html").render(
+        user=user,
+        account_url=account_url,
+        run_url=run_url,
+        integration_type=integration_type,
+    )
+    send_email_via_postmark(
+        from_address=settings.SUPPORT_EMAIL,
+        to_address=recipeints,
+        subject=f"{user.display_name} Attempted to Connect to {integration_type}",
+        html_body=html_body,
+    )
+
+
 is_running_pytest = "pytest" in sys.modules
 pytest_outbox = []
 
