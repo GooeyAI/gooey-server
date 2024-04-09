@@ -240,7 +240,7 @@ Pro-tip: The more frames you add, the longer it will take to render the animatio
     def get_cost_note(self) -> str | None:
         return f"{CREDITS_PER_FRAME} / frame"
 
-    def additional_notes(self, state: dict) -> str | None:
+    def additional_notes(self) -> str | None:
         return "Render Time ≈ 3s / frame"
 
     def get_raw_price(self, state: dict) -> float:

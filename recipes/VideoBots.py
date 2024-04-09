@@ -691,10 +691,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         return total * state.get("num_outputs", 1)
 
-    def additional_notes(self, state: dict):
-        notes = f" \\\n*Breakdown: {self.get_llm_usage_cost()} ({state['selected_model']}) + 3/run*"
+    def additional_notes(self):
+        notes = f" \\\n*Breakdown: {self.get_llm_usage_cost()} ({st.session_state.get('selected_model')}) + 3/run*"
 
-        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
+        if (
+            st.session_state.get("tts_provider")
+            == TextToSpeechProviders.ELEVEN_LABS.name
+        ):
             notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
 
         if st.session_state.get("input_face"):
