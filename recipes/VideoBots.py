@@ -1,14 +1,13 @@
 import json
+import math
 import mimetypes
 import typing
-import math
 
 from django.db.models import QuerySet, Q, Sum
 from furl import furl
 from pydantic import BaseModel, Field
 
 import gooey_ui as st
-from usage_costs.models import UsageCost
 from bots.models import BotIntegration, Platform
 from bots.models import Workflow
 from daras_ai.image_input import (
@@ -90,6 +89,7 @@ from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
+from usage_costs.models import UsageCost
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f454d64a-9457-11ee-b6d5-02420a0001cb/Copilot.jpg.png"
 INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
@@ -677,7 +677,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.audio(audio_url)
 
     def get_raw_price(self, state: dict):
-        total = self.get_usage_cost() + 3
+        total = self.get_llm_usage_cost() + 3
 
         if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
             output_text_list = state.get(
@@ -691,27 +691,29 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
         return total * state.get("num_outputs", 1)
 
-    def get_usage_cost(self):
+    def additional_notes(self, state: dict):
+        notes = f" \\\n*Breakdown: {self.get_llm_usage_cost()} ({state['selected_model']}) + 3/run*"
+
+        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
+            notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
+
+        if st.session_state.get("input_face"):
+            notes += " *+ 1 (lipsync)*"
+
+        return notes
+
+    def get_llm_usage_cost(self):
         current_run, published_run = self.get_runs_from_query_params(
             *extract_query_params(gooey_get_query_params())
-        )  # type: ignore
-        run_id = current_run.run_id or published_run.published_run_id
+        )
+        if not current_run:
+            return 1
         return math.ceil(
-            UsageCost.objects.filter(saved_run__run_id=run_id).aggregate(
+            UsageCost.objects.filter(saved_run__run_id=current_run.run_id).aggregate(
                 Sum("dollar_amount")
             )["dollar_amount__sum"]
             or 1
         )
-
-    def additional_notes(self, state: dict):
-        notes = f" \\\n*Breakdown: {self.get_usage_cost()} ({state['selected_model']}) + 3/run*"
-        tts_provider = st.session_state.get("tts_provider")
-        match tts_provider:
-            case TextToSpeechProviders.ELEVEN_LABS.name:
-                notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
-        if st.session_state.get("input_face"):
-            notes += " *+ 1 (lipsync)*"
-        return notes
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
