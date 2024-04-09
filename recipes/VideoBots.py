@@ -1135,8 +1135,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def integration_connect_screen(
         self, title="Connect your Copilot", status: str | None = None
     ):
-        from routers.facebook_api import ig_connect_url, fb_connect_url, wa_connect_url
+        from routers.facebook_api import fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
+        from daras_ai_v2.base import RedirectException
+        from daras_ai_v2.send_email import send_integration_attempt_email
 
         on_connect = self.get_tab_url(MenuTabs.integrations)
 
@@ -1149,42 +1151,65 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 unsafe_allow_html=True,
             )
 
-            LINKSTYLE = 'class="btn btn-theme btn-secondary" style="margin: 0; display: flex; justify-content: center; align-items: center; padding: 8px; border: 1px solid black; min-width: 120px; width: 160px; aspect-ratio: 5 / 2; overflow: hidden; border-radius: 10px" draggable="false"'
+            LINKSTYLE = dict(margin=0, display="flex", justifyContent="center", alignItems="center", padding="8px", border="1px solid black", minWidth="120px", width="160px", aspectRatio="5 / 2", overflow="hidden", borderRadius="10px")  # fmt: skip
             IMGSTYLE = 'style="width: 80%" draggable="false"'
-            ROWSTYLE = 'style="display: flex; align-items: center; gap: 1em; margin-bottom: 1rem" draggable="false"'
+            ROWSTYLE = dict(display="flex", alignItems="center", gap="1em", marginBottom="1rem")  # fmt: skip
             DESCRIPTIONSTYLE = f'style="color: {GRAYCOLOR}; text-align: left"'
-            st.markdown(
-                # language=html
-                f"""
-                <div>
-                <div {ROWSTYLE}>
-                    <a href="{wa_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Whatsapp number">
-                        <img src="{WHATSAPP_IMG}" {IMGSTYLE} alt="Whatsapp">
-                    </a>
-                    <div {DESCRIPTIONSTYLE}>Bring your own <a href="https://business.facebook.com/wa/manage/phone-numbers">WhatsApp number</a> to connect. Need a new one? Email <a href="mailto:sales@gooey.ai">sales@gooey.ai</a>.</div>
-                </div>
-                <div {ROWSTYLE}>
-                    <a href="{slack_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Slack Workspace">
-                        <img src="{SLACK_IMG}" {IMGSTYLE} alt="Slack">
-                    </a>
-                    <div {DESCRIPTIONSTYLE}>Connect to a Slack Channel. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-slack">Help Guide</a>.</div>
-                </div>
-                <div {ROWSTYLE}>
-                    <a href="{fb_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Facebook Page">
-                        <img src="{FACEBOOK_IMG}" {IMGSTYLE} alt="Facebook Messenger">
-                    </a>
-                    <div {DESCRIPTIONSTYLE}>Connect to a Facebook Page you own. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-facebook">Help Guide</a>.</div>
-                </div>
-                <!--<div {ROWSTYLE}>
-                    <a href="{ig_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Instagram Page">
-                        <img src="{INSTAGRAM_IMG}" {IMGSTYLE} alt="Instagram">
-                    </a>
-                    <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
-                </div>-->
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            with st.div():  # outer wrapper to ensure rows are aligned
+                with st.div(style=ROWSTYLE, draggable="false"):
+                    if st.button(
+                        f'<img src="{WHATSAPP_IMG}" {IMGSTYLE} alt="Whatsapp">',
+                        ariaLabel="Connect your Whatsapp number",
+                        style=LINKSTYLE,
+                        draggable="false",
+                    ):
+                        send_integration_attempt_email(
+                            user=self.request.user,
+                            integration_type="Whatsapp",
+                            run_url=self._get_current_app_url() or "",
+                        )
+                        raise RedirectException(wa_connect_url(on_connect))
+                    st.html(
+                        f'<div {DESCRIPTIONSTYLE}>Bring your own <a href="https://business.facebook.com/wa/manage/phone-numbers">WhatsApp number</a> to connect. Need a new one? Email <a href="mailto:sales@gooey.ai">sales@gooey.ai</a>.</div>'
+                    )
+                with st.div(style=ROWSTYLE, draggable="false"):
+                    if st.button(
+                        f'<img src="{SLACK_IMG}" {IMGSTYLE} alt="Slack">',
+                        ariaLabel="Connect your Slack Workspace",
+                        style=LINKSTYLE,
+                        draggable="false",
+                    ):
+                        send_integration_attempt_email(
+                            user=self.request.user,
+                            integration_type="Slack",
+                            run_url=self._get_current_app_url() or "",
+                        )
+                        raise RedirectException(slack_connect_url(on_connect))
+                    st.html(
+                        f'<div {DESCRIPTIONSTYLE}>Connect to a Slack Channel. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-slack">Help Guide</a>.</div>'
+                    )
+                with st.div(style=ROWSTYLE, draggable="false"):
+                    if st.button(
+                        f'<img src="{FACEBOOK_IMG}" {IMGSTYLE} alt="Facebook Messenger">',
+                        ariaLabel="Connect your Facebook Page",
+                        style=LINKSTYLE,
+                        draggable="false",
+                    ):
+                        send_integration_attempt_email(
+                            user=self.request.user,
+                            integration_type="Facebook",
+                            run_url=self._get_current_app_url() or "",
+                        )
+                        raise RedirectException(fb_connect_url(on_connect))
+                    st.html(
+                        f'<div {DESCRIPTIONSTYLE}>Connect to a Facebook Page you own. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-facebook">Help Guide</a>.</div>'
+                    )
+                #     <div {ROWSTYLE}>
+                #         <a href="{ig_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Instagram Page">
+                #             <img src="{INSTAGRAM_IMG}" {IMGSTYLE} alt="Instagram">
+                #         </a>
+                #         <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
+                #     </div>
 
             st.newline()
             st.write(
