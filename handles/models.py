@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import uuid
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
