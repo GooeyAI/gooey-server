@@ -450,6 +450,9 @@ def _edit_user_profile_form_section(user: AppUser):
                     # user changes existing handle
                     user.handle.name = handle
                     user.handle.save()
+                elif not handle and user.handle:
+                    # user removes existing handle
+                    user.handle.delete()
 
                 user.full_clean()
                 user.save()
