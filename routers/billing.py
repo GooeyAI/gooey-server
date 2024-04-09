@@ -254,11 +254,11 @@ def profile_tab(request: Request):
 
 
 def all_saved_runs_tab(request: Request):
-    saved_runs = PublishedRun.objects.filter(
+    prs = PublishedRun.objects.filter(
         created_by=request.user,
     ).order_by("-updated_at")
 
-    def _render(pr: PublishedRun):
+    def _render_run(pr: PublishedRun):
         workflow = Workflow(pr.workflow)
         visibility = PublishedRunVisibility(pr.visibility)
 
@@ -272,8 +272,21 @@ def all_saved_runs_tab(request: Request):
 
         workflow.page_cls().render_published_run_preview(pr)
 
-    if saved_runs:
-        grid_layout(3, saved_runs, _render)
+    st.write("# Saved Workflows")
+
+    if prs:
+        if request.user.handle:
+            st.write(
+                "All your Saved workflows are here, with public ones listed on your "
+                f"profile page at {request.user.handle.get_app_url()}."
+            )
+        else:
+            st.write(
+                "All your Saved workflows are here. Public ones will be listed on your "
+                "profile page if you [create a username](/account/profile/)."
+            )
+
+        grid_layout(3, prs, _render_run)
     else:
         st.write("No saved runs yet", className="text-muted")
 
