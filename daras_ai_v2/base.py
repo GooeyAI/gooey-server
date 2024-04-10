@@ -13,6 +13,7 @@ from time import sleep
 from types import SimpleNamespace
 
 import sentry_sdk
+from django.db.models import Sum
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -1243,6 +1244,7 @@ class BasePage:
 Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}
 {self.additional_notes() or ""}
                     """,
+                    line_clamp=1,
                     unsafe_allow_html=True,
                 )
             with col2:
@@ -1932,6 +1934,22 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
     def get_raw_price(self, state: dict) -> float:
         return self.price * (state.get("num_outputs") or 1)
+
+    def get_total_linked_usage_cost_in_credits(self, default=1) -> float:
+        """Return the sun of the linked usage costs in gooey credits."""
+        from usage_costs.models import UsageCost
+
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )
+        if not current_run:
+            return default
+        dollar_amt = UsageCost.objects.filter(
+            saved_run__run_id=current_run.run_id
+        ).aggregate(total=Sum("dollar_amount"))["total"]
+        if not dollar_amt:
+            return default
+        return math.ceil(dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR)
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:

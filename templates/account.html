@@ -1,6 +1,6 @@
 <script src="https://js.stripe.com/v3/" async defer></script>
 <script src="https://www.paypal.com/sdk/js?client-id={{ settings.PAYPAL_CLIENT_ID }}&currency=USD&enable-funding=venmo&disable-funding=paylater"
-        async defer onload = renderPaypalButtons></script>
+        async defer onload=renderPaypalButtons></script>
 
 <div class="container">
     {% if is_admin %}
@@ -57,7 +57,7 @@
             </div>
             <div id="stripe-container">
                 {% for lookup_key, subscription in available_subscriptions.items() %}
-                    <ul id="{{ subscription['display']['name'] }}">
+                    <ul>
                         <li>
                             <div class="h4">{{ subscription["display"]["title"] }}</div>
                             <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
@@ -76,21 +76,25 @@
             </div>
             <div id="paypal-container" style="display: none;">
                 {% for lookup_key, subscription in available_subscriptions.items() %}
-                    {% if lookup_key == "addon" %}
-                        <div class="h4">{{ subscription["display"]["title"] }}</div>
-                        <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
-                        {% for option in [10, 30, 50, 100, 300, 500] %}
-                            <button class="streamlit-like-btn paypal-checkout-option"
-                                    onclick="setQuantity(this, {{ option * 100 }});"
-                                    type="button"
-                                    data-submit-disabled>
-                                Buy ${{ option }}
-                            </button>
-                        {% endfor %}
-                        <div class="pt-3" style="width: fit-content; display: none;"
-                             id="paypal-button-container"></div>
-                        <p id="result-message"></p>
-                    {% endif %}
+                    <ul>
+                        {% if lookup_key == "addon" %}
+                            <li>
+                                <div class="h4">{{ subscription["display"]["title"] }}</div>
+                                <div class="h5">{{ subscription["display"]["description"] | safe }}</div>
+                                {% for option in [10, 30, 50, 100, 300, 500] %}
+                                    <button class="streamlit-like-btn paypal-checkout-option"
+                                            onclick="setQuantity(this, {{ option * settings.ADDON_CREDITS_PER_DOLLAR }});"
+                                            type="button"
+                                            data-submit-disabled>
+                                        Buy ${{ option }}
+                                    </button>
+                                {% endfor %}
+                                <div class="pt-3" style="width: fit-content; display: none;"
+                                     id="paypal-button-container"></div>
+                                <p id="result-message"></p>
+                            </li>
+                        {% endif %}
+                    </ul>
                 {% endfor %}
             </div>
         </div>
@@ -138,10 +142,10 @@
         selectedQty = qty;
     }
 
-        function renderPaypalButtons() {
-            if (document.querySelector("#paypal-button-container").innerHTML) return;
-            window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
-        }
+    function renderPaypalButtons() {
+        if (document.querySelector("#paypal-button-container").innerHTML) return;
+        window.paypal.Buttons({createOrder, onApprove}).render("#paypal-button-container");
+    }
 
     async function createOrder() {
         try {

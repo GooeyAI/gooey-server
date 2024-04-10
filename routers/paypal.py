@@ -14,7 +14,6 @@ from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
-from routers.billing import available_subscriptions
 
 router = APIRouter()
 
@@ -62,11 +61,8 @@ def create_order(request: Request, payload=Depends(request_json)):
     if not request.user or request.user.is_anonymous:
         return JSONResponse({}, status_code=401)
 
-    lookup_key = "addon"
     quantity = payload["quantity"]
-    unit_amount = (
-        available_subscriptions[lookup_key]["stripe"]["price_data"]["unit_amount"] / 100
-    )
+    unit_amount = 1 / settings.ADDON_CREDITS_PER_DOLLAR
     value = int(quantity * unit_amount)
 
     response = requests.post(
