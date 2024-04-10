@@ -89,6 +89,7 @@ from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
 
+
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f454d64a-9457-11ee-b6d5-02420a0001cb/Copilot.jpg.png"
 INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
 INSTAGRAM_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/3e7ebbb6-d6c8-11ee-a182-02420a000125/image.png"
@@ -115,6 +116,8 @@ class ReplyButton(typing.TypedDict):
 
 
 class VideoBotsPage(BasePage):
+    PROFIT_CREDITS = 3
+
     title = "Copilot for your Enterprise"  # "Create Interactive Video Bots"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8c014530-88d4-11ee-aac9-02420a00016b/Copilot.png.png"
     workflow = Workflow.VIDEO_BOTS
@@ -675,7 +678,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.audio(audio_url)
 
     def get_raw_price(self, state: dict):
-        total = self.get_total_linked_usage_cost_in_credits() + 3
+        total = self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
 
         if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
             output_text_list = state.get(
@@ -694,7 +697,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             model = LargeLanguageModels[st.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
-        notes = f" \\\n*Breakdown: {self.get_total_linked_usage_cost_in_credits()} ({model}) + 3/run*"
+        notes = f" \\\n*Breakdown: {self.get_total_linked_usage_cost_in_credits()} ({model}) + {self.PROFIT_CREDITS}/run*"
 
         if (
             st.session_state.get("tts_provider")

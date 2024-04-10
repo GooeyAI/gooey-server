@@ -47,4 +47,7 @@ def test_copilot_get_raw_price_round_up(transactional_db):
     )
     copilot_page = VideoBotsPage(run_user=user)
     set_query_params({"run_id": bot_saved_run.run_id or "", "uid": user.uid or ""})
-    assert copilot_page.get_price_roundoff(state=state) == 6
+    assert (
+        copilot_page.get_price_roundoff(state=state)
+        == 210 + copilot_page.PROFIT_CREDITS
+    )
