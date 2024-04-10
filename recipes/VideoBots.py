@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 import gooey_ui as st
 from bots.models import BotIntegration, Platform
 from bots.models import Workflow
+from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
@@ -1138,7 +1139,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         from routers.facebook_api import fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
         from daras_ai_v2.base import RedirectException
-        from daras_ai_v2.send_email import send_integration_attempt_email
 
         on_connect = self.get_tab_url(MenuTabs.integrations)
 
@@ -1156,6 +1156,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             ROWSTYLE = dict(display="flex", alignItems="center", gap="1em", marginBottom="1rem")  # fmt: skip
             DESCRIPTIONSTYLE = f'style="color: {GRAYCOLOR}; text-align: left"'
             with st.div():  # outer wrapper to ensure rows are aligned
+                selected_platform = None
+                redirect_url = None
                 with st.div(style=ROWSTYLE, draggable="false"):
                     if st.button(
                         f'<img src="{WHATSAPP_IMG}" {IMGSTYLE} alt="Whatsapp">',
@@ -1163,12 +1165,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         style=LINKSTYLE,
                         draggable="false",
                     ):
-                        send_integration_attempt_email(
-                            user=self.request.user,
-                            integration_type="Whatsapp",
-                            run_url=self._get_current_app_url() or "",
-                        )
-                        raise RedirectException(wa_connect_url(on_connect))
+                        selected_platform = Platform.WHATSAPP
+                        redirect_url = wa_connect_url(on_connect)
                     st.html(
                         f'<div {DESCRIPTIONSTYLE}>Bring your own <a href="https://business.facebook.com/wa/manage/phone-numbers">WhatsApp number</a> to connect. Need a new one? Email <a href="mailto:sales@gooey.ai">sales@gooey.ai</a>.</div>'
                     )
@@ -1179,12 +1177,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         style=LINKSTYLE,
                         draggable="false",
                     ):
-                        send_integration_attempt_email(
-                            user=self.request.user,
-                            integration_type="Slack",
-                            run_url=self._get_current_app_url() or "",
-                        )
-                        raise RedirectException(slack_connect_url(on_connect))
+                        selected_platform = Platform.SLACK
+                        redirect_url = slack_connect_url(on_connect)
                     st.html(
                         f'<div {DESCRIPTIONSTYLE}>Connect to a Slack Channel. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-slack">Help Guide</a>.</div>'
                     )
@@ -1195,12 +1189,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         style=LINKSTYLE,
                         draggable="false",
                     ):
-                        send_integration_attempt_email(
-                            user=self.request.user,
-                            integration_type="Facebook",
-                            run_url=self._get_current_app_url() or "",
-                        )
-                        raise RedirectException(fb_connect_url(on_connect))
+                        selected_platform = Platform.FACEBOOK
+                        redirect_url = fb_connect_url(on_connect)
                     st.html(
                         f'<div {DESCRIPTIONSTYLE}>Connect to a Facebook Page you own. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-facebook">Help Guide</a>.</div>'
                     )
@@ -1210,6 +1200,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 #         </a>
                 #         <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
                 #     </div>
+                if redirect_url:
+                    send_integration_attempt_email.delay(
+                        user_id=self.request.user.id,
+                        platform=selected_platform,
+                        run_url=self._get_current_app_url() or "",
+                    )
+                    raise RedirectException(redirect_url)
 
             st.newline()
             st.write(

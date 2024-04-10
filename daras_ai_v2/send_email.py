@@ -11,6 +11,7 @@ from decouple import config
 
 from app_users.models import AppUser
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.settings import templates
 from gooey_ui import UploadedFile
 
@@ -63,35 +64,6 @@ def send_low_balance_email(
         to_address=user.email or recipeints,
         bcc=recipeints,
         subject="Your Gooey.AI credit balance is low",
-        html_body=html_body,
-    )
-
-
-def send_integration_attempt_email(
-    *, user: AppUser, integration_type: str, run_url: str
-):
-    from django.urls import reverse
-    from furl import furl
-
-    account_url = str(
-        furl(settings.ADMIN_BASE_URL)
-        / reverse(
-            "admin:%s_%s_change" % (user._meta.app_label, user._meta.model_name),
-            args=[user.pk],
-        )
-    )
-
-    recipeints = "sales@gooey.ai"
-    html_body = templates.get_template("integration_attempt_email.html").render(
-        user=user,
-        account_url=account_url,
-        run_url=run_url,
-        integration_type=integration_type,
-    )
-    send_email_via_postmark(
-        from_address=settings.SUPPORT_EMAIL,
-        to_address=recipeints,
-        subject=f"{user.display_name} Attempted to Connect to {integration_type}",
         html_body=html_body,
     )
 
@@ -168,7 +140,7 @@ def send_email_via_postmark(
             "MessageStream": message_stream,
         },
     )
-    assert r.ok, r.text
+    raise_for_status(r)
 
 
 def send_smtp_message(
