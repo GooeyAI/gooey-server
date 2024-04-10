@@ -168,44 +168,46 @@ def _make_handle_from(name):
 
 
 def _generate_handle_options(user):
-    email_domain = user.email.split("@")[1] if user.email else None
+    if not user.email:
+        return
 
-    match email_domain:
-        case _ if email_domain in COMMON_EMAIL_DOMAINS:
-            email_prefix = _make_handle_from(user.email.split("@")[0])
-            if email_prefix:
-                yield email_prefix
+    email_domain = user.email.split("@")[1]
 
-            if user.display_name:
-                yield _make_handle_from(user.display_name)
+    if email_domain in COMMON_EMAIL_DOMAINS:
+        # popular mail provider where user set their own email prefix
+        email_prefix = _make_handle_from(user.email.split("@")[0])
+        if email_prefix:
+            yield email_prefix
 
-            if email_prefix:
-                for i in range(1, 10):
-                    yield f"{email_prefix[:HANDLE_MAX_LENGTH-1]}{i}"
+        if user.display_name:
+            yield _make_handle_from(user.display_name)
 
-        case _ if email_domain in PRIVATE_EMAIL_DOMAINS:
-            if user.display_name:
-                name_handle = _make_handle_from(user.display_name)
-                yield name_handle
-                for i in range(1, 10):
-                    yield f"{name_handle[:HANDLE_MAX_LENGTH-1]}{i}"
-
-        case _ if email_domain:
-            if user.display_name:
-                name_handle = _make_handle_from(user.display_name)
-                yield name_handle
-
-            email_prefix = user.email.split("@")[0]
-            domain_part = email_domain.split(".")[0]
-            email_handle = _make_handle_from(
-                capitalize_first(email_prefix) + capitalize_first(domain_part)
-            )
-            yield email_handle
+        if email_prefix:
             for i in range(1, 10):
-                yield f"{email_handle[:HANDLE_MAX_LENGTH-1]}{i}"
+                yield f"{email_prefix[:HANDLE_MAX_LENGTH-1]}{i}"
 
-        case _:
-            pass
+    elif email_domain in PRIVATE_EMAIL_DOMAINS:
+        # prefix is not useful
+        if user.display_name:
+            name_handle = _make_handle_from(user.display_name)
+            yield name_handle
+            for i in range(1, 10):
+                yield f"{name_handle[:HANDLE_MAX_LENGTH-1]}{i}"
+
+    else:
+        # probably an org email
+        if user.display_name:
+            yield _make_handle_from(user.display_name)
+
+        email_prefix = user.email.split("@")[0]
+        domain_part = email_domain.split(".")[0]
+        email_handle = _make_handle_from(
+            capitalize_first(email_prefix) + capitalize_first(domain_part)
+        )
+
+        yield email_handle
+        for i in range(1, 10):
+            yield f"{email_handle[:HANDLE_MAX_LENGTH-1]}{i}"
 
 
 def _attempt_create_handle(handle_name):
