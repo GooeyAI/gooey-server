@@ -248,7 +248,7 @@ def send_integration_attempt_email(*, user_id: int, platform: Platform, run_url:
     )
     send_email_via_postmark(
         from_address=settings.SUPPORT_EMAIL,
-        to_address="dev@gooey.ai",
+        to_address="sales@gooey.ai",
         subject=f"{user.display_name} Attempted to Connect to {platform.label}",
         html_body=html_body,
     )
