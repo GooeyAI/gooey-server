@@ -1,9 +1,8 @@
 import json
-import math
 import mimetypes
 import typing
 
-from django.db.models import QuerySet, Q, Sum
+from django.db.models import QuerySet, Q
 from furl import furl
 from pydantic import BaseModel, Field
 
@@ -89,7 +88,6 @@ from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
-from usage_costs.models import UsageCost
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f454d64a-9457-11ee-b6d5-02420a0001cb/Copilot.jpg.png"
 INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
@@ -677,7 +675,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.audio(audio_url)
 
     def get_raw_price(self, state: dict):
-        total = self.get_llm_usage_cost() + 3
+        total = self.get_total_linked_usage_cost_in_credits() + 3
 
         if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
             output_text_list = state.get(
@@ -696,7 +694,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             model = LargeLanguageModels[st.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
-        notes = f" \\\n*Breakdown: {self.get_llm_usage_cost()} ({model}) + 3/run*"
+        notes = f" \\\n*Breakdown: {self.get_total_linked_usage_cost_in_credits()} ({model}) + 3/run*"
 
         if (
             st.session_state.get("tts_provider")
@@ -708,19 +706,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             notes += " *+ 1 (lipsync)*"
 
         return notes
-
-    def get_llm_usage_cost(self):
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )
-        if not current_run:
-            return 1
-        return math.ceil(
-            UsageCost.objects.filter(saved_run__run_id=current_run.run_id).aggregate(
-                Sum("dollar_amount")
-            )["dollar_amount__sum"]
-            or 1
-        )
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)

@@ -29,6 +29,7 @@ available_subscriptions = {
         "display": {
             "name": "Add-on",
             "title": "Top up Credits",
+            "description": f"Buy a one-time top up @ {settings.ADDON_CREDITS_PER_DOLLAR} Credits per dollar.",
         },
         "stripe": {
             "price_data": {
@@ -36,7 +37,9 @@ available_subscriptions = {
                 "product_data": {
                     "name": "Gooey.AI Add-on Credits",
                 },
-                "unit_amount": 1,  # in cents
+                "unit_amount_decimal": (
+                    settings.ADDON_CREDITS_PER_DOLLAR / 100
+                ),  # in cents
             },
             # "quantity": 1000,  # number of credits (set by html)
             "adjustable_quantity": {
