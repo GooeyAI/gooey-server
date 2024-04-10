@@ -47,8 +47,8 @@ def generate_auth_header() -> str:
         data = response.json()
         access_token = data.get("access_token")
         assert access_token, "Missing access token in response"
-        # expiry with a buffer of the time taken to fetch the token + 1 minute
-        expiry = int((data.get("expires_in") or 300) - (time() - s + 60))
+        # expiry with a buffer of the time taken to fetch the token + 5 minutes
+        expiry = int((data.get("expires_in") or 600) - (time() - s + 300))
         redis_cache.set(cache_key, access_token.encode(), ex=expiry)
 
     return f"Bearer " + access_token
