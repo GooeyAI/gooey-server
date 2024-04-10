@@ -33,7 +33,7 @@ from bots.models import (
     PublishedRunVisibility,
     Workflow,
 )
-from daras_ai_v2 import settings
+from daras_ai_v2 import settings, urls
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -474,15 +474,29 @@ class BasePage:
         else:
             with st.div(className="visibility-radio"):
                 options = {
-                    str(enum.value): enum.help_text() for enum in PublishedRunVisibility
+                    enum.value: enum.help_text() for enum in PublishedRunVisibility
                 }
+                if self.request.user and self.request.user.handle:
+                    profile_url = self.request.user.handle.get_app_url()
+                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
+                    options[
+                        PublishedRunVisibility.PUBLIC.value
+                    ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
+                elif self.request.user and not self.request.user.is_anonymous:
+                    edit_profile_url = urls.remove_hostname(
+                        self.request.url_for("account", tab_path="profile")
+                    )
+                    options[
+                        PublishedRunVisibility.PUBLIC.value
+                    ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
+
                 published_run_visibility = PublishedRunVisibility(
                     int(
                         st.radio(
                             "",
                             options=options,
                             format_func=options.__getitem__,
-                            value=str(published_run.visibility),
+                            value=published_run.visibility,
                         )
                     )
                 )

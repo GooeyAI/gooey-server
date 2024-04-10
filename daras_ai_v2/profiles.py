@@ -17,7 +17,7 @@ from bots.models import (
     SavedRun,
     Workflow,
 )
-from daras_ai_v2 import settings
+from daras_ai_v2 import settings, urls
 from daras_ai_v2.base import format_number_with_suffix
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -70,7 +70,7 @@ def user_profile_header(request, user: AppUser):
 
             if request.user == user:
                 with st.link(
-                    to=remove_hostname_from_url(
+                    to=urls.remove_hostname(
                         request.url_for("account", tab_path="profile")
                     ),
                     className="text-decoration-none btn btn-theme btn-secondary mb-0",
@@ -453,6 +453,7 @@ def _edit_user_profile_form_section(user: AppUser):
                 elif not handle and user.handle:
                     # user removes existing handle
                     user.handle.delete()
+                    user.handle = None
 
                 user.full_clean()
                 user.save()
@@ -470,14 +471,6 @@ def github_url_for_username(username: str) -> str:
 def get_placeholder_profile_image(seed: str) -> str:
     hash = hashlib.md5(seed.encode()).hexdigest()
     return f"https://gravatar.com/avatar/{hash}?d=robohash&size=150"
-
-
-def remove_hostname_from_url(url: str) -> str:
-    full_url = furl(url)
-    short_url = furl(full_url.path)
-    short_url.query = str(full_url.query)
-    short_url.fragment = str(full_url.fragment)
-    return str(short_url)
 
 
 def get_profile_title(user: AppUser) -> str:

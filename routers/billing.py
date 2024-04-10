@@ -13,12 +13,12 @@ from starlette.datastructures import FormData
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
-from daras_ai_v2 import icons, settings
+from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.base import RedirectException
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
-from daras_ai_v2.profiles import edit_user_profile_page, remove_hostname_from_url
+from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.settings import templates
 from gooey_ui.components.pills import pill
 from routers.root import page_wrapper, request_json
@@ -281,7 +281,7 @@ def all_saved_runs_tab(request: Request):
                 f"profile page at {request.user.handle.get_app_url()}."
             )
         else:
-            edit_profile_url = remove_hostname_from_url(
+            edit_profile_url = urls.remove_hostname(
                 request.url_for("account", tab_path="profile")
             )
             st.caption(
