@@ -3,6 +3,7 @@ from django.contrib.admin.models import LogEntry
 
 from app_users import models
 from django.db.models import Sum
+
 from bots.admin_links import open_in_new_tab, list_related_html_url
 from bots.models import SavedRun
 from usage_costs.models import UsageCost
@@ -169,26 +170,6 @@ class SavedRunInline(admin.StackedInline):
         return False
 
 
-class IsStripeFilter(admin.SimpleListFilter):
-    title = "Is Stripe Invoice"
-    parameter_name = "is_stripe_invoice"
-
-    def lookups(self, request, model_admin):
-        return (
-            ("1", "Yes"),
-            ("0", "No"),
-        )
-
-    def queryset(self, request, queryset):
-        value = self.value()
-        if value is None:
-            return queryset
-        if int(value):
-            return queryset.filter(invoice_id__startswith="in_")
-        else:
-            return queryset.exclude(invoice_id__startswith="in_")
-
-
 @admin.register(models.AppUserTransaction)
 class AppUserTransactionAdmin(admin.ModelAdmin):
     autocomplete_fields = ["user"]
@@ -202,7 +183,11 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
         "created_at",
     ]
     readonly_fields = ["created_at"]
-    list_filter = ["created_at", IsStripeFilter, "payment_provider"]
+    list_filter = [
+        "created_at",
+        ("payment_provider", admin.EmptyFieldListFilter),
+        "payment_provider",
+    ]
     inlines = [SavedRunInline]
     ordering = ["-created_at"]
 
