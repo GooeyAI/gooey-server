@@ -3,8 +3,7 @@
 </p>
 
 <p>
-    <a href="{{ account_url }}">{{ user.display_name }}</a> attempted to connect their 
-    <a href="{{ run_url }}">run</a> to {{ integration_type }}.
+    {{ account_url | safe }} attempted to connect their <a href="{{ run_url }}">run</a> to {{ integration_type }}.
 </p><p>
     You can reach out to {{ user.email }} to follow up.
 </p><p>
