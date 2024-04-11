@@ -23,7 +23,7 @@ class CustomURLField(models.URLField):
 
 class StrippedTextField(models.TextField):
     def clean(self, value, model_instance):
-        if value is not None:
+        if value:
             value = value.strip()
         return super().clean(value, model_instance)
 
