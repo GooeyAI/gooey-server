@@ -51,6 +51,7 @@ class LLMApis(Enum):
 
 
 class LargeLanguageModels(Enum):
+    gpt_4_turbo_vision = "GPT-4 Turbo with Vision (openai)"
     gpt_4_vision = "GPT-4 Vision (openai)"
     gpt_4_turbo = "GPT-4 Turbo (openai)"
     gpt_4 = "GPT-4 (openai)"
@@ -90,6 +91,7 @@ class LargeLanguageModels(Enum):
     def is_vision_model(self) -> bool:
         return self in {
             self.gpt_4_vision,
+            self.gpt_4_turbo_vision,
             self.gemini_1_pro_vision,
         }
 
@@ -104,6 +106,7 @@ class LargeLanguageModels(Enum):
 AZURE_OPENAI_MODEL_PREFIX = "openai-"
 
 llm_model_names = {
+    LargeLanguageModels.gpt_4_turbo_vision: "gpt-4-turbo-2024-04-09",
     LargeLanguageModels.gpt_4_vision: "gpt-4-vision-preview",
     LargeLanguageModels.gpt_4_turbo: (
         "openai-gpt-4-turbo-prod-ca-1",
@@ -139,6 +142,7 @@ llm_model_names = {
 }
 
 llm_api = {
+    LargeLanguageModels.gpt_4_turbo_vision: LLMApis.openai,
     LargeLanguageModels.gpt_4_vision: LLMApis.openai,
     LargeLanguageModels.gpt_4_turbo: LLMApis.openai,
     LargeLanguageModels.gpt_4: LLMApis.openai,
@@ -164,7 +168,8 @@ llm_api = {
 EMBEDDING_MODEL_MAX_TOKENS = 8191
 
 model_max_tokens = {
-    # https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
+    # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
+    LargeLanguageModels.gpt_4_turbo_vision: 128_000,
     LargeLanguageModels.gpt_4_vision: 128_000,
     # https://help.openai.com/en/articles/8555510-gpt-4-turbo
     LargeLanguageModels.gpt_4_turbo: 128_000,
@@ -194,6 +199,7 @@ model_max_tokens = {
 }
 
 llm_price = {
+    LargeLanguageModels.gpt_4_turbo_vision: 6,
     LargeLanguageModels.gpt_4_vision: 6,
     LargeLanguageModels.gpt_4_turbo: 5,
     LargeLanguageModels.gpt_4: 10,
