@@ -587,9 +587,9 @@ def make_natural_english_list(
         case [first]:
             return first
         case [first, last]:
-            return f"{first} {last_sep} {last}"
+            return f"{first}{last_sep}{last}"
         case [*rest, last]:
             text = ", ".join(rest)
-            return f"{text} {last_sep} {last}"
+            return f"{text}{last_sep}{last}"
         case _:
             raise ValueError("not a list")
