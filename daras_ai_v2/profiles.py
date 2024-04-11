@@ -17,10 +17,16 @@ from bots.models import (
     SavedRun,
     Workflow,
 )
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings, urls
 from daras_ai_v2.base import format_number_with_suffix
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
+from daras_ai_v2.meta_content import (
+    SEP as META_SEP,
+    TITLE_SUFFIX as META_TITLE_SUFFIX,
+    raw_build_meta_tags,
+)
 from gooey_ui.components.pills import pill
 from handles.models import Handle
 
@@ -29,6 +35,23 @@ from handles.models import Handle
 class ContributionsSummary:
     total: int
     top_contributions: dict[Workflow, int]  # sorted dict
+
+
+@dataclass
+class PublicRunsSummary:
+    total: int
+    top_workflows: dict[Workflow, int]
+
+
+def get_meta_tags_for_profile(user: AppUser):
+    assert user.handle
+    return raw_build_meta_tags(
+        url=user.handle.get_app_url(),
+        title=_get_meta_title_for_profile(user),
+        description=_get_meta_description_for_profile(user) or None,
+        image=get_profile_image(user),
+        canonical_url=user.handle.get_app_url(),
+    )
 
 
 def user_profile_page(request: Request, user: AppUser):
@@ -46,12 +69,12 @@ def user_profile_header(request, user: AppUser):
     with st.div(className="mt-3"):
         col1, col2 = st.columns([2, 10])
 
-    with col1, st.div(
-        className="d-flex justify-content-center align-items-center h-100"
+    with (
+        col1,
+        st.div(className="d-flex justify-content-center align-items-center h-100"),
     ):
-        profile_image(
-            user.photo_url,
-            placeholder_seed=user.uid,
+        render_profile_image(
+            get_profile_image(user),
             className="mb-3",
         )
 
@@ -59,8 +82,11 @@ def user_profile_header(request, user: AppUser):
     run_count = get_run_count(user)
     contribs = get_contributions_summary(user)
 
-    with col2, st.div(
-        className="d-flex text-center flex-column justify-content-center align-items-center align-items-lg-start"
+    with (
+        col2,
+        st.div(
+            className="d-flex text-center flex-column justify-content-center align-items-center align-items-lg-start"
+        ),
     ):
         with st.div(
             className="d-inline d-lg-flex w-100 justify-content-between align-items-end"
@@ -99,10 +125,13 @@ def user_profile_header(request, user: AppUser):
                     )
 
             if user.website_url:
-                with st.tag(
-                    "span",
-                    className="text-sm mb-1 me-2 me-lg-4 d-inline-block mb-1",
-                ), st.link(to=user.website_url, className="text-decoration-none"):
+                with (
+                    st.tag(
+                        "span",
+                        className="text-sm mb-1 me-2 me-lg-4 d-inline-block mb-1",
+                    ),
+                    st.link(to=user.website_url, className="text-decoration-none"),
+                ):
                     st.html(
                         '<i class="fa-solid fa-link"></i> '
                         + escape_html(
@@ -181,7 +210,23 @@ def get_contributions_summary(user: AppUser, *, top_n: int = 3) -> Contributions
     return ContributionsSummary(total=total, top_contributions=top_contributions)
 
 
-def profile_image(url: str, placeholder_seed: str, **props):
+def get_public_runs_summary(user: AppUser, *, top_n: int = 3) -> PublicRunsSummary:
+    count_by_workflow = (
+        user.published_runs.filter(visibility=PublishedRunVisibility.PUBLIC)
+        .values("workflow")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+    )
+
+    total = sum(row["count"] for row in count_by_workflow)
+    top_workflows = {
+        Workflow(row["workflow"]): row["count"] for row in count_by_workflow[:top_n]
+    }
+
+    return PublicRunsSummary(total=total, top_workflows=top_workflows)
+
+
+def render_profile_image(url: str, **props):
     style = {
         "maxWidth": "200px",
         "aspectRatio": "1",
@@ -189,7 +234,7 @@ def profile_image(url: str, placeholder_seed: str, **props):
     } | props.pop("style", {})
     className = "w-100 rounded-circle " + props.pop("className", "")
     st.image(
-        url or get_placeholder_profile_image(placeholder_seed),
+        url,
         style=style,
         className=className,
         **props,
@@ -302,10 +347,13 @@ def _edit_user_profile_banner(user: AppUser):
     ):
         if _is_uploading_banner_photo():
             translucent_style = {"backgroundColor": "rgba(255, 255, 255, 0.2)"}
-            with st.div(
-                className="d-flex justify-content-center align-items-center w-100 h-100",
-                style=translucent_style,
-            ), st.div():
+            with (
+                st.div(
+                    className="d-flex justify-content-center align-items-center w-100 h-100",
+                    style=translucent_style,
+                ),
+                st.div(),
+            ):
                 banner_url = st.file_uploader(
                     "", accept=["image/*"], key="banner_photo_url"
                 )
@@ -374,9 +422,9 @@ def _edit_user_profile_photo_section(user: AppUser):
                     st.experimental_rerun()
 
             with image_div:
-                profile_image(image_url or user.photo_url, placeholder_seed=user.uid)
+                render_profile_image(get_profile_image(user))
         else:
-            profile_image(user.photo_url, placeholder_seed=user.uid)
+            render_profile_image(get_profile_image(user))
 
             with st.div(className="mt-2"):
                 if st.button(
@@ -464,8 +512,57 @@ def _edit_user_profile_form_section(user: AppUser):
             st.success("Changes saved")
 
 
+def _get_meta_title_for_profile(user: AppUser) -> str:
+    title = user.display_name if user.display_name else user.handle.name
+    if user.company:
+        title += f" - {user.company[:15]}"
+
+    title += f" {META_SEP} {META_TITLE_SUFFIX}"
+    return title
+
+
+def _get_meta_description_for_profile(user: AppUser) -> str:
+    description = truncate_text_words(user.bio, maxlen=60)
+
+    total_runs = get_run_count(user)
+    if total_runs == 0:
+        return description
+
+    if description:
+        description += f" {META_SEP} "
+
+    description += f"{user.handle.name} has "
+
+    public_runs_summary = get_public_runs_summary(user)
+    contributions_summary = get_contributions_summary(user)
+
+    activity_texts = []
+    if public_runs_summary.total > 0:
+        top_workflow_titles = make_natural_english_list(
+            [
+                str(workflow.short_title)
+                for workflow in public_runs_summary.top_workflows
+            ]
+        )
+        activity_texts.append(
+            f"{public_runs_summary.total} public {top_workflow_titles} workflows"
+        )
+
+    if contributions_summary.total > 0:
+        activity_texts.append(f"{contributions_summary.total} contributions")
+
+    activity_texts.append(f"{total_runs} Gooey.AI runs.")
+
+    description += make_natural_english_list(activity_texts)
+    return description
+
+
 def github_url_for_username(username: str) -> str:
     return f"https://github.com/{escape_html(username)}"
+
+
+def get_profile_image(user: AppUser, placeholder_seed: str | None = None) -> str:
+    return user.photo_url or get_placeholder_profile_image(placeholder_seed or user.uid)
 
 
 def get_placeholder_profile_image(seed: str) -> str:
@@ -482,3 +579,22 @@ def get_profile_title(user: AppUser) -> str:
         return user.phone_number.as_e164[:-4] + "XXXX"
     else:
         return ""
+
+
+def make_natural_english_list(
+    l: list[str],
+    *,
+    last_sep: str = "&",
+) -> str:
+    match l:
+        case []:
+            return ""
+        case [first]:
+            return first
+        case [first, last]:
+            return f"{first} {last_sep} {last}"
+        case [*rest, last]:
+            text = ", ".join(rest)
+            return f"{text} {last_sep} {last}"
+        case _:
+            raise ValueError("not a list")

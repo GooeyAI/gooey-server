@@ -35,7 +35,7 @@ from daras_ai_v2.exceptions import ffmpeg, UserError
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.profiles import user_profile_page
+from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from daras_ai_v2.tabs_widget import MenuTabs
@@ -434,13 +434,16 @@ def recipe_page(
 
 def handle_page(request: Request, handle: Handle, json_data: dict):
     if handle.has_user:
-        return st.runner(
+        response = st.runner(
             lambda: page_wrapper(
                 request=request,
                 render_fn=lambda: user_profile_page(request=request, user=handle.user),
             ),
             **json_data,
         )
+        return response | {
+            "meta": get_meta_tags_for_profile(handle.user),
+        }
     elif handle.has_redirect:
         raise RedirectException(handle.redirect_url, status_code=301)
     else:
