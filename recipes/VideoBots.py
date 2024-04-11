@@ -1201,11 +1201,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 #         <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
                 #     </div>
                 if redirect_url:
-                    send_integration_attempt_email.delay(
-                        user_id=self.request.user.id,
-                        platform=selected_platform,
-                        run_url=self._get_current_app_url() or "",
-                    )
+                    if not self.is_current_user_admin():
+                        send_integration_attempt_email.delay(
+                            user_id=self.request.user.id,
+                            platform=selected_platform,
+                            run_url=self._get_current_app_url() or "",
+                        )
                     raise RedirectException(redirect_url)
 
             st.newline()
