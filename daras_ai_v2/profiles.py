@@ -18,7 +18,7 @@ from bots.models import (
     Workflow,
 )
 from daras_ai.image_input import truncate_text_words
-from daras_ai_v2 import settings, urls
+from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.base import format_number_with_suffix
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -78,7 +78,6 @@ def user_profile_header(request, user: AppUser):
             className="mb-3",
         )
 
-    run_icon = '<i class="fa-regular fa-person-running"></i>'
     run_count = get_run_count(user)
     contribs = get_contributions_summary(user)
 
@@ -101,7 +100,7 @@ def user_profile_header(request, user: AppUser):
                     ),
                     className="text-decoration-none btn btn-theme btn-secondary mb-0",
                 ):
-                    st.html('<i class="fa-solid fa-pencil"></i> Edit Profile')
+                    st.html(f"{icons.edit} Edit Profile")
 
         with st.tag("p", className="lead text-secondary mb-0"):
             st.html(escape_html(user.handle and user.handle.name or ""))
@@ -117,8 +116,7 @@ def user_profile_header(request, user: AppUser):
                     className="text-decoration-none",
                 ):
                     pill(
-                        '<i class="fa-brands fa-github"></i> '
-                        + escape_html(user.github_username),
+                        f"{icons.github} " + escape_html(user.github_username),
                         unsafe_allow_html=True,
                         type=None,
                         className="text-black border border-dark fs-6 me-2 me-lg-4 mb-1",
@@ -133,10 +131,8 @@ def user_profile_header(request, user: AppUser):
                     st.link(to=user.website_url, className="text-decoration-none"),
                 ):
                     st.html(
-                        '<i class="fa-solid fa-link"></i> '
-                        + escape_html(
-                            user.website_url.lstrip("https://").lstrip("http://")
-                        )
+                        f"{icons.link} "
+                        + escape_html(urls.remove_scheme(user.website_url))
                     )
 
             if user.company:
@@ -144,25 +140,27 @@ def user_profile_header(request, user: AppUser):
                     "span",
                     className="text-sm text-muted me-lg-4 mb-1 d-inline-block",
                 ):
-                    st.html(
-                        '<i class="fa-solid fa-buildings"></i> '
-                        + escape_html(user.company)
-                    )
+                    st.html(f"{icons.company} " + escape_html(user.company))
+
+        top_contributions_text = make_natural_english_list(
+            [
+                f"{escape_html(workflow.short_title)} ({count})"
+                for workflow, count in contribs.top_contributions.items()
+            ],
+            last_sep=", ",
+        )
 
         st.html(
             f"""\
 <div class="d-flex mt-3">
     <div class="me-3 text-secondary">
-        {run_icon} {escape_html(format_number_with_suffix(run_count))} runs
+        {icons.run} {escape_html(format_number_with_suffix(run_count))} runs
     </div>
-
+ 
     <div class="text-start">
         <div>{contribs.total} contributions since {user.created_at.strftime("%b %Y")}</div>
         <small class="mt-1">
-            {", ".join(
-                f"{escape_html(workflow.short_title)} ({count})"
-                for workflow, count in contribs.top_contributions.items()
-            )}
+            {top_contributions_text}
         </small>
     </div>
 </div>
@@ -293,7 +291,7 @@ def _edit_user_profile_header(user: AppUser):
 
         if user.handle:
             copy_to_clipboard_button(
-                '<i class="fa-solid fa-copy"></i> Copy',
+                f"{icons.copy} Copy",
                 value=user.handle.get_app_url(),
                 type="tertiary",
                 className="m-0",
@@ -302,7 +300,7 @@ def _edit_user_profile_header(user: AppUser):
                 to=user.handle.get_app_url(),
                 className="btn btn-theme btn-tertiary m-0",
             ):
-                st.html('<i class="fa-solid fa-eye"></i> Preview')
+                st.html(f"{icons.preview} Preview")
 
 
 def _banner_image_div(url: str | None, **props):
@@ -359,16 +357,14 @@ def _edit_user_profile_banner(user: AppUser):
                 )
 
                 with st.div(className="d-flex justify-content-center"):
-                    if banner_url and st.button(
-                        '<i class="fa-regular fa-floppy-disk"></i> Save', type="primary"
-                    ):
+                    if banner_url and st.button(f"{icons.save} Save", type="primary"):
                         user.banner_url = banner_url
                         user.save(update_fields=["banner_url"])
                         _set_uploading_banner_photo(False)
                         st.experimental_rerun()
 
                     if st.button(
-                        '<i class="fa-regular fa-xmark-large"></i> Cancel',
+                        f"{icons.cancel} Cancel",
                         className="text-danger",
                     ):
                         _set_uploading_banner_photo(False)
@@ -376,7 +372,7 @@ def _edit_user_profile_banner(user: AppUser):
         else:
             with st.div(className="position-absolute bottom-0 end-0"):
                 if user.banner_url and st.button(
-                    '<i class="fa-regular fa-broom-wide"></i> Clear',
+                    f"{icons.clear} Clear",
                     type="tertiary",
                     className="text-dark",
                 ):
@@ -385,11 +381,10 @@ def _edit_user_profile_banner(user: AppUser):
                     _set_uploading_banner_photo(False)
                     st.experimental_rerun()
 
-                camera_icon = '<i class="fa-regular fa-camera"></i>'
                 upload_banner_text = (
-                    f"{camera_icon} Edit Cover Photo"
+                    f"{icons.camera} Edit Cover Photo"
                     if user.banner_url
-                    else f"{camera_icon} Add Cover Photo"
+                    else f"{icons.camera} Add Cover Photo"
                 )
                 if st.button(
                     upload_banner_text, className="mb-3 me-3", type="secondary"
@@ -415,7 +410,7 @@ def _edit_user_profile_photo_section(user: AppUser):
                     st.experimental_rerun()
 
                 if st.button(
-                    '<i class="fa-solid fa-xmark-large"></i> Cancel',
+                    f"{icons.cancel} Cancel",
                     className="text-danger",
                 ):
                     _set_is_uploading_photo(False)
@@ -428,14 +423,14 @@ def _edit_user_profile_photo_section(user: AppUser):
 
             with st.div(className="mt-2"):
                 if st.button(
-                    '<i class="fa-regular fa-camera"></i> Upload',
+                    f"{icons.camera} Upload",
                     type="link",
                     className="d-block text-decoration-none px-2 py-1 my-2",
                 ):
                     _set_is_uploading_photo(True)
                     st.experimental_rerun()
                 if user.photo_url and st.button(
-                    '<i class="fa-regular fa-broom-wide"></i> Clear',
+                    f"{icons.clear} Clear",
                     type="link",
                     className="d-block text-decoration-none px-2 py-1 my-2",
                 ):
@@ -584,7 +579,7 @@ def get_profile_title(user: AppUser) -> str:
 def make_natural_english_list(
     l: list[str],
     *,
-    last_sep: str = "&",
+    last_sep: str = " & ",
 ) -> str:
     match l:
         case []:
