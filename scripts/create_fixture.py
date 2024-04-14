@@ -33,8 +33,7 @@ def get_objects():
             yield export(pr.last_edited_by)
         yield export(pr, ["saved_run", "created_by", "last_edited_by"])
 
-        version = pr.versions.latest()
-        if version:
+        for version in pr.versions.all():
             yield export(version.saved_run)
             yield export(version, ["published_run", "saved_run"])
 

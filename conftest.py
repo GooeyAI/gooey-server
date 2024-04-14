@@ -84,7 +84,7 @@ def _mock_realtime_subscribe(channel: str):
 
 
 @pytest.fixture
-def threadpool_subtest(subtests, max_workers: int = 16):
+def threadpool_subtest(subtests, max_workers: int = 8):
     ts = []
 
     def submit(fn, *args, msg=None, **kwargs):
