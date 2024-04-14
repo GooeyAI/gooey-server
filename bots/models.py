@@ -76,10 +76,13 @@ class Platform(models.IntegerChoices):
     INSTAGRAM = (2, "Instagram")
     WHATSAPP = (3, "WhatsApp")
     SLACK = (4, "Slack")
+    WEB = (5, "Web")
 
     def get_favicon(self):
         if self == Platform.WHATSAPP:
             return f"https://static.facebook.com/images/whatsapp/www/favicon.png"
+        elif self == Platform.WEB:
+            return f"https://gooey.ai/favicon.ico"
         else:
             return f"https://www.{self.name.lower()}.com/favicon.ico"
 
@@ -595,6 +598,12 @@ class BotIntegration(models.Model):
         help_text="If set, the bot will create a personal channel for each user in the public channel",
     )
 
+    web_allowed_origins = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of allowed domains for the bot's web integration",
+    )
+
     analysis_run = models.ForeignKey(
         "bots.SavedRun",
         on_delete=models.SET_NULL,
@@ -607,7 +616,7 @@ class BotIntegration(models.Model):
 
     streaming_enabled = models.BooleanField(
         default=False,
-        help_text="If set, the bot will stream messages to the frontend (Slack only)",
+        help_text="If set, the bot will stream messages to the frontend (Slack & Web only)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -653,6 +662,12 @@ class BotIntegration(models.Model):
         )
 
     get_display_name.short_description = "Bot"
+
+    @admin.display(description="API integraton_id")
+    def api_integration_id(self):
+        from routers.bots_api import api_hashids
+
+        return api_hashids.encode(self.id)
 
 
 class ConvoState(models.IntegerChoices):
@@ -854,6 +869,14 @@ class Conversation(models.Model):
     slack_channel_is_personal = models.BooleanField(
         default=False,
         help_text="Whether this is a personal slack channel between the bot and the user",
+    )
+
+    web_user_id = models.CharField(
+        max_length=512,
+        blank=True,
+        default=None,
+        null=True,
+        help_text="User's web user id (mandatory if platform is WEB)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1062,7 +1085,6 @@ class Message(models.Model):
         blank=True,
         null=True,
         default=None,
-        unique=True,
         help_text="The platform's delivered message id",
     )
 
@@ -1107,7 +1129,13 @@ class Message(models.Model):
     class Meta:
         ordering = ("-created_at",)
         get_latest_by = "created_at"
-        indexes = [models.Index(fields=["conversation", "-created_at"])]
+        unique_together = [
+            ("platform_msg_id", "conversation"),
+        ]
+        indexes = [
+            models.Index(fields=["conversation", "-created_at"]),
+            models.Index(fields=["-created_at"]),
+        ]
 
     def __str__(self):
         return Truncator(self.content).words(30)

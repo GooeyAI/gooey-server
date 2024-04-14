@@ -5,7 +5,7 @@ from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes, get_mimetype_from_response
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
-from daras_ai_v2.bots import BotInterface, ReplyButton
+from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.text_splitter import text_splitter
 
@@ -21,11 +21,9 @@ class WhatsappBot(BotInterface):
 
     def __init__(self, message: dict, metadata: dict):
         self.input_message = message
-        self.platform = Platform.WHATSAPP
-
+        self.user_msg_id = message["id"]
         self.bot_id = metadata["phone_number_id"]  # this is NOT the phone number
         self.user_id = message["from"]  # this is a phone number
-
         self.input_type = message["type"]
 
         bi = BotIntegration.objects.get(wa_phone_number_id=self.bot_id)
@@ -89,10 +87,11 @@ class WhatsappBot(BotInterface):
             content_type=mime_type,
         )
 
-    def get_interactive_msg_info(self) -> tuple[str, str]:
-        button_id = self.input_message["interactive"]["button_reply"]["id"]
-        context_msg_id = self.input_message["context"]["id"]
-        return button_id, context_msg_id
+    def get_interactive_msg_info(self) -> ButtonPressed:
+        return ButtonPressed(
+            button_id=self.input_message["interactive"]["button_reply"]["id"],
+            context_msg_id=self.input_message["context"]["id"],
+        )
 
     def send_msg(
         self,

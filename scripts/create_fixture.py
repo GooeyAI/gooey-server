@@ -9,6 +9,7 @@ from bots.models import BotIntegration, PublishedRun, PublishedRunVisibility
 def run():
     with open("fixture.json", "w") as f:
         objs = list(get_objects())
+        print(f"Exporting {len(objs)} objects")
         serializers.serialize(
             "json",
             objs,
@@ -24,33 +25,36 @@ def get_objects():
         is_approved_example=True,
         visibility=PublishedRunVisibility.PUBLIC,
     ):
-        set_fk_null(pr.saved_run)
         if pr.saved_run_id:
-            yield pr.saved_run
+            yield export(pr.saved_run)
         if pr.created_by_id:
-            yield pr.created_by
+            yield export(pr.created_by)
         if pr.last_edited_by_id:
-            yield pr.last_edited_by
-        yield pr
+            yield export(pr.last_edited_by)
+        yield export(pr, ["saved_run", "created_by", "last_edited_by"])
 
-        for version in pr.versions.all():
-            set_fk_null(version.saved_run)
-            yield version.saved_run
-            if version.changed_by_id:
-                yield version.changed_by
-            yield version
+        version = pr.versions.latest()
+        if version:
+            yield export(version.saved_run)
+            yield export(version, ["published_run", "saved_run"])
 
     for obj in BotIntegration.objects.all():
-        if not obj.saved_run_id:
-            continue
-        set_fk_null(obj.saved_run)
-        yield obj.saved_run
-
         yield AppUser.objects.get(uid=obj.billing_account_uid)
-        yield obj
+
+        if obj.saved_run_id:
+            yield export(obj.saved_run)
+
+        if obj.published_run_id:
+            yield export(obj.published_run.saved_run)
+            yield export(obj.published_run, ["saved_run"])
+
+        yield export(obj, ["saved_run", "published_run"])
 
 
-def set_fk_null(obj):
+def export(obj, exclude=()):
     for field in obj._meta.get_fields():
+        if field.name in exclude:
+            continue
         if field.is_relation and field.many_to_one:
             setattr(obj, field.name, None)
+    return obj

@@ -13,6 +13,8 @@ from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
+from daras_ai_v2 import settings
+from daras_ai_v2.api_examples_widget import bot_api_example_generator
 from daras_ai_v2.asr import (
     translation_model_selector,
     translation_language_selector,
@@ -89,7 +91,6 @@ from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage
 from url_shortener.models import ShortenedURL
-
 
 DEFAULT_COPILOT_META_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f454d64a-9457-11ee-b6d5-02420a0001cb/Copilot.jpg.png"
 INTEGRATION_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/c3ba2392-d6b9-11ee-a67b-6ace8d8c9501/image.png"
@@ -1075,8 +1076,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         from daras_ai_v2.slack_bot import send_confirmation_msg
 
         for bid in self.request.query_params.getlist("connect_ids"):
-            bi = BotIntegration.objects.filter(id=bid).first()
-            if not bi:
+            try:
+                bi = BotIntegration.objects.get(id=bid)
+            except BotIntegration.DoesNotExist:
                 continue
             if bi.saved_run is not None:
                 with st.center():
@@ -1151,55 +1153,80 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 unsafe_allow_html=True,
             )
 
-            LINKSTYLE = dict(margin=0, display="flex", justifyContent="center", alignItems="center", padding="8px", border="1px solid black", minWidth="120px", width="160px", aspectRatio="5 / 2", overflow="hidden", borderRadius="10px")  # fmt: skip
-            IMGSTYLE = 'style="width: 80%" draggable="false"'
-            ROWSTYLE = dict(display="flex", alignItems="center", gap="1em", marginBottom="1rem")  # fmt: skip
-            DESCRIPTIONSTYLE = f'style="color: {GRAYCOLOR}; text-align: left"'
+            linkstyle = dict(margin=0, display="flex", justifyContent="center", alignItems="center", padding="8px", border="1px solid black", minWidth="120px", width="160px", aspectRatio="5 / 2", overflow="hidden", borderRadius="10px")  # fmt: skip
+            imgstyle = 'style="width: 80%" draggable="false"'
+            rowstyle = dict(display="flex", alignItems="center", gap="1em", marginBottom="1rem")  # fmt: skip
+            descriptionstyle = dict(
+                color=GRAYCOLOR, textAlign="left", paddingTop="1rem"
+            )
+
             with st.div():  # outer wrapper to ensure rows are aligned
                 selected_platform = None
                 redirect_url = None
-                with st.div(style=ROWSTYLE, draggable="false"):
+                with st.div(style=rowstyle, draggable="false"):
                     if st.button(
-                        f'<img src="{WHATSAPP_IMG}" {IMGSTYLE} alt="Whatsapp">',
+                        f'<img src="{WHATSAPP_IMG}" {imgstyle} alt="Whatsapp">',
                         ariaLabel="Connect your Whatsapp number",
-                        style=LINKSTYLE,
+                        style=linkstyle,
                         draggable="false",
                     ):
                         selected_platform = Platform.WHATSAPP
                         redirect_url = wa_connect_url(on_connect)
-                    st.html(
-                        f'<div {DESCRIPTIONSTYLE}>Bring your own <a href="https://business.facebook.com/wa/manage/phone-numbers">WhatsApp number</a> to connect. Need a new one? Email <a href="mailto:sales@gooey.ai">sales@gooey.ai</a>.</div>'
-                    )
-                with st.div(style=ROWSTYLE, draggable="false"):
+                    with st.div(style=descriptionstyle):
+                        st.markdown(
+                            "Bring your own [WhatsApp number](https://business.facebook.com/wa/manage/phone-numbers) to connect. "
+                            "Need a new one? Email [sales@gooey.ai](mailto:sales@gooey.ai) for help."
+                        )
+
+                with st.div(style=rowstyle, draggable="false"):
                     if st.button(
-                        f'<img src="{SLACK_IMG}" {IMGSTYLE} alt="Slack">',
+                        f'<img src="{SLACK_IMG}" {imgstyle} alt="Slack">',
                         ariaLabel="Connect your Slack Workspace",
-                        style=LINKSTYLE,
+                        style=linkstyle,
                         draggable="false",
                     ):
                         selected_platform = Platform.SLACK
                         redirect_url = slack_connect_url(on_connect)
-                    st.html(
-                        f'<div {DESCRIPTIONSTYLE}>Connect to a Slack Channel. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-slack">Help Guide</a>.</div>'
-                    )
-                with st.div(style=ROWSTYLE, draggable="false"):
+                    with st.div(style=descriptionstyle):
+                        st.markdown(
+                            "Connect to a Slack Channel. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-slack)"
+                        )
+
+                with st.div(style=rowstyle, draggable="false"):
                     if st.button(
-                        f'<img src="{FACEBOOK_IMG}" {IMGSTYLE} alt="Facebook Messenger">',
+                        f'<img src="{FACEBOOK_IMG}" {imgstyle} alt="Facebook Messenger">',
                         ariaLabel="Connect your Facebook Page",
-                        style=LINKSTYLE,
+                        style=linkstyle,
                         draggable="false",
                     ):
                         selected_platform = Platform.FACEBOOK
                         redirect_url = fb_connect_url(on_connect)
-                    st.html(
-                        f'<div {DESCRIPTIONSTYLE}>Connect to a Facebook Page you own. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-facebook">Help Guide</a>.</div>'
-                    )
-                #     <div {ROWSTYLE}>
-                #         <a href="{ig_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Instagram Page">
-                #             <img src="{INSTAGRAM_IMG}" {IMGSTYLE} alt="Instagram">
-                #         </a>
-                #         <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
-                #     </div>
+                    with st.div(style=descriptionstyle):
+                        st.markdown(
+                            "Connect to a Facebook Page you own. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)"
+                        )
+
+                with st.div(style=rowstyle, draggable="false"):
+                    if st.button(
+                        f'<img src="{settings.GOOEY_LOGO_IMG}" {imgstyle} alt="Web">',
+                        ariaLabel="Connect to your App or Website",
+                        style=linkstyle,
+                        draggable="false",
+                    ):
+                        bi = BotIntegration.objects.create(
+                            name="Web",
+                            billing_account_uid=self.request.user.uid,
+                            platform=Platform.WEB,
+                        )
+                        selected_platform = Platform.WEB
+                        redirect_url = str(
+                            furl(on_connect).add(
+                                query_params=dict(connect_ids=str(bi.id))
+                            )
+                        )
+                    with st.div(style=descriptionstyle):
+                        st.markdown("Connect to your own App or Website.")
+
                 if redirect_url:
                     send_integration_attempt_email.delay(
                         user_id=self.request.user.id,
@@ -1210,7 +1237,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
             st.newline()
             st.write(
-                f"Or use [our API]({self.get_tab_url(MenuTabs.run_as_api)}) to integrate with your own app."
+                f"Or use [our API]({self.get_tab_url(MenuTabs.run_as_api)}) to build custom integrations with your server."
             )
 
     def integration_test_config_screen(
@@ -1254,6 +1281,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         else:
             bi = integrations[0]
         icon = f'<img src="{Platform(bi.platform).get_favicon()}" width="20" height="20" />'
+
+        if bi.platform == Platform.WEB:
+            bot_api_example_generator(bi.api_integration_id())
+            st.write("---")
 
         st.newline()
         with st.div(style={"width": "100%", "textAlign": "left"}):

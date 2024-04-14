@@ -1,4 +1,3 @@
-import datetime
 import json
 import os
 import os.path
@@ -29,6 +28,7 @@ from daras_ai_v2.all_pages import all_api_pages
 from daras_ai_v2.base import (
     BasePage,
     StateKeys,
+    RecipeRunState,
 )
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 
@@ -36,15 +36,6 @@ app = APIRouter()
 
 
 O = typing.TypeVar("O")
-
-
-class BalanceResponse(BaseModel):
-    balance: int = Field(description="Current balance in credits")
-
-
-@app.get("/v1/balance/", response_model=BalanceResponse)
-def get_balance(user: AppUser = Depends(api_auth_header)):
-    return BalanceResponse(balance=user.balance)
 
 
 ## v2
@@ -89,9 +80,7 @@ class AsyncApiResponseModelV3(BaseResponseModelV3):
 
 class AsyncStatusResponseModelV3(BaseResponseModelV3, typing.Generic[O]):
     run_time_sec: int = Field(description="Total run time in seconds")
-    status: typing.Literal["starting", "running", "completed", "failed"] = Field(
-        description="Status of the run"
-    )
+    status: RecipeRunState = Field(description="Status of the run")
     detail: str = Field(
         description="Details about the status of the run as a human readable string"
     )
@@ -116,6 +105,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         response_model=response_model,
         responses={500: {"model": FailedReponseModelV2}, 402: {}},
         operation_id=page_cls.slug_versions[0],
+        tags=[page_cls.title],
         name=page_cls.title + " (v2 sync)",
     )
     @app.post(
@@ -168,6 +158,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         responses={402: {}},
         operation_id="async__" + page_cls.slug_versions[0],
         name=page_cls.title + " (v3 async)",
+        tags=[page_cls.title],
         status_code=202,
     )
     @app.post(
@@ -191,6 +182,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             run_async=True,
         )
         response.headers["Location"] = ret["status_url"]
+        response.headers["Access-Control-Expose-Headers"] = "Location"
         return ret
 
     @app.post(
@@ -229,6 +221,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         response_model=response_model,
         responses={402: {}},
         operation_id="status__" + page_cls.slug_versions[0],
+        tags=[page_cls.title],
         name=page_cls.title + " (v3 status)",
     )
     @app.get(
@@ -257,14 +250,10 @@ def script_to_api(page_cls: typing.Type[BasePage]):
             ret |= {"status": "failed", "detail": err_msg}
             return ret
         else:
-            run_status = state.get(StateKeys.run_status) or ""
-            ret |= {"detail": run_status}
-            if run_status.lower().startswith("starting"):
-                ret |= {"status": "starting"}
-            elif run_status:
-                ret |= {"status": "running"}
-            else:
-                ret |= {"status": "completed", "output": state}
+            status = self.get_run_state(state)
+            ret |= {"detail": state.get(StateKeys.run_status) or "", "status": status}
+            if status == RecipeRunState.completed:
+                ret |= {"output": state}
             return ret
 
 
@@ -309,22 +298,18 @@ def call_api(
     query_params,
     run_async: bool = False,
 ) -> dict:
-    created_at = datetime.datetime.utcnow().isoformat()
-
-    self, result, run_id, uid = submit_api_call(
+    page, result, run_id, uid = submit_api_call(
         page_cls=page_cls,
         request_body=request_body,
         user=user,
         query_params=query_params,
     )
-
     return build_api_response(
-        self=self,
+        page=page,
         result=result,
         run_id=run_id,
         uid=uid,
         run_async=run_async,
-        created_at=created_at,
     )
 
 
@@ -367,31 +352,32 @@ def submit_api_call(
 
 def build_api_response(
     *,
-    self: BasePage,
+    page: BasePage,
     result: "celery.result.AsyncResult",
     run_id: str,
     uid: str,
     run_async: bool,
-    created_at: str,
 ):
-    web_url = self.app_url(run_id=run_id, uid=uid)
+    web_url = page.app_url(run_id=run_id, uid=uid)
     if run_async:
         status_url = str(
             furl(settings.API_BASE_URL, query_params=dict(run_id=run_id))
-            / self.endpoint.replace("v2", "v3")
+            / page.endpoint.replace("v2", "v3")
             / "status/"
         )
+        sr = page.run_doc_sr(run_id, uid)
         # return the url to check status
         return {
             "run_id": run_id,
             "web_url": web_url,
-            "created_at": created_at,
+            "created_at": sr.created_at.isoformat(),
             "status_url": status_url,
         }
     else:
         # wait for the result
         get_celery_result_db_safe(result)
-        state = self.run_doc_sr(run_id, uid).to_dict()
+        sr = page.run_doc_sr(run_id, uid)
+        state = sr.to_dict()
         # check for errors
         err_msg = state.get(StateKeys.error_msg)
         if err_msg:
@@ -400,7 +386,7 @@ def build_api_response(
                 detail={
                     "id": run_id,
                     "url": web_url,
-                    "created_at": created_at,
+                    "created_at": sr.created_at.isoformat(),
                     "error": err_msg,
                 },
             )
@@ -409,7 +395,7 @@ def build_api_response(
             return {
                 "id": run_id,
                 "url": web_url,
-                "created_at": created_at,
+                "created_at": sr.created_at.isoformat(),
                 "output": state,
             }
 
@@ -420,3 +406,12 @@ def setup_pages():
 
 
 setup_pages()
+
+
+class BalanceResponse(BaseModel):
+    balance: int = Field(description="Current balance in credits")
+
+
+@app.get("/v1/balance/", response_model=BalanceResponse, tags=["Misc"])
+def get_balance(user: AppUser = Depends(api_auth_header)):
+    return BalanceResponse(balance=user.balance)

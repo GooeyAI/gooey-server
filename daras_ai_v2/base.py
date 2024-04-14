@@ -80,10 +80,10 @@ SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
 
 
 class RecipeRunState(Enum):
-    idle = 1
-    running = 2
-    completed = 3
-    failed = 4
+    starting = "starting"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
 
 
 class StateKeys:
@@ -170,7 +170,9 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
-    def get_tab_url(self, tab: str, query_params: dict = {}) -> str:
+    def get_tab_url(self, tab: str, query_params: dict = None) -> str:
+        if query_params is None:
+            query_params = {}
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         return self.app_url(
             example_id=example_id,
@@ -1047,7 +1049,7 @@ class BasePage:
 
     @classmethod
     def get_sr_from_query_params(
-        cls, example_id: str, run_id: str, uid: str
+        cls, example_id: str | None, run_id: str | None, uid: str | None
     ) -> SavedRun:
         try:
             if run_id and uid:
@@ -1392,7 +1394,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             return RecipeRunState.completed
         else:
             # when user is at a recipe root, and not running anything
-            return RecipeRunState.idle
+            return RecipeRunState.starting
 
     def _render_output_col(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
@@ -1415,7 +1417,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
                 self._render_failed_output()
             case RecipeRunState.running:
                 self._render_running_output()
-            case RecipeRunState.idle:
+            case RecipeRunState.starting:
                 pass
 
         # render outputs

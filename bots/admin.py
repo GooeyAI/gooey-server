@@ -63,6 +63,7 @@ slack_fields = [
     "slack_read_receipt_msg",
     "slack_create_personal_channels",
 ]
+web_fields = ["web_allowed_origins"]
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
@@ -73,12 +74,13 @@ class BotIntegrationAdminForm(forms.ModelForm):
             "platform": forms.Select(
                 attrs={
                     "--hideshow-fields": ",".join(
-                        fb_fields + ig_fields + wa_fields + slack_fields
+                        fb_fields + ig_fields + wa_fields + slack_fields + web_fields
                     ),
-                    "--show-on-1": ",".join(fb_fields),
-                    "--show-on-2": ",".join(fb_fields + ig_fields),
-                    "--show-on-3": ",".join(wa_fields),
-                    "--show-on-4": ",".join(slack_fields),
+                    f"--show-on-{Platform.FACEBOOK}": ",".join(fb_fields),
+                    f"--show-on-{Platform.INSTAGRAM}": ",".join(fb_fields + ig_fields),
+                    f"--show-on-{Platform.WHATSAPP}": ",".join(wa_fields),
+                    f"--show-on-{Platform.SLACK}": ",".join(slack_fields),
+                    f"--show-on-{Platform.WEB}": ",".join(web_fields),
                 },
             ),
         }
@@ -136,6 +138,10 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
     autocomplete_fields = ["saved_run", "published_run", "analysis_run"]
 
+    formfield_overrides = {
+        django.db.models.JSONField: {"widget": JSONEditorWidget},
+    }
+
     readonly_fields = [
         "fb_page_access_token",
         "slack_access_token",
@@ -145,6 +151,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "view_messsages",
         "created_at",
         "updated_at",
+        "api_integration_id",
     ]
 
     fieldsets = [
@@ -157,6 +164,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     "published_run",
                     "billing_account_uid",
                     "user_language",
+                    "api_integration_id",
                 ],
             },
         ),
@@ -169,6 +177,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     *ig_fields,
                     *wa_fields,
                     *slack_fields,
+                    *web_fields,
                 ]
             },
         ),
@@ -537,7 +546,7 @@ class MessageAdmin(admin.ModelAdmin):
         "prev_msg_saved_run",
         "response_time",
     ]
-    ordering = ["created_at"]
+    ordering = ["-created_at"]
     actions = [export_to_csv, export_to_excel]
 
     inlines = [MessageAttachmentInline, FeedbackInline]

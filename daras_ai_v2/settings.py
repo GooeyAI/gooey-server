@@ -32,7 +32,8 @@ else:
     SECRET_KEY = config("SECRET_KEY")
 
 # https://hashids.org/
-HASHIDS_SALT = config("HASHIDS_SALT", default="")
+HASHIDS_URL_SALT = config("HASHIDS_URL_SALT", default="")
+HASHIDS_API_SALT = config("HASHIDS_API_SALT", default="")
 
 ALLOWED_HOSTS = ["*"]
 INTERNAL_IPS = ["127.0.0.1", "localhost"]
@@ -215,6 +216,8 @@ import firebase_admin
 
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
+
+GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
