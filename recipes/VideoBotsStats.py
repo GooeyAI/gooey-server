@@ -373,13 +373,14 @@ class VideoBotsStatsPage(BasePage):
 
     def parse_run_info(self, bi):
         saved_run = bi.get_active_saved_run()
-        if bi.published_run:
+        run_url = None
+        if bi.published_run_id:
             run_title = bi.published_run.title
+            run_url = bi.published_run.get_app_url()
         elif saved_run:
             run_title = saved_run.page_title or "This Copilot Run"
         else:
             run_title = "No Run Connected"
-        run_url = bi.published_run.get_app_url()
         if saved_run and not run_url:
             run_url = saved_run.get_app_url()
         return run_title, run_url
