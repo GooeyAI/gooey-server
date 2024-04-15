@@ -1953,7 +1953,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         multiplier = WorkflowMetadata.objects.get(
             workflow=current_run.workflow
         ).price_multiplier
-        return math.ceil(multiplier * dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR)
+        return math.ceil(dollar_amt * multiplier * settings.ADDON_CREDITS_PER_DOLLAR)
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
