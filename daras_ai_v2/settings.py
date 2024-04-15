@@ -32,8 +32,8 @@ else:
     SECRET_KEY = config("SECRET_KEY")
 
 # https://hashids.org/
-HASHIDS_URL_SALT = config("HASHIDS_URL_SALT", default="")
-HASHIDS_API_SALT = config("HASHIDS_API_SALT", default="")
+HASHIDS_URL_SALT = config("HASHIDS_URL_SALT", default="")  # used for the url shortener
+HASHIDS_API_SALT = config("HASHIDS_API_SALT", default="")  # for everything else
 
 ALLOWED_HOSTS = ["*"]
 INTERNAL_IPS = ["127.0.0.1", "localhost"]

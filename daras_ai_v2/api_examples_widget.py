@@ -403,7 +403,7 @@ Note that you do not need the API key for this endpoint and can use it directly 
     )
     st.markdown(
         f"""
-Read our <a href="{api_docs_url}" target="_blank">complete API</a> for more options like conversation history, input media files, and more.
+Read our <a href="{api_docs_url}" target="_blank">complete API</a> for features like conversation history, input media files, and more.
         """,
         unsafe_allow_html=True,
     )
