@@ -2,6 +2,7 @@ import datetime
 import typing
 from multiprocessing.pool import ThreadPool
 from textwrap import dedent
+from decimal import Decimal
 
 import pytz
 from django.conf import settings
@@ -23,9 +24,11 @@ if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
     import celery.result
 
+max_digits = 15
+decimal_places = 10
+
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
-
 
 EPOCH = datetime.datetime.utcfromtimestamp(0)
 
@@ -181,6 +184,9 @@ class WorkflowMetadata(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    price_multiplier = models.DecimalField(
+        default=Decimal(1.0), max_digits=max_digits, decimal_places=decimal_places
+    )
 
     def __str__(self):
         return self.meta_title

@@ -33,6 +33,7 @@ from bots.models import (
     PublishedRunVersion,
     PublishedRunVisibility,
     Workflow,
+    WorkflowMetadata,
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -1949,7 +1950,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         ).aggregate(total=Sum("dollar_amount"))["total"]
         if not dollar_amt:
             return default
-        return math.ceil(dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR)
+        multiplier = WorkflowMetadata.objects.get(
+            workflow=current_run.workflow
+        ).price_multiplier
+        return math.ceil(multiplier * dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR)
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:

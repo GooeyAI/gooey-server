@@ -776,6 +776,7 @@ class WorkflowMetadataAdmin(admin.ModelAdmin):
         "meta_description",
         "created_at",
         "updated_at",
+        "price_multiplier",
     ]
     search_fields = ["workflow", "meta_title", "meta_description"]
     list_filter = ["workflow"]
