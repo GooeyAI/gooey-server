@@ -1,6 +1,7 @@
 from typing import Any
 
 import simplejson
+from django.core.validators import URLValidator
 from django.db import models
 
 
@@ -12,6 +13,18 @@ class CustomURLField(models.URLField):
     def clean(self, value, model_instance):
         if "://" not in value:
             value = "http://" + value
+
+        # allow blanks - that will be validated separately (e.g. with blank=True)
+        if value:
+            URLValidator(schemes=["http", "https"])(value)
+
+        return super().clean(value, model_instance)
+
+
+class StrippedTextField(models.TextField):
+    def clean(self, value, model_instance):
+        if value:
+            value = value.strip()
         return super().clean(value, model_instance)
 
 

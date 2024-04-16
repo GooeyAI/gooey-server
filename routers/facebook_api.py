@@ -8,7 +8,7 @@ from starlette.responses import HTMLResponse, Response
 
 from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings, db
-from daras_ai_v2.bots import _on_msg, request_json
+from daras_ai_v2.bots import msg_handler, request_json
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
 from daras_ai_v2.functional import map_parallel
@@ -203,7 +203,7 @@ def fb_webhook(
                         bot = WhatsappBot(message, value["metadata"])
                     except ValueError:
                         continue
-                    background_tasks.add_task(_on_msg, bot)
+                    background_tasks.add_task(msg_handler, bot)
             # handle fb/insta messages
             case "instagram" | "page":
                 for messaging in entry.get("messaging", []):
@@ -217,7 +217,7 @@ def fb_webhook(
                         bot = FacebookBot(object_name, messaging)
                     except ValueError:
                         continue
-                    background_tasks.add_task(_on_msg, bot)
+                    background_tasks.add_task(msg_handler, bot)
     return Response("OK")
 
 

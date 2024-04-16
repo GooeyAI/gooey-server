@@ -1,5 +1,3 @@
-from functools import lru_cache
-
 from .components import *
 from .state import *
 

@@ -35,7 +35,7 @@ from bots.models import (
     Workflow,
     WorkflowMetadata,
 )
-from daras_ai_v2 import settings
+from daras_ai_v2 import settings, urls
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -64,6 +64,7 @@ from daras_ai_v2.user_date_widgets import (
 )
 from gooey_ui import realtime_clear_subs
 from gooey_ui.components.modal import Modal
+from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
 
 DEFAULT_META_IMG = (
@@ -81,10 +82,10 @@ SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
 
 
 class RecipeRunState(Enum):
-    idle = 1
-    running = 2
-    completed = 3
-    failed = 4
+    starting = "starting"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
 
 
 class StateKeys:
@@ -157,21 +158,23 @@ class BasePage:
             query_params |= dict(example_id=example_id)
         return query_params
 
-    def api_url(
-        self, example_id=None, run_id=None, uid=None, query_params=None
-    ) -> furl:
+    @classmethod
+    def api_url(cls, example_id=None, run_id=None, uid=None, query_params=None) -> furl:
         query_params = query_params or {}
         if run_id and uid:
             query_params = dict(run_id=run_id, uid=uid)
         elif example_id:
             query_params = dict(example_id=example_id)
-        return furl(settings.API_BASE_URL, query_params=query_params) / self.endpoint
+        return furl(settings.API_BASE_URL, query_params=query_params) / cls.endpoint
 
+    @classmethod
     @property
-    def endpoint(self) -> str:
-        return f"/v2/{self.slug_versions[0]}/"
+    def endpoint(cls) -> str:
+        return f"/v2/{cls.slug_versions[0]}/"
 
-    def get_tab_url(self, tab: str, query_params: dict = {}) -> str:
+    def get_tab_url(self, tab: str, query_params: dict = None) -> str:
+        if query_params is None:
+            query_params = {}
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         return self.app_url(
             example_id=example_id,
@@ -286,10 +289,7 @@ class BasePage:
                 else:
                     author = self.run_user or current_run.get_creator()
                 if not is_root_example:
-                    self.render_author(
-                        author,
-                        show_as_link=self.is_current_user_admin(),
-                    )
+                    self.render_author(author)
 
             with st.div(className="d-flex align-items-center"):
                 can_user_edit_run = self.can_user_edit_run(current_run, published_run)
@@ -480,6 +480,20 @@ class BasePage:
                 options = {
                     str(enum.value): enum.help_text() for enum in PublishedRunVisibility
                 }
+                if self.request.user and self.request.user.handle:
+                    profile_url = self.request.user.handle.get_app_url()
+                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
+                    options[
+                        str(PublishedRunVisibility.PUBLIC.value)
+                    ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
+                elif self.request.user and not self.request.user.is_anonymous:
+                    edit_profile_url = urls.remove_hostname(
+                        self.request.url_for("account", tab_path="profile")
+                    )
+                    options[
+                        str(PublishedRunVisibility.PUBLIC.value)
+                    ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
+
                 published_run_visibility = PublishedRunVisibility(
                     int(
                         st.radio(
@@ -1048,7 +1062,7 @@ class BasePage:
 
     @classmethod
     def get_sr_from_query_params(
-        cls, example_id: str, run_id: str, uid: str
+        cls, example_id: str | None, run_id: str | None, uid: str | None
     ) -> SavedRun:
         try:
             if run_id and uid:
@@ -1165,7 +1179,7 @@ class BasePage:
         *,
         image_size: str = "30px",
         responsive: bool = True,
-        show_as_link: bool = False,
+        show_as_link: bool = True,
         text_size: str | None = None,
     ):
         if not user or (not user.photo_url and not user.display_name):
@@ -1180,13 +1194,8 @@ class BasePage:
         if responsive:
             class_name += "-responsive"
 
-        if show_as_link:
-            linkto = st.link(
-                to=self.app_url(
-                    tab_name=MenuTabs.paths[MenuTabs.history],
-                    query_params={"uid": user.uid},
-                )
-            )
+        if show_as_link and user and user.handle:
+            linkto = st.link(to=user.handle.get_app_url())
         else:
             linkto = st.dummy()
 
@@ -1200,6 +1209,7 @@ class BasePage:
                         height: {responsive_image_size};
                         margin-right: 6px;
                         border-radius: 50%;
+                        object-fit: cover;
                         pointer-events: none;
                     }}
 
@@ -1362,8 +1372,10 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         return self.app_url(example_id, run_id, uid)
 
     def _get_current_api_url(self) -> furl | None:
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        return self.api_url(example_id, run_id, uid)
+        pr = self.get_current_published_run()
+        return self.api_url(
+            example_id=pr and pr.published_run_id, run_id=None, uid=None
+        )
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self.run_doc_sr(uid=uid, run_id=run_id)
@@ -1393,7 +1405,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             return RecipeRunState.completed
         else:
             # when user is at a recipe root, and not running anything
-            return RecipeRunState.idle
+            return RecipeRunState.starting
 
     def _render_output_col(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
@@ -1416,7 +1428,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
                 self._render_failed_output()
             case RecipeRunState.running:
                 self._render_running_output()
-            case RecipeRunState.idle:
+            case RecipeRunState.starting:
                 pass
 
         # render outputs
@@ -1663,7 +1675,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             return
 
         def _render(pr: PublishedRun):
-            self._render_published_run_preview(published_run=pr)
+            with st.div(className="mb-2", style={"font-size": "0.9rem"}):
+                pill(
+                    PublishedRunVisibility(pr.visibility).get_badge_html(),
+                    unsafe_allow_html=True,
+                    type="light",
+                    className="border border-dark",
+                )
+
+            self.render_published_run_preview(published_run=pr)
 
         grid_layout(3, published_runs, _render)
 
@@ -1730,10 +1750,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         with st.link(to=saved_run.get_app_url()):
             with st.div(className="mb-1", style={"fontSize": "0.9rem"}):
                 if is_latest_version:
-                    st.html(
+                    pill(
                         PublishedRunVisibility(
                             published_run.visibility
-                        ).get_badge_html()
+                        ).get_badge_html(),
+                        unsafe_allow_html=True,
+                        type="light",
+                        className="border border-dark",
                     )
 
             st.write(f"#### {tb.h1_title}")
@@ -1754,15 +1777,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         return self.render_example(saved_run.to_dict())
 
-    def _render_published_run_preview(self, published_run: PublishedRun):
+    def render_published_run_preview(self, published_run: PublishedRun):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
-
         with st.link(to=published_run.get_app_url()):
-            with st.div(className="mb-1", style={"fontSize": "0.9rem"}):
-                st.html(
-                    PublishedRunVisibility(published_run.visibility).get_badge_html()
-                )
-
             st.write(f"#### {tb.h1_title}")
 
         with st.div(className="d-flex align-items-center justify-content-between"):
@@ -1790,15 +1807,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        with st.link(to=published_run.get_app_url()):
+        if published_run.created_by:
             with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
-                if published_run.created_by and self.is_user_admin(
-                    published_run.created_by
-                ):
-                    self.render_author(
-                        published_run.created_by, image_size="20px", text_size="0.9rem"
-                    )
+                self.render_author(
+                    published_run.created_by,
+                    image_size="20px",
+                    text_size="0.9rem",
+                )
 
+        with st.link(to=published_run.get_app_url()):
             st.write(f"#### {tb.h1_title}")
 
         with st.div(className="d-flex align-items-center justify-content-between"):
@@ -1887,15 +1904,18 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         as_async = st.checkbox("##### Run Async")
         as_form_data = st.checkbox("##### Upload Files via Form Data")
 
-        request_body = self.get_example_request_body(
-            st.session_state, include_all=include_all
+        pr = self.get_current_published_run()
+        api_url, request_body = self.get_example_request(
+            st.session_state,
+            include_all=include_all,
+            pr=pr,
         )
         response_body = self.get_example_response_body(
             st.session_state, as_async=as_async, include_all=include_all
         )
 
         api_example_generator(
-            api_url=self._get_current_api_url(),
+            api_url=api_url,
             request_body=request_body,
             as_form_data=as_form_data,
             as_async=as_async,
@@ -1963,17 +1983,23 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return []
 
     @classmethod
-    def get_example_request_body(
+    def get_example_request(
         cls,
         state: dict,
+        pr: PublishedRun | None = None,
         include_all: bool = False,
-    ) -> dict:
-        return extract_model_fields(
-            cls.RequestModel,
-            state,
+    ) -> tuple[furl, dict[str, typing.Any]]:
+        api_url = cls.api_url(
+            example_id=pr and pr.published_run_id, run_id=None, uid=None
+        )
+        fields = extract_model_fields(
+            model=cls.RequestModel,
+            state=state,
             include_all=include_all,
             preferred_fields=cls.get_example_preferred_fields(state),
+            diff_from=pr.saved_run.to_dict() if pr else None,
         )
+        return api_url, fields
 
     def get_example_response_body(
         self,
@@ -2079,8 +2105,15 @@ def extract_model_fields(
     state: dict,
     include_all: bool = False,
     preferred_fields: list[str] = None,
+    diff_from: dict | None = None,
 ) -> dict:
-    """Only returns required fields unless include_all is set to True."""
+    """
+    Include a field in result if:
+    - include_all is true
+    - field is required
+    - field is preferred
+    - diff_from is provided and field value differs from diff_from
+    """
     return {
         field_name: state.get(field_name)
         for field_name, field in model.__fields__.items()
@@ -2088,6 +2121,7 @@ def extract_model_fields(
             include_all
             or field.required
             or (preferred_fields and field_name in preferred_fields)
+            or (diff_from and state.get(field_name) != diff_from.get(field_name))
         )
     }
 

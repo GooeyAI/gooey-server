@@ -47,29 +47,11 @@ class PublishedRunVisibility(models.IntegerChoices):
                 return self.label
 
     def get_badge_html(self):
-        badge_container_class = (
-            "text-sm bg-light border border-dark rounded-pill px-2 py-1"
-        )
-
         match self:
             case PublishedRunVisibility.UNLISTED:
-                return dedent(
-                    f"""\
-                <span class="{badge_container_class}">
-                    <i class="fa-regular fa-lock"></i>
-                    Private
-                </span>
-                """
-                )
+                return '<i class="fa-regular fa-lock"></i> Private'
             case PublishedRunVisibility.PUBLIC:
-                return dedent(
-                    f"""\
-                <span class="{badge_container_class}">
-                    <i class="fa-regular fa-globe"></i>
-                    Public
-                </span>
-                """
-                )
+                return '<i class="fa-regular fa-globe"></i> Public'
             case _:
                 raise NotImplementedError(self)
 
@@ -79,10 +61,13 @@ class Platform(models.IntegerChoices):
     INSTAGRAM = (2, "Instagram")
     WHATSAPP = (3, "WhatsApp")
     SLACK = (4, "Slack")
+    WEB = (5, "Web")
 
     def get_favicon(self):
         if self == Platform.WHATSAPP:
             return f"https://static.facebook.com/images/whatsapp/www/favicon.png"
+        elif self == Platform.WEB:
+            return f"https://gooey.ai/favicon.ico"
         else:
             return f"https://www.{self.name.lower()}.com/favicon.ico"
 
@@ -123,6 +108,11 @@ class Workflow(models.IntegerChoices):
     @property
     def short_slug(self):
         return min(self.page_cls.slug_versions, key=len)
+
+    @property
+    def short_title(self):
+        metadata = self.get_or_create_metadata()
+        return metadata.short_title
 
     def get_app_url(self, example_id: str, run_id: str, uid: str, run_slug: str = ""):
         """return the url to the gooey app"""
@@ -281,6 +271,7 @@ class SavedRun(models.Model):
             models.Index(fields=["-created_at"]),
             models.Index(fields=["-updated_at"]),
             models.Index(fields=["workflow"]),
+            models.Index(fields=["uid"]),
             models.Index(fields=["run_id", "uid"]),
             models.Index(fields=["workflow", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
@@ -601,6 +592,12 @@ class BotIntegration(models.Model):
         help_text="If set, the bot will create a personal channel for each user in the public channel",
     )
 
+    web_allowed_origins = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of allowed domains for the bot's web integration",
+    )
+
     analysis_run = models.ForeignKey(
         "bots.SavedRun",
         on_delete=models.SET_NULL,
@@ -613,7 +610,7 @@ class BotIntegration(models.Model):
 
     streaming_enabled = models.BooleanField(
         default=False,
-        help_text="If set, the bot will stream messages to the frontend (Slack only)",
+        help_text="If set, the bot will stream messages to the frontend (Slack & Web only)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -659,6 +656,12 @@ class BotIntegration(models.Model):
         )
 
     get_display_name.short_description = "Bot"
+
+    @admin.display(description="API integraton_id")
+    def api_integration_id(self):
+        from routers.bots_api import api_hashids
+
+        return api_hashids.encode(self.id)
 
 
 class ConvoState(models.IntegerChoices):
@@ -860,6 +863,14 @@ class Conversation(models.Model):
     slack_channel_is_personal = models.BooleanField(
         default=False,
         help_text="Whether this is a personal slack channel between the bot and the user",
+    )
+
+    web_user_id = models.CharField(
+        max_length=512,
+        blank=True,
+        default=None,
+        null=True,
+        help_text="User's web user id (mandatory if platform is WEB)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1068,7 +1079,6 @@ class Message(models.Model):
         blank=True,
         null=True,
         default=None,
-        unique=True,
         help_text="The platform's delivered message id",
     )
 
@@ -1113,7 +1123,13 @@ class Message(models.Model):
     class Meta:
         ordering = ("-created_at",)
         get_latest_by = "created_at"
-        indexes = [models.Index(fields=["conversation", "-created_at"])]
+        unique_together = [
+            ("platform_msg_id", "conversation"),
+        ]
+        indexes = [
+            models.Index(fields=["conversation", "-created_at"]),
+            models.Index(fields=["-created_at"]),
+        ]
 
     def __str__(self):
         return Truncator(self.content).words(30)
@@ -1419,6 +1435,12 @@ class PublishedRun(models.Model):
                     "updated_at",
                 ]
             ),
+            models.Index(
+                "created_by",
+                "visibility",
+                models.F("updated_at").desc(),
+                name="published_run_cre_vis_upd_idx",
+            ),
         ]
 
     def __str__(self):
@@ -1538,6 +1560,7 @@ class PublishedRunVersion(models.Model):
         indexes = [
             models.Index(fields=["published_run", "-created_at"]),
             models.Index(fields=["version_id"]),
+            models.Index(fields=["changed_by"]),
         ]
 
     def __str__(self):

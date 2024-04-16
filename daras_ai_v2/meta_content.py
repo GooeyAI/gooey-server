@@ -8,7 +8,8 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.tabs_widget import MenuTabs
 
-sep = " • "
+SEP = " • "
+TITLE_SUFFIX = "Gooey.AI"
 
 
 def build_meta_tags(
@@ -141,9 +142,9 @@ def meta_title_for_page(
                 part += f" by {user.display_name}"
             parts.append(part)
 
-            ret = sep.join(parts)
+            ret = SEP.join(parts)
 
-    return f"{ret} {sep} Gooey.AI"
+    return f"{ret} {SEP} {TITLE_SUFFIX}"
 
 
 def meta_description_for_page(
@@ -158,7 +159,7 @@ def meta_description_for_page(
 
     if not (pr and pr.is_root()) or not description:
         # for all non-root examples, or when there is no other description
-        description += sep + "AI API, workflow & prompt shared on Gooey.AI."
+        description += SEP + "AI API, workflow & prompt shared on Gooey.AI."
 
     return description
 

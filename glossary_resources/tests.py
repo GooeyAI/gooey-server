@@ -21,29 +21,18 @@ GLOSSARY = [
         "random": get_random_doc_id(),
     },
     {
-        "en-US": "chilli",
-        "hi-IN": "मिर्ची",
+        "en-US": "agniastra",
+        "hi-IN": "अग्निअस्त्र",
         "pos": "noun",
-        "description": "the spicy thing",
-    },
-    {
-        "en-US": "chilli",
-        "hi-IN": "मिर्च",
-        "pos": "noun",
-        "description": "the spicy thing",
+        "description": "well labs agniastra",
     },
 ]
 
 TRANSLATION_TESTS_GLOSSARY = [
     (
-        "मिर्च में बीज उपचार कैसे करें",  # source
-        "How to Treat Seeds in Peppers",  # no glossary
-        "How to Treat Seeds in Chilli",  # with glosssary
-    ),
-    (
-        "मिर्ची में बीज उपचार कैसे करें",
-        "How to Treat Seeds in Peppers",
-        "How to Treat Seeds in Chilli",
+        "एक एकड़ भूमि के लिए कितनी अग्निअस्त्र की आवश्यकता होती है",
+        "how many fire extinguishers are required for one acre of land",  # default
+        "how many agniastra are required for one acre of land",  # using glossary
     ),
     (
         "गुई डॉट ए आई से हम क्या कर सकते हैं",
