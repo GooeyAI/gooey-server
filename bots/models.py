@@ -44,29 +44,11 @@ class PublishedRunVisibility(models.IntegerChoices):
                 return self.label
 
     def get_badge_html(self):
-        badge_container_class = (
-            "text-sm bg-light border border-dark rounded-pill px-2 py-1"
-        )
-
         match self:
             case PublishedRunVisibility.UNLISTED:
-                return dedent(
-                    f"""\
-                <span class="{badge_container_class}">
-                    <i class="fa-regular fa-lock"></i>
-                    Private
-                </span>
-                """
-                )
+                return '<i class="fa-regular fa-lock"></i> Private'
             case PublishedRunVisibility.PUBLIC:
-                return dedent(
-                    f"""\
-                <span class="{badge_container_class}">
-                    <i class="fa-regular fa-globe"></i>
-                    Public
-                </span>
-                """
-                )
+                return '<i class="fa-regular fa-globe"></i> Public'
             case _:
                 raise NotImplementedError(self)
 
@@ -123,6 +105,11 @@ class Workflow(models.IntegerChoices):
     @property
     def short_slug(self):
         return min(self.page_cls.slug_versions, key=len)
+
+    @property
+    def short_title(self):
+        metadata = self.get_or_create_metadata()
+        return metadata.short_title
 
     def get_app_url(self, example_id: str, run_id: str, uid: str, run_slug: str = ""):
         """return the url to the gooey app"""
@@ -278,6 +265,7 @@ class SavedRun(models.Model):
             models.Index(fields=["-created_at"]),
             models.Index(fields=["-updated_at"]),
             models.Index(fields=["workflow"]),
+            models.Index(fields=["uid"]),
             models.Index(fields=["run_id", "uid"]),
             models.Index(fields=["workflow", "run_id", "uid"]),
             models.Index(fields=["workflow", "example_id", "run_id", "uid"]),
@@ -1441,6 +1429,12 @@ class PublishedRun(models.Model):
                     "updated_at",
                 ]
             ),
+            models.Index(
+                "created_by",
+                "visibility",
+                models.F("updated_at").desc(),
+                name="published_run_cre_vis_upd_idx",
+            ),
         ]
 
     def __str__(self):
@@ -1560,6 +1554,7 @@ class PublishedRunVersion(models.Model):
         indexes = [
             models.Index(fields=["published_run", "-created_at"]),
             models.Index(fields=["version_id"]),
+            models.Index(fields=["changed_by"]),
         ]
 
     def __str__(self):

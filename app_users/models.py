@@ -5,10 +5,11 @@ from django.utils import timezone
 from firebase_admin import auth
 from phonenumber_field.modelfields import PhoneNumberField
 
-from bots.custom_fields import CustomURLField
+from bots.custom_fields import CustomURLField, StrippedTextField
 from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
 from daras_ai_v2 import settings, db
 from gooeysite.bg_db_conn import db_middleware
+from handles.models import Handle
 
 
 class AppUserQuerySet(models.QuerySet):
@@ -97,6 +98,21 @@ class AppUser(models.Model):
     upgraded_from_anonymous_at = models.DateTimeField(null=True, blank=True)
 
     disable_safety_checker = models.BooleanField(default=False)
+
+    handle = models.OneToOneField(
+        "handles.Handle",
+        on_delete=models.SET_NULL,
+        default=None,
+        blank=True,
+        null=True,
+        related_name="user",
+    )
+
+    banner_url = CustomURLField(blank=True, default="")
+    bio = StrippedTextField(blank=True, default="")
+    company = models.CharField(max_length=255, blank=True, default="")
+    github_username = models.CharField(max_length=255, blank=True, default="")
+    website_url = CustomURLField(blank=True, default="")
 
     objects = AppUserQuerySet.as_manager()
 
@@ -193,6 +209,8 @@ class AppUser(models.Model):
             field=db.USER_BALANCE_FIELD,
             default=default_balance,
         )
+        if handle := Handle.create_default_for_user(user=self):
+            self.handle = handle
 
         return self
 

@@ -34,7 +34,7 @@ from bots.models import (
     PublishedRunVisibility,
     Workflow,
 )
-from daras_ai_v2 import settings
+from daras_ai_v2 import settings, urls
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import (
@@ -63,6 +63,7 @@ from daras_ai_v2.user_date_widgets import (
 )
 from gooey_ui import realtime_clear_subs
 from gooey_ui.components.modal import Modal
+from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
 
 DEFAULT_META_IMG = (
@@ -287,10 +288,7 @@ class BasePage:
                 else:
                     author = self.run_user or current_run.get_creator()
                 if not is_root_example:
-                    self.render_author(
-                        author,
-                        show_as_link=self.is_current_user_admin(),
-                    )
+                    self.render_author(author)
 
             with st.div(className="d-flex align-items-center"):
                 can_user_edit_run = self.can_user_edit_run(current_run, published_run)
@@ -481,6 +479,20 @@ class BasePage:
                 options = {
                     str(enum.value): enum.help_text() for enum in PublishedRunVisibility
                 }
+                if self.request.user and self.request.user.handle:
+                    profile_url = self.request.user.handle.get_app_url()
+                    pretty_profile_url = urls.remove_scheme(profile_url).rstrip("/")
+                    options[
+                        str(PublishedRunVisibility.PUBLIC.value)
+                    ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
+                elif self.request.user and not self.request.user.is_anonymous:
+                    edit_profile_url = urls.remove_hostname(
+                        self.request.url_for("account", tab_path="profile")
+                    )
+                    options[
+                        str(PublishedRunVisibility.PUBLIC.value)
+                    ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'
+
                 published_run_visibility = PublishedRunVisibility(
                     int(
                         st.radio(
@@ -1166,7 +1178,7 @@ class BasePage:
         *,
         image_size: str = "30px",
         responsive: bool = True,
-        show_as_link: bool = False,
+        show_as_link: bool = True,
         text_size: str | None = None,
     ):
         if not user or (not user.photo_url and not user.display_name):
@@ -1181,13 +1193,8 @@ class BasePage:
         if responsive:
             class_name += "-responsive"
 
-        if show_as_link:
-            linkto = st.link(
-                to=self.app_url(
-                    tab_name=MenuTabs.paths[MenuTabs.history],
-                    query_params={"uid": user.uid},
-                )
-            )
+        if show_as_link and user and user.handle:
+            linkto = st.link(to=user.handle.get_app_url())
         else:
             linkto = st.dummy()
 
@@ -1201,6 +1208,7 @@ class BasePage:
                         height: {responsive_image_size};
                         margin-right: 6px;
                         border-radius: 50%;
+                        object-fit: cover;
                         pointer-events: none;
                     }}
 
@@ -1664,7 +1672,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
             return
 
         def _render(pr: PublishedRun):
-            self._render_published_run_preview(published_run=pr)
+            with st.div(className="mb-2", style={"font-size": "0.9rem"}):
+                pill(
+                    PublishedRunVisibility(pr.visibility).get_badge_html(),
+                    unsafe_allow_html=True,
+                    type="light",
+                    className="border border-dark",
+                )
+
+            self.render_published_run_preview(published_run=pr)
 
         grid_layout(3, published_runs, _render)
 
@@ -1731,10 +1747,13 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         with st.link(to=saved_run.get_app_url()):
             with st.div(className="mb-1", style={"fontSize": "0.9rem"}):
                 if is_latest_version:
-                    st.html(
+                    pill(
                         PublishedRunVisibility(
                             published_run.visibility
-                        ).get_badge_html()
+                        ).get_badge_html(),
+                        unsafe_allow_html=True,
+                        type="light",
+                        className="border border-dark",
                     )
 
             st.write(f"#### {tb.h1_title}")
@@ -1755,15 +1774,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         return self.render_example(saved_run.to_dict())
 
-    def _render_published_run_preview(self, published_run: PublishedRun):
+    def render_published_run_preview(self, published_run: PublishedRun):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
-
         with st.link(to=published_run.get_app_url()):
-            with st.div(className="mb-1", style={"fontSize": "0.9rem"}):
-                st.html(
-                    PublishedRunVisibility(published_run.visibility).get_badge_html()
-                )
-
             st.write(f"#### {tb.h1_title}")
 
         with st.div(className="d-flex align-items-center justify-content-between"):
@@ -1791,15 +1804,15 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     ):
         tb = get_title_breadcrumbs(self, published_run.saved_run, published_run)
 
-        with st.link(to=published_run.get_app_url()):
+        if published_run.created_by:
             with st.div(className="mb-1 text-truncate", style={"height": "1.5rem"}):
-                if published_run.created_by and self.is_user_admin(
-                    published_run.created_by
-                ):
-                    self.render_author(
-                        published_run.created_by, image_size="20px", text_size="0.9rem"
-                    )
+                self.render_author(
+                    published_run.created_by,
+                    image_size="20px",
+                    text_size="0.9rem",
+                )
 
+        with st.link(to=published_run.get_app_url()):
             st.write(f"#### {tb.h1_title}")
 
         with st.div(className="d-flex align-items-center justify-content-between"):

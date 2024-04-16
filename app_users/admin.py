@@ -4,7 +4,7 @@ from django.contrib.admin.models import LogEntry
 from app_users import models
 from django.db.models import Sum
 
-from bots.admin_links import open_in_new_tab, list_related_html_url
+from bots.admin_links import change_obj_url, open_in_new_tab, list_related_html_url
 from bots.models import SavedRun
 from usage_costs.models import UsageCost
 
@@ -46,6 +46,7 @@ class AppUserAdmin(admin.ModelAdmin):
     ]
     list_display = [
         "uid",
+        "user_handle",
         "display_name",
         "email",
         "phone_number",
@@ -59,6 +60,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "email",
         "phone_number",
         "stripe_customer_id",
+        "user_handle",
     ]
     list_filter = [
         "is_anonymous",
@@ -88,6 +90,15 @@ class AppUserAdmin(admin.ModelAdmin):
             instance_id=user.uid,
             show_add=False,
         )
+
+    @admin.display(description="User Handle")
+    def user_handle(self, user: models.AppUser):
+        if user.handle:
+            return change_obj_url(
+                user.handle,
+                label=str(user.handle),
+            )
+        return None
 
     @admin.display(description="Total Payments")
     def total_payments(self, user: models.AppUser):
