@@ -173,20 +173,17 @@ pg_restore --no-privileges --no-owner -d $PGDATABASE $fname
 cid=$(docker ps  | grep gooey-api-prod | cut -d " " -f 1 | head -1)
 # exec the script to create the fixture
 docker exec -it $cid poetry run ./manage.py runscript create_fixture
+# upload the fixture
+docker exec -it $cid poetry run ./manage.py runscript upload_fixture
 ```
 
+Save the new fixture url in `scripts/run-tests.sh` and run the tests -
+
 ```bash
-# copy the fixture outside container
-docker cp $cid:/app/fixture.json .
-# print the absolute path
-echo $PWD/fixture.json
+./scripts/run-tests.sh
 ```
 
-**on local**
-```bash
-# copy fixture.json from server to local
-rsync -P -a <username>@captain.us-1.gooey.ai:/home/<username>/fixture.json .
-```
+To load the fixture on local db -
 
 ```bash
 # reset the database

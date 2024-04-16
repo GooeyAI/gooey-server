@@ -13,7 +13,8 @@ from fastapi import HTTPException
 
 import gooey_ui as st
 from app_users.models import AppUser, AppUserTransaction
-from bots.models import SavedRun
+from bots.admin_links import change_obj_url
+from bots.models import SavedRun, Platform
 from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
@@ -92,7 +93,7 @@ def gui_runner(
         # send outputs to ui
         realtime_push(channel, output)
         # save to db
-        sr.set(page.state_to_doc(st.session_state | output))
+        page.dump_state_to_sr(st.session_state | output, sr)
 
     try:
         gen = page.run(st.session_state)
@@ -233,4 +234,21 @@ def send_email_on_completion(page: BasePage, sr: SavedRun):
             title=title,
         ),
         message_stream="gooey-ai-workflows",
+    )
+
+
+@app.task
+def send_integration_attempt_email(*, user_id: int, platform: Platform, run_url: str):
+    user = AppUser.objects.get(id=user_id)
+    html_body = templates.get_template("integration_attempt_email.html").render(
+        user=user,
+        account_url=(change_obj_url(user)),
+        run_url=run_url,
+        integration_type=platform.label,
+    )
+    send_email_via_postmark(
+        from_address=settings.SUPPORT_EMAIL,
+        to_address="sales@gooey.ai",
+        subject=f"{user.display_name} Attempted to Connect to {platform.label}",
+        html_body=html_body,
     )

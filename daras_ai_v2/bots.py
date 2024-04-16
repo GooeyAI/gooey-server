@@ -8,6 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 from fastapi import HTTPException, Request
 from furl import furl
+from pydantic import BaseModel, Field
 from sentry_sdk import capture_exception
 
 from app_users.models import AppUser
@@ -75,23 +76,37 @@ async def request_urlencoded_body(request: Request):
     return parse_qs((await request.body()).decode("utf-8"))
 
 
+class ButtonPressed(BaseModel):
+    button_id: str = Field(
+        description="The ID of the button that was pressed by the user"
+    )
+    context_msg_id: str = Field(
+        description="The message ID of the context message on which the button was pressed"
+    )
+
+
 class BotInterface:
-    input_message: dict
     platform: Platform
-    billing_account_uid: str
-    page_cls: typing.Type[BasePage] | None
-    query_params: dict
     bot_id: str
     user_id: str
-    input_type: str
+    convo: Conversation
+    input_type: typing.Literal[
+        "text", "audio", "video", "image", "document", "interactive"
+    ]
+    user_msg_id: str = None
+    can_update_message: bool = False
+
+    page_cls: typing.Type[BasePage] | None
+    query_params: dict
     language: str
+    billing_account_uid: str
     show_feedback_buttons: bool = False
     streaming_enabled: bool = False
-    can_update_message: bool = False
-    convo: Conversation
-    recieved_msg_id: str = None
     input_glossary: str | None = None
     output_glossary: str | None = None
+
+    recipe_run_state = RecipeRunState.starting
+    run_status = "Starting..."
 
     def send_msg(
         self,
@@ -120,6 +135,17 @@ class BotInterface:
 
     def get_input_documents(self) -> list[str] | None:
         raise NotImplementedError
+
+    def get_interactive_msg_info(self) -> ButtonPressed:
+        raise NotImplementedError("This bot does not support interactive messages.")
+
+    def on_run_created(
+        self, page: BasePage, result: "celery.result.AsyncResult", run_id: str, uid: str
+    ):
+        pass
+
+    def send_run_status(self, update_msg_id: str | None) -> str | None:
+        pass
 
     def nice_filename(self, mime_type: str) -> str:
         ext = mimetypes.guess_extension(mime_type) or ""
@@ -155,9 +181,6 @@ class BotInterface:
         self.show_feedback_buttons = bi.show_feedback_buttons
         self.streaming_enabled = bi.streaming_enabled
 
-    def get_interactive_msg_info(self) -> tuple[str, str]:
-        raise NotImplementedError("This bot does not support interactive messages.")
-
 
 def _echo(bot, input_text):
     response_text = f"You said ```{input_text}```\nhttps://www.youtube.com/"
@@ -186,7 +209,7 @@ def _mock_api_output(input_text):
 
 
 @db_middleware
-def _on_msg(bot: BotInterface):
+def msg_handler(bot: BotInterface):
     speech_run = None
     input_images = None
     input_documents = None
@@ -334,6 +357,7 @@ def _process_and_send_msg(
         },
         query_params=bot.query_params,
     )
+    bot.on_run_created(page, result, run_id, uid)
 
     if bot.show_feedback_buttons:
         buttons = _feedback_start_buttons()
@@ -348,24 +372,21 @@ def _process_and_send_msg(
         channel = page.realtime_channel_name(run_id, uid)
         with realtime_subscribe(channel) as realtime_gen:
             for state in realtime_gen:
-                run_state = page.get_run_state(state)
-                run_status = state.get(StateKeys.run_status) or ""
+                bot.recipe_run_state = page.get_run_state(state)
+                bot.run_status = state.get(StateKeys.run_status) or ""
                 # check for errors
-                if run_state == RecipeRunState.failed:
+                if bot.recipe_run_state == RecipeRunState.failed:
                     err_msg = state.get(StateKeys.error_msg)
                     bot.send_msg(text=ERROR_MSG.format(err_msg))
                     return  # abort
-                if run_state != RecipeRunState.running:
+                if bot.recipe_run_state != RecipeRunState.running:
                     break  # we're done running, abort
                 text = state.get("output_text") and state.get("output_text")[0]
                 if not text:
-                    # if no text, send the run status
-                    if bot.can_update_message:
-                        update_msg_id = bot.send_msg(
-                            text=run_status, update_msg_id=update_msg_id
-                        )
+                    # if no text, send the run status as text
+                    update_msg_id = bot.send_run_status(update_msg_id=update_msg_id)
                     continue  # no text, wait for the next update
-                streaming_done = not run_status.lower().startswith("streaming")
+                streaming_done = not bot.run_status.lower().startswith("streaming")
                 # send the response to the user
                 if bot.can_update_message:
                     update_msg_id = bot.send_msg(
@@ -395,30 +416,32 @@ def _process_and_send_msg(
     get_celery_result_db_safe(result)
     # get the final state from db
     state = page.run_doc_sr(run_id, uid).to_dict()
+    bot.recipe_run_state = page.get_run_state(state)
+    bot.run_status = state.get(StateKeys.run_status) or ""
     # check for errors
     err_msg = state.get(StateKeys.error_msg)
     if err_msg:
         bot.send_msg(text=ERROR_MSG.format(err_msg))
         return
 
-    text = (state.get("output_text") and state.get("output_text")[0]) or ""
+    text = state.get("output_text") and state.get("output_text")[0]
     audio = state.get("output_audio") and state.get("output_audio")[0]
     video = state.get("output_video") and state.get("output_video")[0]
-    documents = state.get("output_documents") or []
+    documents = state.get("output_documents")
     # check for empty response
     if not (text or audio or video or documents or buttons):
         bot.send_msg(text=DEFAULT_RESPONSE)
         return
     # if in-place updates are enabled, update the message, otherwise send the remaining text
-    if not bot.can_update_message:
+    if text and not bot.can_update_message:
         text = text[last_idx:]
     # send the response to the user if there is any remaining
     if text or audio or video or documents or buttons:
         update_msg_id = bot.send_msg(
-            text=text,
-            audio=audio,
-            video=video,
-            documents=documents,
+            text=text or None,
+            audio=audio or None,
+            video=video or None,
+            documents=documents or None,
             buttons=buttons,
             update_msg_id=update_msg_id,
         )
@@ -450,7 +473,7 @@ def _save_msgs(
 ):
     # create messages for future context
     user_msg = Message(
-        platform_msg_id=bot.recieved_msg_id,
+        platform_msg_id=bot.user_msg_id,
         conversation=bot.convo,
         role=CHATML_ROLE_USER,
         content=response.raw_input_text,
@@ -482,6 +505,7 @@ def _save_msgs(
         response_time=timezone.now() - received_time,
     )
     # save the messages & attachments
+    # note that its important to save the user_msg and assistant_msg together because we use get_next_by_created_at in our code
     with transaction.atomic():
         user_msg.save()
         for attachment in attachments:
@@ -492,22 +516,24 @@ def _save_msgs(
 
 def _handle_interactive_msg(bot: BotInterface):
     try:
-        button_id, context_msg_id = bot.get_interactive_msg_info()
+        button = bot.get_interactive_msg_info()
     except NotImplementedError as e:
         bot.send_msg(text=ERROR_MSG.format(e))
         return
-    match button_id:
+    match button.button_id:
         # handle feedback button press
         case ButtonIds.feedback_thumbs_up | ButtonIds.feedback_thumbs_down:
             try:
-                context_msg = Message.objects.get(platform_msg_id=context_msg_id)
+                context_msg = Message.objects.get(
+                    platform_msg_id=button.context_msg_id, conversation=bot.convo
+                )
             except Message.DoesNotExist as e:
                 traceback.print_exc()
                 capture_exception(e)
                 # send error msg as repsonse
                 bot.send_msg(text=ERROR_MSG.format(e))
                 return
-            if button_id == ButtonIds.feedback_thumbs_up:
+            if button.button_id == ButtonIds.feedback_thumbs_up:
                 rating = Feedback.Rating.RATING_THUMBS_UP
                 # bot.convo.state = ConvoState.ASK_FOR_FEEDBACK_THUMBS_UP
                 # response_text = FEEDBACK_THUMBS_UP_MSG

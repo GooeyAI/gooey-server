@@ -6,6 +6,7 @@ from furl import furl
 
 import gooey_ui as st
 from auth.token_authentication import auth_keyword
+from daras_ai_v2 import settings
 from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 
 
@@ -321,3 +322,108 @@ If you encounter any issues, write to us at support@gooey.ai and make sure to in
             % js_code,
             unsafe_allow_html=True,
         )
+
+
+def bot_api_example_generator(integration_id: str):
+    from routers import bots_api
+    from recipes.VideoBots import VideoBotsPage
+
+    js_code = """
+// create a stream on the server
+let response = await fetch("%(api_url)s", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    // your integration's ID as shown in the Gooey.AI Integrations tab
+    "integration_id": "%(integration_id)s",
+    // the input text for the bot
+    "input_text": "Hello, world!",
+  }),
+});
+// get the server-sent events URL
+let sseUrl = response.headers.get("Location");
+console.log(sseUrl);
+
+// clear screen
+document.body.innerHTML = "";
+
+// start listening to the stream
+const evtSource = new EventSource(sseUrl);
+// handle the stream events
+evtSource.onmessage = (event) => {
+    // display the message in the browser
+    document.body.innerHTML += event.data + "<br><br>";
+    // parse the message as JSON
+    let data = JSON.parse(event.data);
+    // log the message to the console
+    console.log(data.type, data);
+    // check if the message is the final response
+    if (data.type === "final_response") {
+        // close the stream
+        evtSource.close();
+    }
+};
+evtSource.onerror = (event) => {
+    // log the error to the console
+    console.error(event.data);
+    // close the stream
+    evtSource.close();
+}
+    """ % dict(
+        api_url=(
+            furl(settings.API_BASE_URL)
+            / bots_api.app.url_path_for(bots_api.stream_create.__name__)
+        ),
+        integration_id=integration_id,
+    )
+
+    st.write(
+        f"""
+Your Integration ID: `{integration_id}`
+
+
+Use the following code snippet to stream messages from the bot.   
+Note that you do not need the API key for this endpoint and can use it directly in the browser.
+
+```js
+{js_code.strip()}
+```
+        """,
+        unsafe_allow_html=True,
+    )
+
+    api_docs_url = (
+        furl(
+            settings.API_BASE_URL,
+            fragment_path=f"operation/{VideoBotsPage.slug_versions[0]}__stream_create",
+        )
+        / "docs"
+    )
+    st.markdown(
+        f"""
+Read our <a href="{api_docs_url}" target="_blank">complete API</a> for features like conversation history, input media files, and more.
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.js(
+        """
+document.startStreaming = async function() {
+    document.getElementById('stream-output').style.display = 'flex';
+    %s
+}
+        """
+        % js_code.replace(
+            "document.body", "document.getElementById('stream-output')"
+        ).strip()
+    )
+
+    st.html(
+        f"""
+<br>
+<button class="btn btn-theme btn-secondary" onclick="document.startStreaming()">🏃‍♀️ Preview Streaming</button>
+<pre style="text-align: left; background: #f5f2f0; display: none; flex-direction: column-reverse;" id="stream-output"></pre>
+        """
+    )

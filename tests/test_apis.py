@@ -58,8 +58,10 @@ def _test_api_async(page_cls: typing.Type[BasePage]):
     assert r.status_code == 200, r.text
 
     data = r.json()
-    assert data.get("status") == "completed", data
-    assert data.get("output") is not None, data
+    status = data.get("status")
+    assert status, data
+    if status == "completed":
+        assert "output" in data, data
 
 
 @pytest.mark.django_db

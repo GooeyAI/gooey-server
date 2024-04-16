@@ -4,14 +4,13 @@ from string import Template
 
 import requests
 from django.db import transaction
-
 from requests import Response
 from sentry_sdk import capture_exception
 
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.asr import run_google_translate, audio_bytes_to_wav
-from daras_ai_v2.bots import BotInterface, SLACK_MAX_SIZE
+from daras_ai_v2.bots import BotInterface, SLACK_MAX_SIZE, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import fetch_parallel
 from daras_ai_v2.text_splitter import text_splitter
@@ -45,7 +44,7 @@ class SlackBot(BotInterface):
         files: list[dict] = None,
         actions: list[dict] = None,
     ):
-        self.recieved_msg_id = self._msg_ts = message_ts
+        self.user_msg_id = self._msg_ts = message_ts
         self._team_id = team_id
         self.bot_id = channel_id
         self.user_id = user_id
@@ -121,9 +120,15 @@ class SlackBot(BotInterface):
         )
         return audio_url
 
-    def get_interactive_msg_info(self) -> tuple[str, str]:
-        button_id = self._actions[0]["value"]
-        return button_id, self._msg_ts
+    def get_interactive_msg_info(self) -> ButtonPressed:
+        return ButtonPressed(
+            button_id=self._actions[0]["value"], context_msg_id=self._msg_ts
+        )
+
+    def send_run_status(self, update_msg_id: str | None) -> str | None:
+        if not self.run_status:
+            return update_msg_id
+        return self.send_msg(text=self.run_status, update_msg_id=update_msg_id)
 
     def send_msg(
         self,

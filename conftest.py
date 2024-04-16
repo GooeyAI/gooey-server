@@ -1,4 +1,7 @@
+import queue
 import typing
+from collections import defaultdict
+from contextlib import contextmanager
 from functools import wraps
 from threading import Thread
 from unittest.mock import patch
@@ -32,6 +35,7 @@ def django_db_setup(django_db_setup, django_db_blocker):
     with django_db_blocker.unblock():
         from django.core.management import call_command
 
+        print("Loading fixtures from fixture.json")
         call_command("loaddata", "fixture.json")
 
 
@@ -43,10 +47,15 @@ def force_authentication():
 
 app.conf.task_always_eager = True
 
+redis_qs = defaultdict(queue.Queue)
+
 
 @pytest.fixture
 def mock_gui_runner():
-    with patch("celeryapp.tasks.gui_runner", _mock_gui_runner):
+    with (
+        patch("celeryapp.tasks.gui_runner", _mock_gui_runner),
+        patch("daras_ai_v2.bots.realtime_subscribe", _mock_realtime_subscribe),
+    ):
         yield
 
 
@@ -57,10 +66,25 @@ def _mock_gui_runner(
     sr = page_cls.run_doc_sr(run_id, uid)
     sr.set(sr.parent.to_dict())
     sr.save()
+    channel = page_cls().realtime_channel_name(run_id, uid)
+    _mock_realtime_push(channel, sr.to_dict())
+
+
+def _mock_realtime_push(channel, value):
+    redis_qs[channel].put(value)
+
+
+@contextmanager
+def _mock_realtime_subscribe(channel: str):
+    def iterq():
+        while True:
+            yield redis_qs[channel].get()
+
+    yield iterq()
 
 
 @pytest.fixture
-def threadpool_subtest(subtests, max_workers: int = 16):
+def threadpool_subtest(subtests, max_workers: int = 8):
     ts = []
 
     def submit(fn, *args, msg=None, **kwargs):

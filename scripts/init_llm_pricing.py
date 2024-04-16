@@ -58,7 +58,34 @@ def run():
         ),
     )
 
-    #  GPT-4-Turbo-Vision
+    #  GPT-4-Turbo with Vision
+
+    ModelPricing.objects.get_or_create(
+        model_id="gpt-4-turbo-2024-04-09",
+        sku=ModelSku.llm_prompt,
+        defaults=dict(
+            model_name=LargeLanguageModels.gpt_4_turbo_vision.name,
+            unit_cost=0.01,
+            unit_quantity=1000,
+            category=category,
+            provider=ModelProvider.openai,
+            pricing_url="https://openai.com/pricing",
+        ),
+    )
+    ModelPricing.objects.get_or_create(
+        model_id="gpt-4-turbo-2024-04-09",
+        sku=ModelSku.llm_completion,
+        defaults=dict(
+            model_name=LargeLanguageModels.gpt_4_turbo_vision.name,
+            unit_cost=0.03,
+            unit_quantity=1000,
+            category=category,
+            provider=ModelProvider.openai,
+            pricing_url="https://openai.com/pricing",
+        ),
+    )
+
+    #  GPT-4-Vision
 
     ModelPricing.objects.get_or_create(
         model_id="gpt-4-vision-preview",
@@ -82,31 +109,6 @@ def run():
             category=category,
             provider=ModelProvider.openai,
             pricing_url="https://openai.com/pricing",
-        ),
-    )
-
-    ModelPricing.objects.get_or_create(
-        model_id="openai-gpt-4-turbo-vision-prod-ca-1",
-        sku=ModelSku.llm_prompt,
-        defaults=dict(
-            model_name=LargeLanguageModels.gpt_4_vision.name,
-            unit_cost=0.01,
-            unit_quantity=1000,
-            category=category,
-            provider=ModelProvider.azure_openai,
-            pricing_url="https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
-        ),
-    )
-    ModelPricing.objects.get_or_create(
-        model_id="openai-gpt-4-turbo-vision-prod-ca-1",
-        sku=ModelSku.llm_completion,
-        defaults=dict(
-            model_name=LargeLanguageModels.gpt_4_vision.name,
-            unit_cost=0.03,
-            unit_quantity=1000,
-            category=category,
-            provider=ModelProvider.azure_openai,
-            pricing_url="https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
         ),
     )
 
@@ -211,6 +213,60 @@ def run():
             category=category,
             provider=ModelProvider.azure_openai,
             pricing_url="https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
+        ),
+    )
+
+    # GPT-3.5 Turbo Instruct
+
+    ModelPricing.objects.get_or_create(
+        model_id="gpt-3.5-turbo-instruct",
+        sku=ModelSku.llm_prompt,
+        defaults=dict(
+            model_name=LargeLanguageModels.gpt_3_5_turbo_instruct.name,
+            unit_cost=0.0015,
+            unit_quantity=1000,
+            category=category,
+            provider=ModelProvider.openai,
+            pricing_url="https://openai.com/pricing",
+        ),
+    )
+    ModelPricing.objects.get_or_create(
+        model_id="gpt-3.5-turbo-instruct",
+        sku=ModelSku.llm_completion,
+        defaults=dict(
+            model_name=LargeLanguageModels.gpt_3_5_turbo_instruct.name,
+            unit_cost=0.0020,
+            unit_quantity=1000,
+            category=category,
+            provider=ModelProvider.openai,
+            pricing_url="https://openai.com/pricing",
+        ),
+    )
+
+    # Updated GPT-3.5-Turbo
+
+    ModelPricing.objects.get_or_create(
+        model_id="gpt-3.5-turbo-0125",
+        sku=ModelSku.llm_prompt,
+        defaults=dict(
+            model_name=LargeLanguageModels.gpt_3_5_turbo.name,
+            unit_cost=0.0005,
+            unit_quantity=1000,
+            category=category,
+            provider=ModelProvider.openai,
+            pricing_url="https://openai.com/pricing",
+        ),
+    )
+    ModelPricing.objects.get_or_create(
+        model_id="gpt-3.5-turbo-0125",
+        sku=ModelSku.llm_completion,
+        defaults=dict(
+            model_name=LargeLanguageModels.gpt_3_5_turbo.name,
+            unit_cost=0.0015,
+            unit_quantity=1000,
+            category=category,
+            provider=ModelProvider.openai,
+            pricing_url="https://openai.com/pricing",
         ),
     )
 

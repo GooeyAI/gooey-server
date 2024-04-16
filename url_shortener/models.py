@@ -84,7 +84,7 @@ class ShortenedURLQuerySet(models.QuerySet):
         return df
 
 
-_hashids = hashids.Hashids(salt=settings.HASHIDS_SALT)
+_hashids = hashids.Hashids(salt=settings.HASHIDS_URL_SALT)
 
 
 class ShortenedURL(models.Model):

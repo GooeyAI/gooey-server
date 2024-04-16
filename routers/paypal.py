@@ -14,7 +14,6 @@ from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
-from routers.billing import available_subscriptions
 
 router = APIRouter()
 
@@ -48,8 +47,8 @@ def generate_auth_header() -> str:
         data = response.json()
         access_token = data.get("access_token")
         assert access_token, "Missing access token in response"
-        # expiry with a buffer of the time taken to fetch the token + 1 minute
-        expiry = int((data.get("expires_in") or 300) - (time() - s + 60))
+        # expiry with a buffer of the time taken to fetch the token + 5 minutes
+        expiry = int((data.get("expires_in") or 600) - (time() - s + 300))
         redis_cache.set(cache_key, access_token.encode(), ex=expiry)
 
     return f"Bearer " + access_token
@@ -62,11 +61,8 @@ def create_order(request: Request, payload=Depends(request_json)):
     if not request.user or request.user.is_anonymous:
         return JSONResponse({}, status_code=401)
 
-    lookup_key = "addon"
     quantity = payload["quantity"]
-    unit_amount = (
-        available_subscriptions[lookup_key]["stripe"]["price_data"]["unit_amount"] / 100
-    )
+    unit_amount = 1 / settings.ADDON_CREDITS_PER_DOLLAR
     value = int(quantity * unit_amount)
 
     response = requests.post(

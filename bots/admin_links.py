@@ -7,6 +7,8 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from furl import furl
 
+from daras_ai_v2 import settings
+
 
 def open_in_new_tab(url: str, *, label: str = "", add_related_url: str = None) -> str:
     label = re.sub(r"https?://", "", label)
@@ -22,9 +24,12 @@ def open_in_new_tab(url: str, *, label: str = "", add_related_url: str = None) -
 
 def change_obj_url(obj: models.Model, *, label: str = None) -> str:
     return open_in_new_tab(
-        reverse(
-            f"admin:{obj._meta.app_label}_{obj.__class__.__name__.lower()}_change",
-            args=[str(obj.id)],
+        str(
+            furl(settings.ADMIN_BASE_URL)
+            / reverse(
+                f"admin:{obj._meta.app_label}_{obj.__class__.__name__.lower()}_change",
+                args=[str(obj.id)],
+            )
         ),
         label=label or str(obj),
     )

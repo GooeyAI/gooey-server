@@ -32,7 +32,8 @@ else:
     SECRET_KEY = config("SECRET_KEY")
 
 # https://hashids.org/
-HASHIDS_SALT = config("HASHIDS_SALT", default="")
+HASHIDS_URL_SALT = config("HASHIDS_URL_SALT", default="")  # used for the url shortener
+HASHIDS_API_SALT = config("HASHIDS_API_SALT", default="")  # for everything else
 
 ALLOWED_HOSTS = ["*"]
 INTERNAL_IPS = ["127.0.0.1", "localhost"]
@@ -217,6 +218,8 @@ import firebase_admin
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
+GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
+
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
 GCP_PROJECT = config("GCP_PROJECT", default="dara-c1b52")
@@ -241,6 +244,7 @@ TOGETHER_API_KEY = config("TOGETHER_API_KEY", default="")
 
 APP_BASE_URL = config("APP_BASE_URL", "/")
 API_BASE_URL = config("API_BASE_URL", "/")
+ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 
 GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
@@ -274,6 +278,7 @@ CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 EMAIL_USER_FREE_CREDITS = config("EMAIL_USER_FREE_CREDITS", 0, cast=int)
 ANON_USER_FREE_CREDITS = config("ANON_USER_FREE_CREDITS", 25, cast=int)
 LOGIN_USER_FREE_CREDITS = config("LOGIN_USER_FREE_CREDITS", 1000, cast=int)
+ADDON_CREDITS_PER_DOLLAR = config("ADDON_CREDITS_PER_DOLLAR", 100, cast=int)
 
 LOW_BALANCE_EMAIL_CREDITS = config("LOW_BALANCE_EMAIL_CREDITS", 200, cast=int)
 LOW_BALANCE_EMAIL_DAYS = config("LOW_BALANCE_EMAIL_DAYS", 7, cast=int)
@@ -335,6 +340,8 @@ AZURE_OPENAI_KEY = config("AZURE_OPENAI_KEY", "")
 DEEPGRAM_API_KEY = config("DEEPGRAM_API_KEY", "")
 
 ELEVEN_LABS_API_KEY = config("ELEVEN_LABS_API_KEY", "")
+
+GHANA_NLP_SUBKEY = config("GHANA_NLP_SUBKEY", "")
 
 # Paypal
 PAYPAL_CLIENT_ID = config("PAYPAL_CLIENT_ID", "")

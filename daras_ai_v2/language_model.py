@@ -51,6 +51,7 @@ class LLMApis(Enum):
 
 
 class LargeLanguageModels(Enum):
+    gpt_4_turbo_vision = "GPT-4 Turbo with Vision (openai)"
     gpt_4_vision = "GPT-4 Vision (openai)"
     gpt_4_turbo = "GPT-4 Turbo (openai)"
     gpt_4 = "GPT-4 (openai)"
@@ -90,6 +91,7 @@ class LargeLanguageModels(Enum):
     def is_vision_model(self) -> bool:
         return self in {
             self.gpt_4_vision,
+            self.gpt_4_turbo_vision,
             self.gemini_1_pro_vision,
         }
 
@@ -104,6 +106,7 @@ class LargeLanguageModels(Enum):
 AZURE_OPENAI_MODEL_PREFIX = "openai-"
 
 llm_model_names = {
+    LargeLanguageModels.gpt_4_turbo_vision: "gpt-4-turbo-2024-04-09",
     LargeLanguageModels.gpt_4_vision: "gpt-4-vision-preview",
     LargeLanguageModels.gpt_4_turbo: (
         "openai-gpt-4-turbo-prod-ca-1",
@@ -139,6 +142,7 @@ llm_model_names = {
 }
 
 llm_api = {
+    LargeLanguageModels.gpt_4_turbo_vision: LLMApis.openai,
     LargeLanguageModels.gpt_4_vision: LLMApis.openai,
     LargeLanguageModels.gpt_4_turbo: LLMApis.openai,
     LargeLanguageModels.gpt_4: LLMApis.openai,
@@ -164,7 +168,8 @@ llm_api = {
 EMBEDDING_MODEL_MAX_TOKENS = 8191
 
 model_max_tokens = {
-    # https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
+    # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
+    LargeLanguageModels.gpt_4_turbo_vision: 128_000,
     LargeLanguageModels.gpt_4_vision: 128_000,
     # https://help.openai.com/en/articles/8555510-gpt-4-turbo
     LargeLanguageModels.gpt_4_turbo: 128_000,
@@ -194,6 +199,7 @@ model_max_tokens = {
 }
 
 llm_price = {
+    LargeLanguageModels.gpt_4_turbo_vision: 6,
     LargeLanguageModels.gpt_4_vision: 6,
     LargeLanguageModels.gpt_4_turbo: 5,
     LargeLanguageModels.gpt_4: 10,
@@ -219,17 +225,12 @@ llm_price = {
 
 def calc_gpt_tokens(
     prompt: str | list[str] | dict | list[dict],
-    *,
-    sep: str = "",
 ) -> int:
     if isinstance(prompt, (str, dict)):
         messages = [prompt]
     else:
         messages = prompt
-    combined = sep.join(
-        (format_chatml_message(entry) + "\n") if isinstance(entry, dict) else str(entry)
-        for entry in messages
-    )
+    combined = msgs_to_prompt_str(messages)
     return default_length_function(combined)
 
 
@@ -283,14 +284,15 @@ def run_language_model(
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
     api = llm_api[model]
     model_name = llm_model_names[model]
-    is_chatml = False
     if model.is_chat_model():
         if not messages:
-            # if input is chatml, convert it into json messages
-            is_chatml, messages = parse_chatml(prompt)  # type: ignore
-        messages = messages or []
-        logger.info(f"{model_name=}, {len(messages)=}, {max_tokens=}, {temperature=}")
+            # convert text prompt to chat messages
+            messages = [
+                {"role": "system", "content": DEFAULT_SYSTEM_MSG},
+                {"role": "user", "content": prompt},
+            ]
         if not model.is_vision_model():
+            # remove images from the messages
             messages = [
                 format_chat_entry(role=entry["role"], content=get_entry_text(entry))
                 for entry in messages
@@ -309,11 +311,10 @@ def run_language_model(
             # we can't stream with tools or json yet
             stream=stream and not (tools or response_format_type),
         )
-
         if stream:
             return _stream_llm_outputs(entries, response_format_type)
         else:
-            return _parse_entries(entries, is_chatml, response_format_type, tools)
+            return _parse_entries(entries, response_format_type, tools)
     else:
         if tools:
             raise ValueError("Only OpenAI chat models support Tools")
@@ -322,8 +323,12 @@ def run_language_model(
             # assistant prompt to triger a model response
             messages.append({"role": CHATML_ROLE_ASSISTANT, "content": ""})
             # for backwards compat with non-chat models
-            prompt = "\n".join(format_chatml_message(entry) for entry in messages)
-            stop = [CHATML_END_TOKEN, CHATML_START_TOKEN]
+            prompt = msgs_to_prompt_str(messages)
+            stop = [
+                CHATML_ROLE_ASSISTANT + ": ",
+                CHATML_ROLE_SYSTEM + ": ",
+                CHATML_ROLE_USER + ": ",
+            ]
             for entry in reversed(messages):
                 images = get_entry_images(entry)
                 if images:
@@ -369,22 +374,13 @@ def _stream_llm_outputs(
 
 def _parse_entries(
     entries: list[dict],
-    is_chatml: bool,
     response_format_type: typing.Literal["text", "json_object"] | None,
     tools: list[dict] | None,
 ):
     if response_format_type == "json_object":
         ret = [json.loads(entry["content"]) for entry in entries]
     else:
-        ret = [
-            # return messages back as either chatml or json messages
-            (
-                format_chatml_message(entry)
-                if is_chatml
-                else (entry.get("content") or "").strip()
-            )
-            for entry in entries
-        ]
+        ret = [get_entry_text(entry).strip() for entry in entries]
     if tools:
         return ret, [(entry.get("tool_calls") or []) for entry in entries]
     else:
@@ -441,17 +437,20 @@ def _run_text_model(
 def _run_chat_model(
     *,
     api: LLMApis = LLMApis.openai,
+    model: str | tuple,
     messages: list[ConversationEntry],
     max_tokens: int,
     num_outputs: int,
     temperature: float,
-    model: str | tuple,
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[LLMTools] | None,
     response_format_type: typing.Literal["text", "json_object"] | None,
     stream: bool = False,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
+    logger.info(
+        f"{api=} {model=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
+    )
     match api:
         case LLMApis.openai:
             return _run_openai_chat(
@@ -1075,40 +1074,18 @@ def _run_palm_text(
     return [prediction["content"] for prediction in out["predictions"]]
 
 
-def format_chatml_message(entry: ConversationEntry) -> str:
-    msg = CHATML_START_TOKEN + entry.get("role", "")
+def msgs_to_prompt_str(messages: list[ConversationEntry] | dict) -> str:
+    return "\n".join(entry_to_prompt_str(entry) for entry in messages)
+
+
+def entry_to_prompt_str(entry: ConversationEntry) -> str:
+    if isinstance(entry, str):
+        return entry
+    msg = entry.get("role", "") + ": "
     content = get_entry_text(entry).strip()
     if content:
-        msg += "\n" + content + CHATML_END_TOKEN
+        msg += content
     return msg
-
-
-chatml_re = re.compile(
-    re.escape(CHATML_START_TOKEN) + r"(.*)$",
-    flags=re.M,
-)
-
-
-def parse_chatml(prompt: str) -> tuple[bool, list[dict]]:
-    splits = chatml_re.split(prompt)
-    is_chatml = len(splits) > 1
-    if is_chatml:
-        messages = []
-        for i in range(1, len(splits) - 1, 2):
-            role = splits[i].strip()
-            content = (
-                splits[i + 1]
-                .replace(CHATML_START_TOKEN, "")
-                .replace(CHATML_END_TOKEN, "")
-                .strip()
-            )
-            messages.append({"role": role, "content": content})
-    else:
-        messages = [
-            {"role": "system", "content": DEFAULT_SYSTEM_MSG},
-            {"role": "user", "content": prompt},
-        ]
-    return is_chatml, messages
 
 
 # # This prompt formatting was copied from the original Llama v2 repo:

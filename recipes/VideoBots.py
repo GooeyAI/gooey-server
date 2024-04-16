@@ -9,12 +9,17 @@ from pydantic import BaseModel, Field
 import gooey_ui as st
 from bots.models import BotIntegration, Platform
 from bots.models import Workflow
+from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import (
     truncate_text_words,
 )
+from daras_ai_v2 import settings
+from daras_ai_v2.api_examples_widget import bot_api_example_generator
 from daras_ai_v2.asr import (
-    run_google_translate,
-    google_translate_language_selector,
+    translation_model_selector,
+    translation_language_selector,
+    run_translate,
+    TranslationModels,
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
@@ -39,7 +44,7 @@ from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
-from daras_ai_v2.field_render import field_title_desc, field_desc
+from daras_ai_v2.field_render import field_title_desc, field_desc, field_title
 from daras_ai_v2.functions import LLMTools
 from daras_ai_v2.glossary import glossary_input, validate_glossary_document
 from daras_ai_v2.language_model import (
@@ -113,6 +118,8 @@ class ReplyButton(typing.TypedDict):
 
 
 class VideoBotsPage(BasePage):
+    PROFIT_CREDITS = 3
+
     title = "Copilot for your Enterprise"  # "Create Interactive Video Bots"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8c014530-88d4-11ee-aac9-02420a00016b/Copilot.png.png"
     workflow = Workflow.VIDEO_BOTS
@@ -154,6 +161,7 @@ class VideoBotsPage(BasePage):
         "scroll_jump": 5,
         "use_url_shortener": False,
         "dense_weight": 1.0,
+        "translation_model": TranslationModels.google.name,
     }
 
     class RequestModel(BaseModel):
@@ -229,8 +237,11 @@ class VideoBotsPage(BasePage):
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None
         use_url_shortener: bool | None
 
+        translation_model: (
+            typing.Literal[tuple(e.name for e in TranslationModels)] | None
+        )
         user_language: str | None = Field(
-            title="🔠 User Language",
+            title="User Language",
             description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
         )
         # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
@@ -379,12 +390,19 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             "##### 🔠 Translation",
             value=bool(st.session_state.get("user_language")),
         ):
-            google_translate_language_selector(
-                f"{field_desc(self.RequestModel, 'user_language')}",
-                key="user_language",
-            )
+            st.caption(field_desc(self.RequestModel, "user_language"))
+            col1, col2 = st.columns(2)
+            with col1:
+                translation_model = translation_model_selector(allow_none=False)
+            with col2:
+                translation_language_selector(
+                    translation_model,
+                    label=f"###### {field_title(self.RequestModel, 'user_language')}",
+                    key="user_language",
+                )
             st.write("---")
         else:
+            st.session_state["translation_model"] = None
             st.session_state["user_language"] = None
 
         if st.checkbox(
@@ -397,11 +415,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             st.selectbox(
                 f"{field_desc(self.RequestModel, 'document_model')}",
                 key="document_model",
-                options=[None, *doc_model_descriptions],
-                format_func=lambda x: (
-                    f"{doc_model_descriptions[x]} ({x})" if x else "———"
-                ),
+                options=doc_model_descriptions,
+                format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
             )
+        else:
+            st.session_state["document_model"] = None
 
     def validate_form_v2(self):
         input_glossary = st.session_state.get("input_glossary_document", "")
@@ -425,7 +443,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             lipsync_settings()
             st.write("---")
 
-        if st.session_state.get("user_language"):
+        translation_model = st.session_state.get(
+            "translation_model", TranslationModels.google.name
+        )
+        if (
+            st.session_state.get("user_language")
+            and TranslationModels[translation_model].supports_glossary()
+        ):
             st.markdown("##### 🔠 Translation Settings")
             enable_glossary = st.checkbox(
                 "📖 Add Glossary",
@@ -656,32 +680,37 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.audio(audio_url)
 
     def get_raw_price(self, state: dict):
-        match state.get("tts_provider"):
-            case TextToSpeechProviders.ELEVEN_LABS.name:
-                output_text_list = state.get(
-                    "raw_tts_text", state.get("raw_output_text", [])
-                )
-                tts_state = {"text_prompt": "".join(output_text_list)}
-                total = super().get_raw_price(state) + TextToSpeechPage().get_raw_price(
-                    tts_state
-                )
-            case _:
-                total = super().get_raw_price(state)
+        total = self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
+
+        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
+            output_text_list = state.get(
+                "raw_tts_text", state.get("raw_output_text", [])
+            )
+            tts_state = {"text_prompt": "".join(output_text_list)}
+            total += TextToSpeechPage().get_raw_price(tts_state)
+
+        if state.get("input_face"):
+            total += 1
 
         return total * state.get("num_outputs", 1)
 
     def additional_notes(self):
-        tts_provider = st.session_state.get("tts_provider")
-        match tts_provider:
-            case TextToSpeechProviders.ELEVEN_LABS.name:
-                return (
-                    f" \\\n"
-                    f"*Base cost = {super().get_raw_price(st.session_state)} credits*"
-                    f" | "
-                    f"*Additional {TextToSpeechPage().get_cost_note()}*"
-                )
-            case _:
-                return ""
+        try:
+            model = LargeLanguageModels[st.session_state["selected_model"]].value
+        except KeyError:
+            model = "LLM"
+        notes = f" \\\n*Breakdown: {self.get_total_linked_usage_cost_in_credits()} ({model}) + {self.PROFIT_CREDITS}/run*"
+
+        if (
+            st.session_state.get("tts_provider")
+            == TextToSpeechProviders.ELEVEN_LABS.name
+        ):
+            notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
+
+        if st.session_state.get("input_face"):
+            notes += " *+ 1 (lipsync)*"
+
+        return notes
 
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request: VideoBotsPage.RequestModel = self.RequestModel.parse_obj(state)
@@ -721,18 +750,20 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 ocr_texts.append(ocr_text)
 
         # translate input text
+        translation_model = request.translation_model or TranslationModels.google.name
         if request.user_language and request.user_language != "en":
             yield f"Translating Input to English..."
-            user_input = run_google_translate(
+            user_input = run_translate(
                 texts=[user_input],
                 source_language=request.user_language,
                 target_language="en",
                 glossary_url=request.input_glossary_document,
+                model=translation_model,
             )[0]
 
         if ocr_texts:
             yield f"Translating Image Text to English..."
-            ocr_texts = run_google_translate(
+            ocr_texts = run_translate(
                 texts=ocr_texts,
                 source_language="auto",
                 target_language="en",
@@ -773,9 +804,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             query_msgs = saved_msgs + [
                 format_chat_entry(role=CHATML_ROLE_USER, content=user_input)
             ]
-            clip_idx = convo_window_clipper(
-                query_msgs, model_max_tokens[model] // 2, sep=" "
-            )
+            clip_idx = convo_window_clipper(query_msgs, model_max_tokens[model] // 2)
             query_msgs = query_msgs[clip_idx:]
 
             chat_history = "\n".join(
@@ -905,11 +934,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # translate response text
             if request.user_language and request.user_language != "en":
                 yield f"Translating response to {request.user_language}..."
-                output_text = run_google_translate(
+                output_text = run_translate(
                     texts=output_text,
                     source_language="en",
                     target_language=request.user_language,
                     glossary_url=request.output_glossary_document,
+                    model=translation_model,
                 )
                 state["raw_tts_text"] = [
                     "".join(snippet for snippet, _ in parse_refs(text, references))
@@ -1046,8 +1076,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         from daras_ai_v2.slack_bot import send_confirmation_msg
 
         for bid in self.request.query_params.getlist("connect_ids"):
-            bi = BotIntegration.objects.filter(id=bid).first()
-            if not bi:
+            try:
+                bi = BotIntegration.objects.get(id=bid)
+            except BotIntegration.DoesNotExist:
                 continue
             if bi.saved_run is not None:
                 with st.center():
@@ -1077,15 +1108,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         col1, col2, col3 = st.columns(
             3,
             column_props=dict(
-                style={
-                    "display": "flex",
-                    "flex-direction": "column",
-                    "align-items": "center",
-                    "text-align": "center",
-                    "max-width": "300px",
-                }
+                style=dict(
+                    display="flex",
+                    flexDirection="column",
+                    alignItems="center",
+                    textAlign="center",
+                    maxWidth="300px",
+                ),
             ),
-            style={"justify-content": "center"},
+            style={"justifyContent": "center"},
         )
         with col1:
             st.html("🏃‍♀️", style={"fontSize": "4rem"})
@@ -1107,8 +1138,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def integration_connect_screen(
         self, title="Connect your Copilot", status: str | None = None
     ):
-        from routers.facebook_api import ig_connect_url, fb_connect_url, wa_connect_url
+        from routers.facebook_api import fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
+        from daras_ai_v2.base import RedirectException
 
         on_connect = self.get_tab_url(MenuTabs.integrations)
 
@@ -1121,46 +1153,91 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 unsafe_allow_html=True,
             )
 
-            LINKSTYLE = 'class="btn btn-theme btn-secondary" style="margin: 0; display: flex; justify-content: center; align-items: center; padding: 8px; border: 1px solid black; min-width: 120px; width: 160px; aspect-ratio: 5 / 2; overflow: hidden; border-radius: 10px" draggable="false"'
-            IMGSTYLE = 'style="width: 80%" draggable="false"'
-            ROWSTYLE = 'style="display: flex; align-items: center; gap: 1em; margin-bottom: 1rem" draggable="false"'
-            DESCRIPTIONSTYLE = f'style="color: {GRAYCOLOR}; text-align: left"'
-            st.markdown(
-                # language=html
-                f"""
-                <div>
-                <div {ROWSTYLE}>
-                    <a href="{wa_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Whatsapp number">
-                        <img src="{WHATSAPP_IMG}" {IMGSTYLE} alt="Whatsapp">
-                    </a>
-                    <div {DESCRIPTIONSTYLE}>Bring your own <a href="https://business.facebook.com/wa/manage/phone-numbers">WhatsApp number</a> to connect. Need a new one? Email <a href="mailto:sales@gooey.ai">sales@gooey.ai</a>.</div>
-                </div>
-                <div {ROWSTYLE}>
-                    <a href="{slack_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Slack Workspace">
-                        <img src="{SLACK_IMG}" {IMGSTYLE} alt="Slack">
-                    </a>
-                    <div {DESCRIPTIONSTYLE}>Connect to a Slack Channel. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-slack">Help Guide</a>.</div>
-                </div>
-                <div {ROWSTYLE}>
-                    <a href="{fb_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Facebook Page">
-                        <img src="{FACEBOOK_IMG}" {IMGSTYLE} alt="Facebook Messenger">
-                    </a>
-                    <div {DESCRIPTIONSTYLE}>Connect to a Facebook Page you own. <a href="https://gooey.ai/docs/guides/copilot/deploy-to-facebook">Help Guide</a>.</div>
-                </div>
-                <!--<div {ROWSTYLE}>
-                    <a href="{ig_connect_url(on_connect)}" {LINKSTYLE} aria-label="Connect your Instagram Page">
-                        <img src="{INSTAGRAM_IMG}" {IMGSTYLE} alt="Instagram">
-                    </a>
-                    <div {DESCRIPTIONSTYLE}>Connect to an Instagram account you own.</div>
-                </div>-->
-                </div>
-                """,
-                unsafe_allow_html=True,
+            linkstyle = dict(margin=0, display="flex", justifyContent="center", alignItems="center", padding="8px", border="1px solid black", minWidth="120px", width="160px", aspectRatio="5 / 2", overflow="hidden", borderRadius="10px")  # fmt: skip
+            imgstyle = 'style="width: 80%" draggable="false"'
+            rowstyle = dict(display="flex", alignItems="center", gap="1em", marginBottom="1rem")  # fmt: skip
+            descriptionstyle = dict(
+                color=GRAYCOLOR, textAlign="left", paddingTop="1rem"
             )
+
+            with st.div():  # outer wrapper to ensure rows are aligned
+                selected_platform = None
+                redirect_url = None
+                with st.div(style=rowstyle, draggable="false"):
+                    if st.button(
+                        f'<img src="{WHATSAPP_IMG}" {imgstyle} alt="Whatsapp">',
+                        ariaLabel="Connect your Whatsapp number",
+                        style=linkstyle,
+                        draggable="false",
+                    ):
+                        selected_platform = Platform.WHATSAPP
+                        redirect_url = wa_connect_url(on_connect)
+                    with st.div(style=descriptionstyle):
+                        st.markdown(
+                            "Bring your own [WhatsApp number](https://business.facebook.com/wa/manage/phone-numbers) to connect. "
+                            "Need a new one? Email [sales@gooey.ai](mailto:sales@gooey.ai) for help."
+                        )
+
+                with st.div(style=rowstyle, draggable="false"):
+                    if st.button(
+                        f'<img src="{SLACK_IMG}" {imgstyle} alt="Slack">',
+                        ariaLabel="Connect your Slack Workspace",
+                        style=linkstyle,
+                        draggable="false",
+                    ):
+                        selected_platform = Platform.SLACK
+                        redirect_url = slack_connect_url(on_connect)
+                    with st.div(style=descriptionstyle):
+                        st.markdown(
+                            "Connect to a Slack Channel. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-slack)"
+                        )
+
+                with st.div(style=rowstyle, draggable="false"):
+                    if st.button(
+                        f'<img src="{FACEBOOK_IMG}" {imgstyle} alt="Facebook Messenger">',
+                        ariaLabel="Connect your Facebook Page",
+                        style=linkstyle,
+                        draggable="false",
+                    ):
+                        selected_platform = Platform.FACEBOOK
+                        redirect_url = fb_connect_url(on_connect)
+                    with st.div(style=descriptionstyle):
+                        st.markdown(
+                            "Connect to a Facebook Page you own. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)"
+                        )
+
+                with st.div(style=rowstyle, draggable="false"):
+                    if st.button(
+                        f'<img src="{settings.GOOEY_LOGO_IMG}" {imgstyle} alt="Web">',
+                        ariaLabel="Connect to your App or Website",
+                        style=linkstyle,
+                        draggable="false",
+                    ):
+                        bi = BotIntegration.objects.create(
+                            name="Web",
+                            billing_account_uid=self.request.user.uid,
+                            platform=Platform.WEB,
+                        )
+                        selected_platform = Platform.WEB
+                        redirect_url = str(
+                            furl(on_connect).add(
+                                query_params=dict(connect_ids=str(bi.id))
+                            )
+                        )
+                    with st.div(style=descriptionstyle):
+                        st.markdown("Connect to your own App or Website.")
+
+                if redirect_url:
+                    send_integration_attempt_email.delay(
+                        user_id=self.request.user.id,
+                        platform=selected_platform,
+                        run_url=self._get_current_app_url() or "",
+                    )
+                    raise RedirectException(redirect_url)
 
             st.newline()
             st.write(
-                f"Or use [our API]({self.get_tab_url(MenuTabs.run_as_api)}) to integrate with your own app."
+                f"Or use [our API]({self.get_tab_url(MenuTabs.run_as_api)}) to build custom integrations with your server."
             )
 
     def integration_test_config_screen(
@@ -1205,10 +1282,14 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             bi = integrations[0]
         icon = f'<img src="{Platform(bi.platform).get_favicon()}" width="20" height="20" />'
 
+        if bi.platform == Platform.WEB:
+            bot_api_example_generator(bi.api_integration_id())
+            st.write("---")
+
         st.newline()
         with st.div(style={"width": "100%", "textAlign": "left"}):
             test_link = get_bot_test_link(bi)
-            col1, col2 = st.columns(2, style={"align-items": "center"})
+            col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
                 st.write("###### Connected To")
                 st.write(f"{icon} {bi}", unsafe_allow_html=True)
@@ -1222,7 +1303,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 else:
                     st.write("Message quicklink not available.")
 
-            col1, col2 = st.columns(2, style={"align-items": "center"})
+            col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
                 st.write("###### Test")
                 st.caption(f"Send a test {Platform(bi.platform).label} message.")
@@ -1236,7 +1317,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 else:
                     st.write("Message quicklink not available.")
 
-            col1, col2 = st.columns(2, style={"align-items": "center"})
+            col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
                 st.write("###### Understand your Users")
                 st.caption(f"See real-time analytics.")
@@ -1250,7 +1331,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 )
 
             # ==== future changes ====
-            # col1, col2 = st.columns(2, style={"align-items": "center"})
+            # col1, col2 = st.columns(2, style={"alignItems": "center"})
             # with col1:
             #     st.write("###### Evaluate ⚖️")
             #     st.caption(f"Run automated tests against sample user messages.")
@@ -1266,7 +1347,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             # )
 
             if bi.platform == Platform.WHATSAPP and bi.wa_business_waba_id:
-                col1, col2 = st.columns(2, style={"align-items": "center"})
+                col1, col2 = st.columns(2, style={"alignItems": "center"})
                 with col1:
                     st.write("###### WhatsApp Business Management")
                     st.caption(
@@ -1284,7 +1365,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                         new_tab=True,
                     )
 
-            col1, col2 = st.columns(2, style={"align-items": "center"})
+            col1, col2 = st.columns(2, style={"alignItems": "center"})
             with col1:
                 st.write("###### Add Integration")
                 st.caption(f"Add another connection for {run_title}.")
@@ -1306,7 +1387,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     broadcast_input(bi)
 
                 st.write("---")
-                col1, col2 = st.columns(2, style={"align-items": "center"})
+                col1, col2 = st.columns(2, style={"alignItems": "center"})
                 with col1:
                     st.write("###### Disconnect")
                     st.caption(
@@ -1436,11 +1517,9 @@ def convo_window_clipper(
     window: list[ConversationEntry],
     max_tokens,
     *,
-    sep: str = "",
-    is_chat_model: bool = True,
     step=2,
 ):
     for i in range(len(window) - 2, -1, -step):
-        if calc_gpt_tokens(window[i:], sep=sep) > max_tokens:
+        if calc_gpt_tokens(window[i:]) > max_tokens:
             return i + step
     return 0

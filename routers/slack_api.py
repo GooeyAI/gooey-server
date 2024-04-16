@@ -13,7 +13,7 @@ from starlette.responses import RedirectResponse, HTMLResponse
 from bots.models import BotIntegration, Platform, Conversation, Message
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
-from daras_ai_v2.bots import _on_msg, request_json, request_urlencoded_body
+from daras_ai_v2.bots import msg_handler, request_json, request_urlencoded_body
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.slack_bot import (
     SlackBot,
@@ -164,7 +164,7 @@ def slack_interaction(
         channel_id=data["channel"]["id"],
         actions=data["actions"],
     )
-    background_tasks.add_task(_on_msg, bot)
+    background_tasks.add_task(msg_handler, bot)
 
 
 @router.post("/__/slack/event/")
@@ -229,7 +229,7 @@ def _handle_slack_event(event: dict, background_tasks: BackgroundTasks):
                     text=message.get("text", ""),
                     files=files,
                 )
-                background_tasks.add_task(_on_msg, bot)
+                background_tasks.add_task(msg_handler, bot)
 
     except BotIntegration.DoesNotExist as e:
         print(f"Error: contacted from an unknown channel - {e!r}")
@@ -374,9 +374,9 @@ def slack_get_response_for_msg_id(
     slack_user: dict = Depends(slack_auth_header),
 ):
     try:
-        msg = Message.objects.get(platform_msg_id=msg_id)
+        msg = Message.objects.filter(platform_msg_id=msg_id)[0]
         response_msg = msg.get_next_by_created_at()
-    except Message.DoesNotExist:
+    except (Message.DoesNotExist, IndexError):
         return {"status": "not_found"}
 
     if msg.conversation.slack_team_id != slack_user.get(

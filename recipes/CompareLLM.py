@@ -67,7 +67,6 @@ class CompareLLMPage(BasePage):
         st.text_area(
             """
             #### 👩‍💻 Prompt
-            *Supports [ChatML](https://github.com/openai/openai-python/blob/main/chatml.md) & [Jinja](https://jinja.palletsprojects.com/templates/)* 
             """,
             key="input_prompt",
             help="What a fine day..",
@@ -77,7 +76,7 @@ class CompareLLMPage(BasePage):
 
         enum_multiselect(
             LargeLanguageModels,
-            label="#### 🤗 Compare Langugage Models",
+            label="#### 🤗 Compare Language Models",
             key="selected_models",
         )
 

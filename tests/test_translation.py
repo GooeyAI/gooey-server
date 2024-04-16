@@ -6,11 +6,11 @@ TRANSLATION_TESTS = [
     # hindi romanized
     (
         "Hi Sir Mera khet me mircha ke ped me fal gal Kar gir hai to  iske liye  ham kon sa dawa  de please  help me",
-        "hi sir the fruit of the chilli tree in my field has rotted and fallen so what medicine should we give for this please help",
+        "hi sir in my field the fruits of chilli tree are rotting and falling so which medicine should i give for this please help",
     ),
     (
         "Mirchi ka ped",
-        "chilli tree",
+        "pepper tree",
     ),
     # telugu
     (

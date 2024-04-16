@@ -29,8 +29,9 @@ from daras_ai_v2.gdrive_downloader import (
 from daras_ai_v2.google_asr import gcp_asr_v1
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from daras_ai_v2.text_splitter import text_splitter
 
-TRANSLATE_DETECT_BATCH_SIZE = 8
+TRANSLATE_BATCH_SIZE = 8
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -103,6 +104,101 @@ AZURE_SUPPORTED = {
 # but we only have the Nova tier so these are our languages (https://developers.deepgram.com/docs/models-languages-overview):
 DEEPGRAM_SUPPORTED = {"en", "en-US", "en-AU", "en-GB", "en-NZ", "en-IN", "es", "es-419"}  # fmt: skip
 
+# https://huggingface.co/spaces/mms-meta/MMS/raw/main/data/asr/all_langs.tsv
+MMS_SUPPORTED = {
+    'abi', 'abk', 'abp', 'aca', 'acd', 'ace', 'acf', 'ach', 'acn', 'acr', 'acu', 'ade', 'adh', 'adj', 'adx', 'aeu',
+    'afr', 'agd', 'agg', 'agn', 'agr', 'agu', 'agx', 'aha', 'ahk', 'aia', 'aka', 'akb', 'ake', 'akp', 'alj', 'alp',
+    'alt', 'alz', 'ame', 'amf', 'amh', 'ami', 'amk', 'ann', 'any', 'aoz', 'apb', 'apr', 'ara', 'arl', 'asa', 'asg',
+    'asm', 'ast', 'ata', 'atb', 'atg', 'ati', 'atq', 'ava', 'avn', 'avu', 'awa', 'awb', 'ayo', 'ayr', 'ayz', 'azb',
+    'azg', 'azj-script_cyrillic', 'azj-script_latin', 'azz', 'bak', 'bam', 'ban', 'bao', 'bas', 'bav', 'bba', 'bbb',
+    'bbc', 'bbo', 'bcc-script_arabic', 'bcc-script_latin', 'bcl', 'bcw', 'bdg', 'bdh', 'bdq', 'bdu', 'bdv', 'beh',
+    'bel', 'bem', 'ben', 'bep', 'bex', 'bfa', 'bfo', 'bfy', 'bfz', 'bgc', 'bgq', 'bgr', 'bgt', 'bgw', 'bha', 'bht',
+    'bhz', 'bib', 'bim', 'bis', 'biv', 'bjr', 'bjv', 'bjw', 'bjz', 'bkd', 'bkv', 'blh', 'blt', 'blx', 'blz', 'bmq',
+    'bmr', 'bmu', 'bmv', 'bng', 'bno', 'bnp', 'boa', 'bod', 'boj', 'bom', 'bor', 'bos', 'bov', 'box', 'bpr', 'bps',
+    'bqc', 'bqi', 'bqj', 'bqp', 'bre', 'bru', 'bsc', 'bsq', 'bss', 'btd', 'bts', 'btt', 'btx', 'bud', 'bul', 'bus',
+    'bvc', 'bvz', 'bwq', 'bwu', 'byr', 'bzh', 'bzi', 'bzj', 'caa', 'cab', 'cac-dialect_sanmateoixtatan',
+    'cac-dialect_sansebastiancoatan', 'cak-dialect_central', 'cak-dialect_santamariadejesus',
+    'cak-dialect_santodomingoxenacoj', 'cak-dialect_southcentral', 'cak-dialect_western', 'cak-dialect_yepocapa', 'cap',
+    'car', 'cas', 'cat', 'cax', 'cbc', 'cbi', 'cbr', 'cbs', 'cbt', 'cbu', 'cbv', 'cce', 'cco', 'cdj', 'ceb', 'ceg',
+    'cek', 'ces', 'cfm', 'cgc', 'che', 'chf', 'chv', 'chz', 'cjo', 'cjp', 'cjs', 'ckb', 'cko', 'ckt', 'cla', 'cle',
+    'cly', 'cme', 'cmn-script_simplified', 'cmo-script_khmer', 'cmo-script_latin', 'cmr', 'cnh', 'cni', 'cnl', 'cnt',
+    'coe', 'cof', 'cok', 'con', 'cot', 'cou', 'cpa', 'cpb', 'cpu', 'crh', 'crk-script_latin', 'crk-script_syllabics',
+    'crn', 'crq', 'crs', 'crt', 'csk', 'cso', 'ctd', 'ctg', 'cto', 'ctu', 'cuc', 'cui', 'cuk', 'cul', 'cwa', 'cwe',
+    'cwt', 'cya', 'cym', 'daa', 'dah', 'dan', 'dar', 'dbj', 'dbq', 'ddn', 'ded', 'des', 'deu', 'dga', 'dgi', 'dgk',
+    'dgo', 'dgr', 'dhi', 'did', 'dig', 'dik', 'dip', 'div', 'djk', 'dnj-dialect_blowowest', 'dnj-dialect_gweetaawueast',
+    'dnt', 'dnw', 'dop', 'dos', 'dsh', 'dso', 'dtp', 'dts', 'dug', 'dwr', 'dyi', 'dyo', 'dyu', 'dzo', 'eip', 'eka',
+    'ell', 'emp', 'enb', 'eng', 'enx', 'epo', 'ese', 'ess', 'est', 'eus', 'evn', 'ewe', 'eza', 'fal', 'fao', 'far',
+    'fas', 'fij', 'fin', 'flr', 'fmu', 'fon', 'fra', 'frd', 'fry', 'ful', 'gag-script_cyrillic', 'gag-script_latin',
+    'gai', 'gam', 'gau', 'gbi', 'gbk', 'gbm', 'gbo', 'gde', 'geb', 'gej', 'gil', 'gjn', 'gkn', 'gld', 'gle', 'glg',
+    'glk', 'gmv', 'gna', 'gnd', 'gng', 'gof-script_latin', 'gog', 'gor', 'gqr', 'grc', 'gri', 'grn', 'grt', 'gso',
+    'gub', 'guc', 'gud', 'guh', 'guj', 'guk', 'gum', 'guo', 'guq', 'guu', 'gux', 'gvc', 'gvl', 'gwi', 'gwr', 'gym',
+    'gyr', 'had', 'hag', 'hak', 'hap', 'hat', 'hau', 'hay', 'heb', 'heh', 'hif', 'hig', 'hil', 'hin', 'hlb', 'hlt',
+    'hne', 'hnn', 'hns', 'hoc', 'hoy', 'hrv', 'hsb', 'hto', 'hub', 'hui', 'hun', 'hus-dialect_centralveracruz',
+    'hus-dialect_westernpotosino', 'huu', 'huv', 'hvn', 'hwc', 'hye', 'hyw', 'iba', 'ibo', 'icr', 'idd', 'ifa', 'ifb',
+    'ife', 'ifk', 'ifu', 'ify', 'ign', 'ikk', 'ilb', 'ilo', 'imo', 'ina', 'inb', 'ind', 'iou', 'ipi', 'iqw', 'iri',
+    'irk', 'isl', 'ita', 'itl', 'itv', 'ixl-dialect_sangasparchajul', 'ixl-dialect_sanjuancotzal',
+    'ixl-dialect_santamarianebaj', 'izr', 'izz', 'jac', 'jam', 'jav', 'jbu', 'jen', 'jic', 'jiv', 'jmc', 'jmd', 'jpn',
+    'jun', 'juy', 'jvn', 'kaa', 'kab', 'kac', 'kak', 'kam', 'kan', 'kao', 'kaq', 'kat', 'kay', 'kaz', 'kbo', 'kbp',
+    'kbq', 'kbr', 'kby', 'kca', 'kcg', 'kdc', 'kde', 'kdh', 'kdi', 'kdj', 'kdl', 'kdn', 'kdt', 'kea', 'kek', 'ken',
+    'keo', 'ker', 'key', 'kez', 'kfb', 'kff-script_telugu', 'kfw', 'kfx', 'khg', 'khm', 'khq', 'kia', 'kij', 'kik',
+    'kin', 'kir', 'kjb', 'kje', 'kjg', 'kjh', 'kki', 'kkj', 'kle', 'klu', 'klv', 'klw', 'kma', 'kmd', 'kml',
+    'kmr-script_arabic', 'kmr-script_cyrillic', 'kmr-script_latin', 'kmu', 'knb', 'kne', 'knf', 'knj', 'knk', 'kno',
+    'kog', 'kor', 'kpq', 'kps', 'kpv', 'kpy', 'kpz', 'kqe', 'kqp', 'kqr', 'kqy', 'krc', 'kri', 'krj', 'krl', 'krr',
+    'krs', 'kru', 'ksb', 'ksr', 'kss', 'ktb', 'ktj', 'kub', 'kue', 'kum', 'kus', 'kvn', 'kvw', 'kwd', 'kwf', 'kwi',
+    'kxc', 'kxf', 'kxm', 'kxv', 'kyb', 'kyc', 'kyf', 'kyg', 'kyo', 'kyq', 'kyu', 'kyz', 'kzf', 'lac', 'laj', 'lam',
+    'lao', 'las', 'lat', 'lav', 'law', 'lbj', 'lbw', 'lcp', 'lee', 'lef', 'lem', 'lew', 'lex', 'lgg', 'lgl', 'lhu',
+    'lia', 'lid', 'lif', 'lin', 'lip', 'lis', 'lit', 'lje', 'ljp', 'llg', 'lln', 'lme', 'lnd', 'lns', 'lob', 'lok',
+    'lom', 'lon', 'loq', 'lsi', 'lsm', 'ltz', 'luc', 'lug', 'luo', 'lwo', 'lww', 'lzz', 'maa-dialect_sanantonio',
+    'maa-dialect_sanjeronimo', 'mad', 'mag', 'mah', 'mai', 'maj', 'mak', 'mal', 'mam-dialect_central',
+    'mam-dialect_northern', 'mam-dialect_southern', 'mam-dialect_western', 'maq', 'mar', 'maw', 'maz', 'mbb', 'mbc',
+    'mbh', 'mbj', 'mbt', 'mbu', 'mbz', 'mca', 'mcb', 'mcd', 'mco', 'mcp', 'mcq', 'mcu', 'mda', 'mdf', 'mdv', 'mdy',
+    'med', 'mee', 'mej', 'men', 'meq', 'met', 'mev', 'mfe', 'mfh', 'mfi', 'mfk', 'mfq', 'mfy', 'mfz', 'mgd', 'mge',
+    'mgh', 'mgo', 'mhi', 'mhr', 'mhu', 'mhx', 'mhy', 'mib', 'mie', 'mif', 'mih', 'mil', 'mim', 'min', 'mio', 'mip',
+    'miq', 'mit', 'miy', 'miz', 'mjl', 'mjv', 'mkd', 'mkl', 'mkn', 'mlg', 'mlt', 'mmg', 'mnb', 'mnf', 'mnk', 'mnw',
+    'mnx', 'moa', 'mog', 'mon', 'mop', 'mor', 'mos', 'mox', 'moz', 'mpg', 'mpm', 'mpp', 'mpx', 'mqb', 'mqf', 'mqj',
+    'mqn', 'mri', 'mrw', 'msy', 'mtd', 'mtj', 'mto', 'muh', 'mup', 'mur', 'muv', 'muy', 'mvp', 'mwq', 'mwv', 'mxb',
+    'mxq', 'mxt', 'mxv', 'mya', 'myb', 'myk', 'myl', 'myv', 'myx', 'myy', 'mza', 'mzi', 'mzj', 'mzk', 'mzm', 'mzw',
+    'nab', 'nag', 'nan', 'nas', 'naw', 'nca', 'nch', 'ncj', 'ncl', 'ncu', 'ndj', 'ndp', 'ndv', 'ndy', 'ndz', 'neb',
+    'new', 'nfa', 'nfr', 'nga', 'ngl', 'ngp', 'ngu', 'nhe', 'nhi', 'nhu', 'nhw', 'nhx', 'nhy', 'nia', 'nij', 'nim',
+    'nin', 'nko', 'nlc', 'nld', 'nlg', 'nlk', 'nmz', 'nnb', 'nno', 'nnq', 'nnw', 'noa', 'nob', 'nod', 'nog', 'not',
+    'npi', 'npl', 'npy', 'nso', 'nst', 'nsu', 'ntm', 'ntr', 'nuj', 'nus', 'nuz', 'nwb', 'nxq', 'nya', 'nyf', 'nyn',
+    'nyo', 'nyy', 'nzi', 'obo', 'oci', 'ojb-script_latin', 'ojb-script_syllabics', 'oku', 'old', 'omw', 'onb', 'ood',
+    'orm', 'ory', 'oss', 'ote', 'otq', 'ozm', 'pab', 'pad', 'pag', 'pam', 'pan', 'pao', 'pap', 'pau', 'pbb', 'pbc',
+    'pbi', 'pce', 'pcm', 'peg', 'pez', 'pib', 'pil', 'pir', 'pis', 'pjt', 'pkb', 'pls', 'plw', 'pmf', 'pny',
+    'poh-dialect_eastern', 'poh-dialect_western', 'poi', 'pol', 'por', 'poy', 'ppk', 'pps', 'prf', 'prk', 'prt', 'pse',
+    'pss', 'ptu', 'pui', 'pus', 'pwg', 'pww', 'pxm', 'qub', 'quc-dialect_central', 'quc-dialect_east',
+    'quc-dialect_north', 'quf', 'quh', 'qul', 'quw', 'quy', 'quz', 'qvc', 'qve', 'qvh', 'qvm', 'qvn', 'qvo', 'qvs',
+    'qvw', 'qvz', 'qwh', 'qxh', 'qxl', 'qxn', 'qxo', 'qxr', 'rah', 'rai', 'rap', 'rav', 'raw', 'rej', 'rel', 'rgu',
+    'rhg', 'rif-script_arabic', 'rif-script_latin', 'ril', 'rim', 'rjs', 'rkt', 'rmc-script_cyrillic',
+    'rmc-script_latin', 'rmo', 'rmy-script_cyrillic', 'rmy-script_latin', 'rng', 'rnl', 'roh-dialect_sursilv',
+    'roh-dialect_vallader', 'rol', 'ron', 'rop', 'rro', 'rub', 'ruf', 'rug', 'run', 'rus', 'sab', 'sag', 'sah', 'saj',
+    'saq', 'sas', 'sat', 'sba', 'sbd', 'sbl', 'sbp', 'sch', 'sck', 'sda', 'sea', 'seh', 'ses', 'sey', 'sgb', 'sgj',
+    'sgw', 'shi', 'shk', 'shn', 'sho', 'shp', 'sid', 'sig', 'sil', 'sja', 'sjm', 'sld', 'slk', 'slu', 'slv', 'sml',
+    'smo', 'sna', 'snd', 'sne', 'snn', 'snp', 'snw', 'som', 'soy', 'spa', 'spp', 'spy', 'sqi', 'sri', 'srm', 'srn',
+    'srp-script_cyrillic', 'srp-script_latin', 'srx', 'stn', 'stp', 'suc', 'suk', 'sun', 'sur', 'sus', 'suv', 'suz',
+    'swe', 'swh', 'sxb', 'sxn', 'sya', 'syl', 'sza', 'tac', 'taj', 'tam', 'tao', 'tap', 'taq', 'tat', 'tav', 'tbc',
+    'tbg', 'tbk', 'tbl', 'tby', 'tbz', 'tca', 'tcc', 'tcs', 'tcz', 'tdj', 'ted', 'tee', 'tel', 'tem', 'teo', 'ter',
+    'tes', 'tew', 'tex', 'tfr', 'tgj', 'tgk', 'tgl', 'tgo', 'tgp', 'tha', 'thk', 'thl', 'tih', 'tik', 'tir', 'tkr',
+    'tlb', 'tlj', 'tly', 'tmc', 'tmf', 'tna', 'tng', 'tnk', 'tnn', 'tnp', 'tnr', 'tnt', 'tob', 'toc', 'toh', 'tom',
+    'tos', 'tpi', 'tpm', 'tpp', 'tpt', 'trc', 'tri', 'trn', 'trs', 'tso', 'tsz', 'ttc', 'tte', 'ttq-script_tifinagh',
+    'tue', 'tuf', 'tuk-script_arabic', 'tuk-script_latin', 'tuo', 'tur', 'tvw', 'twb', 'twe', 'twu', 'txa', 'txq',
+    'txu', 'tye', 'tzh-dialect_bachajon', 'tzh-dialect_tenejapa', 'tzj-dialect_eastern', 'tzj-dialect_western',
+    'tzo-dialect_chamula', 'tzo-dialect_chenalho', 'ubl', 'ubu', 'udm', 'udu', 'uig-script_arabic',
+    'uig-script_cyrillic', 'ukr', 'umb', 'unr', 'upv', 'ura', 'urb', 'urd-script_arabic', 'urd-script_devanagari',
+    'urd-script_latin', 'urk', 'urt', 'ury', 'usp', 'uzb-script_cyrillic', 'uzb-script_latin', 'vag', 'vid', 'vie',
+    'vif', 'vmw', 'vmy', 'vot', 'vun', 'vut', 'wal-script_ethiopic', 'wal-script_latin', 'wap', 'war', 'waw', 'way',
+    'wba', 'wlo', 'wlx', 'wmw', 'wob', 'wol', 'wsg', 'wwa', 'xal', 'xdy', 'xed', 'xer', 'xho', 'xmm', 'xnj', 'xnr',
+    'xog', 'xon', 'xrb', 'xsb', 'xsm', 'xsr', 'xsu', 'xta', 'xtd', 'xte', 'xtm', 'xtn', 'xua', 'xuo', 'yaa', 'yad',
+    'yal', 'yam', 'yao', 'yas', 'yat', 'yaz', 'yba', 'ybb', 'ycl', 'ycn', 'yea', 'yka', 'yli', 'yor', 'yre', 'yua',
+    'yue-script_traditional', 'yuz', 'yva', 'zaa', 'zab', 'zac', 'zad', 'zae', 'zai', 'zam', 'zao', 'zaq', 'zar', 'zas',
+    'zav', 'zaw', 'zca', 'zga', 'zim', 'ziw', 'zlm', 'zmz', 'zne', 'zos', 'zpc', 'zpg', 'zpi', 'zpl', 'zpm', 'zpo',
+    'zpt', 'zpu', 'zpz', 'ztq', 'zty', 'zul', 'zyb', 'zyp', 'zza'
+}  # fmt: skip
+
+# https://translation.ghananlp.org/api-details#api=ghananlp-translation-webservice-api
+GHANA_NLP_SUPPORTED = { 'en': 'English', 'tw': 'Twi', 'gaa': 'Ga', 'ee': 'Ewe', 'fat': 'Fante', 'dag': 'Dagbani', 'gur': 'Gurene', 'yo': 'Yoruba', 'ki': 'Kikuyu', 'luo': 'Luo', 'mer': 'Kimeru' }  # fmt: skip
+GHANA_NLP_MAXLEN = 500
+
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
@@ -117,9 +213,10 @@ class AsrModels(Enum):
     deepgram = "Deepgram"
     azure = "Azure Speech"
     seamless_m4t = "Seamless M4T (Facebook Research)"
+    mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
 
     def supports_auto_detect(self) -> bool:
-        return self not in {self.azure, self.gcp_v1}
+        return self not in {self.azure, self.gcp_v1, self.mms_1b_all}
 
 
 asr_model_ids = {
@@ -131,6 +228,7 @@ asr_model_ids = {
     AsrModels.nemo_english: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/english_large_data_fixed.nemo",
     AsrModels.nemo_hindi: "https://objectstore.e2enetworks.net/indic-asr-public/checkpoints/conformer/stt_hi_conformer_ctc_large_v2.nemo",
     AsrModels.seamless_m4t: "facebook/hf-seamless-m4t-large",
+    AsrModels.mms_1b_all: "facebook/mms-1b-all",
 }
 
 forced_asr_languages = {
@@ -149,6 +247,7 @@ asr_supported_languages = {
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
     AsrModels.seamless_m4t: SEAMLESS_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
+    AsrModels.mms_1b_all: MMS_SUPPORTED,
 }
 
 
@@ -168,6 +267,62 @@ class AsrOutputFormat(Enum):
     json = "JSON"
     srt = "SRT"
     vtt = "VTT"
+
+
+class TranslationModels(Enum):
+    google = "Google Translate"
+    ghana_nlp = "Ghana NLP"
+
+    def supports_glossary(self) -> bool:
+        return self in {self.google}
+
+    def supports_auto_detect(self) -> bool:
+        return self in {self.google}
+
+
+def translation_language_selector(
+    model: TranslationModels | None,
+    label="###### Target Language",
+    key="translation_target",
+    **kwargs,
+) -> str | None:
+    if not model:
+        st.session_state[key] = None
+        return
+
+    if model == TranslationModels.google:
+        languages = google_translate_target_languages()
+    elif model == TranslationModels.ghana_nlp:
+        languages = GHANA_NLP_SUPPORTED
+    else:
+        raise ValueError("Unsupported translation model: " + str(model))
+
+    options = list(languages.keys())
+    return st.selectbox(
+        label=label,
+        key=key,
+        format_func=lambda k: languages[k],
+        options=options,
+        **kwargs,
+    )
+
+
+def translation_model_selector(
+    key="translation_model", allow_none=True
+) -> TranslationModels | None:
+    from daras_ai_v2.enum_selector_widget import enum_selector
+
+    model = enum_selector(
+        TranslationModels,
+        "###### Translation Model",
+        allow_none=allow_none,
+        use_selectbox=True,
+        key=key,
+    )
+    if model:
+        return TranslationModels[model]
+    else:
+        return None
 
 
 def google_translate_language_selector(
@@ -268,20 +423,112 @@ def asr_language_selector(
     # handle non-canonical language codes
     old_val = st.session_state.get(key)
     if old_val and old_val not in options:
-        lobj = langcodes.Language.get(old_val)
+        old_val_lang = langcodes.Language.get(old_val).language
         for opt in options:
-            if opt and langcodes.Language.get(opt).language == lobj.language:
-                st.session_state[key] = opt
-                break
+            try:
+                if opt and langcodes.Language.get(opt).language == old_val_lang:
+                    st.session_state[key] = opt
+                    break
+            except langcodes.LanguageTagError:
+                pass
 
     return st.selectbox(
         label=label,
         key=key,
-        format_func=lambda l: (
-            f"{langcodes.Language.get(l).display_name()} | {l}" if l else "Auto Detect"
-        ),
+        format_func=lang_format_func,
         options=options,
     )
+
+
+def lang_format_func(l):
+    import langcodes
+
+    if not l:
+        return "Auto Detect"
+    try:
+        return f"{langcodes.Language.get(l).display_name()} | {l}"
+    except langcodes.LanguageTagError:
+        return l
+
+
+def run_translate(
+    texts: list[str],
+    target_language: str,
+    source_language: str | None = None,
+    glossary_url: str | None = None,
+    model: str = TranslationModels.google.name,
+):
+    if not model:
+        return texts
+
+    if model == TranslationModels.google.name:
+        return run_google_translate(
+            texts=texts,
+            target_language=target_language,
+            source_language=source_language,
+            glossary_url=glossary_url,
+        )
+    elif model == TranslationModels.ghana_nlp.name:
+        return run_ghana_nlp_translate(
+            texts=texts,
+            target_language=target_language,
+            source_language=source_language,
+        )
+    else:
+        raise ValueError("Unsupported translation model: " + str(model))
+
+
+def run_ghana_nlp_translate(
+    texts: list[str],
+    target_language: str,
+    source_language: str,
+) -> list[str]:
+    import langcodes
+
+    assert (
+        target_language in GHANA_NLP_SUPPORTED
+    ), "Ghana NLP does not support this target language"
+
+    if source_language not in GHANA_NLP_SUPPORTED:
+        src = langcodes.Language.get(source_language).language
+        for lang in GHANA_NLP_SUPPORTED:
+            if src == langcodes.Language.get(lang).language:
+                source_language = lang
+                break
+    assert (
+        source_language in GHANA_NLP_SUPPORTED
+    ), "Ghana NLP does not support this source language"
+
+    if source_language == target_language:
+        return texts
+
+    return map_parallel(
+        lambda doc: _call_ghana_nlp_chunked(doc, source_language, target_language),
+        texts,
+        max_workers=TRANSLATE_BATCH_SIZE,
+    )
+
+
+def _call_ghana_nlp_chunked(
+    text: str, source_language: str, target_language: str
+) -> str:
+    return "".join(
+        map_parallel(
+            lambda doc: _call_ghana_nlp_raw(doc.text, source_language, target_language),
+            text_splitter(text, chunk_size=GHANA_NLP_MAXLEN, length_function=len),
+            max_workers=TRANSLATE_BATCH_SIZE,
+        )
+    )
+
+
+def _call_ghana_nlp_raw(text: str, source_language: str, target_language: str) -> str:
+    r = requests.post(
+        "https://translation-api.ghananlp.org/v1/translate",
+        headers={"Ocp-Apim-Subscription-Key": str(settings.GHANA_NLP_SUBKEY)},
+        json={"in": text, "lang": source_language + "-" + target_language},
+    )
+    raise_for_status(r)
+    return r.json()
 
 
 def run_google_translate(
@@ -322,8 +569,8 @@ def run_google_translate(
     else:
         translate_client = translate.Client()
         detections = flatten(
-            translate_client.detect_language(texts[i : i + TRANSLATE_DETECT_BATCH_SIZE])
-            for i in range(0, len(texts), TRANSLATE_DETECT_BATCH_SIZE)
+            translate_client.detect_language(texts[i : i + TRANSLATE_BATCH_SIZE])
+            for i in range(0, len(texts), TRANSLATE_BATCH_SIZE)
         )
         language_codes = [detection["language"] for detection in detections]
 
@@ -333,7 +580,7 @@ def run_google_translate(
         ),
         texts,
         language_codes,
-        max_workers=TRANSLATE_DETECT_BATCH_SIZE,
+        max_workers=TRANSLATE_BATCH_SIZE,
     )
 
 
@@ -602,7 +849,19 @@ def run_asr(
                 audio=audio_url,
             ),
         )
-    # check if we should use the fast queue
+    elif selected_model == AsrModels.mms_1b_all:
+        data = call_celery_task(
+            "mms",
+            pipeline=dict(
+                model_id=asr_model_ids[selected_model],
+            ),
+            inputs=dict(
+                audio=audio_url,
+                return_timestamps=output_format != AsrOutputFormat.text,
+                language=language,
+            ),
+            # queue_prefix="gooey-gpu/short" if is_short else "gooey-gpu/long",
+        )
     # call one of the self-hosted models
     else:
         kwargs = {}

@@ -13,6 +13,7 @@ from time import sleep
 from types import SimpleNamespace
 
 import sentry_sdk
+from django.db.models import Sum
 from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -80,10 +81,10 @@ SUBMIT_AFTER_LOGIN_Q = "submitafterlogin"
 
 
 class RecipeRunState(Enum):
-    idle = 1
-    running = 2
-    completed = 3
-    failed = 4
+    starting = "starting"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
 
 
 class StateKeys:
@@ -170,7 +171,9 @@ class BasePage:
     def endpoint(self) -> str:
         return f"/v2/{self.slug_versions[0]}/"
 
-    def get_tab_url(self, tab: str, query_params: dict = {}) -> str:
+    def get_tab_url(self, tab: str, query_params: dict = None) -> str:
+        if query_params is None:
+            query_params = {}
         example_id, run_id, uid = extract_query_params(gooey_get_query_params())
         return self.app_url(
             example_id=example_id,
@@ -423,7 +426,7 @@ class BasePage:
             if pressed_options:
                 options_modal.open()
             if options_modal.is_open():
-                with options_modal.container(style={"min-width": "min(300px, 100vw)"}):
+                with options_modal.container(style={"minWidth": "min(300px, 100vw)"}):
                     self._render_options_modal(
                         current_run=current_run,
                         published_run=published_run,
@@ -444,7 +447,7 @@ class BasePage:
             if pressed_save:
                 publish_modal.open()
             if publish_modal.is_open():
-                with publish_modal.container(style={"min-width": "min(500px, 100vw)"}):
+                with publish_modal.container(style={"minWidth": "min(500px, 100vw)"}):
                     self._render_publish_modal(
                         current_run=current_run,
                         published_run=published_run,
@@ -578,7 +581,7 @@ class BasePage:
                 notes=published_run_notes.strip(),
                 visibility=published_run_visibility,
             )
-        force_redirect(redirect_to or published_run.get_app_url())
+        raise RedirectException(redirect_to or published_run.get_app_url())
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:
@@ -849,7 +852,7 @@ class BasePage:
         with st.link(to=url, className="text-decoration-none"):
             with st.div(
                 className="d-flex mb-4 disable-p-margin",
-                style={"min-width": "min(100vw, 500px)"},
+                style={"minWidth": "min(100vw, 500px)"},
             ):
                 col1 = st.div(className="me-4")
                 col2 = st.div()
@@ -875,7 +878,7 @@ class BasePage:
                     st.write(f"Renamed: {version.title}")
                 elif not older_version:
                     st.write(version.title)
-            with st.div(className="mt-1", style={"font-size": "0.85rem"}):
+            with st.div(className="mt-1", style={"fontSize": "0.85rem"}):
                 self.render_author(
                     version.changed_by, image_size="18px", responsive=False
                 )
@@ -1058,7 +1061,7 @@ class BasePage:
 
     @classmethod
     def get_sr_from_query_params(
-        cls, example_id: str, run_id: str, uid: str
+        cls, example_id: str | None, run_id: str | None, uid: str | None
     ) -> SavedRun:
         try:
             if run_id and uid:
@@ -1251,6 +1254,7 @@ class BasePage:
 Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.session_state)} credits</a> {cost_note}
 {self.additional_notes() or ""}
                     """,
+                    line_clamp=1,
                     unsafe_allow_html=True,
                 )
             with col2:
@@ -1398,7 +1402,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             return RecipeRunState.completed
         else:
             # when user is at a recipe root, and not running anything
-            return RecipeRunState.idle
+            return RecipeRunState.starting
 
     def _render_output_col(self, submitted: bool):
         assert inspect.isgeneratorfunction(self.run)
@@ -1421,7 +1425,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
                 self._render_failed_output()
             case RecipeRunState.running:
                 self._render_running_output()
-            case RecipeRunState.idle:
+            case RecipeRunState.starting:
                 pass
 
         # render outputs
@@ -1473,7 +1477,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             st.session_state[StateKeys.error_msg] = self.generate_credit_error_message(
                 example_id, run_id, uid
             )
-            self.run_doc_sr(run_id, uid).set(self.state_to_doc(st.session_state))
+            self.dump_state_to_sr(st.session_state, self.run_doc_sr(run_id, uid))
         else:
             self.call_runner_task(example_id, run_id, uid)
         raise QueryParamsRedirectException(
@@ -1519,16 +1523,15 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         except PublishedRunVersion.DoesNotExist:
             parent_version = None
 
-        self.run_doc_sr(
+        sr = self.run_doc_sr(
             run_id,
             uid,
             create=True,
             defaults=dict(
-                parent=parent,
-                parent_version=parent_version,
-                is_api_call=is_api_call,
+                parent=parent, parent_version=parent_version, is_api_call=is_api_call
             ),
-        ).set(self.state_to_doc(st.session_state))
+        )
+        self.dump_state_to_sr(st.session_state, sr)
 
         return None, run_id, uid
 
@@ -1559,7 +1562,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             )
             # language=HTML
             error_msg = f"""
-<p>
+<p data-{SUBMIT_AFTER_LOGIN_Q}>
 Doh! <a href="{account_url}" target="_top">Please login</a> to run more Gooey.AI workflows.
 </p>
 
@@ -1607,14 +1610,22 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         render_output_caption()
 
-    def state_to_doc(self, state: dict):
-        ret = {
-            field_name: deepcopy(state[field_name])
-            for field_name in self.fields_to_save()
-            if field_name in state
-        }
+    def load_state_from_sr(self, sr: SavedRun) -> dict:
+        state = sr.to_dict()
+        if state is None:
+            raise HTTPException(status_code=404)
+        for k, v in self.sane_defaults.items():
+            state.setdefault(k, v)
+        return state
 
-        return ret
+    def dump_state_to_sr(self, state: dict, sr: SavedRun):
+        sr.set(
+            {
+                field_name: deepcopy(state[field_name])
+                for field_name in self.fields_to_save()
+                if field_name in state
+            }
+        )
 
     def fields_to_save(self) -> [str]:
         # only save the fields in request/response
@@ -1734,7 +1745,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         tb = get_title_breadcrumbs(self, sr=saved_run, pr=published_run)
 
         with st.link(to=saved_run.get_app_url()):
-            with st.div(className="mb-1", style={"font-size": "0.9rem"}):
+            with st.div(className="mb-1", style={"fontSize": "0.9rem"}):
                 if is_latest_version:
                     pill(
                         PublishedRunVisibility(
@@ -1757,7 +1768,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         if saved_run.run_status:
             started_at_text()
-            html_spinner(saved_run.run_status)
+            html_spinner(saved_run.run_status, scroll_into_view=False)
         elif saved_run.error_msg:
             st.error(saved_run.error_msg, unsafe_allow_html=True)
 
@@ -1939,6 +1950,22 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
     def get_raw_price(self, state: dict) -> float:
         return self.price * (state.get("num_outputs") or 1)
 
+    def get_total_linked_usage_cost_in_credits(self, default=1) -> float:
+        """Return the sun of the linked usage costs in gooey credits."""
+        from usage_costs.models import UsageCost
+
+        current_run, published_run = self.get_runs_from_query_params(
+            *extract_query_params(gooey_get_query_params())
+        )
+        if not current_run:
+            return default
+        dollar_amt = UsageCost.objects.filter(
+            saved_run__run_id=current_run.run_id
+        ).aggregate(total=Sum("dollar_amount"))["total"]
+        if not dollar_amt:
+            return default
+        return math.ceil(dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR)
+
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         """
@@ -2090,17 +2117,6 @@ def extract_nested_str(obj) -> str:
             if it:
                 return extract_nested_str(it)
     return ""
-
-
-def force_redirect(url: str):
-    # note: assumes sanitized URLs
-    st.html(
-        f"""
-    <script>
-    window.location = '{url}';
-    </script>
-    """
-    )
 
 
 class RedirectException(Exception):

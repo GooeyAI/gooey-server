@@ -1,8 +1,7 @@
-<div class="h5" id="add-on-text">Buy a one-time top up @ 100 Credits per dollar.</div>
 {% for amt in [10, 30, 50, 100, 300, 500] %}
     <form class="d-inline" action="/__/stripe/create-checkout-session" method="POST">
         <!-- Add a hidden field with the lookup_key of your Price -->
-        <input type="hidden" name="quantity" value="{{ amt * 100 }}"/>
+        <input type="hidden" name="quantity" value="{{ amt * settings.ADDON_CREDITS_PER_DOLLAR }}"/>
         <input type="hidden" name="lookup_key" value="addon"/>
         <button class="streamlit-like-btn" type="submit">Buy ${{ amt }}</button>
     </form>

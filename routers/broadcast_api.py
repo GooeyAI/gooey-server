@@ -49,6 +49,7 @@ R = typing.TypeVar("R", bound=BotBroadcastRequestModel)
 @app.post(
     f"/v2/{VideoBotsPage.slug_versions[0]}/broadcast/send/",
     operation_id=VideoBotsPage.slug_versions[0] + "__broadcast",
+    tags=["Misc"],
     name=f"Send Broadcast Message",
 )
 @app.post(

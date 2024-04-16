@@ -11,6 +11,7 @@ from decouple import config
 
 from app_users.models import AppUser
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.settings import templates
 from gooey_ui import UploadedFile
 
@@ -139,7 +140,7 @@ def send_email_via_postmark(
             "MessageStream": message_stream,
         },
     )
-    assert r.ok, r.text
+    raise_for_status(r)
 
 
 def send_smtp_message(
