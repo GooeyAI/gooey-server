@@ -162,4 +162,6 @@ def test_workflowmetadata_2x_multiplier(transactional_db):
     )
     llm_page = CompareLLMPage(run_user=user)
     set_query_params({"run_id": bot_saved_run.run_id or "", "uid": user.uid or ""})
-    assert llm_page.get_price_roundoff(state=state) == 210 * 2 + llm_page.PROFIT_CREDITS
+    assert (
+        llm_page.get_price_roundoff(state=state) == (210 + llm_page.PROFIT_CREDITS) * 2
+    )
