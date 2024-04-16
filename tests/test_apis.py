@@ -24,7 +24,7 @@ def _test_api_sync(page_cls: typing.Type[BasePage]):
     state = page_cls.recipe_doc_sr().state
     r = client.post(
         f"/v2/{page_cls.slug_versions[0]}/",
-        json=page_cls.get_example_request_body(state),
+        json=page_cls.get_example_request(state)[1],
         headers={"Authorization": f"Token None"},
         allow_redirects=False,
     )
@@ -42,7 +42,7 @@ def _test_api_async(page_cls: typing.Type[BasePage]):
 
     r = client.post(
         f"/v3/{page_cls.slug_versions[0]}/async/",
-        json=page_cls.get_example_request_body(state),
+        json=page_cls.get_example_request(state)[1],
         headers={"Authorization": f"Token None"},
         allow_redirects=False,
     )
@@ -80,7 +80,7 @@ def _test_apis_examples(sr: SavedRun):
     page_cls = Workflow(sr.workflow).page_cls
     r = client.post(
         f"/v2/{page_cls.slug_versions[0]}/?example_id={sr.example_id}",
-        json=page_cls.get_example_request_body(state),
+        json=page_cls.get_example_request(state)[1],
         headers={"Authorization": f"Token None"},
         allow_redirects=False,
     )

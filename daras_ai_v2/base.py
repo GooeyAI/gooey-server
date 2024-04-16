@@ -157,19 +157,19 @@ class BasePage:
             query_params |= dict(example_id=example_id)
         return query_params
 
-    def api_url(
-        self, example_id=None, run_id=None, uid=None, query_params=None
-    ) -> furl:
+    @classmethod
+    def api_url(cls, example_id=None, run_id=None, uid=None, query_params=None) -> furl:
         query_params = query_params or {}
         if run_id and uid:
             query_params = dict(run_id=run_id, uid=uid)
         elif example_id:
             query_params = dict(example_id=example_id)
-        return furl(settings.API_BASE_URL, query_params=query_params) / self.endpoint
+        return furl(settings.API_BASE_URL, query_params=query_params) / cls.endpoint
 
+    @classmethod
     @property
-    def endpoint(self) -> str:
-        return f"/v2/{self.slug_versions[0]}/"
+    def endpoint(cls) -> str:
+        return f"/v2/{cls.slug_versions[0]}/"
 
     def get_tab_url(self, tab: str, query_params: dict = None) -> str:
         if query_params is None:
@@ -1371,8 +1371,10 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         return self.app_url(example_id, run_id, uid)
 
     def _get_current_api_url(self) -> furl | None:
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        return self.api_url(example_id, run_id, uid)
+        pr = self.get_current_published_run()
+        return self.api_url(
+            example_id=pr and pr.published_run_id, run_id=None, uid=None
+        )
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self.run_doc_sr(uid=uid, run_id=run_id)
@@ -1901,15 +1903,18 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         as_async = st.checkbox("##### Run Async")
         as_form_data = st.checkbox("##### Upload Files via Form Data")
 
-        request_body = self.get_example_request_body(
-            st.session_state, include_all=include_all
+        pr = self.get_current_published_run()
+        api_url, request_body = self.get_example_request(
+            st.session_state,
+            include_all=include_all,
+            pr=pr,
         )
         response_body = self.get_example_response_body(
             st.session_state, as_async=as_async, include_all=include_all
         )
 
         api_example_generator(
-            api_url=self._get_current_api_url(),
+            api_url=api_url,
             request_body=request_body,
             as_form_data=as_form_data,
             as_async=as_async,
@@ -1974,17 +1979,23 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return []
 
     @classmethod
-    def get_example_request_body(
+    def get_example_request(
         cls,
         state: dict,
+        pr: PublishedRun | None = None,
         include_all: bool = False,
-    ) -> dict:
-        return extract_model_fields(
-            cls.RequestModel,
-            state,
+    ) -> tuple[furl, dict[str, typing.Any]]:
+        api_url = cls.api_url(
+            example_id=pr and pr.published_run_id, run_id=None, uid=None
+        )
+        fields = extract_model_fields(
+            model=cls.RequestModel,
+            state=state,
             include_all=include_all,
             preferred_fields=cls.get_example_preferred_fields(state),
+            diff_from=pr.saved_run.to_dict() if pr else None,
         )
+        return api_url, fields
 
     def get_example_response_body(
         self,
@@ -2090,8 +2101,15 @@ def extract_model_fields(
     state: dict,
     include_all: bool = False,
     preferred_fields: list[str] = None,
+    diff_from: dict | None = None,
 ) -> dict:
-    """Only returns required fields unless include_all is set to True."""
+    """
+    Include a field in result if:
+    - include_all is true
+    - field is required
+    - field is preferred
+    - diff_from is provided and field value differs from diff_from
+    """
     return {
         field_name: state.get(field_name)
         for field_name, field in model.__fields__.items()
@@ -2099,6 +2117,7 @@ def extract_model_fields(
             include_all
             or field.required
             or (preferred_fields and field_name in preferred_fields)
+            or (diff_from and state.get(field_name) != diff_from.get(field_name))
         )
     }
 

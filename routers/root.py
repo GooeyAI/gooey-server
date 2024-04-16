@@ -310,13 +310,13 @@ Authorization: Bearer GOOEY_API_KEY
 
     page = workflow.page_cls(request=request)
     state = page.get_root_published_run().saved_run.to_dict()
-    request_body = page.get_example_request_body(state, include_all=include_all)
+    api_url, request_body = page.get_example_request(state, include_all=include_all)
     response_body = page.get_example_response_body(
         state, as_async=as_async, include_all=include_all
     )
 
     api_example_generator(
-        api_url=page._get_current_api_url(),
+        api_url=api_url,
         request_body=request_body,
         as_form_data=as_form_data,
         as_async=as_async,
