@@ -23,9 +23,6 @@ if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
     import celery.result
 
-max_digits = 15
-decimal_places = 10
-
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
 

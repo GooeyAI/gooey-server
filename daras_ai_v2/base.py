@@ -11,6 +11,7 @@ from itertools import pairwise
 from random import Random
 from time import sleep
 from types import SimpleNamespace
+from decimal import Decimal
 
 import sentry_sdk
 from django.db.models import Sum
@@ -1957,7 +1958,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         multiplier = WorkflowMetadata.objects.get(
             workflow=current_run.workflow
         ).price_multiplier
-        return max(1, math.ceil(self.get_raw_price(state) * multiplier))
+        return max(1, math.ceil(float(self.get_raw_price(state)) * multiplier))
 
     def get_raw_price(self, state: dict) -> float:
         return self.price * (state.get("num_outputs") or 1)
@@ -1976,7 +1977,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         ).aggregate(total=Sum("dollar_amount"))["total"]
         if not dollar_amt:
             return default
-        return math.ceil(dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR)
+        return dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:

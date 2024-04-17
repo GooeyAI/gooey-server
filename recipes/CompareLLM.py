@@ -10,7 +10,6 @@ from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
-    llm_price,
     SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings

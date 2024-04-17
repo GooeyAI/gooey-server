@@ -2,7 +2,9 @@ from django.db import models
 
 from bots.custom_fields import CustomURLField
 from daras_ai_v2.stable_diffusion import InpaintingModels
-from bots.models import max_digits, decimal_places
+
+max_digits = 15
+decimal_places = 10
 
 
 class UsageCost(models.Model):
