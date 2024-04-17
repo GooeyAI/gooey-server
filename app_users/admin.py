@@ -60,7 +60,7 @@ class AppUserAdmin(admin.ModelAdmin):
         "email",
         "phone_number",
         "stripe_customer_id",
-        "user_handle",
+        "handle__name",
     ]
     list_filter = [
         "is_anonymous",
