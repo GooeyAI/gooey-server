@@ -478,31 +478,34 @@ def run():
         ),
     )
 
-    # Llama2
+    # groq
 
-    ModelPricing.objects.get_or_create(
-        model_id="togethercomputer/llama-2-70b-chat",
-        sku=ModelSku.llm_prompt,
-        defaults=dict(
-            model_name=LargeLanguageModels.llama2_70b_chat.name,
-            unit_cost=0.9,
-            unit_quantity=10**6,
-            category=category,
-            provider=ModelProvider.together_ai,
-            pricing_url="https://www.together.ai/pricing",
-        ),
+    llm_pricing_create(
+        model_id="llama2-70b-4096",
+        model_name=LargeLanguageModels.llama2_70b_chat.name,
+        unit_cost_input=0.7,
+        unit_cost_output=0.8,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
     )
-    ModelPricing.objects.get_or_create(
-        model_id="togethercomputer/llama-2-70b-chat",
-        sku=ModelSku.llm_completion,
-        defaults=dict(
-            model_name=LargeLanguageModels.llama2_70b_chat.name,
-            unit_cost=0.9,
-            unit_quantity=10**6,
-            category=category,
-            provider=ModelProvider.together_ai,
-            pricing_url="https://www.together.ai/pricing",
-        ),
+    llm_pricing_create(
+        model_id="mixtral-8x7b-32768",
+        model_name=LargeLanguageModels.mixtral_8x7b_instruct_0_1.name,
+        unit_cost_input=0.27,
+        unit_cost_output=0.27,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
+    )
+    llm_pricing_create(
+        model_id="gemma-7b-it",
+        model_name=LargeLanguageModels.gemma_7b_it.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.1,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
     )
 
     # Claude
