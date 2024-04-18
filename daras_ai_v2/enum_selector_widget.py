@@ -27,31 +27,31 @@ def enum_multiselect(
         if e in deprecated and e.name not in value:
             continue
         enums.append(e)
+    enum_names = [e.name for e in enums]
 
     if checkboxes:
         if label:
             st.caption(label)
         selected = set(st.session_state.get(key, []))
+        ret_val = []
 
-        def render(e):
-            inner_key = f"{key} => {e.name}"
+        def render(name):
+            inner_key = f"{key} => {name}"
             if inner_key not in st.session_state:
-                st.session_state[inner_key] = e.name in selected
+                st.session_state[inner_key] = name in selected
 
-            st.checkbox(_format_func(enum_cls)(e.name), key=inner_key)
+            st.checkbox(_format_func(enum_cls)(name), key=inner_key)
 
             if st.session_state.get(inner_key):
-                selected.add(e.name)
-            else:
-                selected.discard(e.name)
+                ret_val.append(name)
 
-        grid_layout(2, enums, render, separator=False)
-        st.session_state[key] = list(selected)
+        grid_layout(2, enum_names, render, separator=False)
 
-        return selected
+        st.session_state[key] = ret_val
+        return ret_val
     else:
         return st.multiselect(
-            options=[e.name for e in enums],
+            options=enum_names,
             format_func=_format_func(enum_cls),
             label=label,
             key=key,

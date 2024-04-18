@@ -18,7 +18,6 @@ from daras_ai_v2.language_model import (
     run_language_model,
     calc_gpt_tokens,
     LargeLanguageModels,
-    model_max_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -369,7 +368,7 @@ def _gen_final_prompt(
     )
 
     max_allowed_tokens = (
-        model_max_tokens[LargeLanguageModels[request.selected_model]]
+        LargeLanguageModels[request.selected_model].context_window
         - request.max_tokens
         - calc_gpt_tokens(end_input_prompt)
     )

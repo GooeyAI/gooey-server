@@ -32,12 +32,13 @@ from daras_ai_v2.text_splitter import (
 
 DEFAULT_SYSTEM_MSG = "You are an intelligent AI assistant. Follow the instructions as closely as possible."
 
-CHATML_START_TOKEN = "<|im_start|>"
-CHATML_END_TOKEN = "<|im_end|>"
-
 CHATML_ROLE_SYSTEM = "system"
 CHATML_ROLE_ASSISTANT = "assistant"
 CHATML_ROLE_USER = "user"
+
+AZURE_OPENAI_MODEL_PREFIX = "openai-"
+
+EMBEDDING_MODEL_MAX_TOKENS = 8191
 
 # nice for showing streaming progress
 SUPERSCRIPT = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
@@ -52,197 +53,235 @@ class LLMApis(Enum):
     anthropic = 6
 
 
+class LLMSpec(typing.NamedTuple):
+    label: str
+    model_id: str | tuple
+    llm_api: LLMApis
+    context_window: int
+    price: int
+    is_chat_model: bool = True
+    is_vision_model: bool = False
+    is_deprecated: bool = False
+
+
 class LargeLanguageModels(Enum):
-    gpt_4_turbo_vision = "GPT-4 Turbo with Vision (openai)"
-    gpt_4_vision = "GPT-4 Vision (openai)"
-    gpt_4_turbo = "GPT-4 Turbo (openai)"
-    gpt_4 = "GPT-4 (openai)"
-    gpt_4_32k = "GPT-4 32K (openai)"
-    gpt_3_5_turbo = "ChatGPT (openai)"
-    gpt_3_5_turbo_16k = "ChatGPT 16k (openai)"
-    gpt_3_5_turbo_instruct = "GPT-3.5 Instruct (openai)"
+    # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
+    gpt_4_turbo_vision = LLMSpec(
+        label="GPT-4 Turbo with Vision (openai)",
+        model_id="gpt-4-turbo-2024-04-09",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=6,
+        is_vision_model=True,
+    )
+    gpt_4_vision = LLMSpec(
+        label="GPT-4 Vision (openai)",
+        model_id="gpt-4-vision-preview",
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=6,
+        is_vision_model=True,
+    )
 
-    llama2_70b_chat = "Llama 2 70b Chat (Meta AI)"
-    mixtral_8x7b_instruct_0_1 = "Mixtral 8x7b Instruct v0.1 (Mistral)"
-    gemma_7b_it = "Gemma 7B (Google)"
+    # https://help.openai.com/en/articles/8555510-gpt-4-turbo
+    gpt_4_turbo = LLMSpec(
+        label="GPT-4 Turbo (openai)",
+        model_id=("openai-gpt-4-turbo-prod-ca-1", "gpt-4-1106-preview"),
+        llm_api=LLMApis.openai,
+        context_window=128_000,
+        price=5,
+    )
 
-    gemini_1_pro = "Gemini 1.0 Pro (Google)"
-    gemini_1_pro_vision = "Gemini 1.0 Pro Vision (Google)"
-    palm2_chat = "PaLM 2 Chat (Google)"
-    palm2_text = "PaLM 2 Text (Google)"
+    # https://platform.openai.com/docs/models/gpt-4
+    gpt_4 = LLMSpec(
+        label="GPT-4 (openai)",
+        model_id=("openai-gpt-4-prod-ca-1", "gpt-4"),
+        llm_api=LLMApis.openai,
+        context_window=8192,
+        price=10,
+    )
+    gpt_4_32k = LLMSpec(
+        label="GPT-4 32K (openai)",
+        model_id="openai-gpt-4-32k-prod-ca-1",
+        llm_api=LLMApis.openai,
+        context_window=32_768,
+        price=20,
+    )
 
-    claude_3_opus = "Claude 3 Opus 💎 (Anthropic)"
-    claude_3_sonnet = "Claude 3 Sonnet 🔷 (Anthropic)"
-    claude_3_haiku = "Claude 3 Haiku 🔹 (Anthropic)"
+    # https://platform.openai.com/docs/models/gpt-3-5
+    gpt_3_5_turbo = LLMSpec(
+        label="ChatGPT (openai)",
+        model_id=("openai-gpt-35-turbo-prod-ca-1", "gpt-3.5-turbo-0613"),
+        llm_api=LLMApis.openai,
+        context_window=4096,
+        price=1,
+    )
+    gpt_3_5_turbo_16k = LLMSpec(
+        label="ChatGPT 16k (openai)",
+        model_id=("openai-gpt-35-turbo-16k-prod-ca-1", "gpt-3.5-turbo-16k-0613"),
+        llm_api=LLMApis.openai,
+        context_window=16_384,
+        price=2,
+    )
+    gpt_3_5_turbo_instruct = LLMSpec(
+        label="GPT-3.5 Instruct (openai)",
+        model_id="gpt-3.5-turbo-instruct",
+        llm_api=LLMApis.openai,
+        context_window=4096,
+        price=1,
+        is_chat_model=False,
+    )
 
-    text_davinci_003 = "GPT-3.5 Davinci-3 [Deprecated] (openai)"
-    text_davinci_002 = "GPT-3.5 Davinci-2 [Deprecated] (openai)"
-    text_curie_001 = "Curie [Deprecated] (openai)"
-    text_babbage_001 = "Babbage [Deprecated] (openai)"
-    text_ada_001 = "Ada [Deprecated] (openai)"
+    # https://console.groq.com/docs/models
+    llama2_70b_chat = LLMSpec(
+        label="Llama 2 70b Chat (Meta AI)",
+        model_id="llama2-70b-4096",
+        llm_api=LLMApis.groq,
+        context_window=4096,
+        price=1,
+    )
+    mixtral_8x7b_instruct_0_1 = LLMSpec(
+        label="Mixtral 8x7b Instruct v0.1 (Mistral)",
+        model_id="mixtral-8x7b-32768",
+        llm_api=LLMApis.groq,
+        context_window=32_768,
+        price=1,
+    )
+    gemma_7b_it = LLMSpec(
+        label="Gemma 7B (Google)",
+        model_id="gemma-7b-it",
+        llm_api=LLMApis.groq,
+        context_window=8_192,
+        price=1,
+    )
 
-    code_davinci_002 = "Codex [Deprecated] (openai)"
+    # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
+    gemini_1_pro = LLMSpec(
+        label="Gemini 1.0 Pro (Google)",
+        model_id="gemini-1.0-pro",
+        llm_api=LLMApis.gemini,
+        context_window=8192,
+        price=15,
+    )
+    gemini_1_pro_vision = LLMSpec(
+        label="Gemini 1.0 Pro Vision (Google)",
+        model_id="gemini-1.0-pro-vision",
+        llm_api=LLMApis.gemini,
+        context_window=2048,
+        price=25,
+        is_vision_model=True,
+        is_chat_model=False,
+    )
+    palm2_chat = LLMSpec(
+        label="PaLM 2 Chat (Google)",
+        model_id="chat-bison",
+        llm_api=LLMApis.palm2,
+        context_window=4096,
+        price=10,
+    )
+    palm2_text = LLMSpec(
+        label="PaLM 2 Text (Google)",
+        model_id="text-bison",
+        llm_api=LLMApis.palm2,
+        context_window=8192,
+        price=15,
+        is_chat_model=False,
+    )
+
+    # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
+    claude_3_opus = LLMSpec(
+        label="Claude 3 Opus 💎 (Anthropic)",
+        model_id="claude-3-opus-20240229",
+        llm_api=LLMApis.anthropic,
+        context_window=200_000,
+        price=75,
+        is_vision_model=True,
+    )
+    claude_3_sonnet = LLMSpec(
+        label="Claude 3 Sonnet 🔷 (Anthropic)",
+        model_id="claude-3-sonnet-20240229",
+        llm_api=LLMApis.anthropic,
+        context_window=200_000,
+        price=15,
+        is_vision_model=True,
+    )
+    claude_3_haiku = LLMSpec(
+        label="Claude 3 Haiku 🔹 (Anthropic)",
+        model_id="claude-3-haiku-20240307",
+        llm_api=LLMApis.anthropic,
+        context_window=200_000,
+        price=2,
+        is_vision_model=True,
+    )
+
+    # https://platform.openai.com/docs/models/gpt-3
+    text_davinci_003 = LLMSpec(
+        label="GPT-3.5 Davinci-3 [Deprecated] (openai)",
+        model_id="text-davinci-003",
+        llm_api=LLMApis.openai,
+        context_window=4097,
+        price=10,
+        is_deprecated=True,
+    )
+    text_davinci_002 = LLMSpec(
+        label="GPT-3.5 Davinci-2 [Deprecated] (openai)",
+        model_id="text-davinci-002",
+        llm_api=LLMApis.openai,
+        context_window=4097,
+        price=10,
+        is_deprecated=True,
+    )
+    code_davinci_002 = LLMSpec(
+        label="Codex [Deprecated] (openai)",
+        model_id="code-davinci-002",
+        llm_api=LLMApis.openai,
+        context_window=8001,
+        price=10,
+        is_deprecated=True,
+    )
+    text_curie_001 = LLMSpec(
+        label="Curie [Deprecated] (openai)",
+        model_id="text-curie-001",
+        llm_api=LLMApis.openai,
+        context_window=2049,
+        price=5,
+        is_deprecated=True,
+    )
+    text_babbage_001 = LLMSpec(
+        label="Babbage [Deprecated] (openai)",
+        model_id="text-babbage-001",
+        llm_api=LLMApis.openai,
+        context_window=2049,
+        price=2,
+        is_deprecated=True,
+    )
+    text_ada_001 = LLMSpec(
+        label="Ada [Deprecated] (openai)",
+        model_id="text-ada-001",
+        llm_api=LLMApis.openai,
+        context_window=2049,
+        price=1,
+        is_deprecated=True,
+    )
+
+    def __init__(self, *args):
+        spec = LLMSpec(*args)
+        self.spec = spec
+        self.model_id = spec.model_id
+        self.llm_api = spec.llm_api
+        self.context_window = spec.context_window
+        self.price = spec.price
+        self.is_deprecated = spec.is_deprecated
+        self.is_chat_model = spec.is_chat_model
+        self.is_vision_model = spec.is_vision_model
+
+    @property
+    def value(self):
+        return self.spec.label
 
     @classmethod
     def _deprecated(cls):
-        return {
-            cls.text_davinci_003,
-            cls.text_davinci_002,
-            cls.text_curie_001,
-            cls.text_babbage_001,
-            cls.text_ada_001,
-            cls.code_davinci_002,
-        }
-
-    def is_vision_model(self) -> bool:
-        return self in {
-            self.gpt_4_vision,
-            self.gpt_4_turbo_vision,
-            self.gemini_1_pro_vision,
-            self.claude_3_opus,
-            self.claude_3_sonnet,
-            self.claude_3_haiku,
-        }
-
-    def is_chat_model(self) -> bool:
-        return self not in {
-            self.gpt_3_5_turbo_instruct,
-            self.palm2_text,
-            self.gemini_1_pro_vision,
-        }
-
-
-AZURE_OPENAI_MODEL_PREFIX = "openai-"
-
-llm_model_names = {
-    LargeLanguageModels.gpt_4_turbo_vision: "gpt-4-turbo-2024-04-09",
-    LargeLanguageModels.gpt_4_vision: "gpt-4-vision-preview",
-    LargeLanguageModels.gpt_4_turbo: (
-        "openai-gpt-4-turbo-prod-ca-1",
-        "gpt-4-1106-preview",
-    ),
-    LargeLanguageModels.gpt_4: (
-        "openai-gpt-4-prod-ca-1",
-        "gpt-4",
-    ),
-    LargeLanguageModels.gpt_4_32k: "openai-gpt-4-32k-prod-ca-1",
-    LargeLanguageModels.gpt_3_5_turbo: (
-        "openai-gpt-35-turbo-prod-ca-1",
-        "gpt-3.5-turbo-0613",
-    ),
-    LargeLanguageModels.gpt_3_5_turbo_16k: (
-        "openai-gpt-35-turbo-16k-prod-ca-1",
-        "gpt-3.5-turbo-16k-0613",
-    ),
-    LargeLanguageModels.gpt_3_5_turbo_instruct: "gpt-3.5-turbo-instruct",
-    LargeLanguageModels.text_davinci_003: "text-davinci-003",
-    LargeLanguageModels.text_davinci_002: "text-davinci-002",
-    LargeLanguageModels.code_davinci_002: "code-davinci-002",
-    LargeLanguageModels.text_curie_001: "text-curie-001",
-    LargeLanguageModels.text_babbage_001: "text-babbage-001",
-    LargeLanguageModels.text_ada_001: "text-ada-001",
-    LargeLanguageModels.palm2_text: "text-bison",
-    LargeLanguageModels.palm2_chat: "chat-bison",
-    LargeLanguageModels.gemini_1_pro: "gemini-1.0-pro",
-    LargeLanguageModels.gemini_1_pro_vision: "gemini-1.0-pro-vision",
-    LargeLanguageModels.llama2_70b_chat: "llama2-70b-4096",
-    LargeLanguageModels.mixtral_8x7b_instruct_0_1: "mixtral-8x7b-32768",
-    LargeLanguageModels.gemma_7b_it: "gemma-7b-it",
-    LargeLanguageModels.claude_3_opus: "claude-3-opus-20240229",
-    LargeLanguageModels.claude_3_sonnet: "claude-3-sonnet-20240229",
-    LargeLanguageModels.claude_3_haiku: "claude-3-haiku-20240307",
-}
-
-llm_api = {
-    LargeLanguageModels.gpt_4_turbo_vision: LLMApis.openai,
-    LargeLanguageModels.gpt_4_vision: LLMApis.openai,
-    LargeLanguageModels.gpt_4_turbo: LLMApis.openai,
-    LargeLanguageModels.gpt_4: LLMApis.openai,
-    LargeLanguageModels.gpt_4_32k: LLMApis.openai,
-    LargeLanguageModels.gpt_3_5_turbo: LLMApis.openai,
-    LargeLanguageModels.gpt_3_5_turbo_16k: LLMApis.openai,
-    LargeLanguageModels.gpt_3_5_turbo_instruct: LLMApis.openai,
-    LargeLanguageModels.text_davinci_003: LLMApis.openai,
-    LargeLanguageModels.text_davinci_002: LLMApis.openai,
-    LargeLanguageModels.code_davinci_002: LLMApis.openai,
-    LargeLanguageModels.text_curie_001: LLMApis.openai,
-    LargeLanguageModels.text_babbage_001: LLMApis.openai,
-    LargeLanguageModels.text_ada_001: LLMApis.openai,
-    LargeLanguageModels.gemini_1_pro: LLMApis.gemini,
-    LargeLanguageModels.gemini_1_pro_vision: LLMApis.gemini,
-    LargeLanguageModels.palm2_text: LLMApis.palm2,
-    LargeLanguageModels.palm2_chat: LLMApis.palm2,
-    LargeLanguageModels.llama2_70b_chat: LLMApis.groq,
-    LargeLanguageModels.mixtral_8x7b_instruct_0_1: LLMApis.groq,
-    LargeLanguageModels.gemma_7b_it: LLMApis.groq,
-    LargeLanguageModels.claude_3_opus: LLMApis.anthropic,
-    LargeLanguageModels.claude_3_sonnet: LLMApis.anthropic,
-    LargeLanguageModels.claude_3_haiku: LLMApis.anthropic,
-}
-
-EMBEDDING_MODEL_MAX_TOKENS = 8191
-
-model_max_tokens = {
-    # https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4
-    LargeLanguageModels.gpt_4_turbo_vision: 128_000,
-    LargeLanguageModels.gpt_4_vision: 128_000,
-    # https://help.openai.com/en/articles/8555510-gpt-4-turbo
-    LargeLanguageModels.gpt_4_turbo: 128_000,
-    # https://platform.openai.com/docs/models/gpt-4
-    LargeLanguageModels.gpt_4: 8192,
-    LargeLanguageModels.gpt_4_32k: 32_768,
-    # https://platform.openai.com/docs/models/gpt-3-5
-    LargeLanguageModels.gpt_3_5_turbo: 4096,
-    LargeLanguageModels.gpt_3_5_turbo_16k: 16_384,
-    LargeLanguageModels.gpt_3_5_turbo_instruct: 4096,
-    LargeLanguageModels.text_davinci_003: 4097,
-    LargeLanguageModels.text_davinci_002: 4097,
-    LargeLanguageModels.code_davinci_002: 8001,
-    # https://platform.openai.com/docs/models/gpt-3
-    LargeLanguageModels.text_curie_001: 2049,
-    LargeLanguageModels.text_babbage_001: 2049,
-    LargeLanguageModels.text_ada_001: 2049,
-    # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
-    LargeLanguageModels.gemini_1_pro: 8192,
-    LargeLanguageModels.gemini_1_pro_vision: 2048,
-    LargeLanguageModels.palm2_text: 8192,
-    LargeLanguageModels.palm2_chat: 4096,
-    # https://console.groq.com/docs/models
-    LargeLanguageModels.llama2_70b_chat: 4096,
-    LargeLanguageModels.mixtral_8x7b_instruct_0_1: 32_768,
-    LargeLanguageModels.gemma_7b_it: 8_192,
-    # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
-    LargeLanguageModels.claude_3_opus: 200_000,
-    LargeLanguageModels.claude_3_sonnet: 200_000,
-    LargeLanguageModels.claude_3_haiku: 200_000,
-}
-
-llm_price = {
-    LargeLanguageModels.gpt_4_turbo_vision: 6,
-    LargeLanguageModels.gpt_4_vision: 6,
-    LargeLanguageModels.gpt_4_turbo: 5,
-    LargeLanguageModels.gpt_4: 10,
-    LargeLanguageModels.gpt_4_32k: 20,
-    LargeLanguageModels.gpt_3_5_turbo: 1,
-    LargeLanguageModels.gpt_3_5_turbo_16k: 2,
-    LargeLanguageModels.gpt_3_5_turbo_instruct: 1,
-    LargeLanguageModels.text_davinci_003: 10,
-    LargeLanguageModels.text_davinci_002: 10,
-    LargeLanguageModels.code_davinci_002: 10,
-    LargeLanguageModels.text_curie_001: 5,
-    LargeLanguageModels.text_babbage_001: 2,
-    LargeLanguageModels.text_ada_001: 1,
-    LargeLanguageModels.gemini_1_pro: 15,
-    LargeLanguageModels.gemini_1_pro_vision: 25,
-    LargeLanguageModels.palm2_text: 15,
-    LargeLanguageModels.palm2_chat: 10,
-    LargeLanguageModels.llama2_70b_chat: 1,
-    LargeLanguageModels.mixtral_8x7b_instruct_0_1: 1,
-    LargeLanguageModels.gemma_7b_it: 1,
-    LargeLanguageModels.claude_3_opus: 75,
-    LargeLanguageModels.claude_3_sonnet: 15,
-    LargeLanguageModels.claude_3_haiku: 2,
-}
+        return {model for model in cls if model.is_deprecated}
 
 
 def calc_gpt_tokens(
@@ -304,24 +343,22 @@ def run_language_model(
     ), "Pleave provide exactly one of { prompt, messages }"
 
     model: LargeLanguageModels = LargeLanguageModels[str(model)]
-    api = llm_api[model]
-    model_name = llm_model_names[model]
-    if model.is_chat_model():
+    if model.is_chat_model:
         if not messages:
             # convert text prompt to chat messages
             messages = [
                 {"role": "system", "content": DEFAULT_SYSTEM_MSG},
                 {"role": "user", "content": prompt},
             ]
-        if not model.is_vision_model():
+        if not model.is_vision_model:
             # remove images from the messages
             messages = [
                 format_chat_entry(role=entry["role"], content=get_entry_text(entry))
                 for entry in messages
             ]
         entries = _run_chat_model(
-            api=api,
-            model=model_name,
+            api=model.llm_api,
+            model=model.model_id,
             messages=messages,  # type: ignore
             max_tokens=max_tokens,
             num_outputs=num_outputs,
@@ -355,10 +392,9 @@ def run_language_model(
                 images = get_entry_images(entry)
                 if images:
                     break
-        logger.info(f"{model_name=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
         msgs = _run_text_model(
-            api=api,
-            model=model_name,
+            api=model.llm_api,
+            model=model.model_id,
             prompt=prompt,
             images=images,
             max_tokens=max_tokens,
@@ -422,6 +458,7 @@ def _run_text_model(
     avoid_repetition: bool,
     quality: float,
 ) -> list[str]:
+    logger.info(f"{api=} {model=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
     match api:
         case LLMApis.openai:
             return _run_openai_text(
@@ -1022,7 +1059,7 @@ def _call_gemini_api(
         parts[0]["text"]
         for item in r.json()
         for msg in item["candidates"]
-        if (parts := msg["content"].get("parts"))
+        if (parts := msg.get("content", {}).get("parts"))
     )
 
     from usage_costs.cost_utils import record_cost_auto

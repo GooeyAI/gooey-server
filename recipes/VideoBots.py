@@ -55,7 +55,6 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
     CHATML_ROLE_SYSTEM,
-    model_max_tokens,
     get_entry_images,
     get_entry_text,
     format_chat_entry,
@@ -732,7 +731,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if not (user_input or request.input_images or request.input_documents):
             return
         model = LargeLanguageModels[request.selected_model]
-        is_chat_model = model.is_chat_model()
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
@@ -804,7 +802,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             query_msgs = saved_msgs + [
                 format_chat_entry(role=CHATML_ROLE_USER, content=user_input)
             ]
-            clip_idx = convo_window_clipper(query_msgs, model_max_tokens[model] // 2)
+            clip_idx = convo_window_clipper(query_msgs, model.context_window // 2)
             query_msgs = query_msgs[clip_idx:]
 
             chat_history = "\n".join(
@@ -879,7 +877,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # truncate the history to fit the model's max tokens
         history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
-            model_max_tokens[model]
+            model.context_window
             - calc_gpt_tokens([system_prompt, user_input])
             - request.max_tokens
             - SAFETY_BUFFER
@@ -893,7 +891,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         state["final_prompt"] = prompt_messages
 
         # ensure input script is not too big
-        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(prompt_messages)
+        max_allowed_tokens = model.context_window - calc_gpt_tokens(prompt_messages)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
             raise UserError("Input Script is too long! Please reduce the script size.")

@@ -17,7 +17,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
-    llm_price,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -217,7 +216,7 @@ class DocSearchPage(BasePage):
     def get_raw_price(self, state: dict) -> float:
         name = state.get("selected_model")
         try:
-            unit_price = llm_price[LargeLanguageModels[name]] * 2
+            unit_price = LargeLanguageModels[name].price * 2
         except KeyError:
             unit_price = 10
         return unit_price * state.get("num_outputs", 1)

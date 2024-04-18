@@ -10,7 +10,6 @@ from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
-    llm_price,
     SUPERSCRIPT,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
@@ -131,7 +130,7 @@ class CompareLLMPage(BasePage):
         total = 0
         for name in selected_models:
             try:
-                total += llm_price[LargeLanguageModels[name]]
+                total += LargeLanguageModels[name].price
             except KeyError:
                 total += 5
         return total * state.get("num_outputs", 1)
