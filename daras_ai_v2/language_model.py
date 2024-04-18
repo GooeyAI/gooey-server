@@ -156,12 +156,13 @@ class LargeLanguageModels(Enum):
     )
 
     # https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
-    gemini_1_pro = LLMSpec(
-        label="Gemini 1.0 Pro (Google)",
-        model_id="gemini-1.0-pro",
+    gemini_1_5_pro = LLMSpec(
+        label="Gemini 1.5 Pro (Google)",
+        model_id="gemini-1.5-pro-preview-0409",
         llm_api=LLMApis.gemini,
-        context_window=8192,
+        context_window=1_000_000,
         price=15,
+        is_vision_model=True,
     )
     gemini_1_pro_vision = LLMSpec(
         label="Gemini 1.0 Pro Vision (Google)",
@@ -171,6 +172,13 @@ class LargeLanguageModels(Enum):
         price=25,
         is_vision_model=True,
         is_chat_model=False,
+    )
+    gemini_1_pro = LLMSpec(
+        label="Gemini 1.0 Pro (Google)",
+        model_id="gemini-1.0-pro",
+        llm_api=LLMApis.gemini,
+        context_window=8192,
+        price=15,
     )
     palm2_chat = LLMSpec(
         label="PaLM 2 Chat (Google)",
@@ -977,7 +985,18 @@ def _run_gemini_pro(
         contents.append(
             {
                 "role": gemini_role_map[entry["role"]],
-                "parts": [{"text": get_entry_text(entry)}],
+                "parts": [
+                    {"text": get_entry_text(entry)},
+                ]
+                + [
+                    {
+                        "fileData": {
+                            "mimeType": mimetypes.guess_type(image)[0] or "image/png",
+                            "fileUri": gs_url_to_uri(image),
+                        },
+                    }
+                    for image in get_entry_images(entry)
+                ],
             },
         )
         if entry["role"] == CHATML_ROLE_SYSTEM:
@@ -1044,7 +1063,7 @@ def _call_gemini_api(
 ) -> str:
     session, project = get_google_auth_session()
     r = session.post(
-        f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{project}/locations/{settings.GCP_REGION}/publishers/google/models/{model_id}:streamGenerateContent",
+        f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/projects/{project}/locations/{settings.GCP_REGION}/publishers/google/models/{model_id}:generateContent",
         json={
             "contents": contents,
             "generation_config": {
@@ -1057,8 +1076,7 @@ def _call_gemini_api(
     raise_for_status(r)
     ret = "".join(
         parts[0]["text"]
-        for item in r.json()
-        for msg in item["candidates"]
+        for msg in r.json()["candidates"]
         if (parts := msg.get("content", {}).get("parts"))
     )
 

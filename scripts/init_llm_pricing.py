@@ -376,6 +376,16 @@ def run():
 
     # Gemini
 
+    llm_pricing_create(
+        model_id="gemini-1.5-pro-preview-0409",
+        model_name=LargeLanguageModels.gemini_1_5_pro.name,
+        unit_cost_input=0.0025,
+        unit_cost_output=0.0075,
+        unit_quantity=1000,
+        provider=ModelProvider.google,
+        pricing_url="https://cloud.google.com/vertex-ai/docs/generative-ai/pricing#text_generation",
+    )
+
     ModelPricing.objects.get_or_create(
         model_id="gemini-1.0-pro",
         sku=ModelSku.llm_prompt,
