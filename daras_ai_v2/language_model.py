@@ -1,3 +1,4 @@
+import base64
 import json
 import mimetypes
 import re
@@ -20,7 +21,7 @@ from openai.types.chat import (
     ChatCompletionChunk,
 )
 
-from daras_ai.image_input import gs_url_to_uri
+from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import get_google_auth_session
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.functions import LLMTools
@@ -48,6 +49,7 @@ class LLMApis(Enum):
     openai = 3
     # together = 4
     groq = 5
+    anthropic = 6
 
 
 class LargeLanguageModels(Enum):
@@ -68,6 +70,10 @@ class LargeLanguageModels(Enum):
     gemini_1_pro_vision = "Gemini 1.0 Pro Vision (Google)"
     palm2_chat = "PaLM 2 Chat (Google)"
     palm2_text = "PaLM 2 Text (Google)"
+
+    claude_3_opus = "Claude 3 Opus 💎 (Anthropic)"
+    claude_3_sonnet = "Claude 3 Sonnet 🔷 (Anthropic)"
+    claude_3_haiku = "Claude 3 Haiku 🔹 (Anthropic)"
 
     text_davinci_003 = "GPT-3.5 Davinci-3 [Deprecated] (openai)"
     text_davinci_002 = "GPT-3.5 Davinci-2 [Deprecated] (openai)"
@@ -93,6 +99,9 @@ class LargeLanguageModels(Enum):
             self.gpt_4_vision,
             self.gpt_4_turbo_vision,
             self.gemini_1_pro_vision,
+            self.claude_3_opus,
+            self.claude_3_sonnet,
+            self.claude_3_haiku,
         }
 
     def is_chat_model(self) -> bool:
@@ -139,6 +148,9 @@ llm_model_names = {
     LargeLanguageModels.llama2_70b_chat: "llama2-70b-4096",
     LargeLanguageModels.mixtral_8x7b_instruct_0_1: "mixtral-8x7b-32768",
     LargeLanguageModels.gemma_7b_it: "gemma-7b-it",
+    LargeLanguageModels.claude_3_opus: "claude-3-opus-20240229",
+    LargeLanguageModels.claude_3_sonnet: "claude-3-sonnet-20240229",
+    LargeLanguageModels.claude_3_haiku: "claude-3-haiku-20240307",
 }
 
 llm_api = {
@@ -163,6 +175,9 @@ llm_api = {
     LargeLanguageModels.llama2_70b_chat: LLMApis.groq,
     LargeLanguageModels.mixtral_8x7b_instruct_0_1: LLMApis.groq,
     LargeLanguageModels.gemma_7b_it: LLMApis.groq,
+    LargeLanguageModels.claude_3_opus: LLMApis.anthropic,
+    LargeLanguageModels.claude_3_sonnet: LLMApis.anthropic,
+    LargeLanguageModels.claude_3_haiku: LLMApis.anthropic,
 }
 
 EMBEDDING_MODEL_MAX_TOKENS = 8191
@@ -196,6 +211,10 @@ model_max_tokens = {
     LargeLanguageModels.llama2_70b_chat: 4096,
     LargeLanguageModels.mixtral_8x7b_instruct_0_1: 32_768,
     LargeLanguageModels.gemma_7b_it: 8_192,
+    # https://docs.anthropic.com/claude/docs/models-overview#model-comparison
+    LargeLanguageModels.claude_3_opus: 200_000,
+    LargeLanguageModels.claude_3_sonnet: 200_000,
+    LargeLanguageModels.claude_3_haiku: 200_000,
 }
 
 llm_price = {
@@ -220,6 +239,9 @@ llm_price = {
     LargeLanguageModels.llama2_70b_chat: 1,
     LargeLanguageModels.mixtral_8x7b_instruct_0_1: 1,
     LargeLanguageModels.gemma_7b_it: 1,
+    LargeLanguageModels.claude_3_opus: 75,
+    LargeLanguageModels.claude_3_sonnet: 15,
+    LargeLanguageModels.claude_3_haiku: 2,
 }
 
 
@@ -495,6 +517,14 @@ def _run_chat_model(
                 avoid_repetition=avoid_repetition,
                 stop=stop,
             )
+        case LLMApis.anthropic:
+            return _run_anthropic_chat(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stop=stop,
+            )
         # case LLMApis.together:
         #     if tools:
         #         raise UserError("Only OpenAI chat models support Tools")
@@ -508,6 +538,75 @@ def _run_chat_model(
         #     )
         case _:
             raise UserError(f"Unsupported chat api: {api}")
+
+
+def _run_anthropic_chat(
+    *,
+    model: str,
+    messages: list[ConversationEntry],
+    max_tokens: int,
+    temperature: float,
+    stop: list[str] | None,
+):
+    import anthropic
+    from usage_costs.cost_utils import record_cost_auto
+    from usage_costs.models import ModelSku
+
+    system_msg = ""
+    anthropic_msgs = []
+    for msg in messages:
+        role = msg.get("role") or CHATML_ROLE_USER
+        if role == CHATML_ROLE_SYSTEM:
+            system_msg += get_entry_text(msg)
+            continue
+        images = get_entry_images(msg)
+        if images:
+            img_bytes = requests.get(images[0]).content
+            cv2_img = bytes_to_cv2_img(img_bytes)
+            img_b64 = base64.b64encode(cv2_img_to_bytes(cv2_img)).decode()
+            content = [
+                # https://docs.anthropic.com/claude/reference/messages_post
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": img_b64,
+                    },
+                },
+                {"type": "text", "text": get_entry_text(msg)},
+            ]
+        else:
+            content = get_entry_text(msg)
+        anthropic_msgs.append({"role": role, "content": content})
+
+    client = anthropic.Anthropic()
+    response = client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        system=system_msg,
+        messages=anthropic_msgs,
+        stop_sequences=stop,
+        temperature=temperature,
+    )
+
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_prompt,
+        quantity=response.usage.input_tokens,
+    )
+    record_cost_auto(
+        model=model,
+        sku=ModelSku.llm_completion,
+        quantity=response.usage.output_tokens,
+    )
+
+    return [
+        {
+            "role": CHATML_ROLE_USER,
+            "content": "".join(entry.text for entry in response.content),
+        }
+    ]
 
 
 @retry_if(openai_should_retry)
@@ -1086,66 +1185,6 @@ def entry_to_prompt_str(entry: ConversationEntry) -> str:
     if content:
         msg += content
     return msg
-
-
-# # This prompt formatting was copied from the original Llama v2 repo:
-# # https://github.com/facebookresearch/llama/blob/c769dfd53ddd509159216a5423204653850f79f4/llama/generation.py#L44
-# # These are components of the prompt that should not be changed by the users
-# B_INST, E_INST = "[INST]", "[/INST]"
-# B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
-#
-# SPECIAL_TAGS = [B_INST, E_INST, B_SYS.strip(), E_SYS.strip()]
-#
-#
-# def build_llama_prompt(messages: list[ConversationEntry]):
-#     if any([tag in msg.get("content", "") for tag in SPECIAL_TAGS for msg in messages]):
-#         raise ValueError(
-#             f"Messages cannot contain any of the following: {SPECIAL_TAGS}"
-#         )
-#
-#     if messages and messages[0]["role"] == CHATML_ROLE_SYSTEM:
-#         system_prompt = messages[0].get("content", "").strip()
-#         messages = messages[1:]
-#     else:
-#         system_prompt = ""
-#
-#     if messages and messages[0]["role"] == CHATML_ROLE_USER:
-#         first_user_message = messages[0].get("content", "").strip()
-#         messages = messages[1:]
-#     else:
-#         first_user_message = ""
-#
-#     if system_prompt:
-#         first_user_message = B_SYS + system_prompt + E_SYS + first_user_message
-#     messages = [
-#         {
-#             "role": CHATML_ROLE_USER,
-#             "content": first_user_message,
-#         },
-#     ] + messages
-#
-#     assert all([msg["role"] == CHATML_ROLE_USER for msg in messages[::2]]) and all(
-#         [msg["role"] == CHATML_ROLE_ASSISTANT for msg in messages[1::2]]
-#     ), (
-#         f"llama only supports '{CHATML_ROLE_SYSTEM}', '{CHATML_ROLE_USER}' and '{CHATML_ROLE_ASSISTANT}' roles, "
-#         "starting with 'system', then 'user' and alternating (u/a/u/a/u...)"
-#     )
-#
-#     if messages[-1]["role"] == CHATML_ROLE_ASSISTANT:
-#         messages.append({"role": CHATML_ROLE_USER, "content": ""})
-#
-#     ret = "".join(
-#         f"{B_INST} {prompt.get('content', '').strip()} {E_INST} {answer.get('content', '').strip()} "
-#         for prompt, answer in zip(messages[::2], messages[1::2])
-#     )
-#
-#     assert (
-#         messages[-1]["role"] == CHATML_ROLE_USER
-#     ), f"Last message must be from {CHATML_ROLE_USER}, got {messages[-1]['role']}"
-#
-#     ret += f"{B_INST} {messages[-1].get('content').strip()} {E_INST}"
-#
-#     return ret
 
 
 def format_chat_entry(
