@@ -10,6 +10,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.routing import APIRouter
 from firebase_admin import auth, exceptions
 from furl import furl
+from loguru import logger
 from starlette.datastructures import FormData
 from starlette.requests import Request
 from starlette.responses import (
@@ -26,7 +27,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages, normalize_slug, page_slug_map
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
-from daras_ai_v2.base import RedirectException
+from daras_ai_v2.base import BasePage, RedirectException
 from daras_ai_v2.bots import request_json
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
@@ -34,10 +35,12 @@ from daras_ai_v2.exceptions import ffmpeg, UserError
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.profiles import user_profile_page, get_meta_tags_for_profile
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.settings import templates
 from daras_ai_v2.tabs_widget import MenuTabs
 from gooey_ui.components.url_button import url_button
+from handles.models import Handle
 from routers.api import request_form_files
 
 app = APIRouter()
@@ -307,13 +310,13 @@ Authorization: Bearer GOOEY_API_KEY
 
     page = workflow.page_cls(request=request)
     state = page.get_root_published_run().saved_run.to_dict()
-    request_body = page.get_example_request_body(state, include_all=include_all)
+    api_url, request_body = page.get_example_request(state, include_all=include_all)
     response_body = page.get_example_response_body(
         state, as_async=as_async, include_all=include_all
     )
 
     api_example_generator(
-        api_url=page._get_current_api_url(),
+        api_url=api_url,
         request_body=request_body,
         as_form_data=as_form_data,
         as_async=as_async,
@@ -336,25 +339,51 @@ Authorization: Bearer GOOEY_API_KEY
     manage_api_keys(page.request.user)
 
 
-@app.post("/")
-@app.post("/{page_slug}/")
-@app.post("/{page_slug}/{run_slug_or_tab}/")
-@app.post("/{page_slug}/{run_slug_or_tab}/{tab}/")
+@app.post("/{page_slug_or_handle}/")
+@app.post("/{page_slug_or_handle}/{run_slug_or_tab}/")
+@app.post("/{page_slug_or_handle}/{run_slug_or_tab}/{tab}/")
 def st_page(
     request: Request,
-    page_slug="",
+    page_slug_or_handle: str = "",
     run_slug_or_tab="",
     tab="",
     json_data: dict = Depends(request_json),
 ):
+    try:
+        page_cls = page_slug_map[normalize_slug(page_slug_or_handle)]
+    except KeyError:
+        pass
+    else:
+        return recipe_page(
+            request=request,
+            page_cls=page_cls,
+            page_slug=page_slug_or_handle,
+            run_slug_or_tab=run_slug_or_tab,
+            tab=tab,
+            json_data=json_data,
+        )
+
+    try:
+        handle = Handle.objects.get_by_name(page_slug_or_handle)
+    except Handle.DoesNotExist:
+        pass
+    else:
+        return handle_page(request=request, handle=handle, json_data=json_data)
+
+    raise HTTPException(status_code=404)
+
+
+def recipe_page(
+    request: Request,
+    page_cls: type[BasePage],
+    page_slug: str,
+    run_slug_or_tab: str,
+    tab: str,
+    json_data: dict,
+):
     run_slug, tab = _extract_run_slug_and_tab(run_slug_or_tab, tab)
     try:
         selected_tab = MenuTabs.paths_reverse[tab]
-    except KeyError:
-        raise HTTPException(status_code=404)
-
-    try:
-        page_cls = page_slug_map[normalize_slug(page_slug)]
     except KeyError:
         raise HTTPException(status_code=404)
 
@@ -401,6 +430,25 @@ def st_page(
         )
     }
     return ret
+
+
+def handle_page(request: Request, handle: Handle, json_data: dict):
+    if handle.has_user:
+        response = st.runner(
+            lambda: page_wrapper(
+                request=request,
+                render_fn=lambda: user_profile_page(request=request, user=handle.user),
+            ),
+            **json_data,
+        )
+        return response | {
+            "meta": get_meta_tags_for_profile(handle.user),
+        }
+    elif handle.has_redirect:
+        raise RedirectException(handle.redirect_url, status_code=301)
+    else:
+        logger.error(f"Handle {handle.name} has no user or redirect")
+        raise HTTPException(status_code=404)
 
 
 def get_og_url_path(request) -> str:

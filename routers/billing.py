@@ -1,7 +1,6 @@
-import html
-import os
 import typing
 from enum import Enum
+from pathlib import Path
 from urllib.parse import quote_plus
 
 import stripe
@@ -13,11 +12,15 @@ from starlette.datastructures import FormData
 
 import gooey_ui as st
 from app_users.models import AppUser, PaymentProvider
-from daras_ai_v2 import settings
+from bots.models import PublishedRun, PublishedRunVisibility, Workflow
+from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.base import RedirectException
+from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
+from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.settings import templates
+from gooey_ui.components.pills import pill
 from routers.root import page_wrapper, request_json
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
@@ -118,12 +121,14 @@ available_subscriptions = {
 class _AccountTab(typing.NamedTuple):
     title: str
     tab_path: str
+    prefixed: bool = True
 
 
 class AccountTabs(Enum):
-    billing = _AccountTab(title="Billing", tab_path="")
-    profile = _AccountTab(title="Profile", tab_path="profile")
-    api_keys = _AccountTab(title="🚀 API Keys", tab_path="api-keys")
+    billing = _AccountTab(title=f"{icons.billing} Billing", tab_path="")
+    profile = _AccountTab(title=f"{icons.profile} Profile", tab_path="profile")
+    saved = _AccountTab(title=f"{icons.save} Saved", tab_path="saved", prefixed=False)
+    api_keys = _AccountTab(title=f"{icons.api} API Keys", tab_path="api-keys")
 
     @property
     def title(self) -> str:
@@ -133,23 +138,46 @@ class AccountTabs(Enum):
     def tab_path(self) -> str:
         return self.value.tab_path
 
+    @property
+    def prefixed(self) -> bool:
+        return self.value.prefixed
+
     @classmethod
-    def from_tab_path(cls, tab_path: str) -> "AccountTabs":
-        for tab in cls:
-            if tab.tab_path == tab_path:
+    def unprefixed_tabs(cls) -> list["AccountTabs"]:
+        return [tab for tab in cls if not tab.prefixed]
+
+    @classmethod
+    def prefixed_tabs(cls) -> list["AccountTabs"]:
+        return [tab for tab in cls if tab.prefixed]
+
+    @classmethod
+    def from_request_and_tab_path(
+        cls, request: Request, tab_path: str
+    ) -> "AccountTabs":
+        for tab in cls.unprefixed_tabs():
+            # like /saved/
+            if request.url.path == tab.get_full_path():
                 return tab
+
+        for tab in cls.prefixed_tabs():
+            # like /account/{tab_path}/
+            if tab_path == tab.tab_path:
+                return tab
+
         raise HTTPException(status_code=404)
 
     def get_full_path(self) -> str:
-        return os.path.join("/account", self.tab_path, "")
+        prefix = "/account" if self.prefixed else "/"
+        return str(Path(prefix) / self.tab_path) + "/"
 
 
+@router.post("/saved/", include_in_schema=False)
 @router.post("/account/", include_in_schema=False)
 @router.post("/account/{tab_path}/", include_in_schema=False)
 def account(
     request: Request, tab_path: str = "", json_data: dict = Depends(request_json)
 ):
-    tab = AccountTabs.from_tab_path(tab_path)
+    tab = AccountTabs.from_request_and_tab_path(request=request, tab_path=tab_path)
     try:
         ret = st.runner(
             lambda: page_wrapper(
@@ -198,6 +226,8 @@ def render_selected_tab(request: Request, tab: AccountTabs):
             profile_tab(request)
         case AccountTabs.api_keys:
             api_keys_tab(request)
+        case AccountTabs.saved:
+            all_saved_runs_tab(request)
         case _:
             raise HTTPException(status_code=401)
 
@@ -223,28 +253,49 @@ def billing_tab(request: Request):
 
 
 def profile_tab(request: Request):
-    with st.div(className="user-info"):
-        if request.user and request.user.photo_url:
-            st.html(
-                f"""
-            <img id="profile-picture" src="{html.escape(request.user.photo_url)}" alt="" width="128" height="128">
-            """
+    return edit_user_profile_page(user=request.user)
+
+
+def all_saved_runs_tab(request: Request):
+    prs = PublishedRun.objects.filter(
+        created_by=request.user,
+    ).order_by("-updated_at")
+
+    def _render_run(pr: PublishedRun):
+        workflow = Workflow(pr.workflow)
+        visibility = PublishedRunVisibility(pr.visibility)
+
+        with st.div(className="mb-2 d-flex justify-content-between align-items-start"):
+            pill(
+                visibility.get_badge_html(),
+                unsafe_allow_html=True,
+                className="border border-dark",
             )
-        with st.div(className="user-info-text-box"):
-            if request.user.display_name:
-                st.write(f"## {request.user.display_name}")
-            if contact := request.user.email or request.user.phone_number:
-                with st.div(style={"fontWeight": "normal"}):
-                    st.html(html.escape(contact))
-            with st.div(
-                className="mb-4",
-                style={"fontSize": "x-small", "fontWeight": "normal"},
-            ):
-                st.html(
-                    """<a href="/privacy">Privacy</a> & <a href="/terms">Terms</a>"""
-                )
-            with st.tag("a", href="/logout/"):
-                st.caption("Sign out")
+            pill(workflow.short_title, className="border border-dark")
+
+        workflow.page_cls().render_published_run_preview(pr)
+
+    st.write("# Saved Workflows")
+
+    if prs:
+        if request.user.handle:
+            st.caption(
+                "All your Saved workflows are here, with public ones listed on your "
+                f"profile page at {request.user.handle.get_app_url()}."
+            )
+        else:
+            edit_profile_url = urls.remove_hostname(
+                request.url_for("account", tab_path="profile")
+            )
+            st.caption(
+                "All your Saved workflows are here. Public ones will be listed on your "
+                f"profile page if you [create a username]({edit_profile_url})."
+            )
+
+        with st.div(className="mt-4"):
+            grid_layout(3, prs, _render_run)
+    else:
+        st.write("No saved runs yet", className="text-muted")
 
 
 def api_keys_tab(request: Request):
