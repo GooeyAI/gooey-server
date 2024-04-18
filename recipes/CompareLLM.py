@@ -127,9 +127,8 @@ class CompareLLMPage(BasePage):
         with col2:
             _render_outputs(state, 300)
 
-    def get_raw_price(self, state: dict) -> int:
-        total = self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
-        return total * state.get("num_outputs", 1)
+    def get_raw_price(self, state: dict) -> float:
+        return self.get_total_linked_usage_cost_in_credits() + self.PROFIT_CREDITS
 
     def related_workflows(self) -> list:
         from recipes.SEOSummary import SEOSummaryPage

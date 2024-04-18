@@ -114,9 +114,7 @@ def test_multiple_llm_sums_usage_cost(transactional_db):
     )
     llm_page = CompareLLMPage(run_user=user)
     set_query_params({"run_id": bot_saved_run.run_id or "", "uid": user.uid or ""})
-    assert (
-        llm_page.get_price_roundoff(state=state) == (310 + llm_page.PROFIT_CREDITS) * 3
-    )
+    assert llm_page.get_price_roundoff(state=state) == (310 + llm_page.PROFIT_CREDITS)
 
 
 @pytest.mark.django_db
