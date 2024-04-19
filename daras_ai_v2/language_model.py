@@ -133,6 +133,20 @@ class LargeLanguageModels(Enum):
     )
 
     # https://console.groq.com/docs/models
+    llama3_70b = LLMSpec(
+        label="Llama 3 70b (Meta AI)",
+        model_id="llama3-70b-8192",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+    )
+    llama3_8b = LLMSpec(
+        label="Llama 3 8b (Meta AI)",
+        model_id="llama3-8b-8192",
+        llm_api=LLMApis.groq,
+        context_window=8192,
+        price=1,
+    )
     llama2_70b_chat = LLMSpec(
         label="Llama 2 70b Chat (Meta AI)",
         model_id="llama2-70b-4096",
