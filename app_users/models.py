@@ -91,6 +91,7 @@ class AppUser(models.Model):
     is_paying = models.BooleanField("paid", default=False)
 
     low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
+    auto_recharge_enabled = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(
         "created", editable=False, blank=True, default=timezone.now

@@ -250,6 +250,7 @@ def billing_tab(request: Request):
     }
 
     st.html(templates.get_template("account.html").render(**context))
+    auto_recharge_section(request)
 
 
 def profile_tab(request: Request):
@@ -303,6 +304,43 @@ def api_keys_tab(request: Request):
     manage_api_keys(request.user)
 
 
+def auto_recharge_section(request: Request):
+    assert request.user
+
+    st.write("## Auto Recharge & Limits")
+    auto_recharge_enabled = st.checkbox(
+        """
+        #### Enable auto recharge
+
+        Enable auto recharge to automatically keep your credit balance topped up.\
+        """,
+        value=request.user.auto_recharge_enabled,
+    )
+
+    if auto_recharge_enabled != request.user.auto_recharge_enabled:
+        request.user.auto_recharge_enabled = auto_recharge_enabled
+        request.user.save(update_fields=["auto_recharge_enabled"])
+
+    if request.user.auto_recharge_enabled:
+        st.write("Auto recharge is enabled!")
+
+        pms = stripe.PaymentMethod.list(
+            customer=request.user.get_or_create_stripe_customer()
+        )
+        if not pms:
+            setup_auto_recharge_url = urls.remove_hostname(
+                request.url_for("create_auto_recharge_checkout_session")
+            )
+            st.write(
+                f"Link a payment method with Stripe [here]({setup_auto_recharge_url})."
+            )
+        else:
+            pm = pms.data[0]
+            st.write(
+                f"Will automatically charge from {pm.card.brand} ending in {pm.card.last4}. ({pm.id=})",
+            )
+
+
 async def request_form(request: Request):
     return await request.form()
 
@@ -347,6 +385,23 @@ def create_checkout_session(
         subscription_data=subscription_data,
         invoice_creation=invoice_creation,
         allow_promotion_codes=True,
+    )
+
+    return RedirectResponse(checkout_session.url, status_code=303)
+
+
+def create_auto_recharge_checkout_session(request: Request):
+    if not request.user or request.user.is_anonymous:
+        return RedirectResponse(
+            request.url_for("login", query_params={"next": request.url.path})
+        )
+
+    checkout_session = stripe.checkout.Session.create(
+        mode="setup",
+        currency="usd",
+        customer=request.user.get_or_create_stripe_customer(),
+        success_url=payment_success_url,
+        cancel_url=account_url,
     )
 
     return RedirectResponse(checkout_session.url, status_code=303)
