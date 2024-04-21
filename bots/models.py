@@ -1,7 +1,6 @@
 import datetime
 import typing
 from multiprocessing.pool import ThreadPool
-from textwrap import dedent
 
 import pytz
 from django.conf import settings
@@ -9,8 +8,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Q
-from django.utils.text import Truncator, slugify
-from furl import furl
+from django.utils.text import Truncator
 from phonenumber_field.modelfields import PhoneNumberField
 
 from app_users.models import AppUser
@@ -725,8 +723,10 @@ class ConversationQuerySet(models.QuerySet):
                 row |= {
                     "Last Sent": last_time.strftime(settings.SHORT_DATETIME_FORMAT),
                     "First Sent": first_time.strftime(settings.SHORT_DATETIME_FORMAT),
-                    "A7": not convo.d7(),
-                    "A30": not convo.d30(),
+                    "A7": last_time
+                    > datetime.datetime.now() - datetime.timedelta(days=7),
+                    "A30": last_time
+                    > datetime.datetime.now() - datetime.timedelta(days=30),
                     "R1": last_time - first_time < datetime.timedelta(days=1),
                     "R7": last_time - first_time < datetime.timedelta(days=7),
                     "R30": last_time - first_time < datetime.timedelta(days=30),
