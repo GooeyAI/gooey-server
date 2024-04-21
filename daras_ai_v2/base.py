@@ -155,13 +155,16 @@ class BasePage:
     @classmethod
     def app_url(
         cls,
-        tab: RecipeTabs = RecipeTabs.run,
+        tab: RecipeTabs = None,
         example_id: str = None,
         run_id: str = None,
         uid: str = None,
         query_params: dict = None,
         path_params: dict = None,
     ) -> str:
+        if not tab:
+            tab = RecipeTabs.run
+
         run_slug = None
         if example_id:
             try:
