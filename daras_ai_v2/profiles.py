@@ -18,8 +18,8 @@ from bots.models import (
     Workflow,
 )
 from daras_ai.image_input import truncate_text_words
+from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons, settings, urls
-from daras_ai_v2.base import format_number_with_suffix
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.meta_content import (

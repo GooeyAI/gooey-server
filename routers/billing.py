@@ -1,10 +1,10 @@
 import typing
+from contextlib import contextmanager
 from enum import Enum
-from pathlib import Path
 from urllib.parse import quote_plus
 
 import stripe
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from furl import furl
@@ -15,13 +15,14 @@ from app_users.models import AppUser, PaymentProvider
 from bots.models import PublishedRun, PublishedRunVisibility, Workflow
 from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.base import RedirectException
+from daras_ai_v2.fastapi_tricks import fastapi_request_body, fastapi_request_form
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.settings import templates
 from gooey_ui.components.pills import pill
-from routers.root import page_wrapper, request_json
+from routers.root import page_wrapper
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
@@ -118,118 +119,84 @@ available_subscriptions = {
 }
 
 
-class _AccountTab(typing.NamedTuple):
-    title: str
-    tab_path: str
-    prefixed: bool = True
-
-
-class AccountTabs(Enum):
-    billing = _AccountTab(title=f"{icons.billing} Billing", tab_path="")
-    profile = _AccountTab(title=f"{icons.profile} Profile", tab_path="profile")
-    saved = _AccountTab(title=f"{icons.save} Saved", tab_path="saved", prefixed=False)
-    api_keys = _AccountTab(title=f"{icons.api} API Keys", tab_path="api-keys")
-
-    @property
-    def title(self) -> str:
-        return self.value.title
-
-    @property
-    def tab_path(self) -> str:
-        return self.value.tab_path
-
-    @property
-    def prefixed(self) -> bool:
-        return self.value.prefixed
-
-    @classmethod
-    def unprefixed_tabs(cls) -> list["AccountTabs"]:
-        return [tab for tab in cls if not tab.prefixed]
-
-    @classmethod
-    def prefixed_tabs(cls) -> list["AccountTabs"]:
-        return [tab for tab in cls if tab.prefixed]
-
-    @classmethod
-    def from_request_and_tab_path(
-        cls, request: Request, tab_path: str
-    ) -> "AccountTabs":
-        for tab in cls.unprefixed_tabs():
-            # like /saved/
-            if request.url.path == tab.get_full_path():
-                return tab
-
-        for tab in cls.prefixed_tabs():
-            # like /account/{tab_path}/
-            if tab_path == tab.tab_path:
-                return tab
-
-        raise HTTPException(status_code=404)
-
-    def get_full_path(self) -> str:
-        prefix = "/account" if self.prefixed else "/"
-        return str(Path(prefix) / self.tab_path) + "/"
-
-
-@router.post("/saved/", include_in_schema=False)
-@router.post("/account/", include_in_schema=False)
-@router.post("/account/{tab_path}/", include_in_schema=False)
-def account(
-    request: Request, tab_path: str = "", json_data: dict = Depends(request_json)
-):
-    tab = AccountTabs.from_request_and_tab_path(request=request, tab_path=tab_path)
-    try:
-        ret = st.runner(
-            lambda: page_wrapper(
-                request,
-                render_fn=lambda: render_account_page(request, tab),
-            ),
-            query_params=dict(request.query_params),
-            **json_data,
+@router.post("/account/")
+@st.route
+def account_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.billing):
+        billing_tab(request)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=str(request.url),
+            title="Billing • Gooey.AI",
+            description="Your billing details.",
+            canonical_url=str(request.url),
+            robots="noindex,nofollow",
         )
-    except RedirectException as e:
-        return RedirectResponse(e.url, status_code=e.status_code)
-    else:
-        ret |= {
-            "meta": raw_build_meta_tags(
-                url=account_url,
-                title="Account • Gooey.AI",
-                description="Your API keys, profile, and billing details.",
-                canonical_url=account_url,
-                robots="noindex,nofollow",
-            )
-        }
-        return ret
+    )
 
 
-def render_account_page(request: Request, current_tab: AccountTabs):
-    if not request.user or request.user.is_anonymous:
-        next_url = request.query_params.get("next", "/account/")
-        redirect_url = furl("/login", query_params={"next": next_url})
-        raise RedirectException(str(redirect_url))
+@router.post("/account/profile/")
+@st.route
+def profile_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.profile):
+        profile_tab(request)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=str(request.url),
+            title="Profile • Gooey.AI",
+            description="Your profile details.",
+            canonical_url=str(request.url),
+            robots="noindex,nofollow",
+        )
+    )
 
-    st.div(className="mt-5")
-    with st.nav_tabs():
-        for tab in AccountTabs:
-            with st.nav_item(tab.get_full_path(), active=tab == current_tab):
-                st.html(tab.title)
 
-    with st.nav_tab_content():
-        render_selected_tab(request, current_tab)
+@router.post("/saved/")
+@st.route
+def saved_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.saved):
+        all_saved_runs_tab(request)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=str(request.url),
+            title="Saved • Gooey.AI",
+            description="Your saved runs.",
+            canonical_url=str(request.url),
+            robots="noindex,nofollow",
+        )
+    )
 
 
-def render_selected_tab(request: Request, tab: AccountTabs):
-    match tab:
-        case AccountTabs.billing:
-            billing_tab(request)
-        case AccountTabs.profile:
-            profile_tab(request)
-        case AccountTabs.api_keys:
-            api_keys_tab(request)
-        case AccountTabs.saved:
-            all_saved_runs_tab(request)
-        case _:
-            raise HTTPException(status_code=401)
+@router.post("/account/api-keys/")
+@st.route
+def api_keys_route(request: Request):
+    with account_page_wrapper(request, AccountTabs.api_keys):
+        api_keys_tab(request)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=str(request.url),
+            title="API Keys • Gooey.AI",
+            description="Your API keys.",
+            canonical_url=str(request.url),
+            robots="noindex,nofollow",
+        )
+    )
+
+
+class TabData(typing.NamedTuple):
+    title: str
+    route: typing.Callable
+
+
+class AccountTabs(TabData, Enum):
+    billing = TabData(title=f"{icons.billing} Billing", route=account_route)
+    profile = TabData(title=f"{icons.profile} Profile", route=profile_route)
+    saved = TabData(title=f"{icons.save} Saved", route=saved_route)
+    api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
+
+    @property
+    def url_path(self) -> str:
+        return router.url_path_for(self.route.__name__)
 
 
 def billing_tab(request: Request):
@@ -303,13 +270,27 @@ def api_keys_tab(request: Request):
     manage_api_keys(request.user)
 
 
-async def request_form(request: Request):
-    return await request.form()
+@contextmanager
+def account_page_wrapper(request: Request, current_tab: TabData):
+    if not request.user or request.user.is_anonymous:
+        next_url = request.query_params.get("next", "/account/")
+        redirect_url = furl("/login", query_params={"next": next_url})
+        raise RedirectException(str(redirect_url))
+
+    with page_wrapper(request):
+        st.div(className="mt-5")
+        with st.nav_tabs():
+            for tab in AccountTabs:
+                with st.nav_item(tab.url_path, active=tab == current_tab):
+                    st.html(tab.title)
+
+        with st.nav_tab_content():
+            yield
 
 
 @router.post("/__/stripe/create-checkout-session")
 def create_checkout_session(
-    request: Request, body_form: FormData = Depends(request_form)
+    request: Request, body_form: FormData = fastapi_request_form
 ):
     lookup_key = body_form["lookup_key"]
     subscription = available_subscriptions[lookup_key]
@@ -371,15 +352,13 @@ def payment_success(request: Request):
 payment_success_url = str(
     furl(settings.APP_BASE_URL) / router.url_path_for(payment_success.__name__)
 )
-account_url = str(furl(settings.APP_BASE_URL) / router.url_path_for(account.__name__))
-
-
-async def request_body(request: Request):
-    return await request.body()
+account_url = str(
+    furl(settings.APP_BASE_URL) / router.url_path_for(account_route.__name__)
+)
 
 
 @router.post("/__/stripe/webhook")
-def webhook_received(request: Request, payload: bytes = Depends(request_body)):
+def webhook_received(request: Request, payload: bytes = fastapi_request_body):
     # Retrieve the event by verifying the signature using the raw body and secret if webhook signing is configured.
     event = stripe.Webhook.construct_event(
         payload=payload,

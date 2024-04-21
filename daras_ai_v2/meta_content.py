@@ -1,12 +1,12 @@
-from django.utils.text import slugify
-from furl import furl
+import typing
 
 from bots.models import PublishedRun, SavedRun, WorkflowMetadata
-from daras_ai_v2 import settings
-from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.meta_preview_url import meta_preview_url
-from daras_ai_v2.tabs_widget import MenuTabs
+
+if typing.TYPE_CHECKING:
+    from routers.root import RecipeTabs
+    from daras_ai_v2.base import BasePage
 
 SEP = " • "
 TITLE_SUFFIX = "Gooey.AI"
@@ -15,7 +15,7 @@ TITLE_SUFFIX = "Gooey.AI"
 def build_meta_tags(
     *,
     url: str,
-    page: BasePage,
+    page: "BasePage",
     state: dict,
     run_id: str,
     uid: str,
@@ -42,13 +42,7 @@ def build_meta_tags(
         metadata=metadata,
         pr=pr,
     )
-    canonical_url = canonical_url_for_page(
-        page=page,
-        state=state,
-        sr=sr,
-        metadata=metadata,
-        pr=pr,
-    )
+    canonical_url = canonical_url_for_page(page=page, sr=sr, pr=pr)
     robots = robots_tag_for_page(page=page, sr=sr, pr=pr)
 
     return raw_build_meta_tags(
@@ -106,22 +100,24 @@ def raw_build_meta_tags(
 
 def meta_title_for_page(
     *,
-    page: BasePage,
+    page: "BasePage",
     metadata: WorkflowMetadata,
     sr: SavedRun,
     pr: PublishedRun | None,
-    tab: str,
+    tab: "RecipeTabs",
 ) -> str:
+    from routers.root import RecipeTabs
+
     match tab:
-        case MenuTabs.examples:
-            label = MenuTabs.display_labels[tab]
-            ret = f"{label}: {metadata.meta_title}"
-        case MenuTabs.run_as_api | MenuTabs.integrations:
-            label = MenuTabs.display_labels[tab]
-            return f"{label} for {meta_title_for_page(page=page, metadata=metadata, sr=sr, pr=pr, tab=MenuTabs.run)}"
-        case MenuTabs.history | MenuTabs.saved:
-            label = MenuTabs.display_labels[tab]
-            ret = f"{label} for {metadata.short_title}"
+        case RecipeTabs.examples:
+            ret = f"{tab.label}: {metadata.meta_title}"
+        case RecipeTabs.run_as_api | RecipeTabs.integrations:
+            page_title = meta_title_for_page(
+                page=page, metadata=metadata, sr=sr, pr=pr, tab=RecipeTabs.run
+            )
+            return f"{tab.label} for {page_title}"
+        case RecipeTabs.history | RecipeTabs.saved:
+            ret = f"{tab.label} for {metadata.short_title}"
         case _ if pr and pr.saved_run == sr and pr.is_root():
             # for root page
             ret = page.get_dynamic_meta_title() or metadata.meta_title
@@ -166,7 +162,7 @@ def meta_description_for_page(
 
 def meta_image_for_page(
     *,
-    page: BasePage,
+    page: "BasePage",
     state: dict,
     metadata: WorkflowMetadata,
     sr: SavedRun,
@@ -185,67 +181,51 @@ def meta_image_for_page(
 
 def canonical_url_for_page(
     *,
-    page: BasePage,
-    state: dict,
-    metadata: WorkflowMetadata,
+    page: "BasePage",
     sr: SavedRun,
     pr: PublishedRun | None,
 ) -> str:
     """
-    Assumes that `page.tab` is a valid tab defined in MenuTabs
+    Assumes that `page.tab` is a valid tab defined in RecipeTabs
     """
+    from routers.root import RecipeTabs
 
-    latest_slug = page.slug_versions[-1]  # for recipe
-    recipe_url = furl(str(settings.APP_BASE_URL)) / latest_slug
-
-    if pr and pr.saved_run == sr and pr.is_root():
-        query_params = {}
-        pr_slug = ""
-    elif pr and pr.saved_run == sr:
-        query_params = {"example_id": pr.published_run_id}
-        pr_slug = (pr.title and slugify(pr.title)) or ""
-    else:
-        query_params = {"run_id": sr.run_id, "uid": sr.uid}
-        pr_slug = ""
-
-    tab_path = MenuTabs.paths[page.tab]
-    match page.tab:
-        case MenuTabs.examples:
-            # no query params / run_slug in this case
-            return str(recipe_url / tab_path / "/")
-        case MenuTabs.history, MenuTabs.saved:
-            # no run slug in this case
-            return str(furl(recipe_url, query_params=query_params) / tab_path / "/")
-        case _:
-            # all other cases
-            return str(
-                furl(recipe_url, query_params=query_params) / pr_slug / tab_path / "/"
-            )
+    kwargs = {}
+    if page.tab in [RecipeTabs.run, RecipeTabs.run_as_api, RecipeTabs.integrations]:
+        if pr and pr.saved_run == sr and pr.is_root():
+            pass
+        elif pr and pr.saved_run == sr:
+            kwargs = {"example_id": pr.published_run_id}
+        else:
+            kwargs = {"run_id": sr.run_id, "uid": sr.uid}
+    return page.app_url(page.tab, **kwargs)
 
 
 def robots_tag_for_page(
     *,
-    page: BasePage,
+    page: "BasePage",
     sr: SavedRun,
     pr: PublishedRun | None,
 ) -> str:
+    from routers.root import RecipeTabs
+
     is_root = pr and pr.saved_run == sr and pr.is_root()
     is_example = pr and pr.saved_run == sr and not pr.is_root()
 
     match page.tab:
-        case MenuTabs.run if is_root or is_example:
+        case RecipeTabs.run if is_root or is_example:
             no_follow, no_index = False, False
-        case MenuTabs.run:  # ordinary run (not example)
+        case RecipeTabs.run:  # ordinary run (not example)
             no_follow, no_index = False, True
-        case MenuTabs.examples:
+        case RecipeTabs.examples:
             no_follow, no_index = False, False
-        case MenuTabs.run_as_api:
+        case RecipeTabs.run_as_api:
             no_follow, no_index = False, True
-        case MenuTabs.integrations:
+        case RecipeTabs.integrations:
             no_follow, no_index = True, True
-        case MenuTabs.history:
+        case RecipeTabs.history:
             no_follow, no_index = True, True
-        case MenuTabs.saved:
+        case RecipeTabs.saved:
             no_follow, no_index = True, True
         case _:
             raise ValueError(f"Unknown tab: {page.tab}")
@@ -260,12 +240,14 @@ def robots_tag_for_page(
 
 def get_is_indexable_for_page(
     *,
-    page: BasePage,
+    page: "BasePage",
     sr: SavedRun,
     pr: PublishedRun | None,
 ) -> bool:
+    from routers.root import RecipeTabs
+
     if pr and pr.saved_run == sr and pr.is_root():
         # index all tabs on root
         return True
 
-    return bool(pr and pr.saved_run == sr and page.tab == MenuTabs.run)
+    return bool(pr and pr.saved_run == sr and page.tab == RecipeTabs.run)

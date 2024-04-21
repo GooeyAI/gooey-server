@@ -132,7 +132,7 @@ class DocSearchPage(BasePage):
         st.write("---")
         st.write("##### 🔎 Document Search Settings")
         citation_style_selector()
-        doc_extract_selector()
+        doc_extract_selector(self.request and self.request.user)
         st.write("---")
         query_instructions_widget()
         doc_search_advanced_settings()

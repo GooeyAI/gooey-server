@@ -1,5 +1,5 @@
 import requests
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 from furl import furl
 from starlette.background import BackgroundTasks
@@ -8,9 +8,10 @@ from starlette.responses import HTMLResponse, Response
 
 from bots.models import BotIntegration, Platform
 from daras_ai_v2 import settings, db
-from daras_ai_v2.bots import msg_handler, request_json
+from daras_ai_v2.bots import msg_handler
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.facebook_bots import WhatsappBot, FacebookBot
+from daras_ai_v2.fastapi_tricks import fastapi_request_json
 from daras_ai_v2.functional import map_parallel
 
 router = APIRouter()
@@ -187,7 +188,7 @@ async def fb_webhook_verify(request: Request):
 @router.post("/__/fb/webhook/")
 def fb_webhook(
     background_tasks: BackgroundTasks,
-    data: dict = Depends(request_json),
+    data: dict = fastapi_request_json,
 ):
     import glom
 

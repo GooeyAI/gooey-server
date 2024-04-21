@@ -6,9 +6,9 @@ from bots.models import (
     PublishedRun,
 )
 from daras_ai.image_input import truncate_text_words
-from daras_ai_v2.tabs_widget import MenuTabs
 
 if typing.TYPE_CHECKING:
+    from routers.root import RecipeTabs
     from daras_ai_v2.base import BasePage
 
 
@@ -76,8 +76,10 @@ def get_title_breadcrumbs(
     page_cls: typing.Union["BasePage", typing.Type["BasePage"]],
     sr: SavedRun,
     pr: PublishedRun | None,
-    tab: str = MenuTabs.run,
+    tab: "RecipeTabs" = None,
 ) -> TitleBreadCrumbs:
+    from routers.root import RecipeTabs
+
     is_root = pr and pr.saved_run == sr and pr.is_root()
     is_example = not is_root and pr and pr.saved_run == sr
     is_run = not is_root and not is_example
@@ -92,18 +94,16 @@ def get_title_breadcrumbs(
     root_breadcrumb = TitleUrl(metadata.short_title, page_cls.app_url())
 
     match tab:
-        case MenuTabs.examples | MenuTabs.history | MenuTabs.saved:
-            label = MenuTabs.display_labels[tab]
+        case RecipeTabs.examples | RecipeTabs.history | RecipeTabs.saved:
             return TitleBreadCrumbs(
-                f"{label}: {metadata.short_title}",
+                f"{tab.label}: {metadata.short_title}",
                 root_title=root_breadcrumb,
                 published_title=None,
             )
-        case MenuTabs.run_as_api | MenuTabs.integrations:
-            label = MenuTabs.display_labels[tab]
+        case RecipeTabs.run_as_api | RecipeTabs.integrations:
             tbreadcrumbs_on_run = get_title_breadcrumbs(page_cls=page_cls, sr=sr, pr=pr)
             return TitleBreadCrumbs(
-                f"{label}: {tbreadcrumbs_on_run.h1_title}",
+                f"{tab.label}: {tbreadcrumbs_on_run.h1_title}",
                 root_title=tbreadcrumbs_on_run.root_title or root_breadcrumb,
                 published_title=tbreadcrumbs_on_run.published_title,
             )

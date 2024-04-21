@@ -13,8 +13,12 @@ from starlette.responses import RedirectResponse, HTMLResponse
 from bots.models import BotIntegration, Platform, Conversation, Message
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2 import settings
-from daras_ai_v2.bots import msg_handler, request_json, request_urlencoded_body
+from daras_ai_v2.bots import msg_handler
 from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.fastapi_tricks import (
+    fastapi_request_urlencoded_body,
+    fastapi_request_json,
+)
 from daras_ai_v2.slack_bot import (
     SlackBot,
     invite_bot_account_to_channel,
@@ -147,7 +151,7 @@ def slack_connect_redirect(request: Request):
 @router.post("/__/slack/interaction/")
 def slack_interaction(
     background_tasks: BackgroundTasks,
-    data: dict = Depends(request_urlencoded_body),
+    data: dict = fastapi_request_urlencoded_body,
 ):
     data = json.loads(data.get("payload", ["{}"])[0])
     print("> slack_interaction:", data)
@@ -170,7 +174,7 @@ def slack_interaction(
 @router.post("/__/slack/event/")
 def slack_event(
     background_tasks: BackgroundTasks,
-    data: dict = Depends(request_json),
+    data: dict = fastapi_request_json,
 ):
     if data["token"] != settings.SLACK_VERIFICATION_TOKEN:
         raise HTTPException(403, "Only accepts requests from Slack")

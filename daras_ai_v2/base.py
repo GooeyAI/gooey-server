@@ -3,7 +3,6 @@ import html
 import inspect
 import math
 import typing
-import urllib.parse
 import uuid
 from copy import deepcopy
 from enum import Enum
@@ -34,6 +33,7 @@ from bots.models import (
     PublishedRunVisibility,
     Workflow,
 )
+from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings, urls
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import render_breadcrumbs, get_title_breadcrumbs
@@ -57,14 +57,18 @@ from daras_ai_v2.query_params_util import (
     extract_query_params,
 )
 from daras_ai_v2.send_email import send_reported_run_email
-from daras_ai_v2.tabs_widget import MenuTabs
 from daras_ai_v2.user_date_widgets import (
     render_local_dt_attrs,
 )
-from gooey_ui import realtime_clear_subs
+from gooey_ui import (
+    realtime_clear_subs,
+    RedirectException,
+    QueryParamsRedirectException,
+)
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
+from routers.root import RecipeTabs
 
 DEFAULT_META_IMG = (
     # Small
@@ -115,7 +119,7 @@ class BasePage:
 
     def __init__(
         self,
-        tab: str = "",
+        tab: RecipeTabs = "",
         request: Request | SimpleNamespace = None,
         run_user: AppUser = None,
     ):
@@ -124,29 +128,80 @@ class BasePage:
         self.run_user = run_user
 
     @classmethod
+    @property
+    def endpoint(cls) -> str:
+        return f"/v2/{cls.slug_versions[0]}/"
+
+    @classmethod
+    def current_app_url(
+        cls,
+        tab: RecipeTabs = RecipeTabs.run,
+        query_params: dict = None,
+        path_params: dict = None,
+    ) -> str:
+        if query_params is None:
+            query_params = {}
+        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
+        return cls.app_url(
+            tab=tab,
+            example_id=example_id,
+            run_id=run_id,
+            uid=uid,
+            query_params=query_params,
+            path_params=path_params,
+        )
+
+    @classmethod
     def app_url(
         cls,
-        example_id=None,
-        run_id=None,
-        uid=None,
-        tab_name=None,
+        tab: RecipeTabs = RecipeTabs.run,
+        example_id: str = None,
+        run_id: str = None,
+        uid: str = None,
         query_params: dict = None,
+        path_params: dict = None,
     ) -> str:
-        query_params = cls.clean_query_params(
-            example_id=example_id, run_id=run_id, uid=uid
-        ) | (query_params or {})
-        f = (
-            furl(settings.APP_BASE_URL, query_params=query_params)
-            / cls.slug_versions[-1]
-        )
-        if example_id := query_params.get("example_id"):
+        run_slug = None
+        if example_id:
             pr = cls.get_published_run(published_run_id=example_id)
             if pr and pr.title:
-                f /= slugify(pr.title)
-        if tab_name:
-            f /= tab_name
-        f /= "/"  # keep trailing slash
-        return str(f)
+                run_slug = slugify(pr.title)
+            else:
+                run_slug = "example"
+
+        query_params = cls.clean_query_params(
+            example_id=None, run_id=run_id, uid=uid
+        ) | (query_params or {})
+
+        return str(
+            furl(settings.APP_BASE_URL, query_params=query_params)
+            / tab.url_path(
+                page_slug=cls.slug_versions[-1],
+                run_slug=run_slug,
+                example_id=example_id,
+                **(path_params or {}),
+            )
+        )
+
+    @classmethod
+    def current_api_url(cls) -> furl | None:
+        pr = cls.get_current_published_run()
+        return cls.api_url(example_id=pr and pr.published_run_id)
+
+    @classmethod
+    def api_url(
+        cls,
+        example_id: str = None,
+        run_id: str = None,
+        uid: str = None,
+        query_params: dict = None,
+    ) -> furl:
+        query_params = query_params or {}
+        if run_id and uid:
+            query_params = dict(run_id=run_id, uid=uid)
+        elif example_id:
+            query_params = dict(example_id=example_id)
+        return furl(settings.API_BASE_URL, query_params=query_params) / cls.endpoint
 
     @classmethod
     def clean_query_params(cls, *, example_id, run_id, uid) -> dict:
@@ -156,32 +211,6 @@ class BasePage:
         if example_id:
             query_params |= dict(example_id=example_id)
         return query_params
-
-    @classmethod
-    def api_url(cls, example_id=None, run_id=None, uid=None, query_params=None) -> furl:
-        query_params = query_params or {}
-        if run_id and uid:
-            query_params = dict(run_id=run_id, uid=uid)
-        elif example_id:
-            query_params = dict(example_id=example_id)
-        return furl(settings.API_BASE_URL, query_params=query_params) / cls.endpoint
-
-    @classmethod
-    @property
-    def endpoint(cls) -> str:
-        return f"/v2/{cls.slug_versions[0]}/"
-
-    def get_tab_url(self, tab: str, query_params: dict = None) -> str:
-        if query_params is None:
-            query_params = {}
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        return self.app_url(
-            example_id=example_id,
-            run_id=run_id,
-            uid=uid,
-            tab_name=MenuTabs.paths[tab],
-            query_params=query_params,
-        )
 
     def get_dynamic_meta_title(self) -> str | None:
         return None
@@ -246,18 +275,13 @@ class BasePage:
         self._render_header()
         st.newline()
 
-        self._render_tab_menu(selected_tab=self.tab)
-        with st.nav_tab_content():
-            self.render_selected_tab(self.tab)
-
-    def _render_tab_menu(self, selected_tab: str):
-        assert selected_tab in MenuTabs.paths
-
         with st.nav_tabs():
-            for name in self.get_tabs():
-                url = self.get_tab_url(name)
-                with st.nav_item(url, active=name == selected_tab):
-                    st.html(name)
+            for tab in self.get_tabs():
+                url = self.current_app_url(tab)
+                with st.nav_item(url, active=tab == self.tab):
+                    st.html(tab.title)
+        with st.nav_tab_content():
+            self.render_selected_tab()
 
     def _render_header(self):
         current_run = self.get_current_sr()
@@ -278,7 +302,7 @@ class BasePage:
                         render_breadcrumbs(
                             tbreadcrumbs,
                             is_api_call=(
-                                current_run.is_api_call and self.tab == MenuTabs.run
+                                current_run.is_api_call and self.tab == RecipeTabs.run
                             ),
                         )
 
@@ -322,18 +346,16 @@ class BasePage:
 
                     self._render_social_buttons(show_button_text=not can_user_edit_run)
 
-        with st.div():
-            if tbreadcrumbs.has_breadcrumbs() or self.run_user:
-                # only render title here if the above row was not empty
-                self._render_title(tbreadcrumbs.h1_title)
-            if (
-                published_run
-                and published_run.notes
-                and MenuTabs.integrations != self.tab
-            ):
-                st.write(published_run.notes, line_clamp=2)
-            elif is_root_example and MenuTabs.integrations != self.tab:
-                st.write(self.preview_description(current_run.to_dict()), line_clamp=2)
+        if tbreadcrumbs.has_breadcrumbs() or self.run_user:
+            # only render title here if the above row was not empty
+            self._render_title(tbreadcrumbs.h1_title)
+
+        if self.tab != RecipeTabs.run:
+            return
+        if published_run and published_run.notes:
+            st.write(published_run.notes, line_clamp=2)
+        elif is_root_example and self.tab != RecipeTabs.integrations:
+            st.write(self.preview_description(current_run.to_dict()), line_clamp=2)
 
     def can_user_edit_run(
         self,
@@ -385,7 +407,7 @@ class BasePage:
 
         copy_to_clipboard_button(
             f'<i class="fa-regular fa-link"></i>{button_text}',
-            value=self.get_tab_url(self.tab),
+            value=self.current_app_url(self.tab),
             type="secondary",
             className="mb-0 ms-lg-2",
         )
@@ -716,7 +738,7 @@ class BasePage:
 
         with st.expander("🛠️ Admin Options"):
             st.write(
-                f"This will hide/show this workflow from {self.app_url(tab_name=MenuTabs.paths[MenuTabs.examples])}  \n"
+                f"This will hide/show this workflow from {self.app_url(RecipeTabs.examples)}  \n"
                 f"(Given that you have set public visibility above)"
             )
             if st.session_state.get("--toggle-approve-example"):
@@ -783,16 +805,16 @@ class BasePage:
             st.stop()
 
     def get_tabs(self):
-        tabs = [MenuTabs.run, MenuTabs.examples, MenuTabs.run_as_api]
+        tabs = [RecipeTabs.run, RecipeTabs.examples, RecipeTabs.run_as_api]
         if self.request.user:
-            tabs.extend([MenuTabs.history])
+            tabs.extend([RecipeTabs.history])
         if self.request.user and not self.request.user.is_anonymous:
-            tabs.extend([MenuTabs.saved])
+            tabs.extend([RecipeTabs.saved])
         return tabs
 
-    def render_selected_tab(self, selected_tab: str):
-        match selected_tab:
-            case MenuTabs.run:
+    def render_selected_tab(self):
+        match self.tab:
+            case RecipeTabs.run:
                 input_col, output_col = st.columns([3, 2], gap="medium")
                 with input_col:
                     submitted = self._render_input_col()
@@ -807,16 +829,16 @@ class BasePage:
 
                 self.render_related_workflows()
 
-            case MenuTabs.examples:
+            case RecipeTabs.examples:
                 self._examples_tab()
 
-            case MenuTabs.history:
+            case RecipeTabs.history:
                 self._history_tab()
 
-            case MenuTabs.run_as_api:
+            case RecipeTabs.run_as_api:
                 self.run_as_api_tab()
 
-            case MenuTabs.saved:
+            case RecipeTabs.saved:
                 self._saved_tab()
 
     def _render_version_history(self):
@@ -933,7 +955,7 @@ class BasePage:
                 value=self.title,
             )
 
-            current_url = self._get_current_app_url()
+            current_url = self.current_app_url()
             st.text_input(
                 "Run URL",
                 disabled=True,
@@ -972,7 +994,7 @@ class BasePage:
             send_reported_run_email(
                 user=self.request.user,
                 run_uid=uid,
-                url=self._get_current_app_url(),
+                url=self.current_app_url(),
                 recipe_name=self.title,
                 report_type=report_type,
                 reason_for_report=reason_for_report,
@@ -1362,19 +1384,9 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         if not (run_id or example_id):
             return
 
-        url = self._get_current_app_url()
+        url = self.current_app_url()
         if not url:
             return
-
-    def _get_current_app_url(self) -> str | None:
-        example_id, run_id, uid = extract_query_params(gooey_get_query_params())
-        return self.app_url(example_id, run_id, uid)
-
-    def _get_current_api_url(self) -> furl | None:
-        pr = self.get_current_published_run()
-        return self.api_url(
-            example_id=pr and pr.published_run_id, run_id=None, uid=None
-        )
 
     def update_flag_for_run(self, run_id: str, uid: str, is_flagged: bool):
         ref = self.run_doc_sr(uid=uid, run_id=run_id)
@@ -1465,7 +1477,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
                         f"""We'll email **{self.request.user.email}** when your workflow is done."""
                     )
                 st.write(
-                    f"""In the meantime, check out [🚀 Examples]({self.get_tab_url(MenuTabs.examples)})
+                    f"""In the meantime, check out [🚀 Examples]({self.current_app_url(RecipeTabs.examples)})
                       for inspiration."""
                 )
 
@@ -1725,13 +1737,9 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
 
         grid_layout(3, run_history, self._render_run_preview)
 
-        next_url = (
-            furl(self._get_current_app_url(), query_params=self.request.query_params)
-            / MenuTabs.paths[MenuTabs.history]
-            / "/"
-        )
-        next_url.query.params.set(
-            "updated_at__lt", run_history[-1].to_dict()["updated_at"]
+        next_url = self.current_app_url(
+            RecipeTabs.history,
+            query_params={"updated_at__lt": run_history[-1].to_dict()["updated_at"]},
         )
         with st.link(to=str(next_url)):
             st.html(
@@ -2138,35 +2146,5 @@ def extract_nested_str(obj) -> str:
     return ""
 
 
-class RedirectException(Exception):
-    def __init__(self, url, status_code=302):
-        self.url = url
-        self.status_code = status_code
-
-
-class QueryParamsRedirectException(RedirectException):
-    def __init__(self, query_params: dict, status_code=303):
-        query_params = {k: v for k, v in query_params.items() if v is not None}
-        url = "?" + urllib.parse.urlencode(query_params)
-        super().__init__(url, status_code)
-
-
 class TitleValidationError(Exception):
     pass
-
-
-def format_number_with_suffix(num: int) -> str:
-    """
-    Formats large number with a suffix.
-
-    Ref: https://stackoverflow.com/a/45846841
-    """
-    num_float = float("{:.3g}".format(num))
-    magnitude = 0
-    while abs(num_float) >= 1000:
-        magnitude += 1
-        num_float /= 1000.0
-    return "{}{}".format(
-        "{:f}".format(num_float).rstrip("0").rstrip("."),
-        ["", "K", "M", "B", "T"][magnitude],
-    )
