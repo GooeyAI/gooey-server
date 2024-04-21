@@ -68,6 +68,7 @@ from gooey_ui import (
 from gooey_ui.components.modal import Modal
 from gooey_ui.components.pills import pill
 from gooey_ui.pubsub import realtime_pull
+from routers.billing import AccountTabs
 from routers.root import RecipeTabs
 
 DEFAULT_META_IMG = (
@@ -511,9 +512,7 @@ class BasePage:
                         str(PublishedRunVisibility.PUBLIC.value)
                     ] += f' <span class="text-muted">on [{pretty_profile_url}]({profile_url})</span>'
                 elif self.request.user and not self.request.user.is_anonymous:
-                    edit_profile_url = urls.remove_hostname(
-                        self.request.url_for("account", tab_path="profile")
-                    )
+                    edit_profile_url = AccountTabs.profile.url_path
                     options[
                         str(PublishedRunVisibility.PUBLIC.value)
                     ] += f' <span class="text-muted">on my [profile page]({edit_profile_url})</span>'

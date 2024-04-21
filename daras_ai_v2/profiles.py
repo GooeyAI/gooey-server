@@ -94,10 +94,10 @@ def user_profile_header(request, user: AppUser):
                 st.html(escape_html(get_profile_title(user)))
 
             if request.user == user:
+                from routers.billing import AccountTabs
+
                 with st.link(
-                    to=urls.remove_hostname(
-                        request.url_for("account", tab_path="profile")
-                    ),
+                    to=AccountTabs.profile.url_path,
                     className="text-decoration-none btn btn-theme btn-secondary mb-0",
                 ):
                     st.html(f"{icons.edit} Edit Profile")

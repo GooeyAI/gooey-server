@@ -32,6 +32,7 @@ from daras_ai_v2.base import (
 )
 from daras_ai_v2.fastapi_tricks import fastapi_request_form
 from gooeysite.bg_db_conn import get_celery_result_db_safe
+from routers.billing import AccountTabs
 
 app = APIRouter()
 
@@ -333,7 +334,7 @@ def submit_api_call(
 
     # check the balance
     if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
-        account_url = furl(settings.APP_BASE_URL) / "account"
+        account_url = furl(settings.APP_BASE_URL) / AccountTabs.billing.url_path
         raise HTTPException(
             status_code=402,
             detail={

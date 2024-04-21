@@ -1,3 +1,4 @@
+import os
 import typing
 from contextlib import contextmanager
 from enum import Enum
@@ -26,7 +27,7 @@ from routers.root import page_wrapper
 
 USER_SUBSCRIPTION_METADATA_FIELD = "subscription_key"
 
-router = APIRouter()
+app = APIRouter()
 
 available_subscriptions = {
     "addon": {
@@ -119,7 +120,7 @@ available_subscriptions = {
 }
 
 
-@router.post("/account/")
+@app.post("/account/")
 @st.route
 def account_route(request: Request):
     with account_page_wrapper(request, AccountTabs.billing):
@@ -135,7 +136,7 @@ def account_route(request: Request):
     )
 
 
-@router.post("/account/profile/")
+@app.post("/account/profile/")
 @st.route
 def profile_route(request: Request):
     with account_page_wrapper(request, AccountTabs.profile):
@@ -151,7 +152,7 @@ def profile_route(request: Request):
     )
 
 
-@router.post("/saved/")
+@app.post("/saved/")
 @st.route
 def saved_route(request: Request):
     with account_page_wrapper(request, AccountTabs.saved):
@@ -167,7 +168,7 @@ def saved_route(request: Request):
     )
 
 
-@router.post("/account/api-keys/")
+@app.post("/account/api-keys/")
 @st.route
 def api_keys_route(request: Request):
     with account_page_wrapper(request, AccountTabs.api_keys):
@@ -196,7 +197,7 @@ class AccountTabs(TabData, Enum):
 
     @property
     def url_path(self) -> str:
-        return router.url_path_for(self.route.__name__)
+        return os.path.join(app.url_path_for(self.route.__name__), "")
 
 
 def billing_tab(request: Request):
@@ -251,9 +252,7 @@ def all_saved_runs_tab(request: Request):
                 f"profile page at {request.user.handle.get_app_url()}."
             )
         else:
-            edit_profile_url = urls.remove_hostname(
-                request.url_for("account", tab_path="profile")
-            )
+            edit_profile_url = AccountTabs.profile.url_path
             st.caption(
                 "All your Saved workflows are here. Public ones will be listed on your "
                 f"profile page if you [create a username]({edit_profile_url})."
@@ -288,7 +287,7 @@ def account_page_wrapper(request: Request, current_tab: TabData):
             yield
 
 
-@router.post("/__/stripe/create-checkout-session")
+@app.post("/__/stripe/create-checkout-session")
 def create_checkout_session(
     request: Request, body_form: FormData = fastapi_request_form
 ):
@@ -333,7 +332,7 @@ def create_checkout_session(
     return RedirectResponse(checkout_session.url, status_code=303)
 
 
-@router.post("/__/stripe/create-portal-session")
+@app.post("/__/stripe/create-portal-session")
 def customer_portal(request: Request):
     customer = request.user.get_or_create_stripe_customer()
     portal_session = stripe.billing_portal.Session.create(
@@ -343,21 +342,21 @@ def customer_portal(request: Request):
     return RedirectResponse(portal_session.url, status_code=303)
 
 
-@router.get("/payment-success/")
+@app.get("/payment-success/")
 def payment_success(request: Request):
     context = {"request": request, "settings": settings}
     return templates.TemplateResponse("payment_success.html", context)
 
 
 payment_success_url = str(
-    furl(settings.APP_BASE_URL) / router.url_path_for(payment_success.__name__)
+    furl(settings.APP_BASE_URL) / app.url_path_for(payment_success.__name__)
 )
 account_url = str(
-    furl(settings.APP_BASE_URL) / router.url_path_for(account_route.__name__)
+    furl(settings.APP_BASE_URL) / app.url_path_for(account_route.__name__)
 )
 
 
-@router.post("/__/stripe/webhook")
+@app.post("/__/stripe/webhook")
 def webhook_received(request: Request, payload: bytes = fastapi_request_body):
     # Retrieve the event by verifying the signature using the raw body and secret if webhook signing is configured.
     event = stripe.Webhook.construct_event(
@@ -408,7 +407,7 @@ def _handle_invoice_paid(uid: str, invoice_data):
         user.save(update_fields=["is_paying"])
 
 
-@router.post("/__/stripe/cancel-subscription")
+@app.post("/__/stripe/cancel-subscription")
 def cancel_subscription(request: Request):
     customer = request.user.get_or_create_stripe_customer()
     subscriptions = stripe.Subscription.list(customer=customer).data
