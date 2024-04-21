@@ -163,7 +163,10 @@ class BasePage:
     ) -> str:
         run_slug = None
         if example_id:
-            pr = cls.get_published_run(published_run_id=example_id)
+            try:
+                pr = cls.get_published_run(published_run_id=example_id)
+            except PublishedRun.DoesNotExist:
+                pr = None
             if pr and pr.title:
                 run_slug = slugify(pr.title)
             else:
