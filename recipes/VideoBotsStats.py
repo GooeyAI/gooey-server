@@ -27,6 +27,7 @@ from bots.models import (
     FeedbackQuerySet,
     MessageQuerySet,
 )
+from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
@@ -61,7 +62,7 @@ class VideoBotsStatsPage(BasePage):
         query_params: dict = None,
         path_params: dict = None,
     ) -> str:
-        return str(self.request.url.replace(query=""))
+        return str(furl(settings.APP_BASE_URL) / self.request.url.path)
 
     def show_title_breadcrumb_share(
         self, bi: BotIntegration, run_title: str, run_url: str
