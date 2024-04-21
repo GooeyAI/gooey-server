@@ -568,7 +568,7 @@ def _handle_interactive_msg(bot: BotInterface):
 
 
 def _handle_audio_msg(billing_account_user, bot: BotInterface):
-    from recipes.asr import AsrPage
+    from recipes.asr_page import AsrPage
     from routers.api import call_api
 
     input_audio = bot.get_input_audio()
