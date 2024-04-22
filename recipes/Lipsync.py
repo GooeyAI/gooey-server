@@ -1,13 +1,13 @@
 import typing
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.lipsync_api import wav2lip
-from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
+from daras_ai_v2.lipsync_api import wav2lip, sadtalker
+from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
 
 CREDITS_PER_MB = 2
@@ -22,13 +22,34 @@ class LipsyncPage(BasePage):
     slug_versions = ["Lipsync"]
 
     class RequestModel(BaseModel):
-        input_face: str
-        input_audio: str
+        lipsync_model: str
 
+        input_face: HttpUrl
+        input_audio: HttpUrl
+
+        # wav2lip settings
         face_padding_top: int | None
         face_padding_bottom: int | None
         face_padding_left: int | None
         face_padding_right: int | None
+
+        # sadtalker settings
+        pose_style: int = 0
+        ref_eyeblink: HttpUrl | None = None
+        ref_pose: HttpUrl | None = None
+        batch_size: int = 2
+        size: int = 256
+        expression_scale: float = 1.0
+        input_yaw: list[int] | None = None
+        input_pitch: list[int] | None = None
+        input_roll: list[int] | None = None
+        enhancer: typing.Literal["gfpgan", "RestoreFormer"] | None = None
+        background_enhancer: typing.Literal["realesrgan"] | None = None
+        face3dvis: bool = False
+        still: bool = False
+        preprocess: typing.Literal["crop", "extcrop", "resize", "full", "extfull"] = (
+            "crop"
+        )
 
     class ResponseModel(BaseModel):
         output_video: str
@@ -65,18 +86,40 @@ class LipsyncPage(BasePage):
     def run(self, state: dict) -> typing.Iterator[str | None]:
         request = self.RequestModel.parse_obj(state)
 
-        yield "Running LipSync..."
-
-        state["output_video"] = wav2lip(
-            face=request.input_face,
-            audio=request.input_audio,
-            pads=(
-                request.face_padding_top,
-                request.face_padding_bottom,
-                request.face_padding_left,
-                request.face_padding_right,
-            ),
-        )
+        if request.lipsync_model == LipsyncModel.Wav2Lip.name:
+            yield "Running Wav2Lip..."
+            state["output_video"] = wav2lip(
+                face=request.input_face,
+                audio=request.input_audio,
+                pads=(
+                    request.face_padding_top,
+                    request.face_padding_bottom,
+                    request.face_padding_left,
+                    request.face_padding_right,
+                ),
+            )
+        elif request.lipsync_model == LipsyncModel.SadTalker.name:
+            yield "Running SadTalker..."
+            state["output_video"] = sadtalker(
+                source_image=request.input_face,
+                driven_audio=request.input_audio,
+                pose_style=request.pose_style,
+                ref_eyeblink=request.ref_eyeblink,
+                ref_pose=request.ref_pose,
+                batch_size=request.batch_size,
+                size=request.size,
+                expression_scale=request.expression_scale,
+                input_yaw=request.input_yaw,
+                input_pitch=request.input_pitch,
+                input_roll=request.input_roll,
+                enhancer=request.enhancer,
+                background_enhancer=request.background_enhancer,
+                face3dvis=request.face3dvis,
+                still=request.still,
+                preprocess=request.preprocess,
+            )
+        else:
+            raise ValueError("Invalid Lipsync Model")
 
     def render_example(self, state: dict):
         output_video = state.get("output_video")
