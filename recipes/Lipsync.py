@@ -147,7 +147,12 @@ class LipsyncPage(BasePage):
         return "Create high-quality, realistic Lipsync animations from any audio file. Input a sample face gif/video + audio and we will automatically generate a lipsync animation that matches your audio."
 
     def get_cost_note(self) -> str | None:
-        return f"{CREDITS_PER_MB} credits per MB"
+        multiplier = (
+            3
+            if st.session_state.get("lipsync_model") == LipsyncModel.SadTalker.name
+            else 1
+        )
+        return f"{CREDITS_PER_MB * multiplier} credits per MB"
 
     def get_raw_price(self, state: dict) -> float:
         total_bytes = 0
@@ -163,7 +168,10 @@ class LipsyncPage(BasePage):
             total_bytes += float(r.headers.get("Content-length") or "1")
 
         total_mb = total_bytes / 1024 / 1024
-        return total_mb * CREDITS_PER_MB
+        multiplier = (
+            3 if state.get("lipsync_model") == LipsyncModel.SadTalker.name else 1
+        )
+        return total_mb * CREDITS_PER_MB * multiplier
 
     def download_blob(self, bucket_name, source_blob_name, destination_file_name):
         """Downloads a blob from the bucket."""
