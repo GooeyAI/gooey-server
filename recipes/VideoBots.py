@@ -149,11 +149,6 @@ class VideoBotsPage(BasePage):
         "quality": 1.0,
         "max_tokens": 1500,
         "sampling_temperature": 0.5,
-        # wav2lip
-        "face_padding_top": 0,
-        "face_padding_bottom": 10,
-        "face_padding_left": 0,
-        "face_padding_right": 0,
         # doc search
         "citation_style": CitationStyles.number.name,
         "documents": [],
@@ -219,11 +214,30 @@ class VideoBotsPage(BasePage):
         sampling_temperature: float | None
 
         # lipsync
-        input_face: str | None
+        lipsync_model: str
+        input_face: str
+        # wav2lip settings
         face_padding_top: int | None
         face_padding_bottom: int | None
         face_padding_left: int | None
         face_padding_right: int | None
+        # sadtalker settings
+        pose_style: int = 0
+        ref_eyeblink: str | None = None
+        ref_pose: str | None = None
+        batch_size: int = 2
+        size: int = 256
+        expression_scale: float = 1.0
+        input_yaw: list[int] | None = None
+        input_pitch: list[int] | None = None
+        input_roll: list[int] | None = None
+        enhancer: typing.Literal["gfpgan", "RestoreFormer"] | None = None
+        background_enhancer: typing.Literal["realesrgan"] | None = None
+        face3dvis: bool = False
+        still: bool = False
+        preprocess: typing.Literal["crop", "extcrop", "resize", "full", "extfull"] = (
+            "crop"
+        )
 
         # doc search
         task_instructions: str | None
