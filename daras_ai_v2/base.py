@@ -137,6 +137,7 @@ class BasePage:
     def current_app_url(
         cls,
         tab: RecipeTabs = RecipeTabs.run,
+        *,
         query_params: dict = None,
         path_params: dict = None,
     ) -> str:
@@ -1359,7 +1360,7 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
             except StopIteration:
                 break
             finally:
-                state.update(response.dict())
+                state.update(response.dict(exclude_unset=True))
             yield val
 
         # validate the response if successful

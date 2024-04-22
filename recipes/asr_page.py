@@ -17,6 +17,7 @@ from daras_ai_v2.asr import (
     forced_asr_languages,
     asr_language_selector,
 )
+from daras_ai_v2.field_render import field_title_desc
 from daras_ai_v2.glossary import glossary_input
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -47,7 +48,13 @@ class AsrPage(BasePage):
         translation_model: (
             typing.Literal[tuple(e.name for e in TranslationModels)] | None
         )
-        translation_target: str | None
+        translation_source: str | None = Field(
+            title="Source Translation Language",
+            description="Usually inferred from the spoken `language`, but in case that is set to Auto detect, you can specify the source language here.",
+        )
+        translation_target: str | None = Field(
+            title="Target Translation Language",
+        )
         google_translate_target: str | None = Field(
             description="DEPRECATED: use translation_model & translation_target instead."
         )
@@ -130,10 +137,23 @@ class AsrPage(BasePage):
         with col1:
             translation_model = translation_model_selector()
         with col2:
-            translation_language_selector(translation_model)
+            translation_language_selector(
+                model=translation_model,
+                label=f"###### {field_title_desc(self.RequestModel, 'translation_target')}",
+                key="translation_target",
+            )
         if translation_model and translation_model.supports_glossary():
             glossary_input()
         st.write("---")
+        selected_model = st.session_state.get("selected_model")
+        if selected_model:
+            translation_language_selector(
+                model=translation_model,
+                label=f"###### {field_title_desc(self.RequestModel, 'translation_source')}",
+                key="translation_source",
+                allow_none=True,
+            )
+            st.write("---")
         enum_selector(
             AsrOutputFormat, label="###### Output Format", key="output_format"
         )
@@ -184,7 +204,7 @@ class AsrPage(BasePage):
                 asr_output,
                 target_language=request.translation_target,
                 source_language=forced_asr_languages.get(
-                    selected_model, request.language
+                    selected_model, request.language or request.translation_source
                 ),
                 glossary_url=request.glossary_document,
                 model=request.translation_model,

@@ -156,6 +156,7 @@ def doc_extract_selector(current_user: AppUser | None):
             {"url": st.session_state.get("doc_extract_url")},
         ),
         current_user=current_user,
+        allow_none=True,
     )
 
 

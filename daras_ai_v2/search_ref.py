@@ -167,7 +167,7 @@ def format_footnotes(
     match citation_style:
         case CitationStyles.number_markdown:
             formatted += "\n\n"
-            formatted += "\n".join(
+            formatted += "  \n".join(
                 f"[{ref_num}] {ref_to_markdown(ref)}"
                 for ref_num, ref in sorted(all_refs.items())
             )
@@ -192,7 +192,7 @@ def format_footnotes(
 
         case CitationStyles.symbol_markdown:
             formatted += "\n\n"
-            formatted += "\n".join(
+            formatted += "  \n".join(
                 f"{generate_footnote_symbol(ref_num - 1)} {ref_to_markdown(ref)}"
                 for ref_num, ref in sorted(all_refs.items())
             )

@@ -81,10 +81,10 @@ def enum_selector(
         widget = st.selectbox
     else:
         widget = st.radio
+    kwargs.setdefault("format_func", _format_func(enum_cls))
     return widget(
         **kwargs,
         options=options,
-        format_func=_format_func(enum_cls),
         label=label,
     )
 

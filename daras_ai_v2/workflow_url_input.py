@@ -8,6 +8,7 @@ from app_users.models import AppUser
 from bots.models import PublishedRun, PublishedRunVisibility, SavedRun
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
+from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from daras_ai_v2.fastapi_tricks import resolve_url
 from daras_ai_v2.query_params_util import extract_query_params
 from gooey_ui.components.url_button import url_button
@@ -20,6 +21,7 @@ def workflow_url_input(
     internal_state: dict,
     del_key: str = None,
     current_user: AppUser | None = None,
+    allow_none: bool = False,
 ):
     init_workflow_selector(internal_state, key)
 
@@ -44,8 +46,11 @@ def workflow_url_input(
                     key=key,
                     options=options,
                     default_value=internal_state.get("url"),
-                    format_func=lambda x: options[x],
+                    format_func=lambda x: options[x] if x else BLANK_OPTION,
+                    allow_none=allow_none,
                 )
+                if not url:
+                    return
         with scol2:
             edit_button(key + ":editmode")
     with col2:

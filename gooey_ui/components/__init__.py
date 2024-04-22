@@ -6,7 +6,6 @@ import typing
 from datetime import datetime, timezone
 
 import numpy as np
-
 from furl import furl
 
 from daras_ai.image_input import resize_img_scale
@@ -331,7 +330,15 @@ def text_area(
     #     assert not value, "only one of value or key can be provided"
     # else:
     if not key:
-        key = md5_values("textarea", label, height, help, placeholder, label_visibility)
+        key = md5_values(
+            "textarea",
+            label,
+            height,
+            help,
+            placeholder,
+            label_visibility,
+            not disabled or value,
+        )
     value = str(state.session_state.setdefault(key, value) or "")
     if label_visibility != "visible":
         label = None
@@ -424,6 +431,7 @@ def selectbox(
     disabled: bool = False,
     label_visibility: LabelVisibility = "visible",
     default_value: T = None,
+    allow_none: bool = False,
     **props,
 ) -> T | None:
     if not options:
@@ -431,6 +439,8 @@ def selectbox(
     if label_visibility != "visible":
         label = None
     options = list(options)
+    if allow_none:
+        options.insert(0, None)
     if not key:
         key = md5_values("select", label, options, help, label_visibility)
     value = state.session_state.get(key)
