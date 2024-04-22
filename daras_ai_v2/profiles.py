@@ -18,8 +18,8 @@ from bots.models import (
     Workflow,
 )
 from daras_ai.image_input import truncate_text_words
+from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons, settings, urls
-from daras_ai_v2.base import format_number_with_suffix
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.meta_content import (
@@ -94,10 +94,10 @@ def user_profile_header(request, user: AppUser):
                 st.html(escape_html(get_profile_title(user)))
 
             if request.user == user:
+                from routers.billing import AccountTabs
+
                 with st.link(
-                    to=urls.remove_hostname(
-                        request.url_for("account", tab_path="profile")
-                    ),
+                    to=AccountTabs.profile.url_path,
                     className="text-decoration-none btn btn-theme btn-secondary mb-0",
                 ):
                     st.html(f"{icons.edit} Edit Profile")

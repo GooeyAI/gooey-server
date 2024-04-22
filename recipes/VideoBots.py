@@ -25,7 +25,7 @@ from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
     azure_form_recognizer_models,
 )
-from daras_ai_v2.base import BasePage, MenuTabs
+from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.bot_integration_widgets import (
     general_integration_settings,
     slack_specific_settings,
@@ -55,7 +55,6 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
     CHATML_ROLE_SYSTEM,
-    model_max_tokens,
     get_entry_images,
     get_entry_text,
     format_chat_entry,
@@ -83,6 +82,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     OPENAI_TTS_VOICES_T,
 )
 from daras_ai_v2.vector_search import DocSearchRequest
+from gooey_ui import RedirectException
 from recipes.DocSearch import (
     get_top_k_references,
     references_as_prompt,
@@ -496,7 +496,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             citation_style_selector()
             st.checkbox("🔗 Shorten Citation URLs", key="use_url_shortener")
 
-            doc_extract_selector()
+            doc_extract_selector(self.request and self.request.user)
 
             st.write("---")
 
@@ -732,7 +732,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if not (user_input or request.input_images or request.input_documents):
             return
         model = LargeLanguageModels[request.selected_model]
-        is_chat_model = model.is_chat_model()
         saved_msgs = request.messages.copy()
         bot_script = request.bot_script
 
@@ -804,7 +803,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             query_msgs = saved_msgs + [
                 format_chat_entry(role=CHATML_ROLE_USER, content=user_input)
             ]
-            clip_idx = convo_window_clipper(query_msgs, model_max_tokens[model] // 2)
+            clip_idx = convo_window_clipper(query_msgs, model.context_window // 2)
             query_msgs = query_msgs[clip_idx:]
 
             chat_history = "\n".join(
@@ -879,7 +878,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         # truncate the history to fit the model's max tokens
         history_window = scripted_msgs + saved_msgs
         max_history_tokens = (
-            model_max_tokens[model]
+            model.context_window
             - calc_gpt_tokens([system_prompt, user_input])
             - request.max_tokens
             - SAFETY_BUFFER
@@ -893,7 +892,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         state["final_prompt"] = prompt_messages
 
         # ensure input script is not too big
-        max_allowed_tokens = model_max_tokens[model] - calc_gpt_tokens(prompt_messages)
+        max_allowed_tokens = model.context_window - calc_gpt_tokens(prompt_messages)
         max_allowed_tokens = min(max_allowed_tokens, request.max_tokens)
         if max_allowed_tokens < 0:
             raise UserError("Input Script is too long! Please reduce the script size.")
@@ -986,13 +985,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def get_tabs(self):
         tabs = super().get_tabs()
-        tabs.extend([MenuTabs.integrations])
+        tabs.extend([RecipeTabs.integrations])
         return tabs
 
-    def render_selected_tab(self, selected_tab):
-        super().render_selected_tab(selected_tab)
+    def render_selected_tab(self):
+        super().render_selected_tab()
 
-        if selected_tab == MenuTabs.integrations:
+        if self.tab == RecipeTabs.integrations:
             st.newline()
 
             # not signed in case
@@ -1036,16 +1035,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     self._render_published_run_buttons(
                         current_run=current_run,
                         published_run=published_run,
-                        redirect_to=self.get_tab_url(MenuTabs.integrations),
+                        redirect_to=self.current_app_url(RecipeTabs.integrations),
                     )
                 return
 
             # if we come from an integration redirect, we connect the integrations
             if "connect_ids" in self.request.query_params:
-                self.integrations_on_connect(
-                    current_run,
-                    published_run,
-                )
+                self.integrations_on_connect(current_run, published_run)
 
             # see which integrations are available to the user for the current published run
             assert published_run, "At this point, published_run should be available"
@@ -1072,9 +1068,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def integrations_on_connect(self, current_run, published_run):
         from app_users.models import AppUser
-        from daras_ai_v2.base import RedirectException
         from daras_ai_v2.slack_bot import send_confirmation_msg
 
+        bi = None
         for bid in self.request.query_params.getlist("connect_ids"):
             try:
                 bi = BotIntegration.objects.get(id=bid)
@@ -1099,7 +1095,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 send_confirmation_msg(bi)
             bi.save()
 
-        raise RedirectException(self.get_tab_url(MenuTabs.integrations))
+        if bi:
+            path_params = dict(integration_id=bi.api_integration_id())
+        else:
+            path_params = dict()
+        raise RedirectException(
+            self.current_app_url(RecipeTabs.integrations, path_params=path_params)
+        )
 
     def integration_welcome_screen(self, title="Connect your Copilot"):
         with st.center():
@@ -1140,9 +1142,8 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     ):
         from routers.facebook_api import fb_connect_url, wa_connect_url
         from routers.slack_api import slack_connect_url
-        from daras_ai_v2.base import RedirectException
 
-        on_connect = self.get_tab_url(MenuTabs.integrations)
+        on_connect = self.current_app_url(RecipeTabs.integrations)
 
         with st.center():
             st.markdown(
@@ -1223,47 +1224,43 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                             furl(on_connect).add(
                                 query_params=dict(connect_ids=str(bi.id))
                             )
+                            / bi.api_integration_id()
                         )
                     with st.div(style=descriptionstyle):
                         st.markdown("Connect to your own App or Website.")
 
                 if redirect_url:
-                    send_integration_attempt_email.delay(
-                        user_id=self.request.user.id,
-                        platform=selected_platform,
-                        run_url=self._get_current_app_url() or "",
-                    )
+                    if not self.is_current_user_admin():
+                        send_integration_attempt_email.delay(
+                            user_id=self.request.user.id,
+                            platform=selected_platform,
+                            run_url=self.current_app_url() or "",
+                        )
                     raise RedirectException(redirect_url)
 
             st.newline()
             st.write(
-                f"Or use [our API]({self.get_tab_url(MenuTabs.run_as_api)}) to build custom integrations with your server."
+                f"Or use [our API]({self.current_app_url(RecipeTabs.run_as_api)}) to build custom integrations with your server."
             )
 
     def integration_test_config_screen(
         self, integrations: QuerySet[BotIntegration], current_run, published_run
     ):
-        from daras_ai_v2.base import RedirectException, get_title_breadcrumbs
-        from recipes.VideoBotsStats import VideoBotsStatsPage
-
-        # from recipes.BulkRunner import BulkRunnerPage
+        from daras_ai_v2.base import get_title_breadcrumbs
         from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 
         run_title = get_title_breadcrumbs(
             VideoBotsPage, current_run, published_run
         ).h1_title
 
-        add_integration = self.get_tab_url(
-            MenuTabs.integrations, query_params={"add-integration": "true"}
-        )
-        if self.request.query_params.get("add-integration") == "true":
-            cancel = self.get_tab_url(MenuTabs.integrations)
+        if st.session_state.pop("--add-integration", None):
+            cancel_url = self.current_app_url(RecipeTabs.integrations)
             self.integration_connect_screen(
                 "Configure your Copilot: Add a New Integration",
-                f'Run Saved ✅ • <b>Connected</b> ✅ • <a href="{cancel}">Test & Configure</a> ✅',
+                f'Run Saved ✅ • <b>Connected</b> ✅ • <a href="{cancel_url}">Test & Configure</a> ✅',
             )
             if st.button("Return to Test & Configure"):
-                raise RedirectException(cancel)
+                raise RedirectException(cancel_url)
             return
 
         st.markdown("#### Configure your Copilot")
@@ -1278,6 +1275,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     key="bi_id",
                 )
                 bi = integrations_map[bi_id]
+                old_bi_id = st.session_state.get("old_bi_id", bi_id)
+                if bi_id != old_bi_id:
+                    raise RedirectException(
+                        self.current_app_url(
+                            RecipeTabs.integrations,
+                            path_params=dict(integration_id=bi.api_integration_id()),
+                        )
+                    )
+                st.session_state["old_bi_id"] = bi_id
         else:
             bi = integrations[0]
         icon = f'<img src="{Platform(bi.platform).get_favicon()}" width="20" height="20" />'
@@ -1322,12 +1328,19 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.write("###### Understand your Users")
                 st.caption(f"See real-time analytics.")
             with col2:
-                stats_url = furl(
-                    VideoBotsStatsPage.app_url(), args={"bi_id": bi.id}
-                ).tostr()
                 st.anchor(
                     "📊 View Analytics",
-                    stats_url,
+                    str(
+                        furl(
+                            self.current_app_url(
+                                RecipeTabs.integrations,
+                                path_params=dict(
+                                    integration_id=bi.api_integration_id()
+                                ),
+                            )
+                        )
+                        / "stats/"
+                    ),
                 )
 
             # ==== future changes ====
@@ -1370,11 +1383,11 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 st.write("###### Add Integration")
                 st.caption(f"Add another connection for {run_title}.")
             with col2:
-                if st.button(
+                st.anchor(
                     f'<img align="left" width="24" height="24" src="{INTEGRATION_IMG}"> &nbsp; Add Integration',
-                    key="btn_connect",
-                ):
-                    raise RedirectException(add_integration)
+                    str(furl(self.current_app_url(RecipeTabs.integrations)) / "add/"),
+                    unsafe_allow_html=True,
+                )
 
             with st.expander("Configure Settings 🛠️"):
                 if bi.platform == Platform.SLACK:

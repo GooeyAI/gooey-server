@@ -30,7 +30,9 @@ from daras_ai_v2.base import (
     StateKeys,
     RecipeRunState,
 )
+from daras_ai_v2.fastapi_tricks import fastapi_request_form
 from gooeysite.bg_db_conn import get_celery_result_db_safe
+from routers.billing import AccountTabs
 
 app = APIRouter()
 
@@ -89,10 +91,6 @@ class AsyncStatusResponseModelV3(BaseResponseModelV3, typing.Generic[O]):
     )
 
 
-async def request_form_files(request: Request) -> FormData:
-    return await request.form()
-
-
 def script_to_api(page_cls: typing.Type[BasePage]):
     endpoint = page_cls().endpoint.rstrip("/")
     response_model = create_model(
@@ -141,7 +139,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
     def run_api_form(
         request: Request,
         user: AppUser = Depends(api_auth_header),
-        form_data=Depends(request_form_files),
+        form_data=fastapi_request_form,
         page_request_json: str = Form(alias="json"),
     ):
         # parse form data
@@ -201,7 +199,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         request: Request,
         response: Response,
         user: AppUser = Depends(api_auth_header),
-        form_data=Depends(request_form_files),
+        form_data=fastapi_request_form,
         page_request_json: str = Form(alias="json"),
     ):
         # parse form data
@@ -336,7 +334,7 @@ def submit_api_call(
 
     # check the balance
     if settings.CREDITS_TO_DEDUCT_PER_RUN and not self.check_credits():
-        account_url = furl(settings.APP_BASE_URL) / "account"
+        account_url = furl(settings.APP_BASE_URL) / AccountTabs.billing.url_path
         raise HTTPException(
             status_code=402,
             detail={

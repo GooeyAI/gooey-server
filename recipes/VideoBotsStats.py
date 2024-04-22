@@ -11,6 +11,7 @@ from django.db.models.functions import (
     Concat,
 )
 from django.utils import timezone
+from fastapi import HTTPException
 from furl import furl
 
 import gooey_ui as st
@@ -26,11 +27,13 @@ from bots.models import (
     FeedbackQuerySet,
     MessageQuerySet,
 )
-from daras_ai_v2.base import BasePage, MenuTabs
+from daras_ai_v2 import settings
+from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
 )
+from gooey_ui import RedirectException
 from recipes.VideoBots import VideoBotsPage
 
 ID_COLUMNS = [
@@ -53,37 +56,41 @@ class VideoBotsStatsPage(BasePage):
 
         self.bi = None
 
-    def _get_current_app_url(self):
-        # this is overwritten to include the query params in the copied url for the share button
-        args = dict(self.request.query_params)
-        return furl(self.app_url(), args=args).tostr()
+    def current_app_url(
+        self,
+        tab: RecipeTabs = RecipeTabs.run,
+        query_params: dict = None,
+        path_params: dict = None,
+    ) -> str:
+        return str(furl(settings.APP_BASE_URL) / self.request.url.path)
 
-    def show_title_breadcrumb_share(self, run_title, run_url, bi):
-        if bi.published_run and bi.published_run.published_run_id:
-            # internally treat the stats page as belonging to a specific publish run
-            # this way, links like get_tab_url will point to the example
-            # note that Sean does not want the run url here
-            st.threadlocal.query_params |= dict(
-                example_id=bi.published_run.published_run_id
-            )
-
+    def show_title_breadcrumb_share(
+        self, bi: BotIntegration, run_title: str, run_url: str
+    ):
         with st.div(className="d-flex justify-content-between mt-4"):
             with st.div(className="d-lg-flex d-block align-items-center"):
                 with st.tag("div", className="me-3 mb-1 mb-lg-0 py-2 py-lg-0"):
                     with st.breadcrumbs():
+                        metadata = VideoBotsPage.workflow.get_or_create_metadata()
                         st.breadcrumb_item(
-                            VideoBotsPage.workflow.get_or_create_metadata().short_title,
+                            metadata.short_title,
                             link_to=VideoBotsPage.app_url(),
                             className="text-muted",
                         )
-                        st.breadcrumb_item(
-                            run_title,
-                            link_to=run_url,
-                            className="text-muted",
-                        )
+                        if not (bi.published_run_id and bi.published_run.is_root()):
+                            st.breadcrumb_item(
+                                run_title,
+                                link_to=run_url,
+                                className="text-muted",
+                            )
                         st.breadcrumb_item(
                             "Integrations",
-                            link_to=VideoBotsPage().get_tab_url(MenuTabs.integrations),
+                            link_to=VideoBotsPage.current_app_url(
+                                RecipeTabs.integrations,
+                                path_params=dict(
+                                    integration_id=bi.api_integration_id()
+                                ),
+                            ),
                         )
 
                 author = (
@@ -116,35 +123,54 @@ class VideoBotsStatsPage(BasePage):
             )
             return
         if self.is_current_user_admin():
-            bot_integrations = BotIntegration.objects.all().order_by(
-                "platform", "-created_at"
-            )
+            bi_qs = BotIntegration.objects.all().order_by("platform", "-created_at")
         else:
-            bot_integrations = BotIntegration.objects.filter(
+            bi_qs = BotIntegration.objects.filter(
                 billing_account_uid=self.request.user.uid
             ).order_by("platform", "-created_at")
 
-        if bot_integrations.count() == 0:
+        if not bi_qs.exists():
             st.write(
                 "**Please connect a bot to a platform to view stats for your bot integrations or login to an account with connected bot integrations**"
             )
             return
 
-        allowed_bids = [bi.id for bi in bot_integrations]
-        bid = self.request.query_params.get("bi_id", allowed_bids[0])
-        if int(bid) not in allowed_bids:
-            bid = allowed_bids[0]
-        self.bi = bi = BotIntegration.objects.get(id=bid)
-        has_analysis_run = bi.analysis_run is not None
-        run_title, run_url = self.parse_run_info(bi)
+        bi_id = self.request.query_params.get("bi_id") or st.session_state.get("bi_id")
+        try:
+            self.bi = bi = bi_qs.get(id=bi_id)
+        except BotIntegration.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Bot Integration not found")
 
-        self.show_title_breadcrumb_share(run_title, run_url, bi)
+        # for backwards compatibility with old urls
+        if self.request.query_params.get("bi_id"):
+            raise RedirectException(
+                str(
+                    furl(
+                        VideoBotsPage.app_url(
+                            tab=RecipeTabs.integrations,
+                            example_id=(
+                                bi.published_run and bi.published_run.published_run_id
+                            ),
+                            path_params=dict(integration_id=bi.api_integration_id()),
+                        )
+                    )
+                    / "stats/"
+                )
+            )
+
+        has_analysis_run = bi.analysis_run is not None
+        run_url = VideoBotsPage.current_app_url()
+        if bi.published_run_id:
+            run_title = bi.published_run.title
+        else:
+            run_title = bi.saved_run.page_title  # this is mostly for backwards compat
+        self.show_title_breadcrumb_share(bi, run_title, run_url)
 
         col1, col2 = st.columns([1, 2])
 
         with col1:
             conversations, messages = self.calculate_overall_stats(
-                bid, bi, run_title, run_url
+                bi, run_title, run_url
             )
 
             (
@@ -162,7 +188,6 @@ class VideoBotsStatsPage(BasePage):
         if df.empty or "date" not in df.columns:
             st.write("No data to show yet.")
             self.update_url(
-                bid,
                 view,
                 st.session_state.get("details"),
                 start_date,
@@ -293,24 +318,23 @@ class VideoBotsStatsPage(BasePage):
         else:
             st.write("No data to show yet.")
 
-        self.update_url(bid, view, details, start_date, end_date, sort_by)
+        self.update_url(view, details, start_date, end_date, sort_by)
 
     # we store important inputs in the url so the user can return to the same view (e.g. bookmark it)
     # this also allows them to share the url (once organizations are supported)
     # and allows us to share a url to a specific view with users
-    def update_url(self, bid, view, details, start_date, end_date, sort_by):
-        new_url = furl(
-            self.app_url(),
-            args={
-                "bi_id": bid,
-                "view": view,
-                "details": details,
-                "start_date": start_date.strftime("%Y-%m-%d"),
-                "end_date": end_date.strftime("%Y-%m-%d"),
-                "sort_by": sort_by,
-            },
-        ).tostr()
-        st.change_url(new_url, self.request)
+    def update_url(self, view, details, start_date, end_date, sort_by):
+        f = furl(str(self.request.url))
+        new_query_params = {
+            "view": view or "",
+            "details": details or "",
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "end_date": end_date.strftime("%Y-%m-%d"),
+            "sort_by": sort_by or "",
+        }
+        if f.query.params == new_query_params:
+            return
+        raise RedirectException(str(f.set(query_params=new_query_params)))
 
     def render_date_view_inputs(self, bi):
         if st.checkbox("Show All"):
@@ -371,23 +395,9 @@ class VideoBotsStatsPage(BasePage):
             trunc_fn = TruncYear
         return start_date, end_date, view, factor, trunc_fn
 
-    def parse_run_info(self, bi):
-        saved_run = bi.get_active_saved_run()
-        run_url = None
-        if bi.published_run_id:
-            run_title = bi.published_run.title
-            run_url = bi.published_run.get_app_url()
-        elif saved_run:
-            run_title = saved_run.page_title or "This Copilot Run"
-        else:
-            run_title = "No Run Connected"
-        if saved_run and not run_url:
-            run_url = saved_run.get_app_url()
-        return run_title, run_url
-
-    def calculate_overall_stats(self, bid, bi, run_title, run_url):
+    def calculate_overall_stats(self, bi, run_title, run_url):
         conversations: ConversationQuerySet = Conversation.objects.filter(
-            bot_integration__id=bid
+            bot_integration=bi
         ).order_by()  # type: ignore
         # due to things like personal convos for slack, each user can have multiple conversations
         users = conversations.get_unique_users().order_by()

@@ -1,10 +1,10 @@
 from daras_ai_v2.language_model import LargeLanguageModels
 from usage_costs.models import ModelSku, ModelCategory, ModelProvider, ModelPricing
 
+category = ModelCategory.LLM
+
 
 def run():
-    category = ModelCategory.LLM
-
     # GPT-4-Turbo
 
     for model in ["gpt-4-0125-preview", "gpt-4-1106-preview"]:
@@ -376,6 +376,16 @@ def run():
 
     # Gemini
 
+    llm_pricing_create(
+        model_id="gemini-1.5-pro-preview-0409",
+        model_name=LargeLanguageModels.gemini_1_5_pro.name,
+        unit_cost_input=0.0025,
+        unit_cost_output=0.0075,
+        unit_quantity=1000,
+        provider=ModelProvider.google,
+        pricing_url="https://cloud.google.com/vertex-ai/docs/generative-ai/pricing#text_generation",
+    )
+
     ModelPricing.objects.get_or_create(
         model_id="gemini-1.0-pro",
         sku=ModelSku.llm_prompt,
@@ -478,29 +488,97 @@ def run():
         ),
     )
 
-    # Llama2
+    # groq
 
+    llm_pricing_create(
+        model_id="llama2-70b-4096",
+        model_name=LargeLanguageModels.llama2_70b_chat.name,
+        unit_cost_input=0.7,
+        unit_cost_output=0.8,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
+    )
+    llm_pricing_create(
+        model_id="mixtral-8x7b-32768",
+        model_name=LargeLanguageModels.mixtral_8x7b_instruct_0_1.name,
+        unit_cost_input=0.27,
+        unit_cost_output=0.27,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
+    )
+    llm_pricing_create(
+        model_id="gemma-7b-it",
+        model_name=LargeLanguageModels.gemma_7b_it.name,
+        unit_cost_input=0.1,
+        unit_cost_output=0.1,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
+    )
+
+    # Claude
+
+    llm_pricing_create(
+        model_id="claude-3-opus-20240229",
+        model_name=LargeLanguageModels.claude_3_opus.name,
+        unit_cost_input=15,
+        unit_cost_output=75,
+        unit_quantity=10**6,
+        provider=ModelProvider.anthropic,
+        pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
+    )
+    llm_pricing_create(
+        model_id="claude-3-sonnet-20240229",
+        model_name=LargeLanguageModels.claude_3_sonnet.name,
+        unit_cost_input=3,
+        unit_cost_output=15,
+        unit_quantity=10**6,
+        provider=ModelProvider.anthropic,
+        pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
+    )
+    llm_pricing_create(
+        model_id="claude-3-haiku-20240307",
+        model_name=LargeLanguageModels.claude_3_haiku.name,
+        unit_cost_input=0.25,
+        unit_cost_output=1.25,
+        unit_quantity=10**6,
+        provider=ModelProvider.anthropic,
+        pricing_url="https://docs.anthropic.com/claude/docs/models-overview#model-comparison",
+    )
+
+
+def llm_pricing_create(
+    model_id: str,
+    model_name: str,
+    unit_cost_input: float,
+    unit_cost_output: float,
+    unit_quantity: int,
+    provider: ModelProvider,
+    pricing_url: str,
+):
     ModelPricing.objects.get_or_create(
-        model_id="togethercomputer/llama-2-70b-chat",
+        model_id=model_id,
         sku=ModelSku.llm_prompt,
         defaults=dict(
-            model_name=LargeLanguageModels.llama2_70b_chat.name,
-            unit_cost=0.9,
-            unit_quantity=10**6,
+            model_name=model_name,
+            unit_cost=unit_cost_input,
+            unit_quantity=unit_quantity,
             category=category,
-            provider=ModelProvider.together_ai,
-            pricing_url="https://www.together.ai/pricing",
+            provider=provider,
+            pricing_url=pricing_url,
         ),
     )
     ModelPricing.objects.get_or_create(
-        model_id="togethercomputer/llama-2-70b-chat",
+        model_id=model_id,
         sku=ModelSku.llm_completion,
         defaults=dict(
-            model_name=LargeLanguageModels.llama2_70b_chat.name,
-            unit_cost=0.9,
-            unit_quantity=10**6,
+            model_name=model_name,
+            unit_cost=unit_cost_output,
+            unit_quantity=unit_quantity,
             category=category,
-            provider=ModelProvider.together_ai,
-            pricing_url="https://www.together.ai/pricing",
+            provider=provider,
+            pricing_url=pricing_url,
         ),
     )

@@ -169,10 +169,6 @@ def caption(body: str, className: str = None, **props):
     markdown(body, className=className, **props)
 
 
-def option_menu(*args, options, **kwargs):
-    return tabs(options)
-
-
 def tabs(labels: list[str]) -> list[state.NestingCtx]:
     parent = state.RenderTreeNode(
         name="tabs",
@@ -973,29 +969,3 @@ def js(src: str, **kwargs):
             args=kwargs,
         ),
     ).mount()
-
-
-def change_url(url: str, request):
-    """Change the url of the page, without reloading the page. Only for urls on the current domain due to browser security policies."""
-    # this is useful to store certain state inputs in the url to allow for sharing/returning to a state
-    old_url = furl(request.url).remove(origin=True).tostr()
-    url = furl(url).remove(origin=True).tostr()
-    if old_url == url:
-        return
-    # the request is likely processing which means it will overwrite the url we set once it is done
-    # so we set up a timer to keep setting the url until the request is done at which point we stop
-    js(
-        f"""
-        setTimeout(() => window.history.replaceState(null, '', '{url}'));
-        function change_url() {{
-            if (window.location.href.replace(window.location.origin, "") == '{old_url}') {{
-                clearInterval(window._change_url_timer);
-            }}
-            window.history.replaceState(null, '', '{url}');
-        }}
-        clearInterval(window._change_url_timer);
-        if (window.location.href.replace(window.location.origin, "") != '{url}') {{
-            window._change_url_timer = setInterval(change_url, 100);
-        }}
-        """,
-    )

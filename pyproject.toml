@@ -4,6 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Dev Aggarwal <devxpy@gmail.com>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
@@ -83,6 +84,7 @@ aifail = "0.2.0"
 pytest-playwright = "^0.4.3"
 emoji = "^2.10.1"
 pyvespa = "^0.39.0"
+anthropic = "^0.25.5"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"

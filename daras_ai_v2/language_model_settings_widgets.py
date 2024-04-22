@@ -32,7 +32,7 @@ How many answers should the copilot generate? Additional answer outputs increase
         show_selector
         and not LargeLanguageModels[
             st.session_state.get("selected_model") or LargeLanguageModels.gpt_4.name
-        ].is_chat_model()
+        ].is_chat_model
     ):
         with col2:
             st.slider(

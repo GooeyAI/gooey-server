@@ -14,7 +14,6 @@ from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
     LargeLanguageModels,
     run_language_model,
-    model_max_tokens,
     calc_gpt_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import language_model_settings
@@ -220,14 +219,14 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
     )
 
     # to merge 2 outputs, we need to have at least 1/3 of the max tokens available
-    max_tokens_bound = (model_max_tokens[model] - prompt_token_count) // 3
+    max_tokens_bound = (model.context_window - prompt_token_count) // 3
     assert request.max_tokens <= max_tokens_bound, (
         f"To summarize accurately, output size must be at max {max_tokens_bound} for {model.value}, "
         f"but got {request.max_tokens}. Please reduce the output size."
     )
 
-    # logic: model max tokens = prompt + output + document chunk
-    chunk_size = model_max_tokens[model] - (prompt_token_count + request.max_tokens)
+    # logic: model context window = prompt + output + document chunk
+    chunk_size = model.context_window - (prompt_token_count + request.max_tokens)
     docs = text_splitter(
         full_text,
         chunk_size=chunk_size,

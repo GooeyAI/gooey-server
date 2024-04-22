@@ -68,14 +68,6 @@ TAPPED_SKIP_MSG = "🌱 Alright. What else can I help you with?"
 SLACK_MAX_SIZE = 3000
 
 
-async def request_json(request: Request):
-    return await request.json()
-
-
-async def request_urlencoded_body(request: Request):
-    return parse_qs((await request.body()).decode("utf-8"))
-
-
 class ButtonPressed(BaseModel):
     button_id: str = Field(
         description="The ID of the button that was pressed by the user"

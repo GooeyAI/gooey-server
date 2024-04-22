@@ -20,9 +20,7 @@ from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
     run_language_model,
     LargeLanguageModels,
-    llm_price,
 )
-from daras_ai_v2.language_model_settings_widgets import language_model_settings
 from daras_ai_v2.prompt_vars import render_prompt_vars
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
@@ -305,7 +303,7 @@ Here's what you uploaded:
 
     def get_raw_price(self, state: dict) -> float:
         try:
-            price = llm_price[LargeLanguageModels[state["selected_model"]]]
+            price = LargeLanguageModels[state["selected_model"]].price
         except KeyError:
             price = 1
         nprompts = len(state.get("eval_prompts") or {}) or 1

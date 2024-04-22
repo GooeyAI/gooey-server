@@ -49,6 +49,8 @@ class ModelProvider(models.IntegerChoices):
     google = 2, "Google"
     together_ai = 3, "TogetherAI"
     azure_openai = 4, "Azure OpenAI"
+    anthropic = 6, "Anthropic"
+    groq = 7, "groq"
 
     aks = 5, "Azure Kubernetes Service"
 

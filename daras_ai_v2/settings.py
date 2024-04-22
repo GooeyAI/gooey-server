@@ -351,3 +351,6 @@ PAYPAL_BASE = config("PAYPAL_BASE", "")
 VESPA_URL = config("VESPA_URL", "http://localhost:8085")
 VESPA_CONFIG_SERVER_URL = config("VESPA_CONFIG_SERVER_URL", "http://localhost:19071")
 VESPA_SCHEMA = config("VESPA_SCHEMA", "gooey")
+
+ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", "")
+os.environ["ANTHROPIC_API_KEY"] = ANTHROPIC_API_KEY

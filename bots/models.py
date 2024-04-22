@@ -110,20 +110,6 @@ class Workflow(models.IntegerChoices):
         metadata = self.get_or_create_metadata()
         return metadata.short_title
 
-    def get_app_url(self, example_id: str, run_id: str, uid: str, run_slug: str = ""):
-        """return the url to the gooey app"""
-        query_params = {}
-        if run_id and uid:
-            query_params |= dict(run_id=run_id, uid=uid)
-        if example_id:
-            query_params |= dict(example_id=example_id)
-        return str(
-            furl(settings.APP_BASE_URL, query_params=query_params)
-            / self.page_cls.slug_versions[-1]
-            / run_slug
-            / "/"
-        )
-
     @property
     def page_cls(self) -> typing.Type["BasePage"]:
         from daras_ai_v2.all_pages import workflow_map
@@ -285,8 +271,9 @@ class SavedRun(models.Model):
         return self.parent_version and self.parent_version.published_run
 
     def get_app_url(self):
-        workflow = Workflow(self.workflow)
-        return workflow.get_app_url(self.example_id, self.run_id, self.uid)
+        return Workflow(self.workflow).page_cls.app_url(
+            example_id=self.example_id, run_id=self.run_id, uid=self.uid
+        )
 
     def to_dict(self) -> dict:
         from daras_ai_v2.base import StateKeys
@@ -1463,11 +1450,8 @@ class PublishedRun(models.Model):
         )
 
     def get_app_url(self):
-        return Workflow(self.workflow).get_app_url(
-            example_id=self.published_run_id,
-            run_id="",
-            uid="",
-            run_slug=self.title and slugify(self.title),
+        return Workflow(self.workflow).page_cls.app_url(
+            example_id=self.published_run_id
         )
 
     def add_version(
