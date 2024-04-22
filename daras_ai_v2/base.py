@@ -1966,8 +1966,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return txn, amount
 
     def get_price_roundoff(self, state: dict) -> int:
+        multiplier = self.workflow.get_or_create_metadata().price_multiplier
+        price = math.ceil(float(self.get_raw_price(state)) * multiplier)
         # don't allow fractional pricing for now, min 1 credit
-        return max(1, math.ceil(self.get_raw_price(state)))
+        return max(1, price)
 
     def get_raw_price(self, state: dict) -> float:
         return self.price * (state.get("num_outputs") or 1)
@@ -1986,7 +1988,7 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         ).aggregate(total=Sum("dollar_amount"))["total"]
         if not dollar_amt:
             return default
-        return math.ceil(dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR)
+        return dollar_amt * settings.ADDON_CREDITS_PER_DOLLAR
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:

@@ -24,7 +24,6 @@ if typing.TYPE_CHECKING:
 CHATML_ROLE_USER = "user"
 CHATML_ROLE_ASSISSTANT = "assistant"
 
-
 EPOCH = datetime.datetime.utcfromtimestamp(0)
 
 
@@ -155,6 +154,7 @@ class WorkflowMetadata(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    price_multiplier = models.FloatField(default=1)
 
     def __str__(self):
         return self.meta_title
