@@ -10,7 +10,6 @@ from itertools import pairwise
 from random import Random
 from time import sleep
 from types import SimpleNamespace
-from decimal import Decimal
 
 import sentry_sdk
 from django.db.models import Sum
@@ -33,7 +32,6 @@ from bots.models import (
     PublishedRunVersion,
     PublishedRunVisibility,
     Workflow,
-    WorkflowMetadata,
 )
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings, urls
@@ -1968,14 +1966,10 @@ We’re always on <a href="{settings.DISCORD_INVITE_URL}" target="_blank">discor
         return txn, amount
 
     def get_price_roundoff(self, state: dict) -> int:
+        multiplier = self.workflow.get_or_create_metadata().price_multiplier
+        price = math.ceil(float(self.get_raw_price(state)) * multiplier)
         # don't allow fractional pricing for now, min 1 credit
-        current_run, published_run = self.get_runs_from_query_params(
-            *extract_query_params(gooey_get_query_params())
-        )
-        multiplier = WorkflowMetadata.objects.get(
-            workflow=current_run.workflow
-        ).price_multiplier
-        return max(1, math.ceil(float(self.get_raw_price(state)) * multiplier))
+        return max(1, price)
 
     def get_raw_price(self, state: dict) -> float:
         return self.price * (state.get("num_outputs") or 1)
