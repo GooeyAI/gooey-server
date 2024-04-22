@@ -6,7 +6,7 @@ from pydantic import BaseModel, HttpUrl
 import gooey_ui as st
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.lipsync_api import wav2lip, sadtalker
+from daras_ai_v2.lipsync_api import wav2lip, sadtalker, SadtalkerInput
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
 
@@ -57,7 +57,7 @@ class LipsyncPage(BasePage):
     def preview_image(self, state: dict) -> str | None:
         return DEFAULT_LIPSYNC_META_IMG
 
-    def render_form_v2(self) -> bool:
+    def render_form_v2(self):
         st.file_uploader(
             """
             #### Input Face
@@ -92,31 +92,33 @@ class LipsyncPage(BasePage):
                 face=request.input_face,
                 audio=request.input_audio,
                 pads=(
-                    request.face_padding_top,
-                    request.face_padding_bottom,
-                    request.face_padding_left,
-                    request.face_padding_right,
+                    request.face_padding_top or 0,
+                    request.face_padding_bottom or 0,
+                    request.face_padding_left or 0,
+                    request.face_padding_right or 0,
                 ),
             )
         elif request.lipsync_model == LipsyncModel.SadTalker.name:
             yield "Running SadTalker..."
             state["output_video"] = sadtalker(
-                source_image=request.input_face,
-                driven_audio=request.input_audio,
-                pose_style=request.pose_style,
-                ref_eyeblink=request.ref_eyeblink,
-                ref_pose=request.ref_pose,
-                batch_size=request.batch_size,
-                size=request.size,
-                expression_scale=request.expression_scale,
-                input_yaw=request.input_yaw,
-                input_pitch=request.input_pitch,
-                input_roll=request.input_roll,
-                enhancer=request.enhancer,
-                background_enhancer=request.background_enhancer,
-                face3dvis=request.face3dvis,
-                still=request.still,
-                preprocess=request.preprocess,
+                SadtalkerInput(
+                    source_image=request.input_face,
+                    driven_audio=request.input_audio,
+                    pose_style=request.pose_style,
+                    ref_eyeblink=request.ref_eyeblink,
+                    ref_pose=request.ref_pose,
+                    batch_size=request.batch_size,
+                    size=request.size,
+                    expression_scale=request.expression_scale,
+                    input_yaw=request.input_yaw,
+                    input_pitch=request.input_pitch,
+                    input_roll=request.input_roll,
+                    enhancer=request.enhancer,
+                    background_enhancer=request.background_enhancer,
+                    face3dvis=request.face3dvis,
+                    still=request.still,
+                    preprocess=request.preprocess,
+                )
             )
         else:
             raise ValueError("Invalid Lipsync Model")
@@ -172,31 +174,3 @@ class LipsyncPage(BasePage):
             3 if state.get("lipsync_model") == LipsyncModel.SadTalker.name else 1
         )
         return total_mb * CREDITS_PER_MB * multiplier
-
-    def download_blob(self, bucket_name, source_blob_name, destination_file_name):
-        """Downloads a blob from the bucket."""
-        # The ID of your GCS bucket
-        # bucket_name = "your-bucket-name"
-
-        # The ID of your GCS object
-        # source_blob_name = "storage-object-name"
-
-        # The path to which the file should be downloaded
-        # destination_file_name = "local/path/to/file"
-
-        storage_client = storage.Client()
-
-        bucket = storage_client.bucket(bucket_name)
-
-        # Construct a client side representation of a blob.
-        # Note `Bucket.blob` differs from `Bucket.get_blob` as it doesn't retrieve
-        # any content from Google Cloud Storage. As we don't need additional data,
-        # using `Bucket.blob` is preferred here.
-        blob = bucket.blob(source_blob_name)
-        blob.download_to_filename(destination_file_name)
-
-        print(
-            "Downloaded storage object {} from bucket {} to local file {}.".format(
-                source_blob_name, bucket_name, destination_file_name
-            )
-        )

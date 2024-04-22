@@ -3,49 +3,34 @@ from loguru import logger
 from daras_ai_v2.exceptions import UserError, GPUError
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 
-from pydantic import HttpUrl
+from pydantic import BaseModel, HttpUrl
+import typing
 
 
-def sadtalker(
-    *,
-    source_image: HttpUrl,
-    driven_audio: HttpUrl,
-    pose_style: int,
-    ref_eyeblink: HttpUrl | None = None,
-    ref_pose: HttpUrl | None = None,
-    batch_size: int = 2,
-    size: int = 256,
-    expression_scale: float = 1.0,
-    input_yaw: list[int] | None = None,
-    input_pitch: list[int] | None = None,
-    input_roll: list[int] | None = None,
-    enhancer: str | None = None,
-    background_enhancer: str | None = None,
-    face3dvis: bool = False,
-    still: bool = False,
-    preprocess: str = "crop",
-):
+class SadtalkerInput(BaseModel):
+    source_image: HttpUrl
+    driven_audio: HttpUrl
+    pose_style: int
+    ref_eyeblink: HttpUrl | None = None
+    ref_pose: HttpUrl | None = None
+    batch_size: int = 2
+    size: int = 256
+    expression_scale: float = 1.0
+    input_yaw: list[int] | None = None
+    input_pitch: list[int] | None = None
+    input_roll: list[int] | None = None
+    enhancer: typing.Literal["gfpgan", "RestoreFormer"] | None = None
+    background_enhancer: typing.Literal["realesrgan"] | None = None
+    face3dvis: bool = False
+    still: bool = False
+    preprocess: typing.Literal["crop", "extcrop", "resize", "full", "extfull"] = "crop"
+
+
+def sadtalker(input: SadtalkerInput):
     return call_celery_task_outfile(
         "lipsync.sadtalker",
         pipeline=dict(model_id="sadtalker"),
-        inputs=dict(
-            source_image=source_image,
-            driven_audio=driven_audio,
-            pose_style=pose_style,
-            ref_eyeblink=ref_eyeblink,
-            ref_pose=ref_pose,
-            batch_size=batch_size,
-            size=size,
-            expression_scale=expression_scale,
-            input_yaw=input_yaw,
-            input_pitch=input_pitch,
-            input_roll=input_roll,
-            enhancer=enhancer,
-            background_enhancer=background_enhancer,
-            face3dvis=face3dvis,
-            still=still,
-            preprocess=preprocess,
-        ),
+        inputs=input.dict(),
         content_type="video/mp4",
         filename=f"gooey.ai lipsync.mp4",
     )[0]
