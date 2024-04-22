@@ -198,7 +198,7 @@ def canonical_url_for_page(
             kwargs = {"example_id": pr.published_run_id}
         else:
             kwargs = {"run_id": sr.run_id, "uid": sr.uid}
-    return page.app_url(page.tab, **kwargs)
+    return page.app_url(tab=page.tab, **kwargs)
 
 
 def robots_tag_for_page(

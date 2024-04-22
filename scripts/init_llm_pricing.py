@@ -491,6 +491,24 @@ def run():
     # groq
 
     llm_pricing_create(
+        model_id="llama3-70b-8192",
+        model_name=LargeLanguageModels.llama3_70b.name,
+        unit_cost_input=0.59,
+        unit_cost_output=0.79,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
+    )
+    llm_pricing_create(
+        model_id="llama3-8b-8192",
+        model_name=LargeLanguageModels.llama3_8b.name,
+        unit_cost_input=0.05,
+        unit_cost_output=0.1,
+        unit_quantity=10**6,
+        provider=ModelProvider.groq,
+        pricing_url="https://wow.groq.com/",
+    )
+    llm_pricing_create(
         model_id="llama2-70b-4096",
         model_name=LargeLanguageModels.llama2_70b_chat.name,
         unit_cost_input=0.7,

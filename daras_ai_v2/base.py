@@ -157,6 +157,7 @@ class BasePage:
     @classmethod
     def app_url(
         cls,
+        *,
         tab: RecipeTabs = None,
         example_id: str = None,
         run_id: str = None,
@@ -745,7 +746,7 @@ class BasePage:
 
         with st.expander("🛠️ Admin Options"):
             st.write(
-                f"This will hide/show this workflow from {self.app_url(RecipeTabs.examples)}  \n"
+                f"This will hide/show this workflow from {self.app_url(tab=RecipeTabs.examples)}  \n"
                 f"(Given that you have set public visibility above)"
             )
             if st.session_state.get("--toggle-approve-example"):
@@ -1579,7 +1580,10 @@ Run cost = <a href="{self.get_credits_click_url()}">{self.get_price_roundoff(st.
         account_url = furl(settings.APP_BASE_URL) / "account/"
         if self.request.user.is_anonymous:
             account_url.query.params["next"] = self.app_url(
-                example_id, run_id, uid, query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
+                example_id=example_id,
+                run_id=run_id,
+                uid=uid,
+                query_params={SUBMIT_AFTER_LOGIN_Q: "1"},
             )
             # language=HTML
             error_msg = f"""

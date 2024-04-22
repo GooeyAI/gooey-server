@@ -162,7 +162,7 @@ Summarize and score every row of any CSV, google sheet or excel with GPT4 (or an
     def related_workflows(self) -> list:
         from recipes.BulkRunner import BulkRunnerPage
         from recipes.VideoBots import VideoBotsPage
-        from recipes.asr import AsrPage
+        from recipes.asr_page import AsrPage
         from recipes.DocSearch import DocSearchPage
 
         return [BulkRunnerPage, VideoBotsPage, AsrPage, DocSearchPage]

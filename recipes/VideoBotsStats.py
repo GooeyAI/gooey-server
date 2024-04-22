@@ -529,9 +529,12 @@ class VideoBotsStatsPage(BasePage):
         successfully_answered = (
             Message.objects.filter(
                 conversation__bot_integration=bi,
-                analysis_result__contains={"Answered": True},
                 created_at__date__gte=start_date,
                 created_at__date__lte=end_date,
+            )
+            .filter(
+                Q(analysis_result__contains={"Answered": True})
+                | Q(analysis_result__contains={"assistant": {"answer": "Found"}}),
             )
             .order_by()
             .annotate(date=trunc_fn("created_at"))
