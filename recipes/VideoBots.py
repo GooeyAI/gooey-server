@@ -692,7 +692,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if state.get("input_face"):
             total += 1
 
-        return total * state.get("num_outputs", 1)
+        return total
 
     def additional_notes(self):
         try:
