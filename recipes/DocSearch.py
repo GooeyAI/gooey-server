@@ -1,3 +1,4 @@
+import math
 import typing
 
 from furl import furl
@@ -223,7 +224,7 @@ class DocSearchPage(BasePage):
             model = LargeLanguageModels[st.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
-        return f" \\\n*Breakdown: {self.get_total_linked_usage_cost_in_credits()} ({model}) + {self.PROFIT_CREDITS}/run*"
+        return f" \\\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
 
 
 def render_documents(state, label="**Documents**", *, key="documents"):

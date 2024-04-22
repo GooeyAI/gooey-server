@@ -1,4 +1,5 @@
 import json
+import math
 import mimetypes
 import typing
 
@@ -699,7 +700,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             model = LargeLanguageModels[st.session_state["selected_model"]].value
         except KeyError:
             model = "LLM"
-        notes = f" \\\n*Breakdown: {self.get_total_linked_usage_cost_in_credits()} ({model}) + {self.PROFIT_CREDITS}/run*"
+        notes = f" \\\n*Breakdown: {math.ceil(self.get_total_linked_usage_cost_in_credits())} ({model}) + {self.PROFIT_CREDITS}/run*"
 
         if (
             st.session_state.get("tts_provider")
