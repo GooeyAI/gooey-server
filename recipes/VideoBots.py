@@ -161,6 +161,12 @@ class VideoBotsPage(BasePage):
         "use_url_shortener": False,
         "dense_weight": 1.0,
         "translation_model": TranslationModels.google.name,
+        # lipsync
+        "lipsync_model": "Wav2Lip",
+        "face_padding_top": 0,
+        "face_padding_bottom": 10,
+        "face_padding_left": 0,
+        "face_padding_right": 0,
     }
 
     class RequestModel(BaseModel):
