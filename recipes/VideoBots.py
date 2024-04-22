@@ -220,8 +220,8 @@ class VideoBotsPage(BasePage):
         sampling_temperature: float | None
 
         # lipsync
-        lipsync_model: str
-        input_face: str
+        lipsync_model: str = "Wav2Lip"
+        input_face: str | None
         # wav2lip settings
         face_padding_top: int | None
         face_padding_bottom: int | None
